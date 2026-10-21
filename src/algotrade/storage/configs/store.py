@@ -61,6 +61,11 @@ class ConfigStore(Protocol):
 
     def users(self) -> list[str]: ...
 
+    def generation(self, user: str) -> int:
+        """``user``'s config generation (``generation.py``): moves with every write of the user's
+        configs; odd while one is in flight, so only an even value may key a cached answer."""
+        ...
+
     def overrides(self, name: str) -> list[dict[str, str]]:
         """Curated site corrections (``config/site/overrides/<name>.csv``); [] if absent."""
         ...
@@ -110,6 +115,9 @@ class OverlayConfigStore:
 
     def users(self) -> list[str]:
         return self._base.users()
+
+    def generation(self, user: str) -> int:
+        return self._base.generation(user)
 
     def overrides(self, name: str) -> list[dict[str, str]]:
         return self._base.overrides(name)

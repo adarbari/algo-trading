@@ -38,6 +38,7 @@ from algotrade_api.graphql.offload import (
 from algotrade_api.graphql.response_cache import (
     CLOSED_SESSION_OPERATIONS,
     RUN_OPERATIONS,
+    SHARED_OPERATIONS,
     TODAY_OPERATIONS,
     OperationLog,
     ResponseCache,
@@ -77,6 +78,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         *args: Any,
         seq: Callable[[], int],
         epoch: WriteEpoch,
+        config_generation: Callable[[str], int | None],
         cache: ResponseCache,
         admission: Admission,
         runs: Callable[[], tuple[int, int]],
@@ -92,6 +94,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         self._revalidating: dict[str, asyncio.Task[None]] = {}
         self._seq, self._epoch, self._cache, self._admission = seq, epoch, cache, admission
         self._runs, self._closed, self._served = runs, closed, served
+        self._config_generation = config_generation
 
     async def process_result(
         self, request: Request, result: ExecutionResult
@@ -110,12 +113,12 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             document, variables = parsed
             self._log.note(viewer, document, variables)
             key = await self._key(viewer, document, variables)
-            body = self._cache.get(key)
+            body = self._cache.get(key) if key is not None else None
             if body is not None:
                 return await _served(body, request)
-            stale = self._cache.get_stale(key)
-            if stale is not None:  # stale-while-revalidate: answer now, recompute behind it
-                self._revalidate(key, Served(viewer, document, variables))
+            stale = self._cache.get_stale(key) if key is not None else None
+            if stale is not None and key is not None:  # stale-while-revalidate: answer now,
+                self._revalidate(key, Served(viewer, document, variables))  # recompute behind it
                 return await _served(stale, request)
         inline = parsed is not None and only_inline(cast(Hashable, self.schema), parsed[0])
         if not inline:
@@ -132,10 +135,21 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             return await _served(packed, request)
         return response
 
-    async def _key(self, viewer: UserRecord, document: str, variables: Any) -> str:
-        """The cache key of this operation for ``viewer`` now; every state the answer depends on
-        is read before it is computed (ADR 0022)."""
+    def _generation(self, viewer: UserRecord, name: str | None) -> int | None:
+        """The viewer's config generation, read before the answer is computed; ``None`` when a
+        write of theirs is in flight or the counter cannot be read: nothing is cached then
+        (ADR 0077 decision 15)."""
+        if name in SHARED_OPERATIONS:
+            return 0
+        return self._config_generation(viewer.user_id)
+
+    async def _key(self, viewer: UserRecord, document: str, variables: Any) -> str | None:
+        """The cache key of this operation for ``viewer`` now (``None``: not cacheable at this
+        moment); every state the answer depends on is read before it is computed (ADR 0022)."""
         name = operation_name(document)
+        generation = self._generation(viewer, name)
+        if generation is None:
+            return None
         served = await off_loop(self._served)  # resolved once per publish / saved record
         return response_key(
             self._seq(),
@@ -148,6 +162,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             self._closed() if name in CLOSED_SESSION_OPERATIONS else None,
             served,
             exchange_date(datetime.now(UTC)) if name in TODAY_OPERATIONS else None,
+            generation,
         )
 
     def _revalidate(self, key: str, op: Served) -> None:
@@ -178,6 +193,8 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         left alone. False when it was skipped or refused (a busy pool), None when it failed (never
         kept)."""
         key = await self._key(op.viewer, op.document, op.variables)
+        if key is None:  # a write of the caller's is in flight: nothing to keep
+            return False
         if only_missing and self._cache.get(key) is not None:
             return False
         context = RequestContext(self._opener, op.viewer, self._stores_opener)
@@ -270,11 +287,13 @@ def graphql_router(
     closed: Callable[[], date] = lambda: last_closed_session(datetime.now(UTC)),
     served: Callable[[], str] = lambda: "",
     log: OperationLog | None = None,
+    config_generation: Callable[[str], int | None] = lambda user: 0,
 ) -> CachingRouter:
     """``POST /graphql`` over the read contexts ``opener`` opens (one per requested session,
     per request) and the session-free one ``stores`` opens (configs, run records); the
     GraphiQL IDE at ``GET /graphql`` only when ``debug``. ``seq`` is the published state
     (``StoreReader.visible_seq``) the response cache keys on; ``epoch`` the writes served,
+    ``config_generation`` a user's durable config counter (ADR 0077 decision 15),
     ``runs`` the runs generation (``StoreReader.runs_generation``) and ``closed`` the last
     closed session, which the keys of the run-dependent operations hold; ``served`` the token of
     the default session (``served_token``) every key holds (ADR 0062)."""
@@ -287,6 +306,7 @@ def graphql_router(
         tags=["graphql"],
         seq=seq,
         epoch=epoch if epoch is not None else WriteEpoch(),
+        config_generation=config_generation,
         cache=cache if cache is not None else ResponseCache(),
         admission=admission if admission is not None else Admission(),
         runs=runs,
