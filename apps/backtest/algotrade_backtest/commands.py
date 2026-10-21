@@ -373,13 +373,25 @@ def _evaluate_edges_pooled(
         data_url(args.data_url), str(config_dir(args.config_dir)),
         None if scratch is None else str(scratch), shared,
     )  # fmt: skip
-    tasks = [EdgeTask(e.id, e.owner, _edge_params(e, args, start, end, as_of)) for e in edges]
+    failed = False
     with ExitStack() as claims:
+        busy: set[str] = set()
         for owner in sorted({e.owner for e in edges}):
-            claims.enter_context(claim_edge_eval(backend, owner))
-        outcomes = run_edge_evals(settings, tasks, args.jobs)
+            try:
+                claims.enter_context(claim_edge_eval(backend, owner))
+            except EdgeEvalBusyError as refused:  # as the serial path: that owner's edges only
+                busy.add(owner)
+                for e in (e for e in edges if e.owner == owner):
+                    print(f"error: {e.id} ({owner}): {refused}", file=sys.stderr)
+                failed = True
+        tasks = [
+            EdgeTask(e.id, e.owner, _edge_params(e, args, start, end, as_of))
+            for e in edges
+            if e.owner not in busy
+        ]
+        outcomes = run_edge_evals(settings, tasks, args.jobs) if tasks else []
     reports: list[str] = []
-    failed, metrics = False, {}
+    metrics: dict[str, dict[str, float]] = {}
     for done in outcomes:
         if not done.ok:
             print(f"error: {done.edge} ({done.owner}): {done.error}", file=sys.stderr)

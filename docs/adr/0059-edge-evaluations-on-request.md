@@ -114,3 +114,8 @@ itself; a `file://` store only).
   stored rows of two edges on two workers with the same two edges one after the other.
 - **Memory**: a worker takes 0.3-1 GB (measured on 10-85 session windows); `--jobs` is the
   caller's choice (6 on the owner's 16 GB Mac).
+- **Failure and refusal as the serial path**: an owner someone else is evaluating for is refused
+  edge by edge (`EdgeEvalBusyError`, exit 2) while the other owners' edges run; a worker that
+  raises or dies is that edge's failed outcome (the other results are kept) and the `edge-eval` job
+  records it left running are failed by the parent, which still holds the claims, for the run's own
+  owners and edges only. Each worker gets its share of the cores for BLAS and Arrow threads.

@@ -7,9 +7,12 @@ run the jobs without claiming. The workers share the run's screen cache director
 leg's rows are keyed by edge, so edges never share a row. Results come back in task order."""
 
 import multiprocessing
-from collections.abc import Mapping, Sequence
+import os
+from collections.abc import Iterator, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +22,7 @@ from algotrade.services.evaluation.cross_section.reads.screens import ScreenCach
 from algotrade.services.jobs.api import run_job
 from algotrade.services.jobs.exclusive import EDGE_EVAL
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
-from algotrade.services.jobs.models import JobStatus
+from algotrade.services.jobs.models import JobRecord, JobStatus
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.tables.result_writer import ResultWriter
 
@@ -55,25 +58,75 @@ def run_edge_evals(
     settings: PoolSettings, tasks: Sequence[EdgeTask], jobs: int
 ) -> list[EdgeOutcome]:
     """``tasks`` on ``jobs`` worker processes (spawned: no shared interpreter state), one edge
-    per worker at a time, longest queue first as submitted; the outcomes in task order."""
-    context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(max_workers=jobs, mp_context=context) as pool:
+    per worker at a time, in the order given; the outcomes in task order. A worker that raises
+    or dies is that edge's failed outcome (the others' results are kept), and the job records the
+    dead worker left running are failed here, while the caller still holds the claims."""
+    threads = max(1, (os.cpu_count() or 1) // jobs)  # each worker's share of the cores
+    outcomes: list[EdgeOutcome] = []
+    died = False
+    with _thread_env(threads), ProcessPoolExecutor(
+        max_workers=jobs, mp_context=multiprocessing.get_context("spawn"),
+    ) as pool:  # fmt: skip
         futures = [pool.submit(_evaluate, settings, task) for task in tasks]
-        return [future.result() for future in futures]
+        for task, future in zip(tasks, futures, strict=True):
+            try:
+                outcomes.append(future.result())
+            except Exception as error:  # a worker killed (memory) breaks the pool
+                died = True
+                outcomes.append(EdgeOutcome(task.edge, task.owner, False, {}, _describe(error)))
+    if died:
+        _fail_in_flight(settings, tasks)
+    return outcomes
+
+
+def _describe(error: BaseException) -> str:
+    return f"{type(error).__name__}: {error}"
+
+
+@contextmanager
+def _thread_env(threads: int) -> Iterator[None]:
+    """The thread counts the spawned workers start with, set before they import numpy (BLAS, and
+    Arrow's pool, which honours OMP_NUM_THREADS)."""
+    names = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS")
+    before = {n: os.environ.get(n) for n in names}
+    os.environ.update(dict.fromkeys(names, str(threads)))
+    try:
+        yield
+    finally:
+        for name, value in before.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def _fail_in_flight(settings: PoolSettings, tasks: Sequence[EdgeTask]) -> None:
+    """Fail the unfinished ``edge-eval`` jobs of these tasks' owners and edges (the claims are
+    the caller's, so they are this run's workers' or a crash's, never another caller's)."""
+    runs = open_backend(settings.data_url).runs
+    wanted = {(t.owner, t.edge) for t in tasks}
+    now = datetime.now(UTC)
+    for run in runs.find(f"job:{EDGE_EVAL}"):
+        record = JobRecord.from_run(run)
+        if not record.done and (record.user, record.params.get("edge")) in wanted:
+            record.status, record.finished_at = JobStatus.FAILED, now
+            record.error = "abandoned: the worker process running it stopped"
+            runs.save(record.to_run())
 
 
 def _evaluate(settings: PoolSettings, task: EdgeTask) -> EdgeOutcome:
     """One edge as its owner's job, in a worker process (the claim is the caller's)."""
-    backend = open_backend(settings.data_url)
-    configs = open_config_store(settings.config_dir)
-    resources: dict[str, Any] = {
-        "reader": StoreReader(backend), "writer": ResultWriter(backend), "configs": configs,
-    }  # fmt: skip
-    if settings.screens_root is not None:
-        resources["screens"] = ScreenCache(Path(settings.screens_root), settings.shared)
-    job = run_job(
-        backend.runs, LIBRARY_HANDLERS, resources, EDGE_EVAL, task.params, UserContext(task.owner)
-    )
-    return EdgeOutcome(
-        task.edge, task.owner, job.status is not JobStatus.FAILED, job.result, job.error
-    )
+    try:
+        backend = open_backend(settings.data_url)
+        resources: dict[str, Any] = {
+            "reader": StoreReader(backend), "writer": ResultWriter(backend),
+            "configs": open_config_store(settings.config_dir),
+        }  # fmt: skip
+        if settings.screens_root is not None:
+            resources["screens"] = ScreenCache(Path(settings.screens_root), settings.shared)
+        user = UserContext(task.owner)
+        job = run_job(backend.runs, LIBRARY_HANDLERS, resources, EDGE_EVAL, task.params, user)
+    except Exception as error:  # the edge's failure, not the run's
+        return EdgeOutcome(task.edge, task.owner, False, {}, _describe(error))
+    ok = job.status is not JobStatus.FAILED
+    return EdgeOutcome(task.edge, task.owner, ok, job.result, job.error)
