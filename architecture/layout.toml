@@ -111,6 +111,11 @@ purpose = "L3 universe settings split from config/site (at its module cap): the 
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
+path = "src/algotrade/config/site/vendors"
+purpose = "L3 vendor-section settings that need their own validation: the stepped SEC pace of a filing-text run (sources.toml [sec_edgar] filing_text_*), typed and validated (split from config/site, at its module cap)"
+contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
+
+[[dir]]
 path = "src/algotrade/config/strategy"
 purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog, rule-screen spec parser"
 

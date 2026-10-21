@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade_sources.framework.limiter import IDLE_RESET_S, Limiter, Pacing
+from algotrade_sources.framework.limiter import IDLE_RESET_S, Limiter, Pacing, StepLimiter
 
 
 class FakeTime:
@@ -214,3 +214,119 @@ def test_pause_holds_the_key_and_waits_the_seconds(tmp_path: Path) -> None:
     limiter = Limiter("p", 0.0, tmp_path, slept.append, lambda: now[0])
     limiter.pause(5.0)
     assert slept == [5.0]
+
+
+# ------------------------------------------------------------------ StepLimiter
+
+
+def stepped(t: FakeTime, tmp_path: Path, **kw: float) -> StepLimiter:
+    return StepLimiter("sec", 8, 5, directory=tmp_path, sleep=t.sleep, clock=t.clock, **kw)  # type: ignore[arg-type]
+
+
+def test_a_step_limiter_starts_at_max_rps_and_spaces_requests_by_it(tmp_path: Path) -> None:
+    t = FakeTime()
+    limiter = stepped(t, tmp_path)
+    assert limiter.rps == 8
+    limiter.wait()
+    limiter.wait()
+    assert t.slept == [pytest.approx(0.125)]
+
+
+def test_an_error_steps_down_one_and_a_burst_counts_once(tmp_path: Path) -> None:
+    t = FakeTime()
+    limiter = stepped(t, tmp_path)
+    for _ in range(5):  # in-flight requests of one burst all fail
+        limiter.record("error")
+        t.now += 1
+    assert limiter.rps == 7
+    t.now += 30
+    limiter.record("error")
+    assert limiter.rps == 6
+
+
+def test_repeated_errors_bottom_out_at_min_rps(tmp_path: Path) -> None:
+    t = FakeTime()
+    limiter = stepped(t, tmp_path)
+    for _ in range(10):
+        limiter.record("error")
+        t.now += 31
+    assert limiter.rps == 5
+    assert limiter.interval == pytest.approx(0.2)
+
+
+def test_quiet_time_steps_up_one_per_recover_period_until_max(tmp_path: Path) -> None:
+    t = FakeTime()
+    limiter = stepped(t, tmp_path)
+    for _ in range(3):
+        limiter.record("error")
+        t.now += 31
+    assert limiter.rps == 5
+    t.now += 899 - 31
+    limiter.record("ok")
+    assert limiter.rps == 5  # 899 s since the last error: not yet
+    t.now += 1
+    limiter.record("ok")
+    assert limiter.rps == 6
+    limiter.record("ok")
+    assert limiter.rps == 6  # the next step is another full period away
+    for expected in (7, 8, 8):
+        t.now += 900
+        limiter.record("ok")
+        assert limiter.rps == expected
+
+
+def test_a_429_is_an_error_and_holds_without_multiplying_the_interval(tmp_path: Path) -> None:
+    t = FakeTime()
+    limiter = stepped(t, tmp_path)
+    limiter.throttled(10.0)
+    limiter.throttled(10.0)
+    assert limiter.rps == 7
+    limiter.wait()
+    assert t.slept[0] == pytest.approx(10.0)
+
+
+def test_step_state_is_shared_through_the_file_and_an_old_file_parses(tmp_path: Path) -> None:
+    t = FakeTime()
+    stepped(t, tmp_path).record("error")
+    assert stepped(t, tmp_path).rps == 7  # another process, same directory
+    assert '"last_error"' in (tmp_path / "sec.lock").read_text()
+    (tmp_path / "sec.lock").write_text(
+        '{"last": 1000.0, "not_before": 0.0, "interval": 0.2, "streak": 0, "window": ""}'
+    )
+    assert stepped(t, tmp_path).rps == 5  # no last_error / last_step: parsed as 0
+    t.now += 900
+    limiter = stepped(t, tmp_path)
+    limiter.record("ok")
+    assert limiter.rps == 8  # idle > IDLE_RESET_S: starts at max
+
+
+def test_an_idle_key_starts_again_at_max_rps(tmp_path: Path) -> None:
+    t = FakeTime()
+    limiter = stepped(t, tmp_path)
+    limiter.wait()
+    for _ in range(3):
+        limiter.record("error")
+        t.now += 31
+    limiter.wait()
+    assert limiter.rps == 5
+    t.now += IDLE_RESET_S + 1
+    assert limiter.rps == 8
+
+
+def test_step_limiter_arguments_are_validated(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="min_rps"):
+        StepLimiter("sec", 5, 8, directory=tmp_path)
+    with pytest.raises(ValueError, match="recover_s"):
+        StepLimiter("sec", 8, 5, recover_s=0, directory=tmp_path)
+
+
+def test_the_plain_limiter_ignores_steps_and_keeps_its_floor(tmp_path: Path) -> None:
+    t = FakeTime()
+    plain = Limiter("sec", 0.2, tmp_path, t.sleep, t.clock)
+    plain.record("error")
+    plain.throttled(0.0)
+    assert plain.interval == pytest.approx(0.2)
+    shared = stepped(t, tmp_path)
+    shared.wait()
+    plain.wait()  # both serialised through one file
+    assert t.slept[-1] == pytest.approx(0.2)

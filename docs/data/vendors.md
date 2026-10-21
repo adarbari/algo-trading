@@ -245,7 +245,11 @@ CIKs a run, `filing_text_min_free_gb` stops the run PARTIAL on a short disk). Th
 holds the default set; the full set wants an external volume (the store location is one setting,
 `ALGOTRADE_DATA_URL`), after which a `--items` full run is a new read of every CIK. The nightly
 increment (CIKs due a report and silent less than 400 days) is optional and WARN-only. Readers go
-through `data.filing_text` (`known_from <= S`, the latest version per item). **Delisted names for
+through `data.filing_text` (`known_from <= S`, the latest version per item). **Read-ahead and `--live-only`
+(ADR 0050, amendment 2026-10-21):** documents are downloaded in threads and parsed in worker processes ahead of
+the loop (about 4x at 5 requests a second on the measured set, identical rows), the SEC pace for this task steps
+between 8 and 5 requests a second, and `--live-only` reads only the universe's operating companies first (the
+recorded filer list stays every filer). **Delisted names for
 D1:** the daily index gives CIKs, not tickers, so a delisted listing still has no ticker-to-CIK
 mapping in the store; EDGAR's company-names history or the `instruments/company` snapshots over
 time are the candidates for D1's Form 25 follow-up (not built here).

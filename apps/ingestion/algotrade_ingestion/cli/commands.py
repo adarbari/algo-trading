@@ -56,17 +56,23 @@ def sources_settings(args: argparse.Namespace) -> SourcesSettings:
 
 
 def sources_for(
-    names: Iterable[str], settings: SourcesSettings, fixture_dir: Path | None = None
+    names: Iterable[str],
+    settings: SourcesSettings,
+    fixture_dir: Path | None = None,
+    stepped: Iterable[str] = (),
 ) -> Built:
-    """The named sources from the registry (credentials from the environment)."""
-    return build_sources(settings, credential, names, fixture_dir=fixture_dir)
+    """The named sources from the registry (credentials from the environment); ``stepped``: the
+    ones that take the stepped SEC limiter (a task's own ``Task.stepped``)."""
+    return build_sources(
+        settings, credential, names, fixture_dir=fixture_dir, stepped=tuple(stepped)
+    )
 
 
 def task_sources(spec: Task, settings: SourcesSettings, params: Mapping[str, Any]) -> Built:
     """An explicit run: every required source must be available, else a clear error.
     A fixture source reads the task's ``golden_dir`` parameter."""
     names = (*spec.sources, *spec.optional_sources)
-    built = sources_for(names, settings, params.get("golden_dir"))
+    built = sources_for(names, settings, params.get("golden_dir"), spec.stepped)
     missing = [s for s in spec.sources if s not in built.sources]
     if missing:
         reasons = sorted({built.skipped[s] for s in missing})

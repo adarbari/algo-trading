@@ -95,6 +95,12 @@ from algotrade.data.filing_text.reading import (
     stored_filing_text,
 )
 from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.events.filing_text_fetch import (
+    BLOCK_HOLD_S,
+    Prefetch,
+    PrefetchedListing,
+    PrefetchedText,
+)
 from algotrade_ingestion.tasks.events.filing_text_filers import (
     CIKS_KEY,
     WINDOW_KEY,
@@ -411,6 +417,14 @@ def _blocking(exc: Exception) -> bool:
     return isinstance(exc, TransientFetchError) or hasattr(exc, "status")
 
 
+def _hold_sec(ctx: TaskContext, run: IngestRun) -> None:
+    """SEC blocked us: hold the shared ``sec`` limiter (every thread and process) for a while."""
+    run.stats.update(blocked_hold_s=BLOCK_HOLD_S)
+    limiter = ctx.pacing.get("sec")
+    if limiter is not None and hasattr(limiter, "hold"):
+        limiter.hold(BLOCK_HOLD_S)
+
+
 def _document(text: Source, request: FilingTextRequest) -> pd.DataFrame:
     """One document's item frame. No raw copy is saved (``IngestRun.fetch`` would): the payload is
     the extraction the rows below store, so a copy is the table again, and the disk is short. A
@@ -423,6 +437,50 @@ def _document(text: Source, request: FilingTextRequest) -> pd.DataFrame:
     assert normalized is not None
     frame: pd.DataFrame = normalized.parsed[FILING_TEXT_FRAME]
     return frame
+
+
+def _complete(
+    cik: str, filings: Sequence[Filing], requested: Sequence[str], force: bool, held: dict[str, Any]
+) -> set[str]:
+    """The accessions of ``filings`` already stored at this parser version (none under force)."""
+    if force:
+        return set()
+    wanted = {f.form: items_for(f.form, requested) for f in filings}
+    return complete_filings(held["keys"].get(cik, held["empty"]), wanted)
+
+
+def _documents(
+    run: IngestRun,
+    listing: Source,
+    cik: str,
+    window: tuple[date, date],
+    requested: Sequence[str],
+    force: bool,
+    held: dict[str, Any],
+) -> tuple[bytes | None, list[FilingTextRequest]]:
+    """What the fetch pipeline reads ahead for one CIK: its submissions payload and the document
+    requests ``_one_cik`` will make (the filings not yet stored that SEC lists a document for)."""
+    since, until = window
+    request = FilingsRequest(key=cik, session_date=run.session, since=since, forms=PERIODIC_FORMS)
+    payload = listing.fetch(request)
+    if payload is None:
+        return None, []
+    normalized = listing.normalize(request, payload)
+    assert normalized is not None
+    filings = listed_filings(normalized.parsed[FILINGS_FRAME], since, until)
+    complete = _complete(cik, filings, requested, force, held)
+    return payload, [
+        FilingTextRequest(
+            key=f.accession,
+            session_date=run.session,
+            cik=cik,
+            form=f.form,
+            primary_document=f.primary_document,
+            items=tuple(requested),
+        )
+        for f in filings
+        if f.accession not in complete and f.primary_document is not None
+    ]
 
 
 def _one_cik(
@@ -453,8 +511,7 @@ def _one_cik(
     assert normalized is not None
     filings = listed_filings(normalized.parsed[FILINGS_FRAME], since, until)
     counts.listed += len(filings)
-    wanted = {f.form: items_for(f.form, requested) for f in filings}
-    complete = set() if force else complete_filings(held["keys"].get(cik, held["empty"]), wanted)
+    complete = _complete(cik, filings, requested, force, held)
     failures: list[str] = []
     for filing in filings:
         if filing.accession in complete:
@@ -551,6 +608,80 @@ def _symbol_ciks(run: IngestRun, requested: Sequence[str]) -> tuple[Names, list[
     return covered, list(ciks_of(run, covered.listed))
 
 
+@dataclass(frozen=True)
+class Loop:
+    """What the per-CIK loop reads with: the run, the two sources, the items, the stored keys and
+    the read-ahead sizes (``threads`` 0: one document at a time)."""
+
+    ctx: TaskContext
+    run: IngestRun
+    listing: Source
+    text: Source
+    items: Sequence[str]
+    force: bool
+    held: dict[str, Any]
+    threads: int
+    procs: int
+
+
+def _prefetch(loop: Loop, todo: list[str], windows: dict[str, tuple[date, date]]) -> Prefetch:
+    """The read-ahead of ``todo`` (``filing_text_fetch.py``): it reads through the real sources."""
+    run, listing, items, force, held = loop.run, loop.listing, loop.items, loop.force, loop.held
+    return Prefetch(
+        todo,
+        lambda cik: _documents(run, listing, cik, windows[cik], items, force, held),
+        getattr(loop.text, "fetch_body"),  # noqa: B009 (the Source protocol has no download half)
+        getattr(loop.text, "parse"),  # noqa: B009
+        threads=loop.threads,
+        procs=loop.procs,
+        blocking=_blocking,
+        on_block=partial(_hold_sec, loop.ctx, run),
+    )
+
+
+def _read(
+    loop: Loop, todo: list[str], windows: dict[str, tuple[date, date]], counts: Counts
+) -> None:
+    """Read each CIK of ``todo`` in order (the loop of the module doc); stops PARTIAL on a short
+    disk or CIKs failing in a row. The read-ahead, when on, is closed before this returns."""
+    run, listing, text = loop.run, loop.listing, loop.text
+    floor, path = loop.ctx.settings.sec_filing_text_min_free_gb, store_path(loop.ctx)
+    prefetch = _prefetch(loop, todo, windows) if loop.threads > 0 and todo else None
+    if prefetch is not None:  # the loop gets wrappers that hand out what was read ahead
+        listing, text = PrefetchedListing(listing, prefetch), PrefetchedText(text, prefetch)
+    blocked_in_a_row = 0
+    try:
+        for i, cik in enumerate(todo, 1):
+            if path is not None and (free := free_gb(path)) < floor:
+                run.partial(
+                    f"stopped: {free:.1f} GB free is under {floor:g} GB "
+                    "(sources.toml [sec_edgar] filing_text_min_free_gb)"
+                )
+                break
+            args = (
+                run,
+                listing,
+                text,
+                cik,
+                windows[cik],
+                loop.items,
+                loop.force,
+                loop.held,
+                counts,
+            )
+            status = run.attempt(cik, partial(_one_cik, *args))
+            failed = status_label(status) == FETCH_ERROR and counts.blocked
+            blocked_in_a_row = blocked_in_a_row + 1 if failed else 0
+            if i % CHECKPOINT_EVERY == 0:
+                run.checkpoint()
+            if blocked_in_a_row >= STOP_AFTER_FAILED:
+                run.partial(f"stopped: {blocked_in_a_row} CIKs failed in a row ({status})")
+                break
+    finally:
+        if prefetch is not None:
+            prefetch.close()  # no request may leave after the run (and its lock) ends
+
+
 def ingest_filing_text(
     ctx: TaskContext,
     listing: Source,
@@ -564,12 +695,18 @@ def ingest_filing_text(
     items: Sequence[str] = (),
     force: bool = False,
     allow_gap: Sequence[str] = (),
+    threads: int = 0,
+    procs: int = 4,
+    live_only: bool = False,
 ) -> RunRecord:
     """Store the item sections of the periodic filings of every filer (module doc): the backfill
     window ``since..until`` (the filers of the daily index, ``--limit`` CIKs a run), or, without
     ``since``, the nightly increment of the due CIKs. ``items``: the ids kept (default
     ``DEFAULT_ITEMS``); ``allow_gap``: ISO weekdays with no daily index an operator verified
-    (SEC closed), which the walk then accepts."""
+    (SEC closed), which the walk then accepts. ``threads`` > 0 reads ahead of the loop with that
+    many download threads and ``procs`` parse processes (``filing_text_fetch.py``; 0: one document
+    at a time, as before). ``live_only``: the backfill asks only the filers that are operating
+    companies of the session's universe (the recorded filer list stays every filer)."""
     until = until or session
     if since is not None and until < since:
         raise ValueError(f"--to {until} is before --from {since}")
@@ -594,6 +731,9 @@ def ingest_filing_text(
             candidates = found.ciks
             if not found.cached:
                 run.stats.update({WINDOW_KEY: _window(since, until), CIKS_KEY: found.ciks})
+            if live_only:
+                live = set(_symbol_ciks(run, [])[1])
+                candidates = [c for c in candidates if c in live]
         counts = Counts()
         plan = _select(run, candidates, runs, session, since, until, limit, force, tag)
         todo, windows = plan.todo, plan.windows
@@ -608,24 +748,8 @@ def ingest_filing_text(
         by_cik = {str(c): g for c, g in keys.groupby("cik")} if len(keys) else {}
         empty_text = pd.DataFrame({c: [] for c in (*KEY_COLUMNS, "text_sha")})
         held = {"keys": by_cik, "empty": empty, "empty_text": empty_text}
-        floor, path = ctx.settings.sec_filing_text_min_free_gb, store_path(ctx)
-        blocked_in_a_row = 0
-        for i, cik in enumerate(todo, 1):
-            if path is not None and (free := free_gb(path)) < floor:
-                run.partial(
-                    f"stopped: {free:.1f} GB free is under {floor:g} GB "
-                    "(sources.toml [sec_edgar] filing_text_min_free_gb)"
-                )
-                break
-            args = (run, listing, text, cik, windows[cik], items, force, held, counts)
-            status = run.attempt(cik, partial(_one_cik, *args))
-            failed = status_label(status) == FETCH_ERROR and counts.blocked
-            blocked_in_a_row = blocked_in_a_row + 1 if failed else 0
-            if i % CHECKPOINT_EVERY == 0:
-                run.checkpoint()
-            if blocked_in_a_row >= STOP_AFTER_FAILED:
-                run.partial(f"stopped: {blocked_in_a_row} CIKs failed in a row ({status})")
-                break
+        loop = Loop(ctx, run, listing, text, items, force, held, threads, procs)
+        _read(loop, todo, windows, counts)
         published = run.publish_sessions(TABLE)
         run.stats.update(
             mode="nightly" if nightly else "backfill",
@@ -648,6 +772,9 @@ def ingest_filing_text(
             quality=counts.quality,
             learned_on=_learned_on(run).isoformat(),
             unknown_symbols=covered.unknown,
+            live_only=live_only,
+            fetch_threads=threads,
+            parse_procs=procs if threads else 0,
             items=run.counts(),
         )
     return run.record

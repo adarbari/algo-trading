@@ -312,3 +312,27 @@ def test_each_key_gets_adaptive_pacing_from_its_section_and_http(tmp_path: Path)
 def test_a_pauser_holds_the_key_limiter_for_the_seconds(tmp_path: Path) -> None:
     build_pauser("golden-run", tmp_path)(0.05)
     assert (tmp_path / "golden-run.lock").exists()
+
+
+def test_nothing_is_stepped_by_default_and_a_run_opts_the_filing_text_sources_in(
+    tmp_path: Path,
+) -> None:
+    from algotrade_sources.framework.limiter import StepLimiter  # noqa: PLC0415
+
+    plain = build_sources(settings(), ENV.get, ["sec_filing_text", "sec_tickers"], tmp_path)
+    assert set(plain.limiters) == {"sec"} and not isinstance(plain.limiters["sec"], StepLimiter)
+    names = ["sec_filing_text", "sec_filings", "sec_daily_index", "sec_tickers"]
+    built = build_sources(settings(), ENV.get, names, tmp_path, stepped=names[:3])
+    step = built.limiters["sec_stepped"]
+    assert isinstance(step, StepLimiter) and (step.max_rps, step.min_rps) == (8, 5)
+    assert step.path == built.limiters["sec"].path  # one state file
+    assert not isinstance(built.limiters["sec"], StepLimiter)
+    assert built.limiters["sec"].min_interval_s == 0.2
+    plain_sec = built.limiters["sec"]
+    for name, expected in (("sec_filing_text", step), ("sec_filings", step)):
+        assert built.sources[name]._http.limiter is expected  # type: ignore[attr-defined]
+    assert built.sources["sec_tickers"]._http.limiter is plain_sec  # type: ignore[attr-defined]
+    only = build_sources(settings(), ENV.get, ["sec_filings"], tmp_path, stepped=["sec_filings"])
+    assert set(only.limiters) == {"sec_stepped"}
+    with pytest.raises(KeyError, match="not steppable"):
+        build_sources(settings(), ENV.get, ["sec_tickers"], tmp_path, stepped=["sec_tickers"])

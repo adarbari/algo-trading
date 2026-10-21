@@ -27,6 +27,9 @@ The adaptive state resets to ``start_interval_s`` when the key has been idle for
 ``IDLE_RESET_S`` (in practice: at the start of each nightly run). ``hold`` alone pushes the
 next slot out (the chain task's cool-down before its retry pass).
 
+``StepLimiter`` (below) is the alternative for a key a run opts into: whole requests a second,
+stepped down on an error and back up after a quiet period (``[sec_edgar] filing_text_*``).
+
 ``track()`` gives a ``PacingStats`` that this process's limiter updates until ``untrack``:
 ``IngestRun`` opens one per key for the length of a run and stores it in the run stats.
 Sources never pace themselves: the registry (``sources/framework/registry.py``) gives each
@@ -141,6 +144,8 @@ class _State:
     interval: float | None = None  # None: not started (``Pacing.start``)
     streak: int = 0  # consecutive non-error responses
     window: str = ""  # the last responses, "1" = error, newest last
+    last_error: float = 0.0  # ``StepLimiter``: time of the last error (0: none)
+    last_step: float = 0.0  # ``StepLimiter``: time of the last step down or up (0: none)
 
     def dump(self) -> bytes:
         return json.dumps(self.__dict__).encode()
@@ -219,7 +224,7 @@ class Limiter:
             held = max(0.0, now + seconds - max(s.not_before, now))
             _hold(s, now + seconds)
             if fresh:
-                s.interval = self.pacing.clamp(self._current(s) * self.pacing.backoff_factor)
+                self._backoff(s)
             self._each(lambda st: _throttled(st, held, fresh))
             self._observe(s, error=True)
 
@@ -228,6 +233,10 @@ class Limiter:
     def record(self, outcome: Outcome) -> None:
         """One response that was not a 429: ``ok``, ``missing`` (not an error) or ``error``."""
         self._update(lambda s: self._observe(s, error=outcome == "error"))
+
+    def _backoff(self, s: _State) -> None:
+        """The slowdown of a fresh 429 (interval x ``backoff_factor``)."""
+        s.interval = self.pacing.clamp(self._current(s) * self.pacing.backoff_factor)
 
     def _observe(self, s: _State, error: bool) -> None:
         p = self.pacing
@@ -291,6 +300,67 @@ class Limiter:
                 os.close(fd)
 
 
+class StepLimiter(Limiter):
+    """A stepped rate governor for one key: ``max_rps`` requests a second to start; an error
+    (``record("error")`` or a 429) steps DOWN by 1 req/s (never below ``min_rps``; errors within
+    ``cooldown_s`` of the last step count once, so a burst of in-flight failures is one step);
+    after ``recover_s`` with no error and no step since, one step UP, repeated every
+    ``recover_s`` until ``max_rps``. A fresh key, or one idle for ``IDLE_RESET_S``, starts at
+    ``max_rps``. The state is the key's shared file (``last_error``, ``last_step`` beside the
+    interval), so processes agree; the adaptive backoff and speedup of ``Pacing`` never apply.
+    Opt-in per run (``build_sources(stepped=...)``); the key's plain ``Limiter`` users keep
+    their floor."""
+
+    def __init__(
+        self,
+        key: str,
+        max_rps: int,
+        min_rps: int,
+        recover_s: float = 900.0,
+        cooldown_s: float = 30.0,
+        directory: Path = DEFAULT_DIR,
+        sleep: Sleep = time.sleep,
+        clock: Clock = time.time,
+    ) -> None:
+        if not 1 <= min_rps <= max_rps:
+            raise ValueError(f"expected 1 <= min_rps <= max_rps, got {min_rps}, {max_rps}")
+        if recover_s <= 0 or cooldown_s <= 0:
+            raise ValueError("recover_s and cooldown_s must be > 0")
+        self.max_rps, self.min_rps = max_rps, min_rps
+        self.recover_s, self.cooldown_s = recover_s, cooldown_s
+        pacing = Pacing(1 / max_rps, 1 / min_rps, 1 / max_rps)
+        super().__init__(key, pacing, directory, sleep, clock)
+
+    @property
+    def rps(self) -> int:
+        """The current whole requests a second (shared state)."""
+        return round(1 / self.interval)
+
+    def _backoff(self, s: _State) -> None:
+        """No multiplicative backoff: ``_observe`` steps down."""
+
+    def _observe(self, s: _State, error: bool) -> None:
+        now, rps = self._clock(), round(1 / self._current(s))
+        if error:
+            self._each(_errored)
+            if rps > self.min_rps and (not s.last_step or now - s.last_step >= self.cooldown_s):
+                rps, s.last_step = rps - 1, now
+                self._each(_slowed)
+            s.last_error = now
+        elif rps < self.max_rps and now - max(s.last_error, s.last_step) >= self.recover_s:
+            rps, s.last_step = rps + 1, now
+            self._each(_sped_up)
+        s.interval = self.pacing.clamp(1 / rps)
+        self._each(lambda st: st.saw(self._current(s)))
+
+    def _current(self, s: _State) -> float:
+        idle = bool(s.last) and self._clock() - s.last > IDLE_RESET_S
+        if (s.interval is None or idle) and s.not_before <= self._clock():
+            s.interval, s.streak, s.window = self.pacing.start, 0, ""
+            s.last_error = s.last_step = 0.0
+        return self.pacing.clamp(self.pacing.start if s.interval is None else s.interval)
+
+
 def _hold(s: _State, until: float) -> None:
     s.not_before = max(s.not_before, until)
 
@@ -338,6 +408,8 @@ def _parse(raw: bytes) -> _State:
             interval=None if value.get("interval") is None else float(value["interval"]),
             streak=int(value.get("streak", 0)),
             window=str(value.get("window", "")),
+            last_error=float(value.get("last_error", 0.0)),
+            last_step=float(value.get("last_step", 0.0)),
         )
     except (TypeError, ValueError):
         return _State()

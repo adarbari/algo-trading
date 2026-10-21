@@ -275,9 +275,14 @@ left):
 
 ```bash
 nohup sh -c 'for w in "2021-01-01" "2016-01-01 --to 2020-12-31" "2010-01-01 --to 2015-12-31"; do
-  for i in $(seq 1 60); do .venv/bin/algotrade-ingest run filing-text --from $w --limit 100; done; done \
+  for i in $(seq 1 60); do .venv/bin/algotrade-ingest run filing-text --from $w --limit 100 --live-only; done; done \
   > var/logs/filing-text-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/filing-text-history.status' >/dev/null 2>&1 &
 ```
+
+Give window 1 an end date (`--from 2021-01-01 --to <last session>`): without one the filer list is walked
+again in every run. `--live-only` limits the backfill to the operating companies of the universe (a later run
+without it reads the other filers); `--threads` / `--procs` set the read-ahead (default 10 / 4; ADR 0050,
+amendment 2026-10-21). A run reads about 8 documents a second.
 
 The nightly step (`filing-text`, optional, WARN-only) reads each due CIK from its latest stored filing.
 

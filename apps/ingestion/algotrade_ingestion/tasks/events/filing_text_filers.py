@@ -18,6 +18,7 @@ recording run's own session is walked again.
 """
 
 from collections.abc import Collection, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -52,6 +53,7 @@ SPECIAL_CLOSURES = frozenset(
         date(2021, 1, 20),
     }
 )
+WALK_THREADS = 6  # daily index files in flight (the shared SEC limiter sets the rate)
 WINDOW_KEY = "filers_window"
 CIKS_KEY = "filer_ciks"
 
@@ -131,25 +133,40 @@ def walk_index(
     ciks: set[str] = set()
     closed: list[date] = []
     days = 0
-    for day in filing_days(since, min(until, run.session)):
+    walk = list(filing_days(since, min(until, run.session)))
+
+    def read(day: date) -> frozenset[str] | None:
         request = DailyIndexRequest(
             key=day.isoformat(), session_date=run.session, day=day, forms=PERIODIC_FORMS
         )
         payload = index.fetch(request)  # no raw copy: the day's file is every form
-        days += 1
         if payload is None:
-            if day in allowed or day in sec_holidays(day.year) | sec_holidays(day.year + 1):
-                closed.append(day)
-                continue
-            if day >= run.session:  # today's index comes after the close
-                continue
-            raise IndexGapError(
-                f"no daily index for {day}, a weekday that is no SEC holiday: if SEC was closed "
-                f"(verified by hand), pass --allow-gap {day}"
-            )
+            return None
         normalized = index.normalize(request, payload)
         assert normalized is not None
-        ciks.update(str(c) for c in normalized.parsed[DAILY_INDEX_FRAME]["cik"])
+        return frozenset(str(c) for c in normalized.parsed[DAILY_INDEX_FRAME]["cik"])
+
+    with ThreadPoolExecutor(WALK_THREADS, thread_name_prefix="ft-index") as pool:
+        futures = [pool.submit(read, day) for day in walk]  # the shared limiter sets the rate
+        try:
+            for day, future in zip(walk, futures, strict=True):
+                found = future.result()  # in day order: the first failing day is the one raised
+                days += 1
+                if found is None:
+                    if day in allowed or day in sec_holidays(day.year) | sec_holidays(day.year + 1):
+                        closed.append(day)
+                        continue
+                    if day >= run.session:  # today's index comes after the close
+                        continue
+                    raise IndexGapError(
+                        f"no daily index for {day}, a weekday that is no SEC holiday: if SEC was "
+                        f"closed (verified by hand), pass --allow-gap {day}"
+                    )
+                ciks.update(found)
+        except BaseException:
+            for future in futures:
+                future.cancel()  # a failed walk sends no more requests
+            raise
     return Filers(sorted(ciks), False, days, closed)
 
 

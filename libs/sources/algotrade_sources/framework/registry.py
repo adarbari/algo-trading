@@ -22,7 +22,7 @@ whose section is disabled or whose variable is missing is left out, with the rea
 ``Built.skipped``; tasks that need it are skipped with that reason.
 """
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -43,7 +43,7 @@ from algotrade_sources.framework.http import (
     urllib_transport,
     with_query_param,
 )
-from algotrade_sources.framework.limiter import DEFAULT_DIR, Limiter, Pacing
+from algotrade_sources.framework.limiter import DEFAULT_DIR, Limiter, Pacing, StepLimiter
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.llm.claude_cli import ClaudeCli
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
@@ -173,6 +173,18 @@ class RegistrySettings(Protocol):
 
     @property
     def http_max_error_rate(self) -> float: ...
+
+    @property
+    def sec_filing_text_max_rps(self) -> int: ...
+
+    @property
+    def sec_filing_text_min_rps(self) -> int: ...
+
+    @property
+    def sec_filing_text_recover_s(self) -> float: ...
+
+    @property
+    def sec_filing_text_error_cooldown_s(self) -> float: ...
 
     def vendor(self, section: str) -> VendorConfig: ...
 
@@ -533,6 +545,9 @@ def interval(spec: SourceSpec | SessionSpec, settings: RegistrySettings) -> floa
     return spec.min_interval_s if configured is None else configured
 
 
+# Sources that may take the stepped limiter (``build_sources(stepped=...)``): the ones a
+# filing-text run requests together, so they share one SEC pace.
+STEPPED_SOURCES = frozenset({"sec_filing_text", "sec_filings", "sec_daily_index"})
 DEFAULT_CEILING = 4.0  # max_interval_s when a section does not set it: 4 x the floor
 
 
@@ -564,9 +579,20 @@ def build_sources(
     names: Iterable[str] | None = None,
     limits_dir: Path | None = None,
     fixture_dir: Path | None = None,
+    stepped: Collection[str] = (),
 ) -> Built:
     """Build the named sources (default: every vendor source, HTTP and session); a named
-    fixture source reads ``fixture_dir``. Unknown names raise ``KeyError``."""
+    fixture source reads ``fixture_dir``. Unknown names raise ``KeyError``.
+
+    ``stepped`` names the sources of this run that take the stepped rate governor
+    (``StepLimiter``: ``[sec_edgar] filing_text_max_rps`` .. ``min_rps``) instead of their key's
+    plain limiter; default none, so the nightly keeps its fixed floor. Only ``STEPPED_SOURCES``
+    (the SEC filing-text sources) may be named. They share ONE ``StepLimiter`` over the key's
+    state file (``Built.limiters["sec_stepped"]``; the other ``sec`` sources keep ``Built.
+    limiters["sec"]``, and the file lock serialises both)."""
+    unknown = sorted(set(stepped) - STEPPED_SOURCES)
+    if unknown:
+        raise KeyError(f"not steppable: {unknown} (steppable: {sorted(STEPPED_SOURCES)})")
     wanted = list(dict.fromkeys([*SOURCES, *SESSION_SOURCES] if names is None else names))
     directory = limits_dir or Path(settings.limits_dir)
     breakers: dict[str, CircuitBreaker] = {}
@@ -597,8 +623,21 @@ def build_sources(
             built.skipped[name] = reason
             continue
         key = spec.limiter
-        if key not in breakers:
+        slot = f"{key}_stepped" if name in stepped else key  # ``Built.limiters`` key
+        if slot in limiters:
+            pass
+        elif name in stepped:
+            limiters[slot] = StepLimiter(
+                key,
+                settings.sec_filing_text_max_rps,
+                settings.sec_filing_text_min_rps,
+                settings.sec_filing_text_recover_s,
+                settings.sec_filing_text_error_cooldown_s,
+                directory,
+            )
+        else:
             limiter(key, pacing(spec, settings))
+        if key not in breakers:
             breakers[key] = CircuitBreaker(key, settings.http_breaker_failures)
         secret = env(spec.env_var) if spec.env_var else None
         headers = spec.headers(secret)
@@ -613,7 +652,7 @@ def build_sources(
                 not_found=spec.not_found,
                 rejected=spec.rejected,
             ),
-            limiters[key],
+            limiters[slot],
             breakers[key],
         )
         built.sources[name] = spec.build(http, **spec.options(settings))

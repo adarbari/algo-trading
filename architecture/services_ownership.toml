@@ -162,6 +162,8 @@ owner = ["src/algotrade/services/jobs/*"]
 allowed = [
     "libs/sources/algotrade_sources/framework/session_thread.py",  # a gateway session's own thread (its socket + event loop), not work (ADR 0028)
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/pool.py",  # the compact-runs worker processes (spawn, their own signals and parent watch) and the in-process thread seam of its tests: an OS process pool around one partition's storage call, not a job fan-out (ADR 0078 amendment 2026-10-20)
+    "apps/ingestion/algotrade_ingestion/tasks/events/filing_text_fetch.py",  # the filing-text read-ahead: download threads and spawned parse processes in front of the task's own loop, closed before the run releases the ingest lock; not a job fan-out (ADR 0050 amendment 2026-10-21)
+    "apps/ingestion/algotrade_ingestion/tasks/events/filing_text_filers.py",  # the daily-index walk's download threads (same amendment): a limiter-paced read of one request a day
     "src/algotrade/storage/recording.py",  # the API's background batch writer (live quotes ADR 0028, usage ADR 0058): one thread draining a queue, not a job
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"

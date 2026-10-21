@@ -63,6 +63,7 @@ from algotrade.config.site.nightly import (
 from algotrade.config.site.universe.etf_category import EtfCategoryRules, etf_overrides
 from algotrade.config.site.users import IDENTITY, identity
 from algotrade.config.site.users import UsersSettings as UsersSettings  # noqa: PLC0414 - re-export
+from algotrade.config.site.vendors import sec_pace
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
@@ -151,6 +152,7 @@ VENDOR_EXTRAS = {
         "statements_priority_min_adv_usd",
         "fund_quarters",
         "filing_text_min_free_gb",
+        *sec_pace.KEYS,
     ),
     "treasury": ("lookback_days",),
     "finra": ("short_interest_lookback_days", "short_volume_lookback_days"),
@@ -228,6 +230,10 @@ class SourcesSettings:
     sec_statements_backfill_per_night: int = 400  # ADR 0067 (0: no cap)
     sec_statements_priority_min_adv_usd: float = 10_000_000.0  # liquid: 20-day $ volume (ADR 0067)
     sec_filing_text_min_free_gb: float = 5.0  # filing-text ends PARTIAL under this free (D10)
+    sec_filing_text_max_rps: int = sec_pace.MAX_RPS  # the stepped pace: see vendors/sec_pace.py
+    sec_filing_text_min_rps: int = sec_pace.MIN_RPS
+    sec_filing_text_recover_s: float = sec_pace.RECOVER_S
+    sec_filing_text_error_cooldown_s: float = sec_pace.ERROR_COOLDOWN_S
     sec_fund_quarters: int = 6  # SEC prospectus data sets read for ETF descriptions (ADR 0034)
     descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
     descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
@@ -376,6 +382,7 @@ class SourcesSettings:
             sec_filing_text_min_free_gb=_extra(vendors, "sec_edgar").number(
                 "filing_text_min_free_gb", d.sec_filing_text_min_free_gb, 0.0
             ),
+            **sec_pace.filing_text_pace(_extra(vendors, "sec_edgar")),
             sec_fund_quarters=_extra(vendors, "sec_edgar").integer(
                 "fund_quarters", d.sec_fund_quarters, 0
             ),
