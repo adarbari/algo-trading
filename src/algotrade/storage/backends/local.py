@@ -306,6 +306,7 @@ class LocalTables:
         run_id: str,
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         directory = self._dir(table, session_date)
 
@@ -318,7 +319,9 @@ class LocalTables:
             if entry is None:
                 return None
             try:
-                return _read_run_file(directory / run_file(run_id, entry), run_id, columns)
+                return _read_run_file(
+                    directory / run_file(run_id, entry), run_id, columns, instruments
+                )
             except FileNotFoundError as gone:  # a commit replaced the version
                 raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
 
@@ -603,22 +606,35 @@ def _file_groups(path: Path, group: Sequence[str]) -> set[tuple[object, ...]] | 
         return found
 
 
-def _read_run_file(path: Path, run_id: str, columns: Sequence[str] | None = None) -> pa.Table:
+def _read_run_file(
+    path: Path,
+    run_id: str,
+    columns: Sequence[str] | None = None,
+    instruments: Sequence[str] | None = None,
+) -> pa.Table:
     """One version file's rows stamped ``run_id``: the row groups whose ``run_id`` statistics
-    cannot hold it are skipped (not decoded), then the rest is filtered exactly. ``columns``:
-    only those and ``keep_columns`` are decoded."""
+    cannot hold it (nor, with ``instruments``, any of them in ``instrument_id``) are skipped
+    (not decoded), then the rest is filtered exactly. ``columns``: only those and
+    ``keep_columns`` are decoded."""
     with pq.ParquetFile(path) as parquet:
         keep = None if columns is None else keep_columns(columns)
         present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
         if "run_id" not in parquet.schema_arrow.names:
             return parquet.read(columns=present)
         groups = row_groups_holding(parquet, "run_id", [run_id])
+        if instruments is not None and "instrument_id" in parquet.schema_arrow.names:
+            near = set(row_groups_holding(parquet, "instrument_id", instruments))
+            groups = [g for g in groups if g in near]
         data = (
             parquet.read_row_groups(groups, columns=present)
             if groups
             else parquet.schema_arrow.empty_table().select(present or parquet.schema_arrow.names)
         )
-    return data.filter(pc.equal(data.column("run_id"), run_id))
+    data = data.filter(pc.equal(data.column("run_id"), run_id))
+    if instruments is None:
+        return data
+    ids = data.column("instrument_id")
+    return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
 
 
 class LocalRaw:

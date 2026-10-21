@@ -82,13 +82,13 @@ def test_the_value_rows_of_a_page_are_read_once_per_published_state(
     run = latest_run(ctx, "site", "alpha").run
     assert run is not None
     read: list[str] = []
-    real = results.partition
+    real = results.run_rows_of
 
     def counting(c: ReadContext, table: str, *args: Any, **kwargs: Any) -> Any:
         read.append(table)
         return real(c, table, *args, **kwargs)
 
-    monkeypatch.setattr(results, "partition", counting)
+    monkeypatch.setattr(results, "run_rows_of", counting)
     first = load_results(ctx, {"r1": ["EQ:AAA"]}, [run])
     assert load_results(replace(ctx, memo={}), {"r1": ["EQ:AAA"]}, [run]) == first
     assert len(read) == 1  # another request, the same answer, nothing read

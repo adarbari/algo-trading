@@ -34,7 +34,6 @@ from algotrade.services.read.context import (
     ReadContext,
     at_session,
     catalogue_key,
-    partition,
     run_rows_of,
 )
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
@@ -48,7 +47,7 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.screens.screeners import ScreenGroup
-from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
+from algotrade.services.read.values import UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import (
     is_criterion_row,
     is_display_column,
@@ -229,20 +228,18 @@ def _read_values(
     ids: Sequence[str] | None,
     wanted: Mapping[str, Sequence[str]] | None,
 ) -> dict[ResultKey, list[Mapping[str, Any]]]:
-    stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, ids, newest_runs=True)
-    if isinstance(stored, Unknown) or stored.empty:
-        return {}
+    """Each run's own values file, read for the instruments the run is asked for (``wanted``, else
+    ``ids``, else every one): never the session's every run filtered by the union of their picks."""
     out: dict[ResultKey, list[Mapping[str, Any]]] = {}
     for run in runs:
-        if wanted is not None and not wanted.get(run.run_id):
-            continue
-        mine = stored[
-            (stored["user_id"] == run.owner)
-            & (stored["config_id"] == run.config_id)
-            & (stored["run_id"] == run.run_id)
-        ]
         if wanted is not None:
-            mine = mine[mine["instrument_id"].isin(set(wanted[run.run_id]))]
+            asked: Sequence[str] | None = wanted.get(run.run_id)
+            if not asked:
+                continue
+        else:
+            asked = ids
+        stored = run_rows_of(ctx, RULE_SCREEN_VALUES, run.run_id, VALUE_COLUMNS, asked)
+        mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
         for row in _records(mine):
             out.setdefault((run.run_id, str(row["instrument_id"])), []).append(row)
     return out

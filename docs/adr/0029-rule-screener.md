@@ -154,7 +154,8 @@ the merge decoded the other nine tenths for nothing (`docs/perf/api-memory.md`: 
   chosen before `instruments` filters it. `ValueError` for any other table.
 - The screen read model (`services/read/screens`) reads both tables through it (`partition(...,
   newest_runs=True)`); the readers of one run's values (`_run_fields`, `_stored_key`) read only that
-  run's own file (`read_run(..., columns)`, `run_rows_of`). Nothing else changes: the same rows
+  run's own file (`read_run(..., columns, instruments)`, `run_rows_of`), and `_read_values` reads each
+  run's own file for the instruments that run is asked for, never the union of every run's picks. Nothing else changes: the same rows
   reach every page.
 - Such a table is never listed in `[compaction]` (ADR 0078 keeps only changed rows, so its newest
   file would be a delta): a fitness test (`tests/unit/config/site/test_nightly.py`) refuses it.

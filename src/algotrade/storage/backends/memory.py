@@ -227,6 +227,7 @@ class MemoryTables:
         run_id: str,
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         def at(upto: int) -> pd.DataFrame | None:
             _, frames = self._view((table, session_date), own_run, upto)
@@ -234,6 +235,8 @@ class MemoryTables:
             if frame is None:
                 return None
             mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame.copy()
+            if instruments is not None:
+                mine = select_instruments(mine, instruments)
             if mine.empty:
                 return None
             if columns is not None:

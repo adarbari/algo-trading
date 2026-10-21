@@ -144,12 +144,15 @@ class TableStore(Protocol):
         run_id: str,
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (those stamped with its ``run_id``),
         whether or not it is the partition's latest run and without reading any other run's
         file (ADR 0064). ``None``: the run has no committed rows there (``own_run`` also
         sees that run's pending write). ``columns``: only those (plus ``read_range``'s key and
-        point-in-time columns) are decoded. Not point-in-time: a run is read as it left them."""
+        point-in-time columns) are decoded; ``instruments``: only their rows (row groups that cannot
+        hold them are skipped; ``None`` when it matches none of the run's). Not point-in-time: a
+        run is read as it left them."""
         ...
 
     def build_history(self, table: str, years: Sequence[int]) -> list[int]:

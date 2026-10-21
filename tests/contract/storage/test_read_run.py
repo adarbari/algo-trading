@@ -104,3 +104,13 @@ def test_columns_decode_only_those_and_the_stamps(backend: Backend) -> None:
     assert "extra" not in found.columns and {"value", "run_id", "knowledge_ts"} <= set(
         found.columns
     )
+
+
+def test_instruments_read_only_their_rows_of_the_run(backend: Backend) -> None:
+    publish(backend, "r1", rows(D1, "r1", "EQ:A", "EQ:B", "EQ:C"))
+    publish(backend, "r2", rows(D1, "r2", "EQ:A", later=1))
+    found = backend.tables.read_run(TABLE, D1, "r1", instruments=["EQ:C", "EQ:A", "EQ:Z"])
+    assert found is not None and sorted(found["instrument_id"]) == ["EQ:A", "EQ:C"]
+    assert set(found["run_id"]) == {"r1"}
+    assert backend.tables.read_run(TABLE, D1, "r1", instruments=["EQ:Z"]) is None
+    assert backend.tables.read_run(TABLE, D1, "r1", instruments=[]) is None
