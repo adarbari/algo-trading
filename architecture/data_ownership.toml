@@ -169,6 +169,7 @@ allowed = [
     "src/algotrade/data/outcomes/residuals.py",  # the residual partitions' stamps, likewise
     "src/algotrade/services/evaluation/cross_section/legs/reuse.py",  # checks a stored leg's reads against the partitions' stamps
     "src/algotrade/services/serving/build.py",  # records each input partition's stamp at the pin in the release manifest (ADR 0077)
+    "apps/ingestion/algotrade_ingestion/workflows/serve_release/serve_release.py",  # compares a release's recorded stamps with the live ones: stale when an input was restated
 ]
 section = "docs/adr/0022-atomic-run-publication.md#decision"
 detect = [{ call = "partition_seq" }, { call = "RecordingReader" }]

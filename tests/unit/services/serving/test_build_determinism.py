@@ -7,7 +7,8 @@ import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
-from algotrade.services.read.session import resolve_session
+from algotrade.services.read.session import Session, resolve_session
+from algotrade.services.serving import build as build_module
 from algotrade.services.serving.build import (
     FORMAT,
     MAX_TRIES,
@@ -16,11 +17,13 @@ from algotrade.services.serving.build import (
     session_frame,
 )
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.backends.release.interfaces import ReleaseInvalidError
 from algotrade.storage.backends.release.memory import MemoryReleaseStore
 from algotrade.storage.backends.run_selection import StaleSnapshotError
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_rows
+from tests.helpers.stored_frames import stamped
 
 S1, S2 = date(2026, 10, 1), date(2026, 10, 2)
 
@@ -78,30 +81,74 @@ def test_the_session_record_has_fixed_columns_and_no_newer() -> None:
     assert frame.equals(session_frame(resolve_session(StoreReader(backend), None)))
 
 
-class Flaky(StoreReader):
-    """A reader whose pinned reads lose a version ``failures`` times."""
-
-    def __init__(self, backend: MemoryBackend, failures: int) -> None:
-        super().__init__(backend)
-        self.failures = failures
-        self.seen: list[int] = []
-
-    def pinned(self, seq: int) -> StoreReader:
-        self.seen.append(seq)
-        if self.failures > 0:
-            self.failures -= 1
-            raise StaleSnapshotError("a version the build needed was replaced")
-        return super().pinned(seq)
-
-
-def test_a_stale_pin_restarts_the_build_and_after_three_tries_gives_up() -> None:
+def test_a_stale_pin_restarts_the_build_and_after_three_tries_gives_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     backend, _ = populated()
-    store = MemoryReleaseStore(backend.tables)
-    once = Flaky(backend, 1)
-    manifest = build_release(once, store, "abc")
-    assert len(once.seen) == 2 and manifest.session == S2.isoformat()
-    never = Flaky(backend, 99)
+    reads: list[int] = []
+    real = build_module.resolve_session
+
+    def lose(times: int) -> object:
+        def resolve(reader: StoreReader, requested: date | None) -> Session:
+            reads.append(1)
+            if len(reads) <= times:
+                raise StaleSnapshotError("a version the build needed was replaced")
+            return real(reader, requested)
+
+        return resolve
+
+    monkeypatch.setattr(build_module, "resolve_session", lose(1))
+    manifest = build_release(StoreReader(backend), MemoryReleaseStore(backend.tables), "abc")
+    assert len(reads) == 2 and manifest.session == S2.isoformat()
+    reads.clear()
+    monkeypatch.setattr(build_module, "resolve_session", lose(99))
     with pytest.raises(StaleSnapshotError):
-        build_release(never, MemoryReleaseStore(backend.tables), "abc")
-    assert len(never.seen) == MAX_TRIES
-    assert backend.tables.pins().keys() <= {f"release-{manifest.release_id}"}  # no pin left behind
+        build_release(StoreReader(backend), MemoryReleaseStore(backend.tables), "abc")
+    assert len(reads) == MAX_TRIES
+    assert backend.tables.pins().keys() <= {f"release-{manifest.release_id}"}  # none left behind
+
+
+def test_a_session_completed_after_the_pin_is_never_named_by_the_release(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The nightly commits S+1's tables then saves its COMPLETE record: both after X was taken.
+    The run records are read before X, so the build still answers S, with S's tables."""
+    backend, _ = populated()
+    day = date(2026, 10, 3)
+    real = build_module.resolve_session
+
+    def after_x(reader: StoreReader, requested: date | None) -> Session:
+        bar = {"open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0, "volume": 1.0}
+        row = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), **bar}
+        backend.tables.write(
+            "bars/1d", day, "nightly-3", stamped([row], day, "nightly-3"), pending=True
+        )
+        backend.tables.commit_run("nightly-3", datetime(2026, 10, 3, 22, tzinfo=UTC))  # a commit
+        started = datetime(day.year, day.month, day.day, 22, tzinfo=UTC)
+        record = RunRecord(f"nightly-{day}", "nightly", day, started, RunStatus.COMPLETE, started)
+        backend.runs.save(record)
+        return real(reader, requested)
+
+    monkeypatch.setattr(build_module, "resolve_session", after_x)
+    store = MemoryReleaseStore(backend.tables)
+    manifest = build_release(StoreReader(backend), store, "abc")
+    assert manifest.session == S2.isoformat()
+    assert resolve_session(StoreReader(backend), None).date == day  # live has moved on
+
+
+def test_a_destructive_operation_during_the_reads_stops_the_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend, _ = populated()
+    real = build_module.resolve_session
+
+    def drop_midway(reader: StoreReader, requested: date | None) -> Session:
+        found = real(reader, requested)
+        backend.tables.drop("rollups/instrument/other@v1")  # between the reads and the draft
+        return found
+
+    monkeypatch.setattr(build_module, "resolve_session", drop_midway)
+    store = MemoryReleaseStore(backend.tables)
+    with pytest.raises(ReleaseInvalidError, match="epoch"):
+        build_release(StoreReader(backend), store, "abc")
+    assert backend.tables.pins() == {} and store.releases() == []

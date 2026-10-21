@@ -1,13 +1,16 @@
 """Build, promote and prune the serving release (ADR 0077 decisions 2-5), under the ``serve`` lock.
 
 ``serve_release`` is the whole job: it does nothing while CURRENT already serves the default
-session (the hourly watchdog and a nightly that changed nothing are no-ops; ``rebuild`` builds
-anyway, which is what the post-session start asks for: release r2 of the same session), else
+session with every input still at its recorded stamp (the hourly watchdog and a nightly that
+changed nothing are no-ops; a same-session restatement is not; ``rebuild`` builds anyway,
+which is what the post-session start asks for: release r2 of the same session), else
 builds the release of the default session at one pinned sequence, promotes it unless CURRENT
 already names it, and prunes (which records what the pins hold). It is not the nightly's last
 step: the nightly starts it after it released the ingest lock, so a failed release neither holds
 back sessions nor triggers the hourly retry. A failure of any kind leaves CURRENT where it was
 (the build only becomes visible at ``promote``) and is recorded as a FAILED ``serve-release`` run.
+A backfill of an older date does not make CURRENT stale (only the session's own inputs are
+compared): it ships with the next session's release.
 """
 
 import subprocess
@@ -16,19 +19,17 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 
-from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.services.jobs import RunLockedError, exclusive_run
 from algotrade.services.read.session import default_session
 from algotrade.services.serving.build import build_release
 from algotrade.storage.backends.release.interfaces import ReleaseError, ReleaseStore
-from algotrade.storage.backends.run_selection import StaleSnapshotError
 from algotrade.storage.runs import RunStatus, start_run
 from algotrade.storage.tables.interfaces import Backend
 
 JOB = "serve-release"
 SERVE_LOCK = "serve"
-KEEP = 2  # the current release plus the newest two: the last of the previous session, one more
+KEEP_SESSIONS = 2  # with the current release: the newest release of the last two sessions
 
 
 class ServeStatus(StrEnum):
@@ -78,7 +79,9 @@ def serve_release(
 
 
 def _serving_now(reader: StoreReader, releases: ReleaseStore) -> str | None:
-    """The release CURRENT serves when it is for the default session (else ``None``)."""
+    """The release CURRENT serves when it is fresh: for the default session and every input
+    partition it was built from still has the stamp it recorded (a same-session restatement
+    ships; a backfill of an older date waits for the next session's release), else ``None``."""
     day = default_session(reader)
     try:
         current = releases.current_release()
@@ -86,6 +89,10 @@ def _serving_now(reader: StoreReader, releases: ReleaseStore) -> str | None:
         return None
     if day is None or current is None or current.manifest.session != day.isoformat():
         return None
+    for item in current.manifest.inputs:
+        for held, stamp in item.partitions.items():
+            if reader.partition_seq(item.table, held, held).get(held) != stamp:
+                return None
     return current.manifest.release_id
 
 
@@ -102,8 +109,8 @@ def _locked(
         manifest = build_release(reader, releases, code_sha)
         if releases.current() != (manifest.release_id, manifest.content_hash):
             releases.promote(manifest.release_id)
-        releases.prune(KEEP)
-    except (AlgoTradeError, ReleaseError, StaleSnapshotError) as exc:
+        releases.prune(KEEP_SESSIONS)
+    except Exception as exc:
         record.status, record.finished_at = RunStatus.FAILED, now
         record.stats = {"error": str(exc), "code_sha": code_sha}
         backend.runs.save(record)

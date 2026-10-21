@@ -271,9 +271,10 @@ def start_serve_release(args: argparse.Namespace) -> None:
     if args.command == "nightly" and not ran:
         return
     rebuild = args.command == "post-session" and ran
+    wait = args.command == "nightly" or ran  # the hourly watchdog never queues behind a build
     try:
-        serve_release_command(open_backend(data_url()), rebuild, True, sys.stderr, quiet=True)
-    except (AlgoTradeError, OSError) as exc:
+        serve_release_command(open_backend(data_url()), rebuild, wait, sys.stderr, quiet=True)
+    except Exception as exc:
         print(f"serve-release not started: {exc}", file=sys.stderr)
 
 

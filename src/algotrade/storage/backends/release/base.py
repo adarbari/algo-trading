@@ -35,6 +35,7 @@ from algotrade.storage.backends.release.interfaces import (
     ReleaseInvalidError,
     ReleaseNotFoundError,
     ReleaseReport,
+    Reservation,
 )
 from algotrade.storage.backends.release.manifest import (
     MAX_RELEASE_BYTES,
@@ -151,17 +152,31 @@ class ReleaseStoreBase(ABC):
     def releases(self) -> list[str]:
         return self._order(self._sealed()[0])
 
-    def begin(self, session: date, seq: int, fmt: int) -> Draft:
+    def reserve(self, seq: int) -> Reservation:
+        token = secrets.token_hex(4)
+        epoch = self._tables.destructive_epoch()  # before the pin and before any read
+        self._tables.pin(f"{PIN_PREFIX}pending-{token}", seq)
+        return Reservation(token, seq, epoch)
+
+    def drop_reservation(self, reservation: Reservation) -> None:
+        self._tables.unpin(f"{PIN_PREFIX}pending-{reservation.token}")
+
+    def begin(
+        self, session: date, seq: int, fmt: int, reservation: Reservation | None = None
+    ) -> Draft:
         manifests = self._sealed()[0]
         order = self._order(manifests)
         need = room_needed(manifests[order[-1]].total_bytes if order else 0)
         if (free := self.free_bytes()) < need:
             raise ReleaseInvalidError(f"free space {free} B is below the floor of {need} B")
+        if reservation is not None and reservation.seq != seq:
+            raise ReleaseInvalidError(f"the reservation is at {reservation.seq}, not {seq}")
         rid = release_id(session, seq, fmt)
-        draft = Draft(
-            rid, session, seq, fmt, self._tables.destructive_epoch(), secrets.token_hex(4)
-        )
+        epoch = self._tables.destructive_epoch() if reservation is None else reservation.epoch
+        draft = Draft(rid, session, seq, fmt, epoch, secrets.token_hex(4))
         self._tables.pin(PIN_PREFIX + rid, seq)  # before any file: a crash leaves a pin prune sees
+        if reservation is not None:
+            self.drop_reservation(reservation)
         self._draft_open(draft)
         return draft
 
@@ -267,10 +282,15 @@ class ReleaseStoreBase(ABC):
         manifest = self._manifest(release)
         return None if manifest is None else StoredRelease(manifest, self._loader(release))
 
-    def prune(self, keep: int) -> int:
+    def prune(self, sessions: int) -> int:
         manifests, unreadable = self._sealed()
         named = self._read_current()
-        kept = set(self._order(manifests)[len(manifests) - keep :] if keep > 0 else [])
+        newest: dict[str, str] = {}  # session -> its newest release (highest sequence)
+        for release in self._order(manifests):
+            newest[manifests[release].session] = release
+        kept = (
+            {newest[s] for s in sorted(newest)[len(newest) - sessions :]} if sessions > 0 else set()
+        )
         if named is not None:
             kept.add(named[0])
         doomed = [r for r in manifests if r not in kept]

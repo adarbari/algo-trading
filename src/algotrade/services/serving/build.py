@@ -18,8 +18,13 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.data import StoreReader
-from algotrade.services.read.session import Session, resolve_session
-from algotrade.storage.backends.release.interfaces import InputPartitions, ReleaseStore
+from algotrade.services.read.session import NIGHTLY, Session, resolve_session
+from algotrade.storage.backends.release.interfaces import (
+    Draft,
+    InputPartitions,
+    ReleaseStore,
+    Reservation,
+)
 from algotrade.storage.backends.release.manifest import Manifest
 from algotrade.storage.backends.run_selection import StaleSnapshotError
 
@@ -82,24 +87,39 @@ def input_partitions(pinned: StoreReader, session: Session) -> list[InputPartiti
 def build_release(reader: StoreReader, store: ReleaseStore, code_sha: str) -> Manifest:
     """Build, seal and return the release of the default session at the current sequence.
     Raises ``NotFoundError`` for an empty store, ``ReleaseError`` when the store refuses the
-    build, ``StaleSnapshotError`` after ``MAX_TRIES`` lost pins. Never promotes."""
+    build, ``StaleSnapshotError`` after ``MAX_TRIES`` lost pins. Never promotes.
+
+    Order matters (point in time): the nightly run records are read first (``runs`` ignores the
+    pin, and a COMPLETE record is saved after the commits it names, so records read before X
+    name only sessions whose tables are inside X); then X is taken, then reserved (pinned, with
+    the destructive epoch) before the first read; the session is resolved on the pinned reader
+    over those records; ``begin`` turns the reservation into the release's pin and ``seal``
+    refuses if the epoch moved since the reservation."""
     lost: StaleSnapshotError | None = None
     for _ in range(MAX_TRIES):
-        x = reader.visible_seq()
+        frozen = reader.with_runs_frozen([NIGHTLY])
+        x = frozen.visible_seq()
+        reservation = store.reserve(x)
         draft = None
         try:
-            pinned = reader.pinned(x)
+            pinned = frozen.pinned(x)
             session = resolve_session(pinned, None)
-            draft = store.begin(session.date, x, FORMAT)
+            draft = store.begin(session.date, x, FORMAT, reservation)
             store.write_frame(draft, SESSION_TABLE, session_frame(session))
             return store.seal(draft, input_partitions(pinned, session), code_sha)
         except StaleSnapshotError as exc:  # a version went before the pin held it: start again
             lost = exc
-            if draft is not None:
-                store.abort(draft)
+            _give_back(store, draft, reservation)
         except BaseException:
-            if draft is not None:
-                store.abort(draft)
+            _give_back(store, draft, reservation)
             raise
     assert lost is not None
     raise lost
+
+
+def _give_back(store: ReleaseStore, draft: Draft | None, reservation: Reservation) -> None:
+    """Undo a failed attempt: the draft and its pin once begun, else the reservation."""
+    if draft is not None:
+        store.abort(draft)
+    else:
+        store.drop_reservation(reservation)

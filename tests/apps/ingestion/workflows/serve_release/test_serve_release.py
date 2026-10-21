@@ -12,6 +12,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.backends.release.memory import MemoryReleaseStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_ingestion.workflows.serve_release import serve_release as serve_module
 from algotrade_ingestion.workflows.serve_release.serve_release import (
     JOB,
     SERVE_LOCK,
@@ -120,3 +121,46 @@ def test_an_empty_store_fails_quietly(
     out = serve_release(empty, MemoryReleaseStore(empty.tables), NOW, code_sha="abc")
     assert out.status is ServeStatus.FAILED and "nothing stored" in out.reason
     assert StoreReader(empty).dates("bars/1d") == [] and store.releases() == []
+
+
+def test_a_restated_input_of_the_same_session_ships_a_new_release(
+    world: tuple[MemoryBackend, StoreWriter, MemoryReleaseStore],
+) -> None:
+    """CURRENT names the session but one of its inputs was restated since: stale."""
+    backend, _, store = world
+    first = serve_release(backend, store, NOW, code_sha="abc")
+    bar = {"open": 2.0, "high": 2.0, "low": 2.0, "close": 2.0, "volume": 2.0}
+    row = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(S1, tz="UTC"), **bar}
+    frame = stamped([row], S1, "restate")
+    backend.tables.write("bars/1d", S1, "restate", frame, restates=True, pending=True)
+    backend.tables.commit_run("restate", NOW)
+    second = serve_release(backend, store, NOW, code_sha="abc")
+    assert second.status is ServeStatus.PROMOTED and second.release_id != first.release_id
+    assert serve_release(backend, store, NOW, code_sha="abc").status is ServeStatus.CURRENT
+
+
+def test_the_newest_release_of_the_last_two_sessions_is_kept(
+    world: tuple[MemoryBackend, StoreWriter, MemoryReleaseStore],
+) -> None:
+    backend, writer, store = world
+    first = serve_release(backend, store, NOW, code_sha="abc")
+    for n in range(2, 5):
+        add_session(backend, writer, date(2026, 10, n))
+        last = serve_release(backend, store, NOW, code_sha="abc")
+    assert store.releases() and first.release_id not in store.releases()
+    assert [r[:10] for r in store.releases()] == ["2026-10-03", "2026-10-04"]
+    assert store.current()[0] == last.release_id  # type: ignore[index]
+
+
+def test_any_exception_is_recorded_and_never_leaves_the_run_running(
+    world: tuple[MemoryBackend, StoreWriter, MemoryReleaseStore], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend, _, store = world
+
+    def explode(*args: object, **kwargs: object) -> None:
+        raise KeyError("a bug in the build")
+
+    monkeypatch.setattr(serve_module, "build_release", explode)
+    out = serve_release(backend, store, NOW, code_sha="abc")
+    assert out.status is ServeStatus.FAILED and "a bug in the build" in out.reason
+    assert [r.status for r in backend.runs.find(JOB)] == [RunStatus.FAILED]

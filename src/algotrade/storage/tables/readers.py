@@ -45,6 +45,14 @@ class StoreReader:
         not pin the store: ``TableStore.pin`` retains the versions."""
         return StoreReader(self._backend, self.own_run, seq)
 
+    def with_runs_frozen(self, jobs: Collection[str]) -> "StoreReader":
+        """A reader whose ``runs(job, ...)`` of each of ``jobs`` answers from the records saved
+        right now (the pin, if any, and ``own_run`` kept). Run records are not versioned by the
+        commit sequence; a build that takes its sequence X after this call sees only records
+        saved before X, which a workflow saves after the commits they name."""
+        frozen = {job: tuple(self.runs(job)) for job in jobs}
+        return _FrozenRuns(self._backend, self.own_run, self._pin, frozen)
+
     def version(self) -> Hashable:
         """What a cache over this reader's rows is keyed by: ``("pin", seq)`` for a pinned
         reader (stable while the store moves on), else ``("live", visible_seq())`` (changes
@@ -160,6 +168,31 @@ class StoreReader:
     def run(self, run_id: str) -> RunRecord | None:
         """One run record by id (``None`` when there is none)."""
         return self._backend.runs.load(run_id)
+
+
+class _FrozenRuns(StoreReader):
+    """A ``StoreReader`` whose run records of some jobs are a snapshot (``with_runs_frozen``)."""
+
+    def __init__(
+        self,
+        backend: Backend,
+        own_run: str | None,
+        pin: int | None,
+        frozen: dict[str, tuple[RunRecord, ...]],
+    ) -> None:
+        super().__init__(backend, own_run, pin)
+        self._frozen = frozen
+
+    def runs(self, job: str, session_date: date | None = None) -> list[RunRecord]:
+        if job not in self._frozen:
+            return super().runs(job, session_date)
+        return [r for r in self._frozen[job] if session_date in (None, r.session_date)]
+
+    def pinned(self, seq: int) -> "StoreReader":
+        return _FrozenRuns(self._backend, self.own_run, seq, self._frozen)
+
+    def including(self, run_id: str) -> "StoreReader":
+        return _FrozenRuns(self._backend, run_id, self._pin, self._frozen)
 
 
 @dataclass(frozen=True)

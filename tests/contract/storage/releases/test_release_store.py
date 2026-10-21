@@ -251,16 +251,16 @@ def test_the_floor_is_three_times_the_last_release_when_that_is_larger(rig: Rig)
         rig.make(free=lambda: floor - 1).begin(S2, x, 1)
 
 
-def test_prune_keeps_the_newest_and_the_current_and_unpins_the_rest(rig: Rig) -> None:
+def test_prune_keeps_the_current_and_the_newest_release_of_the_last_sessions(rig: Rig) -> None:
     ids = []
     for n, day in enumerate((S1, S2, date(2026, 10, 3), date(2026, 10, 4))):
         rig.commit(f"r{n}", day)
         ids.append(rig.build(day))
     rig.store.promote(ids[1])
-    assert rig.store.prune(keep=1) == 2  # ids[0] and ids[2] go; the newest and the current stay
-    assert rig.store.releases() == [ids[1], ids[3]]
+    assert rig.store.prune(sessions=2) == 1  # the newest release of each of the last two sessions
+    assert rig.store.releases() == [ids[1], ids[2], ids[3]]  # and the current one (ids[1])
     assert rig.store.open(ids[0]) is None and rig.store.open(ids[3]) is not None
-    assert set(rig.backend.tables.pins()) == {f"release-{ids[1]}", f"release-{ids[3]}"}
+    assert set(rig.backend.tables.pins()) == {f"release-{i}" for i in ids[1:]}
     assert rig.store.current_release().manifest.release_id == ids[1]  # type: ignore[union-attr]
 
 
@@ -272,11 +272,11 @@ def test_prune_unpins_a_crashed_draft_and_a_pin_with_no_release_but_not_other_pi
     rig.backend.tables.pin("release-2026-09-01.1.f1", 1)  # a release deleted by hand
     rig.backend.tables.pin("someone-else", 1)
     live = rig.make(draft_ttl_s=3600)
-    assert live.prune(keep=1) == 0
+    assert live.prune(sessions=1) == 0
     assert f"release-{crashed.release_id}" in rig.backend.tables.pins()  # a draft in flight
     assert "release-2026-09-01.1.f1" not in rig.backend.tables.pins()
     expired = rig.make(draft_ttl_s=0)
-    expired.prune(keep=1)
+    expired.prune(sessions=1)
     assert rig.backend.tables.pins() == {"someone-else": 1}
 
 
@@ -304,9 +304,9 @@ def test_report_names_the_pins_and_measures_retained_disk_only_when_asked_or_aft
     assert report.releases == (f"{S1.isoformat()}.{x}.f1",) and report.current is None
     assert report.pinned_bytes is None  # never measured: status and doctor do not walk the store
     assert (rig.store.report(with_bytes=True).pinned_bytes or 0) > 0
-    rig.store.prune(keep=1)  # the job records what the pins hold after its prune
+    rig.store.prune(sessions=1)  # the job records what the pins hold after its prune
     assert (rig.store.report().pinned_bytes or 0) > 0
-    rig.store.prune(keep=0)
+    rig.store.prune(sessions=0)
     assert rig.store.report().pinned_bytes == 0 and rig.store.report().pins == {}
 
 
@@ -327,7 +327,7 @@ def test_a_draft_pruned_during_the_build_cannot_be_written_sealed_or_served(rig:
     x = rig.commit("r1")
     draft = rig.store.begin(S1, x, 1)
     rig.store.write(draft, "session", SESSION)
-    rig.make(draft_ttl_s=0).prune(keep=1)  # the build looked dead: folder and pin are gone
+    rig.make(draft_ttl_s=0).prune(sessions=1)  # the build looked dead: folder and pin are gone
     with pytest.raises(ReleaseInvalidError, match="draft"):
         rig.store.write(draft, "picks", PICKS)
     with pytest.raises(ReleaseInvalidError, match="pin"):
@@ -378,6 +378,38 @@ def test_a_read_racing_a_prune_raises_not_found(rig: Rig) -> None:
     rig.store.promote(new)
     release = rig.store.open(old)
     assert release is not None
-    assert rig.store.prune(keep=0) == 1
+    assert rig.store.prune(sessions=0) == 1
     with pytest.raises(ReleaseNotFoundError):
         release.read("picks")
+
+
+def test_prune_keeps_only_the_newest_release_of_a_session(rig: Rig) -> None:
+    rig.commit("r1")
+    first = rig.build()
+    rig.commit("r2", value=2.0)
+    second = rig.build()  # release r2 of the same session
+    assert first != second
+    assert rig.store.prune(sessions=2) == 1
+    assert rig.store.releases() == [second]
+
+
+def test_a_reservation_pins_before_the_reads_and_the_build_keeps_its_epoch(rig: Rig) -> None:
+    x = rig.commit("r1")
+    reservation = rig.store.reserve(x)
+    assert list(rig.backend.tables.pins().values()) == [x]
+    rig.backend.tables.drop("rollups/instrument/other@v1")  # a destructive op during the reads
+    draft = rig.store.begin(S1, x, 1, reservation)
+    names = rig.backend.tables.pins()
+    assert set(names) == {f"release-{draft.release_id}"}  # the pending pin became the release's
+    rig.store.write(draft, "picks", PICKS)
+    with pytest.raises(ReleaseInvalidError, match="epoch"):  # the epoch taken before the reads
+        rig.store.seal(draft, [InputPartitions(TABLE, {S1: x})], "abc")
+
+
+def test_a_dropped_reservation_unpins_and_prune_clears_a_forgotten_one(rig: Rig) -> None:
+    x = rig.commit("r1")
+    rig.store.drop_reservation(rig.store.reserve(x))
+    assert rig.backend.tables.pins() == {}
+    rig.store.reserve(x)  # a build that died between the pin and its begin
+    rig.store.prune(sessions=2)
+    assert rig.backend.tables.pins() == {}

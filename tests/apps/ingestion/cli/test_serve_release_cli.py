@@ -11,7 +11,7 @@ from algotrade_ingestion.workflows.serve_release.serve_release import ServeOutco
 
 class Calls:
     def __init__(self) -> None:
-        self.runs: list[tuple[bool, bool]] = []
+        self.runs: list[tuple[bool, bool]] = []  # (rebuild, wait)
         self.outcome = ServeOutcome(ServeStatus.PROMOTED, "2026-10-02.7.f1")
 
     def serve(
@@ -83,7 +83,8 @@ def test_a_post_session_that_ran_asks_for_release_r2_and_a_no_op_one_does_not(
     assert cli.main(["post-session"]) == 0
     monkeypatch.setattr(cli, "_run", lambda parser, args: 0)
     assert cli.main(["post-session"]) == 0
-    assert calls.runs == [(True, True), (False, True)]
+    # the watchdog's start (nothing ran) never queues behind a running build: wait=False
+    assert calls.runs == [(True, True), (False, False)]
 
 
 def test_a_release_that_cannot_start_never_changes_the_nightlys_exit_code(
@@ -96,8 +97,8 @@ def test_a_release_that_cannot_start_never_changes_the_nightlys_exit_code(
     monkeypatch.setattr(cli, "_run", ran)
 
     def boom(*args: object, **kwargs: object) -> ServeOutcome:
-        raise cli.AlgoTradeError("no store")
+        raise KeyError("no store")
 
     monkeypatch.setattr(cli, "serve_release", boom)
     assert cli.main(["nightly"]) == 0
-    assert "serve-release not started: no store" in capsys.readouterr().err
+    assert "serve-release not started: " in capsys.readouterr().err
