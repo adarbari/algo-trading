@@ -2,11 +2,20 @@
 reads that found nothing; reads outside ``attribute`` are not."""
 
 from datetime import date, timedelta
+from pathlib import Path
 
+import pandas as pd
 import pytest
 
+from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.tables.readers import ReadRecord, RecordingReader, StoreReader, dates_digest
+from algotrade.storage.tables.readers import (
+    ReadRecord,
+    RecordingReader,
+    RollingRead,
+    StoreReader,
+    dates_digest,
+)
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
 
@@ -14,7 +23,7 @@ D1, D2, D3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)
 A, B = "rollups/instrument/a@v1", "rollups/instrument/b@v1"
 
 
-def publish(backend: MemoryBackend, run: str, table: str, *days: date) -> None:
+def publish(backend: MemoryBackend | LocalBackend, run: str, table: str, *days: date) -> None:
     writer = StoreWriter(backend)
     for day in days:
         frame = stamped([{"instrument_id": "EQ:A", "value": 1.0}], day, run)
@@ -242,3 +251,63 @@ def test_a_pinned_recording_reader_logs_the_pinned_partitions() -> None:
     with reader.attribute(D2):
         assert reader.table_range(A, D1, D3) is not None
     assert reader.reads(D2) == (ReadRecord(A, D1, D3, "rows", dates_digest([D1])),)
+
+
+def test_a_rolling_range_read_equals_the_plain_one_and_logs_the_whole_range() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1, D2)
+    reader = RecordingReader(backend)
+    memo = RollingRead(A, ("value",))
+    plain = StoreReader(backend)
+    with reader.attribute(D3):
+        first = reader.table_range_rolling(memo, D1, D2)
+    publish(backend, "r2", A, D3)  # a new partition after the window: appended
+    with reader.attribute(D3):
+        second = reader.table_range_rolling(memo, D2, D3)  # the window moved: D1 dropped
+    pd.testing.assert_frame_equal(first, plain.table_range(A, D1, D2, None, None, ["value"]))
+    pd.testing.assert_frame_equal(second, plain.table_range(A, D2, D3, None, None, ["value"]))
+    assert reader.reads(D3) == (
+        ReadRecord(A, D1, D2, "rows", dates_digest([D1, D2])),
+        ReadRecord(A, D2, D3, "rows", dates_digest([D2, D3])),
+    )
+    publish(backend, "r3", A, D2)  # a kept partition restated: the range is read whole again
+    pd.testing.assert_frame_equal(
+        reader.table_range_rolling(memo, D2, D3),
+        plain.table_range(A, D2, D3, None, None, ["value"]),
+    )
+    assert len(plain.table_range(A, D2, D3, None, None, ["value"])) == 2
+
+
+def _rolled(reader: StoreReader, memo: RollingRead, a: date, b: date) -> pd.DataFrame | None:
+    return reader.table_range_rolling(memo, a, b)
+
+
+def _same(reader: StoreReader, memo: RollingRead, a: date, b: date) -> None:
+    want = reader.table_range(A, a, b, None, None, ["value"])
+    pd.testing.assert_frame_equal(_rolled(reader, memo, a, b), want)  # type: ignore[arg-type]
+
+
+def _publish_instrument(backend: LocalBackend, run: str, iid: str, day: date) -> None:
+    frame = stamped([{"instrument_id": iid, "value": 1.0}], day, run)
+    StoreWriter(backend).write_table(A, day, run, frame, pending=True)
+    backend.tables.commit_run(run, T0 + timedelta(minutes=5))
+
+
+def test_a_rolling_read_sees_a_purged_run_a_pinned_one_and_a_direct_write(tmp_path: Path) -> None:
+    """No partition stamp moves on a purge of a non-top run or a direct write (``epoch`` does)."""
+    backend = LocalBackend(tmp_path)
+    publish(backend, "r0", A, D1)
+    for n, pinned in enumerate((False, True, False)):
+        day = date(2026, 10, 2 + n)
+        _publish_instrument(backend, f"a{n}", "EQ:A", day)
+        _publish_instrument(backend, f"b{n}", "EQ:B", day)  # the day holds two runs' rows
+        reader = StoreReader(backend)
+        reader = reader.pinned(backend.tables.visible_seq()) if pinned else reader
+        memo = RollingRead(A, ("value",))
+        _same(reader, memo, D1, day)
+        if n < 2:
+            backend.tables.purge_runs(A, day, [f"a{n}"])  # a non-top run: its rows go
+        else:
+            frame = stamped([{"instrument_id": "EQ:C", "value": 7.0}], day, "direct")
+            StoreWriter(backend).write_table(A, day, "direct", frame)  # no sequence
+        _same(reader, memo, D1, day)
