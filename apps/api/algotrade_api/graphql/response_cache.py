@@ -238,10 +238,13 @@ def response_key(
     closed: date | None = None,
     served: str = "",
     today: date | None = None,
+    generation: int = 0,
 ) -> str:
     """The hex digest identifying one cacheable answer. ``runs`` (the runs generation) is part
     of a ``RUN_OPERATIONS`` key, ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one, ``served``
-    (``served_token``: the default session) of every key (ADR 0062)."""
+    (``served_token``: the default session) of every key (ADR 0062); ``generation`` is the
+    viewer's config generation (``storage/configs/generation.py``, ADR 0077 decision 15), part of
+    every key that holds the user (a ``SHARED_OPERATIONS`` one does not)."""
     who = (
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )
@@ -249,6 +252,8 @@ def response_key(
     licences = ",".join(sorted(viewer.licences))  # what a viewer may see differs (ADR 0069)
     parts = [str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text]
     parts.append(f"licences:{licences}")
+    if name not in SHARED_OPERATIONS:
+        parts.append(f"config:{generation}")
     parts.append(f"session:{served}")
     if name in RUN_OPERATIONS:
         parts.append(f"runs:{runs[0]}:{runs[1]}")

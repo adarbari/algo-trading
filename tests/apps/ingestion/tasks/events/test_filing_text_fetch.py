@@ -57,10 +57,13 @@ class Fakes:
     def __init__(self, docs: dict[str, list[str]], fail: dict[str, Exception] | None = None):
         self.docs, self.fail = docs, fail or {}
         self.listed: list[str] = []
+        self.hold_list: dict[str, threading.Event] = {}  # a listing waits for its event
         self.bodies: list[str] = []
         self.lock = threading.Lock()
 
     def list_fn(self, cik: str) -> tuple[bytes | None, Sequence[FilingTextRequest]]:
+        if cik in self.hold_list:
+            assert self.hold_list[cik].wait(10), f"the event of {cik} was never set"
         with self.lock:
             self.listed.append(cik)
         return b"list:" + cik.encode(), [request(a, cik) for a in self.docs.get(cik, [])]
@@ -122,22 +125,26 @@ def test_only_a_few_ciks_are_listed_ahead_of_the_loop() -> None:
 
 
 def test_a_block_stops_what_has_not_started_holds_the_limiter_and_later_asks_raise() -> None:
+    """Deterministic: the second CIK's listing is held back until the block has been seen, so its
+    documents are not yet started when the pipeline stops (never a race with a fast document)."""
     held: list[int] = []
+    blocked_seen = threading.Event()
     blocked = GaveUpError("giving up: HTTP 403", 403)
     fakes = Fakes({CIKS[0]: ["a1"], CIKS[1]: ["b1", "b2"]}, fail={"a1": blocked})
-    prefetch = pipeline(fakes, CIKS, on_block=lambda: held.append(1))
+    fakes.hold_list[CIKS[1]] = blocked_seen  # the listing of CIK 2 waits for the block
+    prefetch = pipeline(fakes, CIKS, on_block=lambda: (held.append(1), blocked_seen.set()))
     try:
+        prefetch.listing(CIKS[0])
         with pytest.raises(GaveUpError):
-            prefetch.document(CIKS[0], "a1") if prefetch.listing(CIKS[0]) else None
-        for _ in range(200):  # the block has been seen: nothing new starts
-            if held:
-                break
-            threading.Event().wait(0.01)
+            prefetch.document(CIKS[0], "a1")
+        assert blocked_seen.wait(10)
         assert held == [1]  # the limiter is held once, not once per request in flight
-        started = len(fakes.bodies)
-        with pytest.raises((TransientFetchError, GaveUpError)):
+        prefetch.listing(CIKS[1])  # its listing ends after the stop: its documents are not started
+        with pytest.raises(TransientFetchError):
             prefetch.document(CIKS[1], "b2")
-        assert len(fakes.bodies) <= started + 3  # at most what was already running
+        with pytest.raises(TransientFetchError):
+            prefetch.document(CIKS[1], "b1")
+        assert "b1" not in fakes.bodies and "b2" not in fakes.bodies  # nothing went out
     finally:
         prefetch.close()
 

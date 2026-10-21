@@ -36,6 +36,7 @@ from algotrade.core.model.errors import (
     RateLimitedError,
 )
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
+from algotrade.services.configs import config_generation as config_generation_of
 from algotrade.services.drafting.redraft.cap import PartRedraftCap
 from algotrade.services.explaining.cache import open_text_cache
 from algotrade.services.explaining.limits import RateLimiter
@@ -178,6 +179,7 @@ def _mount_graphql(
     settings: ApiSettings,
     users: UsersSettings,
     epoch: WriteEpoch,
+    config_generation: Callable[[str], int | None],
     caller: list[Any],
 ) -> tuple[Callable[[UserContext, date | None], ReadContext], CachingRouter]:
     """``POST /graphql`` over the app's store with one read-result cache and an operation log
@@ -196,6 +198,7 @@ def _mount_graphql(
         runs=store.reader.runs_generation,
         served=_served(store, cache),
         log=operations,
+        config_generation=config_generation,
     )
     app.include_router(gql, dependencies=caller)
     owner = users.get(settings.user)
@@ -348,7 +351,9 @@ def create_app(
     caller = [Depends(get_caller)]
     for router in ROUTERS:
         app.include_router(router, dependencies=caller)
-    reads, gql = _mount_graphql(app, settings, users, epoch, caller)
+    reads, gql = _mount_graphql(
+        app, settings, users, epoch, config_generation_of(app.state.store.configs), caller
+    )
     app.state.graphql = gql  # the lifespan cancels its background recomputes
     user = app.state.store.user
     app.state.warmer = (
