@@ -195,3 +195,22 @@ def test_capture_outside_the_attributed_day_is_refused() -> None:
         pass
     with reader.attribute(D2), pytest.raises(RuntimeError, match="capture"), reader.capture(D1):
         pass
+
+
+def test_a_capture_that_raises_keeps_its_partial_reads_and_a_day_with_reads_its_sequence() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    reader = RecordingReader(backend)
+    first = backend.tables.visible_seq()
+    with reader.attribute(D1):
+        reader.table(A, D1)  # the day's own first read
+        publish(backend, "r2", A, D1)
+        with pytest.raises(ValueError, match="boom"), reader.capture(D1):
+            reader.table(A, D2)
+            raise ValueError("boom")
+        assert len(reader.reads(D1)) == 2  # the partial read stays logged, as before
+    assert reader.inputs_seq(D1) == first  # the earlier sequence of the day is kept
+    with reader.attribute(D2), pytest.raises(ValueError, match="boom"), reader.capture(D2):
+        reader.table(A, D2)
+        raise ValueError("boom")
+    assert reader.inputs_seq(D2) is not None and len(reader.reads(D2)) == 1

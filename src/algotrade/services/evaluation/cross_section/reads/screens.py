@@ -13,6 +13,7 @@ its caller can read: they are not a store, never outlive the run and are never r
 
 import os
 import pickle
+import tempfile
 from collections import Counter
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
@@ -47,7 +48,7 @@ class ScreenCache:
             return None
         try:
             found = pickle.loads(self._path(owner, config_hash, day).read_bytes())
-        except (FileNotFoundError, EOFError, pickle.UnpicklingError):
+        except (OSError, EOFError, pickle.UnpicklingError):
             return None  # not computed yet (or a stray partial file): compute it
         return found if isinstance(found, CachedScreen) else None
 
@@ -55,10 +56,16 @@ class ScreenCache:
         if not self.wants(owner, config_hash):
             return
         path = self._path(owner, config_hash, day)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        scratch = path.with_suffix(f".{os.getpid()}.tmp")
-        scratch.write_bytes(pickle.dumps(screen, protocol=pickle.HIGHEST_PROTOCOL))
-        scratch.replace(path)
+        scratch: str | None = None
+        try:  # optional: a full disk or a pickling error costs a recompute, never the edge
+            path.parent.mkdir(parents=True, exist_ok=True)
+            handle, scratch = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+            with os.fdopen(handle, "wb") as out:
+                pickle.dump(screen, out, protocol=pickle.HIGHEST_PROTOCOL)
+            Path(scratch).replace(path)
+        except (OSError, pickle.PicklingError):
+            if scratch is not None:
+                Path(scratch).unlink(missing_ok=True)
 
 
 def shared_screens(uses: Iterable[tuple[str, str]]) -> frozenset[tuple[str, str]]:

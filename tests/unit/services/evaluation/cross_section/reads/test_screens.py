@@ -50,6 +50,18 @@ def test_a_cache_returns_what_was_put_for_a_wanted_pair_only(world: World, tmp_p
     assert not list(tmp_path.rglob(f"{DAYS[1].isoformat()}*"))  # not shared: never written
 
 
+def test_a_put_that_cannot_write_costs_a_recompute_not_the_run(
+    world: World, tmp_path: Path
+) -> None:
+    variant = _first_variant(world)
+    run = picks.screen_variant(world.reader, variant.config, DAYS[0])
+    blocked = tmp_path / "file"
+    blocked.write_text("x")  # the scratch root is a file: no directory can be made under it
+    cache = ScreenCache(blocked, {(OWNER, variant.config.hash)})
+    cache.put(OWNER, variant.config.hash, DAYS[0], CachedScreen(run, CapturedReads(1, ())))
+    assert cache.get(OWNER, variant.config.hash, DAYS[0]) is None
+
+
 def test_the_second_session_reads_back_the_screen_and_its_reads(
     world: World, tmp_path: Path, monkeypatch: Any
 ) -> None:

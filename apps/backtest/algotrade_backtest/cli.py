@@ -111,7 +111,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-screen-cache",
         action="store_true",
         help="do not share the screens of a config used by several edges between them "
-        "(a scratch directory of about 70 KB per config and session; ADR 0059 amendment)",
+        "(scratch in $TMPDIR, about 70 KB per config and session, deleted at the end; "
+        "a killed run leaves it; ADR 0059 amendment)",
     )
     ee.add_argument(
         "--extra-baseline",
