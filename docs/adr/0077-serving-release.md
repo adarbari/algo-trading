@@ -241,7 +241,7 @@ Owner decisions 2026-10-21: 14-22 as written; no owner decision is open.
 The architect's design note (shared notes folder, `release-design-note.md`) found that pages are
 slow because every loader key reads `visible_seq()` (`services/read/context.py`, `screens/hits.py`,
 `instruments/*`, `regime/*`), not because pages lack precomputed tables. So the order of the
-code PRs is refined (21 stands):
+code PRs is refined (21's order stands for (1)-(3); (4) the separate warmer and (5) the proxy are deferred by 24):
 
 23. **Format F1 is a pin.** The first release is a manifest `{release_id, session S, seq X,
     destructive_epoch, code_sha, inputs, content_hash}` plus the session record
@@ -254,12 +254,21 @@ code PRs is refined (21 stands):
     - **Pinned reads** take `upto` on `TableStore.read/read_range/read_run/dates/partition_seq`;
       with `upto` set a read never retries at a fresh seq and raises `StaleSnapshotError`;
       `dates(upto)` drops partitions with no version at or below it.
-    - **Retention (replaces the per-partition protected-seq sets of 3):** `TableStore.pin / unpin
+    - **Retention (supersedes 3's protected `partition_seq` sets and its `promote` existence check;
+      the pin floor and `destructive_epoch` replace them):** `TableStore.pin / unpin
       / pins` (durable, read under the commit lock); the version chain of a partition keeps every
       version some pin sees (at most pins + 1 long), honoured by `_referenced`, `_discard` and
       `drop_unreferenced`. `purge`, `remove_runs` and `drop` are not protected: each bumps a
       durable `destructive_epoch`, a release whose epoch differs is invalid and reads fall back
       to live (never a silently empty page).
+    - **Release retention (amends 5):** keep CURRENT, the newest release of each of the last two
+      sessions, and live drafts.
+    - **Build rules:** a release is also rebuilt when an input's `partition_seq` moved (a restated
+      or backfilled current session), not only for a new session; `begin` pins a provisional X
+      and records the epoch before any read; the run records (`complete`, `cutoff`) are read
+      before X is taken and are not pinned (a COMPLETE record is saved after its commits).
+    - **Amends 11 and 12:** the deploy-time rebuild gate waits for the first shaped table;
+      until then the API warms on promote inside the process.
     - **Fallback (today's path exactly, answer not cached):** no CURRENT, unknown format, hash or
       epoch mismatch, `StaleSnapshotError`, or the kill switch `serving.release_reads = false`.
     - **First family:** the role-only `SHARED_OPERATIONS` over stored tables (prices, market
@@ -273,7 +282,10 @@ code PRs is refined (21 stands):
     (12) and shadow comparison (19) stay owner-approved but come after the pin has been measured
     under the writer-mode load test: a warm-on-promote plus a persisted response cache keyed on
     `release_id` (which survives restarts) may remove most of the need, and the deploy planner
-    stops restarting the API for changes it does not load. Each is then decided on the numbers.
+    stops restarting the API for changes it does not load. Each is built if the writer-mode load test misses the read-model criteria (page p95 > 2.5 s,
+    `/health` p99 >= 250 ms, `docs/api/read-model.md`), or the cold page p95 within 5 minutes of a
+    deploy is above 1 s (the owner's cold-load goal; threshold proposed here, the owner may set
+    another).
 
 Owner decision 2026-10-21 (logged in `docs/decisions/log.md`): "try the pin first approach and
 measure the impact"; the deferral in 24 is revisited with the load-test numbers.

@@ -426,7 +426,7 @@ follow-up PR).
 ## 2026-10-21 | Serving release (ADR 0077 amendment b) | Pin first, measure, then decide the front proxy, warmer and shadow comparison
 - Question: build the full release with the blue/green front proxy, a separate warmer and shadow comparison now, or the pin first (a manifest and the session record read through a pinned reader, keys on the release id) and measure?
 - Options: the full ADR as written / the pin first, the proxy, the separate warmer and shadow comparison deferred until the writer-mode load test is measured / drop the proxy for good.
-- Decision: the pin first, measure the page p95 while an ingest publishes and the cold site after a deploy, then decide the deferred items on the numbers (decisions 23-24).
+- Decision: the pin first, measure the page p95 while an ingest publishes and the cold site after a deploy, then build a deferred item only if the load test misses the read-model criteria (page p95 > 2.5 s, `/health` p99 >= 250 ms) or the cold page p95 within 5 minutes of a deploy is above 1 s (decisions 23-24).
 - decided by: owner
 - status: final
 - Reasoning: the architect found pages are slow because every loader key holds the published sequence, so a pin removes most of the churn with far less machinery; the owner asked on 2026-10-21 to try the pin first and measure the impact.
