@@ -181,6 +181,17 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     assert (env / "r.html").read_text().startswith("<!doctype html>")
 
 
+def test_every_ingest_command_takes_background_priority(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The measured miss (2026-10-21): a hand-started backfill ran at normal priority and its
+    spawned workers inherited it. The CLI lowers its own, from ``[resources] nice``."""
+    niced: list[int] = []
+    monkeypatch.setattr(cli, "lower_priority", niced.append)
+    assert cli.main(["arrivals"]) == 0
+    assert niced == [10]
+
+
 def test_arrivals_command_prints_the_first_published_percentiles(
     env: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

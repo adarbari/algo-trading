@@ -56,7 +56,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/entries_ops.py",  # the registry entry
 ]
 section = "docs/adr/0078-outcomes-run-compaction.md#decision"
-detect = [{ call = "lower_priority" }]
+detect = [{ call = "RollingSweep" }]
 
 [[responsibility]]
 id = "coverage-acceptance"

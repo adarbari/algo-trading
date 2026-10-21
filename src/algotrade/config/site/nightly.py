@@ -139,6 +139,7 @@ class NightlySettings:
     # [resources]: what a running ingest may take from the Mac that also serves the web
     arrow_cpu_threads: int = 2  # Arrow decode threads (the API caps itself at the same 2)
     arrow_io_threads: int = 4
+    nice: int = 10  # os.nice of every ingest command (and so its workers): the API's reads win
     min_free_gb: float = 15.0  # the nightly refuses to start with less free on the data volume
     # [backfilling]: tables still being filled; a screener short only of them warns until `until`
     backfilling: Mapping[str, Backfilling] = field(default_factory=dict)
@@ -179,7 +180,7 @@ class NightlySettings:
         notify = root.table("notify", ["enabled", "desktop", "summary_path", "email"])
         email = notify.table("email", ["enabled", "smtp_host", "smtp_port", "max_examples"])
         resources = root.table(
-            "resources", ["arrow_cpu_threads", "arrow_io_threads", "min_free_gb"]
+            "resources", ["arrow_cpu_threads", "arrow_io_threads", "min_free_gb", "nice"]
         )
         history_copy = HistoryCopySettings.from_table(
             root.table(
@@ -207,6 +208,7 @@ class NightlySettings:
             history_copy=history_copy,
             compaction=compaction,
             arrow_cpu_threads=resources.integer("arrow_cpu_threads", d.arrow_cpu_threads, 1),
+            nice=resources.integer("nice", d.nice, 0),
             arrow_io_threads=resources.integer("arrow_io_threads", d.arrow_io_threads, 1),
             min_free_gb=resources.number("min_free_gb", d.min_free_gb, 0),
             settle_minutes=sessions.integer("settle_minutes", d.settle_minutes, 0),
