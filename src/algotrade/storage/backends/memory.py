@@ -33,6 +33,7 @@ from algotrade.storage.backends.run_compaction import (
 )
 from algotrade.storage.backends.run_selection import (
     RunEntry,
+    chain_needed,
     committed,
     concat_frames,
     keep_newest_runs,
@@ -85,6 +86,7 @@ class MemoryTables:
                 self._pending.setdefault(run_id, {})[key] = (copy, restates)
                 self._touched[run_id] = datetime.now(UTC)
                 return
+            self._epoch += 1  # no sequence: every pin sees it, so no release is trusted
             entries = self._partitions.setdefault(key, {})
             if not copy.empty:
                 entries[run_id] = RunEntry(copy["knowledge_ts"].max(), restates)
@@ -392,7 +394,7 @@ class MemoryTables:
             expected = dict(self._partitions.get(key, {}))
             if not expected:
                 return CompactionReport(skipped="no such partition")
-            if self._pins and any(e.prev is not None for e in expected.values()):
+            if chain_needed(expected, self._pins.values()):
                 return CompactionReport(skipped="a pinned version is retained here")
             sources: dict[str, pa.Table] = {}
 

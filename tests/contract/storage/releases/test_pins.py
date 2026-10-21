@@ -199,3 +199,47 @@ def test_compaction_leaves_a_partition_holding_a_pinned_version_alone(backend: B
     report = backend.tables.compact_runs("events/dividend", D1)
     assert report.skipped is not None and "pinned" in report.skipped
     assert backend.tables.read("events/dividend", D1, upto=x) is not None
+
+
+def test_a_run_first_committed_after_the_pin_is_hidden_from_it_not_stale(backend: Backend) -> None:
+    """The run did not exist at X: a read there is not an error, even after the run was
+    recommitted so often that its first version is gone (and neither is the table's listing)."""
+    x = commit(backend, "r1", D1, 1.0)
+    backend.tables.pin("release-a", x)
+    for v in (2.0, 3.0, 4.0, 5.0):
+        commit(backend, "r2", D1, v)  # a second run of the same partition, born after X
+        commit(backend, "r3", D2, v)  # and a partition born after X
+    assert value(backend.tables.read(TABLE, D1, upto=x)) == 1.0
+    assert backend.tables.read(TABLE, D2, upto=x) is None
+    assert backend.tables.dates(TABLE, upto=x) == [D1]
+    assert backend.tables.partition_seq(TABLE, D1, D2, upto=x) == {D1: x}
+    pinned = StoreReader(backend).pinned(x)
+    assert value(pinned.table_range(TABLE, D1, D3)) == 1.0
+
+
+def test_a_direct_write_bumps_the_epoch_because_it_has_no_sequence(backend: Backend) -> None:
+    """A write that is not pending replaces rows in place for every pin: such a release is
+    not trusted any more."""
+    commit(backend, "r1", D1, 1.0)
+    before = backend.tables.destructive_epoch()
+    frame = stamped([{"instrument_id": "EQ:A", "value": 7.0}], D2, "direct")
+    backend.tables.write(TABLE, D2, "direct", frame)
+    assert backend.tables.destructive_epoch() > before
+
+
+def test_compaction_runs_under_a_pin_when_nothing_was_recommitted_after_it(
+    backend: Backend,
+) -> None:
+    ts = pd.Timestamp(D1, tz="UTC")
+
+    def dividend(run: str, hour: int) -> None:
+        row = {"instrument_id": "EQ:A", "ts": ts, "cash_amount": 1.0}
+        frame = stamped([row], D1, run, T0 + timedelta(hours=hour))
+        backend.tables.write("events/dividend", D1, run, frame, pending=True)
+        backend.tables.commit_run(run, T0 + timedelta(days=1, hours=hour))
+
+    for hour, run in enumerate(("r1", "r2", "r3", "r3")):  # r3 recommitted: it keeps a chain
+        dividend(run, hour)
+    backend.tables.pin("current", backend.tables.visible_seq())  # always present
+    report = backend.tables.compact_runs("events/dividend", D1)
+    assert report.skipped is None and report.runs_dropped == 1

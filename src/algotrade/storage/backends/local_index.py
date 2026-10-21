@@ -45,7 +45,7 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.storage.backends.run_selection import RunEntry, chain, committed
+from algotrade.storage.backends.run_selection import RunEntry, chain, chain_needed, committed
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.tables.interfaces import PartitionBusyError
 
@@ -478,11 +478,10 @@ class Commits:
             }
             if directory in busy:
                 raise PartitionBusyError(str(directory))
-            chained = any(e.prev is not None for e in expected.values())
             with held(index_lock(directory)):
                 if read_index(directory) != expected or (refuse is not None and refuse.exists()):
                     return False
-                if chained and self._read_pins():  # a collapsed chain would unpin a release
+                if chain_needed(expected, self._read_pins().values()):  # it would unpin a release
                     return False
                 if any(  # a file the new index names was swept or never landed: never publish it
                     not (directory / name).exists()

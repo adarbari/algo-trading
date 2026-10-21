@@ -30,7 +30,8 @@ A **pin** (``TableStore.pin``, ADR 0077) names a sequence whose versions must st
 commit also keeps, per pin, the newest version of the run at or below it, so the chain
 (``prev`` of ``prev``) is at most pins + 2 long. A version discarded from the middle leaves
 ``gap`` on the version above it (the lowest sequence lost): a read whose sequence is at or above
-it cannot know whether the lost version was its answer and raises ``StaleSnapshotError`` too. A
+it cannot know whether the lost version was its answer and raises ``StaleSnapshotError`` too
+(below it the run is read as absent: it was first committed above that sequence). A
 read given ``upto`` explicitly (``read_at``) is never retried at a fresh sequence: a pinned
 reader that cannot be served says so.
 
@@ -136,9 +137,14 @@ def retained(previous: RunEntry | None, pins: Collection[int]) -> RunEntry | Non
             for lower in skipped:
                 lost += [lower.seq or 0, *([lower.gap] if lower.gap is not None else [])]
             below = replace(version, prev=below, gap=min(lost) if skipped else version.gap)
-        else:
-            lost_below = bool(skipped) or versions[-1].dropped
-            below = replace(version, prev=None, dropped=lost_below, gap=None)
+        elif versions[-1].dropped:  # something older than every kept version is already gone
+            below = replace(version, prev=None, dropped=True, gap=None)
+        else:  # the oldest kept version: what was cut below it is a gap (the run may not have
+            # existed at a sequence under it: a read there is answered "absent", not stale)
+            lost = [version.gap] if version.gap is not None else []
+            for lower in skipped:
+                lost += [lower.seq or 0, *([lower.gap] if lower.gap is not None else [])]
+            below = replace(version, prev=None, gap=min(lost) if lost else None)
     return below
 
 
@@ -157,6 +163,16 @@ def max_seq(entries: Mapping[str, RunEntry], upto: int) -> int:
     return top
 
 
+def chain_needed(entries: Mapping[str, RunEntry], pins: Collection[int]) -> bool:
+    """Whether some pin may read an older version a run of ``entries`` keeps: an entry committed
+    above a pin that has a version below it. Collapsing such a chain (compaction) would make that
+    pin's read raise; an entry at or below every pin is what they all see."""
+    return any(
+        e.prev is not None and e.seq is not None and any(e.seq > p for p in pins)
+        for e in entries.values()
+    )
+
+
 def seq_at(entries: Mapping[str, RunEntry], upto: int) -> int | None:
     """The highest sequence among the versions a read at ``upto`` sees (``max_seq`` for a pinned
     read: raises ``StaleSnapshotError`` as ``visible_entries`` does); ``None``: no run of the
@@ -173,7 +189,7 @@ def visible_entries(entries: Mapping[str, RunEntry], upto: int | None) -> dict[s
         seen: RunEntry | None = entry
         while seen is not None and upto is not None and seen.seq is not None and seen.seq > upto:
             lost = (seen.prev is None and seen.dropped) or (
-                seen.prev is not None and seen.gap is not None and upto >= seen.gap
+                seen.gap is not None and upto >= seen.gap
             )
             if lost:
                 raise StaleSnapshotError(f"run {run}: the version at commit {upto} was replaced")

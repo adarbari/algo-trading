@@ -79,6 +79,7 @@ from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
     chain,
+    chain_needed,
     keep_newest_runs,
     max_seq,
     merge_rows,
@@ -155,6 +156,7 @@ class LocalTables:
             if file is not None:
                 atomic_write(directory / file, data)
             return
+        self.commits.bump_epoch()  # no sequence: every pin sees it, so no release is trusted
         if known is not None:
             atomic_write(directory / default_file(safe(run_id)), data)
         with held(index_lock(directory)):
@@ -556,7 +558,7 @@ class LocalTables:
         nothing); ``budget_s`` bounds planning and verifying: over it the partition is skipped."""
         directory = self._dir(table, session_date)
         expected = read_index(directory)
-        chained = any(e.prev is not None for e in expected.values()) and bool(self.commits.pins())
+        chained = chain_needed(expected, self.commits.pins().values())
         if (self.root / table / HISTORY).exists() or not expected or chained:
             why = "the table has a history copy" if expected else "no such partition"
             return CompactionReport(skipped="a pinned version is retained here" if chained else why)

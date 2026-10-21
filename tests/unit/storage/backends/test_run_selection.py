@@ -39,10 +39,12 @@ def seen(entry: RunEntry, upto: int) -> str | None:
 def test_without_pins_a_commit_keeps_one_older_version_as_before() -> None:
     entry = history(1, 2, 3, 4)
     assert [e.ref for e in chain(entry)] == ["v4", "v3"]
-    assert entry.prev is not None and entry.prev.dropped and entry.prev.gap is None
+    assert entry.prev is not None and entry.prev.gap == 1
     assert seen(entry, 3) == "v3"
     with pytest.raises(StaleSnapshotError):
         seen(entry, 2)
+    with pytest.raises(StaleSnapshotError):
+        seen(entry, 1)
 
 
 def test_a_first_commit_has_no_chain_and_a_second_does_not_drop() -> None:
@@ -113,3 +115,11 @@ def test_read_at_reads_once_at_a_named_sequence_and_retries_without_one() -> Non
         read_at(read, lambda: 9, nullcontext, 5)
     assert calls == [5]  # a pinned reader gets the error, not an answer at sequence 9
     assert read_at(read, lambda: 9, nullcontext, None) == "read at 9"
+
+
+def test_a_run_born_after_the_pin_is_hidden_from_it_however_often_it_was_recommitted() -> None:
+    entry = history(5, 6, 7, 8, pins=(2,))
+    assert seen(entry, 2) is None
+    assert seen(entry, 4) is None
+    with pytest.raises(StaleSnapshotError):
+        seen(entry, 5)  # the version at 5 is gone
