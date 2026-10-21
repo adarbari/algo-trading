@@ -18,7 +18,7 @@ def lower_priority(nice: int) -> None:
     """Take on background CPU (niceness ``nice`` in total, not added to the current one) and
     (darwin) utility disk priority for the rest of this process, and so for the workers it
     spawns (both are inherited); never raises: a platform without the calls just runs at
-    normal priority, and a refused disk policy is logged once."""
+    normal priority, and a refused disk policy is logged."""
     with contextlib.suppress(OSError):
         if nice > 0:
             os.nice(max(0, nice - os.nice(0)))
