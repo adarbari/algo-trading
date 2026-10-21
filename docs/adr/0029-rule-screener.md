@@ -153,6 +153,8 @@ the merge decoded the other nine tenths for nothing (`docs/perf/api-memory.md`: 
   keeps each group's newest run, so the answer never depends on the statistics. The newest run is
   chosen before `instruments` filters it. `ValueError` for any other table.
 - The screen read model (`services/read/screens`) reads both tables through it (`partition(...,
-  newest_runs=True)`). Nothing else changes: the same rows reach every page.
+  newest_runs=True)`); the readers of one run's values (`_run_fields`, `_stored_key`) read only that
+  run's own file (`read_run(..., columns)`, `run_rows_of`). Nothing else changes: the same rows
+  reach every page.
 - Such a table is never listed in `[compaction]` (ADR 0078 keeps only changed rows, so its newest
   file would be a delta): a fitness test (`tests/unit/config/site/test_nightly.py`) refuses it.
