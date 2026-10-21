@@ -25,9 +25,13 @@ later commit of the same run has passed still finds the version it pinned. When 
 again before such a read reaches the partition, that version is discarded (``dropped`` on the
 oldest one kept): the read raises ``StaleSnapshotError`` and ``pinned_read`` runs it again, whole,
 at a fresh sequence, so a range read never mixes partitions of different commits.
+
+A table whose runs each hold one group's whole result (``TableSpec.whole_per_group``) is also
+read by its newest run per group alone (``newest_run_per_group``, ``TableStore.read_latest_runs``):
+the same rows as the merge followed by "keep each group's newest run", without decoding the rest.
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -159,6 +163,35 @@ def select_runs(entries: Mapping[str, RunEntry], as_of: datetime | None, mode: s
     restating = [i for i, (_, run) in enumerate(eligible) if entries[run].restates]
     start = restating[-1] if restating else 0
     return [run for _, run in eligible[start:]]
+
+
+def newest_run_per_group(
+    order: Sequence[str], groups: Mapping[str, Collection[tuple[object, ...]] | None]
+) -> dict[tuple[object, ...], str] | None:
+    """Each group's newest run, from ``order`` (the runs ``select_runs`` chose, oldest first) and
+    the groups each run's rows hold (``None``: unknown, e.g. a file without statistics). ``None``
+    when any run's groups are unknown or are not exactly one: the caller then merges every run
+    and keeps each group's newest run from its rows (``keep_newest_runs``), so the answer never
+    depends on whether the statistics exist."""
+    newest: dict[tuple[object, ...], str] = {}
+    for run in order:
+        held = groups.get(run)
+        if held is None or len(held) != 1:
+            return None
+        newest[next(iter(held))] = run
+    return newest
+
+
+def keep_newest_runs(
+    frame: pd.DataFrame, group: Sequence[str], order: Sequence[str]
+) -> pd.DataFrame:
+    """The rows of ``frame`` (merged runs) stamped with the newest run of their group: the run
+    latest in ``order`` among those holding the group (a run missing from ``order`` ranks first)."""
+    if frame.empty:
+        return frame
+    rank = frame["run_id"].map({run: i for i, run in enumerate(order)}).fillna(-1)
+    top = rank.groupby([frame[g] for g in group]).transform("max")
+    return frame[rank == top].reset_index(drop=True)
 
 
 def merge_rows(table: str, data: pa.Table) -> pa.Table:

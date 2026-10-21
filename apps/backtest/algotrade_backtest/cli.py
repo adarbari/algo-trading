@@ -108,6 +108,13 @@ def build_parser() -> argparse.ArgumentParser:
         "(ADR 0063; the default is incremental)",
     )
     ee.add_argument(
+        "--no-screen-cache",
+        action="store_true",
+        help="do not share the screens of a config used by several edges between them "
+        "(scratch in $TMPDIR, about 70 KB per config and session, deleted at the end; "
+        "a killed run leaves it; ADR 0059 amendment)",
+    )
+    ee.add_argument(
         "--extra-baseline",
         action="append",
         default=[],

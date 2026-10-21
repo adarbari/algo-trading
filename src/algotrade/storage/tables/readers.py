@@ -65,9 +65,31 @@ class StoreReader:
         tables = self._backend.tables
         return tables.read_range(table, start, end, as_of, instruments, self.own_run, columns)
 
-    def read_run(self, table: str, session_date: date, run_id: str) -> pd.DataFrame | None:
+    def read_run(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (``TableStore.read_run``)."""
-        return self._backend.tables.read_run(table, session_date, run_id, self.own_run)
+        tables = self._backend.tables
+        return tables.read_run(table, session_date, run_id, self.own_run, columns, instruments)
+
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        """Each group's newest run of a partition (``TableStore.read_latest_runs``)."""
+        tables = self._backend.tables
+        return tables.read_latest_runs(
+            table, session_date, group, columns, instruments, self.own_run
+        )
 
     def visible_seq(self) -> int:
         """The latest committed publish sequence: changes exactly when a commit publishes."""
@@ -148,6 +170,15 @@ class _Attribution:
     seq: dict[date, int] = field(default_factory=dict)
 
 
+@dataclass
+class CapturedReads:
+    """The reads a block made for one day (``RecordingReader.capture``) and ``seq``, the commit
+    sequence when it started."""
+
+    seq: int
+    records: tuple[ReadRecord, ...] = ()
+
+
 class RecordingReader(StoreReader):
     """A ``StoreReader`` that logs, per attributed day, which partitions it read (ADR 0063).
 
@@ -190,6 +221,41 @@ class RecordingReader(StoreReader):
     def attributed_days(self) -> list[date]:
         return sorted(self._attr.reads)
 
+    @contextmanager
+    def capture(self, day: date) -> Iterator["CapturedReads"]:
+        """Run the block's reads of the attributed ``day`` into a log of their own and merge it
+        into the day's afterwards: ``CapturedReads`` holds what the block read and the sequence
+        it started at, so a computation can be handed to another reader (``replay``). A block
+        that reads nothing leaves the day as it was (no sequence is stamped for it)."""
+        attr = self._attr
+        if attr.day != day:
+            raise RuntimeError(f"capture({day}) outside attribute({day}): attributing {attr.day}")
+        out = CapturedReads(self.visible_seq())
+        outer = attr.reads.get(day)
+        attr.reads[day] = {}
+        try:
+            yield out
+        finally:
+            mine = attr.reads[day]
+            out.records = tuple(mine)
+            if outer is None and not mine:
+                del attr.reads[day]
+            else:
+                attr.reads[day] = {**(outer or {}), **mine}
+                if outer is None:
+                    attr.seq[day] = out.seq
+
+    def replay(self, day: date, captured: "CapturedReads") -> None:
+        """Log ``captured`` against ``day`` as if this reader had made those reads: the day's
+        sequence becomes the earlier of its own and the capture's (a partition committed since
+        the capture started is then never read as unchanged, ADR 0063)."""
+        if not captured.records:
+            return
+        attr = self._attr
+        log = attr.reads.setdefault(day, {})
+        log.update(dict.fromkeys(captured.records))
+        attr.seq[day] = min(attr.seq.get(day, captured.seq), captured.seq)
+
     def _log(self, record: ReadRecord) -> None:
         self._attr.reads[self._attr.day][record] = None  # type: ignore[index]
 
@@ -231,9 +297,30 @@ class RecordingReader(StoreReader):
             self._log_rows(table, start, end)
         return frame
 
-    def read_run(self, table: str, session_date: date, run_id: str) -> pd.DataFrame | None:
+    def read_run(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
         recording = self._open()
-        frame = super().read_run(table, session_date, run_id)
+        frame = super().read_run(table, session_date, run_id, columns, instruments)
+        if recording:
+            self._log_rows(table, session_date, session_date)
+        return frame
+
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        recording = self._open()
+        frame = super().read_latest_runs(table, session_date, group, columns, instruments)
         if recording:
             self._log_rows(table, session_date, session_date)
         return frame

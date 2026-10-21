@@ -183,8 +183,17 @@ backfilled events behind the storage stamp.
    FINRA does not flag, cannot be told from the original: history may carry a small lookahead of
    that kind. A restated row erases the first-seen one, so it reads as missing in between,
    never as wrong.
-3. **Repair (manual, live store).** `algotrade-ingest run short-interest --from 2017-12-29
-   --force` and `run short-volume --from <first stored date> --force`, then rerun the rollups
-   `short_interest@v1` (and any short-volume rollup) over the history and the screens and edge
+3. **Repair (manual, live store).** `algotrade-ingest run restamp-known-from` (amended
+   2026-10-20): the stored values are already right and only the stamps are old, so the task applies
+   the rule above to the stored rows locally, with no FINRA request (a `--force` refetch of both
+   tables spent about 50 minutes, 90 % of it request latency). An unflagged row gets
+   `min(stored, schedule)`; a flagged row, and a row whose partition holds an earlier run with other
+   values for its key (a restatement), and a row absent from the partition's earliest run (FINRA
+   added it after publication and a later fetch stored it), keep their stamp. The refetch rule has
+   the mirror gap: `row_known_from` gives a never-stored key of an already stored partition the
+   schedule date although it was first seen at that fetch (disclosed here; a later fix may floor it).
+   The restating run makes the partition's earlier runs non-compactable (`run_compaction.py`). It restates the changed partitions in one
+   run, under the ingest lock, and `--dry-run` counts only. `--force` stays for refreshing values.
+   Then rerun the rollups `short_interest@v1` (one process from 2018-01-02) and the screens and edge
    evaluation of the sessions since. No feature version is bumped: no consumer read the empty
    history.

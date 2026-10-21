@@ -323,3 +323,24 @@ def test_every_shipped_edge_loads_through_the_warm_path() -> None:
     ctx = open_stores(StoreReader(MemoryBackend()), store, UserContext(SITE_USER))
     shipped = {p.parent.name for p in (REPO_ROOT / "config/site/edges").glob("*/edge.toml")}
     assert shipped and {e.id for e in load_edges(ctx)} == shipped
+
+
+def test_each_warmed_step_logs_the_process_footprint(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # 2026-10-20: one warm took the API to 36 GB and no log line said which step grew it.
+    sizes = iter([1200.0, 36864.0])
+    monkeypatch.setattr(warm, "_footprint", lambda: next(sizes))
+    with caplog.at_level("INFO"):
+        warm._run([("small", lambda: None), ("market frames", lambda: None)])
+    assert "warmed small in" in caplog.text and "footprint 1200 MB" in caplog.text
+    assert "warmed market frames in" in caplog.text and "footprint 36864 MB" in caplog.text
+
+
+def test_a_step_logs_without_a_figure_when_the_probe_reads_nothing(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(warm, "_footprint", lambda: None)
+    with caplog.at_level("INFO"):
+        warm._run([("a", lambda: None)])
+    assert "warmed a in" in caplog.text and "footprint" not in caplog.text

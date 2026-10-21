@@ -30,7 +30,12 @@ from algotrade.services.features import catalogue
 from algotrade.services.licences import ALL_LICENCES, hidden_stored
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
-from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
+from algotrade.services.read.context import (
+    ReadContext,
+    at_session,
+    catalogue_key,
+    run_rows_of,
+)
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -42,7 +47,7 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.screens.screeners import ScreenGroup
-from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
+from algotrade.services.read.values import UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import (
     is_criterion_row,
     is_display_column,
@@ -223,20 +228,18 @@ def _read_values(
     ids: Sequence[str] | None,
     wanted: Mapping[str, Sequence[str]] | None,
 ) -> dict[ResultKey, list[Mapping[str, Any]]]:
-    stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, ids)
-    if isinstance(stored, Unknown) or stored.empty:
-        return {}
+    """Each run's own values file, read for the instruments the run is asked for (``wanted``, else
+    ``ids``, else every one): never the session's every run filtered by the union of their picks."""
     out: dict[ResultKey, list[Mapping[str, Any]]] = {}
     for run in runs:
-        if wanted is not None and not wanted.get(run.run_id):
-            continue
-        mine = stored[
-            (stored["user_id"] == run.owner)
-            & (stored["config_id"] == run.config_id)
-            & (stored["run_id"] == run.run_id)
-        ]
         if wanted is not None:
-            mine = mine[mine["instrument_id"].isin(set(wanted[run.run_id]))]
+            asked: Sequence[str] | None = wanted.get(run.run_id)
+            if not asked:
+                continue
+        else:
+            asked = ids
+        stored = run_rows_of(ctx, RULE_SCREEN_VALUES, run.run_id, VALUE_COLUMNS, asked)
+        mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
         for row in _records(mine):
             out.setdefault((run.run_id, str(row["instrument_id"])), []).append(row)
     return out
@@ -325,14 +328,10 @@ def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     key = ("screen_run_fields", run.run_id, ctx.session.date, ctx.reader.visible_seq())
 
     def read() -> frozenset[str]:
-        stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS)
-        if isinstance(stored, Unknown) or stored.empty:
+        stored = run_rows_of(ctx, RULE_SCREEN_VALUES, run.run_id, VALUE_COLUMNS)
+        if stored.empty:
             return frozenset()
-        mine = stored[
-            (stored["user_id"] == run.owner)
-            & (stored["config_id"] == run.config_id)
-            & (stored["run_id"] == run.run_id)
-        ]
+        mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
         read = mine[~mine["mode"].map(is_group_row).astype(bool)]  # a group's field is its kind
         return frozenset(str(f) for f in read["field"].dropna().unique())
 
@@ -524,7 +523,7 @@ def _check_sort(ctx: ReadContext, sort: str) -> str | None:
 
 def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Scalar]:
     """Each instrument's stored value of ``criterion:<id>`` or ``column:<name>`` in ``run``
-    (one filtered read of the values partition, cached per run, key and published state)."""
+    (a read of the run's own values file, cached per run, key and published state)."""
     cache_key = (
         "screen_sort_key",
         run.run_id,
@@ -537,15 +536,14 @@ def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Sc
     if found is not None:
         return found
     kind, _, name = key.partition(":")
-    stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS)
+    stored = run_rows_of(ctx, RULE_SCREEN_VALUES, run.run_id, VALUE_COLUMNS)
     out: dict[str, Scalar] = {}
-    if not isinstance(stored, Unknown) and not stored.empty:
+    if not stored.empty:
         column = stored["mode"].map(is_display_column).astype(bool)
         group = stored["mode"].map(is_group_row).astype(bool)
         mine = stored[
             (stored["user_id"] == run.owner)
             & (stored["config_id"] == run.config_id)
-            & (stored["run_id"] == run.run_id)
             & (stored["criterion_id"] == name)
             & (column == (kind == "column"))
             & ~group  # a group is no criterion (ADR 0071)

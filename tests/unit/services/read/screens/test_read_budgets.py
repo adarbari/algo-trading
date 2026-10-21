@@ -1,0 +1,286 @@
+"""The per-read memory budget of the screen rows (``docs/perf/api-memory.md``, guard 3): a session
+holds many reruns of many configs, and a read decodes only each config's newest run. Peak Arrow
+allocation is measured through a proxy of the default pool installed for the read, so what ran
+earlier in the process does not count. The value readers are budgeted the same way: a run's values
+come from that run's own file and for its own picks, never from the session's every run (the
+union of every run's picks filtered all of them), and a run that is not its config's newest reads
+its own rows."""
+
+from collections.abc import Iterator
+from dataclasses import replace
+from datetime import timedelta
+from pathlib import Path
+
+import pandas as pd
+import pyarrow as pa
+import pytest
+
+from algotrade.data import StoreReader
+from algotrade.services.read.context import ReadContext, partition
+from algotrade.services.read.screens import results
+from algotrade.services.read.screens.results import VALUE_COLUMNS, _read_values, run_withheld
+from algotrade.services.read.screens.runs import (
+    ROW_COLUMNS,
+    RULE_SCREEN,
+    ScreenerRun,
+    load_latest_runs,
+    screen_rows,
+)
+from algotrade.services.read.values import Unknown
+from algotrade.storage.backends.arrow import to_arrow
+from algotrade.storage.backends.local import LocalBackend
+from algotrade.storage.tables.schemas import result_table
+from algotrade.storage.tables.writers import StoreWriter
+from tests.helpers.stored_frames import stamped, write_reference
+from tests.unit.services.read.screens.conftest import D1, T, context
+
+VR, VRUNS, VINST, PICKED = 20, 5, 200, 3  # the values-read tests: configs, runs, instruments, picks
+RULE_SCREEN_VALUES = result_table("rule_screen_values")
+CONFIGS, RUNS, INSTRUMENTS = 20, 10, 400
+
+
+def _frame(config: int, run: int) -> pd.DataFrame:
+    rows: list[dict[str, object]] = [
+        {"instrument_id": f"EQ:S{i}", "user_id": "site", "config_id": f"c{config}",
+         "config_version": 1, "config_hash": "h", "decision": "QUALIFIED", "score": 1.0,
+         "rank": i, "tie_break": None, "flags": "", "reasons": f"c{config} r{run} " + "x" * 200,
+         "failed": "", "near_missed": "", "missing": ""}
+        for i in range(INSTRUMENTS)
+    ]  # fmt: skip
+    return stamped(rows, D1, f"c{config}-r{run}", T + timedelta(hours=run))
+
+
+@pytest.fixture
+def store(tmp_path: Path) -> tuple[LocalBackend, int]:
+    """A session of 10 runs of each of 20 configs; -> it and the Arrow bytes of the newest runs."""
+    backend = LocalBackend(tmp_path / "data")
+    writer = StoreWriter(backend)
+    write_reference(writer, D1, {f"S{i}": f"EQ:S{i}" for i in range(INSTRUMENTS)})
+    bar = {"instrument_id": "EQ:S0", "ts": pd.Timestamp(D1, tz="UTC"), "open": 1.0, "high": 1.0,
+           "low": 1.0, "close": 1.0, "volume": 1.0}  # fmt: skip
+    writer.write_table("bars/1d", D1, "bars", stamped([bar], D1, "bars"))
+    newest = 0
+    for run in range(RUNS):
+        for config in range(CONFIGS):
+            frame = _frame(config, run)
+            writer.write_result("rule_screen", D1, frame["run_id"].iloc[0], frame)
+            if run == RUNS - 1:
+                newest += to_arrow("results/rule_screen", frame).nbytes
+    return backend, newest
+
+
+@pytest.fixture
+def proxy() -> Iterator[pa.ProxyMemoryPool]:
+    before = pa.default_memory_pool()
+    pool = pa.proxy_memory_pool(before)
+    pa.set_memory_pool(pool)
+    try:
+        yield pool
+    finally:
+        pa.set_memory_pool(before)
+
+
+def test_the_screen_rows_read_stays_within_twice_the_newest_runs_bytes(
+    store: tuple[LocalBackend, int], proxy: pa.ProxyMemoryPool
+) -> None:
+    backend, newest = store
+    ctx = context(StoreReader(backend))
+    found = screen_rows(ctx)
+    assert not isinstance(found, Unknown) and len(found) == CONFIGS * INSTRUMENTS
+    assert found["run_id"].str.endswith(f"r{RUNS - 1}").all()
+    assert proxy.max_memory() <= 2 * newest
+
+
+def test_the_budget_would_catch_the_merge_of_every_run(
+    store: tuple[LocalBackend, int], proxy: pa.ProxyMemoryPool
+) -> None:
+    backend, newest = store
+    ctx = context(StoreReader(backend))
+    partition(ctx, RULE_SCREEN, ROW_COLUMNS)  # the read before the newest-run rule
+    assert proxy.max_memory() > 2 * newest
+
+
+def _values(config: int, run: int) -> pd.DataFrame:
+    rows: list[dict[str, object]] = [
+        {"instrument_id": f"EQ:S{i}", "user_id": "site", "config_id": f"c{config}",
+         "criterion_id": "k", "field": "feature.f", "mode": "hard", "value_num": 1.0,
+         "value_str": "v" * 100, "outcome": "PASS", "distance": None}
+        for i in range(INSTRUMENTS)
+    ]  # fmt: skip
+    return stamped(rows, D1, f"c{config}-r{run}", T + timedelta(hours=run))
+
+
+def test_the_withheld_fields_of_every_run_decode_one_runs_values_each(
+    store: tuple[LocalBackend, int],
+) -> None:
+    # the values partition holds every rerun of every config (146 million rows on the real
+    # store): reading it whole for each run's fields decoded it once per run
+    backend, _ = store
+    writer = StoreWriter(backend)
+    newest = 0
+    for run in range(RUNS):
+        for config in range(CONFIGS):
+            frame = _values(config, run)
+            writer.write_result("rule_screen_values", D1, frame["run_id"].iloc[0], frame)
+            if run == RUNS - 1:
+                newest += to_arrow("results/rule_screen_values", frame).nbytes
+    ctx = context(StoreReader(backend), user="trader")  # holds no licence: reads the values
+    keys = [("site", f"c{c}") for c in range(CONFIGS)]
+    found = [lr.run for lr in load_latest_runs(ctx, keys).values()]
+    assert all(run is not None for run in found)
+    before = pa.default_memory_pool()
+    proxy = pa.proxy_memory_pool(before)
+    pa.set_memory_pool(proxy)
+    try:
+        for run in found:
+            assert run is not None
+            run_withheld(ctx, run)
+    finally:
+        pa.set_memory_pool(before)
+    # each run decodes its own file once (about 2.7x its bytes with the filter's copy); reading
+    # the newest runs of every config per run was 20x
+    assert proxy.total_bytes_allocated() <= 4 * newest
+
+
+def test_the_budget_would_catch_a_values_partition_read_per_run(
+    store: tuple[LocalBackend, int],
+) -> None:
+    # the values partition holds every rerun of every config (146 million rows on the real
+    # store): reading it whole for each run's fields decoded it once per run
+    backend, _ = store
+    writer = StoreWriter(backend)
+    newest = 0
+    for run in range(RUNS):
+        for config in range(CONFIGS):
+            frame = _values(config, run)
+            writer.write_result("rule_screen_values", D1, frame["run_id"].iloc[0], frame)
+            if run == RUNS - 1:
+                newest += to_arrow("results/rule_screen_values", frame).nbytes
+    ctx = context(StoreReader(backend), user="trader")  # holds no licence: reads the values
+    keys = [("site", f"c{c}") for c in range(CONFIGS)]
+    found = [lr.run for lr in load_latest_runs(ctx, keys).values()]
+    assert all(run is not None for run in found)
+    before = pa.default_memory_pool()
+    proxy = pa.proxy_memory_pool(before)
+    pa.set_memory_pool(proxy)
+    try:
+        for run in found:
+            assert run is not None
+            partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, newest_runs=True)  # P1's per-run read
+    finally:
+        pa.set_memory_pool(before)
+    # each run decodes its own file once (about 2.7x its bytes with the filter's copy); reading
+    # the newest runs of every config per run was 20x
+    assert proxy.total_bytes_allocated() > 4 * newest
+
+
+def _values_frame(config: int, run: int, field: str) -> pd.DataFrame:
+    rows: list[dict[str, object]] = [
+        {"instrument_id": f"EQ:S{i}", "user_id": "site", "config_id": f"c{config}",
+         "criterion_id": "k", "field": field, "mode": "hard", "value_num": float(i),
+         "value_str": None, "outcome": "PASS", "distance": None}
+        for i in range(VINST)
+    ]  # fmt: skip
+    return stamped(rows, D1, f"c{config}-r{run}", T + timedelta(hours=run))
+
+
+def _screen_frame(config: int, run: int) -> pd.DataFrame:
+    rows: list[dict[str, object]] = [
+        {"instrument_id": f"EQ:S{i}", "user_id": "site", "config_id": f"c{config}",
+         "config_version": 1, "config_hash": "h", "decision": "QUALIFIED", "score": 1.0,
+         "rank": i, "tie_break": None, "flags": "", "reasons": "", "failed": "",
+         "near_missed": "", "missing": ""}
+        for i in range(VINST)
+    ]  # fmt: skip
+    return stamped(rows, D1, f"c{config}-r{run}", T + timedelta(hours=run))
+
+
+@pytest.fixture
+def values_store(tmp_path: Path) -> LocalBackend:
+    backend = LocalBackend(tmp_path / "data")
+    writer = StoreWriter(backend)
+    write_reference(writer, D1, {f"S{i}": f"EQ:S{i}" for i in range(VINST)})
+    bar = {"instrument_id": "EQ:S0", "ts": pd.Timestamp(D1, tz="UTC"), "open": 1.0, "high": 1.0,
+           "low": 1.0, "close": 1.0, "volume": 1.0}  # fmt: skip
+    writer.write_table("bars/1d", D1, "bars", stamped([bar], D1, "bars"))
+    for run in range(VRUNS):
+        for config in range(VR):
+            name = f"c{config}-r{run}"
+            writer.write_result("rule_screen", D1, name, _screen_frame(config, run))
+            # a run's own field: an older run's is not the newest run's
+            writer.write_result(
+                "rule_screen_values", D1, name, _values_frame(config, run, f"feature.f{run}")
+            )
+    return backend
+
+
+def _returned_rows(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """The row counts ``StoreReader.read_run`` and ``read_latest_runs`` hand back."""
+    counts: list[int] = []
+    for name in ("read_run", "read_latest_runs"):
+        real = getattr(StoreReader, name)
+
+        def counting(
+            self: StoreReader, *args: object, _real: object = real, **kw: object
+        ) -> object:
+            found = _real(self, *args, **kw)  # type: ignore[operator]
+            counts.append(0 if found is None else len(found))
+            return found
+
+        monkeypatch.setattr(StoreReader, name, counting)
+    return counts
+
+
+def _runs_and_wanted(
+    backend: LocalBackend, user: str = "trader"
+) -> tuple[ReadContext, list[ScreenerRun], dict[str, list[str]]]:
+    ctx = context(StoreReader(backend), user=user)
+    keys = [("site", f"c{c}") for c in range(VR)]
+    found = [lr.run for lr in load_latest_runs(ctx, keys).values() if lr.run is not None]
+    assert len(found) == VR
+    picks = {  # each run picks its own three: the union of every run's is 60 instruments
+        r.run_id: [f"EQ:S{n * PICKED + j}" for j in range(PICKED)] for n, r in enumerate(found)
+    }
+    return ctx, found, picks
+
+
+def test_the_values_of_every_run_are_read_for_its_own_picks_only(
+    values_store: LocalBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx, runs, wanted = _runs_and_wanted(values_store)
+    counts = _returned_rows(monkeypatch)
+    found = _read_values(ctx, runs, [i for ids in wanted.values() for i in ids], wanted)
+    assert len(found) == VR * PICKED  # one entry per (run, picked instrument)
+    assert sum(counts) <= 1.5 * VR * PICKED
+
+
+def test_the_budget_would_catch_the_union_of_every_runs_picks(
+    values_store: LocalBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx, _, wanted = _runs_and_wanted(values_store)
+    counts = _returned_rows(monkeypatch)
+    union = sorted({i for ids in wanted.values() for i in ids})
+    partition(ctx, results.RULE_SCREEN_VALUES, results.VALUE_COLUMNS, union, newest_runs=True)
+    assert sum(counts) > 1.5 * VR * PICKED  # every run's rows of the union, read once
+
+
+def test_the_fields_and_a_sort_key_of_a_run_that_is_not_the_newest_are_its_own(
+    values_store: LocalBackend,
+) -> None:
+    ctx, runs, _ = _runs_and_wanted(values_store, "me")
+    newest = runs[0]
+    older = replace(newest, run_id="c0-r1")
+    assert results._run_fields(ctx, newest) == frozenset({f"feature.f{VRUNS - 1}"})
+    assert results._run_fields(ctx, older) == frozenset({"feature.f1"})
+    keyed = results._stored_key(ctx, older, "criterion:k")
+    assert keyed["EQ:S7"] == 7.0 and len(keyed) == VINST
+
+
+def test_the_values_of_a_run_that_is_not_the_newest_are_its_own(
+    values_store: LocalBackend,
+) -> None:
+    ctx, runs, _ = _runs_and_wanted(values_store, "me")
+    older = replace(runs[0], run_id="c0-r1")
+    found = _read_values(ctx, [older], None, {"c0-r1": ["EQ:S4"]})
+    assert list(found) == [("c0-r1", "EQ:S4")]
+    assert [row["field"] for row in found[("c0-r1", "EQ:S4")]] == ["feature.f1"]

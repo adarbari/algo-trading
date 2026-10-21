@@ -109,7 +109,7 @@ def screen_rows(ctx: ReadContext) -> pd.DataFrame | Unknown:
     key = ("rule_screen", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
     # key read first (ADR 0022)
     found: pd.DataFrame | Unknown = ctx.cache.get_or_compute(
-        key, lambda: partition(ctx, RULE_SCREEN, ROW_COLUMNS)
+        key, lambda: partition(ctx, RULE_SCREEN, ROW_COLUMNS, newest_runs=True)
     )
     return found
 
