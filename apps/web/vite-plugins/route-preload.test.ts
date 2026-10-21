@@ -31,6 +31,9 @@ const bundle = {
   }),
   'assets/ibm-plex-sans-latin-400-normal-AbC.woff2': { type: 'asset' as const },
   'assets/ibm-plex-sans-latin-300-normal-AbC.woff2': { type: 'asset' as const },
+  'assets/early.js': chunk('assets/early.js', {
+    facadeModuleId: '/repo/apps/web/src/app/router/early-reads.ts',
+  }),
   'assets/signals.js': chunk('assets/signals.js', {
     facadeModuleId: '/repo/apps/web/src/widgets/edge-signals/index.ts',
   }),
@@ -50,6 +53,7 @@ describe('preloadTable', () => {
       'assets/page.css',
       'assets/table.js',
       'assets/cache.js', // every page needs the saved page cache
+      'assets/early.js', // and the start-up read of its data
       'assets/ibm-plex-sans-latin-400-normal-AbC.woff2', // a first-paint font, after the scripts
     ]);
   });

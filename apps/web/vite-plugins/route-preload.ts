@@ -20,8 +20,9 @@ export const ROUTE_PAGES: Record<string, string[]> = {
   '/admin/ingestion': ['src/pages/admin-ingestion/index.ts'],
 };
 
-/** Chunks every listed path needs early: the saved page cache the loaders wait for (briefly). */
-const EVERY_PAGE = ['src/entities/page-cache/index.ts'];
+/** Chunks every listed path needs early: the saved page cache the loaders wait for (briefly), and
+ * the start-up read of the page's data (app/router/early-reads.ts). */
+const EVERY_PAGE = ['src/entities/page-cache/index.ts', 'src/app/router/early-reads.ts'];
 
 /** The fonts the first paint uses (hashed file names found in the bundle): after the scripts. */
 const FONT = /ibm-plex-(sans-latin-(400|600)|mono-latin-400)-normal-.*\.woff2$/;
