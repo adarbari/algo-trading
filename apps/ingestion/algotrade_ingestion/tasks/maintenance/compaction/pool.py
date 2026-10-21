@@ -346,14 +346,17 @@ class Pool:
         day = entry[0]
         error = future.exception()
         if isinstance(error, BrokenProcessPool):
+            self._abort_flying()  # first: the message says whether a partition completed
             self._pool_broke(error)
-            self._abort_flying()
             return
         if error is not None:
             if not self._interrupted:
                 self.failure = self.failure or error
             return
-        outcome = future.result()
+        self._record(future.result(), day)
+
+    def _record(self, outcome: Outcome, day: date) -> None:
+        """Count one finished partition: progress, totals, the sweeper's bookkeeping."""
         name = self._names.setdefault(outcome.worker, f"w{len(self._names) + 1}")
         self._done += 1
         self.progress(describe(outcome.day, outcome.report, outcome.seconds, name))
@@ -369,7 +372,9 @@ class Pool:
 
     def _pool_broke(self, error: BaseException) -> None:
         """A worker process died (the pool refuses more work): stop dispatching and say how to
-        go on. Nothing was swapped for a partition in flight (a swap is the last, atomic step)."""
+        go on. A partition in flight is left: its fresh files are discarded, or, when the worker
+        died after its swap but before its result, the swap stands and the next run's sweep
+        clears the old files."""
         self._broken = True
         hint = (
             "; no partition was compacted first: an entry point without an "
@@ -383,8 +388,15 @@ class Pool:
         )
 
     def _abort_flying(self) -> None:
-        """The pool broke: every future in flight carries the same error."""
+        """The pool broke: the futures in flight carry the same error, except those that had
+        finished with a result (their swap happened: count them and hand them to the sweeper)."""
+        pending = list(self._flying)
         self._flying.clear()
+        wait(pending, timeout=5.0)
+        for future in pending:
+            if future.done() and not future.cancelled() and future.exception() is None:
+                outcome = future.result()
+                self._record(outcome, outcome.day)
 
     def _tick(self, started: float) -> bool:
         """The clock work between results; -> whether the run must stop at once (a silent

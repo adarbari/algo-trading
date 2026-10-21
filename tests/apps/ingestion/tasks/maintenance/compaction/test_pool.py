@@ -509,3 +509,21 @@ def test_a_broken_pool_ends_the_run_partial_and_the_cli_exit_is_nonzero(
     assert record.status == "partial"  # ``run_task_command`` exits 1 unless "complete"
     assert "a worker process died" in stats["stopped"]
     assert stats["compacted"] == 0 and leftovers(backend.root) == []
+
+
+@pytest.mark.parametrize("ok_first", [True, False], ids=["ok-first", "broken-first"])
+def test_a_partition_finished_when_the_pool_broke_is_counted_and_swept(
+    backend: LocalBackend, ok_first: bool
+) -> None:
+    job_ = pool_of(backend)
+    swept: list[date] = []
+    job_.sweeper.after_swap = swept.append  # type: ignore[method-assign]
+    ok: Future[Outcome] = Future()
+    ok.set_result(Outcome(DAYS[0], CompactionReport(4, 1, 400, 100, 3), 0.1, "w"))
+    broken = BrokenFuture()
+    job_._flying = {ok: (DAYS[0], 0.0), broken: (DAYS[1], 0.0)}
+    for future in [ok, broken] if ok_first else [broken, ok]:
+        job_._collect(future)
+    assert job_.totals.compacted == 1 and job_._done == 1 and swept == [DAYS[0]]
+    assert job_._flying == {} and job_._broken
+    assert "__main__" not in (job_.stopped or "")  # a partition did complete
