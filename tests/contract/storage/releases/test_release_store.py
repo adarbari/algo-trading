@@ -291,15 +291,93 @@ def test_abort_removes_a_draft_and_its_pin(rig: Rig) -> None:
     assert f"release-{sealed}" in rig.backend.tables.pins()
 
 
-def test_report_names_the_pins_and_the_disk_the_retained_versions_hold(rig: Rig) -> None:
+def test_report_names_the_pins_and_measures_retained_disk_only_when_asked_or_after_a_prune(
+    rig: Rig,
+) -> None:
     x = rig.commit("r1")
     rig.build()
     for v in (2.0, 3.0, 4.0):
         rig.commit("r1", value=v)
+    name = f"release-{S1.isoformat()}.{x}.f1"
     report = rig.store.report()
-    assert report.pins == {f"release-{S1.isoformat()}.{x}.f1": x}
+    assert report.pins == {name: x}
     assert report.releases == (f"{S1.isoformat()}.{x}.f1",) and report.current is None
-    assert report.pinned_bytes > 0
+    assert report.pinned_bytes is None  # never measured: status and doctor do not walk the store
+    assert (rig.store.report(with_bytes=True).pinned_bytes or 0) > 0
+    rig.store.prune(keep=1)  # the job records what the pins hold after its prune
+    assert (rig.store.report().pinned_bytes or 0) > 0
     rig.store.prune(keep=0)
-    rig.backend.tables.unpin(f"release-{S1.isoformat()}.{x}.f1")
-    assert rig.store.report().pinned_bytes == 0
+    assert rig.store.report().pinned_bytes == 0 and rig.store.report().pins == {}
+
+
+def test_a_rebuild_after_a_deploy_returns_the_existing_release_not_an_error(rig: Rig) -> None:
+    x = rig.commit("r1")
+    first = rig.build()
+    again = rig.store.begin(S1, x, 1)
+    rig.store.write(again, "picks", PICKS)
+    kept = rig.store.seal(again, [InputPartitions(TABLE, {S1: x})], "newcode")  # other code_sha
+    assert kept.release_id == first and kept.code_sha == "abc123"
+    same_code = rig.store.begin(S1, x, 1)
+    rig.store.write(same_code, "picks", pa.table({"instrument_id": ["EQ:Z"], "rank": [9]}))
+    with pytest.raises(ReleaseInvalidError, match="other content"):  # same code, other bytes
+        rig.store.seal(same_code, [InputPartitions(TABLE, {S1: x})], "abc123")
+
+
+def test_a_draft_pruned_during_the_build_cannot_be_written_sealed_or_served(rig: Rig) -> None:
+    x = rig.commit("r1")
+    draft = rig.store.begin(S1, x, 1)
+    rig.store.write(draft, "session", SESSION)
+    rig.make(draft_ttl_s=0).prune(keep=1)  # the build looked dead: folder and pin are gone
+    with pytest.raises(ReleaseInvalidError, match="draft"):
+        rig.store.write(draft, "picks", PICKS)
+    with pytest.raises(ReleaseInvalidError, match="pin"):
+        rig.store.seal(draft, [InputPartitions(TABLE, {S1: x})], "abc")
+    assert rig.store.open(draft.release_id) is None and rig.store.releases() == []
+    if rig.kind == "local":
+        assert not (rig.root / "serving" / "drafts").exists() or not any(
+            (rig.root / "serving" / "drafts").iterdir()
+        )
+
+
+def test_promote_refuses_a_release_whose_pin_is_gone(rig: Rig) -> None:
+    rig.commit("r1")
+    release_id = rig.build()
+    rig.backend.tables.unpin(f"release-{release_id}")
+    with pytest.raises(ReleaseInvalidError, match="pin"):
+        rig.store.promote(release_id)
+    assert rig.store.current() is None
+
+
+def test_current_naming_a_pruned_release_is_read_again_once(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig.commit("r1")
+    old = rig.build()
+    rig.store.promote(old)
+    rig.commit("r2", S2)
+    new = rig.build(S2)
+    rig.store.promote(new)
+    stale = (old, "stale")
+    real, calls = rig.store.current, []
+
+    def current() -> tuple[str, str] | None:
+        calls.append(1)
+        return stale if len(calls) == 1 else real()
+
+    rig.store._delete_release(old)  # type: ignore[attr-defined]
+    monkeypatch.setattr(rig.store, "current", current)
+    found = rig.store.current_release()
+    assert found is not None and found.manifest.release_id == new
+
+
+def test_a_read_racing_a_prune_raises_not_found(rig: Rig) -> None:
+    rig.commit("r1")
+    old = rig.build()
+    rig.commit("r2", S2)
+    new = rig.build(S2)
+    rig.store.promote(new)
+    release = rig.store.open(old)
+    assert release is not None
+    assert rig.store.prune(keep=0) == 1
+    with pytest.raises(ReleaseNotFoundError):
+        release.read("picks")

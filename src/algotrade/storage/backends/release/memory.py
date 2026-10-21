@@ -6,7 +6,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from algotrade.storage.backends.release.base import DRAFT_TTL_S, ReleaseStoreBase
-from algotrade.storage.backends.release.interfaces import Draft, ReleaseNotFoundError
+from algotrade.storage.backends.release.interfaces import (
+    Draft,
+    ReleaseInvalidError,
+    ReleaseNotFoundError,
+)
 from algotrade.storage.backends.release.manifest import MAX_RELEASE_BYTES, Manifest
 from algotrade.storage.tables.interfaces import TableStore
 
@@ -16,6 +20,7 @@ class MemoryReleaseState:
     releases: dict[str, tuple[Manifest, dict[str, bytes]]] = field(default_factory=dict)
     drafts: dict[tuple[str, str], tuple[dict[str, bytes], float]] = field(default_factory=dict)
     current: tuple[str, str] | None = None
+    stats: dict[str, int] | None = None
 
 
 class MemoryReleaseStore(ReleaseStoreBase):
@@ -37,7 +42,11 @@ class MemoryReleaseStore(ReleaseStoreBase):
         self.state.drafts[draft.release_id, draft.token] = ({}, time.monotonic())
 
     def _draft_put(self, draft: Draft, name: str, data: bytes) -> None:
-        self.state.drafts[draft.release_id, draft.token][0][name] = data
+        held = self.state.drafts.get((draft.release_id, draft.token))
+        if held is None:
+            raise ReleaseInvalidError(f"the draft of {draft.release_id} is gone (pruned?)")
+        held[0][name] = data
+        self.state.drafts[draft.release_id, draft.token] = (held[0], time.monotonic())  # last write
 
     def _draft_files(self, draft: Draft) -> dict[str, bytes]:
         return dict(self.state.drafts[draft.release_id, draft.token][0])
@@ -71,6 +80,12 @@ class MemoryReleaseStore(ReleaseStoreBase):
             return held[1][name]
 
         return load
+
+    def _read_stats(self) -> dict[str, int] | None:
+        return self.state.stats
+
+    def _write_stats(self, stats: dict[str, int]) -> None:
+        self.state.stats = stats
 
     def _read_current(self) -> tuple[str, str] | None:
         return self.state.current

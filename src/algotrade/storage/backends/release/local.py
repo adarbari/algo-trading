@@ -3,6 +3,7 @@
 Layout under ``<root>/serving`` (an internal detail)::
 
     CURRENT                         {"manifest_hash", "release_id"}: the release served
+    stats.json                      what the last prune recorded (disk the pins hold)
     releases/<release_id>/          manifest.json + <table>.parquet, appears whole at seal
     drafts/<release_id>~<token>/    a build in progress (invisible to every reader)
 
@@ -22,12 +23,17 @@ from pathlib import Path
 
 from algotrade.storage.backends.local_index import atomic_write
 from algotrade.storage.backends.release.base import DRAFT_TTL_S, ReleaseStoreBase
-from algotrade.storage.backends.release.interfaces import Draft, ReleaseCorruptError
+from algotrade.storage.backends.release.interfaces import (
+    Draft,
+    ReleaseCorruptError,
+    ReleaseInvalidError,
+)
 from algotrade.storage.backends.release.manifest import MAX_RELEASE_BYTES, Manifest
 from algotrade.storage.tables.interfaces import TableStore
 
 MANIFEST = "manifest.json"
 CURRENT = "CURRENT"
+STATS = "stats.json"  # what the last prune recorded, beside CURRENT
 
 
 def _fsync(path: Path) -> None:
@@ -67,7 +73,10 @@ class LocalReleaseStore(ReleaseStoreBase):
         self._draft_folder(draft.release_id, draft.token).mkdir(parents=True, exist_ok=True)
 
     def _draft_put(self, draft: Draft, name: str, data: bytes) -> None:
-        atomic_write(self._draft_folder(draft.release_id, draft.token) / f"{name}.parquet", data)
+        folder = self._draft_folder(draft.release_id, draft.token)
+        if not folder.is_dir():  # pruned: atomic_write would recreate it and seal a partial release
+            raise ReleaseInvalidError(f"the draft of {draft.release_id} is gone (pruned?)")
+        atomic_write(folder / f"{name}.parquet", data)
 
     def _draft_files(self, draft: Draft) -> dict[str, bytes]:
         folder = self._draft_folder(draft.release_id, draft.token)
@@ -125,6 +134,15 @@ class LocalReleaseStore(ReleaseStoreBase):
             return (folder / f"{name}.parquet").read_bytes()
 
         return load
+
+    def _read_stats(self) -> dict[str, int] | None:
+        try:
+            return {k: int(v) for k, v in json.loads((self.root / STATS).read_text()).items()}
+        except (FileNotFoundError, ValueError):
+            return None
+
+    def _write_stats(self, stats: dict[str, int]) -> None:
+        atomic_write(self.root / STATS, json.dumps(stats, sort_keys=True).encode())
 
     def _read_current(self) -> tuple[str, str] | None:
         try:

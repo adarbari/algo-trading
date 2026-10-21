@@ -41,10 +41,11 @@ def open_release_store(url: str, backend: Backend) -> ReleaseStore:
     raise ConfigurationError(f"unsupported storage URL {url!r} (expected file:// or memory://)")
 
 
-def release_report(url: str) -> ReleaseReport:
-    """The pins, releases and retained-version disk of the store at ``url`` for ``make status`` and
-    ``make doctor`` (read-only; a ``file://`` store only: a memory store has nothing durable)."""
-    return open_release_store(url, open_backend(url)).report()
+def release_report(url: str, with_bytes: bool = False) -> ReleaseReport:
+    """The pins and releases of the store at ``url`` for ``make status`` and ``make doctor``
+    (read-only). ``pinned_bytes`` is what the serve job's last prune recorded; ``with_bytes``
+    measures it now (every partition index: not for a routine report)."""
+    return open_release_store(url, open_backend(url)).report(with_bytes)
 
 
 def open_text_cache(url: str) -> LocalTextCache | MemoryTextCache:

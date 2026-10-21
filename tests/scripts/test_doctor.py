@@ -548,6 +548,8 @@ def test_serving_releases_report_pins_and_warn_on_orphans_or_a_heavy_retention(
     assert orphan.level == doctor.WARN and "release-b.2.f1" in orphan.detail
     heavy = check(ReleaseReport("a.1.f1", ("a.1.f1",), {"release-a.1.f1": 1}, 6 * 1024**3))
     assert heavy.level == doctor.WARN and "over 5 GB" in heavy.detail
+    unmeasured = check(ReleaseReport("a.1.f1", ("a.1.f1",), {"release-a.1.f1": 1}))
+    assert unmeasured.level == "ok" and "not measured yet" in unmeasured.detail
     assert check(None).level == doctor.INFO
 
 

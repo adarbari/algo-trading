@@ -6,9 +6,16 @@ protects the build's inputs, the checks at ``seal`` (inputs not past the draft's
 epoch unmoved, size ceiling), idempotent re-sealing, ``promote``'s epoch check, CURRENT's
 verification against the manifest hash, and ``prune``'s unpinning of every pin no kept release
 or live draft holds. Nothing here knows a path.
+
+**Single writer.** One pin (``release-<id>``) serves every draft of an id, so ``begin``, ``seal``,
+``abort``, ``promote`` and ``prune`` run only under the serve job's ``exclusive_run("serve")``
+(the build job takes that lock around them); readers (``open``, ``current_release``,
+``report``) need none. ``seal`` and ``promote`` still refuse a release whose pin is gone (a
+draft pruned mid-build), so a lock slip cannot serve a partial release.
 """
 
 import io
+import logging
 import re
 import secrets
 from abc import ABC, abstractmethod
@@ -38,6 +45,7 @@ from algotrade.storage.backends.release.manifest import (
 )
 from algotrade.storage.tables.interfaces import TableStore
 
+log = logging.getLogger(__name__)
 PIN_PREFIX = "release-"
 DRAFT_TTL_S = 6 * 3600.0  # a draft this old is a build that died (the build restarts <= 3 times)
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -56,7 +64,10 @@ class StoredRelease:
 
     def read(self, name: str) -> pa.Table:
         info = self._manifest.tables[name]  # KeyError: the release holds no such table
-        data = self._load(name)
+        try:
+            data = self._load(name)
+        except FileNotFoundError as gone:  # a prune deleted the release under an open reader
+            raise ReleaseNotFoundError(self._manifest.release_id) from gone
         if sha256(data) != info.sha256:
             raise ReleaseCorruptError(f"{self._manifest.release_id}/{name} does not match its hash")
         return pq.read_table(io.BytesIO(data))
@@ -116,6 +127,13 @@ class ReleaseStoreBase(ABC):
     def _loader(self, release: str) -> Callable[[str], bytes]: ...
 
     @abstractmethod
+    def _read_stats(self) -> dict[str, int] | None:
+        """What the last prune recorded (``pinned_bytes``), ``None`` before any."""
+
+    @abstractmethod
+    def _write_stats(self, stats: dict[str, int]) -> None: ...
+
+    @abstractmethod
     def _read_current(self) -> tuple[str, str] | None: ...
 
     @abstractmethod
@@ -151,7 +169,12 @@ class ReleaseStoreBase(ABC):
             raise ValueError(f"invalid release table name {name!r}")
         self._draft_put(draft, name, parquet_bytes(table))
 
+    def _require_pin(self, release: str, seq: int) -> None:
+        if self._tables.pins().get(PIN_PREFIX + release) != seq:
+            raise ReleaseInvalidError(f"the pin of {release} is gone (pruned during the build?)")
+
     def seal(self, draft: Draft, inputs: Sequence[InputPartitions], code_sha: str) -> Manifest:
+        self._require_pin(draft.release_id, draft.seq)
         for item in inputs:
             for day, seq in item.partitions.items():
                 if seq > draft.seq:
@@ -188,9 +211,15 @@ class ReleaseStoreBase(ABC):
             if existing.content_hash == manifest.content_hash:  # the same build again
                 self._draft_delete(draft.release_id, draft.token)
                 return existing
-            if existing.destructive_epoch == draft.epoch:
+            if existing.destructive_epoch != draft.epoch:
+                self._delete_release(draft.release_id)  # built before a destructive operation
+            elif existing.code_sha != code_sha:  # a rebuild after a deploy: the old one stands
+                log.info("%s exists from code %s: kept over %s", draft.release_id,
+                         existing.code_sha, code_sha)  # fmt: skip
+                self._draft_delete(draft.release_id, draft.token)
+                return existing
+            else:  # the same code gave other bytes: a build that is not deterministic
                 raise ReleaseInvalidError(f"{draft.release_id} exists with other content")
-            self._delete_release(draft.release_id)  # built before a destructive operation
         self._publish(draft, manifest)
         return manifest
 
@@ -205,6 +234,7 @@ class ReleaseStoreBase(ABC):
             raise ReleaseNotFoundError(release)
         if manifest.destructive_epoch != self._tables.destructive_epoch():
             raise ReleaseInvalidError(f"{release} was built before a destructive operation (epoch)")
+        self._require_pin(release, manifest.seq)
         self._write_current(release, manifest.content_hash)
 
     def current(self) -> tuple[str, str] | None:
@@ -215,8 +245,13 @@ class ReleaseStoreBase(ABC):
         if named is None:
             return None
         found = self.open(named[0])
-        if found is None:
-            return None
+        if found is None:  # pruned under a stale CURRENT: read it again once
+            again = self.current()
+            if again is None or again == named:
+                return None
+            named, found = again, self.open(again[0])
+            if found is None:
+                return None
         if found.manifest.content_hash != named[1]:
             raise ReleaseCorruptError(f"CURRENT names another hash than {named[0]}'s manifest")
         return found
@@ -243,13 +278,17 @@ class ReleaseStoreBase(ABC):
         for pin in self._tables.pins():
             if pin.startswith(PIN_PREFIX) and pin[len(PIN_PREFIX) :] not in kept | live:
                 self._tables.unpin(pin)
+        self._write_stats({"pinned_bytes": self._tables.pinned_bytes()})  # for doctor, not a read
         return len(doomed)
 
-    def report(self) -> ReleaseReport:
+    def report(self, with_bytes: bool = False) -> ReleaseReport:
+        """``pinned_bytes``: what the last prune recorded (``None`` before any); ``with_bytes``
+        measures it now by walking every partition index (an operator's one-off, never a page)."""
         named = self._read_current()
+        stats = self._read_stats()
+        pinned = (
+            self._tables.pinned_bytes() if with_bytes else stats["pinned_bytes"] if stats else None
+        )
         return ReleaseReport(
-            named[0] if named else None,
-            tuple(self.releases()),
-            self._tables.pins(),
-            self._tables.pinned_bytes(),
+            named[0] if named else None, tuple(self.releases()), self._tables.pins(), pinned
         )

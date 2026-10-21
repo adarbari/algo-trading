@@ -439,7 +439,7 @@ PINNED_WARN_BYTES = 5 * 1024**3  # retained versions a release pins: a warning p
 def check_serving(p: Probes) -> Result:
     """Pins keep the store versions a release was built from; a pin no release or build holds
     (a crashed build) keeps disk until ``serve-release`` prunes it. Reports the pins and what
-    the retained versions weigh (read from every partition index: seconds on a large store)."""
+    the retained versions weighed at the serve job's last prune (never measured here)."""
     try:
         report = p.serving()
     except Exception as exc:  # no store / no venv: store and library checks say so
@@ -448,12 +448,15 @@ def check_serving(p: Probes) -> Result:
         return Result(INFO, "serving releases", "not checked")
     held = set(report.releases)
     orphans = sorted(n for n in report.pins if n.startswith("release-") and n[8:] not in held)
-    gb = report.pinned_bytes / 1024**3
+    held_bytes = report.pinned_bytes
+    holding = "disk not measured yet (the serve job's prune records it)"
+    if held_bytes is not None:
+        holding = f"holding {held_bytes / 1024**3:.2f} GB of older versions as of the last prune"
     detail = (
         f"{len(report.releases)} releases, current {report.current or 'none'}, "
-        f"{len(report.pins)} pins holding {gb:.2f} GB of older versions"
+        f"{len(report.pins)} pins {holding}"
     )
-    if report.pinned_bytes > PINNED_WARN_BYTES:
+    if held_bytes is not None and held_bytes > PINNED_WARN_BYTES:
         limit = f"over {PINNED_WARN_BYTES // 1024**3} GB"
         fix = "prune old releases (`algotrade-ingest serve-release`) or unpin what is stale"
         return Result(WARN, "serving releases", f"{detail}: {limit}", fix)

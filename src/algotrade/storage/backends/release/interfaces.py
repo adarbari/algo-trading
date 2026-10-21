@@ -58,7 +58,7 @@ class ReleaseReport:
     current: str | None
     releases: tuple[str, ...]
     pins: dict[str, int] = field(default_factory=dict)
-    pinned_bytes: int = 0
+    pinned_bytes: int | None = None  # None: never measured (the serve job's prune records it)
 
 
 class Release(Protocol):
@@ -74,6 +74,9 @@ class Release(Protocol):
 
 
 class ReleaseStore(Protocol):
+    """Every mutator (``begin``, ``write``, ``seal``, ``abort``, ``promote``, ``prune``) runs only
+    under the serve job's ``exclusive_run("serve")``; readers need no lock."""
+
     def begin(self, session: date, seq: int, fmt: int) -> Draft:
         """Start a build at commit sequence ``seq``: refuses without the free-space floor
         (``ReleaseInvalidError``), then pins ``seq`` (``release-<id>``) so every version the
@@ -128,4 +131,7 @@ class ReleaseStore(Protocol):
         """Bytes free on the volume releases live on."""
         ...
 
-    def report(self) -> ReleaseReport: ...
+    def report(self, with_bytes: bool = False) -> ReleaseReport:
+        """Current release, releases, pins and ``pinned_bytes`` as the last prune recorded it
+        (``with_bytes``: measured now: reads every partition index of the store)."""
+        ...
