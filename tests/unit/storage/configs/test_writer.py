@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.configs.generation import is_stable, writing
 from algotrade.storage.configs.writer import (
     FileConfigWriter,
     MemoryConfigWriter,
@@ -151,3 +152,45 @@ def test_file_layout_and_atomicity(tmp_path: Path) -> None:
     assert writer.screen_dir("site", "mine") == tmp_path / "site" / "presets" / "screeners" / "mine"
     with pytest.raises(ConfigurationError, match="site"):
         writer.add_version("site", "mine", 1, DOC)  # site presets change by PR only
+
+
+def test_every_write_moves_the_users_generation_to_the_next_even_value(writer: Any) -> None:
+    """ADR 0077 decision 15: the counter a cached answer is keyed on (file and memory alike)."""
+    at = datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+    assert writer.generation("alice") == 0
+    calls = [
+        lambda: writer.save_draft("alice", "mine", DOC),
+        lambda: writer.add_version("alice", "mine", 1, DOC | {"version": 1}),
+        lambda: writer.save_features("alice", "theme", {"features": {}}),
+        lambda: writer.save_preferences("alice", {"ideas": {"priority": []}}),
+        lambda: writer.save_user_document("alice", "edges", "e1", {"id": "e1"}),
+        lambda: writer.archive_user_document("alice", "edges", "e1", at),
+        lambda: writer.discard_draft("alice", "mine"),
+        lambda: writer.delete_screen("alice", "mine", at),
+    ]
+    seen = [writer.generation("alice")]
+    for call in calls:
+        call()
+        seen.append(writer.generation("alice"))
+    assert all(g % 2 == 0 for g in seen) and seen == sorted(set(seen)), seen
+    assert writer.generation("bob") == 0  # one user's write moves no other's
+
+
+def test_a_failed_write_still_leaves_the_generation_even_and_moved(writer: Any) -> None:
+    writer.add_version("alice", "mine", 1, DOC | {"version": 1})
+    before = writer.generation("alice")
+    with pytest.raises(VersionExistsError if isinstance(writer, FileConfigWriter) else Exception):
+        writer.add_version("alice", "mine", 1, DOC | {"version": 1})
+    assert writer.generation("alice") > before and writer.generation("alice") % 2 == 0
+
+
+def test_the_generation_is_odd_during_a_write_and_a_crash_leaves_it_odd(tmp_path: Path) -> None:
+    writer = FileConfigWriter(tmp_path)
+    user_dir = tmp_path / "users" / "alice"
+    with writing(user_dir):
+        assert not is_stable(writer.generation("alice"))
+    assert is_stable(writer.generation("alice"))
+    (user_dir / ".generation").write_text("7")  # a process died mid write
+    assert not is_stable(writer.generation("alice"))  # nothing is cached under it
+    writer.save_preferences("alice", {"x": 1})
+    assert writer.generation("alice") == 10  # the next write repairs it, to an even value
