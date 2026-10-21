@@ -7,11 +7,13 @@ union of every run's picks filtered all of them), and a run that is not its conf
 its own rows."""
 
 import gc
+import weakref
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pyarrow as pa
@@ -19,7 +21,7 @@ import pytest
 
 from algotrade.data import StoreReader
 from algotrade.services.read.context import MAX_CACHE_BYTES, ReadContext, partition, weigh
-from algotrade.services.read.screens import results
+from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.results import VALUE_COLUMNS, _read_values, run_withheld
 from algotrade.services.read.screens.runs import (
     DETAIL_COLUMNS,
@@ -97,15 +99,25 @@ def test_the_run_summaries_read_stays_within_twice_the_newest_runs_bytes(
 
 
 def test_the_summaries_keep_no_frame_after_they_are_built(
-    store: tuple[LocalBackend, int], proxy: pa.ProxyMemoryPool
+    store: tuple[LocalBackend, int], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    backend, newest = store
+    backend, _ = store
     ctx = context(StoreReader(backend))
+    seen: list[weakref.ref[pd.DataFrame]] = []
+
+    def watching(*args: Any, **kwargs: Any) -> Any:
+        found = partition(*args, **kwargs)
+        if isinstance(found, pd.DataFrame):
+            seen.append(weakref.ref(found))
+        return found
+
+    monkeypatch.setattr(runs, "partition", watching)
     run_summaries(ctx)
     gc.collect()
-    assert proxy.bytes_allocated() < newest // 20  # no decoded rows are still referenced
+    assert len(seen) == 1 and seen[0]() is None  # the rows are gone once they are counted
     key = ("run_summaries", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
-    assert 0 < ctx.cache._weights[key] < 100_000  # about a hundred bytes a screener, not a frame
+    # the guard: about a hundred bytes a screener in the cache, not a frame
+    assert 0 < ctx.cache._weights[key] < 100_000
     assert max(ctx.cache._weights.values()) <= MAX_CACHE_BYTES // 2
 
 

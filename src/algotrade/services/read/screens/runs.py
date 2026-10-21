@@ -38,7 +38,7 @@ from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import result_table
 
 RULE_SCREEN = result_table("rule_screen")
-# ``screen_rows`` reads these (a ``ScreenerRun`` is built from them), column-pruned (the row key
+# ``run_summaries`` reads these (a ``ScreenerRun`` is built from them), column-pruned (the row key
 # and the point-in-time columns come with them); ``run_rows`` reads ``RUN_COLUMNS`` of one run's
 # own file, and ``load_results`` the heavier ``DETAIL_COLUMNS`` of the instruments a page asks for.
 ROW_COLUMNS = ("user_id", "config_id", "config_version", "decision", "regime")
