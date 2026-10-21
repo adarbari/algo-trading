@@ -1,0 +1,120 @@
+# The read-your-writes gate (ADR 0077 decisions 14-17). Every write route of the API (PUT, POST
+# and DELETE of the OpenAPI document, except POST /graphql) is listed once:
+#
+#   test    "tests/contract/api/read_your_writes/<file>.py::<function>": the test that writes
+#           through the route and proves the next cached GraphQL read shows the change, with and
+#           without the process-local write epoch;
+#   exempt  the reason the route persists nothing a cached read shows (a dry run, a draft).
+#
+# tests/architecture/api/test_read_your_writes.py fails on a write route not listed, on an entry
+# no route serves, on a `test` that is not an existing test function, on an empty reason, and when
+# the exempt count differs from `max_exempt`. The exempt list may only shrink: a new route is
+# persistent by default and needs a test. (The tests sit in tests/contract/api, not under
+# tests/apps/api: that tree mirrors source folders and this gate mirrors none.)
+
+max_exempt = 5
+
+[[route]]
+method = "DELETE"
+path = "/edges/{edge_id}"
+test = "tests/contract/api/read_your_writes/test_edges.py::test_delete_removes_the_edge"
+
+[[route]]
+method = "PUT"
+path = "/edges/{edge_id}"
+test = "tests/contract/api/read_your_writes/test_edges.py::test_save_shows_the_new_document"
+
+[[route]]
+method = "POST"
+path = "/edges/{edge_id}/copy"
+test = "tests/contract/api/read_your_writes/test_edges.py::test_copy_shows_the_new_edge"
+
+[[route]]
+method = "POST"
+path = "/edges/{edge_id}/evaluate"
+test = "tests/contract/api/read_your_writes/test_edges.py::test_evaluate_shows_the_verdict_once_the_run_is_stored"
+
+[[route]]
+method = "PUT"
+path = "/edges/{edge_id}/state"
+test = "tests/contract/api/read_your_writes/test_edges.py::test_state_shows_a_status_and_a_follow"
+
+[[route]]
+method = "POST"
+path = "/features/user"
+test = "tests/contract/api/read_your_writes/test_features.py::test_a_saved_user_feature_is_in_the_next_catalogue"
+
+[[route]]
+method = "PUT"
+path = "/preferences/ideas"
+test = "tests/contract/api/read_your_writes/test_preferences.py::test_ideas_priority_shows_the_saved_order"
+
+[[route]]
+method = "PUT"
+path = "/preferences/views/{scope}/view"
+test = "tests/contract/api/read_your_writes/test_preferences.py::test_view_put_shows_the_saved_view"
+
+[[route]]
+method = "DELETE"
+path = "/preferences/views/{scope}/view"
+test = "tests/contract/api/read_your_writes/test_preferences.py::test_view_delete_forgets_a_named_view"
+
+[[route]]
+method = "DELETE"
+path = "/screeners/{screener_id}"
+test = "tests/contract/api/read_your_writes/test_screeners.py::test_delete_removes_the_screen"
+
+[[route]]
+method = "POST"
+path = "/screeners/{screener_id}/copy"
+test = "tests/contract/api/read_your_writes/test_screeners.py::test_copy_shows_the_new_screen"
+
+[[route]]
+method = "DELETE"
+path = "/screeners/{screener_id}/draft"
+test = "tests/contract/api/read_your_writes/test_screeners.py::test_draft_delete_removes_the_draft"
+
+[[route]]
+method = "PUT"
+path = "/screeners/{screener_id}/draft"
+test = "tests/contract/api/read_your_writes/test_screeners.py::test_draft_put_shows_the_draft_and_a_replacement"
+
+[[route]]
+method = "POST"
+path = "/screeners/{screener_id}/finalise"
+test = "tests/contract/api/read_your_writes/test_screeners.py::test_finalise_shows_the_new_version"
+
+[[route]]
+method = "POST"
+path = "/screeners/{screener_id}/rebase"
+test = "tests/contract/api/read_your_writes/test_screeners.py::test_rebase_moves_the_pin_to_the_current_preset"
+
+[[route]]
+method = "POST"
+path = "/screens/{config_id}/run"
+test = "tests/contract/api/read_your_writes/test_screens.py::test_a_run_shows_in_the_next_results_read"
+
+[[route]]
+method = "POST"
+path = "/features/check"
+exempt = "a dry run of a formula: it stores nothing"
+
+[[route]]
+method = "POST"
+path = "/regime/explain"
+exempt = "an on-demand explanation: its derived cache is keyed on its own inputs, not served by a cached GraphQL read of the caller's data"
+
+[[route]]
+method = "POST"
+path = "/screeners/preview"
+exempt = "a Builder dry run: it stores nothing"
+
+[[route]]
+method = "POST"
+path = "/screeners/{screener_id}/draft-from-text"
+exempt = "writes feedback events, requests and the text-model usage log (ADR 0066, ADR 0058), none of which a cached read shows: they are read only through never-cached operations or after a publish"
+
+[[route]]
+method = "POST"
+path = "/screeners/{screener_id}/draft-part"
+exempt = "writes feedback events, requests and the text-model usage log (ADR 0066, ADR 0058), none of which a cached read shows: they are read only through never-cached operations or after a publish"
