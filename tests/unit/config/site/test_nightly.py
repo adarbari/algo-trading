@@ -55,3 +55,11 @@ def test_compaction_lists_only_merge_tables_without_a_history_copy() -> None:
         assert spec_for(table).runs == "merge", f"{table} is not a merge-mode table"
         assert table not in copied.instrument_tables, f"{table} has a history copy declared"
         assert not (copied.market_prefix and table.startswith(copied.market_prefix)), table
+
+
+def test_the_shipped_warm_ceiling_is_3000_mb_and_a_bad_one_is_refused() -> None:
+    assert load_nightly(FileConfigStore(REPO_ROOT / "config", local=False)).warm_ceiling_mb == 3000
+    doc = {"serving": {"warm_ceiling_mb": 1500}}
+    assert NightlySettings.from_document(doc).warm_ceiling_mb == 1500
+    with pytest.raises(ConfigurationError):
+        NightlySettings.from_document({"serving": {"warm_ceiling_mb": 0}})

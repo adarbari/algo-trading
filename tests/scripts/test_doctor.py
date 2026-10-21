@@ -31,6 +31,7 @@ def probes(tmp_path: Path, tools: dict[str, str], **kw: object) -> "doctor.Probe
         "run": run,
         "port_open": lambda host, port: False,
         "api_build": lambda: None,
+        "api_footprint": lambda: None,
     }
     return doctor.Probes(**{**base, **kw})
 
@@ -433,6 +434,23 @@ def test_an_api_out_of_step_with_its_build_warns_with_the_fix(tmp_path: Path) ->
     assert (warn.level, warn.detail) == (doctor.WARN, stale[0])
     assert doctor.check_api_build(probes(tmp_path, {}, api_build=lambda: ())).level == doctor.OK
     assert doctor.check_api_build(probes(tmp_path, {})).level == doctor.INFO  # none answering
+
+
+def test_an_api_footprint_over_2_gb_warns_with_the_number_and_the_doc(tmp_path: Path) -> None:
+    # 2026-10-20: a warm took the API to 36 GB and nothing on the Mac said so.
+    big = doctor.check_api_footprint(probes(tmp_path, {}, api_footprint=lambda: 36 * 1024.0))
+    assert (big.level, big.fix) == (doctor.WARN, "see docs/perf/api-memory.md")
+    assert "36.0 GB" in big.detail
+    small = doctor.check_api_footprint(probes(tmp_path, {}, api_footprint=lambda: 1200.0))
+    assert small.level == doctor.OK
+    assert doctor.check_api_footprint(probes(tmp_path, {})).level == doctor.INFO  # unreadable
+
+
+def test_an_unusable_footprint_probe_is_info_not_a_crash(tmp_path: Path) -> None:
+    def boom() -> float:
+        raise ModuleNotFoundError("algotrade_api")
+
+    assert doctor.check_api_footprint(probes(tmp_path, {}, api_footprint=boom)).level == doctor.INFO
 
 
 def test_the_disk_floor_is_the_nightlys_configured_one(tmp_path: Path) -> None:

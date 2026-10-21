@@ -35,6 +35,9 @@ arrow_cpu_threads = 2            # Arrow's decode threads in the ingest process 
 arrow_io_threads = 4
 min_free_gb = 6                  # TEMPORARY 2026-10-20 (owner): lowered from 15 so the outcomes compaction (needs the floor + a partition free) can run beside the backfill; restore 15 once it is done. The nightly refuses to start with less free on the data volume (a full disk stops every agent); make doctor warns below it
 
+[serving]                        # the served API's own limit (docs/perf/api-memory.md)
+warm_ceiling_mb = 3000           # the cache warmer starts no new step while the API's footprint is above this (MB)
+
 [backfilling]                    # ADR 0055 amendment 2026-10-20: a table still being backfilled. A screener short of coverage
                                  # only for want of these (HARD criteria on them) is a WARN `backfilling` while until >= today's UTC date
                                  # (wall clock: lapses even for catch-up; a 22:00 ET run is already the next UTC day), never a failed screens step; after `until` it fails again. The PR that confirms a backfill deletes its entry.
