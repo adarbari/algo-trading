@@ -56,6 +56,7 @@ def test_the_url_is_the_archive_folder_of_the_accession_without_dashes_and_leadi
         {"primary_document": "../../etc/passwd.htm"},
         {"primary_document": "a/b.htm"},
         {"primary_document": "report.exe"},
+        {"primary_document": "scan.paper"},
         {"key": "0000320193-24-12"},
         {"cik": "abc"},
     ],
@@ -67,6 +68,12 @@ def test_a_malformed_accession_cik_or_file_name_is_refused_before_any_request(
     with pytest.raises(ValueError):
         source(TEN_K, urls).fetch(request(**bad))
     assert urls == []
+
+
+@pytest.mark.parametrize("name", ["D12345.HTM", "d12345.Html", "FORM10K.TXT"])
+def test_an_uppercase_extension_primary_document_is_accepted_as_named(name: str) -> None:
+    url = document_url(request(primary_document=name))
+    assert url == URL.rsplit("/", 1)[0] + "/" + name  # SEC paths are case-sensitive: kept as is
 
 
 def test_the_raw_payload_is_the_extraction_never_the_html() -> None:
