@@ -62,6 +62,18 @@ def _api_build() -> tuple[str, ...] | None:
     return running_mismatches(API_URL)
 
 
+API_FOOTPRINT_WARN_MB = 2048  # docs/perf/api-memory.md: the API settles near 1 to 1.5 GB
+
+
+def _api_footprint() -> float | None:
+    """MB of the largest process listening on the API's port (macOS ``footprint``; ``--reload``
+    lists a parent and a child); None: nobody listens or it is not readable."""
+    from algotrade_api.ops.footprint import listener_pids, process_footprint_mb  # noqa: PLC0415
+
+    sizes = [process_footprint_mb(pid) for pid in listener_pids(urlparse(API_URL).port or 8000)]
+    return max((s for s in sizes if s is not None), default=None)
+
+
 @dataclass
 class Probes:
     """The machine, as the checks see it. Defaults are real; tests override."""
@@ -79,6 +91,7 @@ class Probes:
     launch_agents: Path = Path.home() / "Library" / "LaunchAgents"
     free_bytes: Callable[[Path], int] = lambda path: shutil.disk_usage(path).free
     api_build: Callable[[], tuple[str, ...] | None] = field(default=_api_build)
+    api_footprint: Callable[[], float | None] = field(default=_api_footprint)
     history_stale: Callable[[], str | None] = field(default=lambda: None)  # see history_stale()
 
 
@@ -313,6 +326,26 @@ def check_api_build(p: Probes) -> Result:
             OK, "api build", "the running API matches its " + _API_TREE + " and the served web"
         )
     return Result(WARN, "api build", "; ".join(found), "the restart or rebuild named above")
+
+
+def check_api_footprint(p: Probes) -> Result:
+    """The footprint of the process on the API's port (``footprint -p``, read-only): above 2 GB
+    warns with the number (2026-10-20: a warm took it to 36 GB and the Mac swapped). INFO when
+    unreadable."""
+    try:
+        mb = p.api_footprint()
+    except Exception as exc:  # no venv, no footprint tool: not macOS
+        return Result(INFO, "api footprint", f"not checked ({type(exc).__name__})")
+    if mb is None:
+        return Result(INFO, "api footprint", "not readable (no API listening, or not macOS)")
+    if mb > API_FOOTPRINT_WARN_MB:
+        return Result(
+            WARN,
+            "api footprint",
+            f"{mb / 1024:.1f} GB ({mb:.0f} MB) above {API_FOOTPRINT_WARN_MB // 1024} GB",
+            "see docs/perf/api-memory.md",
+        )
+    return Result(OK, "api footprint", f"{mb / 1024:.1f} GB")
 
 
 def check_llm(p: Probes) -> Result:
@@ -662,6 +695,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_history_copy(p),
         check_web_dist(p),
         check_api_build(p),
+        check_api_footprint(p),
         check_llm(p),
         *check_main_checkout(p),
         *check_release_tree(p),

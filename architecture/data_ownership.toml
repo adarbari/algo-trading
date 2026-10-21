@@ -223,7 +223,7 @@ detect = [{ call = "RunRecord" }, { call = "new_run_id" }, { attr = "RunStatus.P
 
 [[responsibility]]
 id = "run-selection"
-description = "Which runs of a partition a read at as_of sees, per the table's run mode (TableSpec.runs): snapshot = the latest run; merge (events) = the union from the latest restating run on, the latest run's row per table key"
+description = "Which runs of a partition a read at as_of sees, per the table's run mode (TableSpec.runs): snapshot = the latest run; merge (events) = the union from the latest restating run on, the latest run's row per table key; for a whole_per_group table (each run holds its group's whole result) the newest run per group (newest_run_per_group, keep_newest_runs: TableStore.read_latest_runs)"
 owner = ["src/algotrade/storage/backends/run_selection.py"]
 allowed = [
     "src/algotrade/storage/backends/local.py",  # applies the selection to its _runs.json index
@@ -232,7 +232,7 @@ allowed = [
     "src/algotrade/storage/backends/run_compaction.py",  # verifies a compaction with the owner's select_runs / merge_rows (ADR 0078)
 ]
 section = "docs/adr/0007-point-in-time-data.md#how-runs-combine"
-detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }]
+detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }, { call = "newest_run_per_group" }, { call = "keep_newest_runs" }]
 
 [[responsibility]]
 id = "snapshot-selection"
