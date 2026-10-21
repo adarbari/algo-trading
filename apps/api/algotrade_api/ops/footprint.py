@@ -60,8 +60,11 @@ class OwnFootprint:
     def __call__(self) -> float | None:
         now = self._clock()
         if now - self._at >= OWN_CACHE_S:
-            self._mb = process_footprint_mb(os.getpid(), self._run)
-            if self._mb is None and not self._warned:  # a broken probe must not hide the guard
+            try:
+                self._mb = process_footprint_mb(os.getpid(), self._run)
+            except Exception:  # a parse error must not abort the warm steps that log through us
+                self._mb = None
+            if self._mb is None and not self._warned:  # a broken probe must not go unnoticed
                 log.warning(
                     "cannot read this process's footprint: warm steps are logged without it"
                 )

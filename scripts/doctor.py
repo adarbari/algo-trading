@@ -329,14 +329,15 @@ def check_api_build(p: Probes) -> Result:
 
 
 def check_api_footprint(p: Probes) -> Result:
-    """The footprint of the API on 8000 (``footprint -p``, read-only): above 2 GB warns with the
-    number (2026-10-20: a warm took it to 36 GB and the Mac swapped). INFO when unreadable."""
+    """The footprint of the process on the API's port (``footprint -p``, read-only): above 2 GB
+    warns with the number (2026-10-20: a warm took it to 36 GB and the Mac swapped). INFO when
+    unreadable."""
     try:
         mb = p.api_footprint()
     except Exception as exc:  # no venv, no footprint tool: not macOS
         return Result(INFO, "api footprint", f"not checked ({type(exc).__name__})")
     if mb is None:
-        return Result(INFO, "api footprint", "not readable (no API on 8000, or not macOS)")
+        return Result(INFO, "api footprint", "not readable (no API listening, or not macOS)")
     if mb > API_FOOTPRINT_WARN_MB:
         return Result(
             WARN,

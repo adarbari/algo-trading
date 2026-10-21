@@ -26,6 +26,13 @@ def test_every_listener_pid_is_returned_for_a_reload_parent_and_child() -> None:
     assert listener_pids(8000, lambda cmd: (127, "no lsof")) == []
 
 
+def test_a_probe_that_raises_reads_as_unknown() -> None:
+    def boom(cmd: list[str]) -> tuple[int, str]:
+        raise ValueError("garbled")
+
+    assert OwnFootprint(boom)() is None
+
+
 def test_a_probe_that_reads_nothing_warns_once(caplog: pytest.LogCaptureFixture) -> None:
     own = OwnFootprint(lambda cmd: (127, "no footprint"), lambda: 1e9)
     with caplog.at_level("WARNING"):
