@@ -134,6 +134,7 @@ RULE_SCREEN = fixed(
     "size_multiplier float64",  # the regime's size for the screener; null in runs before it
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
+    whole_per_group=True,  # a run's file is its config's whole result (ADR 0029 amendment)
 )
 
 # One row per (instrument, criterion), per display column (``mode = "column"``, ``outcome =
@@ -183,4 +184,5 @@ RULE_SCREEN_VALUES = fixed(
     "group_id string",  # the parent group (ADR 0071); null: a gate, or a partition before groups
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
+    whole_per_group=True,
 )

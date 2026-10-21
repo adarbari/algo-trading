@@ -158,9 +158,9 @@ def test_pick_ids_read_the_run_rows_only_in_rank_order(
     read: list[str] = []
     real = results.partition
 
-    def counting(c: ReadContext, table: str, *args: Any) -> Any:
+    def counting(c: ReadContext, table: str, *args: Any, **kwargs: Any) -> Any:
         read.append(table)
-        return real(c, table, *args)
+        return real(c, table, *args, **kwargs)
 
     monkeypatch.setattr(results, "partition", counting)
     found = runs.load_pick_ids(ctx, run, 100)

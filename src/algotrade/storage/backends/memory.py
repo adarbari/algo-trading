@@ -18,6 +18,7 @@ from algotrade.storage.backends.arrow import (
     concat,
     keep_columns,
     parquet_bytes,
+    table_spec,
     to_arrow,
     to_frame,
 )
@@ -34,8 +35,10 @@ from algotrade.storage.backends.run_selection import (
     RunEntry,
     committed,
     concat_frames,
+    keep_newest_runs,
     max_seq,
     merge_rows,
+    newest_run_per_group,
     pinned_read,
     run_mode,
     select_instruments,
@@ -170,6 +173,52 @@ class MemoryTables:
             lambda: self._seq,
             lambda: self._index_lock,
         )
+
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+        own_run: str | None = None,
+        upto: int | None = None,
+    ) -> pd.DataFrame | None:
+        spec = table_spec(table)
+        if spec is None or not spec.whole_per_group:
+            raise ValueError(f"{table}: a run's file is not its group's whole result")
+
+        def at(seq: int | None) -> pd.DataFrame | None:
+            entries, frames = self._view((table, session_date), own_run, seq)
+            runs = select_runs(entries, None, run_mode(table))
+            if not runs:
+                return None
+            held = {
+                run: None
+                if entries[run].restates or any(g not in frames[run].columns for g in group)
+                else set(
+                    frames[run][list(group)].drop_duplicates().itertuples(index=False, name=None)
+                )
+                for run in runs
+            }
+            newest = newest_run_per_group(runs, held)
+            if newest is None:  # the same fallback as the local backend: merge, then keep newest
+                parts = [to_arrow(table, frames[r]) for r in runs]
+                data = merge_rows(table, concat(table, parts)) if len(runs) > 1 else parts[0]
+                merged = keep_newest_runs(to_frame(data), group, runs)
+            else:
+                chosen = set(newest.values())
+                found = concat_frames([frames[r] for r in runs if r in chosen])
+                merged = found if found is not None else frames[runs[0]].iloc[0:0]
+            frame = select_instruments(merged, instruments)
+            if columns is not None:
+                keep = keep_columns([*columns, *group])
+                frame = frame[[c for c in frame.columns if c in keep]]
+            return frame.reset_index(drop=True)
+
+        if upto is not None:
+            return at(upto)
+        return pinned_read(at, lambda: self._seq, lambda: self._index_lock)
 
     def read_run(
         self, table: str, session_date: date, run_id: str, own_run: str | None = None

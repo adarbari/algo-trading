@@ -55,3 +55,11 @@ def test_compaction_lists_only_merge_tables_without_a_history_copy() -> None:
         assert spec_for(table).runs == "merge", f"{table} is not a merge-mode table"
         assert table not in copied.instrument_tables, f"{table} has a history copy declared"
         assert not (copied.market_prefix and table.startswith(copied.market_prefix)), table
+
+
+def test_compaction_never_lists_a_table_whose_runs_are_each_a_groups_whole_result() -> None:
+    # ADR 0078 keeps only the changed rows, so a compacted newest run is a delta: the newest-run
+    # read (``read_latest_runs``, ADR 0029 amendment) would then return a fraction of a screen
+    nightly = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False))
+    for table in nightly.compaction.tables:
+        assert not spec_for(table).whole_per_group, f"{table} is read by its newest run alone"

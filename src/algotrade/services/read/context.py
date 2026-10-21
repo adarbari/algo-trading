@@ -332,11 +332,15 @@ def partition(
     table: str,
     columns: Sequence[str] | None = None,
     instruments: Sequence[str] | None = None,
+    newest_runs: bool = False,
 ) -> pd.DataFrame | Unknown:
     """``table``'s partition for exactly ``ctx.session.date``, else ``Unknown(NO_PARTITION)``;
     never an older partition. ``columns``: only these (plus the row key and the point-in-time
     columns); ``instruments``: only their rows (a stored partition with none of them is an
-    empty frame, not UNKNOWN). ``ValueError`` for a table that is not session grain (snapshot,
+    empty frame, not UNKNOWN). ``newest_runs``: only each (user, config)'s newest run's rows,
+    for a table whose runs each hold their config's whole result (``read_latest_runs``, ADR 0029
+    amendment): what every reader of the screen tables takes from the merge anyway.
+    ``ValueError`` for a table that is not session grain (snapshot,
     event, issuer-dated and incremental tables have their own rule: ``session.grain_of``)."""
     grain = grain_of(table)
     if grain is not Grain.SESSION:
@@ -346,6 +350,9 @@ def partition(
         UnknownCode.NO_PARTITION,
         table_cause(table, f"{table} has no partition for {day.isoformat()}", session=day),
     )
+    if newest_runs:
+        latest = ctx.reader.read_latest_runs(table, day, columns, instruments)
+        return absent if latest is None else latest
     if columns is None and instruments is None:
         whole = ctx.reader.table(table, day)
         return absent if whole is None else whole

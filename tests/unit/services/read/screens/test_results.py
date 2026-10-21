@@ -84,9 +84,9 @@ def test_the_value_rows_of_a_page_are_read_once_per_published_state(
     read: list[str] = []
     real = results.partition
 
-    def counting(c: ReadContext, table: str, *args: Any) -> Any:
+    def counting(c: ReadContext, table: str, *args: Any, **kwargs: Any) -> Any:
         read.append(table)
-        return real(c, table, *args)
+        return real(c, table, *args, **kwargs)
 
     monkeypatch.setattr(results, "partition", counting)
     first = load_results(ctx, {"r1": ["EQ:AAA"]}, [run])

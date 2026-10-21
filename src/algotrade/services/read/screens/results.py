@@ -223,7 +223,7 @@ def _read_values(
     ids: Sequence[str] | None,
     wanted: Mapping[str, Sequence[str]] | None,
 ) -> dict[ResultKey, list[Mapping[str, Any]]]:
-    stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, ids)
+    stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, ids, newest_runs=True)
     if isinstance(stored, Unknown) or stored.empty:
         return {}
     out: dict[ResultKey, list[Mapping[str, Any]]] = {}
@@ -325,7 +325,7 @@ def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     key = ("screen_run_fields", run.run_id, ctx.session.date, ctx.reader.visible_seq())
 
     def read() -> frozenset[str]:
-        stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS)
+        stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, newest_runs=True)
         if isinstance(stored, Unknown) or stored.empty:
             return frozenset()
         mine = stored[
@@ -537,7 +537,7 @@ def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Sc
     if found is not None:
         return found
     kind, _, name = key.partition(":")
-    stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS)
+    stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS, newest_runs=True)
     out: dict[str, Scalar] = {}
     if not isinstance(stored, Unknown) and not stored.empty:
         column = stored["mode"].map(is_display_column).astype(bool)

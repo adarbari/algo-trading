@@ -112,6 +112,31 @@ class TableStore(Protocol):
         ``instrument_id`` and the point-in-time columns."""
         ...
 
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+        own_run: str | None = None,
+        upto: int | None = None,
+    ) -> pd.DataFrame | None:
+        """The rows of each ``group``'s newest run in a partition (ADR 0029 amendment), for a
+        table whose runs each hold their group's whole result (``TableSpec.whole_per_group``;
+        ``ValueError`` otherwise): what ``read`` then ``last_run_rows`` per group gives, without
+        decoding the older runs. The newest run is the latest by (``knowledge_ts``, run id) among
+        the runs a read sees (a pending ``own_run`` included; no ``as_of``), chosen from the index
+        and the files' footer statistics and read inside one pinned sequence (``upto``: the
+        caller's, else a fresh one); a restating run, or a file whose groups the statistics cannot
+        name exactly, reads the whole merge and keeps each group's newest run, same rows.
+        ``columns`` and ``instruments`` as ``read_range`` / ``read`` (the group columns come with
+        them; an ``instruments`` matching nothing: an empty frame). ``None``: no run in the
+        partition.
+        The newest run is chosen before ``instruments`` filters it, so a group's older run is
+        never read for an instrument its newest run dropped."""
+        ...
+
     def read_run(
         self, table: str, session_date: date, run_id: str, own_run: str | None = None
     ) -> pd.DataFrame | None:

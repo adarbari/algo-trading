@@ -69,6 +69,20 @@ class StoreReader:
         """One committed run's own rows of a partition (``TableStore.read_run``)."""
         return self._backend.tables.read_run(table, session_date, run_id, self.own_run)
 
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+        group: Sequence[str] = ("user_id", "config_id"),
+    ) -> pd.DataFrame | None:
+        """Each group's newest run of a partition (``TableStore.read_latest_runs``)."""
+        tables = self._backend.tables
+        return tables.read_latest_runs(
+            table, session_date, group, columns, instruments, self.own_run
+        )
+
     def visible_seq(self) -> int:
         """The latest committed publish sequence: changes exactly when a commit publishes."""
         return self._backend.tables.visible_seq()
@@ -234,6 +248,20 @@ class RecordingReader(StoreReader):
     def read_run(self, table: str, session_date: date, run_id: str) -> pd.DataFrame | None:
         recording = self._open()
         frame = super().read_run(table, session_date, run_id)
+        if recording:
+            self._log_rows(table, session_date, session_date)
+        return frame
+
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+        group: Sequence[str] = ("user_id", "config_id"),
+    ) -> pd.DataFrame | None:
+        recording = self._open()
+        frame = super().read_latest_runs(table, session_date, columns, instruments, group)
         if recording:
             self._log_rows(table, session_date, session_date)
         return frame
