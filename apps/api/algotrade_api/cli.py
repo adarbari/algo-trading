@@ -81,6 +81,7 @@ from algotrade_api.auth.local import require_loopback
 from algotrade_api.auth.mode import AuthMode
 from algotrade_api.deps import ReadStore, open_store
 from algotrade_api.ops.build import Fetch, fetch_http, running_mismatches, write_web_stamp
+from algotrade_api.ops.closure import GitTree
 from algotrade_api.ops.deploy import CHECKS, actions, holds_ingest, verify
 from algotrade_api.ops.schedule import (
     DEFAULT_PORT,
@@ -518,7 +519,7 @@ def main(argv: list[str] | None = None) -> None:
         if args.ingest_sync:
             print("ingest" if holds_ingest(paths) else "")
         else:
-            print(" ".join(a.value for a in actions(paths)))
+            print(" ".join(a.value for a in actions(paths, GitTree(args.to))))
         return
     if args.command == "deploy-verify":
         url = f"http://{HOST}:{args.agent_port}"

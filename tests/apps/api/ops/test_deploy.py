@@ -51,6 +51,7 @@ def test_the_deploy_cycle_is_owned_by_the_api_module_and_the_ingestion_hold() ->
     owners = tomllib.loads((REPO_ROOT / "architecture" / "api_ownership.toml").read_text())
     (cycle,) = [r for r in owners["responsibility"] if r["id"] == "deploy-cycle"]
     assert set(cycle["owner"]) == {
+        "apps/api/algotrade_api/ops/closure.py",
         "apps/api/algotrade_api/ops/deploy.py",
         "apps/ingestion/algotrade_ingestion/ops/hold.py",
     }

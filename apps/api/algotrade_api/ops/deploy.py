@@ -19,6 +19,7 @@ from enum import StrEnum
 from fnmatch import fnmatchcase
 
 from algotrade_api.ops.build import Fetch, running_mismatches
+from algotrade_api.ops.closure import ApiClosure, Tree
 
 PLIST_WRITERS = (
     "apps/ingestion/algotrade_ingestion/ops/schedule.py",
@@ -46,22 +47,39 @@ _RULES: tuple[tuple[tuple[str, ...], frozenset[Action]], ...] = (
 )  # fmt: skip
 
 
-def _needs(path: str) -> set[Action]:
+# Under these a change restarts the API only when it is code the API process loads (ADR 0077
+# decision 21 item 5): a ``.py`` module outside the API's static import closure
+# (``ops/closure.py``) does not. Everything else under the restart rule, and every doubt,
+# still restarts.
+_CLOSURE_ONLY = ("src/*", "libs/*")
+
+
+def _needs(path: str, closure: ApiClosure | None = None) -> set[Action]:
     out: set[Action] = set()
     for patterns, actions in _RULES:
         if any(fnmatchcase(path, p) for p in patterns):
             out |= actions
+            if (
+                closure is not None
+                and actions == {Action.RESTART}
+                and any(fnmatchcase(path, p) for p in _CLOSURE_ONLY)
+                and not closure.loads(path)
+            ):
+                out.discard(Action.RESTART)
             break
     if path in PLIST_WRITERS:
         out.add(Action.PLISTS)
     return out
 
 
-def actions(paths: Iterable[str]) -> list[Action]:
-    """The union of what the changed ``paths`` need, in execution order."""
+def actions(paths: Iterable[str], tree: Tree | None = None) -> list[Action]:
+    """The union of what the changed ``paths`` need, in execution order. ``tree`` is the
+    target commit's files: given, a ``src/`` or ``libs/`` module the API never loads does not
+    restart it; without it every such path does."""
     needed: set[Action] = set()
+    closure = ApiClosure(tree) if tree is not None else None
     for path in paths:
-        needed |= _needs(path)
+        needed |= _needs(path, closure)
     return [a for a in Action if a in needed]
 
 

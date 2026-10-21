@@ -32,8 +32,9 @@ detect = [
 
 [[responsibility]]
 id = "deploy-cycle"
-description = "Decide what a deploy of origin/main must do: map the changed paths to actions (sync, web, restart, plists), hold the deploy lock, (never the ingest run lock: a serving deploy runs from a release tree, ADR 0079; `holds_ingest` only hints which changes an ingest loads) around it (the ingestion app's `algotrade-ingest deploy-hold`), poll the running API until it serves the deployed commit; scripts/ops/deploy.sh orchestrates (git, build, swap, notify, log) and calls this through `algotrade-api deploy-plan|deploy-verify` and `algotrade-ingest deploy-hold` (ADRs 0057, 0079)"
+description = "Decide what a deploy of origin/main must do: map the changed paths to actions (sync, web, restart, plists; a src/ or libs/ module restarts the API only when its static import closure, `closure.py`, loads it), hold the deploy lock, (never the ingest run lock: a serving deploy runs from a release tree, ADR 0079; `holds_ingest` only hints which changes an ingest loads) around it (the ingestion app's `algotrade-ingest deploy-hold`), poll the running API until it serves the deployed commit; scripts/ops/deploy.sh orchestrates (git, build, swap, notify, log) and calls this through `algotrade-api deploy-plan|deploy-verify` and `algotrade-ingest deploy-hold` (ADRs 0057, 0079)"
 owner = [
+    "apps/api/algotrade_api/ops/closure.py",
     "apps/api/algotrade_api/ops/deploy.py",
     "apps/ingestion/algotrade_ingestion/ops/hold.py",
 ]

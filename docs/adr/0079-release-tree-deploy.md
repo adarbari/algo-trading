@@ -166,6 +166,17 @@ must not hold the `deploy` lock for hours to prevent that (it blocked serving de
 `ingest-tree` (`INGEST_TREE_LOCK`) is held by such a job for its whole run, never waited for;
 `deploy-hold` takes it with the ingest lock (the sync), and `--deploy-only` (serving) does not.
 
+**Amendment 2026-10-21 (restart only for code the API loads, ADR 0077 decision 21 item 5).** A
+restart means cold caches and minutes of slow pages, so the planner no longer restarts for every
+change under `src/` or `libs/`. `ops/closure.py` computes the API's static import closure by AST
+from the target commit's tree (`git cat-file`, not the working directory; every `algotrade_api`
+module is a root; imports in functions and under `TYPE_CHECKING` count; a module using
+`__import__`, `importlib`, `pkgutil` walks or entry points loads its whole package). A changed
+`.py` module of `src/` or `libs/` outside the closure needs no restart. Deny by default: package
+data, `config/site/*`, `apps/api/*`, a module missing from the target tree, anything
+unclassifiable restarts. A fitness test (`tests/apps/api/ops/test_closure.py`) fails when a module
+`algotrade_api.main` loads at runtime is missing from the closure.
+
 ## Review
 Architect review 2026-10-20: design sound; nine edits applied (refmap, rebuild constraint, ingest-sync range, two roots, plists, symlinks, bootstrap, proxy truth, lock wording). A re-review of R1 is required (locks, format and deploy lifecycle change there).
 
