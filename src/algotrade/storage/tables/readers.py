@@ -149,13 +149,8 @@ class StoreReader:
             )
             frame = kept if added is None else pd.concat([kept, added], ignore_index=True)
             frame = frame.reset_index(drop=True)
-        memo.frame, memo.start, memo.end, memo.pin, memo.stamps = (
-            frame,
-            start,
-            end,
-            self._pin,
-            stamps,
-        )
+        memo.frame, memo.start, memo.end = frame, start, end
+        memo.pin, memo.epoch, memo.stamps = self._pin, epoch, stamps
         return frame
 
     def read_run(
