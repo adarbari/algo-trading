@@ -22,6 +22,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from datetime import date
 
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -172,6 +173,12 @@ class ReleaseStoreBase(ABC):
     def _require_pin(self, release: str, seq: int) -> None:
         if self._tables.pins().get(PIN_PREFIX + release) != seq:
             raise ReleaseInvalidError(f"the pin of {release} is gone (pruned during the build?)")
+
+    def write_frame(self, draft: Draft, name: str, frame: pd.DataFrame) -> None:
+        """``write`` of a frame (callers outside storage hold no Arrow): the index is dropped and
+        the pandas schema metadata too, so the bytes depend on the values alone."""
+        table = pa.Table.from_pandas(frame, preserve_index=False).replace_schema_metadata(None)
+        self.write(draft, name, table)
 
     def seal(self, draft: Draft, inputs: Sequence[InputPartitions], code_sha: str) -> Manifest:
         self._require_pin(draft.release_id, draft.seq)

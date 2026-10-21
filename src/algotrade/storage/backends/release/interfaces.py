@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING, Protocol
 
+import pandas as pd
 import pyarrow as pa
 
 if TYPE_CHECKING:
@@ -85,6 +86,10 @@ class ReleaseStore(Protocol):
 
     def write(self, draft: Draft, name: str, table: pa.Table) -> None:
         """Add a table to the draft (``name``: lowercase letters, digits, ``_``); invisible."""
+        ...
+
+    def write_frame(self, draft: Draft, name: str, frame: pd.DataFrame) -> None:
+        """``write`` for a caller that holds a frame, not an Arrow table."""
         ...
 
     def seal(self, draft: Draft, inputs: Sequence[InputPartitions], code_sha: str) -> "Manifest":

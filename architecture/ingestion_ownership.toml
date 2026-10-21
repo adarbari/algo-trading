@@ -341,6 +341,16 @@ section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-
 detect = [{ call = "stamp" }]
 
 [[responsibility]]
+id = "serve-release-job"
+description = "The serve-release workflow (ADR 0077 decision 4): under the serve lock, a no-op while CURRENT serves the default session (unless rebuild), else build the release, promote it unless CURRENT already names it, prune (which records what the pins hold), with its own serve-release run record, FAILED and CURRENT untouched on any failure; started by the CLI after a nightly or post-session finished, never a nightly step"
+owner = ["apps/ingestion/algotrade_ingestion/workflows/serve_release/serve_release.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/cli/main.py",  # the serve-release command and the starts after the nightly and post-session
+]
+section = "docs/adr/0077-serving-release.md#decision"
+detect = [{ call = "serve_release" }, { string_prefix = "serve-release" }]
+
+[[responsibility]]
 id = "statements-backlog-priority"
 description = "In which order the shares task fetches the statements backlog and a --limit chunk (ADR 0067 amendment 2026-10-17): the event scope, the S&P 500, then the rest, optionable and liquid names first, by dollar volume and market cap, ties by CIK, every input as of the day before the session; it reorders only, never changes what is due"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"]

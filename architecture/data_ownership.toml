@@ -168,6 +168,7 @@ allowed = [
     "src/algotrade/data/outcomes/chain.py",  # the chain outcome partitions' stamps, likewise (EB H13)
     "src/algotrade/data/outcomes/residuals.py",  # the residual partitions' stamps, likewise
     "src/algotrade/services/evaluation/cross_section/legs/reuse.py",  # checks a stored leg's reads against the partitions' stamps
+    "src/algotrade/services/serving/build.py",  # records each input partition's stamp at the pin in the release manifest (ADR 0077)
 ]
 section = "docs/adr/0022-atomic-run-publication.md#decision"
 detect = [{ call = "partition_seq" }, { call = "RecordingReader" }]
@@ -250,6 +251,7 @@ description = "The serving releases beside the data store (ADR 0077): a draft th
 owner = ["src/algotrade/storage/backends/release/*"]
 allowed = [
     "src/algotrade/storage/factory.py",  # opens the store from the storage URL
+    "apps/ingestion/algotrade_ingestion/cli/main.py",  # opens the store for the serve-release command
 ]
 section = "docs/adr/0077-serving-release.md#decision"
 detect = [{ call = "LocalReleaseStore" }, { call = "MemoryReleaseStore" }, { call = "open_release_store" }]

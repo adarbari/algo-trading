@@ -277,6 +277,10 @@ purpose = "the nightly workflow: sessions, steps, screens, the summary report an
 path = "apps/ingestion/algotrade_ingestion/workflows/post_session"
 purpose = "the post-session workflow (ADR 0070): descriptions, verify and edge-eval after a session's nightly is done, with its own run record"
 
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows/serve_release"
+purpose = "the serve-release workflow (ADR 0077): build, promote and prune the serving release under the serve lock, with its own run record"
+
 # --------------------------------------------------------------------------- shared helpers
 
 [[shared]]
