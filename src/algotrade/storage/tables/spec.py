@@ -59,6 +59,12 @@ class TableSpec:
     def __post_init__(self) -> None:
         if self.runs not in RUN_MODES:
             raise ValueError(f"{self.name}: unknown run mode {self.runs!r}")
+        if self.whole_per_group and (
+            self.runs != "merge" or not {"user_id", "config_id"} <= set(self.key)
+        ):
+            raise ValueError(
+                f"{self.name}: whole_per_group needs a merge table keyed by user, config"
+            )
 
     def column(self, name: str) -> Column | None:
         return next((c for c in self.columns if c.name == name), None)

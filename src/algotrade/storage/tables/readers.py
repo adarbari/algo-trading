@@ -73,9 +73,9 @@ class StoreReader:
         self,
         table: str,
         session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
-        group: Sequence[str] = ("user_id", "config_id"),
     ) -> pd.DataFrame | None:
         """Each group's newest run of a partition (``TableStore.read_latest_runs``)."""
         tables = self._backend.tables
@@ -256,12 +256,12 @@ class RecordingReader(StoreReader):
         self,
         table: str,
         session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
-        group: Sequence[str] = ("user_id", "config_id"),
     ) -> pd.DataFrame | None:
         recording = self._open()
-        frame = super().read_latest_runs(table, session_date, columns, instruments, group)
+        frame = super().read_latest_runs(table, session_date, group, columns, instruments)
         if recording:
             self._log_rows(table, session_date, session_date)
         return frame

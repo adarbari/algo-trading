@@ -351,7 +351,7 @@ def partition(
         table_cause(table, f"{table} has no partition for {day.isoformat()}", session=day),
     )
     if newest_runs:
-        latest = ctx.reader.read_latest_runs(table, day, columns, instruments)
+        latest = ctx.reader.read_latest_runs(table, day, columns=columns, instruments=instruments)
         return absent if latest is None else latest
     if columns is None and instruments is None:
         whole = ctx.reader.table(table, day)
