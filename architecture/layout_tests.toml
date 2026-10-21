@@ -81,6 +81,10 @@ path = "tests/contract/storage"
 purpose = "the storage contract: every table backend passes it"
 
 [[test_dir]]
+path = "tests/contract/storage/releases"
+purpose = "the contract of pinned reads and retention (ADR 0077): a pin keeps the versions a read at its sequence sees, dates and stamps hide later partitions, a destructive operation bumps the epoch, the history copy serves a pinned read only when it cannot leak; every table backend passes it"
+
+[[test_dir]]
 path = "tests/contract/storage/rewrites"
 purpose = "the contract of the admin rewrites of a partition's runs (purge_runs, sweep_orphans, compact_runs): every table backend passes it"
 
