@@ -1,6 +1,8 @@
 # ADR 0077: The serving release: pages read one immutable, read-optimised snapshot per session
 
-**Status:** proposed (2026-10-19; owner approved the direction the same day; design: the
+**Status:** proposed (2026-10-19; owner approved the direction the same day; amended
+2026-10-21 with the owner-approved decisions 14-22 below, which win over 8, 10 and 13 where
+they differ; design: the
 architect's memo, which corrected four points of the first sketch, marked below). Amends
 [0022](0022-atomic-run-publication.md) (a pinned read of the history copy, a build-wide pin and retained versions), [0060](0060-history-copy.md) (how the copy serves a pinned read), [0044](0044-hosting-from-the-owners-mac.md) (a second port, blue/green),
 [0062](0062-reads-serve-the-last-complete-session.md) (the default session is the current
@@ -82,8 +84,9 @@ requests use. The owner accepts data up to a day stale and wants fast loads alwa
    default-session page key, not every key): user expression features (evaluated over the
    release's feature frame), the user's on-request screen runs (ADR 0033, composed with the
    release's preset picks; keyed by user and runs generation), admin ops pages (live; a lane capped at a thread count the plan sets), live quotes and usage logs, Builder previews (pinned per 3), and an explicit
-   date other than the release's (ADR 0036). These keep their keys, listed in the shrink-only
-   `architecture/live_read_keys.toml`.
+   date other than the release's (ADR 0036). These keep their keys. (*Amended by 14*: the
+   list of live keys is inverted into an allow-list of release-shared operations; a live key is
+   never listed.)
 9. **Roles and licences.** The release stores every name with its licence and the full `Cause`
    chain; the API filters by the viewer's licences (0069) and redacts causes for non-admins
    (0056). Nothing is pre-rendered per role; a missing value is null with its kind and reason.
@@ -136,3 +139,97 @@ fitness test requires release inputs to be stored tables, never `own_run`.
   max(5 GB, 3x the last release); blue/green through a front proxy. `PUBLISHING` is shown only after the configured delay (default 15 minutes)
   without promotion, in a neutral tone (the exact words are Guide content, ADR 0051). No
   owner decision is open.
+
+## Amendment 2026-10-21: stale is never an option, slow is
+Measured 2026-10-21: the keys carry `visible_seq`, so each ingest publish (the filing-text
+backfill, every ~13 min) empties every API cache; one cold read took ~100 s on one core
+(GIL-bound, starving `/health`); each deploy restart (every 10-30 min) does the same. With the
+backfill paused for 20 min the same site was fast (warm p99 <= 0.11 s, 785 MB RSS). The machine
+(10 cores, 16 GB, swap 5-7 GB) is shared with ingests and compaction. The owner approved on
+2026-10-21 the safe way: the release (1-13) plus the following, built in the order of 21.
+
+14. **Deny by default (inverts 8).** An operation is served from the release only if it is
+    listed in the release-shared allow-list `architecture/release_shared_ops.toml` (a
+    shrink-never-silently list: an entry needs a reason and the test of 17). Every other
+    operation, above all every per-user one, reads live and **uncached** unless it is listed
+    in a user-keyed group (15). The old `live_read_keys.toml` idea (an allow-list of live keys,
+    where a forgotten entry serves stale data) is dropped. A forgotten entry leaves a page
+    slow, never stale. `response_cache.cacheable` already defaults to not cached; the
+    allow-list keeps that default and extends it to the release. Of today's four groups:
+    `SHARED_OPERATIONS` not on the allow-list stay cached in process, keyed by the published
+    state as now, until P3 moves them; `USER_OPERATIONS` are keyed by 15; `RUN_OPERATIONS`
+    read live run records and are never release-shared (16); `NEVER_CACHED` stays so.
+15. **One writer, one version.** The owner of the per-user `config_generation` is
+    `storage/configs` (ADR 0006: only it builds the path; the counter lives under
+    `config/users/<id>/`, durable, never process memory). Every user write goes through the
+    `ConfigWriter` Protocol (`storage/configs/writer.py`, called by `services/authoring`);
+    both `FileConfigWriter` and `MemoryConfigWriter` bump it, `ConfigStore.generation(user)`
+    reads it, a contract test covers both, and a fitness test forbids any other writer under
+    `config/users/`. Order: the counter is bumped **after the last config file of the write
+    is durably renamed** (two files cannot change atomically; the other order would let a
+    reader pair the new generation with the old config and cache it for good), and a key
+    reads the generation before the answer is computed (the `visible_seq` rule, ADR 0022).
+    CLI and hand edits that skip the routes must go through `ConfigWriter` too, else the
+    stale-while-revalidate TTL is their only bound and the CLI says so. This replaces the
+    process-local `WriteEpoch` / `CountWrites` middleware (lost on restart, invisible to a
+    green process, skipped by routes outside `WRITE_PACKAGES`). Every user-keyed key **adds**
+    `config_generation` to its existing parts (role, ADR 0056; licences, ADR 0069; served
+    session, ADR 0062; runs generation where it applies) and all keys are built in the one
+    `response_key` function (a fitness test forbids another key builder outside it and the
+    loaders' `ResultCache` helpers). Site config changes arrive with a deploy, as today.
+16. **Run state.** `runs_generation` is the store's, not per user (it moves on every saved
+    run record, job checkpoints included). On-request writes that are not configs (a screens
+    run, ADR 0033; an edge `evaluate`) save a run record and so move it; the gate of 17
+    covers them. `RUN_OPERATIONS` read live run records and are never release-shared; P3
+    limits their churn (checkpoints) or declares it, since today it cools them on every
+    ingest job. That is slow, not stale.
+17. **The read-your-writes gate.** A fitness test enumerates every write route (PUT, POST,
+    DELETE) of the OpenAPI document and requires, per route, either an entry in
+    `architecture/read_your_writes.toml` naming a test (the counter and both new governed files need ownership and layout entries in the P2 PR), or a reason it is not persistent
+    (Builder previews, draft-from-text, regime explain). The named test warms the cache against the
+    published store (P3 extends it to a release in place), writes through the real route, reads the affected GraphQL operations
+    and asserts the change shows (create, edit and delete). About 17 routes today: screeners
+    delete, draft put and delete, finalise, copy, rebase; screens run; edges copy, put,
+    delete, state, evaluate; user features; preferences ideas and views put and delete. A new
+    write route without an entry fails CI, the same pattern as `rest_allowlist.toml`
+    (shrink-only for the exemptions). It lands before the release exists (21).
+18. **Client cache.** The web app has its own page cache (the page-cache chunk, TanStack
+    Query). Responses carry `release_id` and `config_generation` (an "as of", also shown
+    where the page shows its session). After a write the web app invalidates by the new
+    generation; it derives nothing (ADR 0038). A small separate web PR (add-web-page skill,
+    component-only layering); the web/network session owns route preloading and payload
+    shaping, this ADR owns the version contract.
+19. **Shadow comparison (optional, before the cutover).** For user-keyed operations the
+    server may compute the release-served and the live answer, log differences (counts, never
+    contents with user data) and serve the live one. Off by default; its result is recorded in
+    the PR that flips an operation into the allow-list.
+20. **Resources, as measured or estimated** (a doctor line each where a number is checked):
+    - A release is 50-250 MB (estimate; the ceiling stays 300 MB), three kept, <= ~0.75 GB,
+      ~1% of the store (52 GB in `var/data/tables`; the disk has 39 GB free of 228 GB).
+    - A second release-tree slot (ADR 0079) is ~1 GB.
+    - The retained store versions a release pins (3) are **not sized yet**: PR P3 measures
+      the disk they hold (partition versions named by retained releases beyond the live
+      index) and adds a `make doctor` line with a warning threshold.
+    - Memory: a blue/green flip runs two API processes at once (+1-2.5 GB for minutes), so
+      the flip runs only when no ingest or compaction runs, or after the new colour's warm
+      completes; the deploy planner checks the same `doctor` memory gate. Pre-built page
+      payloads are tens of MB per session (persisted cache, 12).
+21. **Ingest isolation is its own item and comes first.** Ingestion and compaction run at
+    background priority (`taskpolicy -b` where available, else `nice`), with worker and
+    memory caps, so the API keeps its CPU (PR #734 started this; this item extends it and
+    tests it: a unit test over the launch wrapper's argv and a test that every ingest
+    entry point goes through it). Order of the code PRs, each small, naming first the test
+    that would have caught the problem: (1) ingest isolation; (2) deny-by-default keys,
+    `config_generation` and the gate of 17, **before the release exists**; (3) release
+    build and promote, pages reading CURRENT instead of `visible_seq`; (4) the persisted
+    payload cache and the separate low-priority warmer (12); (5) the blue/green front proxy
+    and the flip, with ADR 0079 R3 (the colours are the release-tree slots; the deploy
+    planner also stops restarting the API for changes it does not load, such as
+    ingestion- or backtest-only source files).
+22. **Acceptance (amends 13).** A writer-mode load test (`scripts/perf/load.py
+    --writer-store --writer-cmd`) holds the page p95 criteria while an ingest publishes every
+    few minutes, and a deploy shows no cold site; the read-your-writes gate is green; no stale
+    answer after create, edit or delete in the tests. Load runs are by hand, with the
+    backfill paused.
+
+Owner decisions 2026-10-21: 14-22 as written; no owner decision is open.
