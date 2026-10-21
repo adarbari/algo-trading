@@ -243,15 +243,21 @@ def test_evaluate_edges_takes_a_full_flag_that_defaults_off() -> None:
     assert parse(["evaluate-edges", "--full"]).full and not parse(["evaluate-edges"]).full
 
 
-def test_evaluate_edges_screen_cache_is_off_for_one_edge_and_by_flag() -> None:
+def test_evaluate_edges_screen_cache_is_off_for_one_edge_by_flag_and_on_a_full_disk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The screen cache's scratch directory exists only for a multi-edge run that wants it."""
     parse = build_parser().parse_args
     two, one = ["a", "b"], ["a"]
     assert _screen_scratch(parse(["evaluate-edges"]), None, one) is None
     assert _screen_scratch(parse(["evaluate-edges", "--no-screen-cache"]), None, two) is None
+    usage = shutil.disk_usage
+    monkeypatch.setattr(shutil, "disk_usage", lambda _p: usage(".")._replace(free=1024**4))
     scratch = _screen_scratch(parse(["evaluate-edges"]), None, two)
     assert scratch is not None and scratch.is_dir()
     scratch.rmdir()
+    monkeypatch.setattr(shutil, "disk_usage", lambda _p: usage(".")._replace(free=1024**3))
+    assert _screen_scratch(parse(["evaluate-edges"]), None, two) is None  # under 5 GB free
 
 
 def test_study_winners_needs_the_stored_history_and_draft_edges_a_known_run(cli: Cli) -> None:
