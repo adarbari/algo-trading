@@ -3,9 +3,6 @@ partition and sweeps what the swap superseded without a read noticing; it stops 
 lock is held or the disk is under the floor, skips a partition it cannot compact exactly with the
 reason, is a no-op the second time, and refuses a table the config does not list."""
 
-import ctypes
-import os
-import sys
 from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
@@ -28,7 +25,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance.compaction import task
-from algotrade_ingestion.tasks.maintenance.compaction.pool import lower_priority, thread_executor
+from algotrade_ingestion.tasks.maintenance.compaction.pool import thread_executor
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import T0, stamped
 
@@ -230,21 +227,6 @@ def test_a_held_ingest_tree_lock_stops_the_run_before_any_change(ctx: TaskContex
     with held(ctx.writer.backend.lock(INGEST_TREE_LOCK)):
         record = compact(ctx, SESSION, TABLE)
     assert "ingest-tree lock is held" in record.stats["stopped"] and _files(ctx) == before
-
-
-def test_lower_priority_never_raises_and_asks_for_the_cpu_nice(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    niced: list[int] = []
-    monkeypatch.setattr(os, "nice", niced.append)
-    monkeypatch.setattr(sys, "platform", "linux")
-    lower_priority(10)
-    assert niced == [10]
-    monkeypatch.setattr(os, "nice", lambda n: (_ for _ in ()).throw(OSError("no")))
-    lower_priority(10)  # swallowed
-    monkeypatch.setattr(sys, "platform", "darwin")
-    monkeypatch.setattr(ctypes, "CDLL", lambda *a, **k: (_ for _ in ()).throw(OSError("no libc")))
-    lower_priority(0)  # the disk policy failing is swallowed too
 
 
 def test_progress_has_one_flushed_line_per_partition_and_per_sweep(ctx: TaskContext) -> None:

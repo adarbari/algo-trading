@@ -10,6 +10,17 @@
 scope = ["src/algotrade/services/", "src/algotrade/engines/", "src/algotrade/strategies/"]
 
 [[responsibility]]
+id = "background-priority"
+description = "Lowering a process's CPU niceness and darwin disk priority so the API on the same Mac keeps its reads fast: the ingest CLI does it once for every command and so for the workers it spawns (nice inherited), and the compact-runs workers again at start (ADR 0077 decision 21, ADR 0078)"
+owner = ["src/algotrade/services/jobs/priority.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/cli/main.py",  # every ingest command, from [resources] nice
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/pool.py",  # a compact-runs worker at start (its own nice from [compaction])
+]
+section = "docs/adr/0077-serving-release.md#amendment-2026-10-21-stale-is-never-an-option-slow-is"
+detect = [{ call = "lower_priority" }]
+
+[[responsibility]]
 id = "config-authoring"
 description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features, a user's edges (services/authoring/edges.py, ADR 0053 amendment 2026-10-09: copy an edge under a new id with `extends`, optionally as a new version (a candidate that replaces it), save and delete the user's own edge document in config/users/<id>/edges/ validated as the harness reads it, bookmark a site edge (`follow`) or move the status of the user's own with its permitted transitions and the labels the server decides (ADR 0053 amendment 2026-10-10), migrate the old `[follow]` states; never the site's config); for a user the site registry declares (the API passes the registry as a predicate to `author`; no I/O of its own); the ConfigWriter (atomic, user-scoped files; one TOML document per id for the kinds in USER_DOCUMENT_KINDS, archived on delete; the serialiser is storage/configs/toml_text.py) behind the ConfigStore protocol (which reads drafts and versions back: the read model, services/read/screens/documents.py)"
 owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
