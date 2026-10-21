@@ -140,6 +140,7 @@ from algotrade.services.evaluation.cross_section.random_picks import (
     pool_random,
     random_measures,
 )
+from algotrade.services.evaluation.cross_section.reads.screens import ScreenCache
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.reporting.report_containment import (
     ReportContainment,
@@ -369,6 +370,21 @@ def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Varia
     return found
 
 
+def screen_uses(configs: ConfigStore, edges: Sequence[Edge]) -> list[tuple[str, str]]:
+    """The (owner, config hash) of every screener and baseline the ``edges`` score, one pair
+    per use: what ``shared_screens`` counts to choose the screens worth caching for a run."""
+    uses: list[tuple[str, str]] = []
+    for edge in edges:
+        if edge.base == OUT_OF_WINDOW:
+            continue  # measured by time_series/, no screener runs
+        try:
+            found = _variants(configs, UserContext(edge.owner), edge)
+        except ConfigurationError:
+            continue  # the run of that edge reports it
+        uses.extend((edge.owner, v.config.hash) for v in found if not v.members)
+    return uses
+
+
 def edge_universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
     if isinstance(edge.universe, Selection):
         return edge.universe
@@ -444,13 +460,15 @@ def evaluate_edge(
     split_from: date | None = None,
     random_draws: int = DEFAULT_DRAWS,
     full: bool = False,
+    screens: ScreenCache | None = None,
 ) -> EdgeEvaluation:
     """``edge`` and its ``[[variants]]`` over the decision sessions in ``start..end`` for every
     horizon, its screeners and baselines, with outcomes known by ``as_of``. ``iv_field``: the
     one implied-vol field of the run (an outcome that reads one; its source and licence are
     recorded); ``split_from``: the run's own split over the edge's;
     ``random_draws``: random picks drawn per out-of-sample session (``random_picks.py``);
-    ``full``: compute every leg, reusing none of the stored ones (``legs/reuse.py``). Raises
+    ``full``: compute every leg, reusing none of the stored ones (``legs/reuse.py``);
+    ``screens``: the screens other edges of the run computed (``reads/screens.py``). Raises
     ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon. An edge with ``base =
     "out_of_window"`` is a time-series edge, measured by ``time_series/`` (``_time_series``)."""
@@ -461,7 +479,7 @@ def evaluate_edge(
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
-    session = SessionReads(reader, label)
+    session = SessionReads(reader, label, screens, user.user_id)
     days = sessions_between(start, end)
     scopes = _scopes(configs, user, edge, iv_field)
     licences: dict[str, str | None] = {}

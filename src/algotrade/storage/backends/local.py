@@ -421,9 +421,17 @@ class LocalTables:
         base = self.root / table
         out: dict[date, int] = {}
         published = self.commits.published()  # before the indexes: a later commit is not seen
-        for day in sorted(base.glob("date=*")) if base.exists() else []:
-            when = date.fromisoformat(day.name.removeprefix("date="))
-            if start <= when <= end and (day / INDEX).exists():
+        if not base.exists():
+            return out
+        wanted = []
+        with os.scandir(base) as entries:  # names only: no Path built or sorted per directory
+            for entry in entries:
+                if entry.name.startswith("date="):
+                    when = date.fromisoformat(entry.name.removeprefix("date="))
+                    if start <= when <= end:
+                        wanted.append((when, base / entry.name))
+        for when, day in sorted(wanted):
+            if (day / INDEX).exists():
                 out[when] = max_seq(read_index(day), published)
         return out
 

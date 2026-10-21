@@ -74,7 +74,7 @@ from algotrade_ingestion.tasks.reference import (
     universe_build,
     universe_import,
 )
-from algotrade_ingestion.tasks.shorting import short_interest, short_volume
+from algotrade_ingestion.tasks.shorting import restamp, short_interest, short_volume
 from algotrade_ingestion.tasks.verification import verify
 
 __all__ = (
@@ -521,6 +521,15 @@ TASKS: dict[str, Task] = {
             sources=(short_volume.SOURCE,),
             settings="sources.toml [finra]",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "refetch stored dates")),
+        ),
+        Task(
+            "restamp-known-from",
+            "move the stored FINRA rows' known_from to the publication schedule without a "
+            "refetch (ADR 0050 repair); values untouched",
+            restamp,
+            (),  # restates events/short_interest and short_volume, owned by their tasks
+            entries_ops.run_restamp_known_from,
+            params=(SESSION, Param("dry_run", ("--dry-run",), None, "count the rows only")),
         ),
         Task(
             "corporate-actions",
