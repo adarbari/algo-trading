@@ -151,8 +151,8 @@ backfill paused for 20 min the same site was fast (warm p99 <= 0.11 s, 785 MB RS
 14. **Deny by default (inverts 8).** An operation is served from the release only if it is
     listed in the release-shared allow-list `architecture/release_shared_ops.toml` (a
     shrink-never-silently list: an entry needs a reason and the test of 17). Every other
-    operation, above all every per-user one, reads live and **uncached** unless it is listed
-    in a user-keyed group (15). The old `live_read_keys.toml` idea (an allow-list of live keys,
+    operation, above all every per-user one, reads live and **uncached**, unless it is in
+    `SHARED_OPERATIONS` (keyed by the published state) or a user-keyed group (15). The old `live_read_keys.toml` idea (an allow-list of live keys,
     where a forgotten entry serves stale data) is dropped. A forgotten entry leaves a page
     slow, never stale. `response_cache.cacheable` already defaults to not cached; the
     allow-list keeps that default and extends it to the release. Of today's four groups:
@@ -161,11 +161,14 @@ backfill paused for 20 min the same site was fast (warm p99 <= 0.11 s, 785 MB RS
     read live run records and are never release-shared (16); `NEVER_CACHED` stays so.
 15. **One writer, one version.** The owner of the per-user `config_generation` is
     `storage/configs` (ADR 0006: only it builds the path; the counter lives under
-    `config/users/<id>/`, durable, never process memory). Every user write goes through the
+    `config/users/<id>/`, durable, never process memory) and is a seqlock: made odd before
+    the first rename of a write and even after the last, and while it is odd nothing is
+    cached (a crash between leaves it odd, so nothing stays cached under a half-written
+    config until the next write or a repair on start). Every user write goes through the
     `ConfigWriter` Protocol (`storage/configs/writer.py`, called by `services/authoring`);
     both `FileConfigWriter` and `MemoryConfigWriter` bump it, `ConfigStore.generation(user)`
     reads it, a contract test covers both, and a fitness test forbids any other writer under
-    `config/users/`. Order: the counter is bumped **after the last config file of the write
+    `config/users/`. Order: the counter is made even **after the last config file of the write
     is durably renamed** (two files cannot change atomically; the other order would let a
     reader pair the new generation with the old config and cache it for good), and a key
     reads the generation before the answer is computed (the `visible_seq` rule, ADR 0022).
@@ -180,7 +183,7 @@ backfill paused for 20 min the same site was fast (warm p99 <= 0.11 s, 785 MB RS
 16. **Run state.** `runs_generation` is the store's, not per user (it moves on every saved
     run record, job checkpoints included). On-request writes that are not configs (a screens
     run, ADR 0033; an edge `evaluate`) save a run record and so move it; the gate of 17
-    covers them. `RUN_OPERATIONS` read live run records and are never release-shared; P3
+    covers them; the run record is saved after the result files are durable, the same rule as in 15. `RUN_OPERATIONS` read live run records and are never release-shared; P3
     limits their churn (checkpoints) or declares it, since today it cools them on every
     ingest job. That is slow, not stale.
 17. **The read-your-writes gate.** A fitness test enumerates every write route (PUT, POST,
