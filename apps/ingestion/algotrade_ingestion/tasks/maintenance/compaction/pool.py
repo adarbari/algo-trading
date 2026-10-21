@@ -16,6 +16,11 @@ The parent dispatches the days oldest first, one per worker at a time (so the fr
 line of progress (a worker never writes stderr) and a summary each minute. A worker silent for
 ``partition_seconds + 60`` s stops the run (the pool is terminated); SIGINT / SIGTERM stop the
 dispatch, terminate the workers and leave the sweep to the next run.
+
+A ``spawn`` worker re-imports the parent's ``__main__`` from its file; an entry point without an
+``if __name__ == "__main__":`` guard would then run the whole CLI in every worker and break the
+pool. While the pool lives the parent's ``__main__`` is hidden from multiprocessing
+(``main_hidden``), so the workers never re-run it, guard or not.
 """
 
 import contextlib
@@ -59,6 +64,23 @@ SILENT_EXTRA_S = 60.0  # a worker silent this long past ``partition_seconds`` is
 POLL_S = 0.5  # how often the parent looks at the clock, the signals and the lock
 SUMMARY_S = 60.0
 IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE = 1, 0, 3  # <sys/resource.h> (darwin)
+
+
+@contextmanager
+def main_hidden() -> Iterator[None]:
+    """Hide the parent's ``__main__`` file and spec from ``multiprocessing.spawn`` (its
+    preparation data names them, and a worker re-imports the module they name) and restore them
+    after. The workers' functions live in importable modules, so they need nothing from it."""
+    main = sys.modules.get("__main__")
+    names = ("__file__", "__spec__")
+    saved = {n: main.__dict__[n] for n in names if main is not None and n in main.__dict__}
+    for name in saved:  # ``None``, not deleted: ``get_preparation_data`` reads ``__spec__``
+        setattr(main, name, None)
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            setattr(main, name, value)
 
 
 def lower_priority(nice: int) -> None:
@@ -221,6 +243,7 @@ class Pool:
         self._flying: dict[Future[Outcome], tuple[date, float]] = {}
         self._names: dict[str, str] = {}
         self._interrupted: str | None = None
+        self._broken = False  # a worker process died: the pool is gone
         self._executor: Executor | None = None
         self._last_summary = 0.0
         self._total = 0
@@ -231,28 +254,34 @@ class Pool:
     def run(self, days: list[date], limit: int | None) -> None:
         queue, self._total = deque(days), len(days)
         started = self._last_summary = self.clock()
-        executor = self._executor = self.make_executor(self.plan)
         crashed = True
-        try:
-            with self._signals():
-                while True:
-                    self._dispatch(queue, limit)
-                    if not self._flying:
-                        break
-                    done, _ = wait(self._flying, timeout=POLL_S, return_when=FIRST_COMPLETED)
-                    for future in done:
-                        self._collect(future)
-                    if self._interrupted or self.failure is not None or self._tick(started):
-                        break
-            crashed = False
-        finally:
-            self._finish(executor, crashed)
+        with main_hidden():
+            executor = self._executor = self.make_executor(self.plan)
+            try:
+                self._loop(queue, limit, started)
+                crashed = False
+            finally:
+                self._finish(executor, crashed)
         if self.failure is not None:
             raise self.failure
 
+    def _loop(self, queue: deque[date], limit: int | None, started: float) -> None:
+        with self._signals():
+            while True:
+                self._dispatch(queue, limit)
+                if not self._flying:
+                    break
+                done, _ = wait(self._flying, timeout=POLL_S, return_when=FIRST_COMPLETED)
+                for future in done:
+                    self._collect(future)
+                if self._interrupted or self.failure is not None or self._tick(started):
+                    break
+
     def _finish(self, executor: Executor, crashed: bool) -> None:
         """Stop what is still running (SIGTERM: its partition discards its files), then sweep."""
-        aborted = crashed or self._interrupted or self.failure is not None or self._flying
+        aborted = (
+            crashed or self._interrupted or self.failure is not None or self._flying or self._broken
+        )
         if aborted:
             stop_children(executor)
         executor.shutdown(wait=not aborted, cancel_futures=True)
@@ -276,7 +305,7 @@ class Pool:
             try:
                 future = self._executor.submit(work, day)  # type: ignore[union-attr]
             except BrokenProcessPool as exc:
-                self.stopped = f"a worker process died ({exc})"
+                self._pool_broke(exc)
                 break
             self._flying[future] = (day, self.clock())
             executor_full = len(self._flying) >= self.plan.workers
@@ -311,10 +340,13 @@ class Pool:
     # ------------------------------------------------------------------ results
 
     def _collect(self, future: "Future[Outcome]") -> None:
-        day, _ = self._flying.pop(future)
+        entry = self._flying.pop(future, None)
+        if entry is None:  # the pool broke on an earlier future: this one was dropped with it
+            return
+        day = entry[0]
         error = future.exception()
         if isinstance(error, BrokenProcessPool):
-            self.stopped = self.stopped or f"a worker process died ({error})"
+            self._pool_broke(error)
             self._abort_flying()
             return
         if error is not None:
@@ -334,6 +366,21 @@ class Pool:
             self.stopped = self.stopped or (
                 f"{day} took over {self.plan.budget_s:g} s (the disk is slow)"
             )
+
+    def _pool_broke(self, error: BaseException) -> None:
+        """A worker process died (the pool refuses more work): stop dispatching and say how to
+        go on. Nothing was swapped for a partition in flight (a swap is the last, atomic step)."""
+        self._broken = True
+        hint = (
+            "; no partition was compacted first: an entry point without an "
+            '`if __name__ == "__main__":` guard breaks spawn workers'
+            if not self._done
+            else ""
+        )
+        self.stopped = self.stopped or (
+            f"a worker process died ({error}); the partitions in flight were left, run again "
+            f"to continue{hint}"
+        )
 
     def _abort_flying(self) -> None:
         """The pool broke: every future in flight carries the same error."""
