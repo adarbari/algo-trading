@@ -236,3 +236,44 @@ backfill paused for 20 min the same site was fast (warm p99 <= 0.11 s, 785 MB RS
     backfill paused.
 
 Owner decisions 2026-10-21: 14-22 as written; no owner decision is open.
+
+## Amendment 2026-10-21 (b): the first release is a pin
+The architect's design note (shared notes folder, `release-design-note.md`) found that pages are
+slow because every loader key reads `visible_seq()` (`services/read/context.py`, `screens/hits.py`,
+`instruments/*`, `regime/*`), not because pages lack precomputed tables. So the order of the
+code PRs is refined (21 stands):
+
+23. **Format F1 is a pin.** The first release is a manifest `{release_id, session S, seq X,
+    destructive_epoch, code_sha, inputs, content_hash}` plus the session record
+    (`session.parquet`); default-session reads go through `StoreReader.pinned(X)` and every
+    loader key holds `StoreReader.version()` (`("pin", X)` or `("live", visible_seq())`) instead
+    of `visible_seq()` (a fitness test bans `visible_seq()` under `services/read`). Purpose-shaped
+    tables (picks, Explore facts, home, ideas, edge desk) are added one operation at a time and
+    only when a measured cold compute is over budget; the deploy-time format rebuild gate comes
+    with the first of them. A format mismatch falls back to live.
+    - **Pinned reads** take `upto` on `TableStore.read/read_range/read_run/dates/partition_seq`;
+      with `upto` set a read never retries at a fresh seq and raises `StaleSnapshotError`;
+      `dates(upto)` drops partitions with no version at or below it.
+    - **Retention (replaces the per-partition protected-seq sets of 3):** `TableStore.pin / unpin
+      / pins` (durable, read under the commit lock); the version chain of a partition keeps every
+      version some pin sees (at most pins + 1 long), honoured by `_referenced`, `_discard` and
+      `drop_unreferenced`. `purge`, `remove_runs` and `drop` are not protected: each bumps a
+      durable `destructive_epoch`, a release whose epoch differs is invalid and reads fall back
+      to live (never a silently empty page).
+    - **Fallback (today's path exactly, answer not cached):** no CURRENT, unknown format, hash or
+      epoch mismatch, `StaleSnapshotError`, or the kill switch `serving.release_reads = false`.
+    - **First family:** the role-only `SHARED_OPERATIONS` over stored tables (prices, market
+      history, events, holdings, regime) read CURRENT, keyed `(release_id, role, document,
+      variables, licences)`; the allow-list `architecture/release_shared_ops.toml` (reason plus
+      test per entry) is introduced then. User operations keep `config_generation`, run operations
+      their runs generation, as in 14-16. The CI test promotes a release, warms, makes commits
+      (a next-session partition, a same-run restatement, a job checkpoint, an old-date
+      filing-text commit) and asserts zero recomputes and byte-equal bodies.
+24. **Deferred, not dropped.** The front proxy and blue/green (11), the separate warmer process
+    (12) and shadow comparison (19) stay owner-approved but come after the pin has been measured
+    under the writer-mode load test: a warm-on-promote plus a persisted response cache keyed on
+    `release_id` (which survives restarts) may remove most of the need, and the deploy planner
+    stops restarting the API for changes it does not load. Each is then decided on the numbers.
+
+Owner decisions 2026-10-21: the order above is the implementer's design under the owner's
+standing instruction to proceed; the deferral in 24 is revisited with the load-test numbers.
