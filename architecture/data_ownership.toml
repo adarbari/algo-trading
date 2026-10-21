@@ -245,6 +245,16 @@ section = "docs/adr/0007-point-in-time-data.md#how-runs-combine"
 detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }, { call = "newest_run_per_group" }, { call = "keep_newest_runs" }]
 
 [[responsibility]]
+id = "serving-release-store"
+description = "The serving releases beside the data store (ADR 0077): a draft that pins its commit sequence (begin), tables written to it, the seal that fsyncs and checks (no input past the sequence, epoch unmoved, 300 MB ceiling, free-space floor max(5 GB, 3x the last release)), the manifest (canonical JSON, content hash, no build time), the atomic CURRENT (promote, verified against the manifest hash), and prune (keeps the newest and the current, unpins every release-* pin nothing holds). A derived cache: deleting it loses nothing"
+owner = ["src/algotrade/storage/backends/release/*"]
+allowed = [
+    "src/algotrade/storage/factory.py",  # opens the store from the storage URL
+]
+section = "docs/adr/0077-serving-release.md#decision"
+detect = [{ call = "LocalReleaseStore" }, { call = "MemoryReleaseStore" }, { call = "open_release_store" }]
+
+[[responsibility]]
 id = "snapshot-selection"
 description = "Pick the snapshot a reader sees: the latest partition on or before a date, else the earliest (pre_snapshot)"
 owner = ["src/algotrade/data/reference.py"]

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.storage.backends.release.interfaces import ReleaseReport
 from algotrade.storage.runs import RunStatus
 from tests.unit.services.read.test_session import nightly, store, write_bar
 
@@ -532,3 +533,26 @@ def test_a_release_tree_counts_as_the_main_checkouts_code(tmp_path: Path) -> Non
     (tree / ".git").write_text("gitdir: x")
     assert doctor._in_main(str(tree / ".venv" / "bin" / "python"), tmp_path)
     assert not doctor._in_main(str(tmp_path / ".claude" / "worktrees" / "a"), tmp_path)
+
+
+def test_serving_releases_report_pins_and_warn_on_orphans_or_a_heavy_retention(
+    tmp_path: Path,
+) -> None:
+    def check(report: object) -> "doctor.Result":
+        return doctor.check_serving(probes(tmp_path, {}, serving=lambda: report))
+
+    held = ReleaseReport("a.1.f1", ("a.1.f1",), {"release-a.1.f1": 1}, 2 * 1024**3)
+    ok = check(held)
+    assert ok.level == "ok" and "2.00 GB" in ok.detail and "current a.1.f1" in ok.detail
+    orphan = check(ReleaseReport(None, (), {"release-b.2.f1": 2}, 0))
+    assert orphan.level == doctor.WARN and "release-b.2.f1" in orphan.detail
+    heavy = check(ReleaseReport("a.1.f1", ("a.1.f1",), {"release-a.1.f1": 1}, 6 * 1024**3))
+    assert heavy.level == doctor.WARN and "over 5 GB" in heavy.detail
+    assert check(None).level == doctor.INFO
+
+
+def test_serving_releases_are_not_checked_without_a_store(tmp_path: Path) -> None:
+    def boom() -> None:
+        raise FileNotFoundError
+
+    assert doctor.check_serving(probes(tmp_path, {}, serving=boom)).level == doctor.INFO

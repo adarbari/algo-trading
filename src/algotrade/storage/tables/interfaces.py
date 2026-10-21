@@ -91,6 +91,12 @@ class TableStore(Protocol):
         """Every pin, name -> sequence."""
         ...
 
+    def pinned_bytes(self) -> int:
+        """Bytes the older versions of runs take (those a commit kept besides each run's newest),
+        measured only while a pin exists, else 0: the disk retention for releases costs. Reads
+        every partition's index (seconds on a large store): an operator's report, never a read."""
+        ...
+
     def destructive_epoch(self) -> int:
         """How many operations that delete committed rows (``purge_before`` that deleted,
         ``purge_runs`` that deleted, ``drop``) the store has made, 0 before any; durable, rising
