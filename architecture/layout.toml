@@ -456,7 +456,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/services/jobs"
-purpose = "long-running work as jobs: runner, models, handlers, exclusive runs and claims"
+purpose = "long-running work as jobs: runner, models, handlers, exclusive runs and claims, and the worker processes of a parallel edge evaluation (edge_pool.py)"
 contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
 
 [[dir]]
