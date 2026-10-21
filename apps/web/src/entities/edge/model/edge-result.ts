@@ -140,6 +140,7 @@ const EXCLUDED_LABELS: Record<string, string> = {
   NO_ENTRY_BAR: 'No entry bar',
   NO_IMPLIED_VOL: 'No implied volatility',
   MISSING_DRAWDOWN: 'Missing drawdown',
+  NO_PAIR: 'No pair',
   SKIPPED: 'Skipped',
 };
 

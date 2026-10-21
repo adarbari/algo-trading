@@ -128,6 +128,9 @@ INVALID_IMPLIED_VOL = "invalid_implied_vol"  # ... or non-finite or above MAX_IM
 MAX_IMPLIED_VOL = 5.0  # the catalogue's declared range of an IV field is (0, 5] (decimal)
 MISSING_DRAWDOWN = "missing_drawdown"
 UNMEASURED = "unmeasured"  # an UNMEASURED outcome row (a flagged bar in its window, ADR 0061)
+SIBLING_REASONS = (
+    NO_SIBLING, SIBLING_NOT_ELIGIBLE, SIBLING_MISMATCH, NO_SIBLING_ROW, SIBLING_UNMEASURED,
+)  # fmt: skip
 TRADING_DAYS = 252  # sessions per year: T of an expires_otm strike
 RESULT_COLUMNS = (
     "instrument_id", "value", "oriented", "hit", "excluded", "delisted", "reference", "touch",
