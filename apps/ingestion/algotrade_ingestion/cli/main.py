@@ -25,6 +25,11 @@
                               nightly is done, after it: ADR 0070; a quiet no-op when its
                               post-session record exists; holds the ingest lock only for the
                               first two)
+    algotrade-ingest serve-release [--rebuild] [--wait]
+                              (build, promote and prune the serving release of the default session
+                              under the serve lock: ADR 0077; a quiet no-op while CURRENT already
+                              serves it, --rebuild builds anyway; the nightly and post-session start
+                              it after they finish, it is never a nightly step)
     algotrade-ingest report   [--date D] [--out report.html] [--send] [--max-examples N]
                               (the nightly summary email for a past session; read-only)
     algotrade-ingest arrivals [--sessions N]
@@ -59,7 +64,7 @@ import sys
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from algotrade.config.env import data_url, load_dotenv
 from algotrade.config.site.settings import load_nightly
@@ -71,7 +76,7 @@ from algotrade.services.configs import default_user
 from algotrade.services.jobs import RunLockedError, exclusive_run
 from algotrade.services.jobs.priority import lower_priority
 from algotrade.storage.backends.arrow_memory import limit_threads
-from algotrade.storage.factory import open_backend
+from algotrade.storage.factory import open_backend, open_release_store
 from algotrade.storage.runs import done_sessions
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
@@ -112,6 +117,11 @@ from algotrade_ingestion.workflows.post_session.post_session import (
     post_done,
     target_session,
 )
+from algotrade_ingestion.workflows.serve_release.serve_release import (
+    ServeStatus,
+    git_head,
+    serve_release,
+)
 
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
@@ -143,7 +153,8 @@ def writes(args: argparse.Namespace) -> bool:
         "report",
         "arrivals",
         "post-session",
-    ):  # post-session: own locks
+        "serve-release",
+    ):  # post-session, serve-release: own locks
         return False
     if getattr(args, "task", None) == "compact-runs":  # probes the ingest lock itself
         return False
@@ -219,7 +230,52 @@ def post_session(args: argparse.Namespace, backend: Backend) -> int:
     if job.result.get("status") == BUSY:  # the ingest lock is taken: a later start retries
         print(f"busy: {job.result.get('reason')}")
         return LOCKED_EXIT
+    args.ran_job = True  # the post-session workflow ran now: its edge desk makes release r2
     return report(job)
+
+
+def serve_release_command(
+    backend: Backend,
+    rebuild: bool,
+    wait: bool,
+    out: TextIO | None = None,
+    quiet: bool = False,
+) -> int:
+    """``serve-release``: one run of the serve-release workflow (ADR 0077); exit 0 for a promoted
+    or already-current release, ``LOCKED_EXIT`` when another run holds the serve lock, 2 on a
+    failed build (CURRENT unchanged, recorded)."""
+    outcome = serve_release(
+        backend,
+        open_release_store(data_url(), backend),
+        datetime.now(UTC),
+        git_head(Path(__file__).resolve().parents[4]),
+        rebuild,
+        wait,
+    )
+    if not (quiet and outcome.status is ServeStatus.CURRENT):  # nothing to say about a no-op
+        print(f"serve-release {outcome.status}: {outcome.release_id or outcome.reason}", file=out)
+    if outcome.status is ServeStatus.BUSY:
+        return LOCKED_EXIT
+    return 2 if outcome.status is ServeStatus.FAILED else 0
+
+
+def start_serve_release(args: argparse.Namespace) -> None:
+    """After a nightly or a post-session finished (their locks released, ADR 0077 decision 4):
+    start the serve-release workflow. A nightly that found nothing to do starts nothing (it is a
+    quiet no-op); a post-session start always does, as the watchdog that heals a missing release
+    (a no-op while CURRENT serves the session, and quiet then). Release r2 of a session
+    (``rebuild``) only when this post-session start ran its workflow. Never changes the caller's
+    exit code: a release that fails is recorded and alerts on its own; its one line goes to
+    stderr, the nightly's stdout being its own report."""
+    ran = getattr(args, "ran_job", False)
+    if args.command == "nightly" and not ran:
+        return
+    rebuild = args.command == "post-session" and ran
+    wait = args.command == "nightly" or ran  # the hourly watchdog never queues behind a build
+    try:
+        serve_release_command(open_backend(data_url()), rebuild, wait, sys.stderr, quiet=True)
+    except Exception as exc:
+        print(f"serve-release not started: {exc}", file=sys.stderr)
 
 
 def add_task_arguments(parser: argparse.ArgumentParser, spec: Task) -> None:
@@ -277,6 +333,14 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
         "--force", action="store_true", help="run even when the session has a post-session record"
     )
     add_wait(ps)
+    sr = sub.add_parser(
+        "serve-release",
+        help="build, promote and prune the serving release (ADR 0077; a no-op while current)",
+    )
+    sr.add_argument(
+        "--rebuild", action="store_true", help="build even when CURRENT serves the default session"
+    )
+    add_wait(sr)
     dh = sub.add_parser(
         "deploy-hold",
         help="run a command under the deploy, ingest and ingest-tree locks (exit 75: busy)",
@@ -411,12 +475,13 @@ def task_params(args: argparse.Namespace, session: date) -> dict[str, Any]:
 
 
 def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
-    if args.command in ("schedule", "post-session"):  # no session of their own to resolve
-        return (
-            write_schedule(args)
-            if args.command == "schedule"
-            else post_session(args, writer.backend)
-        )
+    own = {  # no session of their own to resolve
+        "schedule": lambda: write_schedule(args),
+        "post-session": lambda: post_session(args, writer.backend),
+        "serve-release": lambda: serve_release_command(writer.backend, args.rebuild, args.wait),
+    }
+    if args.command in own:
+        return own[args.command]()
     explicit = getattr(args, "date", None) or getattr(args, "session", None)
     session = explicit or default_session(args, datetime.now(UTC))
     if args.command == "golden":
@@ -457,6 +522,7 @@ def nightly(
         "workers": args.workers,
         "export_dir": str(args.export_dir) if args.export_dir else None,
     }
+    args.ran_job = True  # not the quiet no-op: a session may have completed
     return report(run_job(args, reader, writer, "nightly", params, SITE_USER))
 
 
@@ -478,6 +544,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     check_waive(parser, args)
+    code = _run(parser, args)
+    if code == 0 and args.command in ("nightly", "post-session"):  # their locks are released
+        start_serve_release(args)
+    return code
+
+
+def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     backend = open_backend(data_url())
     if args.command == "deploy-hold":  # not an ingest run: before the writes / lock path
         cmd = args.cmd[1:] if args.cmd[:1] == ["--"] else args.cmd
@@ -492,7 +565,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         resources = load_nightly(config_store(args))  # the Mac also serves the web: stay modest
         limit_threads(resources.arrow_cpu_threads, resources.arrow_io_threads)
         lower_priority(resources.nice)  # every ingest command, and the workers it spawns
-        if args.command in ("nightly", "post-session"):  # never a branch against the real store
+        if args.command in ("nightly", "post-session", "serve-release"):  # never a branch
             ensure_main_checkout()
         if not writes(args):
             return _dispatch(args, StoreReader(backend), StoreWriter(backend))

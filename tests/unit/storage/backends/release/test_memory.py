@@ -17,8 +17,8 @@ def test_a_write_renews_the_age_of_a_draft() -> None:
     key = (draft.release_id, draft.token)
     store.state.drafts[key] = (store.state.drafts[key][0], store.state.drafts[key][1] - 5000)
     store.write(draft, "picks", pa.table({"instrument_id": ["EQ:A"]}))  # a build still going
-    store.prune(keep=1)
+    store.prune(sessions=1)
     assert key in store.state.drafts
     store.state.drafts[key] = (store.state.drafts[key][0], store.state.drafts[key][1] - 5000)
-    store.prune(keep=1)
+    store.prune(sessions=1)
     assert key not in store.state.drafts

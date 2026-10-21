@@ -577,6 +577,11 @@ purpose = "use case: run a screener over the universe, record the run, export it
 contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)"]
 
 [[dir]]
+path = "src/algotrade/services/serving"
+purpose = "use case: build the serving release (ADR 0077): the session record read at one pinned commit sequence and written to the release store; never reads the edge outcomes"
+contracts = ["The release build never reaches the edge harness or the outcomes, even indirectly (ADR 0077, ADR 0053)"]
+
+[[dir]]
 path = "src/algotrade/services/text_model"
 purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through, and the FallbackTextModel chain over the llm.toml providers (ADR 0041, amended 2026-10-08), with the usage ledger (prices, budget) and the background recorder of usage/llm_calls (ADR 0058); no vendor, no market-data writer, no jobs"
 contracts = [

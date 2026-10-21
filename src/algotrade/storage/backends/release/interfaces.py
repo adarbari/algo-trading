@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING, Protocol
 
+import pandas as pd
 import pyarrow as pa
 
 if TYPE_CHECKING:
@@ -35,6 +36,17 @@ class InputPartitions:
 
     table: str
     partitions: Mapping[date, int]
+
+
+@dataclass(frozen=True)
+class Reservation:
+    """A sequence held (pinned) before the build reads anything, with the store's
+    ``destructive_epoch`` taken at the same moment; ``begin`` turns it into the release's own
+    pin and keeps this epoch, so an operation that ran during the reads fails the seal."""
+
+    token: str
+    seq: int
+    epoch: int
 
 
 @dataclass(frozen=True)
@@ -77,14 +89,29 @@ class ReleaseStore(Protocol):
     """Every mutator (``begin``, ``write``, ``seal``, ``abort``, ``promote``, ``prune``) runs only
     under the serve job's ``exclusive_run("serve")``; readers need no lock."""
 
-    def begin(self, session: date, seq: int, fmt: int) -> Draft:
+    def reserve(self, seq: int) -> Reservation:
+        """Pin ``seq`` (``release-pending-<token>``) and record the epoch, before any read."""
+        ...
+
+    def drop_reservation(self, reservation: Reservation) -> None:
+        """Release a reservation that never became a draft."""
+        ...
+
+    def begin(
+        self, session: date, seq: int, fmt: int, reservation: Reservation | None = None
+    ) -> Draft:
         """Start a build at commit sequence ``seq``: refuses without the free-space floor
         (``ReleaseInvalidError``), then pins ``seq`` (``release-<id>``) so every version the
-        build reads survives, and records the epoch."""
+        build reads survives, and records the epoch. With the ``reservation`` taken before the
+        reads, that is the epoch recorded and its pending pin is replaced."""
         ...
 
     def write(self, draft: Draft, name: str, table: pa.Table) -> None:
         """Add a table to the draft (``name``: lowercase letters, digits, ``_``); invisible."""
+        ...
+
+    def write_frame(self, draft: Draft, name: str, frame: pd.DataFrame) -> None:
+        """``write`` for a caller that holds a frame, not an Arrow table."""
         ...
 
     def seal(self, draft: Draft, inputs: Sequence[InputPartitions], code_sha: str) -> "Manifest":
@@ -121,10 +148,12 @@ class ReleaseStore(Protocol):
         """Every sealed release id, oldest first (session, then sequence)."""
         ...
 
-    def prune(self, keep: int) -> int:
-        """Delete all but the ``keep`` newest releases and the current one; delete drafts older
-        than their TTL (a build that died); unpin every ``release-*`` pin that no kept release or
-        live draft holds. -> releases deleted."""
+    def prune(self, sessions: int) -> int:
+        """Keep the current release and the newest release (highest sequence) of each of the
+        ``sessions`` newest sessions; delete the rest and any draft older than its TTL (a build
+        that died); unpin every ``release-*`` pin that no kept release or live draft holds (a
+        reservation of a build in flight too: prune runs only under the serve lock, after the
+        build). -> releases deleted."""
         ...
 
     def free_bytes(self) -> int:
