@@ -95,12 +95,14 @@ class RequestContext(BaseContext):
         releases: ReleaseReads | None = None,
         state: Any = None,
         pin: bool = False,
+        serving: Serving | None = None,
     ) -> None:
         super().__init__()
         self.viewer = viewer
         # a request answered from a serving release (ADR 0077): every read context is pinned at
         # the release's sequence and the default session is the release's
         self._release, self._releases, self._state, self._pin = release, releases, state, pin
+        self._serving = serving
         self._user = UserContext(viewer.user_id)
         self._open = opener
         self._open_stores = stores
@@ -149,7 +151,9 @@ class RequestContext(BaseContext):
             return self._open(self._user, requested)
         if self._pinned():
             return releases.pinned(self._user, requested or release.session, release.seq)
-        return self._open(self._user, requested, serving=releases.serving_of(release))
+        # the router's one Serving of this request (its key was made from the same object)
+        serving = self._serving or getattr(self._state, "serving", None)
+        return self._open(self._user, requested, serving=serving)
 
     def read(self, requested: date | None) -> ReadContext | None:
         """The read context for ``requested`` (None: the latest session), with this request's

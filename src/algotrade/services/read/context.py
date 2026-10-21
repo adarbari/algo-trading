@@ -36,11 +36,13 @@ from algotrade.services.features import catalogue
 from algotrade.services.licences import held_by
 from algotrade.services.read.availability.cause import UnavailableKind, table_cause
 from algotrade.services.read.session import (
+    Due,
     Grain,
     NotFoundError,
     Serving,
     Session,
     grain_of,
+    publishing_due,
     resolve_session,
 )
 from algotrade.services.read.values import KIND_OF_CODE, Unknown, UnknownCode
@@ -376,15 +378,30 @@ def _session(
     # under a serving release the default session is the release's and what is newer follows the
     # publishing delay: the day and that flag are in the key (it flips with the clock, not a client)
     follow = serving if requested is None else None
+    due: Due | None = None
+    if follow is not None:
+        # when the newer session is disclosed: asked of the run records once per publish and runs
+        # generation, never per request (a request only compares its clock with it)
+        found = cache.get_or_compute(
+            (
+                "publishing-due",
+                follow.session,
+                reader.version(),
+                reader.runs_generation(),
+                follow.publishing_delay,
+            ),
+            lambda: publishing_due(reader, follow.session, follow.publishing_delay) or (),
+        )
+        due = found or None
     key: tuple[Hashable, ...] = ("session", requested, reader.own_run, reader.version(), runs)
     if follow is not None:
-        key += (follow.key(reader),)
+        key += (follow.key(due),)
     session: Session = cache.get_or_compute(
         key,
         lambda: (
             resolve_session(reader, requested)
             if follow is None
-            else resolve_session(reader, requested, serving=follow)
+            else resolve_session(reader, requested, serving=follow, due=due)
         ),
     )
     return session

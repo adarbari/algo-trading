@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query, Response
 
 from algotrade.config.user import UserContext
 from algotrade.services.ondemand.screens import READY, RunRequest
-from algotrade_api.deps import Caller, OnDemand, User
+from algotrade_api.deps import Caller, Followed, OnDemand, User
 from algotrade_api.redact import redact
 
 router = APIRouter(prefix="/screens", tags=["screens"])
@@ -23,10 +23,11 @@ def run(
     response: Response,
     config_id: str,
     user: User,
+    serving: Followed,
     on: Annotated[
-        date | None, Query(alias="date", description="default: the latest session with data")
+        date | None, Query(alias="date", description="default: the session the pages show")
     ] = None,
 ) -> RunRequest:
-    request = runner.request(config_id, UserContext(user), on)
+    request = runner.request(config_id, UserContext(user), on, serving)
     response.status_code = 200 if request.state in (READY, "complete", "partial") else 202
     return redact(request, caller.role)

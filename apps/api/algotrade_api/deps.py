@@ -51,6 +51,7 @@ from algotrade.services.read.context import (
     NotFoundError,
     ReadContext,
     ResultCache,
+    Serving,
     StoreReader,
     Stores,
     open_context,
@@ -178,21 +179,34 @@ def acting_for(caller: UserRecord, requested: str | None) -> str:
     return requested
 
 
-def get_context(store: Store, caller: Caller) -> ReadContext:
-    """A REST read's context for the latest session (``NotFoundError``, a 404, on an empty
-    store), as the caller, over the store's result cache: the session is resolved once until
-    a publish."""
-    return open_context(store.reader, store.configs, UserContext(caller.user_id), cache=store.cache)
+def get_serving(request: Request) -> Serving | None:
+    """The serving release the default session follows now (ADR 0077 decision 7), or ``None``:
+    the one provider every read with no date takes its default from, the GraphQL pages, the REST
+    reads, the builder preview and the screener Run alike (``create_app`` sets it)."""
+    provider = getattr(request.app.state, "serving", None)
+    return cast(Serving | None, None if provider is None else provider())
+
+
+Followed = Annotated[Serving | None, Depends(get_serving)]
+
+
+def get_context(store: Store, caller: Caller, serving: Followed) -> ReadContext:
+    """A REST read's context for the default session (the serving release's, else the latest
+    complete one; ``NotFoundError``, a 404, on an empty store), as the caller, over the store's
+    result cache: the session is resolved once until a publish."""
+    return open_context(
+        store.reader, store.configs, UserContext(caller.user_id), cache=store.cache, serving=serving
+    )
 
 
 Context = Annotated[ReadContext, Depends(get_context)]
 
 
-def get_reads(store: Store, caller: Caller) -> Stores:
-    """The latest session's ``ReadContext``, else (an empty store) the session-free
+def get_reads(store: Store, caller: Caller, serving: Followed) -> Stores:
+    """The default session's ``ReadContext``, else (an empty store) the session-free
     ``StoreContext``: for a route that also answers before any market data is stored."""
     try:
-        return get_context(store, caller)
+        return get_context(store, caller, serving)
     except NotFoundError:
         return open_stores(store.reader, store.configs, UserContext(caller.user_id), store.cache)
 

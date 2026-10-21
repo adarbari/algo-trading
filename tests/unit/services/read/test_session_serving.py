@@ -14,6 +14,7 @@ from algotrade.services.read.session import (
     NewerState,
     Serving,
     default_session,
+    publishing_due,
     resolve_session,
 )
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -101,3 +102,49 @@ def test_a_release_for_the_newest_complete_session_has_nothing_newer_to_say() ->
     reader, done = world()
     current = resolve_session(reader, None, EXPECTED, serving(D3, done + timedelta(hours=2)))
     assert (current.date, current.newer) == (D3, None)
+
+
+def counting_runs(reader: StoreReader) -> list[int]:
+    """Count the reads of run records the store serves (each opens a JSON file locally)."""
+    backend = reader._backend  # type: ignore[attr-defined]
+    real, calls = backend.runs.find, []
+
+    def find(*args: object, **kwargs: object) -> object:
+        calls.append(1)
+        return real(*args, **kwargs)
+
+    backend.runs.find = find
+    return calls
+
+
+def test_a_request_does_not_read_run_records_per_call_under_a_release() -> None:
+    """The session is cached and so is the instant the publishing flag flips: asking for it again
+    (every request of every non-listed operation does) opens no run file."""
+    reader, done = world()
+    cache = ResultCache()
+    calls = counting_runs(reader)
+    served_session(reader, cache, serving(D2, done + timedelta(minutes=5)))
+    first = len(calls)
+    for minute in (6, 7, 8):
+        served_session(reader, cache, serving(D2, done + timedelta(minutes=minute)))
+    assert len(calls) == first  # no further read while the flag holds
+    flipped = served_session(reader, cache, serving(D2, done + DELAY))
+    assert flipped.newer == NewerSession(D3, NewerState.PUBLISHING)
+    after_flip = len(calls)
+    served_session(reader, cache, serving(D2, done + DELAY + timedelta(minutes=1)))
+    assert len(calls) == after_flip
+
+
+def test_a_complete_record_without_bars_is_not_a_session_to_publish() -> None:
+    writer, reader = store()
+    for day in (D1, D2):
+        write_bar(writer, day)
+    finished(reader, D1, RunStatus.COMPLETE)
+    finished(reader, D2, RunStatus.COMPLETE)
+    end = finished(reader, D3, RunStatus.COMPLETE)  # no bars/1d for D3
+    served = resolve_session(reader, None, EXPECTED, serving(D2, end + timedelta(hours=2)))
+    assert served.newer is not None and served.newer.state is NewerState.IN_PROGRESS
+    assert Serving(D2, end + timedelta(hours=2), DELAY).key(publishing_due(reader, D2, DELAY)) == (
+        D2,
+        False,
+    )

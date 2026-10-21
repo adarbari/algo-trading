@@ -400,6 +400,7 @@ def create_app(
         releases if releases is not None else releases_at(settings.data_url),
     )
     app.state.graphql = gql  # the lifespan cancels its background recomputes
+    app.state.serving = gql.serving_now  # the default session of every read (deps.get_serving)
     user = app.state.store.user
     app.state.warmer = (
         CacheWarmer(

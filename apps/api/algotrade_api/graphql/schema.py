@@ -120,14 +120,16 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         parsed = await _operation(request)
         viewer = getattr(request.state, "viewer", None)
         key = None
-        release, pinned = None, False
+        release, pinned, serving = None, False, None
         if parsed is not None:  # every operation follows the release's session (decision 7)
-            release, pinned = await self._follow(operation_name(parsed[0]), parsed[0])
+            release, pinned, serving = await self._follow(operation_name(parsed[0]), parsed[0])
+        # one Serving (one clock reading) per request: the key and the context both use it
         request.state.release, request.state.pinned = release, pinned
+        request.state.serving = serving
         if parsed is not None and viewer is not None and cacheable(parsed[0]):
             document, variables = parsed
             self._log.note(viewer, document, variables)
-            key = await self._key(viewer, document, variables, release, pinned)
+            key = await self._key(viewer, document, variables, release, pinned, serving)
             body = self._cache.get(key) if key is not None else None
             if body is not None:
                 return await _served(body, request)
@@ -145,7 +147,8 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             if getattr(request.state, "pinned", False) and getattr(
                 request.state, "stale", False
             ):  # a pin was lost: today's live path, its answer not kept (ADR 0077 decision 23)
-                request.state.release, request.state.pinned, key = None, False, None
+                request.state.release, request.state.pinned = None, False
+                request.state.serving, key = None, None
                 context = kwargs.get("context")
                 if isinstance(context, RequestContext):
                     context.forget_reads()
@@ -176,21 +179,24 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         release = self._releases.resolve()
         return None if release is None else self._releases.serving_of(release)
 
-    async def _follow(self, name: str | None, document: str) -> tuple[Any, bool]:
+    async def _follow(self, name: str | None, document: str) -> tuple[Any, bool, Any]:
         """The serving release this request follows (a current one that can be trusted, the kill
         switch on; ``None``: the live path, ADR 0062 unchanged) and whether its reads are pinned
         at the release's sequence: a listed operation whose document selects only the fields it
         may. Every other operation reads live with the release's session as its default (ADR 0077
         decisions 7 and 23). The name alone is not trusted."""
         if self._releases is None:
-            return None, False
+            return None, False, None
         release = await off_loop(self._releases.resolve)
         pinned = (
             release is not None
             and name in RELEASE_SHARED_OPERATIONS
             and release_selects_only(name, document)
         )
-        return release, pinned
+        # built once: the session this request resolves and the key it is cached under must
+        # not read the clock separately
+        serving = None if release is None else self._releases.serving_of(release)
+        return release, pinned, serving
 
     async def _key(
         self,
@@ -199,6 +205,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         variables: Any,
         release: Any = None,
         pinned: bool = False,
+        serving: Any = None,
     ) -> str | None:
         """The cache key of this operation for ``viewer`` now (``None``: not cacheable at this
         moment); every state the answer depends on is read before it is computed (ADR 0022).
@@ -212,8 +219,6 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         if generation is None:
             return None
         # resolved once per publish / saved record; under a release, the release's session
-        releases = self._releases
-        serving = None if release is None or releases is None else releases.serving_of(release)
         args = () if serving is None else (serving,)
         served = await off_loop(self._served, *args)
         return response_key(
@@ -256,14 +261,21 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         ran (the replay of the warmer and of a stale hit); with ``only_missing`` a fresh entry is
         left alone. False when it was skipped or refused (a busy pool), None when it failed (never
         kept)."""
-        release, pinned = await self._follow(operation_name(op.document), op.document)
-        key = await self._key(op.viewer, op.document, op.variables, release, pinned)
+        release, pinned, serving = await self._follow(operation_name(op.document), op.document)
+        key = await self._key(op.viewer, op.document, op.variables, release, pinned, serving)
         if key is None:  # a write of the caller's is in flight: nothing to keep
             return False
         if only_missing and self._cache.get(key) is not None:
             return False
         context = RequestContext(
-            self._opener, op.viewer, self._stores_opener, release, self._releases, None, pinned
+            self._opener,
+            op.viewer,
+            self._stores_opener,
+            release,
+            self._releases,
+            None,
+            pinned,
+            serving,
         )
         try:
             self._admission.admit()
