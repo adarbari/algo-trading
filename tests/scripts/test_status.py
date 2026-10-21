@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.storage.backends.release.interfaces import ReleaseReport
+
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "status.py"
 _spec = importlib.util.spec_from_file_location("status", SCRIPT)
 assert _spec and _spec.loader
@@ -51,6 +53,7 @@ def probes(tmp_path: Path, **kw: object) -> "status.Probes":
         "store_facts": lambda: ("2026-10-02", "2026-10-02 SUCCESS", "2026-10-02 COMPLETE"),
         "logs": tmp_path,
         "api_build": lambda url: (),
+        "serving": lambda: None,
     }
     return status.Probes(**{**base, **kw})
 
@@ -149,3 +152,19 @@ def test_release_lines_are_silent_without_a_release_tree_and_report_one(tmp_path
     text = "\n".join(status.release(p))
     assert "blue abcdef123 (2 behind)" in text and "current ->" in text
     assert "ingest checkout abcdef123 (2 behind" in text and "BLOCKED: t busy" in text
+
+
+def test_serving_line_names_the_current_release_and_the_pins(tmp_path: Path) -> None:
+    report = ReleaseReport("2026-10-02.9.f1", ("2026-10-02.9.f1",), {"release-2026-10-02.9.f1": 9})
+    text = status.report(probes(tmp_path, serving=lambda: report))
+    assert "Serving: current 2026-10-02.9.f1; 1 releases; pins 2026-10-02.9.f1@9" in text
+    assert "Serving" not in status.report(probes(tmp_path))  # no release, no pin: no line
+
+
+def test_serving_line_degrades_when_the_store_cannot_be_read(tmp_path: Path) -> None:
+    def boom() -> None:
+        raise FileNotFoundError("no store")
+
+    assert "Serving: unreadable (FileNotFoundError)" in status.report(
+        probes(tmp_path, serving=boom)
+    )
