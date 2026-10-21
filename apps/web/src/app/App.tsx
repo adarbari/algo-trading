@@ -10,7 +10,11 @@ import { router } from './router';
 
 export function App() {
   // One query client for the providers and, through the router context, the route guards.
-  const [queryClient] = useState(createQueryClient);
+  const [queryClient] = useState(() => {
+    const client = createQueryClient();
+    void import('./router/early-reads'); // starts the opened trader page's reads (see the module)
+    return client;
+  });
   return (
     <AppProviders queryClient={queryClient}>
       <GuideHelpProvider

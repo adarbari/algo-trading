@@ -214,3 +214,31 @@ def test_a_capture_that_raises_keeps_its_partial_reads_and_a_day_with_reads_its_
         reader.table(A, D2)
         raise ValueError("boom")
     assert reader.inputs_seq(D2) is not None and len(reader.reads(D2)) == 1
+
+
+def test_a_pinned_reader_reads_as_of_its_sequence_and_keys_by_the_pin() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    x = backend.tables.visible_seq()
+    publish(backend, "r2", A, D2)
+    live = StoreReader(backend)
+    pinned = live.pinned(x)
+    assert live.version() == ("live", backend.tables.visible_seq())
+    assert pinned.version() == ("pin", x)
+    publish(backend, "r3", A, D3)
+    assert pinned.version() == ("pin", x)  # stable while the store moves on
+    assert pinned.dates(A) == [D1] and pinned.latest_date(A) == D1
+    assert pinned.table(A, D2) is None
+    assert pinned.including("r9").version() == ("pin", x)
+    assert pinned.recording().version() == ("pin", x)
+
+
+def test_a_pinned_recording_reader_logs_the_pinned_partitions() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    x = backend.tables.visible_seq()
+    publish(backend, "r2", A, D2)
+    reader = RecordingReader(backend).pinned(x)
+    with reader.attribute(D2):
+        assert reader.table_range(A, D1, D3) is not None
+    assert reader.reads(D2) == (ReadRecord(A, D1, D3, "rows", dates_digest([D1])),)

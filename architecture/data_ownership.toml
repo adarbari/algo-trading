@@ -250,3 +250,13 @@ description = "Pick the snapshot a reader sees: the latest partition on or befor
 owner = ["src/algotrade/data/reference.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
 detect = [{ call = "latest_date" }]
+
+[[responsibility]]
+id = "store-pins"
+description = "Which versions of a committed run the store keeps and for whom: TableStore.pin / unpin / pins (a sequence whose versions every later commit retains, run_selection.retained, with a recorded gap where one was discarded), reads at a named sequence (upto, never retried at a fresh one), StoreReader.pinned / version, and destructive_epoch (the count of purge, remove-runs and drop operations: a derived artefact built at another epoch is not trusted). The store never protects a pin from those deletions (ADR 0077 decisions 2, 3, 23)"
+owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/readers.py"]
+allowed = [
+    "src/algotrade/storage/tables/interfaces.py",  # declares the methods on TableStore
+]
+section = "docs/adr/0077-serving-release.md#decision"
+detect = [{ call = "destructive_epoch" }, { call = "unpin" }]

@@ -1,7 +1,7 @@
 """Read-your-writes of the screener write routes (ADR 0077 decision 16): each route changes
 what ``MyScreens``, ``ScreenDetail``, ``ScreenVersions`` and ``ScreenerConfigs`` (the web's
 operations, all cached per user) serve on the very next read, while another user's answers
-are unchanged. Every test runs with and without the process-local write epoch (``conftest``)."""
+are unchanged."""
 
 from pathlib import Path
 

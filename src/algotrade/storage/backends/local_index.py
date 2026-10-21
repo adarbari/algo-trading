@@ -19,6 +19,13 @@ A crash after 1 leaves the marker: ``recover`` (and every later commit or abort,
 re-applies it, which is idempotent. A crash before 1 leaves only the journal and files no
 index refers to: ``abort_run`` deletes them (the ingestion startup recovery, or retention).
 
+Pins (ADR 0077): ``pin(name, seq)`` records, under the commit lock, a sequence whose versions
+must stay readable (``tables/_txn/pins/<name>.json``). Every commit reads the pins under the
+same lock and keeps, per pin, the version it sees (``run_selection.retained``), so a pinned read
+survives any number of recommits. Nothing guards against ``purge``, ``remove_runs`` or ``drop``:
+each bumps ``destructive_epoch`` (``_txn/epoch``) instead, and a release built at another epoch
+is not trusted.
+
 Every file is written to a unique temp file in its directory and renamed into place.
 """
 
@@ -38,13 +45,15 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.storage.backends.run_selection import RunEntry, committed
+from algotrade.storage.backends.run_selection import RunEntry, chain, chain_needed, committed
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.tables.interfaces import PartitionBusyError
 
 INDEX = "_runs.json"
 INDEX_LOCK = ".runs.lock"
 TXN = "_txn"
+PINS = "pins"  # tables/_txn/pins/<name>.json: {"seq": N}, one per retained serving release
+EPOCH = "epoch"  # tables/_txn/epoch: the count of destructive operations (see ``Commits``)
 ORPHAN_GRACE_S = 60.0  # a loose file younger than this may be a write about to be indexed
 SWAP_GRACE_S = 30.0  # a file a compaction swap superseded is swept no sooner than this (ADR 0078)
 
@@ -82,7 +91,7 @@ def run_file(run_id: str, entry: RunEntry) -> str:
 
 def _entry(value: str | dict[str, Any]) -> RunEntry:
     """An index value: ``knowledge_ts`` (a plain run) or a dict with ``knowledge_ts`` and
-    optional ``restates``, ``visible_at``, ``seq``, ``file``, ``prev`` and ``dropped``."""
+    optional ``restates``, ``visible_at``, ``seq``, ``file``, ``prev``, ``dropped`` and ``gap``."""
     if isinstance(value, str):
         return RunEntry(pd.Timestamp(value))
     visible = value.get("visible_at")
@@ -94,6 +103,7 @@ def _entry(value: str | dict[str, Any]) -> RunEntry:
         value.get("file"),
         _entry(value["prev"]) if value.get("prev") else None,
         bool(value.get("dropped")),
+        int(value["gap"]) if value.get("gap") is not None else None,
     )
 
 
@@ -112,6 +122,8 @@ def _value(entry: RunEntry) -> str | dict[str, Any]:
         out["prev"] = _value(entry.prev)
     if entry.dropped:
         out["dropped"] = True
+    if entry.gap is not None:
+        out["gap"] = entry.gap
     return out["knowledge_ts"] if len(out) == 1 else out
 
 
@@ -172,6 +184,56 @@ class Commits:
             return int((self.base / "seq").read_text())
         except FileNotFoundError:
             return 0
+
+    # ------------------------------------------------------------------ pins and the epoch
+
+    def _pin_path(self, name: str) -> Path:
+        return self.base / PINS / f"{safe(name)}.json"
+
+    def _read_pins(self) -> dict[str, int]:
+        """The pins on disk (caller holds the commit lock, or accepts a moment-old answer)."""
+        directory = self.base / PINS
+        found = sorted(directory.glob("*.json")) if directory.exists() else []
+        out: dict[str, int] = {}
+        for path in found:
+            try:
+                out[path.stem] = int(json.loads(path.read_text())["seq"])
+            except FileNotFoundError:  # unpinned meanwhile
+                continue
+        return out
+
+    def pins(self) -> dict[str, int]:
+        """Every pin, name -> sequence, read under the commit lock."""
+        with held(self._commit_lock()):
+            return self._read_pins()
+
+    def pin(self, name: str, seq: int) -> None:
+        """Keep the versions a read at ``seq`` sees (from now on: ``ValueError`` above the
+        published sequence). Replaces the pin of the same name."""
+        with held(self._commit_lock()):
+            self._recover()
+            if seq > self.published():
+                raise ValueError(f"pin {name!r}: sequence {seq} is above the published one")
+            atomic_write(self._pin_path(name), json.dumps({"seq": seq}).encode())
+
+    def unpin(self, name: str) -> None:
+        with held(self._commit_lock()):
+            self._pin_path(name).unlink(missing_ok=True)
+
+    def epoch(self) -> int:
+        """The number of destructive operations so far (0 before any)."""
+        try:
+            return int((self.base / EPOCH).read_text())
+        except FileNotFoundError:
+            return 0
+
+    def _bump_epoch(self) -> None:
+        atomic_write(self.base / EPOCH, str(self.epoch() + 1).encode())
+
+    def bump_epoch(self) -> None:
+        """Record a destructive operation made outside the commit lock (``drop``)."""
+        with held(self._commit_lock()):
+            self._bump_epoch()
 
     # ------------------------------------------------------------------ pending writes
 
@@ -318,6 +380,8 @@ class Commits:
                 for item in self.journal(run_id).values()
             }
             gone = [d for d in directories if d not in busy]
+            if gone:
+                self._bump_epoch()  # before the files go: a release is never trusted over a hole
             for directory in gone:
                 with held(index_lock(directory)):  # no write is mid-way in the partition
                     (directory / INDEX).unlink(missing_ok=True)  # unindexed first
@@ -345,11 +409,7 @@ class Commits:
                 raise PartitionBusyError(str(directory))
             with held(index_lock(directory)):
                 entries = read_index(directory)
-                named = set()
-                for run, entry in entries.items():
-                    for version in (entry, entry.prev):
-                        if version is not None:
-                            named.add(run_file(run, version))
+                named = _named(entries)
                 found = [p for p in directory.glob("run=*.parquet") if p.name not in named]
                 staged = {  # read after the glob: a run staged since the busy check is spared
                     item["file"]
@@ -384,6 +444,7 @@ class Commits:
                 gone = [r for r in dict.fromkeys(runs) if r in entries]
                 if not gone:
                     return 0
+                self._bump_epoch()
                 write_index(directory, {r: e for r, e in entries.items() if r not in gone})
             for run in gone:
                 drop_unreferenced(directory, run)  # no longer indexed: every version's file
@@ -420,6 +481,8 @@ class Commits:
             with held(index_lock(directory)):
                 if read_index(directory) != expected or (refuse is not None and refuse.exists()):
                     return False
+                if chain_needed(expected, self._read_pins().values()):  # it would unpin a release
+                    return False
                 if any(  # a file the new index names was swept or never landed: never publish it
                     not (directory / name).exists()
                     for name in _named(replacement) - _named(expected)
@@ -453,6 +516,7 @@ class Commits:
     def _apply(self, marker: dict[str, Any]) -> None:
         """Steps 2-4 of the module docstring; safe to repeat after a crash."""
         run_id, seq, at = marker["run_id"], int(marker["seq"]), pd.Timestamp(marker["at"])
+        pins = set(self._read_pins().values())  # under the commit lock: no pin appears mid-apply
         touched = []
         for item in marker["entries"]:
             directory = self._dir(item["table"], item["date"])
@@ -465,7 +529,7 @@ class Commits:
                     known = pd.Timestamp(item["knowledge_ts"])
                     previous = entries.get(run_id)
                     entries[run_id] = committed(
-                        known, bool(item["restates"]), at, seq, ref, previous
+                        known, bool(item["restates"]), at, seq, ref, previous, pins
                     )
                 write_index(directory, entries)
         if seq > self.published():
@@ -484,20 +548,13 @@ def _older(path: Path, cutoff: float) -> bool:
 
 
 def _named(entries: dict[str, RunEntry]) -> set[str]:
-    """Every file name an index names: each run's version and the one before."""
-    return {
-        run_file(run, version)
-        for run, entry in entries.items()
-        for version in (entry, entry.prev)
-        if version is not None
-    }
+    """Every file name an index names: each run's version and every older one it keeps."""
+    return {run_file(run, version) for run, entry in entries.items() for version in chain(entry)}
 
 
 def _referenced(directory: Path, run_id: str) -> set[str]:
-    """Files of ``run_id`` the partition's index refers to (its version and the one before)."""
-    entry = read_index(directory).get(run_id)
-    versions: Iterable[RunEntry | None] = (entry, entry.prev if entry else None)
-    return {run_file(run_id, e) for e in versions if e is not None}
+    """Files of ``run_id`` the partition's index refers to (its version and every older kept)."""
+    return {run_file(run_id, e) for e in chain(read_index(directory).get(run_id))}
 
 
 def drop_unreferenced(directory: Path, run_id: str) -> None:

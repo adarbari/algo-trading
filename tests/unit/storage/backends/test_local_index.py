@@ -95,3 +95,28 @@ def test_the_temp_file_of_a_killed_write_is_swept_once_old(tmp_path: Path) -> No
 
 def test_the_swap_grace_is_thirty_seconds() -> None:
     assert SWAP_GRACE_S == 30.0
+
+
+def files(backend: LocalBackend, day: date = DAY) -> set[str]:
+    return {p.name for p in (backend.tables.root / TABLE / f"date={day.isoformat()}").glob("run=*")}
+
+
+def test_a_pinned_chain_keeps_its_files_through_sweeps_and_recommits_and_gap_round_trips(
+    tmp_path: Path,
+) -> None:
+    backend = LocalBackend(tmp_path / "data")
+    directory = backend.tables.root / TABLE / f"date={DAY.isoformat()}"
+    put(backend, "r1", DAY, True)
+    backend.tables.pin("release-a", backend.tables.visible_seq())
+    for _ in range(4):
+        put(backend, "r1", DAY, True)  # five versions of r1, the first pinned
+    entry = read_index(directory)["r1"]
+    chain_files = {entry.ref, entry.prev.ref, entry.prev.prev.ref}  # type: ignore[union-attr]
+    assert entry.prev is not None and entry.prev.gap is not None  # a hole, recorded
+    assert files(backend) >= {f for f in chain_files if f}
+    age(directory)
+    assert backend.tables.sweep_orphans(TABLE, DAY) == 0  # every file of the chain is named
+    assert read_index(directory) == {"r1": entry}  # the index round-trips with its gaps
+    backend.tables.unpin("release-a")
+    put(backend, "r1", DAY, True)
+    assert len(files(backend)) == 2  # head and the one before: the pinned ones are deleted

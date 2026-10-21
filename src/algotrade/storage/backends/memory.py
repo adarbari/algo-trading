@@ -33,16 +33,18 @@ from algotrade.storage.backends.run_compaction import (
 )
 from algotrade.storage.backends.run_selection import (
     RunEntry,
+    chain_needed,
     committed,
     concat_frames,
     keep_newest_runs,
     max_seq,
     merge_rows,
     newest_run_per_group,
-    pinned_read,
+    read_at,
     run_mode,
     select_instruments,
     select_runs,
+    seq_at,
     visible_entries,
 )
 from algotrade.storage.locks import ThreadLock
@@ -64,6 +66,8 @@ class MemoryTables:
         self._pending: dict[str, dict[Key, tuple[pd.DataFrame, bool]]] = {}
         self._touched: dict[str, datetime] = {}  # a pending run's last write (retention)
         self._seq = 0
+        self._pins: dict[str, int] = {}  # name -> a sequence whose versions are retained
+        self._epoch = 0  # destructive operations so far (purge, remove_runs, drop)
         self._index_lock = threading.RLock()  # re-entered by a read that waits out commits
 
     def write(
@@ -82,6 +86,7 @@ class MemoryTables:
                 self._pending.setdefault(run_id, {})[key] = (copy, restates)
                 self._touched[run_id] = datetime.now(UTC)
                 return
+            self._epoch += 1  # no sequence: every pin sees it, so no release is trusted
             entries = self._partitions.setdefault(key, {})
             if not copy.empty:
                 entries[run_id] = RunEntry(copy["knowledge_ts"].max(), restates)
@@ -101,7 +106,7 @@ class MemoryTables:
                     continue
                 known = frame["knowledge_ts"].max()
                 entries[run_id] = committed(
-                    known, restates, at, self._seq, ref, entries.get(run_id)
+                    known, restates, at, self._seq, ref, entries.get(run_id), self._pins.values()
                 )
                 self._frames[(key, run_id, ref)] = frame
             return len(writes)
@@ -109,6 +114,24 @@ class MemoryTables:
     def visible_seq(self) -> int:
         with self._index_lock:
             return self._seq
+
+    def pin(self, name: str, seq: int) -> None:
+        with self._index_lock:
+            if seq > self._seq:
+                raise ValueError(f"pin {name!r}: sequence {seq} is above the published one")
+            self._pins[name] = seq
+
+    def unpin(self, name: str) -> None:
+        with self._index_lock:
+            self._pins.pop(name, None)
+
+    def pins(self) -> dict[str, int]:
+        with self._index_lock:
+            return dict(self._pins)
+
+    def destructive_epoch(self) -> int:
+        with self._index_lock:
+            return self._epoch
 
     def abort_run(self, run_id: str) -> int:
         with self._index_lock:
@@ -167,11 +190,13 @@ class MemoryTables:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
-        return pinned_read(
-            lambda upto: self._read(table, session_date, as_of, instruments, own_run, upto),
+        return read_at(
+            lambda seq: self._read(table, session_date, as_of, instruments, own_run, seq),
             lambda: self._seq,
             lambda: self._index_lock,
+            upto,
         )
 
     def read_latest_runs(
@@ -216,9 +241,7 @@ class MemoryTables:
                 frame = frame[[c for c in frame.columns if c in keep]]
             return frame.reset_index(drop=True)
 
-        if upto is not None:
-            return at(upto)
-        return pinned_read(at, lambda: self._seq, lambda: self._index_lock)
+        return read_at(at, lambda: self._seq, lambda: self._index_lock, upto)
 
     def read_run(
         self,
@@ -228,9 +251,10 @@ class MemoryTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
-        def at(upto: int) -> pd.DataFrame | None:
-            _, frames = self._view((table, session_date), own_run, upto)
+        def at(seq: int) -> pd.DataFrame | None:
+            _, frames = self._view((table, session_date), own_run, seq)
             frame = frames.get(run_id)
             if frame is None:
                 return None
@@ -244,7 +268,7 @@ class MemoryTables:
                 mine = mine[[c for c in mine.columns if c in keep]]
             return mine.reset_index(drop=True)
 
-        return pinned_read(at, lambda: self._seq, lambda: self._index_lock)
+        return read_at(at, lambda: self._seq, lambda: self._index_lock, upto)
 
     def read_range(
         self,
@@ -255,16 +279,17 @@ class MemoryTables:
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
-        def at(upto: int) -> list[pd.DataFrame]:  # one commit sequence for the whole range
+        def at(seq: int) -> list[pd.DataFrame]:  # one commit sequence for the whole range
             days = [d for d in self.dates(table, own_run) if start <= d <= end]
             return [
                 f
                 for d in days
-                if (f := self._read(table, d, as_of, instruments, own_run, upto)) is not None
+                if (f := self._read(table, d, as_of, instruments, own_run, seq)) is not None
             ]
 
-        frames = pinned_read(at, lambda: self._seq, lambda: self._index_lock)
+        frames = read_at(at, lambda: self._seq, lambda: self._index_lock, upto)
         if columns is not None:
             frames = [f[[c for c in f.columns if c in keep_columns(columns)]] for f in frames]
         return concat_frames(frames)
@@ -290,6 +315,7 @@ class MemoryTables:
     def drop(self, table: str) -> int:
         with self._index_lock:
             keys = [k for k in self._partitions if k[0] == table]
+            self._epoch += 1
             for key in keys:
                 del self._partitions[key]
             for frame_key in [k for k in self._frames if k[0][0] == table]:
@@ -311,6 +337,7 @@ class MemoryTables:
                 for frame_key in [f for f in self._frames if f[0] == key]:
                     del self._frames[frame_key]
             if keys:
+                self._epoch += 1
                 self._seq += 1  # committed like a run: a read sees all of the purge or none
             return len(keys)
 
@@ -337,6 +364,7 @@ class MemoryTables:
             for frame_key in [f for f in self._frames if f[0] == key and f[1] in gone]:
                 del self._frames[frame_key]
             if gone:
+                self._epoch += 1
                 self._seq += 1  # committed like a run: a read sees all of the purge or none
             return len(gone)
 
@@ -366,6 +394,8 @@ class MemoryTables:
             expected = dict(self._partitions.get(key, {}))
             if not expected:
                 return CompactionReport(skipped="no such partition")
+            if chain_needed(expected, self._pins.values()):
+                return CompactionReport(skipped="a pinned version is retained here")
             sources: dict[str, pa.Table] = {}
 
             def load(run: str, entry: RunEntry) -> pa.Table:
@@ -399,18 +429,29 @@ class MemoryTables:
             self._partitions[key] = kept
             return report
 
-    def dates(self, table: str, own_run: str | None = None) -> list[date]:
+    def dates(self, table: str, own_run: str | None = None, upto: int | None = None) -> list[date]:
         with self._index_lock:
-            keys = set(self._partitions) | set(self._pending.get(own_run or "", {}))
+            held = {
+                k
+                for k, entries in self._partitions.items()
+                if upto is None or visible_entries(entries, upto)
+            }
+            keys = held | set(self._pending.get(own_run or "", {}))
         return sorted(d for (t, d) in keys if t == table)
 
-    def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
+    def partition_seq(
+        self, table: str, start: date, end: date, upto: int | None = None
+    ) -> dict[date, int]:
         with self._index_lock:
-            return {
-                d: max_seq(entries, self._seq)
-                for (t, d), entries in self._partitions.items()
-                if t == table and start <= d <= end
-            }
+            out: dict[date, int] = {}
+            for (t, d), entries in self._partitions.items():
+                if t != table or not start <= d <= end:
+                    continue
+                if upto is None:
+                    out[d] = max_seq(entries, self._seq)
+                elif (stamp := seq_at(entries, upto)) is not None:
+                    out[d] = stamp
+            return out
 
     def names(self, own_run: str | None = None) -> list[str]:
         with self._index_lock:

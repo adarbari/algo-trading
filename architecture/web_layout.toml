@@ -137,6 +137,10 @@ path = "apps/web/scripts"
 purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the node_modules guard (predev), the Playwright Docker runner, the performance budgets check (bundle sizes) and its budgets file reader, the dependency audit gate (check-audit, over audit-allowlist.json)"
 
 [[web_dir]]
+path = "apps/web/scripts/network"
+purpose = "the distant-client link model of the throttled performance gate (e2e/perf-network.spec.ts): connection setup, round trips, slow start, one downlink, and the serial round-trip depth of a load"
+
+[[web_dir]]
 path = "apps/web/src"
 purpose = "the app, by layer: app -> pages -> widgets -> features -> entities -> shared (no files of its own)"
 kind = "layer"
@@ -267,4 +271,4 @@ purpose = "Playwright screenshot + axe suite over every design-system story, lig
 
 [[web_dir]]
 path = "apps/web/vite-plugins"
-purpose = "Vite build plugins (graphql-documents: each GraphQL operation ships with the module that writes it, out of the entry bundle)"
+purpose = "Vite build plugins (graphql-documents: each GraphQL operation ships with the module that writes it, out of the entry bundle; route-preload: the opened URL's page files are preloaded from index.html)"

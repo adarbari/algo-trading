@@ -6,7 +6,7 @@ bars, adjustments, events and chains are ``algotrade.data``. Consumers get this 
 """
 
 import hashlib
-from collections.abc import Collection, Iterator, Sequence
+from collections.abc import Collection, Hashable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -20,19 +20,38 @@ from algotrade.storage.tables.interfaces import Backend
 
 class StoreReader:
     """``own_run``: also see that run's pending writes (the run reading what it wrote before
-    it commits, ADR 0022); ``None`` (the default) sees committed data only."""
+    it commits, ADR 0022); ``None`` (the default) sees committed data only. ``pin``: every read
+    is made as of that commit sequence (``pinned``; ``TableStore.pin`` keeps its versions)."""
 
-    def __init__(self, backend: Backend, own_run: str | None = None) -> None:
+    def __init__(
+        self, backend: Backend, own_run: str | None = None, pin: int | None = None
+    ) -> None:
         self._backend = backend
         self.own_run = own_run
+        self._pin = pin
 
     def including(self, run_id: str) -> "StoreReader":
         """This reader, also seeing ``run_id``'s pending writes."""
-        return StoreReader(self._backend, run_id)
+        return StoreReader(self._backend, run_id, self._pin)
 
     def recording(self) -> "RecordingReader":
         """A reader of the same store and view that logs the reads of an attributed day."""
-        return RecordingReader(self._backend, self.own_run)
+        return RecordingReader(self._backend, self.own_run, pin=self._pin)
+
+    def pinned(self, seq: int) -> "StoreReader":
+        """A reader of the same store whose every read is made as of commit sequence ``seq``:
+        partitions and dates committed after it are invisible, a version the store no longer
+        keeps raises ``StaleSnapshotError`` (the caller falls back to a live reader). It does
+        not pin the store: ``TableStore.pin`` retains the versions."""
+        return StoreReader(self._backend, self.own_run, seq)
+
+    def version(self) -> Hashable:
+        """What a cache over this reader's rows is keyed by: ``("pin", seq)`` for a pinned
+        reader (stable while the store moves on), else ``("live", visible_seq())`` (changes
+        exactly when a commit publishes)."""
+        if self._pin is not None:
+            return ("pin", self._pin)
+        return ("live", self.visible_seq())
 
     def table(
         self,
@@ -41,7 +60,8 @@ class StoreReader:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        return self._backend.tables.read(table, session_date, as_of, instruments, self.own_run)
+        tables = self._backend.tables
+        return tables.read(table, session_date, as_of, instruments, self.own_run, self._pin)
 
     def require(
         self, table: str, session_date: date, hint: str, as_of: datetime | None = None
@@ -63,7 +83,9 @@ class StoreReader:
     ) -> pd.DataFrame | None:
         """``columns``: only these (+ ``instrument_id`` and the point-in-time columns)."""
         tables = self._backend.tables
-        return tables.read_range(table, start, end, as_of, instruments, self.own_run, columns)
+        return tables.read_range(
+            table, start, end, as_of, instruments, self.own_run, columns, self._pin
+        )
 
     def read_run(
         self,
@@ -75,7 +97,9 @@ class StoreReader:
     ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (``TableStore.read_run``)."""
         tables = self._backend.tables
-        return tables.read_run(table, session_date, run_id, self.own_run, columns, instruments)
+        return tables.read_run(
+            table, session_date, run_id, self.own_run, columns, instruments, self._pin
+        )
 
     def read_latest_runs(
         self,
@@ -88,7 +112,7 @@ class StoreReader:
         """Each group's newest run of a partition (``TableStore.read_latest_runs``)."""
         tables = self._backend.tables
         return tables.read_latest_runs(
-            table, session_date, group, columns, instruments, self.own_run
+            table, session_date, group, columns, instruments, self.own_run, self._pin
         )
 
     def visible_seq(self) -> int:
@@ -97,7 +121,7 @@ class StoreReader:
 
     def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
         """Per committed partition in the range, its highest commit sequence (ADR 0063)."""
-        return self._backend.tables.partition_seq(table, start, end)
+        return self._backend.tables.partition_seq(table, start, end, self._pin)
 
     def runs_generation(self) -> tuple[int, int]:
         """Changes exactly when a run record (a job's too) is saved: the key of a cache over the
@@ -113,7 +137,7 @@ class StoreReader:
         return self._backend.tables.names(self.own_run)
 
     def dates(self, table: str) -> list[date]:
-        return self._backend.tables.dates(table, self.own_run)
+        return self._backend.tables.dates(table, self.own_run, self._pin)
 
     def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
         """The last partition date (on or before a date). Picking the snapshot a reader
@@ -191,13 +215,21 @@ class RecordingReader(StoreReader):
     day at a time: attribution is not thread-safe."""
 
     def __init__(
-        self, backend: Backend, own_run: str | None = None, _shared: _Attribution | None = None
+        self,
+        backend: Backend,
+        own_run: str | None = None,
+        _shared: _Attribution | None = None,
+        pin: int | None = None,
     ) -> None:
-        super().__init__(backend, own_run)
+        super().__init__(backend, own_run, pin)
         self._attr = _shared if _shared is not None else _Attribution()
 
     def including(self, run_id: str) -> "RecordingReader":
-        return RecordingReader(self._backend, run_id, self._attr)
+        return RecordingReader(self._backend, run_id, self._attr, self._pin)
+
+    def pinned(self, seq: int) -> "RecordingReader":
+        """As ``StoreReader.pinned``, logging into the same attribution."""
+        return RecordingReader(self._backend, self.own_run, self._attr, seq)
 
     @contextmanager
     def attribute(self, day: date) -> Iterator[None]:

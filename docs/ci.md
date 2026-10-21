@@ -190,7 +190,19 @@ without a settings change) builds the production bundle and runs two gates; ever
   ingestion), with the API mocked as in the e2e suite, the gzip bytes of scripts transferred, the
   requests made and the DOM nodes once settled stay under their budgets.
 
-All gated numbers are counts or sizes, never durations. LCP and total blocking time (CPU throttled
+- **Distant client** (`apps/web/e2e/perf-network.spec.ts`, `npm run perf:network`, owner ask 2026-10-21):
+  each main route (Ideas, Screeners, Edges, Regime, Calendar, Explore, Admin ingestion) loaded over a
+  modelled link of 280 ms round trip and 10 Mbit/s down (`scripts/network/model.ts`: connection setup,
+  one round trip per request, TCP slow start, one shared downlink; the profile of a user in India
+  reaching the Mac behind Tailscale Funnel). Gated, in `perf-budgets.json` `network`: the serial
+  round-trip depth, gzip bytes on the wire, and milliseconds until the page is settled. It is a model,
+  not a measurement from another continent, and the mocked API bodies are small fixtures: real payload
+  sizes come from `scripts/perf/payload_sizes.py` against a spare API (never the live one).
+  `PERF_TRACE=1` prints the waterfall. The index.html of a build preloads the opened path's page files,
+  the page cache and the first-paint fonts (`vite-plugins/route-preload.ts`).
+
+All gated numbers are counts or sizes, never durations, except the distant-client time, which runs on a model
+(no network noise) with 30 % headroom. LCP and total blocking time (CPU throttled
 4x) are measured in the same run but **only reported** in the job summary: on shared GitHub
 runners they move 20-50 % between identical runs, so a gate on them would fail PRs at random and
 teach people to ignore it. Read them as a trend, not a verdict.
