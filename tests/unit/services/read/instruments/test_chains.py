@@ -60,5 +60,5 @@ def test_the_rows_are_read_once_per_publish() -> None:
     reader = store_with(_chains)
     ctx = context(reader)
     load_chains(ctx, ["EQ:AAA"])
-    key = ("chain-rows", D1, ("EQ:AAA",), reader.visible_seq())
+    key = ("chain-rows", D1, ("EQ:AAA",), reader.version())
     assert ctx.cache.get(key) is not None

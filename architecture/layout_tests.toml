@@ -77,6 +77,10 @@ path = "tests/contract/api/read_your_writes"
 purpose = "the read-your-writes gate (ADR 0077): one test per persistent write route proves the next cached GraphQL read shows the write, with and without the process-local write epoch"
 
 [[test_dir]]
+path = "tests/contract/api/release_reads"
+purpose = "the API reading the serving release (ADR 0077 decision 23): the listed operations survive commits with no recompute, the release answer equals the live answer pinned at its sequence, every untrusted release falls back to the live path uncached"
+
+[[test_dir]]
 path = "tests/contract/storage"
 purpose = "the storage contract: every table backend passes it"
 

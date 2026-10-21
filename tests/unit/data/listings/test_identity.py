@@ -19,8 +19,8 @@ class _Reader:
     seq: int = 1
     own_run: str | None = None
 
-    def visible_seq(self) -> int:
-        return self.seq
+    def version(self) -> tuple[str, int]:
+        return ("live", self.seq)
 
 
 def _computer(calls: list[int]):  # type: ignore[no-untyped-def]

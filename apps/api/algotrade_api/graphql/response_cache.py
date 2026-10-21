@@ -49,7 +49,7 @@ from datetime import date
 from functools import lru_cache
 from typing import Any
 
-from graphql import GraphQLError, OperationDefinitionNode, parse
+from graphql import FieldNode, GraphQLError, OperationDefinitionNode, parse
 
 from algotrade.config.site.users import UserRecord
 
@@ -79,6 +79,170 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
         "SessionDate",
     }
 )
+# The SHARED_OPERATIONS read from the current serving release (ADR 0077 decision 23): stored
+# tables only, no run record, no catalogue. Listed with a reason and a test in
+# ``architecture/release_shared_ops.toml`` (``tests/architecture/api/test_release_reads.py``).
+RELEASE_SHARED_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "InstrumentPrices",
+        "MarketHistory",
+        "InstrumentEvents",
+        "EtfHoldings",
+        "RegimeBands",
+        "RegimeSignals",
+        "RegimeEpisodes",
+    }
+)
+# The field tree a release operation's document may select, every dotted path of the web's own
+# document (``apps/web/src/shared/api/generated/graphql/gql.ts``; a test keeps them equal). The
+# key of a release answer is role-wide, so it may hold nothing of the caller: a document named
+# like a listed operation that selects any field outside its tree (a ``viewer``, a user's
+# ``features``), or uses an alias, a directive or a fragment, is answered live and never kept.
+RELEASE_FIELDS: dict[str, frozenset[str]] = {
+    "InstrumentPrices": frozenset(
+        {
+            "instrument",
+            "instrument.instrumentId",
+            "instrument.prices",
+            "instrument.prices.bars",
+            "instrument.prices.bars.close",
+            "instrument.prices.bars.session",
+            "instrument.prices.bars.volume",
+            "instrument.prices.end",
+            "instrument.prices.start",
+        }
+    ),
+    "MarketHistory": frozenset(
+        {
+            "market",
+            "market.history",
+            "market.history.bucketSessions",
+            "market.history.name",
+            "market.history.points",
+            "market.history.points.session",
+            "market.history.points.value",
+            "market.history.segments",
+            "market.history.segments.end",
+            "market.history.segments.start",
+            "market.history.segments.value",
+        }
+    ),
+    "InstrumentEvents": frozenset(
+        {
+            "instrument",
+            "instrument.events",
+            "instrument.events.date",
+            "instrument.events.kind",
+            "instrument.events.table",
+            "instrument.events.ts",
+            "instrument.events.values",
+            "instrument.instrumentId",
+        }
+    ),
+    "EtfHoldings": frozenset(
+        {
+            "instrument",
+            "instrument.holdings",
+            "instrument.holdings.asOf",
+            "instrument.holdings.items",
+            "instrument.holdings.items.assetClass",
+            "instrument.holdings.items.instrument",
+            "instrument.holdings.items.instrument.symbol",
+            "instrument.holdings.items.name",
+            "instrument.holdings.items.rank",
+            "instrument.holdings.items.symbol",
+            "instrument.holdings.items.weight",
+            "instrument.holdings.source",
+            "instrument.holdings.total",
+            "instrument.instrumentId",
+            "instrument.isEtf",
+        }
+    ),
+    "RegimeBands": frozenset(
+        {
+            "regime",
+            "regime.bands",
+            "regime.bands.end",
+            "regime.bands.label",
+            "regime.bands.start",
+        }
+    ),
+    "RegimeSignals": frozenset(
+        {
+            "regime",
+            "regime.episodes",
+            "regime.episodes.key",
+            "regime.episodes.signals",
+            "regime.episodes.signals.gate",
+            "regime.episodes.signals.gate.clearedDay",
+            "regime.episodes.signals.gate.firstKnownDay",
+            "regime.episodes.signals.gate.flaggedDay",
+            "regime.episodes.signals.gate.flaggedDayFromTrough",
+            "regime.episodes.signals.gate.indicator",
+            "regime.episodes.signals.gate.kind",
+            "regime.episodes.signals.gate.neverFired",
+            "regime.episodes.signals.gate.state",
+            "regime.episodes.signals.gate.unknownReason",
+            "regime.episodes.signals.gate.unknownReason.cause",
+            "regime.episodes.signals.gate.unknownReason.cause.links",
+            "regime.episodes.signals.gate.unknownReason.cause.links.level",
+            "regime.episodes.signals.gate.unknownReason.cause.links.message",
+            "regime.episodes.signals.gate.unknownReason.cause.links.runId",
+            "regime.episodes.signals.gate.unknownReason.cause.links.status",
+            "regime.episodes.signals.gate.unknownReason.cause.links.subject",
+            "regime.episodes.signals.gate.unknownReason.code",
+            "regime.episodes.signals.gate.unknownReason.guideTerm",
+            "regime.episodes.signals.gate.unknownReason.kind",
+            "regime.episodes.signals.gate.unknownReason.kindText",
+            "regime.episodes.signals.indicators",
+            "regime.episodes.signals.indicators.clearedDay",
+            "regime.episodes.signals.indicators.firstKnownDay",
+            "regime.episodes.signals.indicators.flaggedDay",
+            "regime.episodes.signals.indicators.flaggedDayFromTrough",
+            "regime.episodes.signals.indicators.indicator",
+            "regime.episodes.signals.indicators.kind",
+            "regime.episodes.signals.indicators.neverFired",
+            "regime.episodes.signals.indicators.state",
+            "regime.episodes.signals.indicators.unknownReason",
+            "regime.episodes.signals.indicators.unknownReason.cause",
+            "regime.episodes.signals.indicators.unknownReason.cause.links",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.level",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.message",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.runId",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.status",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.subject",
+            "regime.episodes.signals.indicators.unknownReason.code",
+            "regime.episodes.signals.indicators.unknownReason.guideTerm",
+            "regime.episodes.signals.indicators.unknownReason.kind",
+            "regime.episodes.signals.indicators.unknownReason.kindText",
+        }
+    ),
+    "RegimeEpisodes": frozenset(
+        {
+            "regime",
+            "regime.episodes",
+            "regime.episodes.cause",
+            "regime.episodes.key",
+            "regime.episodes.kind",
+            "regime.episodes.knownFrom",
+            "regime.episodes.name",
+            "regime.episodes.nasdaqDrawdown",
+            "regime.episodes.nberEnd",
+            "regime.episodes.nberStart",
+            "regime.episodes.notes",
+            "regime.episodes.peak",
+            "regime.episodes.recession",
+            "regime.episodes.recovered",
+            "regime.episodes.spxDrawdown",
+            "regime.episodes.trough",
+            "regime.recessions",
+            "regime.recessions.announcedEnd",
+            "regime.recessions.announcedStart",
+            "regime.recessions.end",
+            "regime.recessions.start",
+        }
+    ),
+}
 # Operations over published tables and configs that depend on the caller's catalogue or
 # configs (user features, the Guide's field entries): cached per user.
 USER_OPERATIONS: frozenset[str] = frozenset(
@@ -185,6 +349,35 @@ def operation_name(document: str) -> str | None:
     return (names[0] or None) if len(names) == 1 else None
 
 
+@lru_cache(maxsize=256)
+def release_selects_only(name: str, document: str) -> bool:
+    """Whether ``document`` (the operation ``name``) selects only the field tree
+    ``RELEASE_FIELDS`` allows it, at every depth, with no alias, directive or fragment, a single
+    query operation: deny by default (a field not in the tree is a caller-dependent field until
+    shown otherwise)."""
+    allowed = RELEASE_FIELDS.get(name)
+    try:
+        definitions = parse(document).definitions
+    except GraphQLError:
+        return False
+    operations = [d for d in definitions if isinstance(d, OperationDefinitionNode)]
+    if allowed is None or len(operations) != 1 or len(definitions) != 1 or operations[0].directives:
+        return False
+    return _within(operations[0].selection_set, "", allowed)
+
+
+def _within(selections: Any, prefix: str, allowed: frozenset[str]) -> bool:
+    for node in selections.selections:
+        if not isinstance(node, FieldNode) or node.alias is not None or node.directives:
+            return False
+        path = prefix + node.name.value
+        if path not in allowed:
+            return False
+        if node.selection_set is not None and not _within(node.selection_set, path + ".", allowed):
+            return False
+    return True
+
+
 def cacheable(document: str) -> bool:
     """Whether the operation in ``document`` is one whose answers are kept."""
     name = operation_name(document)
@@ -202,12 +395,23 @@ def response_key(
     served: str = "",
     today: date | None = None,
     generation: int = 0,
+    release: str | None = None,
 ) -> str:
     """The hex digest identifying one cacheable answer. ``runs`` (the runs generation) is part
     of a ``RUN_OPERATIONS`` key, ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one, ``served``
     (``served_token``: the default session) of every key (ADR 0062); ``generation`` is the
     viewer's config generation (``storage/configs/generation.py``, ADR 0077 decision 15), part of
-    every key that holds the user (a ``SHARED_OPERATIONS`` one does not)."""
+    every key that holds the user (a ``SHARED_OPERATIONS`` one does not). ``release`` (the id of
+    the serving release the answer is read from, ADR 0077 decision 23): the key of a
+    ``RELEASE_SHARED_OPERATIONS`` operation is then that id, the role, the document, the
+    variables and the licences alone: no sequence, no served session, no runs generation, so a
+    commit, a restatement or a saved run record does not evict it."""
+    if release is not None and name in RELEASE_SHARED_OPERATIONS:
+        text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
+        licences = ",".join(sorted(viewer.licences))
+        document_hash = hashlib.sha256(document.encode()).hexdigest()
+        parts = ["release", release, viewer.role.value, document_hash, text, f"licences:{licences}"]
+        return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
     who = (
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )

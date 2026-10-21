@@ -253,6 +253,7 @@ owner = ["src/algotrade/storage/backends/release/*"]
 allowed = [
     "src/algotrade/storage/factory.py",  # opens the store from the storage URL
     "apps/ingestion/algotrade_ingestion/cli/main.py",  # opens the store for the serve-release command
+    "src/algotrade/services/read/serving/current.py",  # opens the release store for the API's reads
 ]
 section = "docs/adr/0077-serving-release.md#decision"
 detect = [{ call = "LocalReleaseStore" }, { call = "MemoryReleaseStore" }, { call = "open_release_store" }]
@@ -270,6 +271,7 @@ description = "Which versions of a committed run the store keeps and for whom: T
 owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/readers.py"]
 allowed = [
     "src/algotrade/storage/tables/interfaces.py",  # declares the methods on TableStore
+    "src/algotrade/services/read/serving/current.py",  # compares a release's epoch with the store's
 ]
 section = "docs/adr/0077-serving-release.md#decision"
 detect = [{ call = "destructive_epoch" }, { call = "unpin" }]

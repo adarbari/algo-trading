@@ -243,3 +243,35 @@ def test_compaction_runs_under_a_pin_when_nothing_was_recommitted_after_it(
     backend.tables.pin("current", backend.tables.visible_seq())  # always present
     report = backend.tables.compact_runs("events/dividend", D1)
     assert report.skipped is None and report.runs_dropped == 1
+
+
+def test_a_partition_written_empty_is_listed_and_stamped_under_a_pin_as_it_is_live(
+    backend: Backend,
+) -> None:
+    """An empty frame leaves a partition with no run (a source with nothing today): live lists it
+    and stamps it 0, so a pinned read must too (the release's session record names the table)."""
+    x = commit(backend, "r1", D1, 1.0)
+    empty = stamped([{"instrument_id": "EQ:A", "value": 1.0}], D2, "empty").iloc[0:0]
+    backend.tables.write(TABLE, D2, "empty", empty)
+    assert D2 in backend.tables.dates(TABLE)
+    assert D2 in backend.tables.dates(TABLE, upto=x)
+    assert backend.tables.partition_seq(TABLE, D2, D2) == {D2: 0}
+    assert backend.tables.partition_seq(TABLE, D2, D2, upto=x) == {D2: 0}
+
+
+def test_a_partition_made_empty_by_a_commit_after_the_pin_is_not_listed_at_it(
+    backend: Backend,
+) -> None:
+    """S+1 arrives with no rows (a source with nothing today) after X: live lists it, the pin
+    must not (the release's present / missing would flip after the build)."""
+    before = stamped([{"instrument_id": "EQ:A", "value": 1.0}], D1, "e0").iloc[0:0]
+    backend.tables.write(TABLE, D1, "e0", before, pending=True)
+    backend.tables.commit_run("e0", AT)  # S exists, empty, at X
+    x = backend.tables.visible_seq()
+    later = stamped([{"instrument_id": "EQ:A", "value": 1.0}], D2, "e1").iloc[0:0]
+    backend.tables.write(TABLE, D2, "e1", later, pending=True)
+    backend.tables.commit_run("e1", AT)
+    assert backend.tables.dates(TABLE) == [D1, D2]
+    assert backend.tables.dates(TABLE, upto=x) == [D1]
+    assert backend.tables.partition_seq(TABLE, D1, D2, upto=x) == {D1: 0}
+    assert backend.tables.dates(TABLE, upto=backend.tables.visible_seq()) == [D1, D2]

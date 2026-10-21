@@ -141,6 +141,9 @@ class NightlySettings:
     arrow_io_threads: int = 4
     nice: int = 10  # os.nice of every ingest command (and so its workers): the API's reads win
     min_free_gb: float = 15.0  # the nightly refuses to start with less free on the data volume
+    # [serving] release_reads: the API serves the listed operations from the current serving
+    # release (ADR 0077); false: every read is live, as before the release existed (kill switch)
+    release_reads: bool = True
     # [backfilling]: tables still being filled; a screener short only of them warns until `until`
     backfilling: Mapping[str, Backfilling] = field(default_factory=dict)
 
@@ -168,8 +171,10 @@ class NightlySettings:
                 "post",
                 "resources",
                 "backfilling",
+                "serving",
             ]
         )
+        serving = root.table("serving", ["release_reads"])
         schedule = root.table("schedule", ["data_deadline"])
         declared = root.raw("steps") or {}
         steps_table = root.table("steps", list(declared))
@@ -207,6 +212,7 @@ class NightlySettings:
             backfilling=backfilling(root.table("backfilling", list(declared_backfills))),
             history_copy=history_copy,
             compaction=compaction,
+            release_reads=serving.boolean("release_reads", d.release_reads),
             arrow_cpu_threads=resources.integer("arrow_cpu_threads", d.arrow_cpu_threads, 1),
             nice=resources.integer("nice", d.nice, 0),
             arrow_io_threads=resources.integer("arrow_io_threads", d.arrow_io_threads, 1),

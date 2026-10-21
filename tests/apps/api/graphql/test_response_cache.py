@@ -90,6 +90,7 @@ class Harness:
             served: Any,
             log: Any = None,
             config_generation: Any = None,
+            releases: Any = None,
         ) -> Any:
             self.wired, self.wired_served = runs, served
             self.router = graphql_router(

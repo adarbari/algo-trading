@@ -6,13 +6,17 @@ backtest. ``as_user``: the authenticator the API tests run as (a stand-in for a 
 token, ADR 0040)."""
 
 import atexit
+import json
+import re
 import shutil
 import tempfile
 from datetime import UTC, date, datetime, timedelta
+from functools import cache
 from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
+from graphql import FieldNode, OperationDefinitionNode, SelectionSetNode, parse
 from starlette.requests import Request
 
 from algotrade.config.site.users import Role, UserRecord
@@ -320,3 +324,38 @@ def api_store(source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
     }
     user = UserContext("local")
     return store_over(backend, site_only_store(), user), ids
+
+
+GQL_TS = CONFIG_ROOT.parent / "apps/web/src/shared/api/generated/graphql/gql.ts"
+
+
+@cache
+def web_documents() -> dict[str, str]:
+    """Every query document of the web app, by operation name."""
+    found: dict[str, str] = {}
+    pattern = re.compile(r'^\s*("(?:\\.|[^"\\])*"): types\.\w+Document,$', re.M)
+    for match in pattern.finditer(GQL_TS.read_text()):
+        document = json.loads(match.group(1))
+        named = re.search(r"\bquery (\w+)", document)
+        if named:
+            found[named.group(1)] = document
+    return found
+
+
+def field_paths(document: str) -> frozenset[str]:
+    """Every dotted field path a document selects (``instrument.prices.bars.close``)."""
+    operation = next(
+        d for d in parse(document).definitions if isinstance(d, OperationDefinitionNode)
+    )
+
+    def walk(selections: SelectionSetNode, prefix: str) -> list[str]:
+        out: list[str] = []
+        for node in selections.selections:
+            assert isinstance(node, FieldNode), "a fragment in a release document"
+            path = prefix + node.name.value
+            out.append(path)
+            if node.selection_set is not None:
+                out += walk(node.selection_set, path + ".")
+        return out
+
+    return frozenset(walk(operation.selection_set, ""))

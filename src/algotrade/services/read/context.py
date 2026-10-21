@@ -172,7 +172,7 @@ class ResultCache:
     """A small LRU of computed results, bounded by entries and by the bytes of the frames it
     holds (``max_bytes``: one page can leave dozens of megabytes per screener behind, and a
     publish leaves the old entries until they age out). Callers key on
-    ``StoreReader.visible_seq()`` (read before computing), so a publish makes every earlier
+    ``StoreReader.version()`` (read before computing), so a publish makes every earlier
     entry unreachable (ADR 0022). One cache serves every caller of the API (ADR 0040): a
     result that depends on the request's user has ``ctx.user.user_id`` in its key, and one
     that depends on their catalogue (a user feature's formula) also ``catalogue_key(ctx)``, so
@@ -358,7 +358,10 @@ def _session(reader: StoreReader, requested: date | None, cache: ResultCache) ->
     # Read before resolving (ADR 0022); a run's own pending writes do not move visible_seq.
     # the default session follows the nightly's run records (ADR 0062): a saved record moves
     # the runs generation, not the seq
-    key = ("session", requested, reader.own_run, reader.visible_seq(), reader.runs_generation())
+    # a pinned reader (a serving release) resolves a session that was complete at its sequence:
+    # the records saved since (a job's checkpoint) cannot change it, so they are not in its key
+    runs = None if reader.pin is not None else reader.runs_generation()
+    key = ("session", requested, reader.own_run, reader.version(), runs)
     session: Session = cache.get_or_compute(key, lambda: resolve_session(reader, requested))
     return session
 
@@ -484,7 +487,7 @@ def stored_dates(ctx: Stores, table: str) -> tuple[date, ...]:
     entry holds every table's listing, so the grid does not evict the pages' entries."""
     if ctx.reader.own_run is not None:  # its pending writes add dates without a publish
         return tuple(ctx.reader.dates(table))
-    key = ("stored-dates", ctx.reader.visible_seq())  # read before listing (ADR 0022)
+    key = ("stored-dates", ctx.reader.version())  # read before listing (ADR 0022)
     listed: dict[str, tuple[date, ...]] = ctx.cache.get_or_compute(key, dict)
     if table not in listed:
         listed[table] = tuple(ctx.reader.dates(table))
