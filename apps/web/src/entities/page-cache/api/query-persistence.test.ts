@@ -163,6 +163,34 @@ describe('startQueryPersistence', () => {
     stop();
   });
 
+  it('leaves a read already in flight running when the record turns out to be another session', async () => {
+    const store = fakeStore(record('s1'));
+    let answer: (date: string) => void = () => undefined;
+    const client = new QueryClient();
+    client.setQueryData(queryKeys.gql('Viewer', {}), { id: 'u1' });
+    const stop = startQueryPersistence(client, {
+      store,
+      fetchSession: () => new Promise((resolve) => (answer = resolve)),
+      now: () => Date.now(),
+    });
+    await whenRestored(client);
+    // the router's early start: the page's read leaves before the session date is known
+    const key = queryKeys.gql('IdeasPage', {});
+    let finish: (rows: unknown) => void = () => undefined;
+    const queryFn = vi.fn(() => new Promise((resolve) => (finish = resolve)));
+    const early = client.query({ queryKey: key, queryFn });
+    answer('s2');
+    await vi.advanceTimersByTimeAsync(0);
+    // the other session's rows are gone, the read is still the one in flight, not reset to idle
+    expect(client.getQueryData(key)).toBeUndefined();
+    const loader = client.query({ queryKey: key, queryFn });
+    finish({ rows: ['new'] });
+    await Promise.all([early, loader]);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(key)).toEqual({ rows: ['new'] });
+    stop();
+  });
+
   it('keeps a record rendered before the session date answered when it is the same session', async () => {
     const store = fakeStore(record('s1'));
     let answer: (date: string) => void = () => undefined;

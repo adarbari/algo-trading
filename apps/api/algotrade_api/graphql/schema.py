@@ -43,7 +43,6 @@ from algotrade_api.graphql.response_cache import (
     OperationLog,
     ResponseCache,
     Served,
-    WriteEpoch,
     cacheable,
     operation_name,
     response_key,
@@ -77,8 +76,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         self,
         *args: Any,
         seq: Callable[[], int],
-        epoch: WriteEpoch,
-        config_generation: Callable[[str], int | None],
+        config_generation: Callable[[str, bool], int | None],
         cache: ResponseCache,
         admission: Admission,
         runs: Callable[[], tuple[int, int]],
@@ -92,7 +90,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         super().__init__(*args, **kwargs)
         self._opener, self._stores_opener, self._log = opener, stores, log
         self._revalidating: dict[str, asyncio.Task[None]] = {}
-        self._seq, self._epoch, self._cache, self._admission = seq, epoch, cache, admission
+        self._seq, self._cache, self._admission = seq, cache, admission
         self._runs, self._closed, self._served = runs, closed, served
         self._config_generation = config_generation
 
@@ -141,7 +139,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         (ADR 0077 decision 15)."""
         if name in SHARED_OPERATIONS:
             return 0
-        return self._config_generation(viewer.user_id)
+        return self._config_generation(viewer.user_id, viewer.role is Role.ADMIN)
 
     async def _key(self, viewer: UserRecord, document: str, variables: Any) -> str | None:
         """The cache key of this operation for ``viewer`` now (``None``: not cacheable at this
@@ -153,7 +151,6 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         served = await off_loop(self._served)  # resolved once per publish / saved record
         return response_key(
             self._seq(),
-            self._epoch.value,
             viewer,
             document,
             variables,
@@ -280,23 +277,22 @@ def graphql_router(
     debug: bool = False,
     stores: StoresOpener | None = None,
     seq: Callable[[], int] = lambda: 0,
-    epoch: WriteEpoch | None = None,
     cache: ResponseCache | None = None,
     admission: Admission | None = None,
     runs: Callable[[], tuple[int, int]] = lambda: (0, 0),
     closed: Callable[[], date] = lambda: last_closed_session(datetime.now(UTC)),
     served: Callable[[], str] = lambda: "",
     log: OperationLog | None = None,
-    config_generation: Callable[[str], int | None] = lambda user: 0,
+    config_generation: Callable[[str, bool], int | None] = lambda user, everyone: 0,
 ) -> CachingRouter:
     """``POST /graphql`` over the read contexts ``opener`` opens (one per requested session,
     per request) and the session-free one ``stores`` opens (configs, run records); the
     GraphiQL IDE at ``GET /graphql`` only when ``debug``. ``seq`` is the published state
-    (``StoreReader.visible_seq``) the response cache keys on; ``epoch`` the writes served,
-    ``config_generation`` a user's durable config counter (ADR 0077 decision 15),
-    ``runs`` the runs generation (``StoreReader.runs_generation``) and ``closed`` the last
-    closed session, which the keys of the run-dependent operations hold; ``served`` the token of
-    the default session (``served_token``) every key holds (ADR 0062)."""
+    (``StoreReader.visible_seq``) the response cache keys on; ``config_generation`` a user's
+    durable config counter (an admin's: every user's; ADR 0077 decision 15), ``runs`` the runs
+    generation (``StoreReader.runs_generation``) and ``closed`` the last closed session, which
+    the keys of the run-dependent operations hold; ``served`` the token of the default session
+    (``served_token``) every key holds (ADR 0062)."""
     router = CachingRouter(
         schema,
         path=PATH,
@@ -305,7 +301,6 @@ def graphql_router(
         context_getter=context_getter(opener, stores),
         tags=["graphql"],
         seq=seq,
-        epoch=epoch if epoch is not None else WriteEpoch(),
         config_generation=config_generation,
         cache=cache if cache is not None else ResponseCache(),
         admission=admission if admission is not None else Admission(),

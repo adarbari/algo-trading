@@ -414,3 +414,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: a gate that cannot be read on the launch day would leave the edge with no events; the established O2 gate keeps the short side a liquid-name test, at the cost of a small count, which the edge's notes disclose.
+
+## 2026-10-21 | Remote-client load PR (early start) | Entry-static-imports waiver of 200 B
+- Question: starting a trader page's reads at start-up beside the viewer (one round trip less for a distant client) puts a one-line dynamic import in the entry, about 90 B gzip over a static-imports budget with about 35 B of margin; cut elsewhere or waive?
+- Options: cut elsewhere in the entry / waive the shared rule for this PR by up to 200 B / drop the early start.
+- Decision: owner waiver of the shared rule for the entry static imports budget only, ceiling 196390 B through the `waivers` map; the budget is set to 196290 B (CI measures about 93 B above a laptop); every other budget unchanged.
+- decided by: owner
+- status: final
+- Reasoning: a distant client (India, 250-300 ms) pays one round trip for the viewer before the page's reads leave; the owner asked on 2026-10-21 for load time to hold on other continents.

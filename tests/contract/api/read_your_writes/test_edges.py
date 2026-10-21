@@ -1,6 +1,6 @@
 """Read-your-writes of the edge write routes (ADR 0077 decision 16): copy, save, delete, state
 and evaluate change what ``EdgesPage`` and ``PublishedEdge`` (cached per user) serve on the very
-next read. Every test runs with and without the process-local write epoch (``conftest``)."""
+next read."""
 
 import time
 from collections.abc import Iterator

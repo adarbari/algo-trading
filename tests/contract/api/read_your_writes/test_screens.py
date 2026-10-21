@@ -1,6 +1,6 @@
 """Read-your-writes of ``POST /screens/{id}/run`` (ADR 0077 decision 16): once the on-request run
 is stored, the next ``ScreenerResults`` read (a run operation, keyed on the runs generation) shows
-it. Every test runs with and without the process-local write epoch."""
+it."""
 
 import time
 from collections.abc import Iterator
