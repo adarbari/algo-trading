@@ -23,7 +23,7 @@ was allocated, touched and then kept (freed to the allocator, not the OS, or sti
 
 **1. A session partition of `results/rule_screen` is 940 run files and 12.6 million rows; every
 read decodes all of them, merges, and keeps one tenth.**
-`services/read/screens/runs.py` `screen_rows` -> `partition()` -> `table_range` ->
+`services/read/screens/runs.py` `screen_rows` (before P2b; now `run_summaries`) -> `partition()` -> `table_range` ->
 `LocalBackend._partition`: a `merge` table reads *every* run of the partition (`select_runs`),
 `concat`s them in Arrow, `merge_rows` (latest run wins per key), then `to_frame`. The session
 2026-10-19 holds 112 screen configs with up to 10 runs each (reruns and backfills; nothing

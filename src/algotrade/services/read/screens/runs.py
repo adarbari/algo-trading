@@ -24,6 +24,9 @@ import pandas as pd
 from algotrade.services.read.availability.cause import Unavailable, run_cause
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import (
+    DICT_BASE_BYTES,
+    DICT_ENTRY_BYTES,
+    NUMBER_BYTES,
     ReadContext,
     at_session,
     partition,
@@ -35,7 +38,7 @@ from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import result_table
 
 RULE_SCREEN = result_table("rule_screen")
-# ``screen_rows`` reads these (a ``ScreenerRun`` is built from them), column-pruned (the row key
+# ``run_summaries`` reads these (a ``ScreenerRun`` is built from them), column-pruned (the row key
 # and the point-in-time columns come with them); ``run_rows`` reads ``RUN_COLUMNS`` of one run's
 # own file, and ``load_results`` the heavier ``DETAIL_COLUMNS`` of the instruments a page asks for.
 ROW_COLUMNS = ("user_id", "config_id", "config_version", "decision", "regime")
@@ -117,13 +120,61 @@ class LatestRun:
     not_run: Unknown | None
 
 
-def screen_rows(ctx: ReadContext) -> pd.DataFrame | Unknown:
-    """Every rule screen's rows for the session (column-pruned), read once per publish."""
-    key = ("rule_screen", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
-    # key read first (ADR 0022)
-    found: pd.DataFrame | Unknown = ctx.cache.get_or_compute(
-        key, lambda: partition(ctx, RULE_SCREEN, ROW_COLUMNS, newest_runs=True)
-    )
+@dataclass(frozen=True)
+class RunSummary:
+    """What a screener's newest run says about itself in the rows it stored: its ``run_id``, when
+    it was known, the version that ran, its decisions counted (most first) and the regime it
+    stamped. The part of a ``ScreenerRun`` that comes from the rows, not from the run record."""
+
+    run_id: str
+    knowledge_ts: datetime
+    config_version: int | None
+    decisions: tuple[DecisionCount, ...]
+    regime: str | None
+
+    def weight_bytes(self) -> int:
+        """About what it holds (``weigh``'s prices: strings, numbers, slots)."""
+        return (
+            weigh(self.run_id)
+            + weigh(self.regime or "")
+            + 3 * NUMBER_BYTES
+            + sum(weigh(d.decision) + NUMBER_BYTES + DICT_BASE_BYTES for d in self.decisions)
+        )
+
+
+class RunSummaries:
+    """The newest run of each (owner, config) for one publish (``run_summaries``): a few hundred
+    bytes each, never the rows they were counted from."""
+
+    def __init__(self, by_key: Mapping[RunKey, RunSummary]) -> None:
+        self.by_key = by_key
+
+    def weight_bytes(self) -> int:
+        return sum(
+            weigh(owner) + weigh(config) + s.weight_bytes() + DICT_ENTRY_BYTES
+            for (owner, config), s in self.by_key.items()
+        )
+
+
+def run_summaries(ctx: ReadContext) -> RunSummaries | Unknown:
+    """Each rule screen's newest run for the session, summarised once per publish and kept in
+    ``ctx.cache`` (read first, ADR 0022): the rows it is counted from (``ROW_COLUMNS`` of every
+    config's newest run, millions of rows on the real store) are dropped as soon as they are, so
+    the cache holds a summary per screener, not a frame. ``Unknown``: no partition."""
+    key = ("run_summaries", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+
+    def build() -> RunSummaries | Unknown:
+        stored = partition(ctx, RULE_SCREEN, ROW_COLUMNS, newest_runs=True)
+        if isinstance(stored, Unknown):
+            return stored
+        return RunSummaries(
+            {
+                (str(o), str(c)): _summary(rows)
+                for (o, c), rows in stored.groupby(["user_id", "config_id"], sort=False)
+            }
+        )
+
+    found: RunSummaries | Unknown = ctx.cache.get_or_compute(key, build)
     return found
 
 
@@ -163,29 +214,40 @@ def last_run_rows(rows: pd.DataFrame) -> tuple[pd.Series, pd.DataFrame]:
     return last, rows[rows["run_id"] == str(last["run_id"])]
 
 
-def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> ScreenerRun:
-    """The run of ``rows`` (one owner's rows of one config) with the latest ``knowledge_ts``."""
+def _summary(rows: pd.DataFrame) -> RunSummary:
+    """The summary of ``rows`` (one owner's rows of one config) by the latest-run rule."""
     last, mine = last_run_rows(rows)
-    run_id = str(last["run_id"])
     counts = mine["decision"].astype(str).value_counts()
-    record = ctx.reader.run(run_id)
-    stats: Mapping[str, Any] = {} if record is None else dict(record.stats)
-    coverage, missing_tables, missing_optional = _coverage(stats)
-    return ScreenerRun(
-        run_id=run_id,
-        config_id=config_id,
-        owner=owner,
-        session=ctx.session.date,
-        status=None if record is None else record.status.value,
+    return RunSummary(
+        run_id=str(last["run_id"]),
         knowledge_ts=pd.Timestamp(last["knowledge_ts"]).to_pydatetime(),
         config_version=_version(last.get("config_version")),
         decisions=tuple(
             DecisionCount(str(d), int(n))
             for d, n in sorted(counts.items(), key=lambda dn: (-int(dn[1]), str(dn[0])))
         ),
-        picked=int(sum(int(n) for d, n in counts.items() if is_picked(str(d)))),
-        paused=int(counts.get(PAUSED, 0)),
         regime=_regime(mine),
+    )
+
+
+def _run(ctx: ReadContext, owner: str, config_id: str, found: RunSummary) -> ScreenerRun:
+    """The screener's run: its summary and its run record."""
+    record = ctx.reader.run(found.run_id)
+    stats: Mapping[str, Any] = {} if record is None else dict(record.stats)
+    coverage, missing_tables, missing_optional = _coverage(stats)
+    counts = {d.decision: d.count for d in found.decisions}
+    return ScreenerRun(
+        run_id=found.run_id,
+        config_id=config_id,
+        owner=owner,
+        session=ctx.session.date,
+        status=None if record is None else record.status.value,
+        knowledge_ts=found.knowledge_ts,
+        config_version=found.config_version,
+        decisions=found.decisions,
+        picked=sum(n for d, n in counts.items() if is_picked(d)),
+        paused=counts.get(PAUSED, 0),
+        regime=found.regime,
         audit=stats,
         coverage=coverage,
         missing_tables=missing_tables,
@@ -197,23 +259,19 @@ def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> Sc
 def load_latest_runs(ctx: ReadContext, keys: Sequence[RunKey]) -> dict[RunKey, LatestRun]:
     """THE latest-run rule for each ``(owner, config id)`` of ``keys``, in one read."""
     day = ctx.session.date.isoformat()
-    stored = screen_rows(ctx)
+    stored = run_summaries(ctx)
     if isinstance(stored, Unknown):
         why = Unknown(UnknownCode.NOT_RUN, stored.cause)
         return {k: LatestRun(None, why) for k in keys}
-    groups = {
-        (str(o), str(c)): rows
-        for (o, c), rows in stored.groupby(["user_id", "config_id"], sort=False)
-    }
     out: dict[RunKey, LatestRun] = {}
     for owner, config_id in keys:
-        rows = groups.get((owner, config_id))
-        if rows is None:
+        found = stored.by_key.get((owner, config_id))
+        if found is None:
             detail = f"{config_id} ({owner}) has no run in {RULE_SCREEN} for {day}"
             cause = run_cause(config_id, detail, ctx.session.date)
             out[(owner, config_id)] = LatestRun(None, Unknown(UnknownCode.NOT_RUN, cause))
         else:
-            out[(owner, config_id)] = LatestRun(_run(ctx, owner, config_id, rows), None)
+            out[(owner, config_id)] = LatestRun(_run(ctx, owner, config_id, found), None)
     return out
 
 
