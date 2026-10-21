@@ -41,7 +41,10 @@ class TableSpec:
     ``runs`` says how a partition's runs combine on read (``RUN_MODES``); ``key``, when set,
     is the table key (``table_key``) instead of the grain's default. ``retention_days``, when
     set, is the default retention window: only such tables may have old partitions purged
-    (``purge_before``); every other table is history, kept forever."""
+    (``purge_before``); every other table is history, kept forever. ``whole_per_group``: each
+    run's file holds its (user, config) group's whole result, so the group's newest run alone
+    answers a read (``TableStore.read_latest_runs``); a table that compaction trims to changed
+    rows (ADR 0078) never sets it."""
 
     name: str
     grain: str
@@ -51,10 +54,17 @@ class TableSpec:
     runs: str = "snapshot"
     key: tuple[str, ...] = ()
     retention_days: int | None = None
+    whole_per_group: bool = False
 
     def __post_init__(self) -> None:
         if self.runs not in RUN_MODES:
             raise ValueError(f"{self.name}: unknown run mode {self.runs!r}")
+        if self.whole_per_group and (
+            self.runs != "merge" or not {"user_id", "config_id"} <= set(self.key)
+        ):
+            raise ValueError(
+                f"{self.name}: whole_per_group needs a merge table keyed by user, config"
+            )
 
     def column(self, name: str) -> Column | None:
         return next((c for c in self.columns if c.name == name), None)
@@ -78,10 +88,11 @@ def fixed(
     runs: str = "snapshot",
     key: tuple[str, ...] = (),
     retention_days: int | None = None,
+    whole_per_group: bool = False,
 ) -> TableSpec:
     spec = TableSpec(
         name, grain, required, columns=columns_of(*columns), runs=runs, key=key,
-        retention_days=retention_days,
+        retention_days=retention_days, whole_per_group=whole_per_group,
     )  # fmt: skip
     undeclared = [c for c in (*COMMON, *required, *key) if spec.column(c) is None]
     if undeclared:

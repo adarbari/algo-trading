@@ -18,7 +18,7 @@ derived."""
 import threading
 from collections import OrderedDict
 from collections.abc import Callable, Hashable, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 from datetime import date
 from functools import cached_property
 from pathlib import Path
@@ -37,13 +37,14 @@ from algotrade.services.licences import held_by
 from algotrade.services.read.availability.cause import UnavailableKind, table_cause
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
 from algotrade.services.read.values import KIND_OF_CODE, Unknown, UnknownCode
-from algotrade.storage.backends.arrow_memory import limit_threads, release_unused
+from algotrade.storage.backends.arrow_memory import limit_threads, release_unused, use_system_pool
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
 
 __all__ = [
     "ConfigStore",
+    "Held",
     "NotFoundError",
     "ReadContext",
     "ResultCache",
@@ -59,9 +60,11 @@ __all__ = [
     "partition_on",
     "previous_session",
     "run_partition",
+    "run_rows_of",
     "served_session",
     "snapshot_on",
     "stored_dates",
+    "use_system_pool",
 ]
 
 
@@ -83,9 +86,13 @@ class Weighted(Protocol):
     def weight_bytes(self) -> int: ...
 
 
-def weigh(value: Any) -> int:
+WEIGH_DEPTH = 6  # how deep ``weigh`` follows containers and dataclasses (a cycle ends there)
+
+
+def weigh(value: Any, depth: int = WEIGH_DEPTH) -> int:
     """About how many bytes ``value`` holds: a DataFrame's buffers, a container's slots
     (``SLOT_BYTES`` each) and what they hold, a string's characters and header, a number; any
+    dataclass instance (a result record) its fields' weights, to a depth of ``WEIGH_DEPTH``; any
     other object weighs nothing (the cache's count bound covers it). Cheap: no deep walk of a
     frame's strings, an object column's cells are priced at ``STRING_CELL_BYTES``. Records (a
     dict per row) are priced too: a page's value rows held as records weighed nothing before."""
@@ -96,18 +103,69 @@ def weigh(value: Any) -> int:
         return int(value.memory_usage(index=True, deep=False).sum()) + (
             STRING_CELL_BYTES * len(value) * objects
         )
+    if depth <= 0:
+        return 0
     if isinstance(value, str):
         return STR_OVERHEAD_BYTES + len(value)
     if isinstance(value, float | int) and not isinstance(value, bool):
         return NUMBER_BYTES
-    if isinstance(value, tuple | list):
-        return SLOT_BYTES * len(value) + sum(weigh(v) for v in value)
+    return _weigh_nested(value, depth)
+
+
+def _weigh_nested(value: Any, depth: int) -> int:
+    """``weigh`` of a tuple, list, dict or dataclass (its fields), one level below ``depth``."""
+    below = depth - 1
+    if isinstance(value, tuple | list | set | frozenset):
+        return SLOT_BYTES * len(value) + sum(weigh(v, below) for v in value)
     if isinstance(value, dict):
         # keys are the few column names every row shares: not priced per row
-        return (
-            DICT_BASE_BYTES + DICT_ENTRY_BYTES * len(value) + sum(weigh(v) for v in value.values())
+        held = sum(weigh(v, below) for v in value.values())
+        return DICT_BASE_BYTES + DICT_ENTRY_BYTES * len(value) + held
+    if is_dataclass(value) and not isinstance(value, type):
+        return DICT_BASE_BYTES + sum(
+            weigh(getattr(value, f.name), below) + SLOT_BYTES for f in fields(value)
         )
     return 0
+
+
+class Held[T]:
+    """Results of one publish, read when first asked for and kept together: one container per
+    (session, view, publish) in ``ctx.cache``, never an entry per item (the cache holds 32). Each
+    item is read once even when threads ask together (a lock per item); the container weighs what
+    its items really take (a running total, ``weigh``) and its owner puts it into the cache again
+    whenever ``get_or_read`` says it grew, so the cache's byte bound sees it."""
+
+    def __init__(self) -> None:
+        self._items: dict[Hashable, T] = {}
+        self._bytes = 0  # what the items weigh: only grows
+        self._lock = threading.Lock()
+        self._flights: dict[Hashable, threading.Lock] = {}
+
+    def get_or_read(self, key: Hashable, read: Callable[[], T]) -> tuple[T, bool]:
+        """The item under ``key``, read once; -> (item, read just now)."""
+        with self._lock:
+            if key in self._items:
+                return self._items[key], False
+            flight = self._flights.setdefault(key, threading.Lock())
+        try:
+            with flight:
+                with self._lock:
+                    if key in self._items:
+                        return self._items[key], False
+                found = read()
+                weight = weigh(found)  # outside the lock: weighing a frame is not free
+                with self._lock:
+                    self._items[key] = found
+                    self._bytes += weight
+                return found, True
+        finally:
+            with self._lock:
+                if self._flights.get(key) is flight:  # not a newer caller's
+                    del self._flights[key]
+
+    def weight_bytes(self) -> int:
+        with self._lock:
+            return self._bytes
 
 
 class ResultCache:
@@ -161,8 +219,10 @@ class ResultCache:
             return self._items[key]
 
     def put(self, key: Hashable, value: Any) -> None:
-        weight = value.weight_bytes() if isinstance(value, Weighted) else weigh(value)
         with self._lock:
+            # weighed under the lock: a container two threads add to is put by both, and the
+            # later put must not record the older (smaller) weight
+            weight = value.weight_bytes() if isinstance(value, Weighted) else weigh(value)
             self._held -= self._weights.pop(key, 0)
             self._items[key] = value
             self._items.move_to_end(key)
@@ -332,11 +392,15 @@ def partition(
     table: str,
     columns: Sequence[str] | None = None,
     instruments: Sequence[str] | None = None,
+    newest_runs: bool = False,
 ) -> pd.DataFrame | Unknown:
     """``table``'s partition for exactly ``ctx.session.date``, else ``Unknown(NO_PARTITION)``;
     never an older partition. ``columns``: only these (plus the row key and the point-in-time
     columns); ``instruments``: only their rows (a stored partition with none of them is an
-    empty frame, not UNKNOWN). ``ValueError`` for a table that is not session grain (snapshot,
+    empty frame, not UNKNOWN). ``newest_runs``: only each (user, config)'s newest run's rows,
+    for a table whose runs each hold their config's whole result (``read_latest_runs``, ADR 0029
+    amendment): what every reader of the screen tables takes from the merge anyway.
+    ``ValueError`` for a table that is not session grain (snapshot,
     event, issuer-dated and incremental tables have their own rule: ``session.grain_of``)."""
     grain = grain_of(table)
     if grain is not Grain.SESSION:
@@ -346,6 +410,9 @@ def partition(
         UnknownCode.NO_PARTITION,
         table_cause(table, f"{table} has no partition for {day.isoformat()}", session=day),
     )
+    if newest_runs:
+        latest = ctx.reader.read_latest_runs(table, day, columns=columns, instruments=instruments)
+        return absent if latest is None else latest
     if columns is None and instruments is None:
         whole = ctx.reader.table(table, day)
         return absent if whole is None else whole
@@ -359,15 +426,49 @@ def partition(
     return found
 
 
-def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | None:
+def _run_file_rows(
+    ctx: Stores,
+    table: str,
+    day: date,
+    run_id: str,
+    columns: Sequence[str] | None,
+    instruments: Sequence[str] | None,
+    why: str,
+) -> pd.DataFrame | None:
+    """One run's own rows of the session-grain ``table`` on ``day`` (``read_run``: only that run's
+    file, ADR 0064); ``None``: it has none. ``ValueError`` for a table that is not session grain."""
+    grain = grain_of(table)
+    if grain is not Grain.SESSION:
+        raise ValueError(f"{table} is {grain} grain: {why}")
+    return ctx.reader.read_run(table, day, run_id, columns, instruments)
+
+
+def run_rows_of(
+    ctx: ReadContext,
+    table: str,
+    run_id: str,
+    columns: Sequence[str] | None = None,
+    instruments: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """The rows run ``run_id`` stored in ``table`` for ``ctx.session.date`` (only ``columns`` and
+    ``instruments``, when given), reading only that run's file: what one run's reader needs, not
+    the session's every run. An empty frame when the run has none there."""
+    found = _run_file_rows(
+        ctx, table, ctx.session.date, run_id, columns, instruments, "read it by its own rule"
+    )
+    return pd.DataFrame(columns=["instrument_id", *(columns or ())]) if found is None else found
+
+
+def run_partition(
+    ctx: Stores, table: str, run: RunRecord, columns: Sequence[str] | None = None
+) -> pd.DataFrame | None:
     """The rows ``run`` wrote to the session-grain ``table`` (a ``results/*`` table it
     publishes to its own end session), read as the run left them whatever later run shares
     the partition (``read_run``: only that run's file, ADR 0064). ``None``: nothing
     stored for it. ``ValueError`` for a table that is not session grain."""
-    grain = grain_of(table)
-    if grain is not Grain.SESSION:
-        raise ValueError(f"{table} is {grain} grain: a run's results are session grain")
-    return ctx.reader.read_run(table, run.session_date, run.run_id)
+    return _run_file_rows(
+        ctx, table, run.session_date, run.run_id, columns, None, "a run's results are session grain"
+    )
 
 
 # ---------------------------------------------------------------------------- inventory

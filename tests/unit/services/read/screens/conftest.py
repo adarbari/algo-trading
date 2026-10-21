@@ -71,8 +71,10 @@ def write_run(
     config_id: str,
     rows: list[tuple[str, str, float | None, float | None]],
     knowledge: datetime = T,
+    pending: bool = False,
 ) -> None:
-    """``rows``: (symbol, decision, score, tie-break), ranked in the order given."""
+    """``rows``: (symbol, decision, score, tie-break), ranked in the order given. ``pending``: not
+    committed yet (visible to a reader that includes the run)."""
     frame = [
         {"instrument_id": f"EQ:{s}", "user_id": owner, "config_id": config_id,
          "config_version": 1, "config_hash": "h", "decision": d, "score": sc, "rank": n,
@@ -80,7 +82,9 @@ def write_run(
          "failed": "", "near_missed": "", "missing": ""}
         for n, (s, d, sc, tb) in enumerate(rows, start=1)
     ]  # fmt: skip
-    writer.write_result("rule_screen", day, run_id, stamped(frame, day, run_id, knowledge))
+    writer.write_result(
+        "rule_screen", day, run_id, stamped(frame, day, run_id, knowledge), pending=pending
+    )
 
 
 def _values(writer: StoreWriter) -> None:
@@ -100,6 +104,11 @@ def _values(writer: StoreWriter) -> None:
 
 @pytest.fixture
 def backend() -> MemoryBackend:
+    return screens_store()
+
+
+def screens_store() -> MemoryBackend:
+    """The small store of this folder's tests (also built by the warm-path test)."""
     store = MemoryBackend()
     w = StoreWriter(store)
     write_reference(w, D0, {s: f"EQ:{s}" for s in SYMBOLS})

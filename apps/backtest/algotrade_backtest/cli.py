@@ -108,6 +108,20 @@ def build_parser() -> argparse.ArgumentParser:
         "(ADR 0063; the default is incremental)",
     )
     ee.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="evaluate this many edges at once on worker processes (default 1: one at a time); "
+        "each takes up to about 1 GB, so keep it under the free memory (ADR 0059 amendment)",
+    )
+    ee.add_argument(
+        "--no-screen-cache",
+        action="store_true",
+        help="do not share the screens of a config used by several edges between them "
+        "(scratch in $TMPDIR, about 70 KB per config and session, deleted at the end; "
+        "a killed run leaves it; ADR 0059 amendment)",
+    )
+    ee.add_argument(
         "--extra-baseline",
         action="append",
         default=[],

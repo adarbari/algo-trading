@@ -13,11 +13,16 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from algotrade.services.jobs.exclusive import claim_edge_eval
+from algotrade.storage.backends.local import LocalBackend
 from algotrade_backtest.cli import build_parser, main
+from algotrade_backtest.commands import _evaluate_edges_pooled, _screen_scratch
 from algotrade_ingestion.cli.main import main as ingest_main
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 
@@ -240,6 +245,55 @@ def test_evaluate_edges_takes_a_split_flag_that_is_a_date(cli: Cli) -> None:
 def test_evaluate_edges_takes_a_full_flag_that_defaults_off() -> None:
     parse = build_parser().parse_args
     assert parse(["evaluate-edges", "--full"]).full and not parse(["evaluate-edges"]).full
+
+
+def test_evaluate_edges_screen_cache_is_off_for_one_edge_by_flag_and_on_a_full_disk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The screen cache's scratch directory exists only for a multi-edge run that wants it."""
+    parse = build_parser().parse_args
+    two, one = ["a", "b"], ["a"]
+    assert _screen_scratch(parse(["evaluate-edges"]), None, one) is None
+    assert _screen_scratch(parse(["evaluate-edges", "--no-screen-cache"]), None, two) is None
+    usage = shutil.disk_usage
+    monkeypatch.setattr(shutil, "disk_usage", lambda _p: usage(".")._replace(free=1024**4))
+    scratch = _screen_scratch(parse(["evaluate-edges"]), None, two)
+    assert scratch is not None and scratch.is_dir()
+    scratch.rmdir()
+    monkeypatch.setattr(shutil, "disk_usage", lambda _p: usage(".")._replace(free=1024**3))
+    assert _screen_scratch(parse(["evaluate-edges"]), None, two) is None  # under 5 GB free
+
+
+def test_evaluate_edges_jobs_is_a_positive_number_over_a_file_store(cli: Cli) -> None:
+    parse = build_parser().parse_args
+    assert (
+        parse(["evaluate-edges"]).jobs == 1 and parse(["evaluate-edges", "--jobs", "4"]).jobs == 4
+    )
+    zero = cli("evaluate-edges", "--jobs", "0")
+    assert zero.returncode == 2 and "--jobs" in zero.stderr
+    memory = cli("--data-url", "memory://", "evaluate-edges", "--jobs", "2")
+    assert memory.returncode == 2 and "file:// store" in memory.stderr
+
+
+def test_a_pooled_run_refuses_the_edges_of_a_busy_owner_and_goes_on(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """As the serial path: the owner someone else is evaluating for is reported edge by edge."""
+    backend = LocalBackend(tmp_path / "data")
+    edges = [SimpleNamespace(id="a", owner="site"), SimpleNamespace(id="b", owner="site")]
+    args = build_parser().parse_args(["evaluate-edges", "--jobs", "2"])
+    with claim_edge_eval(backend, "site"):  # another caller holds the owner's slot
+        reports, failed, metrics = _evaluate_edges_pooled(
+            backend,
+            edges,
+            args,
+            ("2026-01-01", "2026-02-01", datetime(2026, 3, 1, tzinfo=UTC)),
+            None,
+            (),
+        )
+    err = capsys.readouterr().err
+    assert failed and reports == [] and metrics == {}
+    assert "error: a (site)" in err and "error: b (site)" in err
 
 
 def test_study_winners_needs_the_stored_history_and_draft_edges_a_known_run(cli: Cli) -> None:

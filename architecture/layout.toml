@@ -405,7 +405,7 @@ purpose = "the portfolio_return outcome of the edge harness (ADR 0074): the weig
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reads"
-purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 0063): each screener's run, the regime label, the eligible names per universe, the implied vol, the picks' ADV at D and the scored outcomes, cached until a chunk of sessions is released (session.py), and the implied vol of names at a session (implied_at, also the paper record's)"
+purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 0063): each screener's run, the regime label, the eligible names per universe, the implied vol, the picks' ADV at D and the scored outcomes, cached until a chunk of sessions is released (session.py), the implied vol of names at a session (implied_at, also the paper record's), and the screens the edges of one CLI run share through a scratch cache of pickles (screens.py, ADR 0059 amendment 2026-10-20)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reporting"
@@ -461,7 +461,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/services/jobs"
-purpose = "long-running work as jobs: runner, models, handlers, exclusive runs and claims"
+purpose = "long-running work as jobs: runner, models, handlers, exclusive runs and claims, and the worker processes of a parallel edge evaluation (edge_pool.py)"
 contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
 
 [[dir]]

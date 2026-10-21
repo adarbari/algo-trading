@@ -70,3 +70,52 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
   by `job_name`. No new table. A run written before this has no trigger: the read model and
   GraphQL (`EdgeRun.trigger`, `EdgeRun.legacyOwner`) serve null, never an invented value.
 - Guide terms "Who may run what" and "Run trigger" explain both to users (ADR 0051).
+
+## Amendment 2026-10-20: the edges of one CLI run share their screens
+
+Profile of a full evaluation (`docs/perf/edge-eval-speed-spike.md`): 56-80% of an edge's CPU is
+screening, and the 70 edges name 195 screener and baseline slots over 79 distinct configs
+(`size_small` in 48 edges, `momentum_12_1` in 40). A screener's run at a session depends on its
+config and the session, not on the edge.
+
+- **A scratch cache of screens per CLI run** (`reads/screens.py`, `ScreenCache`). `evaluate-edges` over
+  more than one edge computes which (owner, config hash) pairs more than one edge uses
+  (`harness.screen_uses`) and keeps only those screens, one pickle per (owner, config, session)
+  in a temporary directory the command creates and deletes (`--no-screen-cache` opts out; none
+  with under 5 GB free). It is scratch, not a store (ADR 0005 is unchanged): written atomically,
+  read by no other process and never outliving the run.
+- **Leg reuse cannot tell a hit from a computed screen** (ADR 0063). The entry carries the reads
+  the screen logged and the commit sequence it started at; a hit replays them into the edge's own
+  recording reader (`RecordingReader.capture` / `replay`) and the day's `inputs_seq` becomes the
+  earlier of the edge's own and the entry's, so a partition committed between the first
+  computation and a hit is never read as unchanged. A session lost to a missing table is not
+  cached (it is recomputed and counted by each edge).
+- Memory does not grow with the range: entries live on disk, a hit reads one file.
+
+### Amendment 2026-10-20 (continued): `evaluate-edges --jobs N`
+
+The 70-edge evaluation is CPU-bound in one process (measured 2.9x on 6 processes while a
+backfill loaded the machine). `--jobs N` (default 1: the existing serial path) runs the edges
+on N worker processes (`services/jobs/edge_pool.py`, spawned, each opening the store and configs
+itself; a `file://` store only).
+
+- **One claim per owner, held by the parent for the whole run** (not per edge): the parent takes
+  `claim_edge_eval(owner)` for every distinct owner of the edges, so the API, the nightly and a
+  second CLI are refused exactly as during a serial run; the workers run their `edge-eval` jobs
+  without claiming. The claim key stays `edge-eval:<owner>`: no per-edge key, so nothing lets the
+  API and a worker evaluate the same edge together.
+- **Why the workers cannot collide**: a worker's trials are its edge's own (`harness._prior_trials`),
+  a leg row carries the edge and user, results are written in one publish block per edge and
+  commits serialise on the store's commit lock; a run's pending journal is aborted only by the
+  retention purge of the nightly (`purge_pending_before`), which is the same exposure a serial run
+  has. Workers share the screen cache directory (same amendment); a pickle is written by
+  rename, so two workers computing one screen both write a complete file.
+- **Results equal the serial run's**: `tests/unit/services/jobs/test_edge_pool.py` compares the
+  stored rows of two edges on two workers with the same two edges one after the other.
+- **Memory**: a worker takes 0.3-1 GB (measured on 10-85 session windows); `--jobs` is the
+  caller's choice (6 on the owner's 16 GB Mac).
+- **Failure and refusal as the serial path**: an owner someone else is evaluating for is refused
+  edge by edge (`EdgeEvalBusyError`, exit 2) while the other owners' edges run; a worker that
+  raises or dies is that edge's failed outcome (the other results are kept) and the `edge-eval` job
+  records it left running are failed by the parent, which still holds the claims, for the run's own
+  owners and edges only. Each worker gets its share of the cores for BLAS and Arrow threads.

@@ -48,6 +48,7 @@ from algotrade.storage.backends.arrow import (
     keep_columns,
     parquet_bytes,
     row_groups_holding,
+    table_spec,
     to_arrow,
     to_frame,
 )
@@ -77,8 +78,10 @@ from algotrade.storage.backends.run_compaction import (
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
+    keep_newest_runs,
     max_seq,
     merge_rows,
+    newest_run_per_group,
     pinned_read,
     run_mode,
     select_instruments,
@@ -231,8 +234,79 @@ class LocalTables:
         )
         return None if data is None else select_instruments(to_frame(data), instruments)
 
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+        own_run: str | None = None,
+        upto: int | None = None,
+    ) -> pd.DataFrame | None:
+        spec = table_spec(table)
+        if spec is None or not spec.whole_per_group:
+            raise ValueError(f"{table}: a run's file is not its group's whole result")
+        wanted = None if columns is None else [*columns, *group]
+
+        def at(seq: int) -> pd.DataFrame | None:
+            return self._latest_runs(table, session_date, group, wanted, instruments, own_run, seq)
+
+        if upto is not None:
+            return at(upto)
+        return pinned_read(at, self.commits.published, self.commits.no_commits)
+
+    def _latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str],
+        columns: Sequence[str] | None,
+        instruments: Sequence[str] | None,
+        own_run: str | None,
+        upto: int,
+    ) -> pd.DataFrame | None:
+        """Choose and read inside one pinned sequence: the runs ``select_runs`` would merge, each
+        group's newest of them by the files' footer statistics, only those files decoded. A
+        restating run among them, or a file whose groups the statistics cannot name exactly, reads
+        the whole merge and keeps each group's newest run from its rows (same rows either way)."""
+        directory = self._dir(table, session_date)
+        entries = visible_entries(read_index(directory), upto)
+        own = self._own(table, session_date, own_run)
+        if own_run is not None and own is not None:
+            entries[own_run] = own
+        runs = select_runs(entries, None, run_mode(table))
+        if not runs:
+            return None
+        try:
+            held = {
+                run: None
+                if entries[run].restates
+                else _file_groups(directory / run_file(run, entries[run]), group)
+                for run in runs
+            }
+            newest = newest_run_per_group(runs, held)
+            if newest is None:
+                data = self._partition(table, session_date, None, None, own_run, upto, columns)
+                frame = keep_newest_runs(to_frame(data), group, runs) if data is not None else None
+                return None if frame is None else select_instruments(frame, instruments)
+            chosen = [run for run in runs if run in set(newest.values())]
+            parts = [
+                _read_file(directory / run_file(run, entries[run]), instruments, columns)
+                for run in chosen
+            ]
+        except FileNotFoundError as gone:  # a commit replaced the version and removed its file
+            raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
+        return to_frame(concat(table, parts))
+
     def read_run(
-        self, table: str, session_date: date, run_id: str, own_run: str | None = None
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        own_run: str | None = None,
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         directory = self._dir(table, session_date)
 
@@ -245,7 +319,9 @@ class LocalTables:
             if entry is None:
                 return None
             try:
-                return _read_run_file(directory / run_file(run_id, entry), run_id)
+                return _read_run_file(
+                    directory / run_file(run_id, entry), run_id, columns, instruments
+                )
             except FileNotFoundError as gone:  # a commit replaced the version
                 raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
 
@@ -345,9 +421,17 @@ class LocalTables:
         base = self.root / table
         out: dict[date, int] = {}
         published = self.commits.published()  # before the indexes: a later commit is not seen
-        for day in sorted(base.glob("date=*")) if base.exists() else []:
-            when = date.fromisoformat(day.name.removeprefix("date="))
-            if start <= when <= end and (day / INDEX).exists():
+        if not base.exists():
+            return out
+        wanted = []
+        with os.scandir(base) as entries:  # names only: no Path built or sorted per directory
+            for entry in entries:
+                if entry.name.startswith("date="):
+                    when = date.fromisoformat(entry.name.removeprefix("date="))
+                    if start <= when <= end:
+                        wanted.append((when, base / entry.name))
+        for when, day in sorted(wanted):
+            if (day / INDEX).exists():
                 out[when] = max_seq(read_index(day), published)
         return out
 
@@ -509,15 +593,56 @@ def _read_file(
     return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
 
 
-def _read_run_file(path: Path, run_id: str) -> pa.Table:
-    """One version file's rows stamped ``run_id``: the row groups whose ``run_id`` statistics
-    cannot hold it are skipped (not decoded), then the rest is filtered exactly."""
+def _file_groups(path: Path, group: Sequence[str]) -> set[tuple[object, ...]] | None:
+    """The groups (values of the ``group`` columns) a version file holds, from its footer alone:
+    every row group's statistics must name one value per column (min == max). ``None``: a column
+    missing, a row group without statistics, or one holding two values (the caller falls back)."""
     with pq.ParquetFile(path) as parquet:
+        meta = parquet.metadata
+        at = {meta.schema.column(i).path: i for i in range(meta.num_columns)}
+        if any(name not in at for name in group):
+            return None
+        found: set[tuple[object, ...]] = set()
+        for number in range(meta.num_row_groups):
+            values = []
+            for name in group:
+                stats = meta.row_group(number).column(at[name]).statistics
+                if stats is None or not stats.has_min_max or stats.min != stats.max:
+                    return None
+                values.append(stats.min)
+            found.add(tuple(values))
+        return found
+
+
+def _read_run_file(
+    path: Path,
+    run_id: str,
+    columns: Sequence[str] | None = None,
+    instruments: Sequence[str] | None = None,
+) -> pa.Table:
+    """One version file's rows stamped ``run_id``: the row groups whose ``run_id`` statistics
+    cannot hold it (nor, with ``instruments``, any of them in ``instrument_id``) are skipped
+    (not decoded), then the rest is filtered exactly. ``columns``: only those and
+    ``keep_columns`` are decoded."""
+    with pq.ParquetFile(path) as parquet:
+        keep = None if columns is None else keep_columns(columns)
+        present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
         if "run_id" not in parquet.schema_arrow.names:
-            return parquet.read()
+            return parquet.read(columns=present)
         groups = row_groups_holding(parquet, "run_id", [run_id])
-        data = parquet.read_row_groups(groups) if groups else parquet.schema_arrow.empty_table()
-    return data.filter(pc.equal(data.column("run_id"), run_id))
+        if instruments is not None and "instrument_id" in parquet.schema_arrow.names:
+            near = set(row_groups_holding(parquet, "instrument_id", instruments))
+            groups = [g for g in groups if g in near]
+        data = (
+            parquet.read_row_groups(groups, columns=present)
+            if groups
+            else parquet.schema_arrow.empty_table().select(present or parquet.schema_arrow.names)
+        )
+    data = data.filter(pc.equal(data.column("run_id"), run_id))
+    if instruments is None:
+        return data
+    ids = data.column("instrument_id")
+    return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
 
 
 class LocalRaw:

@@ -199,7 +199,7 @@ def test_it_runs_the_extra_steps_after_the_screen_rows_and_before_the_market_fra
 
         return run
 
-    monkeypatch.setattr(warm, "screen_rows", lambda c: ran.append("rows"))
+    monkeypatch.setattr(warm, "run_summaries", lambda c: ran.append("rows"))
     monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
     monkeypatch.setattr(warm, "load_completeness", lambda c, n: None)
     monkeypatch.setattr(warm, "load_regime", lambda c: None)
@@ -221,7 +221,7 @@ def test_it_warms_what_the_ideas_page_reads(monkeypatch: pytest.MonkeyPatch) -> 
     (the regime strip and the status strip need them too)."""
     ran: list[str] = []
     monkeypatch.setattr(warm, "load_screeners", lambda c: ran.append("screeners"))
-    monkeypatch.setattr(warm, "screen_rows", lambda c: None)
+    monkeypatch.setattr(warm, "run_summaries", lambda c: None)
     monkeypatch.setattr(warm, "warm_market_frames", lambda c: None)
     monkeypatch.setattr(warm, "load_completeness", lambda c, n: None)
     monkeypatch.setattr(warm, "load_regime", lambda c: None)
@@ -235,7 +235,7 @@ def test_it_warms_what_the_ideas_page_reads(monkeypatch: pytest.MonkeyPatch) -> 
 def test_warm_home_reads_only_the_home_steps(monkeypatch: pytest.MonkeyPatch) -> None:
     """What the app's start waits for: the home page's reads, never the market frames."""
     ran: list[str] = []
-    for name in ("load_screeners", "screen_rows", "load_regime", "load_edge_desk"):
+    for name in ("load_screeners", "run_summaries", "load_regime", "load_edge_desk"):
         monkeypatch.setattr(warm, name, lambda c, _n=name: ran.append(_n))
     monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append("load_completeness"))
     monkeypatch.setattr(warm, "load_ideas", lambda c, n: ran.append("load_ideas"))
@@ -285,7 +285,7 @@ def test_it_warms_the_admin_ingestion_grid_after_the_home_steps_not_before_servi
     """The Admin Ingestion page's 10-session grid (3 s of partition reads cold) is warmed by the
     task after the start, never by the home warm-up the start waits for."""
     ran: list[str] = []
-    for name in ("load_screeners", "screen_rows", "load_regime", "load_edge_desk"):
+    for name in ("load_screeners", "run_summaries", "load_regime", "load_edge_desk"):
         monkeypatch.setattr(warm, name, lambda c, _n=name: ran.append(_n))
     monkeypatch.setattr(warm, "load_ideas", lambda c, n: ran.append("load_ideas"))
     monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append(f"grid {n}"))
@@ -323,3 +323,24 @@ def test_every_shipped_edge_loads_through_the_warm_path() -> None:
     ctx = open_stores(StoreReader(MemoryBackend()), store, UserContext(SITE_USER))
     shipped = {p.parent.name for p in (REPO_ROOT / "config/site/edges").glob("*/edge.toml")}
     assert shipped and {e.id for e in load_edges(ctx)} == shipped
+
+
+def test_each_warmed_step_logs_the_process_footprint(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # 2026-10-20: one warm took the API to 36 GB and no log line said which step grew it.
+    sizes = iter([1200.0, 36864.0])
+    monkeypatch.setattr(warm, "_footprint", lambda: next(sizes))
+    with caplog.at_level("INFO"):
+        warm._run([("small", lambda: None), ("market frames", lambda: None)])
+    assert "warmed small in" in caplog.text and "footprint 1200 MB" in caplog.text
+    assert "warmed market frames in" in caplog.text and "footprint 36864 MB" in caplog.text
+
+
+def test_a_step_logs_without_a_figure_when_the_probe_reads_nothing(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(warm, "_footprint", lambda: None)
+    with caplog.at_level("INFO"):
+        warm._run([("a", lambda: None)])
+    assert "warmed a in" in caplog.text and "footprint" not in caplog.text

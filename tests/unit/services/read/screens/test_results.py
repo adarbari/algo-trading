@@ -82,13 +82,13 @@ def test_the_value_rows_of_a_page_are_read_once_per_published_state(
     run = latest_run(ctx, "site", "alpha").run
     assert run is not None
     read: list[str] = []
-    real = results.partition
+    real = results.run_rows_of
 
-    def counting(c: ReadContext, table: str, *args: Any) -> Any:
+    def counting(c: ReadContext, table: str, *args: Any, **kwargs: Any) -> Any:
         read.append(table)
-        return real(c, table, *args)
+        return real(c, table, *args, **kwargs)
 
-    monkeypatch.setattr(results, "partition", counting)
+    monkeypatch.setattr(results, "run_rows_of", counting)
     first = load_results(ctx, {"r1": ["EQ:AAA"]}, [run])
     assert load_results(replace(ctx, memo={}), {"r1": ["EQ:AAA"]}, [run]) == first
     assert len(read) == 1  # another request, the same answer, nothing read
@@ -100,22 +100,25 @@ def test_the_value_rows_of_a_page_are_read_once_per_published_state(
     assert len(read) == 3
 
 
-def test_a_runs_rows_are_filtered_once_per_request(
+def test_a_runs_rows_are_read_once_per_publish_for_every_request(
     ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     run = latest_run(ctx, "site", "alpha").run
     assert run is not None
-    filtered: list[str] = []
-    real = runs.screen_rows
+    read: list[str] = []
+    real = runs.run_rows_of
 
-    def counting(c: ReadContext) -> Any:
-        filtered.append(c.session.date.isoformat())
-        return real(c)
+    def counting(c: ReadContext, table: str, run_id: str, *args: Any) -> Any:
+        read.append(run_id)
+        return real(c, table, run_id, *args)
 
-    monkeypatch.setattr(runs, "screen_rows", counting)
+    monkeypatch.setattr(runs, "run_rows_of", counting)
     first = runs.run_rows(ctx, run)
-    assert runs.run_rows(ctx, run) is first and len(filtered) == 1
-    assert runs.run_rows(replace(ctx, memo={}), run) is not first  # another request: its own
+    assert runs.run_rows(ctx, run) is first and read == ["r1"]
+    assert runs.run_rows(replace(ctx, memo={}), run) is first  # another request: the same rows
+    seq = ctx.reader.visible_seq()
+    monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
+    assert runs.run_rows(ctx, run) is not first and read == ["r1", "r1"]
 
 
 def test_nothing_asked_reads_nothing(ctx: ReadContext) -> None:

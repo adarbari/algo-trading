@@ -272,3 +272,22 @@ def test_a_short_range_probes_its_days_and_reads_what_the_listing_reads(
     assert listed is not None and probed is not None and len(probed) > 12
     pd.testing.assert_frame_equal(probed, listed, check_exact=True)
     assert tables.read_range(TABLE, date(1990, 1, 1), date(1990, 1, 5)) is None  # no partition
+
+
+def test_partition_seq_equals_the_sorted_glob_it_replaced(tmp_path: Path) -> None:
+    """``partition_seq`` filters directory names by date before touching any path: the same
+    dict, in ascending date order, as the glob over every partition directory it replaced, with
+    out-of-range days, an unindexed day and stray entries around."""
+    backend = _write(tmp_path / "data", 30)
+    base = tmp_path / "data" / "tables" / TABLE
+    (base / f"date={(START + timedelta(days=40)).isoformat()}").mkdir()  # a day with no index
+    (base / "notes.txt").write_text("x")
+    start, end = START + timedelta(days=5), START + timedelta(days=20)
+    published = backend.tables.commits.published()
+    old = {}
+    for day in sorted(base.glob("date=*")):
+        when = date.fromisoformat(day.name.removeprefix("date="))
+        if start <= when <= end and (day / local.INDEX).exists():
+            old[when] = local.max_seq(local.read_index(day), published)
+    found = backend.tables.partition_seq(TABLE, start, end)
+    assert found == old and list(found) == sorted(found) and len(found) == 16

@@ -2,12 +2,16 @@
 days beside a committing writer, a killed worker, an ingest lock taken mid-run, SIGTERM, a worker
 that goes silent or raises, and readers that never notice the sweeps."""
 
+import json
 import multiprocessing
 import os
 import signal
 import subprocess
+import sys
 import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -371,3 +375,155 @@ def test_a_sigtermed_busy_worker_exits_by_itself_with_143(backend: LocalBackend)
     finally:
         if child.is_alive():
             child.kill()
+
+
+# ------------------------------------------------------- entry points without a main guard
+
+REPO = Path(__file__).resolve().parents[6]
+SCRIPT = """
+import json, sys
+from pathlib import Path
+from algotrade.storage.backends.local import LocalBackend
+from tests.helpers.compaction.store import SESSION, TABLE, context
+from algotrade_ingestion.tasks.maintenance.compaction import task
+
+def go():
+    ctx = context(LocalBackend(Path(sys.argv[1])))
+    record = task.compact(ctx, SESSION, TABLE, workers=2, swap_grace_s=0.0, progress=lambda s: None)
+    print(json.dumps(dict(record.stats), default=str))
+%s
+"""
+GUARDED = 'if __name__ == "__main__":\n    go()'
+UNGUARDED = "go()"  # no guard: a spawn worker re-importing this file would run it all again
+
+
+def run_python(
+    args: list[str], env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    path = os.pathsep.join([str(REPO), os.environ.get("PYTHONPATH", "")])
+    return subprocess.run(
+        [sys.executable, *args],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+        env={**os.environ, "PYTHONPATH": path, **(env or {})},
+    )
+
+
+@pytest.mark.parametrize("main", [GUARDED, UNGUARDED], ids=["guarded", "unguarded"])
+def test_spawn_workers_never_rerun_the_entry_point_script(
+    backend: LocalBackend, tmp_path: Path, main: str
+) -> None:
+    fill(backend, days_from(3))
+    script = tmp_path / "entry.py"
+    script.write_text(SCRIPT % main)
+    done = run_python([str(script), str(backend.root)])
+    assert done.returncode == 0, done.stderr[-2000:]
+    summaries = [ln for ln in done.stdout.splitlines() if ln.startswith("{")]
+    assert len(summaries) == 1  # not once per worker
+    stats = json.loads(summaries[0])
+    assert stats["compacted"] == 3 and "stopped" not in stats
+
+
+def test_the_cli_compacts_through_spawn_workers_and_exits_zero(
+    backend: LocalBackend, tmp_path: Path
+) -> None:
+    fill(backend, days_from(3))
+    site = tmp_path / "config" / "site"
+    site.mkdir(parents=True)
+    (site / "nightly.toml").write_text(
+        f'[compaction]\ntables = ["{TABLE}"]\n[resources]\nmin_free_gb = 0\n'
+    )
+    done = run_python(
+        [
+            "-m",
+            "algotrade_ingestion.cli.main",
+            "--config-dir",
+            str(tmp_path / "config"),
+            "run",
+            "compact-runs",
+            "--table",
+            TABLE,
+            "--date",
+            SESSION.isoformat(),
+            "--workers",
+            "2",
+        ],
+        {"ALGOTRADE_DATA_URL": f"file://{backend.root}"},
+    )
+    assert done.returncode == 0, done.stderr[-2000:] + done.stdout[-2000:]
+    assert json.loads(done.stdout[done.stdout.index("{") :])["compacted"] == 3
+
+
+def test_main_hidden_restores_the_main_module() -> None:
+    main = sys.modules["__main__"]
+    before = (getattr(main, "__file__", None), getattr(main, "__spec__", None))
+    with pool.main_hidden():
+        assert main.__dict__.get("__file__") is None and main.__spec__ is None
+    assert (getattr(main, "__file__", None), getattr(main, "__spec__", None)) == before
+
+
+class BrokenFuture(Future[Outcome]):
+    def __init__(self) -> None:
+        super().__init__()
+        self.set_exception(BrokenProcessPool("a process in the pool was terminated abruptly"))
+
+
+def pool_of(backend: LocalBackend, **kw: Any) -> Pool:
+    return Pool(StoreWriter(backend), plan_for(backend, 2), 0.0, progress=lambda line: None, **kw)
+
+
+def test_collect_after_the_pool_broke_tolerates_the_futures_dropped_with_it(
+    backend: LocalBackend,
+) -> None:
+    job_ = pool_of(backend)
+    first, second = BrokenFuture(), BrokenFuture()
+    job_._flying = {first: (DAYS[0], 0.0), second: (DAYS[1], 0.0)}
+    for future in (first, second):  # the loop collects every future of ``done``
+        job_._collect(future)  # the second was emptied by ``_abort_flying``: no KeyError
+    assert job_._flying == {} and job_._broken
+    assert "a worker process died" in (job_.stopped or "")
+    assert "run again" in (job_.stopped or "") and "__main__" in (job_.stopped or "")
+
+
+class BrokenExecutor(ThreadPoolExecutor):
+    def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Future[Outcome]:
+        return BrokenFuture()
+
+
+def test_a_broken_pool_ends_the_run_partial_and_the_cli_exit_is_nonzero(
+    backend: LocalBackend,
+) -> None:
+    fill(backend, DAYS)
+    record = task.compact(
+        context(backend),
+        SESSION,
+        TABLE,
+        workers=2,
+        swap_grace_s=0.0,
+        make_executor=lambda plan: BrokenExecutor(1),
+        progress=lambda line: None,
+    )
+    stats = record.stats
+    assert record.status == "partial"  # ``run_task_command`` exits 1 unless "complete"
+    assert "a worker process died" in stats["stopped"]
+    assert stats["compacted"] == 0 and leftovers(backend.root) == []
+
+
+@pytest.mark.parametrize("ok_first", [True, False], ids=["ok-first", "broken-first"])
+def test_a_partition_finished_when_the_pool_broke_is_counted_and_swept(
+    backend: LocalBackend, ok_first: bool
+) -> None:
+    job_ = pool_of(backend)
+    swept: list[date] = []
+    job_.sweeper.after_swap = swept.append  # type: ignore[method-assign]
+    ok: Future[Outcome] = Future()
+    ok.set_result(Outcome(DAYS[0], CompactionReport(4, 1, 400, 100, 3), 0.1, "w"))
+    broken = BrokenFuture()
+    job_._flying = {ok: (DAYS[0], 0.0), broken: (DAYS[1], 0.0)}
+    for future in [ok, broken] if ok_first else [broken, ok]:
+        job_._collect(future)
+    assert job_.totals.compacted == 1 and job_._done == 1 and swept == [DAYS[0]]
+    assert job_._flying == {} and job_._broken
+    assert "__main__" not in (job_.stopped or "")  # a partition did complete
