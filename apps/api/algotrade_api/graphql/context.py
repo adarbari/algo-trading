@@ -14,7 +14,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date
-from typing import Any
+from typing import Any, Protocol
 
 from fastapi import Request
 from strawberry.dataloader import DataLoader
@@ -26,13 +26,23 @@ from algotrade.services.read.availability.cause import Cause
 from algotrade.services.read.availability.explain import explain
 from algotrade.services.read.context import NotFoundError, ReadContext, Stores
 from algotrade.services.read.serving.current import CurrentRelease
+from algotrade.services.read.session import Serving
 from algotrade_api.deps import Caller
 from algotrade_api.graphql.loaders import Loaders
 from algotrade_api.graphql.offload import off_loop
 
+
 # Opens the read context for a user and a requested session (None: the latest):
 # ``open_context`` over the app's store, configs and result cache.
-Opener = Callable[[UserContext, date | None], ReadContext]
+class Opener(Protocol):
+    """``open_context`` over the app's store: ``serving`` (the serving release the default session
+    follows, ADR 0077 decision 7) is a keyword."""
+
+    def __call__(
+        self, user: UserContext, requested: date | None, *, serving: Serving | None = None
+    ) -> ReadContext: ...
+
+
 # Opens a user's session-free context (configs, run records, the catalogue): ``open_stores``.
 StoresOpener = Callable[[UserContext], Stores]
 
@@ -55,6 +65,12 @@ class ReleaseReads:
     current: Callable[[], CurrentRelease | None]
     pinned: PinnedOpener
     enabled: Callable[[], bool] = lambda: True
+    # the serving a request follows: its day, the clock and the publishing delay (decision 7)
+    serving: Callable[[CurrentRelease], Serving] | None = None
+
+    def serving_of(self, release: CurrentRelease) -> Serving | None:
+        """What the default session of a request following ``release`` is resolved by."""
+        return None if self.serving is None else self.serving(release)
 
     def resolve(self) -> CurrentRelease | None:
         """The release this request follows, or ``None`` (the live path)."""
@@ -76,14 +92,15 @@ class RequestContext(BaseContext):
         viewer: UserRecord,
         stores: StoresOpener | None = None,
         release: CurrentRelease | None = None,
-        pinned: PinnedOpener | None = None,
+        releases: ReleaseReads | None = None,
         state: Any = None,
+        pin: bool = False,
     ) -> None:
         super().__init__()
         self.viewer = viewer
         # a request answered from a serving release (ADR 0077): every read context is pinned at
         # the release's sequence and the default session is the release's
-        self._release, self._pinned, self._state = release, pinned, state
+        self._release, self._releases, self._state, self._pin = release, releases, state, pin
         self._user = UserContext(viewer.user_id)
         self._open = opener
         self._open_stores = stores
@@ -100,6 +117,11 @@ class RequestContext(BaseContext):
         if self._release is not None:
             return self._release
         return getattr(self._state, "release", None)
+
+    def _pinned(self) -> bool:
+        """Whether this request's reads are pinned at the release's sequence (a listed operation)
+        or only follow its session (every other operation, reading live)."""
+        return self._pin or bool(getattr(self._state, "pinned", False))
 
     def forget_reads(self) -> None:
         """Drop the read contexts opened so far (the router answers this request live after a
@@ -119,17 +141,23 @@ class RequestContext(BaseContext):
         only behind ``AdminCause``, so a trader's request never reads a run record for it."""
         return await self._causes.load(leaf)
 
+    def _open_for(self, requested: date | None) -> ReadContext:
+        """One read context: pinned at the release for a listed operation, live with the
+        release's session as the default for every other, plain ADR 0062 without a release."""
+        release, releases = self._following(), self._releases
+        if release is None or releases is None:
+            return self._open(self._user, requested)
+        if self._pinned():
+            return releases.pinned(self._user, requested or release.session, release.seq)
+        return self._open(self._user, requested, serving=releases.serving_of(release))
+
     def read(self, requested: date | None) -> ReadContext | None:
         """The read context for ``requested`` (None: the latest session), with this request's
         dataloaders; ``None`` when the store holds nothing to resolve a session from."""
         with self._lock:
             if requested not in self._contexts:
                 try:
-                    release = self._following()
-                    if release is not None and self._pinned is not None:
-                        ctx = self._pinned(self._user, requested or release.session, release.seq)
-                    else:
-                        ctx = self._open(self._user, requested)
+                    ctx = self._open_for(requested)
                 except NotFoundError:
                     self._contexts[requested] = None
                 else:
@@ -164,14 +192,14 @@ class RequestContext(BaseContext):
         with self._lock:
             if self._stores is None:
                 self._stores = self._open_stores(self._user)
-            release = self._following()
+            release = self._following() if self._pinned() else None
             if release is not None:  # an admin's Cause chains (ADR 0056) read what the release read
                 return replace(self._stores, reader=self._stores.reader.pinned(release.seq))
             return self._stores
 
 
 def context_getter(
-    opener: Opener, stores: StoresOpener | None = None, pinned: PinnedOpener | None = None
+    opener: Opener, stores: StoresOpener | None = None, releases: ReleaseReads | None = None
 ) -> Callable[[UserRecord, Request], RequestContext]:
     """The router's ``context_getter``: a fresh ``RequestContext`` per request, for the caller
     (a FastAPI dependency: Strawberry resolves it, sharing the request's one resolution).
@@ -180,6 +208,6 @@ def context_getter(
 
     def get_context(caller: Caller, request: Request) -> RequestContext:
         request.state.viewer = caller  # ``errors.response_of`` words an error by the role
-        return RequestContext(opener, caller, stores, None, pinned, request.state)
+        return RequestContext(opener, caller, stores, None, releases, request.state)
 
     return get_context

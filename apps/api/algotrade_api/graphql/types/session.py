@@ -15,9 +15,9 @@ strawberry.enum(session.NewerState, description="What a session newer than the o
 
 
 @strawberry.type(
-    description="The newest session after the one served whose nightly workflow is not "
-    "complete (ADR 0062): its `date`, its `state`, and for a failure the public `kind` only "
-    "(never the step or its cause: ADR 0056)"
+    description="The newest session after the one served that is still processing, failing "
+    "(ADR 0062) or complete but not yet published (`PUBLISHING`, ADR 0077): its `date`, its "
+    "`state`, and for a failure the public `kind` only (never the step or its cause: ADR 0056)"
 )
 class NewerSession:
     date: dt.date
@@ -33,8 +33,9 @@ class NewerSession:
     description="The session a read serves: every value in the response is for `date` "
     "(ADR 0036). `unavailable` says what the nightly tables with no partition for it leave "
     "out; identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: "
-    "one taken later). A read with no date serves the latest session whose nightly workflow "
-    "is complete (ADR 0062): `newer` is the later session still processing or failing "
+    "one taken later). A read with no date serves the session of the current serving release "
+    "(ADR 0077), else the latest whose nightly workflow is complete (ADR 0062): `newer` is the "
+    "later session still processing, failing or waiting to be published "
     "(null: none, or a date was asked for), `complete` whether `date`'s workflow is complete "
     "(false on a store with none complete yet: the latest bars are served unconfirmed)."
 )

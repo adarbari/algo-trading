@@ -33,4 +33,10 @@ describe('SessionNoticeBanner', () => {
       await screen.findByText(/10 Oct 2026 data failed and is being retried/),
     ).toBeInTheDocument();
   });
+
+  it('says a complete session is being published and opens its own Guide term', async () => {
+    render(<SessionNoticeBanner notice={notice('PUBLISHING')} />);
+    expect(await screen.findByText(/10 Oct 2026 data is being published/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Help: term/publishing_session' })).toBeVisible();
+  });
 });

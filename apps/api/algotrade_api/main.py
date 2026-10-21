@@ -15,7 +15,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -55,6 +55,7 @@ from algotrade.services.read.context import (
     NotFoundError,
     ReadContext,
     ResultCache,
+    Serving,
     StoreContext,
     limit_threads,
     open_context,
@@ -62,7 +63,12 @@ from algotrade.services.read.context import (
     served_session,
     use_system_pool,
 )
-from algotrade.services.read.serving.current import ReleaseStore, releases_at, resolve_current
+from algotrade.services.read.serving.current import (
+    CurrentRelease,
+    ReleaseStore,
+    releases_at,
+    resolve_current,
+)
 from algotrade.services.text_model.model import TextModel
 from algotrade_api import __version__
 from algotrade_api.auth.local import LocalAuthenticator
@@ -70,7 +76,7 @@ from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.feedback import DraftMemory, feedback_sink, request_sink
-from algotrade_api.graphql.context import ReleaseReads
+from algotrade_api.graphql.context import Opener, ReleaseReads
 from algotrade_api.graphql.offload import OverloadedError, off_loop
 from algotrade_api.graphql.response_cache import OperationLog, served_token
 from algotrade_api.graphql.schema import CachingRouter, graphql_router, sdl
@@ -184,7 +190,7 @@ def _mount_graphql(
     config_generation: Callable[[str, bool], int | None],
     caller: list[Any],
     releases: ReleaseStore | None = None,
-) -> tuple[Callable[[UserContext, date | None], ReadContext], CachingRouter]:
+) -> tuple[Opener, CachingRouter]:
     """``POST /graphql`` over the app's store with one read-result cache and an operation log
     (seeded for the configured user when served: the pages that user opens first); the read
     opener and the router, whose ``replay`` the warmer runs. ``releases``: the serving release
@@ -222,18 +228,25 @@ def _release_reads(
     ``None`` without a release store (a memory store has none unless one is given)."""
     if releases is None:
         return None
-    switch: list[Any] = [0.0, True]  # (when read, value): read per request, kept for a few seconds
+    switch: list[Any] = [0.0, None]  # (when read, settings): read per request, kept a few seconds
+
+    def settings() -> Any:
+        now = time.monotonic()
+        if switch[1] is None or now - switch[0] > RELEASE_SWITCH_S:
+            switch[0], switch[1] = now, load_nightly(store.configs)
+        return switch[1]
 
     def enabled() -> bool:
-        now = time.monotonic()
-        if now - switch[0] > RELEASE_SWITCH_S or switch[0] == 0.0:
-            switch[0], switch[1] = now, load_nightly(store.configs).release_reads
-        return bool(switch[1])
+        return bool(settings().release_reads)
+
+    def serving(release: CurrentRelease) -> Serving:
+        delay = timedelta(minutes=settings().publishing_delay_minutes)
+        return Serving(release.session, datetime.now(UTC), delay)
 
     def pinned(user: UserContext, day: date, seq: int) -> ReadContext:
         return open_context(store.reader.pinned(seq), store.configs, user, day, cache)
 
-    return ReleaseReads(lambda: resolve_current(store.reader, releases), pinned, enabled)
+    return ReleaseReads(lambda: resolve_current(store.reader, releases), pinned, enabled, serving)
 
 
 async def _warm_home(warmer: CacheWarmer) -> None:
@@ -390,7 +403,7 @@ def create_app(
     user = app.state.store.user
     app.state.warmer = (
         CacheWarmer(
-            lambda: reads(user, None),
+            lambda: reads(user, None, serving=gql.serving_now()),
             extra=partial(warm_steps, app.state.store.preview_cache),
             replay=gql.replay,
             stale=lambda: checkout_moved(app.state.build),
@@ -408,9 +421,7 @@ def create_app(
 READ_CACHE_SIZE = 256
 
 
-def _reads(
-    store: ReadStore, cache: ResultCache
-) -> Callable[[UserContext, date | None], ReadContext]:
+def _reads(store: ReadStore, cache: ResultCache) -> Opener:
     """Opens a GraphQL request's read context over ``store`` for its caller and a requested
     session, with one result cache for every request of the app (entries keyed on the
     published state, and on the user where the result is the user's; room for the session,
@@ -418,13 +429,13 @@ def _reads(
     return partial(open_context, store.reader, store.configs, cache=cache)
 
 
-def _served(store: ReadStore, cache: ResultCache) -> Callable[[], str]:
+def _served(store: ReadStore, cache: ResultCache) -> Callable[..., str]:
     """The response cache's token of the session a read with no date serves (ADR 0062); an
     empty store has none."""
 
-    def token() -> str:
+    def token(serving: Serving | None = None) -> str:
         try:
-            return served_token(served_session(store.reader, cache))
+            return served_token(served_session(store.reader, cache, serving))
         except NotFoundError:
             return "empty"
 

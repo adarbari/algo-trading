@@ -48,7 +48,8 @@ export type IndicatorStatus =
 /** What a session newer than the one served is doing */
 export type NewerState =
   | 'FAILED_RETRYING'
-  | 'IN_PROGRESS';
+  | 'IN_PROGRESS'
+  | 'PUBLISHING';
 
 /** Why a value is null when the null is the fact (EXPLAINED) */
 export type NullReason =
