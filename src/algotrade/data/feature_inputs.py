@@ -191,7 +191,7 @@ from algotrade.data.events import (
     stored_events,
 )
 from algotrade.data.filing_text.recent import TABLE as FILING_TEXT
-from algotrade.data.filing_text.recent import recent_filing_texts
+from algotrade.data.filing_text.recent import RecentFilings
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
 from algotrade.data.funds.holdings import funds_holdings
 from algotrade.data.funds.shares import TABLE as ETF_SHARES
@@ -549,6 +549,11 @@ def _partition(read: Callable[[StoreReader, date], pd.DataFrame | None]) -> Load
     return load
 
 
+def _rolling_filing_text(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    """The recent filing view per session, sharing one run's rolling read of the long window."""
+    return _Partition(RecentFilings(reader).at)
+
+
 @dataclass(frozen=True)
 class _Window:
     """Rows sorted by a date (``days``); ``at`` slices ``lookback`` sessions up to the session."""
@@ -683,7 +688,7 @@ INPUTS: Mapping[str, Loader] = {
     ETF_LAUNCHES: _etf_launches,
     "events/filing": _filings,
     INSIDERS: _insider_views,
-    FILING_TEXT: _partition(recent_filing_texts),
+    FILING_TEXT: _rolling_filing_text,
     "events/short_interest": _short_interest,
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,

@@ -3,10 +3,17 @@ reads that found nothing; reads outside ``attribute`` are not."""
 
 from datetime import date, timedelta
 
+import pandas as pd
 import pytest
 
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.tables.readers import ReadRecord, RecordingReader, StoreReader, dates_digest
+from algotrade.storage.tables.readers import (
+    ReadRecord,
+    RecordingReader,
+    RollingRead,
+    StoreReader,
+    dates_digest,
+)
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
 
@@ -242,3 +249,28 @@ def test_a_pinned_recording_reader_logs_the_pinned_partitions() -> None:
     with reader.attribute(D2):
         assert reader.table_range(A, D1, D3) is not None
     assert reader.reads(D2) == (ReadRecord(A, D1, D3, "rows", dates_digest([D1])),)
+
+
+def test_a_rolling_range_read_equals_the_plain_one_and_logs_the_whole_range() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1, D2)
+    reader = RecordingReader(backend)
+    memo = RollingRead(A, ("value",))
+    plain = StoreReader(backend)
+    with reader.attribute(D3):
+        first = reader.table_range_rolling(memo, D1, D2)
+    publish(backend, "r2", A, D3)  # a new partition after the window: appended
+    with reader.attribute(D3):
+        second = reader.table_range_rolling(memo, D2, D3)  # the window moved: D1 dropped
+    pd.testing.assert_frame_equal(first, plain.table_range(A, D1, D2, None, None, ["value"]))
+    pd.testing.assert_frame_equal(second, plain.table_range(A, D2, D3, None, None, ["value"]))
+    assert reader.reads(D3) == (
+        ReadRecord(A, D1, D2, "rows", dates_digest([D1, D2])),
+        ReadRecord(A, D2, D3, "rows", dates_digest([D2, D3])),
+    )
+    publish(backend, "r3", A, D2)  # a kept partition restated: the range is read whole again
+    pd.testing.assert_frame_equal(
+        reader.table_range_rolling(memo, D2, D3),
+        plain.table_range(A, D2, D3, None, None, ["value"]),
+    )
+    assert len(plain.table_range(A, D2, D3, None, None, ["value"])) == 2

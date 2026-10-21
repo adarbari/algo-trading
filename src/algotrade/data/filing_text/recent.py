@@ -25,8 +25,8 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data.events import acceptance_sessions
-from algotrade.data.filing_text.reading import TABLE, filing_text
-from algotrade.storage.tables.readers import StoreReader
+from algotrade.data.filing_text.reading import TABLE, filing_text, light_memo
+from algotrade.storage.tables.readers import RollingRead, StoreReader
 
 RECENT_SESSIONS = 5  # equals features.rollups.text.comparison.RECENT_SESSIONS (tested)
 LOOKBACK_DAYS = 460  # acceptance dates read: the year-ago comparator and a late filer's margin
@@ -34,13 +34,28 @@ SCAN_MARGIN_DAYS = 10
 FORMS = ("10-K", "10-Q")
 ITEMS = ("1", "1A", "3", "7", "I-2", "II-1A")  # equals comparison.ITEMS, all forms (tested)
 
-__all__ = ["FORMS", "ITEMS", "TABLE", "recent_filing_texts"]
+__all__ = ["FORMS", "ITEMS", "TABLE", "RecentFilings", "recent_filing_texts"]
 
 
-def recent_filing_texts(reader: StoreReader, session: date) -> pd.DataFrame | None:
+class RecentFilings:
+    """The views of a run of sessions over one reader: the light read of the long window is kept
+    and extended (``reading.light_memo``), so session after session re-reads only the partitions
+    that are new; every view equals ``recent_filing_texts(reader, session)``."""
+
+    def __init__(self, reader: StoreReader) -> None:
+        self._reader = reader
+        self._memo = light_memo()
+
+    def at(self, session: date) -> pd.DataFrame | None:
+        return recent_filing_texts(self._reader, session, self._memo)
+
+
+def recent_filing_texts(
+    reader: StoreReader, session: date, memo: RollingRead | None = None
+) -> pd.DataFrame | None:
     """The view of ``session`` (module doc): ``COLUMNS`` rows with text and a non-null
     ``instrument_id``; ``None`` when no company has a periodic filing known in the last
-    ``RECENT_SESSIONS`` sessions."""
+    ``RECENT_SESSIONS`` sessions. ``memo``: the run's kept light read (``RecentFilings``)."""
     first = sessions_ending(session, RECENT_SESSIONS)[0]
     scan = filing_text(
         reader, None, session, ITEMS, FORMS, first - timedelta(days=SCAN_MARGIN_DAYS), None, False
@@ -53,7 +68,7 @@ def recent_filing_texts(reader: StoreReader, session: date) -> pd.DataFrame | No
         return None
     frame = filing_text(
         reader, None, session, ITEMS, FORMS, session - timedelta(days=LOOKBACK_DAYS),
-        ciks=sorted(set(recent["cik"])),
+        ciks=sorted(set(recent["cik"])), light_memo=memo,
     )  # fmt: skip
     frame = frame[frame["instrument_id"].notna()]
     if frame.empty:

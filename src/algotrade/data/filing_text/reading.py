@@ -39,7 +39,7 @@ from algotrade.core.model.fields import COMPANY_TABLE
 from algotrade.core.model.instruments import pad_cik
 from algotrade.data.events import ALL_TIME, acceptance_sessions
 from algotrade.data.reference import REFERENCE_HINT, read_snapshot
-from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.readers import RollingRead, StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
 
 TABLE = "events/filing_text"
@@ -70,7 +70,14 @@ COLUMNS = (
     "quality",
     "reason",
 )
+LIGHT_COLUMNS = tuple(c for c in COLUMNS if c != "text")
 _NO_ITEM = "\x00"  # a null item in a group key (null == null for the version rule)
+
+
+def light_memo() -> RollingRead:
+    """The memory of a run of ``filing_text`` reads moving forward (the ``light_memo`` argument):
+    the long window's light read is made once, then extended by each session's new partitions."""
+    return RollingRead(TABLE, LIGHT_COLUMNS)
 
 
 def effective_known_from(frame: pd.DataFrame) -> pd.Series:
@@ -153,6 +160,7 @@ def _with_text(reader: StoreReader, frame: pd.DataFrame, as_of: datetime | None)
     acceptance-session partition at a time, only the days the rows are in."""
     key = ["cik", "accession", "_item", "parser_version", "_kf"]
     days = sorted(set(pd.to_datetime(frame["session_date"]).dt.date))
+    wanted = frame[key].drop_duplicates()  # a text of another row is dropped as the merge would
     parts = []
     for day in days:
         part = reader.table_range(
@@ -164,11 +172,8 @@ def _with_text(reader: StoreReader, frame: pd.DataFrame, as_of: datetime | None)
             ["cik", "accession", "item", "parser_version", "known_from", "text"],
         )
         if part is not None and not part.empty:
-            parts.append(
-                part.assign(_item=part["item"].fillna(_NO_ITEM), _kf=part["known_from"])[
-                    [*key, "text"]
-                ]
-            )
+            keyed = part.assign(_item=part["item"].fillna(_NO_ITEM), _kf=part["known_from"])
+            parts.append(keyed[[*key, "text"]].merge(wanted, how="inner", on=key))
     if not parts:
         return frame.assign(text=None)
     texts = pd.concat(parts, ignore_index=True).drop_duplicates(key, keep="last")
@@ -185,6 +190,7 @@ def filing_text(
     as_of: datetime | None = None,
     with_text: bool = True,
     ciks: Collection[str] | None = None,
+    light_memo: RollingRead | None = None,
 ) -> pd.DataFrame:
     """The item rows (``COLUMNS``) known on or before session ``on`` (module doc), the latest
     version of each (cik, accession, item), for filings accepted on or after ``since`` and the
@@ -193,7 +199,9 @@ def filing_text(
     ``None``: every filer, ``instrument_id`` NULL where the company snapshot of ``on`` maps the
     CIK to none, ``ciks`` narrowing the scan. ``with_text=False`` leaves ``text`` out of the read
     (a scan of what is there; no text column is read). Empty (with the columns) when nothing is
-    known."""
+    known. ``light_memo`` (from ``light_memo()``; ignored with ``as_of``): the memory of the
+    previous call's light read of the window, so a later ``on`` re-reads only its new partitions;
+    the rows are the same."""
     wanted = [c for c in COLUMNS if with_text or c != "text"]
     pairs, snap_date, pre = _instruments_by_cik(reader, on, as_of, instrument_ids)
     meta = {"company_snapshot": snap_date, "pre_snapshot": pre}
@@ -203,8 +211,11 @@ def filing_text(
         out.attrs.update(meta)
         return out
 
-    light = [c for c in COLUMNS if c != "text"]
-    frame = reader.table_range(TABLE, since or ALL_TIME[0], on, as_of, None, light)
+    light = list(LIGHT_COLUMNS)
+    if light_memo is not None and as_of is None:
+        frame = reader.table_range_rolling(light_memo, since or ALL_TIME[0], on)
+    else:
+        frame = reader.table_range(TABLE, since or ALL_TIME[0], on, as_of, None, light)
     if frame is None or frame.empty:
         return nothing()
     frame = frame[effective_known_from(frame) <= pd.Timestamp(on)]  # known first, then the latest

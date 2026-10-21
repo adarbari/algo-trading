@@ -17,9 +17,17 @@ composite is under the floor). A value is null whenever the status is not ``OK``
 The measures are ``quant.text``: cosine on raw term counts and Jaccard on word sets. The
 risk-factor pair (10-K Item 1A alone) also gives the change in length: new words over old, minus
 one.
+
+A pair's measures depend only on the words of the compared items, so they are memoised per process
+(``_MEMO``) under the form and each side's (item, text digest) list: a filing that is a subject
+for ``RECENT_SESSIONS`` sessions is tokenised once, not once per session. The memo holds a few
+floats per pair and is bounded (``MEMO_PAIRS``, least recently used out); a miss recomputes the
+same value, so the output never depends on it.
 """
 
-from collections import Counter
+import hashlib
+import threading
+from collections import Counter, OrderedDict
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -43,6 +51,7 @@ OK = "OK"
 NO_PRIOR = "NO_PRIOR"
 NOT_COMPARABLE = "NOT_COMPARABLE"
 OK_QUALITY = "OK"  # equals data.filing_text.reading.OK (tested)
+MEMO_PAIRS = 20_000  # memoised pair results kept (a few floats each)
 
 
 @dataclass(frozen=True)
@@ -86,37 +95,62 @@ def _filings(frame: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values(["cik", "known_from", "accession"], kind="stable")
 
 
-def _item_counts(
-    frame: pd.DataFrame, cik: str, accession: str, form: str
-) -> dict[str, Counter[str]]:
-    """The term counts of each item of one filing that passes the quality and length floors."""
-    rows = frame[(frame["cik"] == cik) & (frame["accession"] == accession)]
-    out: dict[str, Counter[str]] = {}
-    for item, quality, text in zip(rows["item"], rows["quality"], rows["text"], strict=True):
-        if item not in ITEMS[form] or quality != OK_QUALITY or not isinstance(text, str):
-            continue
-        counts = term_counts(text)
-        if sum(counts.values()) >= MIN_ITEM_TOKENS:
-            out[str(item)] = counts
+Signature = tuple[tuple[str, str], ...]  # (item, digest of its text) per row that is compared
+_MEMO: OrderedDict[tuple[str, Signature, Signature], dict[str, Any]] = OrderedDict()
+_MEMO_LOCK = threading.Lock()
+
+
+def _rows_of(frame: pd.DataFrame) -> dict[tuple[str, str], list[int]]:
+    """The positions of each (cik, accession)'s rows in ``frame``, in frame order."""
+    keys = zip(frame["cik"], frame["accession"], strict=True)
+    out: dict[tuple[str, str], list[int]] = {}
+    for position, (cik, accession) in enumerate(keys):
+        out.setdefault((str(cik), str(accession)), []).append(position)
     return out
 
 
-def _comparator(filings: pd.DataFrame, subject: pd.Series) -> pd.Series | None:
-    """The year-ago filing of the same company and form (module doc), or ``None``."""
-    report = subject["report_date"]
+def _usable(
+    columns: tuple[list[Any], list[Any], pd.Series], rows: list[int], form: str
+) -> list[tuple[str, str]]:
+    """The (item, text) of one filing's rows that pass the item and quality floors, in order;
+    ``columns`` are the frame's item and quality lists and its text series."""
+    items, qualities, texts = columns
+    wanted = [i for i in rows if items[i] in ITEMS[form] and qualities[i] == OK_QUALITY]
+    found = texts.take(wanted).tolist() if wanted else []
+    return [(str(items[i]), t) for i, t in zip(wanted, found, strict=True) if isinstance(t, str)]
+
+
+def _signature(usable: list[tuple[str, str]]) -> Signature:
+    return tuple(
+        (item, hashlib.blake2b(text.encode(), digest_size=16).hexdigest()) for item, text in usable
+    )
+
+
+def _item_counts(usable: list[tuple[str, str]]) -> dict[str, Counter[str]]:
+    """The term counts of each item of one filing that passes the length floor."""
+    out: dict[str, Counter[str]] = {}
+    for item, text in usable:
+        counts = term_counts(text)
+        if sum(counts.values()) >= MIN_ITEM_TOKENS:
+            out[item] = counts
+    return out
+
+
+def _comparator(
+    candidates: list[tuple[date | None, str]], report: date | None, own: str
+) -> str | None:
+    """The accession of the year-ago filing among the company's filings of the subject's form
+    (``candidates``: report date and accession; ``own``, the subject's, is never its own
+    comparator; module doc), or ``None``."""
     if report is None:
         return None
     low, high = (report - timedelta(days=d) for d in WINDOW_DAYS[::-1])
-    same = filings[(filings["cik"] == subject["cik"]) & (filings["form"] == subject["form"])]
-    same = same[[r is not None and low <= r <= high for r in same["report_date"]]]
-    same = same[same["accession"] != subject["accession"]]
-    if same.empty:
-        return None
-    gap = [abs((report - r).days - YEAR_DAYS) for r in same["report_date"]]
-    best: pd.Series = (
-        same.assign(_gap=gap).sort_values(["_gap", "accession"], kind="stable").iloc[0]
-    )
-    return best
+    found = [
+        (abs((report - r).days - YEAR_DAYS), a)
+        for r, a in candidates
+        if r is not None and low <= r <= high and a != own
+    ]
+    return min(found)[1] if found else None
 
 
 def _measure(
@@ -151,19 +185,45 @@ def compare_filings(frame: pd.DataFrame, recent_from: date, session: date) -> li
     subjects = filings[[recent_from <= k <= session for k in filings["known_from"]]]
     subjects = subjects.sort_values(["cik", "form", "known_from", "accession"], kind="stable")
     subjects = subjects.drop_duplicates(["cik", "form"], keep="last")
+    positions = _rows_of(frame)
+    by_company: dict[tuple[str, str], list[tuple[date | None, str]]] = {}
+    for cik, form, report, accession in zip(
+        filings["cik"], filings["form"], filings["report_date"], filings["accession"], strict=True
+    ):
+        by_company.setdefault((str(cik), str(form)), []).append((report, accession))
+    columns = (frame["item"].tolist(), frame["quality"].tolist(), frame["text"])
+    positions = _rows_of(frame)
     out = []
     for _, subject in subjects.iterrows():
         base: dict[str, Any] = {"cik": subject["cik"], "accession": subject["accession"],
                 "form": subject["form"], "known_from": subject["known_from"]}  # fmt: skip
-        prior = _comparator(filings, subject)
+        form = subject["form"]
+        prior = _comparator(
+            by_company[(subject["cik"], form)], subject["report_date"], subject["accession"]
+        )
         if prior is None:
             out.append(Comparison(**base, prior_accession=None, status=NO_PRIOR))
             continue
-        new = _item_counts(frame, subject["cik"], subject["accession"], subject["form"])
-        old = _item_counts(frame, prior["cik"], prior["accession"], prior["form"])
-        out.append(
-            Comparison(
-                **base, prior_accession=prior["accession"], **_measure(new, old, subject["form"])
-            )
-        )
+        new = _usable(columns, positions.get((subject["cik"], subject["accession"]), []), form)
+        old = _usable(columns, positions.get((subject["cik"], prior), []), form)
+        out.append(Comparison(**base, prior_accession=prior, **_memoised_measure(new, old, form)))
     return out
+
+
+def _memoised_measure(
+    new: list[tuple[str, str]], old: list[tuple[str, str]], form: str
+) -> dict[str, Any]:
+    """``_measure`` of the two filings' compared items, from the memo when the same words were
+    compared before."""
+    key = (form, _signature(new), _signature(old))
+    with _MEMO_LOCK:
+        hit = _MEMO.get(key)
+        if hit is not None:
+            _MEMO.move_to_end(key)
+            return dict(hit)
+    measured = _measure(_item_counts(new), _item_counts(old), form)
+    with _MEMO_LOCK:
+        _MEMO[key] = measured
+        while len(_MEMO) > MEMO_PAIRS:
+            _MEMO.popitem(last=False)
+    return dict(measured)
