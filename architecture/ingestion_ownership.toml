@@ -352,6 +352,18 @@ section = "docs/adr/0077-serving-release.md#amendment-2026-10-22-c-the-release-p
 detect = [{ call = "stored_run_frames" }]
 
 [[responsibility]]
+id = "screen-values-recluster"
+description = "Rewrite the stored results/rule_screen and results/rule_screen_values files of earlier sessions in the layout the writer gives new ones (TableSpec.cluster_by: sorted by instrument_id, 8,192-row row groups; storage.md), so a read of a few instruments skips row groups: per run, read back as stored and published again through ResultWriter.publishing (ADR 0022) under the same run id and knowledge_ts (never now), every table of a run in one publish, checked by reading the run back; idempotent and resumable by the files' footers (ResultWriter.run_layouts), progress in the run record, run under the ingest lock and the lowered priority; owner-run, never in the nightly"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/screens/screen_values_recluster.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_ops.py",  # the task's entry
+    "src/algotrade/storage/tables/writers.py",  # the writer facade's one-line delegation
+]
+section = "docs/adr/0022-atomic-run-publication.md#decision"
+detect = [{ call = "run_layouts" }]
+
+[[responsibility]]
 id = "serve-release-job"
 description = "The serve-release workflow (ADR 0077 decision 4): under the serve lock, a no-op while CURRENT serves the default session (unless rebuild), else build the release, promote it unless CURRENT already names it, prune (which records what the pins hold), with its own serve-release run record, FAILED and CURRENT untouched on any failure; started by the CLI after a nightly or post-session finished, never a nightly step"
 owner = ["apps/ingestion/algotrade_ingestion/workflows/serve_release/serve_release.py"]

@@ -26,6 +26,10 @@ again before such a read reaches the partition, that version is discarded (``dro
 oldest one kept): the read raises ``StaleSnapshotError`` and ``pinned_read`` runs it again, whole,
 at a fresh sequence, so a range read never mixes partitions of different commits.
 
+A rewrite of a run's file that keeps its rows (``screen-values-recluster``) leaves the old file as
+``prev``; ``trimmed`` (``TableStore.trim_superseded``) forgets it once no pin needs it and its
+grace has passed, and the file then goes with ``sweep_orphans``.
+
 A **pin** (``TableStore.pin``, ADR 0077) names a sequence whose versions must stay readable: a
 commit also keeps, per pin, the newest version of the run at or below it, so the chain
 (``prev`` of ``prev``) is at most pins + 2 long. A version discarded from the middle leaves
@@ -146,6 +150,15 @@ def retained(previous: RunEntry | None, pins: Collection[int]) -> RunEntry | Non
                 lost += [lower.seq or 0, *([lower.gap] if lower.gap is not None else [])]
             below = replace(version, prev=None, gap=min(lost) if lost else None)
     return below
+
+
+def trimmed(entry: RunEntry, pins: Collection[int]) -> RunEntry | None:
+    """``entry`` without the older versions it keeps (``dropped`` records that they are gone, so a
+    read still on one raises ``StaleSnapshotError`` and starts again); ``None`` when there is
+    nothing to trim or a pin may still read one (``chain_needed``: the pin's versions stay)."""
+    if entry.prev is None or entry.seq is None or any(entry.seq > p for p in pins):
+        return None
+    return replace(entry, prev=None, dropped=True, gap=None)
 
 
 def max_seq(entries: Mapping[str, RunEntry], upto: int) -> int:

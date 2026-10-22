@@ -13,6 +13,7 @@ from algotrade.storage.backends.runs.run_selection import (
     committed,
     read_at,
     seq_at,
+    trimmed,
     visible_entries,
 )
 
@@ -123,3 +124,12 @@ def test_a_run_born_after_the_pin_is_hidden_from_it_however_often_it_was_recommi
     assert seen(entry, 4) is None
     with pytest.raises(StaleSnapshotError):
         seen(entry, 5)  # the version at 5 is gone
+
+
+def test_trimmed_forgets_older_versions_unless_a_pin_may_read_them() -> None:
+    old = RunEntry(pd.Timestamp("2026-10-01", tz="UTC"), seq=2)
+    entry = RunEntry(pd.Timestamp("2026-10-01", tz="UTC"), seq=5, prev=old)
+    gone = trimmed(entry, [6, 9])
+    assert gone is not None and gone.prev is None and gone.dropped  # a read on it retries
+    assert trimmed(entry, [3]) is None  # a pin below the commit reads the older version
+    assert trimmed(gone, []) is None  # nothing left to trim

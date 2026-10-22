@@ -47,6 +47,7 @@ from algotrade.storage.backends.arrow import (
     concat,
     file_groups,
     file_stats,
+    is_clustered,
     keep_columns,
     table_parquet_bytes,
     table_spec,
@@ -58,7 +59,6 @@ from algotrade.storage.backends.partial_reads import read_run_file
 from algotrade.storage.backends.runs.local_index import (
     INDEX,
     SWAP_GRACE_S,
-    TXN,
     Commits,
     atomic_write,
     created_seq,
@@ -68,6 +68,7 @@ from algotrade.storage.backends.runs.local_index import (
     read_index,
     run_file,
     safe,
+    stored_tables,
     write_index,
 )
 from algotrade.storage.backends.runs.run_compaction import (
@@ -104,32 +105,6 @@ from algotrade.storage.tables.schemas import require_retention
 
 def _parquet_bytes(frame: pd.DataFrame) -> bytes:
     return frame.to_parquet(index=False, engine="pyarrow", compression="zstd")
-
-
-def _stored_tables(root: Path) -> list[str]:
-    """Table paths (relative, posix) with an indexed partition, found by walking directories
-    only: a directory is a table when one of its ``date=*`` children holds an index, which
-    ends its scan (so the cost is the number of table directories, not of partitions or
-    files; was ``root.glob("**/date=*/_runs.json")``: 20 s on 54,000 partitions). A directory
-    with no indexed partition is searched below, apart from ``_txn`` at the root."""
-    found: list[str] = []
-    pending = [root]
-    while pending:
-        directory = pending.pop()
-        below: list[str] = []
-        with os.scandir(directory) as entries:
-            for entry in entries:
-                if not entry.is_dir():
-                    continue
-                if entry.name.startswith("date="):
-                    if (Path(entry.path) / INDEX).exists():
-                        found.append(directory.relative_to(root).as_posix())
-                        below = []
-                        break
-                elif not (directory == root and entry.name == TXN):
-                    below.append(entry.path)
-        pending.extend(Path(p) for p in below)
-    return found
 
 
 class LocalTables:
@@ -588,7 +563,7 @@ class LocalTables:
     def names(self, own_run: str | None = None) -> list[str]:
         found = {t for t, _ in self._own_partitions(own_run)}
         if self.root.exists():
-            found |= set(_stored_tables(self.root))
+            found |= set(stored_tables(self.root))
         return sorted(found)
 
     @staticmethod
@@ -626,6 +601,22 @@ class LocalTables:
 
     def sweep_orphans(self, table: str, session_date: date) -> int:
         return self.commits.sweep(self._dir(table, session_date))
+
+    def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
+        directory = self._dir(table, session_date)
+        return {
+            r: is_clustered(directory / run_file(r, e), table)
+            for r, e in read_index(directory).items()
+        }
+
+    def run_visible_from(self, table: str, session_date: date) -> dict[str, datetime]:
+        return {
+            r: e.visible_from.to_pydatetime()
+            for r, e in read_index(self._dir(table, session_date)).items()
+        }
+
+    def trim_superseded(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        return self.commits.trim_runs(self._dir(table, session_date), runs, self.swap_grace_s)
 
     def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
         return self.commits.remove_runs(self._dir(table, session_date), runs)

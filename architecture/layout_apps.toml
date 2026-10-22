@@ -257,7 +257,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/screens"
-purpose = "screen tasks: the screen-runs-backfill job that frames ScreenRun and ScreenPick rows (results/screen_runs, results/screen_picks) for the rule-screen runs stored before those tables existed (ADR 0077 amendment (c))"
+purpose = "screen tasks: the screen-runs-backfill job that frames ScreenRun and ScreenPick rows (results/screen_runs, results/screen_picks) for the rule-screen runs stored before those tables existed (ADR 0077 amendment (c)), and the screen-values-recluster job that rewrites older rule_screen / rule_screen_values files sorted by instrument id"
 kind = "task-domain"
 
 [[dir]]
