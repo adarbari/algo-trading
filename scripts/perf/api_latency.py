@@ -60,7 +60,7 @@ UNCACHED_DOC_OUT = REPO / "docs/perf/api-latency-uncached.md"
 REPEATS = 10
 UNCACHED_REPEATS = 5
 LOAD_CLIENTS = 4
-TIMEOUT = 120.0
+TIMEOUT = 180.0
 PORT_OFFSET = 8  # spare ports: ALGOTRADE_PORT_BASE + 8 .. + 19 (release_writer_run.py uses + 7)
 MODES = {"cache": "0", "nocache": "1", "uncached": "2"}
 RELEASE_READS = re.compile(r"^(release_reads\s*=\s*)\w+", re.M)
@@ -307,7 +307,11 @@ class Api:
         """(ms, status, decoded bytes, longest list) of one GraphQL call."""
         body = {"query": op["query"], "variables": op["variables"]}
         t0 = time.perf_counter()
-        r = self.client.post(f"{self.url}/graphql", json=body)
+        try:
+            r = self.client.post(f"{self.url}/graphql", json=body)
+        except httpx.TimeoutException:  # a call over TIMEOUT is a FAILED row, not a crashed run
+            self.last_error = f"timed out after {TIMEOUT:.0f} s"
+            return (time.perf_counter() - t0) * 1000, 0, 0, 0
         ms = (time.perf_counter() - t0) * 1000
         rows = 0
         self.last_error = response_error(r.status_code, r.content)
@@ -440,7 +444,8 @@ def measure_cold(ops: dict[str, dict], **target: object) -> dict[str, dict]:
         finally:
             api.close()
         out[name] = {"status": status, "cold_ms": ms, "bytes": size, "rows": rows}
-        print(f"  {name}: cold {ms:.0f} ms")
+        note = f" ({api.last_error})" if status != 200 else ""
+        print(f"  {name}: cold {ms:.0f} ms{note}", flush=True)
     return out
 
 
@@ -457,7 +462,13 @@ async def load_samples(
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             for _ in range(repeats):
                 t0 = time.perf_counter()
-                r = await client.post(f"{url}/graphql", json=body)
+                try:
+                    r = await client.post(f"{url}/graphql", json=body)
+                except httpx.TimeoutException:
+                    out.append(
+                        ((time.perf_counter() - t0) * 1000, f"timed out after {TIMEOUT:.0f} s")
+                    )
+                    continue
                 out.append(
                     ((time.perf_counter() - t0) * 1000, response_error(r.status_code, r.content))
                 )
