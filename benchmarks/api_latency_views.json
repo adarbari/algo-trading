@@ -1,0 +1,1822 @@
+{
+ "generated": "2026-10-22 05:11 UTC",
+ "views": {
+  "(shell)": {
+   "route": "/ideas",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "GuideSearch",
+    "Regime",
+    "SessionDate",
+    "StatusStrip",
+    "Viewer"
+   ],
+   "uncertain": [
+    "GuideSearch"
+   ],
+   "interaction": [],
+   "source": "static",
+   "shell": true
+  },
+  "/admin/feature-requests": {
+   "route": "/admin/feature-requests",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureRequests",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/admin/harness-runs": {
+   "route": "/admin/harness-runs",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "HarnessRun",
+    "HarnessRuns"
+   ],
+   "uncertain": [
+    "HarnessRun"
+   ],
+   "interaction": [
+    "GuideEntries",
+    "GuideHelpField"
+   ],
+   "source": "static"
+  },
+  "/admin/harness-runs?run={run}": {
+   "route": "/admin/harness-runs",
+   "search": {
+    "run": "{run}"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "HarnessRun",
+    "HarnessRuns"
+   ],
+   "uncertain": [
+    "HarnessRun"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/admin/ingestion": {
+   "route": "/admin/ingestion",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FigiReview",
+    "GuideHelpField",
+    "IngestionCell",
+    "IngestionCompleteness",
+    "LeverageReview",
+    "NightlyRuns",
+    "QualityChecks",
+    "RunRecord",
+    "Verification"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "IngestionCell",
+    "RunRecord"
+   ],
+   "interaction": [
+    "GuideEntries",
+    "RunItems"
+   ],
+   "source": "static"
+  },
+  "/admin/ingestion?session={session}": {
+   "route": "/admin/ingestion",
+   "search": {
+    "session": "{session}"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FigiReview",
+    "GuideHelpField",
+    "IngestionCell",
+    "IngestionCompleteness",
+    "LeverageReview",
+    "NightlyRuns",
+    "QualityChecks",
+    "RunRecord",
+    "Verification"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "IngestionCell",
+    "RunRecord"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/admin/ingestion?session={session} > expand:Checks by status": {
+   "route": "/admin/ingestion",
+   "search": {
+    "session": "{session}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Checks by status"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/ingestion?session={session}"
+  },
+  "/admin/llm-usage": {
+   "route": "/admin/llm-usage",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "GuideHelpField",
+    "LlmUsage"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/calendar": {
+   "route": "/calendar",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EventCalendar",
+    "ScreenerConfigs",
+    "ScreenerPicks"
+   ],
+   "uncertain": [
+    "ScreenerPicks"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/edges": {
+   "route": "/edges",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeCompare",
+    "EdgeDesk",
+    "EdgePaper",
+    "EdgeResultCapacity",
+    "EdgeResultCosts",
+    "EdgeResultCurve",
+    "EdgeResultDecay",
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultMonthly",
+    "EdgeResultRegimes",
+    "EdgeResultRollingStarts",
+    "EdgeTrades",
+    "EdgeVariantGrid",
+    "EdgesPage",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultRegimes",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries",
+    "PublishedEdge"
+   ],
+   "source": "static"
+  },
+  "/edges/:id/edit": {
+   "route": "/edges/:id/edit",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "edge"
+   },
+   "ops": [
+    "EdgeBuilder",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeBuilder",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/edges/:id/edit > expand:More: the rest of the quality bar": {
+   "route": "/edges/:id/edit",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "More: the rest of the quality bar"
+    }
+   ],
+   "params": {
+    "id": "edge"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges/:id/edit"
+  },
+  "/edges/new": {
+   "route": "/edges/new",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeBuilder",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeBuilder",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/edges/new > expand:More: the rest of the quality bar": {
+   "route": "/edges/new",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "More: the rest of the quality bar"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges/new"
+  },
+  "/edges?edge={edge}": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeCompare",
+    "EdgeDesk",
+    "EdgePaper",
+    "EdgeResultCapacity",
+    "EdgeResultCosts",
+    "EdgeResultCurve",
+    "EdgeResultDecay",
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultMonthly",
+    "EdgeResultRegimes",
+    "EdgeResultRollingStarts",
+    "EdgeTrades",
+    "EdgeVariantGrid",
+    "EdgesPage",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultRegimes",
+    "GuideHelpField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/edges?edge={edge} > expand:Details": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Details"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
+  },
+  "/edges?edge={edge} > tab:Where it worked views:Drawdown": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Where it worked views",
+     "name": "Drawdown"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "EdgeResultDrawdown",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static",
+   "parent": "/edges?edge={edge}",
+   "target": true
+  },
+  "/edges?edge={edge} > tab:Where it worked views:Holding period": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Where it worked views",
+     "name": "Holding period"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "EdgeResultHorizons",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static",
+   "parent": "/edges?edge={edge}",
+   "target": true
+  },
+  "/edges?edge={edge} > tab:Where it worked views:Regime": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Where it worked views",
+     "name": "Regime"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "EdgeResultRegimes",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static",
+   "parent": "/edges?edge={edge}",
+   "target": true
+  },
+  "/edges?edge={edge} > tab:Where it worked views:Year by year": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Where it worked views",
+     "name": "Year by year"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static",
+   "parent": "/edges?edge={edge}",
+   "target": true
+  },
+  "/edges?view=following": {
+   "route": "/edges",
+   "search": {
+    "view": "following"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeCompare",
+    "EdgeDesk",
+    "EdgePaper",
+    "EdgeResultCapacity",
+    "EdgeResultCosts",
+    "EdgeResultCurve",
+    "EdgeResultDecay",
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultMonthly",
+    "EdgeResultRegimes",
+    "EdgeResultRollingStarts",
+    "EdgeTrades",
+    "EdgeVariantGrid",
+    "EdgesPage",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultRegimes",
+    "GuideHelpField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/edges?view=mine": {
+   "route": "/edges",
+   "search": {
+    "view": "mine"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeCompare",
+    "EdgeDesk",
+    "EdgePaper",
+    "EdgeResultCapacity",
+    "EdgeResultCosts",
+    "EdgeResultCurve",
+    "EdgeResultDecay",
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultMonthly",
+    "EdgeResultRegimes",
+    "EdgeResultRollingStarts",
+    "EdgeTrades",
+    "EdgeVariantGrid",
+    "EdgesPage",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultRegimes",
+    "GuideHelpField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/edges?view=rejected": {
+   "route": "/edges",
+   "search": {
+    "view": "rejected"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeCompare",
+    "EdgeDesk",
+    "EdgePaper",
+    "EdgeResultCapacity",
+    "EdgeResultCosts",
+    "EdgeResultCurve",
+    "EdgeResultDecay",
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultMonthly",
+    "EdgeResultRegimes",
+    "EdgeResultRollingStarts",
+    "EdgeTrades",
+    "EdgeVariantGrid",
+    "EdgesPage",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeResultDrawdown",
+    "EdgeResultHorizons",
+    "EdgeResultRegimes",
+    "GuideHelpField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore": {
+   "route": "/explore",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/explore?range=1Y": {
+   "route": "/explore",
+   "search": {
+    "range": "1Y"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?range=2Y": {
+   "route": "/explore",
+   "search": {
+    "range": "2Y"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?range=3M": {
+   "route": "/explore",
+   "search": {
+    "range": "3M"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?range=All": {
+   "route": "/explore",
+   "search": {
+    "range": "All"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?right=C": {
+   "route": "/explore",
+   "search": {
+    "right": "C"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?right=P": {
+   "route": "/explore",
+   "search": {
+    "right": "P"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?sel={instrument}": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?sel={instrument} > tab:View:Chart": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Chart"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentPrices",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentPrices",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": true
+  },
+  "/explore?sel={instrument} > tab:View:Compare": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Compare"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": false
+  },
+  "/explore?sel={instrument} > tab:View:Events": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Events"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": false
+  },
+  "/explore?sel={instrument} > tab:View:Features": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Features"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "FeatureDistribution",
+    "InstrumentFeatureValues"
+   ],
+   "uncertain": [
+    "FeatureDistribution",
+    "InstrumentFeatureValues"
+   ],
+   "interaction": [
+    "GuideEntries",
+    "GuideHelpField"
+   ],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": true
+  },
+  "/explore?sel={instrument} > tab:View:Financials": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Financials"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": false
+  },
+  "/explore?sel={instrument} > tab:View:Options": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Options"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "OptionChain",
+    "OptionQuotes"
+   ],
+   "uncertain": [
+    "OptionChain",
+    "OptionQuotes"
+   ],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": true
+  },
+  "/explore?sel={instrument} > tab:View:Overview": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Overview"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "InstrumentEvents",
+    "InstrumentFacts"
+   ],
+   "uncertain": [
+    "InstrumentEvents",
+    "InstrumentFacts"
+   ],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": true
+  },
+  "/explore?sel={instrument} > tab:View:Screener hits": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Screener hits"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": true
+  },
+  "/explore?sel={instrument} > tab:View:Why it is an idea": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Why it is an idea"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": false
+  },
+  "/explore?strikes=all": {
+   "route": "/explore",
+   "search": {
+    "strikes": "all"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?view=pro": {
+   "route": "/explore",
+   "search": {
+    "view": "pro"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/explore?view=simple": {
+   "route": "/explore",
+   "search": {
+    "view": "simple"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "InstrumentScreenerHits",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "uncertain": [
+    "ComparePrices",
+    "EtfHoldings",
+    "FeatureDistribution",
+    "FeatureTable",
+    "GuideHelpField",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentFacts",
+    "InstrumentFeatureValues",
+    "InstrumentPrices",
+    "OptionChain",
+    "OptionQuotes",
+    "RegimeBands"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide": {
+   "route": "/guide",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/edges/:splat": {
+   "route": "/guide/edges/:splat",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "splat": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdge",
+    "GuideEdgeIndex",
+    "GuideHelpField",
+    "GuideIndex",
+    "GuideMechanism",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/guide/edges/:splat > expand:Researched, not built": {
+   "route": "/guide/edges/:splat",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Researched, not built"
+    }
+   ],
+   "params": {
+    "splat": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/guide/edges/:splat"
+  },
+  "/guide/fields": {
+   "route": "/guide/fields",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureCatalogue",
+    "FeatureCatalogueDetail",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "FeatureCatalogueDetail",
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/fields/:name": {
+   "route": "/guide/fields/:name",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "name": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "FeatureCatalogueDetail",
+    "FeatureDistribution",
+    "GuideEdgeIndex",
+    "GuideField",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "FeatureCatalogueDetail",
+    "FeatureDistribution",
+    "GuideEdgeIndex",
+    "GuideField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/glossary": {
+   "route": "/guide/glossary",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/glossary/:id": {
+   "route": "/guide/glossary/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/guide/regime": {
+   "route": "/guide/regime",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/regime/episodes/:key": {
+   "route": "/guide/regime/episodes/:key",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "key": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/guide/regime/indicators/:key": {
+   "route": "/guide/regime/indicators/:key",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "key": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/guide/screeners": {
+   "route": "/guide/screeners",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms",
+    "GuideScreenerIndex"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/screeners/:id": {
+   "route": "/guide/screeners/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideHelpField",
+    "GuideIndex",
+    "GuideMechanisms",
+    "GuideScreener",
+    "GuideScreenerEdges"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/guide/screeners/c/:category": {
+   "route": "/guide/screeners/c/:category",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "category": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms",
+    "GuideScreenerCategory"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/situations": {
+   "route": "/guide/situations",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/situations/:slug": {
+   "route": "/guide/situations/:slug",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "slug": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms",
+    "GuideSituation"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/start": {
+   "route": "/guide/start",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/guide/start/:id": {
+   "route": "/guide/start/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
+   },
+   "ops": [
+    "FeatureCatalogue",
+    "GuideEdgeIndex",
+    "GuideIndex",
+    "GuideMechanisms"
+   ],
+   "uncertain": [
+    "GuideEdgeIndex"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/ideas": {
+   "route": "/ideas",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeDesk",
+    "GuideHelpField",
+    "IdeasPage"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/ideas?liq=ok": {
+   "route": "/ideas",
+   "search": {
+    "liq": "ok"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeDesk",
+    "GuideHelpField",
+    "IdeasPage"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/ideas?liq=risk": {
+   "route": "/ideas",
+   "search": {
+    "liq": "risk"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeDesk",
+    "GuideHelpField",
+    "IdeasPage"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/ideas?screener={screener}": {
+   "route": "/ideas",
+   "search": {
+    "screener": "{screener}"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeDesk",
+    "GuideHelpField",
+    "IdeasPage"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [],
+   "source": "static"
+  },
+  "/ideas?screener={screener} > expand:Paused by regime": {
+   "route": "/ideas",
+   "search": {
+    "screener": "{screener}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Paused by regime"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/ideas?screener={screener}"
+  },
+  "/login": {
+   "route": "/login",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static"
+  },
+  "/regime": {
+   "route": "/regime",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "GuideHelpField",
+    "MarketHistory",
+    "RegimeEpisodes",
+    "RegimeSignals"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "MarketHistory"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/regime > expand:Show history": {
+   "route": "/regime",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Show history"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/regime"
+  },
+  "/screeners": {
+   "route": "/screeners",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "MyScreens",
+    "ScreenerConfigs",
+    "ScreenerRuns",
+    "ScreenerTrackRecords"
+   ],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static"
+  },
+  "/screeners/:id": {
+   "route": "/screeners/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "screener"
+   },
+   "ops": [
+    "GuideHelpField",
+    "ScreenerResults",
+    "TableView"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "ScreenerResults"
+   ],
+   "interaction": [
+    "GuideEntries",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentPrices",
+    "RegimeBands"
+   ],
+   "source": "static"
+  },
+  "/screeners/:id/edit": {
+   "route": "/screeners/:id/edit",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "screener"
+   },
+   "ops": [
+    "GuideHelpField",
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "interaction": [
+    "FeatureDistribution",
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/screeners/:id/edit > expand:Distribution": {
+   "route": "/screeners/:id/edit",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Distribution"
+    }
+   ],
+   "params": {
+    "id": "screener"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/screeners/:id/edit"
+  },
+  "/screeners/:id/edit > expand:Missing data": {
+   "route": "/screeners/:id/edit",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Missing data"
+    }
+   ],
+   "params": {
+    "id": "screener"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/screeners/:id/edit"
+  },
+  "/screeners/:id/edit > expand:Narrow misses": {
+   "route": "/screeners/:id/edit",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Narrow misses"
+    }
+   ],
+   "params": {
+    "id": "screener"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/screeners/:id/edit"
+  },
+  "/screeners/new": {
+   "route": "/screeners/new",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static"
+  }
+ }
+}

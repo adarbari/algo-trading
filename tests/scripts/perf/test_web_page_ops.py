@@ -153,3 +153,59 @@ def test_reference_kinds_conditional_and_arrow_scopes() -> None:
     assert kinds["useB"] == wpo.MAYBE
     assert kinds["useC"] == wpo.HANDLER
     assert kinds["useD"] == wpo.MAYBE
+
+
+def test_generated_document_index_is_not_followed_and_hand_written_queries_count(
+    tmp_path: Path,
+) -> None:
+    src = tree(tmp_path)
+    (src / "shared/api/generated").mkdir(parents=True)
+    # codegen's `graphql()` indexes every document: reaching it must not reach them all
+    (src / "shared/api/generated/gql.ts").write_text(
+        "const documents = { x: RowsDocument };\n"
+        "export function graphql(s) { return documents[s]; }\n"
+    )
+    page = src / "pages/list/ui/ListPage.tsx"
+    page.write_text(
+        "import { graphql } from '@/shared/api/generated/gql';\n"
+        "import { useRows } from '@/entities/rows';\n"
+        "const HandDoc = gql<Q>(`query Hand($id: String!) { hand(id: $id) }`);\n"
+        "export function ListPage() { graphql('x'); useRows(); return HandDoc; }\n"
+    )
+    assert wpo.all_query_ops(src) == {"Rows", "Detail", "Hand"}
+    pages, _ = wpo.static_page_ops(src, wpo.enumerate_routes(src))
+    assert pages["/items"] == {"Rows": wpo.LOAD, "Hand": wpo.LOAD}
+
+
+def test_a_loader_built_above_the_route_and_a_dynamic_document_import_are_followed(
+    tmp_path: Path,
+) -> None:
+    """The ops missed on the real tree: `...loading` keeps `page.prefetchXReads` outside the route
+    block, and a hook that loads its document with `await import('./doc')`."""
+    src = tree(tmp_path)
+    routes = src / "app/routes/trader.tsx"
+    text = routes.read_text()
+    block = text[text.index("  ...pageRoute(ListPage") : text.index("  component: ListPage,")]
+    text = text.replace(block, "  ...loading,\n")
+    text = text.replace(
+        "const listRoute = createRoute({",
+        "const loading = pageRoute(ListPage, (page, client) => {\n"
+        "  page.prefetchListReads(client);\n});\nconst listRoute = createRoute({",
+    )
+    routes.write_text(text)
+    hooks = src / "entities/rows/api/hooks.ts"
+    hooks.write_text(
+        hooks.read_text().replace(
+            "  return useQuery({ queryFn: () => gql(DetailDoc), enabled: true });",
+            "  return useQuery({ queryFn: async () => {\n"
+            "    const { LazyDoc } = await import('./lazy-doc');\n"
+            "    return gql(LazyDoc);\n  } });",
+        )
+    )
+    (src / "entities/rows/api/lazy-doc.ts").write_text(
+        "export const LazyDoc = graphql(`\n  query Lazy { lazy { id } }\n`);\n"
+    )
+    found = {r.path: r for r in wpo.enumerate_routes(src)}
+    assert [n[1] for n in found["/items"].prefetch] == ["prefetchListReads"]
+    pages, _ = wpo.static_page_ops(src, list(found.values()))
+    assert "Lazy" in pages["/items"]

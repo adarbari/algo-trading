@@ -32,6 +32,11 @@ and `--ops NAME ...` measure only those operations (writes nothing); `--profile 
 profiles each of the page's operations once, uncached, in process (`page_profile.py`, ->
 docs/perf/page-profiles.md). Every mode stops with exit code 3 (partial results kept) when free
 swap is under `--min-free-swap-mb` (500).
+
+`--view VIEW_ID` (repeatable) is `--page` for one VIEW of `benchmarks/api_latency_views.json`
+(route + search + the clicks that reach a sub-view, e.g. `/edges?edge={edge} > tab:...`; list
+them in docs/perf/view-coverage.md): the operations and variables the crawler captured for it,
+else its static ones; the same guards apply (`--profile --view ID` profiles one view).
 """
 
 from __future__ import annotations
@@ -59,6 +64,7 @@ import httpx2 as httpx  # the httpx API; installed with the test dependencies
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import page_map
 import page_profile as pp
+import views as vw
 import web_page_ops as wpo
 
 REPO = Path(__file__).resolve().parents[2]
@@ -801,6 +807,14 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         metavar="ROUTE",
         help="measure only the operations of this route (repeatable; writes nothing)",
     )
+    p.add_argument(
+        "--view",
+        action="append",
+        default=[],
+        metavar="VIEW_ID",
+        help="measure only the operations of this view of the views file (repeatable; "
+        "writes nothing)",
+    )
     p.add_argument("--uncached", action="store_true", help="truly uncached + calls per page")
     p.add_argument(
         "--profile",
@@ -827,17 +841,17 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 def run_needs_url(args: argparse.Namespace) -> bool:
     """The modes that must name a clone: any run but the whole-site baseline (a subset run
     starts an API too, and would otherwise default to the real store)."""
-    return bool(args.uncached or args.profile or args.page or args.only)
+    return bool(args.uncached or args.profile or args.page or args.view or args.only)
 
 
 def profile_selection_error(args: argparse.Namespace) -> str | None:
     """--profile runs one page (one process per page) or named operations, never none or two."""
     if not args.profile:
         return None
-    if len(args.page) > 1:
-        return "--profile takes one --page per run (one process per page)"
-    if not args.page and not args.only:
-        return "--profile needs --page ROUTE or --ops NAME ..."
+    if len(args.page) + len(args.view) > 1:
+        return "--profile takes one --page or --view per run (one process per page)"
+    if not args.page and not args.view and not args.only:
+        return "--profile needs --page ROUTE, --view VIEW_ID or --ops NAME ..."
     return None
 
 
@@ -861,6 +875,14 @@ def main(argv: list[str] | None = None) -> int:
     GUARD_PATH[0] = store_path(args.data_url) if args.data_url else None
     pages = json.loads(PAGES_FILE.read_text())["pages"]
     ops, by_page = inventory(pages)
+    if args.view:
+        try:
+            view_ops, by_view = vw.view_operations(vw.load_views(), args.view, ops)
+        except vw.SelectionError as err:
+            print(f"refused: {err}", file=sys.stderr)
+            return 2
+        ops, by_page = {**ops, **view_ops}, {**by_page, **by_view}
+        args.page = [*args.page, *args.view]  # a view is measured as a page of its own
     args.subset = bool(args.only or args.page)
     if args.subset:
         try:
