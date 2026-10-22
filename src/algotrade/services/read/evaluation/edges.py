@@ -14,8 +14,10 @@ from algotrade.config.edges import document, loading
 from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
 from algotrade.config.edges.portfolio import benchmark_words
+from algotrade.config.user import SITE_USER
 from algotrade.core.time.windows import window_name
-from algotrade.services.read.context import Stores
+from algotrade.services.read.context import Stores, once_per_request
+from algotrade.storage.configs.generation import is_stable
 
 
 @dataclass(frozen=True)
@@ -296,11 +298,25 @@ def _published(e: document.Edge) -> EdgePublished | None:
     )
 
 
+def parsed_edges(ctx: Stores, user: str) -> tuple[document.Edge, ...]:
+    """``loading.load_edges`` for ``user``, parsed once per request and config generation: a page
+    of 80 edges asks for them in every resolver, and each parse reads and types every document
+    (0.15 s a call over the site's edges). Keyed on the user's and the site's config generation
+    read before the documents (ADR 0077 decision 15): a write of theirs gives a new key, and one in
+    flight (odd) is not memoised, so nothing half-written is kept."""
+    gens = (ctx.configs.generation(user), ctx.configs.generation(SITE_USER))
+    if not all(is_stable(g) for g in gens):
+        return loading.load_edges(ctx.configs, user)
+    return once_per_request(
+        ctx, ("edges-parsed", user, gens), lambda: loading.load_edges(ctx.configs, user)
+    )
+
+
 def load_edges(ctx: Stores) -> tuple[Edge, ...]:
     """Every edge ``ctx.user`` sees, by id; none without documents."""
     site = set(ctx.configs.names(loading.SITE, loading.KIND))
-    found = loading.load_edges(ctx.configs, ctx.user.user_id)
     user = ctx.user.user_id
+    found = parsed_edges(ctx, user)
     return tuple(
         _edge(
             e,

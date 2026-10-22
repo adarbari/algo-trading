@@ -28,14 +28,13 @@ from algotrade.config.edges.document import (
     job_name,
 )
 from algotrade.config.edges.loading import load_all_edges
-from algotrade.config.edges.loading import load_edges as load_site_edges
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.data import StoreReader
 from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause, table_cause
-from algotrade.services.read.context import ReadContext, Stores, run_partition
-from algotrade.services.read.evaluation.edges import Edge, load_edges
+from algotrade.services.read.context import ReadContext, Stores, once_per_request, run_partition
+from algotrade.services.read.evaluation.edges import Edge, load_edges, parsed_edges
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -333,19 +332,17 @@ def load_site_trials(ctx: Stores) -> int:
     user's own edges are not the site's). An edge with no canonical run, or one from before the
     count, adds none. Kept until the next publish or run, and keyed on the site edges' ids,
     frozen periods and statuses, so an edited document recounts."""
-    if not isinstance(ctx, ReadContext):
-        return _site_trials(ctx)
-    # one request asks per edge per field: the count (and the config reads of its key) once
+    # one request asks per edge per field, from resolvers running side by side (every one of them
+    # on ``RequestContext.stores()``, a ``StoreContext``): the count (and the config reads of its
+    # key) once
     memo_key = ("site-trials", ctx.reader.version(), ctx.reader.runs_generation())
-    if memo_key not in ctx.memo:
-        ctx.memo[memo_key] = _site_trials(ctx)
-    return int(ctx.memo[memo_key])
+    return once_per_request(ctx, memo_key, lambda: _site_trials(ctx))
 
 
 def _site_trials(ctx: Stores) -> int:
     """``load_site_trials`` without the request memo: kept in ``ctx.cache`` until the next publish
     or run."""
-    site = {e.id: (e.status, e.frozen_from) for e in load_site_edges(ctx.configs)}
+    site = {e.id: (e.status, e.frozen_from) for e in parsed_edges(ctx, SITE_USER)}
     key = (
         "site-trials",
         ctx.reader.version(),
