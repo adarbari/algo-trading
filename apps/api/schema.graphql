@@ -439,6 +439,11 @@ type Edge {
   verdict: EdgeVerdict!
 
   """
+  The headline of `verdict` (label, result, trades, lift, basis) for a list: always equal to those fields of `verdict`, read without the pieces a list never shows
+  """
+  summary: EdgeSummary!
+
+  """
   The user's own edge against the edge it extends and its baselines, in-sample only while `oosHidden`; null for a site edge
   """
   compare: EdgeCompare
@@ -831,6 +836,19 @@ type EdgeSettings {
 type EdgeSource {
   title: String!
   url: String!
+}
+
+"""
+The headline of an edge's verdict, what the edges list shows: the same `verdict`, `result`, `basis`, `trades` and `lift` as `Edge.verdict` (the one judge, the same run), without the haircut, decay, robustness, years, columns or evidence the list never reads, so it is read at a fraction of the cost; `oosTrades`, `liftPts`: the out-of-sample session count and the win rate over the base rate in points
+"""
+type EdgeSummary {
+  verdict: String!
+  result: String!
+  basis: String
+  trades: Int
+  oosTrades: Int
+  lift: Float
+  liftPts: Float
 }
 
 """

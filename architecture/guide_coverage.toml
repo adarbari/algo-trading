@@ -145,6 +145,11 @@ values_from = "python:algotrade.services.read.evaluation.verdict:ORDER"
 values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data", diagnostic_only = "term:verdict_diagnostic_only" }
 
 [[enum]]
+source = "graphql:EdgeSummary.verdict"
+values_from = "python:algotrade.services.read.evaluation.verdict:ORDER"
+values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data", diagnostic_only = "term:verdict_diagnostic_only" }
+
+[[enum]]
 source = "graphql:VerdictCriterion.status"
 values_from = "python:algotrade.services.read.evaluation.verdict:CRITERION_STATUSES"
 values = { pass = "term:verdict_criteria", fail = "term:verdict_criteria", not_measured = "term:verdict_criteria", not_applicable = "term:verdict_criteria" }

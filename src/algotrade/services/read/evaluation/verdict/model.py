@@ -229,3 +229,26 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
             )
         )
     return found
+
+
+@dataclass(frozen=True)
+class EdgeSummary:
+    """The headline of an edge's verdict, what the edges list renders: the label, the one-line
+    ``result``, the screen and holding period it rests on, the trades and the lift. Always a
+    projection of the full verdict's own fields (``summary_of``), never a second rule."""
+
+    edge_id: str
+    verdict: str
+    result: str
+    basis: str | None
+    trades: int | None
+    oos_trades: int | None
+    lift: float | None
+    lift_pts: float | None
+
+
+def summary_of(v: EdgeVerdict) -> EdgeSummary:
+    """The headline fields of ``v``."""
+    return EdgeSummary(
+        v.edge_id, v.verdict, v.result, v.basis, v.trades, v.oos_trades, v.lift, v.lift_pts
+    )

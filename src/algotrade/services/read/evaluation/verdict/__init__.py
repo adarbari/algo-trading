@@ -93,6 +93,9 @@ from algotrade.services.read.evaluation.verdict.model import (
     WORKS as WORKS,
 )
 from algotrade.services.read.evaluation.verdict.model import (
+    EdgeSummary as EdgeSummary,
+)
+from algotrade.services.read.evaluation.verdict.model import (
     EdgeVerdict as EdgeVerdict,
 )
 from algotrade.services.read.evaluation.verdict.model import (
@@ -103,6 +106,9 @@ from algotrade.services.read.evaluation.verdict.model import (
 )
 from algotrade.services.read.evaluation.verdict.model import (
     YearRow as YearRow,
+)
+from algotrade.services.read.evaluation.verdict.model import (
+    summary_of as summary_of,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     EdgeFacts as EdgeFacts,
@@ -118,6 +124,9 @@ from algotrade.services.read.evaluation.verdict.rule import (
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     judge as judge,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    load_edge_summary as load_edge_summary,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     load_edge_verdict as load_edge_verdict,

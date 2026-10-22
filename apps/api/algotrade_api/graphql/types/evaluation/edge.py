@@ -18,6 +18,7 @@ from algotrade_api.graphql.types.evaluation.verdict import (
     EdgeDefinition,
     EdgeSettings,
     EdgeSource,
+    EdgeSummary,
     EdgeVerdict,
 )
 from algotrade_api.graphql.types.instruments.feature import Unknown
@@ -298,6 +299,14 @@ class Edge:
     async def verdict(self, info: Info) -> EdgeVerdict:
         found = await off_loop(versions.load_verdict, self.ctx, self.edge)
         return EdgeVerdict.of(found)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The headline of `verdict` (label, result, trades, lift, basis) for a list: "
+        "always equal to those fields of `verdict`, read without the pieces a list never shows"
+    )
+    async def summary(self, info: Info) -> EdgeSummary:
+        found = await off_loop(versions.load_summary, self.ctx, self.edge)
+        return EdgeSummary.of(found)
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's own edge against the edge it extends and its baselines, "
