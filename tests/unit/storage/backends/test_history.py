@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import pytest
 from pandas.testing import assert_frame_equal
 
-from algotrade.storage.backends import history
+from algotrade.storage.backends import history, local
 from algotrade.storage.backends.history import HISTORY, MANIFEST
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -457,3 +457,126 @@ def test_the_index_digest_is_read_once_per_version_of_the_file(
     copy.current(TABLE, day)
     copy.current(TABLE, day)
     assert first == 1 and len(reads) == 1
+
+
+# ---- the per-year verdict of ``usable`` is kept per (published sequence, destructive epoch)
+
+ARGS = (date(2025, 12, 1), date(2026, 3, 1))
+
+
+def _usable(backend: LocalBackend, upto: int | None = None) -> list[int]:
+    seq = backend.tables.commits.published() if upto is None else upto
+    return sorted(backend.tables.history.usable(TABLE, *ARGS, True, seq))
+
+
+def test_a_commit_inside_a_year_invalidates_its_kept_verdict(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    assert _usable(backend) == [2025, 2026]  # kept now
+    day = date(2025, 12, 22)  # a restatement
+    backend.tables.write(TABLE, day, "r7", stamped(_rows(1, scale=100.0), day, "r7", LATER), True)
+    assert _usable(backend) == [2026]
+    new = date(2026, 1, 25)  # a new session
+    backend.tables.write(TABLE, new, "r9", stamped(_rows(99), new, "r9", LATER))
+    assert _usable(backend) == []
+    same = date(2026, 1, 5)  # a same-run rewrite, same knowledge_ts
+    backend.tables.write(TABLE, same, "r1", stamped(_rows(1, scale=55.0), same, "r1"))
+    assert _usable(backend) == []
+
+
+def test_a_purge_invalidates_its_kept_verdict(tmp_path: Path) -> None:
+    root = tmp_path / "data"
+    backend = _store(root)
+    backend.tables.build_history(TABLE, [2025, 2026])
+    assert _usable(backend) == [2025, 2026]
+    assert backend.tables.commits.purge([root / "tables" / TABLE / "date=2025-12-25"]) == 1
+    assert _usable(backend) == [2026]
+
+
+def test_a_drop_style_epoch_bump_alone_invalidates_the_kept_verdict(tmp_path: Path) -> None:
+    root = tmp_path / "data"
+    backend = _store(root)
+    backend.tables.build_history(TABLE, [2025, 2026])
+    assert _usable(backend) == [2025, 2026]
+    index = root / "tables" / TABLE / "date=2025-12-25" / "_runs.json"
+    index.write_bytes(index.read_bytes() + b" ")  # a change the sequence does not see
+    assert _usable(backend) == [2025, 2026]  # same key: the kept verdict stands
+    backend.tables.commits.bump_epoch()  # what a drop does
+    assert _usable(backend) == [2026]
+
+
+def test_a_pinned_and_a_live_reader_never_share_a_wrong_answer(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    pin = backend.tables.commits.published()
+    assert _usable(backend, pin) == [2025, 2026]
+    day = date(2025, 12, 22)  # a commit run: the sequence moves
+    frame = stamped(_rows(1, scale=100.0), day, "r8", LATER)
+    backend.tables.write(TABLE, day, "r8", frame, pending=True)
+    backend.tables.commit_run("r8", LATER)
+    assert backend.tables.commits.published() > pin
+    assert _usable(backend) == [2026]  # the live reader after the restate
+    assert _usable(backend, pin) == [2026]  # the pin gets the store as published, no stale yes
+    # a copy built after the commit is not served to the earlier pin, whatever was kept
+    backend.tables.build_history(TABLE, [2025, 2026])
+    assert _usable(backend) == [2025, 2026]
+    assert _usable(backend, pin) == [2026]  # 2026 was kept at the pin; 2025 is newer than it
+    # an own_run read bypasses the copy (and so the kept verdicts)
+    with _copy_reads(backend) as taken:
+        backend.tables.read_range(TABLE, *ARGS, instruments=["EQ:A"], own_run="r8")
+    assert taken == []
+
+
+def test_a_repeat_usable_call_does_no_stat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    copy = backend.tables.history
+    assert _usable(backend) == [2025, 2026]
+    stats: list[Path] = []
+    real = Path.stat
+
+    def counting(path: Path, **kwargs: Any) -> Any:
+        if path.name == "_runs.json":
+            stats.append(path)
+        return real(path, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", counting)
+    for _ in range(5):
+        assert sorted(copy.usable(TABLE, *ARGS, True, backend.tables.commits.published())) == [
+            2025,
+            2026,
+        ]
+    assert stats == []
+    backend.tables.commits.bump_epoch()
+    assert _usable(backend) == [2025, 2026]
+    assert len(stats) > 0  # a new epoch asks again
+
+
+def test_the_kept_verdicts_are_bounded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    monkeypatch.setattr(history, "MAX_VERDICTS", 3)
+    copy = backend.tables.history
+    seq = backend.tables.commits.published()
+    for k in range(10):
+        copy.usable(TABLE, date(2025, 12, 1 + k), date(2025, 12, 28), True, seq)
+    assert len(copy._verdicts) <= 3
+
+
+def test_a_verdict_taken_mid_direct_write_is_not_kept_after_the_write_lands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    real = local.write_index
+    seen: list[list[int]] = []
+
+    def racing(directory: Path, index: Any) -> None:  # a reader between the bump and the rewrite
+        seen.append(_usable(backend))
+        real(directory, index)
+
+    monkeypatch.setattr(local, "write_index", racing)
+    day = date(2026, 1, 5)
+    backend.tables.write(TABLE, day, "r1", stamped(_rows(1, scale=55.0), day, "r1"))
+    assert seen == [[2025, 2026]]  # the reader saw the old index
+    assert _usable(backend) == [2025]  # ...and its verdict did not stick
