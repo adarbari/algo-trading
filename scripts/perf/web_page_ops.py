@@ -56,6 +56,8 @@ LAZY_RE = re.compile(
 )
 THUNK_RE = re.compile(r"(?:const)\s+(\w+)\s*=\s*\(\)\s*=>\s*import\(['\"]([^'\"]+)['\"]\)")
 DOC_RE = re.compile(r"graphql\(\s*`\s*(query|mutation|subscription)\s+(\w+)")
+# a hand-written document (a typed `query X(...)` string outside the codegen'd `graphql(` calls)
+HAND_RE = re.compile(r"[`'\"]\s*(query)\s+(\w+)\s*[({]")
 IDENT_RE = re.compile(r"(?<![.\w$])([A-Za-z_]\w*)\b")
 
 
@@ -177,7 +179,7 @@ class Source:
         for i, (start, name) in enumerate(starts):
             end = starts[i + 1][0] if i + 1 < len(starts) else len(text)
             m.decls[name] = (start, end)
-            doc = DOC_RE.search(text, start, end)
+            doc = DOC_RE.search(text, start, end) or HAND_RE.search(text, start, end)
             if doc and text[start:end].lstrip().startswith(("const", "export const")):
                 m.docs[name] = (doc.group(1), doc.group(2))
         thunks = dict(THUNK_RE.findall(text))
@@ -356,6 +358,8 @@ class Walk:
                             if found:
                                 best[found] = min(best.get(found, HANDLER), kind)
                 continue
+            if "/generated/" in target[0].as_posix():
+                continue  # `graphql()` indexes every document: following it would reach them all
             tm = self.source.module(target[0])
             edge = kind
             if target[1] in tm.docs:
@@ -375,8 +379,8 @@ class Walk:
             and re.search(r"\benabled\b", m.text[span[0] : span[1]])
         )
 
-    def classify(self, roots: list[tuple[Node, int]]) -> dict[str, int]:
-        """Operation name -> best (lowest) class over every path from the roots."""
+    def reach(self, roots: list[tuple[Node, int]]) -> dict[Node, int]:
+        """Declaration -> best (lowest) class over every path from the roots."""
         best: dict[Node, int] = {}
         work = list(roots)
         while work:
@@ -386,8 +390,12 @@ class Walk:
             best[node] = kind
             for target, edge in self.edges(node):
                 work.append((target, max(kind, edge)))
+        return best
+
+    def classify(self, roots: list[tuple[Node, int]]) -> dict[str, int]:
+        """Operation name -> best (lowest) class over every path from the roots."""
         ops: dict[str, int] = {}
-        for (path, name), kind in best.items():
+        for (path, name), kind in self.reach(roots).items():
             doc = self.source.module(path).docs.get(name)
             if doc and doc[0] == "query":
                 ops[doc[1]] = min(ops.get(doc[1], 3), kind)
@@ -401,7 +409,8 @@ def all_query_ops(src: Path) -> set[str]:
         rel = f.relative_to(src).as_posix()
         if ".test." in rel or "/generated/" in rel or ".stories." in rel:
             continue
-        for kind, name in DOC_RE.findall(strip_comments(f.read_text())):
+        text = strip_comments(f.read_text())
+        for kind, name in [*DOC_RE.findall(text), *HAND_RE.findall(text)]:
             if kind == "query":
                 found.add(name)
     return found
@@ -423,6 +432,7 @@ class Route:
     search: bool = False  # declares search params (validateSearch)
     file: str = ""
     kind: str = "page"  # page | placeholder | redirect | layout
+    validator: Node | None = None  # the `validateSearch` function, where it is a named one
 
 
 @dataclass
@@ -516,6 +526,9 @@ def enumerate_routes(src: Path, source: Source | None = None) -> list[Route]:
             route.kind = "placeholder"
         else:
             _page_symbols(source, r, route)
+            named = re.search(r"validateSearch:\s*(\w+)", r.block)
+            if named:
+                route.validator = Walk(source)._target(source.module(r.file), named.group(1))
             if not route.pages:
                 route.kind = "redirect" if "redirect(" in r.block else "layout"
         routes.append(route)
@@ -585,7 +598,9 @@ def match_capture(routes: list[str], captured: list[str]) -> tuple[dict[str, lis
 def static_page_ops(
     src: Path, routes: list[Route]
 ) -> tuple[dict[str, dict[str, int]], dict[str, int]]:
-    """({route path: {op: class}} with the shell's ops removed, the shell's {op: class})."""
+    """({route path: {op: class}} with the shell's ops removed, the shell's {op: class}). Only a
+    shell op that is itself sent on load (or maybe) is removed: one the shell only sends from a
+    handler (a dialog, a menu) is still the page's own when the page sends it."""
     source = Source(src)
     walk = Walk(source)
     shell_roots: list[tuple[Node, int]] = []
@@ -600,5 +615,5 @@ def static_page_ops(
     for route in routes:
         roots = [(n, LOAD) for n in route.pages + route.prefetch]
         ops = walk.classify(roots)
-        pages[route.path] = {o: k for o, k in ops.items() if o not in shell}
+        pages[route.path] = {o: k for o, k in ops.items() if shell.get(o, HANDLER) == HANDLER}
     return pages, shell

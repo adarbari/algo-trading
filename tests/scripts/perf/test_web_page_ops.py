@@ -153,3 +153,25 @@ def test_reference_kinds_conditional_and_arrow_scopes() -> None:
     assert kinds["useB"] == wpo.MAYBE
     assert kinds["useC"] == wpo.HANDLER
     assert kinds["useD"] == wpo.MAYBE
+
+
+def test_generated_document_index_is_not_followed_and_hand_written_queries_count(
+    tmp_path: Path,
+) -> None:
+    src = tree(tmp_path)
+    (src / "shared/api/generated").mkdir(parents=True)
+    # codegen's `graphql()` indexes every document: reaching it must not reach them all
+    (src / "shared/api/generated/gql.ts").write_text(
+        "const documents = { x: RowsDocument };\n"
+        "export function graphql(s) { return documents[s]; }\n"
+    )
+    page = src / "pages/list/ui/ListPage.tsx"
+    page.write_text(
+        "import { graphql } from '@/shared/api/generated/gql';\n"
+        "import { useRows } from '@/entities/rows';\n"
+        "const HandDoc = gql<Q>(`query Hand($id: String!) { hand(id: $id) }`);\n"
+        "export function ListPage() { graphql('x'); useRows(); return HandDoc; }\n"
+    )
+    assert wpo.all_query_ops(src) == {"Rows", "Detail", "Hand"}
+    pages, _ = wpo.static_page_ops(src, wpo.enumerate_routes(src))
+    assert pages["/items"] == {"Rows": wpo.LOAD, "Hand": wpo.LOAD}
