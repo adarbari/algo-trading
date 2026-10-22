@@ -51,7 +51,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, job_of_name, run_session
-from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
+from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError, PartitionStats
 from algotrade.storage.tables.schemas import require_retention
 
 Key = tuple[str, date]  # (table, session_date)
@@ -216,6 +216,17 @@ class MemoryTables:
             lambda: self._index_lock,
             upto,
         )
+
+    def partition_stats(
+        self,
+        table: str,
+        session_date: date,
+        own_run: str | None = None,
+        column: str | None = None,
+        upto: int | None = None,
+    ) -> PartitionStats | None:
+        frame = self.read(table, session_date, None, None, own_run, upto)
+        return None if frame is None else PartitionStats.of(frame, column)
 
     def read_latest_runs(
         self,

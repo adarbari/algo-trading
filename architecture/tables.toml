@@ -560,6 +560,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "v1 (RG3a) was never materialised; v2 added ebp, ebp_recession_prob, ofr_fsi and epu; v3 let the unemployment windows tolerate a missing month (v2 rows on the owner's store are superseded and read by nothing, deleted by hand once v3 is backfilled)"
 
 [[table]]
+name = "rollups/market/macro_asof@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "per regime-card macro series, its latest known observation, that vintage's date and kind and its first ALFRED vintage (provenance, personal licence on the personal series); read by services/read/regime/sources.py instead of the 2.9 M stored vintages, which it recomputes for a session with no row"
+
+[[table]]
 name = "rollups/market/market_triggers@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "ADR 0075: the VIX spike trigger of the on_market time-series edges, from FRED VIXCLS and VXVCLS (personal licence)"

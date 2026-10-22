@@ -77,7 +77,7 @@ Change (smallest fit): `[outcome] side = "long" | "short" | "long_short"` (defau
 - `[published] leg = "long_short" | "long" | "short"` so the decay read compares like with like
   (see 7b).
 Files: `config/edges/document.py`, `cross_section/{picks,hit,measures,random_picks}.py`,
-`cross_section/legs/rows.py`, `cross_section/detail/trades.py`, `services/read/evaluation/verdict.py`
+`cross_section/legs/rows.py`, `cross_section/detail/trades.py`, `services/read/evaluation/verdict/`
 (basis may be a side), Guide entries for the three values (`guide_coverage.toml`).
 ADR: amendment to 0053 ("outcome sides") and to 0065 (the basis names a side).
 Risks: a bottom leg drawn from names with no score (UNKNOWN read as worst) is the classic
@@ -237,7 +237,7 @@ a) **t > 3 beside deflated Sharpe.** `works_t = 3.0` already gates the decile-sp
    edge's trials, from the run records) passed to `haircut_sharpe` beside the per-edge count;
    the report shows both haircuts. Promising stays `promising_t = 2.0` unless the owner raises
    it (O1). Files: `quant/edges/statistics.py` (none new), `cross_section/results.py`,
-   `services/read/evaluation/verdict.py`, `config/site/verdict.toml`. ADR 0065 amendment.
+   `services/read/evaluation/verdict/`, `config/site/verdict.toml`. ADR 0065 amendment.
    Effort S. Architect review (verdict).
 b) **Published-size haircut.** `[published] leg` (from (1)) and `verdict.toml [published_haircut]
    long_short = 0.5, long_only = 0.333`; the edge page shows "published x, expect y" beside

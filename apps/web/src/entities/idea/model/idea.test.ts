@@ -5,16 +5,23 @@ import { earningsBeforeExpiry, factOf, NO_IDEAS, toIdeasData, type IdeasResponse
 
 type Served = NonNullable<IdeasResponse['ideas']>;
 type Item = Served['items'][number];
-type Pick = Item['picks'][number];
+type Best = Item['best'];
+type By = Item['pickedBy'][number];
 
-const pick = (configId: string, decision: string, score: number | null): Pick => ({
+const best = (configId: string, decision: string, score: number | null): Best => ({
   configId,
   decision,
   score,
   reasons: '',
-  flags: [],
   criteria: [],
-  columns: [],
+});
+
+const by = (configId: string, position: number, decision = 'QUALIFIED', own = false): By => ({
+  configId,
+  own,
+  position,
+  score: 1 / position,
+  decision,
 });
 
 const value = (name: string, v: unknown) => ({
@@ -27,15 +34,22 @@ const value = (name: string, v: unknown) => ({
 const item = (
   rank: number,
   symbol: string | null,
-  picks: Pick[],
+  served: Best,
+  pickedBy: By[],
   facts = [value('x', 1)],
+  extra: Partial<Item> = {},
 ): Item => ({
   rank,
   instrumentId: `id-${String(rank)}`,
+  score: 1 / rank,
   regime: rank === 1 ? 'STRESS' : null,
   sizeMultiplier: rank === 1 ? 0.5 : null,
+  watchOut: [],
   instrument: symbol === null ? null : { symbol, name: `${symbol} Inc`, features: facts },
-  picks,
+  best: served,
+  pickedBy,
+  metrics: [],
+  ...extra,
 });
 
 const screener = (id: string, name: string, notRun = false): Served['screeners'][number] => ({
@@ -52,13 +66,13 @@ const screener = (id: string, name: string, notRun = false): Served['screeners']
       }
     : null,
   picked: notRun ? 0 : 7,
+  withheld: id === 'hidden',
   top: notRun ? [] : [{ instrumentId: 'id-1', score: 84, instrument: { symbol: 'AAPL' } }],
 });
 
 const response: IdeasResponse = {
   ideas: {
     session: '2026-10-02',
-    priority: ['vrp', 'liq'],
     total: 3,
     hasMore: false,
     nextCursor: null,
@@ -84,14 +98,14 @@ const response: IdeasResponse = {
       item(
         1,
         'AAPL',
-        [pick('vrp', 'WATCH', 60), pick('liq', 'QUALIFIED', 84)],
+        best('liq', 'QUALIFIED', 84),
+        [by('liq', 1), by('vrp', 2, 'WATCH', true)],
         [
           value(IDEA_FACTS.nextEarnings, '2026-10-29'),
           value(IDEA_FACTS.earningsBeforeExpiry, true),
         ],
       ),
-      item(2, null, [pick('liq', 'EVENT_RISK', null)]),
-      item(3, 'ZZZ', []),
+      item(2, null, best('liq', 'EVENT_RISK', null), [by('liq', 1, 'EVENT_RISK')]),
     ],
   },
 };
@@ -99,15 +113,19 @@ const response: IdeasResponse = {
 describe('toIdeasData', () => {
   const data = toIdeasData(response);
 
-  it('keeps the server order of picks and takes the best decision', () => {
+  it('serves each idea from the best pick the server chose, in the server order', () => {
     const [first] = data.ideas;
-    expect(first?.picks.map((p) => p.screenerId)).toEqual(['vrp', 'liq']);
+    expect(first?.pickedBy.map((p) => [p.screenerId, p.screenerName, p.position, p.own])).toEqual([
+      ['liq', 'liq', 1, false],
+      ['vrp', 'VRP scanner', 2, true],
+    ]);
     expect(first?.best).toMatchObject({ screenerId: 'liq', decision: 'QUALIFIED', score: 84 });
+    expect(first?.score).toBe(1);
     expect(first && factOf(first, IDEA_FACTS.nextEarnings)?.value).toBe('2026-10-29');
     expect(first && earningsBeforeExpiry(first)).toBe(true);
   });
 
-  it('keeps an instrument the snapshot lacks and drops an idea nobody picked', () => {
+  it('keeps an instrument the snapshot lacks', () => {
     expect(data.ideas.map((i) => i.instrumentId)).toEqual(['id-1', 'id-2']);
     const second = data.ideas[1];
     expect(second?.symbol).toBeNull();
@@ -115,7 +133,11 @@ describe('toIdeasData', () => {
   });
 
   it('lists the screeners as served, with the run counts and why one did not run', () => {
-    expect(data.screeners.map((s) => s.id)).toEqual(['vrp', 'liq', 'gone']);
+    expect(data.screeners.map((s) => [s.id, s.withheld])).toEqual([
+      ['vrp', false],
+      ['liq', false],
+      ['gone', false],
+    ]);
     expect(data.screeners[0]).toMatchObject({
       picked: 7,
       notRun: null,
@@ -165,57 +187,37 @@ describe('display values and watch-outs', () => {
         item(
           1,
           'AAPL',
-          [
-            {
-              ...pick('liq', 'LIQUIDITY_RISK', 60),
-              flags: ['leveraged_inverse', 'large_move'],
-              columns: [
-                { name: 'iv30', value: 0.3 },
-                { name: 'hv30', value: 0.2 },
-              ],
-              criteria: [
-                { id: 'iv30', outcome: 'PASS', value: 0.99 },
-                { id: 'adv', outcome: 'NEAR', value: 4.5e7 },
-              ],
-            },
-            {
-              ...pick('vrp', 'QUALIFIED', 84),
-              flags: ['large_move', 'odd_flag'],
-              columns: [
-                { name: 'iv30', value: 0.31 },
-                { name: 'put_roc', value: 0.019 },
-                { name: 'note', value: 'x' },
-              ],
-            },
-          ],
+          best('liq', 'LIQUIDITY_RISK', 60),
+          [by('liq', 1, 'LIQUIDITY_RISK'), by('vrp', 3)],
           [value(IDEA_FACTS.earningsBeforeExpiry, true)],
+          {
+            watchOut: ['leveraged_inverse', 'large_move', 'liquidity_risk', 'odd_flag'],
+            metrics: [
+              { name: 'iv30', value: 0.3 },
+              { name: 'hv30', value: 0.2 },
+              { name: 'note', value: 'x' },
+            ],
+          },
         ),
       ],
     },
   };
   const [idea] = toIdeasData(rich).ideas;
 
-  it('takes each value from the best pick that has it, columns before criterion values', () => {
-    expect(idea?.metrics).toEqual({
-      iv30: 0.31,
-      put_roc: 0.019,
-      note: 'x',
-      hv30: 0.2,
-      adv: 4.5e7,
-    });
+  it("takes the best pick's served display values as they are", () => {
+    expect(idea?.metrics).toEqual({ iv30: 0.3, hv30: 0.2, note: 'x' });
   });
 
-  it('lists each watch-out once, with the served earnings-before-expiry flag', () => {
+  it('labels the served watch-outs, each once, and adds none of its own', () => {
     expect(idea?.watchOut.map((w) => w.label)).toEqual([
       'Leveraged / inverse',
       'Large move',
       'Liquidity risk',
       'Odd flag',
-      'Earnings before expiry',
     ]);
   });
 
   it('names the screeners', () => {
-    expect(idea?.picks.map((p) => p.screenerName)).toEqual(['liq', 'VRP scanner']);
+    expect(idea?.pickedBy.map((p) => p.screenerName)).toEqual(['liq', 'VRP scanner']);
   });
 });

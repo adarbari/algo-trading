@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-672 stored features in 86 groups, in dependency order; 161 expression features.
+700 stored features in 87 groups, in dependency order; 161 expression features.
 
 ## `option_liquidity@v1`
 
@@ -1238,6 +1238,41 @@ Slow macro readings of the regime model: the yield curve, credit spreads, labour
 | `vix` | window | float32 | pct_points | personal | 0 .. 150 | Cboe VIX close (20 = 20% implied vol) | no observation of VIX known by the session (no FRED key, or before it starts) | `series:VIX` |
 | `vix3m` | window | float32 | pct_points | personal | 0 .. 150 | Cboe 3-month VIX close | no observation of VIX3M known by the session (no FRED key, or before it starts) | `series:VIX3M` |
 | `vix_term_ratio` | window | float32 | ratio | personal | 0 .. 5 | VIX / VIX3M (above 1: backwardation, short-term stress) | no observation of VIX, VIX3M known by the session (no FRED key, or before it starts) | `series:VIX`, `series:VIX3M` |
+
+### `macro_asof@v1`
+
+When each macro series the regime cards rest on became known: its latest observation known by the session, the date and kind of that vintage and the series' first ALFRED vintage (provenance, point in time by vintage). Stored as `rollups/market/macro_asof@v1`; reads `macro/series` (optional), `macro/first_vintages` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `t10y3m_last_obs_date` | window | date | date | open |  | T10Y3M: the latest observation known by the session | the series has no observation known by the session (no FRED key, or before it starts) | `series:T10Y3M` |
+| `t10y3m_vintage_date` | window | date | date | open |  | T10Y3M: the date that observation's value became public | the series has no observation known by the session (no FRED key, or before it starts) | `series:T10Y3M` |
+| `t10y3m_vintage_kind` | label | str | category | open | alfred, lagged | T10Y3M: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:T10Y3M` |
+| `t10y3m_first_vintage` | window | date | date | open |  | T10Y3M: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:T10Y3M` |
+| `bamlh0a0hym2_last_obs_date` | window | date | date | personal |  | BAMLH0A0HYM2: the latest observation known by the session | the series has no observation known by the session (no FRED key, or before it starts) | `series:BAMLH0A0HYM2` |
+| `bamlh0a0hym2_vintage_date` | window | date | date | personal |  | BAMLH0A0HYM2: the date that observation's value became public | the series has no observation known by the session (no FRED key, or before it starts) | `series:BAMLH0A0HYM2` |
+| `bamlh0a0hym2_vintage_kind` | label | str | category | personal | alfred, lagged | BAMLH0A0HYM2: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:BAMLH0A0HYM2` |
+| `bamlh0a0hym2_first_vintage` | window | date | date | personal |  | BAMLH0A0HYM2: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:BAMLH0A0HYM2` |
+| `unrate_last_obs_date` | window | date | date | open |  | UNRATE: the latest observation known by the session | the series has no observation known by the session (no FRED key, or before it starts) | `series:UNRATE` |
+| `unrate_vintage_date` | window | date | date | open |  | UNRATE: the date that observation's value became public | the series has no observation known by the session (no FRED key, or before it starts) | `series:UNRATE` |
+| `unrate_vintage_kind` | label | str | category | open | alfred, lagged | UNRATE: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:UNRATE` |
+| `unrate_first_vintage` | window | date | date | open |  | UNRATE: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:UNRATE` |
+| `nfci_last_obs_date` | window | date | date | open |  | NFCI: the latest observation known by the session | the series has no observation known by the session (no FRED key, or before it starts) | `series:NFCI` |
+| `nfci_vintage_date` | window | date | date | open |  | NFCI: the date that observation's value became public | the series has no observation known by the session (no FRED key, or before it starts) | `series:NFCI` |
+| `nfci_vintage_kind` | label | str | category | open | alfred, lagged | NFCI: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:NFCI` |
+| `nfci_first_vintage` | window | date | date | open |  | NFCI: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:NFCI` |
+| `spx_last_obs_date` | window | date | date | personal |  | SPX: the latest observation known by the session | the series has no observation known by the session (no FRED key, or before it starts) | `series:SPX` |
+| `spx_vintage_date` | window | date | date | personal |  | SPX: the date that observation's value became public | the series has no observation known by the session (no FRED key, or before it starts) | `series:SPX` |
+| `spx_vintage_kind` | label | str | category | personal | alfred, lagged | SPX: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:SPX` |
+| `spx_first_vintage` | window | date | date | personal |  | SPX: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:SPX` |
+| `vix_last_obs_date` | window | date | date | personal |  | VIX: the latest observation known by the session | the series has no observation known by the session (no FRED key, or before it starts) | `series:VIX` |
+| `vix_vintage_date` | window | date | date | personal |  | VIX: the date that observation's value became public | the series has no observation known by the session (no FRED key, or before it starts) | `series:VIX` |
+| `vix_vintage_kind` | label | str | category | personal | alfred, lagged | VIX: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:VIX` |
+| `vix_first_vintage` | window | date | date | personal |  | VIX: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:VIX` |
+| `vix3m_last_obs_date` | window | date | date | personal |  | VIX3M: the latest observation known by the session | the series has no observation known by the session (no FRED key, or before it starts) | `series:VIX3M` |
+| `vix3m_vintage_date` | window | date | date | personal |  | VIX3M: the date that observation's value became public | the series has no observation known by the session (no FRED key, or before it starts) | `series:VIX3M` |
+| `vix3m_vintage_kind` | label | str | category | personal | alfred, lagged | VIX3M: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:VIX3M` |
+| `vix3m_first_vintage` | window | date | date | personal |  | VIX3M: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:VIX3M` |
 
 ### `market_triggers@v1`
 

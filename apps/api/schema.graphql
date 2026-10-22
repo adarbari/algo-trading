@@ -444,6 +444,11 @@ type Edge {
   verdict: EdgeVerdict!
 
   """
+  The headline of `verdict` (label, result, trades, lift, basis) for a list: always equal to those fields of `verdict`, read without the pieces a list never shows
+  """
+  summary: EdgeSummary!
+
+  """
   The user's own edge against the edge it extends and its baselines, in-sample only while `oosHidden`; null for a site edge
   """
   compare: EdgeCompare
@@ -836,6 +841,19 @@ type EdgeSettings {
 type EdgeSource {
   title: String!
   url: String!
+}
+
+"""
+The headline of an edge's verdict, what the edges list shows: the same `verdict`, `result`, `basis`, `trades` and `lift` as `Edge.verdict` (the one judge, the same run), without the haircut, decay, robustness, years, columns or evidence the list never reads, so it is read at a fraction of the cost; `oosTrades`, `liftPts`: the out-of-sample session count and the win rate over the base rate in points
+"""
+type EdgeSummary {
+  verdict: String!
+  result: String!
+  basis: String
+  trades: Int
+  oosTrades: Int
+  lift: Float
+  liftPts: Float
 }
 
 """
@@ -1983,19 +2001,31 @@ type HorizonRow {
 }
 
 """
-A ticker some screener picked: its picks, best screener first. `regime` and `sizeMultiplier`: the session's label and the size of its best pick, as the run stamped them (null: gate off, regime unknown, or a run before the stamp)
+A ticker some screener picked, served from its `best` pick only. `score`: that pick's, the idea's place in the list; `pickedBy`: every screener that picked it, the best first; `metrics` and `watchOut` (ids: flags, `liquidity_risk`, `earnings_before_expiry`) are the best pick's; `regime` and `sizeMultiplier`: the session's label and the size of the best pick, as the run stamped them (null: gate off, regime unknown, or a run before the stamp)
 """
 type Idea {
   rank: Int!
   instrumentId: String!
   instrument: Instrument
-  picks: [ScreenResult!]!
+  score: Float!
+  best: ScreenResult!
+  pickedBy: [PickedBy!]!
   regime: String
   sizeMultiplier: Float
+  metrics: [IdeaMetric!]!
+  watchOut: [String!]!
 }
 
 """
-One of the user's screeners on the Ideas page: its run for the session (else `notRun`: NOT_RUN), how many tickers it picked and its best picks, over the run
+A stored display value of an idea's best pick: a screener column or a criterion's value, by name
+"""
+type IdeaMetric {
+  name: String!
+  value: JSON!
+}
+
+"""
+One of the user's screeners on the Ideas page: its run for the session (else `notRun`: NOT_RUN), how many tickers it picked over the run, its first picks that count towards the ideas (`top`) and `withheld`: its run's order follows values the viewer's data licences do not cover, so it contributes no idea and lists no pick
 """
 type IdeaScreener {
   screener: Screener!
@@ -2003,14 +2033,14 @@ type IdeaScreener {
   notRun: Unknown
   picked: Int!
   top: [ScreenResult!]!
+  withheld: Boolean!
 }
 
 """
-The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` one page of the `total` picked tickers (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
+The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
 """
 type Ideas {
   session: Date!
-  priority: [String!]!
   screeners: [IdeaScreener!]!
   total: Int!
   items: [Idea!]!
@@ -2436,6 +2466,18 @@ type PickIds {
 }
 
 """
+One screener's pick of an idea: its `position` in the screener's run, the `score` it earns under the Ideas rule (weight over position: a site screener's first pick is 1, the viewer's own screener weighs 3) and the `decision` it gave
+"""
+type PickedBy {
+  configId: String!
+  owner: String!
+  own: Boolean!
+  position: Int!
+  score: Float!
+  decision: String!
+}
+
+"""
 The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
 """
 type PresetPin {
@@ -2556,7 +2598,7 @@ type Query {
   ): EventCalendar
 
   """
-  The tickers the user's screeners picked in the session, ranked by their screener priority then score (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
+  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
   """
   ideas(
     first: Int! = 50

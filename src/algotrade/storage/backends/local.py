@@ -46,6 +46,8 @@ import pyarrow.parquet as pq
 
 from algotrade.storage.backends.arrow import (
     concat,
+    file_groups,
+    file_stats,
     keep_columns,
     parquet_bytes,
     row_groups_holding,
@@ -96,7 +98,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, is_job_record_name, job_of_name, run_session
-from algotrade.storage.tables.interfaces import CompactionReport
+from algotrade.storage.tables.interfaces import CompactionReport, PartitionStats
 from algotrade.storage.tables.schemas import require_retention
 
 
@@ -233,6 +235,15 @@ class LocalTables:
         known = pd.Timestamp(item["knowledge_ts"])
         return RunEntry(known, bool(item["restates"]), ref=item["file"])
 
+    def _entries(
+        self, directory: Path, table: str, session_date: date, own_run: str | None, upto: int
+    ) -> dict[str, RunEntry]:
+        entries = visible_entries(read_index(directory), upto)
+        own = self._own(table, session_date, own_run)
+        if own_run is not None and own is not None:
+            entries[own_run] = own
+        return entries
+
     def _partition(
         self,
         table: str,
@@ -247,10 +258,7 @@ class LocalTables:
         ``upto``: the commit sequence the read captured before opening any index.
         ``columns``: only those (and the key / point-in-time columns) are decoded."""
         directory = self._dir(table, session_date)
-        entries = visible_entries(read_index(directory), upto)
-        own = self._own(table, session_date, own_run)
-        if own_run is not None and own is not None:
-            entries[own_run] = own
+        entries = self._entries(directory, table, session_date, own_run, upto)
         runs = select_runs(entries, as_of, run_mode(table))
         if not runs:
             return None
@@ -316,10 +324,7 @@ class LocalTables:
         restating run among them, or a file whose groups the statistics cannot name exactly, reads
         the whole merge and keeps each group's newest run from its rows (same rows either way)."""
         directory = self._dir(table, session_date)
-        entries = visible_entries(read_index(directory), upto)
-        own = self._own(table, session_date, own_run)
-        if own_run is not None and own is not None:
-            entries[own_run] = own
+        entries = self._entries(directory, table, session_date, own_run, upto)
         runs = select_runs(entries, None, run_mode(table))
         if not runs:
             return None
@@ -327,7 +332,7 @@ class LocalTables:
             held = {
                 run: None
                 if entries[run].restates
-                else _file_groups(directory / run_file(run, entries[run]), group)
+                else file_groups(directory / run_file(run, entries[run]), group)
                 for run in runs
             }
             newest = newest_run_per_group(runs, held)
@@ -357,10 +362,7 @@ class LocalTables:
         directory = self._dir(table, session_date)
 
         def at(seq: int) -> pa.Table | None:
-            entries = visible_entries(read_index(directory), seq)
-            own = self._own(table, session_date, own_run)
-            if own_run is not None and own is not None:
-                entries[own_run] = own
+            entries = self._entries(directory, table, session_date, own_run, seq)
             entry = entries.get(run_id)
             if entry is None:
                 return None
@@ -376,6 +378,31 @@ class LocalTables:
             return None
         frame = to_frame(concat(table, [data]))
         return None if frame.empty else frame.reset_index(drop=True)
+
+    def partition_stats(
+        self,
+        table: str,
+        session_date: date,
+        own_run: str | None = None,
+        column: str | None = None,
+        upto: int | None = None,
+    ) -> PartitionStats | None:
+        directory = self._dir(table, session_date)
+
+        def at(seq: int) -> PartitionStats | None:
+            entries = self._entries(directory, table, session_date, own_run, seq)
+            runs = select_runs(entries, None, run_mode(table))
+            if not runs:
+                return None
+            if len(runs) > 1:  # merged by key: the rows decide the count
+                data = self._partition(table, session_date, None, None, own_run, seq)
+                return None if data is None else PartitionStats.of(to_frame(data), column)
+            try:  # one file: its footer counts it
+                return file_stats(directory / run_file(runs[0], entries[runs[0]]), column)
+            except FileNotFoundError as gone:  # a commit replaced the version
+                raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
+
+        return read_at(at, self.commits.published, self.commits.no_commits, upto)
 
     def read_range(
         self,
@@ -715,27 +742,6 @@ def _read_file(
         return data
     ids = data.column("instrument_id")
     return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
-
-
-def _file_groups(path: Path, group: Sequence[str]) -> set[tuple[object, ...]] | None:
-    """The groups (values of the ``group`` columns) a version file holds, from its footer alone:
-    every row group's statistics must name one value per column (min == max). ``None``: a column
-    missing, a row group without statistics, or one holding two values (the caller falls back)."""
-    with pq.ParquetFile(path) as parquet:
-        meta = parquet.metadata
-        at = {meta.schema.column(i).path: i for i in range(meta.num_columns)}
-        if any(name not in at for name in group):
-            return None
-        found: set[tuple[object, ...]] = set()
-        for number in range(meta.num_row_groups):
-            values = []
-            for name in group:
-                stats = meta.row_group(number).column(at[name]).statistics
-                if stats is None or not stats.has_min_max or stats.min != stats.max:
-                    return None
-                values.append(stats.min)
-            found.add(tuple(values))
-        return found
 
 
 def _read_run_file(

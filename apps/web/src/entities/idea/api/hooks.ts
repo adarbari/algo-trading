@@ -1,9 +1,9 @@
 /**
- * The Ideas page's one read (ADR 0037): `IdeasPage` over GraphQL, the ranked ideas for the
- * latest session with every pick (the size each gets from the regime, ADR 0049), the picks the
- * regime gate paused with their reasons, the user's screeners with their run (or why not run) and
- * picked counts over the whole run, and each idea's facts by catalogue name (earnings, nearest
- * expiry, IV: ADR 0038). The cache holds the response; `select` shapes it.
+ * The Ideas page's one read (ADR 0037): `IdeasPage` over GraphQL, the ideas for the latest
+ * session ranked by the Ideas rule and served from each one's best pick (with the screeners that
+ * picked it, the size it gets from the regime, ADR 0049), the picks the regime gate paused with
+ * their reasons, the user's screeners with their run (or why not run) and picked counts over the
+ * whole run, and each idea's facts by catalogue name (earnings, nearest expiry, IV: ADR 0038). The cache holds the response; `select` shapes it.
  */
 import {
   queryOptions,
@@ -30,7 +30,6 @@ const IdeasPage = graphql(`
   query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!) {
     ideas(first: $first, after: $after) {
       session
-      priority
       total
       hasMore
       nextCursor
@@ -76,6 +75,7 @@ const IdeasPage = graphql(`
           }
         }
         picked
+        withheld
         top {
           instrumentId
           score
@@ -87,8 +87,10 @@ const IdeasPage = graphql(`
       items {
         rank
         instrumentId
+        score
         regime
         sizeMultiplier
+        watchOut
         instrument {
           symbol
           name
@@ -118,21 +120,26 @@ const IdeasPage = graphql(`
             }
           }
         }
-        picks {
+        best {
           configId
           decision
           score
           reasons
-          flags
           criteria {
             id
             outcome
-            value
           }
-          columns {
-            name
-            value
-          }
+        }
+        pickedBy {
+          configId
+          own
+          position
+          score
+          decision
+        }
+        metrics {
+          name
+          value
         }
       }
     }

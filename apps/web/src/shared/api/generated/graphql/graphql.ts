@@ -428,7 +428,7 @@ export type IdeasPageQueryVariables = Exact<{
 }>;
 
 
-export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, hasMore: boolean, nextCursor: string | null, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, regime: string | null, sizeMultiplier: number | null, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, outcome: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
+export type IdeasPageQuery = { ideas: { session: string, total: number, hasMore: boolean, nextCursor: string | null, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, withheld: boolean, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, score: number, regime: string | null, sizeMultiplier: number | null, watchOut: Array<string>, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, best: { configId: string, decision: string, score: number | null, reasons: string, criteria: Array<{ id: string, outcome: string }> }, pickedBy: Array<{ configId: string, own: boolean, position: number, score: number, decision: string }>, metrics: Array<{ name: string, value: unknown }> }> } | null };
 
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
@@ -2672,7 +2672,6 @@ export const IdeasPageDocument = new TypedDocumentString(`
     query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!) {
   ideas(first: $first, after: $after) {
     session
-    priority
     total
     hasMore
     nextCursor
@@ -2718,6 +2717,7 @@ export const IdeasPageDocument = new TypedDocumentString(`
         }
       }
       picked
+      withheld
       top {
         instrumentId
         score
@@ -2729,8 +2729,10 @@ export const IdeasPageDocument = new TypedDocumentString(`
     items {
       rank
       instrumentId
+      score
       regime
       sizeMultiplier
+      watchOut
       instrument {
         symbol
         name
@@ -2760,21 +2762,26 @@ export const IdeasPageDocument = new TypedDocumentString(`
           }
         }
       }
-      picks {
+      best {
         configId
         decision
         score
         reasons
-        flags
         criteria {
           id
           outcome
-          value
         }
-        columns {
-          name
-          value
-        }
+      }
+      pickedBy {
+        configId
+        own
+        position
+        score
+        decision
+      }
+      metrics {
+        name
+        value
       }
     }
   }

@@ -1,35 +1,13 @@
-"""``PUT /preferences/ideas`` (the priority is checked and saved) and ``PUT`` / ``DELETE
-/preferences/views/{scope}/view`` (a user's views of a table, read back by GraphQL
-``Query.view``)."""
+"""``PUT`` / ``DELETE /preferences/views/{scope}/view`` (a user's views of a table, read back by
+GraphQL ``Query.view``)."""
 
 from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
 
-URL = "/preferences/ideas"
 ALICE = {"X-Act-For": "alice"}
 SITE = {"X-Act-For": "site"}
-
-
-def test_saves_the_priority_of_site_presets_and_keeps_other_preferences(
-    writer_client: TestClient, root: Path
-) -> None:
-    prefs = root / "users" / "alice" / "preferences.toml"
-    prefs.parent.mkdir(parents=True)
-    prefs.write_text('[theme]\nname = "dark"\n')
-    saved = writer_client.put(URL, json={"priority": ["vrp"]}, headers=ALICE)
-    assert (saved.status_code, saved.json()) == (200, {"priority": ["vrp"]})
-    text = prefs.read_text()
-    assert 'priority = ["vrp"]' in text and 'name = "dark"' in text
-
-
-def test_unknown_duplicate_or_site_users_are_refused(writer_client: TestClient, root: Path) -> None:
-    for body in ({"priority": ["nope"]}, {"priority": ["vrp", "vrp"]}, {"priority": ["Bad Id"]}):
-        assert writer_client.put(URL, json=body, headers=ALICE).status_code == 400
-    site = writer_client.put(URL, json={"priority": []}, headers=SITE)
-    assert site.status_code == 400
-    assert not (root / "users").exists()
 
 
 VIEW = "/preferences/views/screener:vrp/view"
@@ -56,7 +34,6 @@ def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
         "scope": "screener:vrp", "name": None, "saved": False, "columns": [], "sort": None,
         "decisions": [], "names": [], "narrow_columns": [],
     }  # fmt: skip
-    writer_client.put("/preferences/ideas", json={"priority": ["vrp"]})
     saved = writer_client.put(VIEW, json=BODY)
     assert (saved.status_code, saved.json()) == (
         200,
@@ -71,7 +48,7 @@ def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
     )
     assert read(writer_client) == saved.json()
     text = prefs.read_text()
-    assert 'priority = ["vrp"]' in text and CLOSE in text and '[views."screener:vrp".view]' in text
+    assert CLOSE in text and '[views."screener:vrp".view]' in text
     assert writer_client.put(VIEW, json=BODY, headers={"X-Act-For": "bob"}).status_code == 200
     assert (root / "users" / "bob" / "preferences.toml").exists()  # bob's own file
     cleared = writer_client.put(VIEW, json={"columns": [], "sort": None, "decisions": []})
@@ -88,7 +65,7 @@ def test_a_view_saved_under_the_old_layout_moves_on_the_next_write(
         '[screeners.vrp.views.Mine]\ncolumns = []\ndecisions = ["WATCH"]\n'
     )
     assert read(writer_client)["columns"] == [CLOSE]  # read where it was saved
-    writer_client.put("/preferences/ideas", json={"priority": ["vrp"]})  # any write moves it
+    writer_client.put(VIEW, json=BODY)  # any write moves it
     text = prefs.read_text()
     assert "[screeners" not in text and '[views."screener:vrp".views.Mine]' in text
     assert read(writer_client)["names"] == ["Mine"]

@@ -23,6 +23,24 @@ class CompactionReport:
     skipped: str | None = None  # why nothing was changed (never an error)
 
 
+@dataclass(frozen=True)
+class PartitionStats:
+    """What a partition holds, counted without decoding its rows (``TableStore.partition_stats``):
+    ``rows``, the sorted ``run_ids`` its rows carry and, when a column was asked for and the
+    partition has it, ``values`` (that column as text, row order)."""
+
+    rows: int
+    run_ids: tuple[str, ...] = ()
+    values: tuple[str, ...] = ()
+
+    @classmethod
+    def of(cls, frame: pd.DataFrame, column: str | None = None) -> "PartitionStats":
+        """The stats of a frame read in full (the reference the footer-based ones must equal)."""
+        runs = tuple(sorted(map(str, frame["run_id"].unique())))
+        found = column is not None and column in frame
+        return cls(len(frame), runs, tuple(map(str, frame[column])) if found else ())
+
+
 class TableStore(Protocol):
     """Point-in-time tables partitioned by (table, session_date, run_id).
 
@@ -134,6 +152,21 @@ class TableStore(Protocol):
         the read is made once at it and a version that was discarded raises
         ``StaleSnapshotError`` (never a retry at a fresh sequence, which would answer another
         question). ``None``: a fresh one, retried as needed. Same for every read below."""
+        ...
+
+    def partition_stats(
+        self,
+        table: str,
+        session_date: date,
+        own_run: str | None = None,
+        column: str | None = None,
+        upto: int | None = None,
+    ) -> PartitionStats | None:
+        """``PartitionStats.of(read(table, session_date, own_run=own_run, upto=upto), column)``
+        (``None`` where ``read`` is), without decoding the rows when the partition is one run's
+        file: the local backend counts from the Parquet footer and decodes only ``run_id`` (when
+        its statistics cannot name it) and ``column``; a partition that merges several runs is
+        read whole, as the merge decides its rows."""
         ...
 
     def read_range(

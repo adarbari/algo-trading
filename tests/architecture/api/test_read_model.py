@@ -92,7 +92,7 @@ def test_only_loaders_read_partitions() -> None:
 
 # The context's inventory reads (what is stored, on dates the caller names): only the ops loader
 # that reports on storage itself (the Admin completeness grid) calls or imports them.
-INVENTORY_READS = {"stored_dates", "partition_on", "snapshot_on"}
+INVENTORY_READS = {"stored_dates", "partition_on", "partition_stats_on", "snapshot_on"}
 INVENTORY_CALLERS = {READ_MODEL / "context.py", READ_MODEL / "ops" / "ingestion.py"}
 
 

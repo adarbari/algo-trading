@@ -556,3 +556,32 @@ class EdgeVerdict:
             haircut=EdgeHaircut.of(d.haircut) if d.haircut else None,
             decay=EdgeDecay.of(d.decay) if d.decay else None,
         )
+
+
+@strawberry.type(
+    description="The headline of an edge's verdict, what the edges list shows: the same `verdict`, "
+    "`result`, `basis`, `trades` and `lift` as `Edge.verdict` (the one judge, the same run), "
+    "without the haircut, decay, robustness, years, columns or evidence the list never reads, "
+    "so it is read at a fraction of the cost; `oosTrades`, `liftPts`: the out-of-sample session "
+    "count and the win rate over the base rate in points"
+)
+class EdgeSummary:
+    verdict: str
+    result: str
+    basis: str | None
+    trades: int | None
+    oos_trades: int | None
+    lift: float | None
+    lift_pts: float | None
+
+    @classmethod
+    def of(cls, d: read.EdgeSummary) -> Self:
+        return cls(
+            verdict=d.verdict,
+            result=d.result,
+            basis=d.basis,
+            trades=d.trades,
+            oos_trades=d.oos_trades,
+            lift=d.lift,
+            lift_pts=d.lift_pts,
+        )

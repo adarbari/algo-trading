@@ -13,7 +13,11 @@ value's vintage date and kind (``series_as_of`` with ``lookback=0``: ``known_win
 series' stored vintages), and ``first_vintage``, the series' earliest ALFRED vintage the
 session knew: before it the stored history is the figures as first vintaged, not as they were
 known then ("before <date> these are today's revised figures"). ``None`` for a lagged
-(unrevised) series. One read of the vintages per publish (``visible_seq``) and session."""
+(unrevised) series. Read by name from the stored catalogue features
+``market.macro_asof@v1.<key>_<field>`` of the session (``features/rollups/market/macro_asof.py``:
+the same rule, computed nightly); a session with no row, a series without columns or with no
+observation stored is recomputed from the stored vintages instead (one read of them per publish
+(``visible_seq``) and session), so a session before a backfill gives what it always gave."""
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -23,13 +27,14 @@ import pandas as pd
 
 from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.regime.cards import InputSource, SourceSwitch
-from algotrade.data.macro.series import known_window, stored_vintages
+from algotrade.core.model.instruments import market_id
+from algotrade.data.macro.series import first_alfred_vintages, latest_known, stored_vintages
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import SERIES_REF, is_feature_ref, is_series_ref
+from algotrade.services.features import entity_field_view
 from algotrade.services.read.context import ReadContext
 
 FRED_URL = "https://fred.stlouisfed.org/series/"
-ALFRED = "alfred"  # macro/series vintage_kind of an ALFRED vintage
 SOURCE_NAMES = {"fred": "FRED", "published": "Published file"}
 
 
@@ -117,11 +122,6 @@ class Provenance:
     vintage_kind: str
 
 
-def _first_vintages(frame: pd.DataFrame) -> dict[str, date]:
-    alfred = frame[frame["vintage_kind"] == ALFRED]
-    return {str(k): v for k, v in alfred.groupby("instrument_id")["vintage_date"].min().items()}
-
-
 def _provenance(
     ctx: ReadContext, ids: tuple[str, ...]
 ) -> tuple[Mapping[str, Provenance], Mapping[str, date]]:
@@ -133,16 +133,13 @@ def _provenance(
     latest, first = ctx.cache.get(latest_key), ctx.cache.get(first_key)
     if latest is None or first is None:
         frame = stored_vintages(ctx.reader, ids)
-        known = known_window(frame, day, 0)  # series_as_of(lookback=0) over this one read
-        newest = known.sort_values("obs_date", kind="stable").drop_duplicates(
-            "instrument_id", keep="last"
-        )
+        newest = latest_known(frame, day)  # series_as_of(lookback=0) over this one read
         columns = ("instrument_id", "obs_date", "vintage_date", "vintage_kind")
         latest = {
             str(iid): Provenance(obs, vintage, str(kind))
             for iid, obs, vintage, kind in zip(*(newest[c] for c in columns), strict=True)
         }
-        first = _first_vintages(frame)
+        first = first_alfred_vintages(frame)
         ctx.cache.put(latest_key, latest)
         ctx.cache.put(first_key, first)
     return latest, first
@@ -182,16 +179,65 @@ def _found(
     return by_card
 
 
+MACRO_ASOF = "market.macro_asof@v1."  # the stored provenance (``features/rollups/market``)
+_PROVENANCE_COLUMNS = ("last_obs_date", "vintage_date", "vintage_kind", "first_vintage")
+
+
+def _stored_provenance(
+    ctx: ReadContext, series: Iterable[MacroSeries]
+) -> dict[str, SeriesProvenance]:
+    """Per series key, the provenance the nightly stored for ``ctx.session`` (the catalogue
+    features ``market.macro_asof@v1.<key>_<field>``, read by name for exactly that session; the
+    licence gate is not applied: the provenance is metadata the cards show every viewer, as the
+    stored-vintage read always did). A series is absent when the session has no row, the
+    catalogue lacks its columns, or it has no observation known (the caller recomputes those)."""
+    keys = sorted({s.key for s in series})
+    names = {k: [f"{MACRO_ASOF}{k.lower()}_{c}" for c in _PROVENANCE_COLUMNS] for k in keys}
+    known = ctx.features.field_types("market")
+    wanted = [k for k in keys if all(n in known for n in names[k])]
+    if not wanted:
+        return {}
+    cache_key = ("regime-source-stored", tuple(wanted), ctx.session.date, ctx.reader.version())
+    found = ctx.cache.get(cache_key)
+    if found is None:
+        fields = [n for k in wanted for n in names[k]]
+        mid = market_id("US")
+        frame, missing = entity_field_view(
+            ctx.reader, ctx.session.date, fields, [mid], features=ctx.features
+        )
+        row = None if missing or frame.empty else frame.iloc[0]
+        found = {}
+        if row is not None:
+            for k in wanted:
+                last, vintage, kind, first = (row[n] for n in names[k])
+                if not pd.isna(last):  # no observation stored: recomputed, never assumed
+                    found[k] = SeriesProvenance(
+                        _day(last),
+                        _day(vintage),
+                        str(kind),
+                        None if pd.isna(first) else _day(first),
+                    )
+        ctx.cache.put(cache_key, found)
+    return found
+
+
+def _day(value: object) -> date:
+    """A stored date column's value as a ``date``."""
+    return pd.Timestamp(str(value)).date()
+
+
 def _provenance_of(
     ctx: ReadContext, found: Iterable[IndicatorSource | tuple[str, MacroSeries]]
 ) -> dict[str, SeriesProvenance]:
-    """Per series key of ``found``, its provenance: the one stored read of the vintages."""
+    """Per series key of ``found``, its provenance: the stored one for the session, else (older
+    sessions before a backfill, a series the stored group lacks) the one read of the vintages."""
     series = {s.key: s for f in found if isinstance(f, tuple) for s in (f[1],)}
-    ids = tuple(sorted({s.instrument_id for s in series.values()}))
+    out = _stored_provenance(ctx, series.values())
+    rest = {k: s for k, s in series.items() if k not in out}
+    ids = tuple(sorted({s.instrument_id for s in rest.values()}))
     latest, first = _provenance(ctx, ids) if ids else ({}, {})
     day = ctx.session.date
-    out: dict[str, SeriesProvenance] = {}
-    for key, s in series.items():
+    for key, s in rest.items():
         p, earliest = latest.get(s.instrument_id), first.get(s.instrument_id)
         out[key] = SeriesProvenance(
             p.last_observation if p else None,

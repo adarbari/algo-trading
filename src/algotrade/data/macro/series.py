@@ -22,7 +22,7 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import MACRO_SERIES
+from algotrade.storage.tables.schemas import ALFRED, MACRO_SERIES
 
 TABLE = MACRO_SERIES.name
 KEY = list(MACRO_SERIES.key)
@@ -46,6 +46,25 @@ def stored_vintages(
     frame = frame.drop(columns=[c for c in STAMPS if c in frame.columns])
     order = ["vintage_date", "instrument_id", "obs_date"]
     return frame.sort_values(order, kind="stable").reset_index(drop=True)
+
+
+def first_alfred_vintages(vintages: pd.DataFrame) -> dict[str, date]:
+    """Per ``instrument_id`` of ``vintages`` (``stored_vintages``' shape), its earliest ALFRED
+    vintage date: before it the stored history is the figures as first vintaged, not as they
+    were known then. A series with no ALFRED vintage (lagged, unrevised) is absent."""
+    alfred = vintages[vintages["vintage_kind"] == ALFRED]
+    return {str(k): v for k, v in alfred.groupby("instrument_id")["vintage_date"].min().items()}
+
+
+def latest_known(vintages: pd.DataFrame, session: date) -> pd.DataFrame:
+    """Per ``instrument_id``, the row of its latest observation ``session`` knew (``obs_date``,
+    ``vintage_date`` of the vintage it knew, ``vintage_kind``): ``known_window`` with
+    ``lookback=0`` over rows already read, one row per series with any known observation."""
+    known = known_window(vintages, session, 0)
+    newest = known.sort_values("obs_date", kind="stable").drop_duplicates(
+        "instrument_id", keep="last"
+    )
+    return newest.reset_index(drop=True)
 
 
 def latest_vintages(vintages: pd.DataFrame, session: date) -> pd.DataFrame:
