@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from algotrade.config.site.guide.glossary import GlossaryTerm, load_guide_glossary
 from algotrade.config.site.guide.start import load_guide_start
-from algotrade.services.configs import catalog_of
+from algotrade.services.configs import field_catalog
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.index import GuideStartEntry, GuideTermEntry
 from algotrade.services.read.guide.prose import LinkedProse, link_prose
@@ -59,7 +59,7 @@ def load_guide_term(ctx: Stores, term_id: str) -> GuideTerm | None:
     others = (glossary.get(other) for other in term.see_also)
     return GuideTerm(
         entry=_term_entry(term),
-        body=link_prose(term.reading, catalog_of(ctx.features).fields),
+        body=link_prose(term.reading, field_catalog(ctx.configs).fields),
         see_also=tuple(_term_entry(t) for t in others if t is not None),
     )
 
@@ -69,7 +69,7 @@ def load_guide_start_page(ctx: Stores, page_id: str) -> GuideStartPage | None:
     page = load_guide_start(ctx.configs).get(page_id)
     if page is None:
         return None
-    fields = catalog_of(ctx.features).fields
+    fields = field_catalog(ctx.configs).fields
     titles = entry_titles(ctx)
     return GuideStartPage(
         entry=GuideStartEntry(page.id, page.order, page.title, page.summary),

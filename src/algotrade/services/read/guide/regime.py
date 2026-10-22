@@ -30,7 +30,7 @@ from datetime import date
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import Episode as EpisodeConfig
 from algotrade.config.site.regime.episodes import load_episodes
-from algotrade.services.configs import catalog_of
+from algotrade.services.configs import field_catalog
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.prose import LinkedProse, link_prose
 from algotrade.services.read.regime.episodes import Episode, episode_known_by
@@ -79,7 +79,7 @@ def load_guide_episode(ctx: Stores, slug: str) -> GuideEpisodeDetail | None:
     e = next((e for e in episodes if e.key == slug), None)
     if e is None:
         return None
-    fields = catalog_of(ctx.features).fields
+    fields = field_catalog(ctx.configs).fields
     return GuideEpisodeDetail(
         episode=episode_known_by(e, date.max, config.recessions),
         cause=link_prose(e.cause, fields),
@@ -136,7 +136,7 @@ def load_guide_indicator(ctx: Stores, key: str) -> GuideIndicatorDetail | None:
     card = next((c for c in load_cards(ctx.configs).cards if c.key == key), None)
     if card is None:
         return None
-    fields = catalog_of(ctx.features).fields
+    fields = field_catalog(ctx.configs).fields
     episodes = load_episodes(ctx.configs).episodes
 
     def linked(text: str) -> LinkedProse:
