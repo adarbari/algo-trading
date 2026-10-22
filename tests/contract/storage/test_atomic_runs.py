@@ -16,6 +16,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.backends.run_selection import OPTIMISTIC_TRIES
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
+from algotrade.storage.tables.schemas import SCREEN_PICKS, SCREEN_RUNS
 from tests.helpers.stored_frames import T0, stamped
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
@@ -292,6 +293,30 @@ def test_a_screen_run_and_its_picks_publish_with_the_rule_screen_or_not_at_all(
     for name in tables:
         committed = backend.tables.read(f"results/{name}", D1)
         assert committed is not None and set(committed["run_id"]) == {"s2"}
+
+
+def test_a_rerun_without_picks_never_shows_the_earlier_runs_picks(backend: Backend) -> None:
+    """Fix for: ``screen_picks`` as whole_per_group let a rerun that picked nothing (an empty
+    frame writes no file) read as the previous run's picks through ``read_latest_runs``. Fitness:
+    only ``screen_runs`` is a group's whole result; a picks reader takes the run id from it."""
+    assert SCREEN_RUNS.whole_per_group and not SCREEN_PICKS.whole_per_group
+    writer = ResultWriter(backend)
+    for run, at, picked in (("p1", T0, 1), ("p2", T0 + timedelta(hours=1), 0)):
+        frames = _screen_run_frames(run)
+        runs = frames["screen_runs"]
+        runs["picked"], runs["knowledge_ts"] = picked, pd.Timestamp(at)
+        frames["screen_picks"] = frames["screen_picks"].iloc[:picked]
+        frames["screen_picks"]["knowledge_ts"] = pd.Timestamp(at)
+        with writer.publishing(run, at):
+            for name in ("screen_runs", "screen_picks"):
+                writer.write_result(name, D1, run, frames[name], pending=True)
+    newest = backend.tables.read_latest_runs("results/screen_runs", D1)
+    assert newest is not None and list(newest["run_id"]) == ["p2"]
+    picks = backend.tables.read_run("results/screen_picks", D1, "p2")
+    assert picks is None or picks.empty
+    # the generic latest-run reader refuses the table, so it cannot resurrect run p1's picks
+    with pytest.raises(ValueError, match="whole result"):
+        backend.tables.read_latest_runs("results/screen_picks", D1)
 
 
 # A read pins one commit sequence. Each partition keeps one older version of a run, so when

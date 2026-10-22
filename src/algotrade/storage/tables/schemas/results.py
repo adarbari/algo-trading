@@ -220,6 +220,7 @@ SCREEN_RUNS = fixed(
     "finished_at timestamp_utc",
     runs="merge",
     key=("user_id", "config_id", "run_id"),
+    whole_per_group=True,  # every run writes its row, so a group's newest run is its latest run
 )
 
 # A screener run's picks as a business object (ScreenPick, same decision): the rows of
