@@ -50,3 +50,9 @@ def test_sync_rewrites_documents_and_keeps_variables() -> None:
     assert pages["/a"][0]["query"] == DOCS["X"]
     assert pages["/a"][0]["variables"] == {"first": 5}
     assert pages["/a"][1]["query"] == "query Z { z }"
+
+
+def test_an_optional_variable_may_be_left_out_but_a_required_one_may_not() -> None:
+    docs = {"X": "query X($first: Int!, $after: String) { x(first: $first, after: $after) }"}
+    assert pd.drift({"/a": [call("X", docs["X"], {"first": 1})]}, docs) == []
+    assert "variables" in pd.drift({"/a": [call("X", docs["X"], {"after": "a"})]}, docs)[0]

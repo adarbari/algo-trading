@@ -37,6 +37,12 @@ def declared_variables(document: str) -> set[str]:
     return set(re.findall(r"\$(\w+)", head.group(1))) if head else set()
 
 
+def required_variables(document: str) -> set[str]:
+    """The declared variables with a non-null type (`$first: Int!`): a call must send them."""
+    head = _HEAD_VARS.search(document)
+    return set(re.findall(r"\$(\w+)\s*:\s*[^,$]*!", head.group(1))) if head else set()
+
+
 def web_documents() -> dict[str, str]:
     """Operation name -> the web's generated document."""
     return load.parse_documents(GQL_TS.read_text())
@@ -61,10 +67,11 @@ def drift(
                 problems.append(f"{route} {name}: not a web operation (gql.ts has no such name)")
             elif squash(call["query"]) != squash(doc):
                 problems.append(f"{route} {name}: the recorded document differs from gql.ts")
-            elif set(call["variables"]) != declared_variables(doc):
+            elif not required_variables(doc) <= set(call["variables"]) <= declared_variables(doc):
                 problems.append(
-                    f"{route} {name}: recorded variables {sorted(call['variables'])} "
-                    f"!= declared {sorted(declared_variables(doc))}"
+                    f"{route} {name}: recorded variables {sorted(call['variables'])} do not fit "
+                    f"the declared {sorted(declared_variables(doc))} (required "
+                    f"{sorted(required_variables(doc))})"
                 )
     return problems
 
