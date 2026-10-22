@@ -389,7 +389,8 @@ def history_stale() -> str | None:
 
     reader, configs = open_read_stores(data_url(), config_dir())
     settings = load_nightly(configs).history_copy
-    return stale_history(reader, settings.instrument_tables) if settings.enabled else None
+    tables = (*settings.instrument_tables, *settings.event_tables)
+    return stale_history(reader, tables) if settings.enabled else None
 
 
 def serving_report() -> Any:

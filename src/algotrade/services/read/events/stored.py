@@ -20,6 +20,7 @@ from functools import partial
 
 import pandas as pd
 
+from algotrade.config.site.settings import load_nightly
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.events import ALL_TIME, NO_INSTRUMENT_ROWS, knowledge_bound, read_events
 from algotrade.services.read.context import Held, ReadContext
@@ -50,6 +51,18 @@ def event_tables(ctx: ReadContext) -> tuple[str, ...]:
     tables = sorted(t for t in names if t.startswith(EVENTS_PREFIX) and t not in NO_INSTRUMENT_ROWS)
     assert all(grain_of(t) is Grain.EVENT for t in tables)
     return tuple(tables)
+
+
+def warm_event_copies(ctx: ReadContext) -> tuple[str, ...]:
+    """Validate the history copy (ADR 0060) of every ``[history_copy] event_tables`` table for
+    all years, so the first events read after a start or a publish finds each partition index's
+    digest held instead of reading one file per stored day (about 8,400 for ``events/fund_nav``);
+    the tables validated, in name order (none when the copy is off)."""
+    settings = load_nightly(ctx.configs).history_copy
+    tables = tuple(sorted(settings.event_tables)) if settings.enabled else ()
+    for table in tables:
+        ctx.reader.warm_history(table)
+    return tables
 
 
 def load_events(

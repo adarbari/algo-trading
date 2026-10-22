@@ -65,7 +65,7 @@ column pruning, `ParquetFile` + filter) cannot remove the per-file cost.
   (`nightly.toml [history_copy]`): every table under `market_prefix` for all years, the listed
   `instrument_tables` for the last `recent_years` calendar years. A table is skipped with a
   WARN when free disk is below `free_disk_floor_gb` plus the table's current copy (a rebuilt year
-  exists twice), or when the instrument copies already hold `budget_gb` (a table not yet copied
+  exists twice), or when the event and instrument copies already hold `budget_gb` (a table not yet copied
   is not started; a table is added to the list only after its size is measured). Reads need no
   change: a skipped or failed night leaves a copy that reads detect as stale.
 
@@ -120,7 +120,7 @@ whole for one name) 0.1 to 0.25 s each. `events/filing_text` is left out of the 
 
 **Decision.** `nightly.toml [history_copy] event_tables` lists events tables copied for **every
 year they have partitions** (an events read is over all time, like a market table), by the same
-`build_history`, with the same layout, signature rule, memo (#814, #824), ragged-day rule and
+`build_history`, with the same layout, signature rule, memo (#814; #824 pending), ragged-day rule and
 fallback. Nothing in the read path changes: `read_range` serves an events table from the copy for
 `as_of` None, no `own_run`, an instrument filter picking the row groups whose `instrument_id`
 min / max can hold the id (`arrow.row_groups_holding`); a year whose signatures differ (a restated
@@ -136,13 +136,18 @@ run in the partition of its `session_date` (often an old one: that year's signat
 the year is rebuilt, the others kept); several runs of a day resolve per `run_mode` as for any
 table; `known_from` is data, never part of the copy's key.
 
-**Size.** Measured on the clone, sources only (no copy was built outside tests): `fund_nav` 84 MB,
-`short_interest` 99, `short_volume` 97, `insider_transaction` 137, `filing` 30: about 450 MB
-(a copy is sorted by instrument and compresses as well or better). The other events tables
-(`dividend`, `earnings`, `split`, `reference_change`, ...) are under 9 MB in at most 14 partitions
-each and read in under 0.03 s: not copied. `budget_gb` rises from 2.6 to 3.2 (2.3 GB of instrument
-copies + about 0.45 GB, with year-end growth), the event copies counting in it; the disk (17 GB
-free, floor 10) holds it.
+**Size and build cost (measured on the clone, 2026-10-22).** Copies: `fund_nav` 3.2 MB (23 years),
+`short_interest` 37.8, `short_volume` 32.0, `insider_transaction` 157.0 (6.4 M rows), `filing`
+29.6: 260 MB in all. One build of the five from scratch: 20.8 s, peak RSS 3.1 GB (the insider
+year sorts in memory; the nightly rebuilds the current year of `insider_transaction`,
+`short_volume`, `short_interest` and `filing` in full, about 17 s and the same 3 GB, a few
+minutes inside the nightly's last, non-critical step). Reads, `InstrumentEvents` for AAPL on the
+clone, response cache off: first call 20.9 s to 2.0 s; the five tables alone, AAPL: 4.8 s cold /
+2.9 s warm to 0.78 s / 0.14 s; a closed-end fund (ASA): 3.4 s / 2.7 s to 0.26 s / 0.13 s. The
+other events tables (`dividend`, `earnings`, `split`, `reference_change`, ...) are under 9 MB in
+at most 14 partitions and read in under 0.03 s: not copied. `budget_gb` rises from 2.6 to 3.0
+(2.3 GB of instrument copies + 0.26 GB, with year-end growth; the event copies are built after
+the instrument ones, so they never displace an Explore copy); free disk fell 16.45 to 16.20 GiB.
 
 **Known cost.** Validating a year checks every calendar day's partition signature: an all-time read
 checks about 8,400 days of `fund_nav` (one `stat` each once digests are held; the first read in a

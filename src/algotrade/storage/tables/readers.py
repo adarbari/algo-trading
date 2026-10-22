@@ -210,6 +210,11 @@ class StoreReader:
         operator learns the nightly's ``history-copy`` step is behind (``make doctor``)."""
         return self._backend.tables.history_current(table, day)
 
+    def warm_history(self, table: str) -> int:
+        """Validate the table's history copy for every year (ADR 0060), at this reader's
+        version: the API's warmer calls it so the first read pays no digest."""
+        return self._backend.tables.warm_history(table, self._pin)
+
     def table_names(self) -> list[str]:
         return self._backend.tables.names(self.own_run)
 

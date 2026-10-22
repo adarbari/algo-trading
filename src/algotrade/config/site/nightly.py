@@ -40,7 +40,7 @@ class HistoryCopySettings:
     ] = ()  # events tables read per instrument over all time: every year
     recent_years: int = 2  # calendar years (the session's and the ones before) kept for those
     budget_gb: float = (
-        2.0  # the instrument tables' copies together; one that would not fit is skipped
+        2.0  # the instrument and event tables' copies together; one that would not fit is skipped
     )
     free_disk_floor_gb: float = (
         10.0  # no build below this much free disk (a rebuilt year exists twice)

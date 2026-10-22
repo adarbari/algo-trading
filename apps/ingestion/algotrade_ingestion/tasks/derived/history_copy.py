@@ -56,12 +56,12 @@ def build_copies(ctx: TaskContext, session: date) -> RunRecord:
     with IngestRun(ctx, TASK, session) as run:
         for table, years, budgeted in (
             *((t, sorted({d.year for d in ctx.reader.dates(t)}), False) for t in market),
+            *((t, recent, True) for t in cfg.instrument_tables),  # Explore's copies come first
             *((t, sorted({d.year for d in ctx.reader.dates(t)}), True) for t in cfg.event_tables),
-            *((t, recent, True) for t in cfg.instrument_tables),
         ):
             held = ctx.writer.history_size(table)
             if budgeted and held == 0 and instrument_bytes >= cfg.budget_gb * GB:
-                skipped[table] = f"the instrument copies already hold {cfg.budget_gb} GB"
+                skipped[table] = f"the event and instrument copies already hold {cfg.budget_gb} GB"
                 continue
             free = ctx.writer.free_bytes()
             if free < cfg.free_disk_floor_gb * GB + held:
@@ -86,7 +86,7 @@ def build_copies(ctx: TaskContext, session: date) -> RunRecord:
 
 
 def check_history_copy(stats: Mapping[str, Any], session: date) -> list[Check]:
-    """One WARN per table the step skipped, and one when the instrument copies exceed the
+    """One WARN per table the step skipped, and one when the event and instrument copies exceed the
     budget (never a FAIL: a missing copy only means reads use the partitions)."""
     checks = [
         Check("history_copy", "WARN", f"{table}: {why}", data={"table": table})
@@ -98,7 +98,7 @@ def check_history_copy(stats: Mapping[str, Any], session: date) -> list[Check]:
             Check(
                 "history_copy_budget",
                 "WARN",
-                f"instrument copies {used / GB:.2f} GB > {budget / GB:.1f} GB",
+                f"event and instrument copies {used / GB:.2f} GB > {budget / GB:.1f} GB",
             )
         )
     return checks

@@ -441,6 +441,12 @@ class LocalTables:
         """Whether the history copy holds ``day``'s partition as it is now (``history.py``)."""
         return self.history.current(table, day)
 
+    def warm_history(self, table: str, upto: int | None = None) -> int:
+        """Validate every year of the table's copy now, so a read finds each index digest held
+        (``history.py``); -> the years that serve."""
+        seq = self.commits.published() if upto is None else upto
+        return len(self.history.usable(table, date.min, date.max, True, seq))
+
     def free_bytes(self) -> int:
         """Bytes free on the volume the store is on (a build checks it before writing)."""
         return self.history.free_bytes()

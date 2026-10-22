@@ -138,9 +138,9 @@ def test_an_instrument_table_over_the_budget_is_not_started(tmp_path: Path) -> N
     ctx = _ctx(tmp_path, budget_gb=1e-6)
     record = build_copies(ctx, SESSION)
     assert MARKET in record.stats["built"]  # market tables are not budgeted
-    assert EVENTS in record.stats["built"]  # the first table starts: nothing is held yet
+    assert BARS in record.stats["built"]  # the first table starts: nothing is held yet
     assert OTHER in record.stats["skipped"] and "already hold" in record.stats["skipped"][OTHER]
-    assert BARS in record.stats["skipped"]  # events count in the same budget
+    assert EVENTS in record.stats["skipped"]  # Explore's instrument copies keep the budget first
     assert any(c.name == "history_copy_budget" for c in check_history_copy(record.stats, SESSION))
 
 

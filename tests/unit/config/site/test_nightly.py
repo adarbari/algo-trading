@@ -64,6 +64,7 @@ def test_compaction_lists_only_merge_tables_without_a_history_copy() -> None:
     for table in nightly.compaction.tables:
         assert spec_for(table).runs == "merge", f"{table} is not a merge-mode table"
         assert table not in copied.instrument_tables, f"{table} has a history copy declared"
+        assert table not in copied.event_tables, f"{table} has a history copy declared"
         assert not (copied.market_prefix and table.startswith(copied.market_prefix)), table
 
 

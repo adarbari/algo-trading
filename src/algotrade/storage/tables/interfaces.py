@@ -215,6 +215,12 @@ class TableStore(Protocol):
         one built before the partition's last commit; the memory backend has none: True)."""
         ...
 
+    def warm_history(self, table: str, upto: int | None = None) -> int:
+        """Validate the table's history copy for every year (the check a first read pays: one
+        digest per stored day, held in process afterwards); -> the years it serves. The memory
+        backend has no copy: 0."""
+        ...
+
     def free_bytes(self) -> int:
         """Bytes free on the volume the store is on (the history build's disk floor)."""
         ...

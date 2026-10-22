@@ -340,3 +340,20 @@ def test_a_step_logs_without_a_figure_when_the_probe_reads_nothing(
     with caplog.at_level("INFO"):
         warm._run([("a", lambda: None)])
     assert "warmed a in" in caplog.text and "footprint" not in caplog.text
+
+
+def test_it_validates_the_event_copies_after_the_market_frames(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The first events read after a start or a publish pays no per-day validation: the warmer
+    runs ``warm_event_copies`` beside ``warm_market_frames`` (a publish replays it)."""
+    ran: list[str] = []
+    for name in ("run_summaries", "load_regime", "load_screeners", "load_edge_desk"):
+        monkeypatch.setattr(warm, name, lambda c: None)
+    monkeypatch.setattr(warm, "load_ideas", lambda c, n: None)
+    monkeypatch.setattr(warm, "load_completeness", lambda c, n: None)
+    monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
+    monkeypatch.setattr(warm, "warm_event_copies", lambda c: ran.append("event copies"))
+    monkeypatch.setattr(warm, "load_episodes", lambda configs: type("E", (), {"episodes": []}))
+    warm.warm(type("C", (), {"configs": None})())  # type: ignore[arg-type]
+    assert ran == ["frames", "event copies"]
