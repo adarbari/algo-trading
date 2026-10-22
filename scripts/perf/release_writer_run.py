@@ -105,7 +105,15 @@ def port_is_free(port: int) -> bool:
 
 def is_apfs(path: Path, run: Callable[..., subprocess.CompletedProcess]) -> bool:
     """True when ``diskutil info`` says the volume of ``path`` is APFS."""
-    done = run(["diskutil", "info", str(path)], capture_output=True, text=True, check=False)
+    # `diskutil info <path>` only takes a device or a mount point ("Could not find disk"), so
+    # the device comes from `df` first.
+    where = run(["df", "-P", str(path)], capture_output=True, text=True, check=False)
+    rows = where.stdout.strip().splitlines()
+    if where.returncode != 0 or len(rows) < 2:
+        return False
+    done = run(
+        ["diskutil", "info", rows[-1].split()[0]], capture_output=True, text=True, check=False
+    )
     return done.returncode == 0 and "apfs" in done.stdout.lower()
 
 
