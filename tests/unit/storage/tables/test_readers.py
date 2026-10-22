@@ -17,18 +17,10 @@ from algotrade.storage.tables.readers import (
     dates_digest,
 )
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.stored_frames import T0, stamped
+from tests.helpers.stored_frames import T0, publish, stamped
 
 D1, D2, D3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)
 A, B = "rollups/instrument/a@v1", "rollups/instrument/b@v1"
-
-
-def publish(backend: MemoryBackend | LocalBackend, run: str, table: str, *days: date) -> None:
-    writer = StoreWriter(backend)
-    for day in days:
-        frame = stamped([{"instrument_id": "EQ:A", "value": 1.0}], day, run)
-        writer.write_table(table, day, run, frame, pending=True)
-    backend.tables.commit_run(run, T0 + timedelta(minutes=5))
 
 
 def test_reads_are_logged_per_attributed_day_found_or_not() -> None:
@@ -311,3 +303,69 @@ def test_a_rolling_read_sees_a_purged_run_a_pinned_one_and_a_direct_write(tmp_pa
             frame = stamped([{"instrument_id": "EQ:C", "value": 7.0}], day, "direct")
             StoreWriter(backend).write_table(A, day, "direct", frame)  # no sequence
         _same(reader, memo, D1, day)
+
+
+def _gappy(backend: MemoryBackend | LocalBackend) -> list[date]:
+    """A table with gaps, a day committed after the first pin, and one far outside any window."""
+    days = [date(2026, 1, 5), date(2026, 9, 1), date(2026, 9, 3), D1, D3]
+    for n, day in enumerate(days):
+        publish(backend, f"g{n}", A, day)
+    return days
+
+
+def _no_listing(reader: StoreReader, monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*_a: object, **_k: object) -> list[date]:
+        raise AssertionError("dates_in listed the table")
+
+    monkeypatch.setattr(reader._backend.tables, "dates", refuse)
+
+
+@pytest.mark.parametrize("kind", ["memory", "local"])
+def test_dates_in_equals_the_listing_restricted_to_the_span_without_listing(
+    kind: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = MemoryBackend() if kind == "memory" else LocalBackend(tmp_path)
+    days = _gappy(backend)
+    reader = StoreReader(backend)
+    spans = [(date(2026, 8, 20), D3), (D2, D2), (D1, D1), (date(2026, 1, 1), date(2026, 1, 31))]
+    expected = {s: [d for d in reader.dates(A) if s[0] <= d <= s[1]] for s in spans}
+    _no_listing(reader, monkeypatch)
+    for (start, end), want in expected.items():
+        assert reader.dates_in(A, start, end) == want
+    assert reader.dates_in(A, date(2026, 8, 20), D3) == [days[1], days[2], D1, D3]
+    assert reader.dates_in(A, D3, D1) == []  # an empty span
+
+
+def test_dates_in_under_a_pin_sees_the_pinned_view_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    x = backend.tables.visible_seq()
+    publish(backend, "r2", A, D2)
+    publish(backend, "r3", A, date(2026, 9, 20))  # backfilled after the pin
+    live = StoreReader(backend)
+    pinned = live.pinned(x)
+    span = (date(2026, 9, 1), D3)
+    assert live.dates_in(A, *span) == [date(2026, 9, 20), D1, D2]
+    assert (
+        pinned.dates_in(A, *span) == [D1] == [d for d in pinned.dates(A) if span[0] <= d <= span[1]]
+    )
+    _no_listing(pinned, monkeypatch)
+    assert pinned.dates_in(A, *span) == [D1]
+
+
+def test_a_span_over_the_probe_cap_lists_once_and_gives_the_same_days() -> None:
+    backend = MemoryBackend()
+    _gappy(backend)
+    reader = StoreReader(backend)
+    start, end = date(2024, 1, 1), D3
+    assert (end - start).days > 366
+    assert reader.dates_in(A, start, end) == [d for d in reader.dates(A) if start <= d <= end]
+
+
+def test_a_recording_reader_logs_a_windowed_listing_as_a_listing() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1, D2)
+    reader = RecordingReader(backend)
+    with reader.attribute(D2):
+        assert reader.dates_in(A, D1, D2) == [D1, D2]
+    assert [r.kind for r in reader.reads(D2)] == ["dates"]

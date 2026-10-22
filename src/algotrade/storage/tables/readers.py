@@ -9,13 +9,15 @@ import hashlib
 from collections.abc import Collection, Hashable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.interfaces import Backend
+
+DATES_IN_PROBE_MAX = 366  # a longer ``dates_in`` span lists the table once instead of probing
 
 
 @dataclass
@@ -217,6 +219,18 @@ class StoreReader:
     def has_partition(self, table: str, day: date) -> bool:
         """Whether ``dates(table)`` lists ``day``: one probe, not a listing of the table."""
         return self._backend.tables.has_partition(table, day, self.own_run, self._pin)
+
+    def dates_in(self, table: str, start: date, end: date) -> list[date]:
+        """``dates(table)`` restricted to ``start..end``, oldest first, from one index probe per
+        day (live, pinned and own-run views alike): bounded by the span, not by the table's
+        partitions (listing 4,000 directories to place ten sessions). A span over
+        ``DATES_IN_PROBE_MAX`` days lists the table once instead, as probing would cost more."""
+        span = (end - start).days + 1
+        if span > DATES_IN_PROBE_MAX:
+            return [d for d in self.dates(table) if start <= d <= end]
+        days = (start + timedelta(days=k) for k in range(max(span, 0)))
+        tables = self._backend.tables
+        return [d for d in days if tables.has_partition(table, d, self.own_run, self._pin)]
 
     def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
         """The last partition date (on or before a date). Picking the snapshot a reader
@@ -492,6 +506,10 @@ class RecordingReader(StoreReader):
     def has_partition(self, table: str, day: date) -> bool:
         """A membership test is a read of the listing: recorded as one (its digest)."""
         return day in self.dates(table)
+
+    def dates_in(self, table: str, start: date, end: date) -> list[date]:
+        """A windowed listing is still a read of the listing for the record (its digest)."""
+        return [d for d in self.dates(table) if start <= d <= end]
 
     def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
         recording = self._open()
