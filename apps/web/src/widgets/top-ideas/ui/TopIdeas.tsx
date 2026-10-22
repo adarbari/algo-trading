@@ -136,7 +136,7 @@ export function TopIdeas({
             rowLines={search.columns === 'options' ? 2 : 3}
             visibleRows={14}
           />
-          {state === 'ready' && (ideas.data?.total ?? 0) > IDEAS_PAGE && (
+          {state === 'ready' && ((ideas.data?.total ?? 0) > IDEAS_PAGE || ideas.data?.hasMore) && (
             <Box padding={3}>
               <ShowMore
                 shown={all.length}

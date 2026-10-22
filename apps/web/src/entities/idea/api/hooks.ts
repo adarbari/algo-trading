@@ -5,9 +5,15 @@
  * picked counts over the whole run, and each idea's facts by catalogue name (earnings, nearest
  * expiry, IV: ADR 0038). The cache holds the response; `select` shapes it.
  */
-import { infiniteQueryOptions, useInfiniteQuery, type QueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import {
+  infiniteQueryOptions,
+  useInfiniteQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 
-import { gql, graphql, queryKeys } from '@/shared/api';
+import { gql, GraphQLRequestError, graphql, queryKeys } from '@/shared/api';
 
 import { IDEA_FEATURES } from '../model/facts';
 import { toIdeasData, type IdeasResponse } from '../model/idea';
@@ -137,7 +143,19 @@ const IdeasPage = graphql(`
  * joins the pages into one `IdeasData`: the screeners and the paused picks are the first page's.
  */
 export function useIdeas() {
-  return useInfiniteQuery({ ...ideasQuery(), select: toPagedIdeas });
+  const client = useQueryClient();
+  const query = useInfiniteQuery({ ...ideasQuery(), select: toPagedIdeas });
+  const { error, isFetchNextPageError } = query;
+  // A cursor the server refuses (BAD_REQUEST: the runs behind the loaded pages changed) means the
+  // list is stale: start over from a fresh first page, never append to it.
+  useEffect(() => {
+    if (isFetchNextPageError && error instanceof GraphQLRequestError) {
+      if (error.codes.includes('BAD_REQUEST')) {
+        void client.resetQueries({ queryKey: ideasQuery().queryKey });
+      }
+    }
+  }, [client, error, isFetchNextPageError]);
+  return query;
 }
 
 function toPagedIdeas(data: { pages: IdeasResponse[] }) {

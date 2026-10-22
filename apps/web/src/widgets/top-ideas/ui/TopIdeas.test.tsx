@@ -329,6 +329,18 @@ describe('TopIdeas', () => {
     expect(screen.queryByRole('button', { name: /Show .* more/ })).toBeNull();
   });
 
+  it('keeps "Show more" while the server has more, even when a filter hides every loaded row', async () => {
+    const fetchNextPage = vi.fn(() => Promise.resolve());
+    hooks.useIdeas.mockReturnValue({
+      ...fakeQuery<IdeasData>({ ...data, total: 312, hasMore: true }),
+      fetchNextPage,
+    });
+    setup({ screener: 'no-such-screener' });
+    expect(screen.getByText(/No idea matches/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the watch-outs as chips', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });

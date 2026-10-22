@@ -118,6 +118,27 @@ describe('useIdeas', () => {
     ]);
   });
 
+  it('starts over from a fresh first page when the server refuses the cursor', async () => {
+    GQL.mockResolvedValueOnce(page([1, 2], 'old'))
+      .mockRejectedValueOnce(
+        new GraphQLRequestError([{ message: 'changed', extensions: { code: 'BAD_REQUEST' } }]),
+      )
+      .mockResolvedValueOnce(page([7, 8], null));
+    const { result } = renderHook(() => useIdeas(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    await result.current.fetchNextPage();
+    await waitFor(() => {
+      expect(result.current.data?.ideas.map((i) => i.rank)).toEqual([7, 8]);
+    });
+    expect(GQL.mock.calls.map((call) => (call[1] as { after: string | null }).after)).toEqual([
+      null,
+      'old',
+      null,
+    ]);
+  });
+
   it('surfaces a GraphQL error', async () => {
     GQL.mockRejectedValue(new GraphQLRequestError([{ message: 'boom' }]));
     const { result } = renderHook(() => useIdeas(), { wrapper });
