@@ -454,3 +454,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: it does not help the cold-load bar, so it does not belong in the speed phases.
+
+## 2026-10-22 | Data stores (data architecture v2, decision 2) | Two engines: Parquet for domain data, SQLite for operational state, files for configuration
+- Question: which engine for the run ledger, and how many data stores should the system have?
+- Options: SQLite / JSON lines per job / DuckDB / none; one store for everything / two engines / a third engine.
+- Decision: two engines plus files, and no third. Parquet (under the existing commit protocol) stores domain facts and derived business objects (market data, features, `results/` tables such as `screen_runs` and `screen_picks`); SQLite stores operational state (the run ledger: run id, job, session, status, times, owner, the latest-run lookups); human-edited configuration stays as TOML files. The run ledger is SQLite. The domain-relevant parts of a run (a screener run's counts and changes) live in the domain object, not in the ledger. The ledger starts as a derived, rebuildable index of the run JSON files (the JSON stays the truth); an amendment to ADR 0006 (DuckDB stays a future query engine only) is written when the build starts. When it is built is decided by the re-measure after phases 1-3 (triggers: a run-record lookup still above about 100 ms warm, run files past about 100,000, or an admin page needing the list under 1 s).
+- decided by: owner
+- status: final (engine and structure); build timing per the triggers
+- Reasoning: the call patterns of run records are small, mutable, key-based reads and writes from several processes, which fit an indexed transactional store and not immutable columnar partitions; SQLite is in the Python standard library, so there is no new dependency; keeping domain facts in one engine keeps one place to read a business fact.
