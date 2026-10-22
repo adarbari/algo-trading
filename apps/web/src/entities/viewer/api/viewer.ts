@@ -25,7 +25,7 @@ export type Viewer = gqlTypes.ViewerQuery['viewer'];
 
 async function fetchViewer(): Promise<Viewer | null> {
   try {
-    return (await gql(ViewerQuery, {}, null)).viewer;
+    return (await gql(ViewerQuery, {}, viewerKey)).viewer;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;
