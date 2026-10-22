@@ -11,7 +11,7 @@ from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.portfolio import benchmark_words as benchword
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
-from algotrade.services.read.context import Stores
+from algotrade.services.read.context import Stores, once_per_request
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.decay import decay_of
 from algotrade.services.read.evaluation.edges import Edge, EdgePublished
@@ -58,6 +58,7 @@ from algotrade.services.read.evaluation.verdict.model import (
     PROMISING,
     WAITING,
     WORKS,
+    EdgeSummary,
     EdgeVerdict,
     VerdictCriterion,
     YearRow,
@@ -66,6 +67,7 @@ from algotrade.services.read.evaluation.verdict.model import (
     _num,
     _pct,
     _ret,
+    summary_of,
 )
 
 
@@ -169,23 +171,36 @@ def _at_target(
 
 
 def _judge_one(
-    c: _Candidate, t: VerdictSettings, draws: Draws, decoys: bool, facts: EdgeFacts
+    c: _Candidate,
+    t: VerdictSettings,
+    draws: Draws,
+    decoys: bool,
+    facts: EdgeFacts,
+    headline: bool = False,
 ) -> EdgeVerdict:
+    """``headline``: only what the label, result and figures need. The level and reason come
+    from ``_criteria`` and ``_level`` alone (the haircut, decay, robustness, columns, evidence
+    and outlook are pieces the verdict carries beside them, never inputs to them), so they are
+    the same as the full verdict's."""
     c = replace(c, timed=facts.base == OUT_OF_WINDOW)
     crit = _criteria(c, t, draws, decoys, facts.portfolio)
     level, reason = _level(c, crit, t)
     gap = _next_gap(crit)
-    outlook = outlook_of(
-        gap,
-        _words(gap) if gap else "",
-        c.oos.sessions,
-        c.whole.sessions,
-        t,
-        facts.schedule,
-        facts.hidden,
-        projection_of(c.whole),
-        facts.after,
-        _at_target(c, t, draws, decoys, gap, facts),
+    outlook = (
+        None
+        if headline
+        else outlook_of(
+            gap,
+            _words(gap) if gap else "",
+            c.oos.sessions,
+            c.whole.sessions,
+            t,
+            facts.schedule,
+            facts.hidden,
+            projection_of(c.whole),
+            facts.after,
+            _at_target(c, t, draws, decoys, gap, facts),
+        )
     )
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
@@ -232,11 +247,15 @@ def _judge_one(
         pbo=pbo,
         trials=whole.trials,
         deciles=c.insample.decile_means if c.insample else (),
-        robustness=load_robustness(oos.lift, draws, c.horizon, c.variant, whole.trials),
-        columns=_columns(c, t),
-        evidence=evidence_of(oos.sessions, whole.sessions, crit, t, outlook),
-        haircut=_haircut(c, facts),
-        decay=decay_of(facts.published, c.horizon, c.insample, oos, facts.hidden, t),
+        robustness=None
+        if headline
+        else load_robustness(oos.lift, draws, c.horizon, c.variant, whole.trials),
+        columns=() if headline else _columns(c, t),
+        evidence=None if headline else evidence_of(oos.sessions, whole.sessions, crit, t, outlook),
+        haircut=None if headline else _haircut(c, facts),
+        decay=None
+        if headline
+        else decay_of(facts.published, c.horizon, c.insample, oos, facts.hidden, t),
     )
 
 
@@ -306,6 +325,7 @@ def _judge_candidate(
     decoys: bool,
     lost_inputs: Sequence[str],
     facts: EdgeFacts,
+    headline: bool = False,
 ) -> EdgeVerdict:
     """A candidate that lost inputs (its own screen could not read a table on some decision
     sessions) is Waiting on data even when it has rows: the figures are not the whole test."""
@@ -313,7 +333,7 @@ def _judge_candidate(
     if lost:
         reason = f"The result lost inputs for {c.variant}: {'; '.join(lost)}"
         return replace(_waiting("", reason), basis=_basis_words((c.variant, c.horizon)))
-    return _judge_one(c, t, draws, decoys, facts)
+    return _judge_one(c, t, draws, decoys, facts, headline)
 
 
 def judge(
@@ -328,6 +348,7 @@ def judge(
     basis: BasisChoice | None = None,
     facts: EdgeFacts | None = None,
     range_to: date | None = None,
+    headline: bool = False,
 ) -> EdgeVerdict:
     """The verdict of ``edge_id`` from its official result's ``rows`` (None: it has no official
     result); ``split``: the out-of-sample start; ``draws``: the run's random-pick draws (none:
@@ -335,7 +356,9 @@ def judge(
     ``basis``: one already chosen (a hidden copy's, from rows the verdict does not see), else
     ``choose_basis`` over ``rows``; ``facts``: the edge's
     published figure, schedule and whether its out-of-sample result is hidden; ``range_to``: the
-    run's last session (the out-of-sample year part ends there)."""
+    run's last session (the out-of-sample year part ends there); ``headline``: the label, result
+    and figures only (no years, columns, evidence, haircut, decay or robustness), the same
+    ``verdict`` and ``result`` as without."""
     if rows is None:
         return _waiting(edge_id, "No official result yet")
     found = _candidates(rows)
@@ -356,39 +379,60 @@ def judge(
         reason = f"The official result has no out-of-sample figures for {on}{lost}"
         return replace(_waiting(edge_id, reason), basis=on)
     facts = facts or EdgeFacts()
-    judged = _judge_candidate(replace(c, chain=facts.chain), t, draws, decoys, lost_inputs, facts)
-    return replace(judged, edge_id=edge_id, years=_years(c, split, range_to), basis_why=choice.why)
+    judged = _judge_candidate(
+        replace(c, chain=facts.chain), t, draws, decoys, lost_inputs, facts, headline
+    )
+    years = () if headline else _years(c, split, range_to)
+    return replace(judged, edge_id=edge_id, years=years, basis_why=choice.why)
 
 
-def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
+def _inputs(ctx: Stores, run: runs.EdgeRun) -> tuple[tuple[EdgeRow, ...], Draws]:
+    """``run``'s rows and random-pick draws, read once per request however many summaries ask."""
+    return once_per_request(
+        ctx,
+        ("edge-run-inputs", run.run_id, run.oos_hidden),
+        lambda: (runs.load_run_rows(ctx, run), runs.load_run_draws(ctx, run)),
+    )
+
+
+def load_edge_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> EdgeVerdict:
     """The verdict of ``edge`` from its canonical run's stored rows. Like ``canonicalRun`` it
-    ignores ``after_session`` (ADR 0036: runs are read by run, not by session)."""
+    ignores ``after_session`` (ADR 0036: runs are read by run, not by session). ``headline``:
+    the label, result and figures only, without the haircut (so no read of the run's series or
+    of the site's trials), decay, robustness, years, columns or outlook."""
     settings = load_verdict(ctx.configs)
     run = runs.load_canonical_run(ctx, edge).run
     if run is None:
         return judge(edge.id, None, edge.frozen_from, settings)
-    rows = runs.load_run_rows(ctx, run)
+    rows, draws = _inputs(ctx, run) if headline else (runs.load_run_rows(ctx, run), None)
     return judge(
         edge.id,
         rows,
         run.split_from or edge.frozen_from,  # the split its year parts were cut at
         settings,
         run.lost_inputs,
-        draws=runs.load_run_draws(ctx, run),
+        draws=runs.load_run_draws(ctx, run) if draws is None else draws,
         decoys=bool(edge.baselines),
         declared=Declared(edge.promoted, edge.basis_horizon),
         facts=EdgeFacts(
             edge.published,
             edge.schedule,
             after=run.range_to,
-            measured=lambda: runs.load_measured_sessions(ctx, run),
+            measured=None if headline else lambda: runs.load_measured_sessions(ctx, run),
             wins=counts_wins(edge),
             chain=is_chain(edge),
             portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
             benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
             neutral=is_factor_neutral(edge),
             base=edge.base,
-            site_trials=None if edge.mine else lambda: runs.load_site_trials(ctx),
+            site_trials=None if edge.mine or headline else lambda: runs.load_site_trials(ctx),
         ),
         range_to=run.range_to,
+        headline=headline,
     )
+
+
+def load_edge_summary(ctx: Stores, edge: Edge) -> EdgeSummary:
+    """The headline of a site edge's verdict (what the edges list shows): the same judge on the
+    same canonical run, without the pieces the list never reads."""
+    return summary_of(load_edge_verdict(ctx, edge, headline=True))
