@@ -434,6 +434,11 @@ type Edge {
   runs: [EdgeRun!]!
 
   """
+  The most variants any run of the edge recorded as tried (the multiple-testing disclosure the builder shows); 0: none. Reads this edge's run records only
+  """
+  variantsTried: Int!
+
+  """
   The verdict on the official result (a site edge: the canonical run; the user's own edge: their latest run, judged on in-sample figures while `oosHidden`): Works, Promising, Not working, Not enough data or Waiting on data, with the reason, the figures it rests on and its criteria (ED8)
   """
   verdict: EdgeVerdict!
@@ -2755,9 +2760,9 @@ type Query {
   backtests: [Backtest!]!
 
   """
-  Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data
+  Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data. `ids`: only those edges
   """
-  edges: [Edge!]!
+  edges(ids: [String!] = null): [Edge!]!
 
   """
   The user's own edge files `edges` leaves out (or reads only in part), by id, with the reason; empty: every file of theirs loads

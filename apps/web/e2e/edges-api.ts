@@ -1,5 +1,5 @@
 /**
- * Playwright route mock for the edges: the `EdgesPage`, `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record)
+ * Playwright route mock for the edges: the `EdgesPage`, `EdgeDocument` (the builder's one-edge read), `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record)
  * and the result sections (`EdgeResultCurve`, `EdgeResultDrawdown`, `EdgeResultDecay`, the regimes,
  * holding periods, costs, capacity, rolling starts and monthly map, `EdgeTrades`, `EdgeVariantGrid`) GraphQL
  * operations (POST /api/graphql). The golden store holds no edge runs, so the answers are
@@ -361,9 +361,20 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
     await route.fulfill({ json: evaluation(polls > 1 ? 'complete' : 'running') });
   });
   await page.route('**/api/graphql', async (route: Route) => {
-    const body = route.request().postDataJSON() as { query?: string } | null;
+    const body = route.request().postDataJSON() as {
+      query?: string;
+      variables?: { ids?: string[] };
+    } | null;
     const query = body?.query ?? '';
-    if (/query\s+EdgesPage\b/.test(query)) {
+    if (/query\s+EdgeDocument\b/.test(query)) {
+      // The builder's document-only read: the listed edges (the user's copies too), no runs.
+      const ids = body?.variables?.ids ?? [];
+      const all = [...(EDGES as EdgesPageData).data.edges, ...copies];
+      const found = all.filter((e) => ids.includes(String(e['id'])));
+      await route.fulfill({
+        json: { data: { edges: found.map((e) => ({ ...e, variantsTried: 0 })) } },
+      });
+    } else if (/query\s+EdgesPage\b/.test(query)) {
       const all = EDGES as EdgesPageData;
       await route.fulfill({
         json: { ...all, data: { ...all.data, edges: [...all.data.edges, ...copies] } },

@@ -304,6 +304,12 @@ def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:
     return tuple(sorted(runs.values(), key=lambda r: r.knowledge_ts, reverse=True))
 
 
+def load_edge_variants_tried(ctx: Stores, edge: Edge) -> int:
+    """The variants tried on ``edge``: the most ``trials_counted`` any run it shows recorded (0:
+    none), read from this edge's own run records only (never the site's trials)."""
+    return max((r.trials_counted or 0 for r in load_edge_runs(ctx, edge)), default=0)
+
+
 def load_runs_of(ctx: Stores, edge_id: str) -> tuple[EdgeRun, ...]:
     """``load_edge_runs`` by edge id; none for an edge the user does not have."""
     edge = next((e for e in load_edges(ctx) if e.id == edge_id), None)
