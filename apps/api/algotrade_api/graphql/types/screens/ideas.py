@@ -18,6 +18,26 @@ from algotrade_api.graphql.types.screens.screener import Screener, ScreenerRun
 
 
 @strawberry.type(
+    description="One of a screener's first picks: who it is, its `position` in the screener's "
+    "run and the `score` the run stored for it (null: none stored)"
+)
+class TopPick:
+    instrument_id: str
+    instrument: Instrument | None
+    position: int
+    score: float | None
+
+    @classmethod
+    def of(cls, d: ideas.TopPick, ctx: ReadContext) -> Self:
+        return cls(
+            instrument_id=d.instrument_id,
+            instrument=Instrument.of(d.instrument, ctx) if d.instrument is not None else None,
+            position=d.position,
+            score=d.score,
+        )
+
+
+@strawberry.type(
     description="One of the user's screeners on the Ideas page: its run for the session "
     "(else `notRun`: NOT_RUN), how many tickers it picked over the run, its first picks that "
     "count towards the ideas (`top`) and `withheld`: its run's order follows values the "
@@ -28,7 +48,7 @@ class IdeaScreener:
     run: ScreenerRun | None
     not_run: Unknown | None
     picked: int
-    top: list[ScreenResult]
+    top: list[TopPick]
     withheld: bool
 
     @classmethod
@@ -38,7 +58,7 @@ class IdeaScreener:
             run=ScreenerRun.of(d.run, ctx) if d.run is not None else None,
             not_run=Unknown.of(d.not_run) if d.not_run is not None else None,
             picked=d.picked,
-            top=[ScreenResult.of(r, ctx) for r in d.top],
+            top=[TopPick.of(r, ctx) for r in d.top],
             withheld=d.withheld,
         )
 

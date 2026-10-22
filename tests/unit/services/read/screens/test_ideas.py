@@ -10,6 +10,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
+from algotrade.services.read.screens import results as results_module
 from algotrade.services.read.screens import runs as runs_module
 from algotrade.services.read.screens.ideas import (
     FIRST_PAGE,
@@ -169,6 +170,42 @@ def test_only_the_first_picks_of_a_screener_count() -> None:
     ideas = load_ideas(context(StoreReader(backend)), 100)
     assert _ids(ideas) == ["EQ:BBB", "EQ:DDD", *[f"EQ:S00{n}" for n in range(5)]]
     assert [i.score for i in ideas.items][2:] == [1.0, 0.5, 1 / 3, 0.25, 0.2]
+
+
+# ----------------------------------------------------------------------------- top
+
+
+def test_a_screeners_top_is_read_from_its_picks_without_reading_its_run_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = screens_store()
+    write_big_run(backend, 30, frozen=True, criteria=2)
+    ctx = context(StoreReader(backend))
+    shown = load_ideas(ctx, 100)  # every pick shown: the stored result is the reference
+    real = results_module.run_row_details
+    asked: list[str] = []
+
+    def spy(c: ReadContext, run: ScreenerRun, instruments: object) -> pd.DataFrame:
+        asked.append(run.run_id)
+        return real(c, run, instruments)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(results_module, "run_row_details", spy)
+    light = load_ideas(context(StoreReader(backend)), 1)  # one idea (beta's): big read for top only
+    assert "big" not in asked  # the top of alpha came from screen_picks, no run file read
+    ours = {s.screener.id: s for s in light.screeners}["alpha"]
+    full = {s.screener.id: s for s in shown.screeners}["alpha"]
+    assert [(t.instrument_id, t.position, t.score) for t in ours.top] == [
+        ("EQ:S000", 1, 500.0), ("EQ:S001", 2, 500.0), ("EQ:S002", 3, 500.0)
+    ]  # fmt: skip
+    assert ours.top == full.top  # the same whatever else the page shows
+    by_id = {i.instrument_id: i for i in shown.items}
+    assert [t.score for t in ours.top] == [by_id[t.instrument_id].best.score for t in ours.top]
+
+
+def test_top_picks_name_their_instrument_or_none_when_not_in_the_snapshot(ctx: ReadContext) -> None:
+    alpha = {s.screener.id: s for s in load_ideas(ctx, 10).screeners}["alpha"]
+    assert [(t.instrument_id, t.position) for t in alpha.top] == [("EQ:AAA", 1), ("EQ:BBB", 2)]
+    assert [t.instrument.symbol if t.instrument else None for t in alpha.top] == ["AAA", "BBB"]
 
 
 # ----------------------------------------------------------------------------- pages
