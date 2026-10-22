@@ -46,7 +46,13 @@ def _tools(tmp_path, apfs=True, free_gb=500, device=1, port_free=True, calls=Non
 
     def run(cmd, **kw):
         calls.append(cmd)
+        if cmd[0] == "df":
+            return _done(
+                0,
+                "Filesystem 512-blocks Used Available Capacity Mounted on\n/dev/disk3s5 1 1 1 1% /",
+            )
         if cmd[0] == "diskutil":
+            assert cmd[2] == "/dev/disk3s5"  # a device: diskutil rejects a plain path
             return _done(0, "Type (Bundle): apfs" if apfs else "Type (Bundle): hfs")
         return _done(0, "written var/perf/x.json\n" if "load.py" in cmd[1] else "")
 
@@ -198,7 +204,7 @@ def test_dry_run_prints_plan_and_changes_nothing(tmp_path, store, capsys):
     assert rw.main(_argv(store, dest, "--dry-run"), t) == 0
     assert not dest.exists()
     assert any("cp -c -R" in line for line in lines) and any("12187" in line for line in lines)
-    assert all(c[0] == "diskutil" for c in calls)
+    assert all(c[0] in ("df", "diskutil") for c in calls)
 
 
 def test_refuses_without_confirm_paused(tmp_path, store, capsys):
@@ -260,6 +266,11 @@ def _full(tmp_path, store, monkeypatch, env=None, run_hook=None, procs=None):
 
     def run(cmd, **kw):
         spawned.append((cmd, kw))
+        if cmd[0] == "df":
+            return _done(
+                0,
+                "Filesystem 512-blocks Used Available Capacity Mounted on\n/dev/disk3s5 1 1 1 1% /",
+            )
         if cmd[0] == "diskutil":
             return _done(0, "apfs")
         if cmd[0] == "cp":
@@ -286,7 +297,7 @@ def test_children_get_the_clone_and_dest_config_not_the_inherited_store(
     code, dest, spawned, _ = _full(tmp_path, store, monkeypatch, env)
     assert code == 0
     clone_url = f"file://{dest.resolve()}/data"
-    children = [(c, k) for c, k in spawned if c[0] not in ("diskutil", "cp")]
+    children = [(c, k) for c, k in spawned if c[0] not in ("df", "diskutil", "cp")]
     assert len(children) == 7  # serve-release, 3 APIs, 3 load.py
     for cmd, kw in children:
         assert kw["env"]["ALGOTRADE_DATA_URL"] == clone_url, cmd
