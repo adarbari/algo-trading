@@ -664,3 +664,12 @@ def test_cors_exposes_both_headers(harness: Harness) -> None:
     )
     exposed = response.headers["access-control-expose-headers"].lower()
     assert GENERATION in exposed and RELEASE in exposed
+
+
+def test_a_stale_serve_carries_the_generation_and_the_release(harness: Harness) -> None:
+    harness.generation, harness.releases = 4, _releases("r7")
+    with harness.client() as client:
+        _post(client, SESSION)
+        harness.now[0] += TTL_S + 1
+        stale = _post(client, SESSION)  # served from the stale entry while it recomputes
+        assert stale.headers[GENERATION] == "4" and stale.headers[RELEASE] == "r7"

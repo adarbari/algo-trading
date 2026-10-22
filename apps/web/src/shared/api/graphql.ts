@@ -17,6 +17,7 @@ import { apiBaseUrl } from '@/shared/config';
 
 import { accessToken, handleUnauthorized } from './auth';
 import { ApiError } from './client';
+import { queryKeys } from './query-keys';
 import type { TypedDocumentString } from './generated/graphql/graphql';
 import { observeVersions } from './versions';
 
@@ -78,7 +79,10 @@ export async function gql<TResult, TVariables>(
   }
   if (response.status === 401) await handleUnauthorized();
   if (!response.ok) throw new ApiError(response.status, response.statusText);
-  observeVersions(operationName(query), response.headers);
+  observeVersions(
+    queryKeys.gql(operationName(query), variables as Readonly<Record<string, unknown>>),
+    response.headers,
+  );
   const body = (await response.json()) as Body<TResult>;
   if (body.errors?.length) throw new GraphQLRequestError(body.errors);
   if (body.data == null) throw new GraphQLRequestError([{ message: 'no data in the response' }]);

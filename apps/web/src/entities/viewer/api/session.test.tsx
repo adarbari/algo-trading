@@ -7,6 +7,7 @@ import {
   ApiError,
   AuthFailure,
   currentSession,
+  forgetVersions,
   gql,
   signInWithPassword,
   signOutSession,
@@ -21,6 +22,7 @@ vi.mock('@/shared/api', async (importOriginal) => {
   return {
     ...actual,
     gql: vi.fn(),
+    forgetVersions: vi.fn(),
     currentSession: vi.fn(),
     subscribeSession: vi.fn(),
     signInWithPassword: vi.fn(),
@@ -74,6 +76,15 @@ describe('useSignIn', () => {
     expect(viewer).toEqual(TRADER);
     expect(client.getQueryData(viewerKey)).toEqual(TRADER);
     expect(result.current.error).toBeUndefined();
+  });
+
+  it("forgets the last user's page-cache versions", async () => {
+    GQL.mockResolvedValue({ viewer: TRADER });
+    const { result } = renderHook(() => useSignIn(), { wrapper });
+    await act(async () => {
+      await result.current.signIn('a@b.co', 'pw');
+    });
+    expect(forgetVersions).toHaveBeenCalled();
   });
 
   it('says wrong credentials in plain words and stays signed out', async () => {
