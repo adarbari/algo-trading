@@ -11,7 +11,8 @@ from algotrade.services.jobs.models import JobRecord, job_id_for
 from algotrade.storage.runs import is_job_record_name, job_of_name
 
 
-@pytest.mark.parametrize("kind", sorted(LIBRARY_HANDLERS))
+# ``nightly`` is registered by the ingestion app (cli/commands.py), outside LIBRARY_HANDLERS
+@pytest.mark.parametrize("kind", [*sorted(LIBRARY_HANDLERS), "nightly"])
 def test_the_name_of_a_job_record_implies_its_job(kind: str) -> None:
     user = UserContext("site")
     job_id = job_id_for(kind, {"a": 1}, user)
