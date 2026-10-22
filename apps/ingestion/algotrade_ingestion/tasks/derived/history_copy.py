@@ -4,6 +4,8 @@ publishing, so long range reads (Explore charts, market history) read one file p
 Which tables comes from ``nightly.toml [history_copy]``: every table under ``market_prefix``
 for all the years it has partitions, and each of ``instrument_tables`` for the last
 ``recent_years`` calendar years (older years are removed, which is how the disk budget holds).
+Each of ``event_tables`` (events tables an instrument's events page reads over all time, ADR 0060
+amendment 2026-10-22) is copied for every year it has partitions, and counts in the budget.
 ``TableStore.build_history`` rebuilds only the years whose partitions changed, so a night
 rebuilds the session's year. The task writes no table and no run's publish: a failure or a skip
 leaves the earlier copy in place and reads fall back to the partitions, which is why the step is
@@ -11,7 +13,8 @@ optional. It skips a table, with a reason the acceptance check turns into a WARN
 
 - the disk has less free than ``free_disk_floor_gb`` plus the table's current copy (a rebuilt
   year exists twice for a moment), or
-- the instrument tables' copies already hold ``budget_gb`` (a table not yet copied is not started).
+- the event and instrument tables' copies already hold ``budget_gb`` (a table not yet copied is
+  not started).
 """
 
 from collections.abc import Mapping
@@ -47,10 +50,13 @@ def build_copies(ctx: TaskContext, session: date) -> RunRecord:
         t for t in ctx.reader.table_names() if cfg.market_prefix and t.startswith(cfg.market_prefix)
     )
     recent = [session.year - k for k in range(cfg.recent_years)]
-    instrument_bytes = sum(ctx.writer.history_size(t) for t in cfg.instrument_tables)
+    instrument_bytes = sum(
+        ctx.writer.history_size(t) for t in (*cfg.event_tables, *cfg.instrument_tables)
+    )
     with IngestRun(ctx, TASK, session) as run:
         for table, years, budgeted in (
             *((t, sorted({d.year for d in ctx.reader.dates(t)}), False) for t in market),
+            *((t, sorted({d.year for d in ctx.reader.dates(t)}), True) for t in cfg.event_tables),
             *((t, recent, True) for t in cfg.instrument_tables),
         ):
             held = ctx.writer.history_size(table)

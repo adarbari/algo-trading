@@ -108,3 +108,44 @@ asked instruments' rows of a rollup (a partition with none of them is read whole
 
 ## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
 See [0077](0077-serving-release.md): a pinned read serves the copy only when every requested day's `partition_seq` is at most `upto`; releases retain the versions they name.
+
+## Amendment 2026-10-22: events tables are copied, every year
+**Why.** An instrument's events page (`InstrumentEvents`, `data.events.read_events`) reads each events
+table over all time for one name. Events are partitioned by day, so that is one file per
+partition per run: `events/fund_nav` holds 5,737 day partitions (9,617 files, 84 MB, 1.3 M rows for
+280 closed-end funds) and cost 2.14 s for any instrument, 0 rows for a non-fund; `short_interest`
+(211 partitions), `short_volume` (252) and `insider_transaction` (137 MB in 2 partitions, decoded
+whole for one name) 0.1 to 0.25 s each. `events/filing_text` is left out of the read
+(`data.events.NO_INSTRUMENT_ROWS`), not copied.
+
+**Decision.** `nightly.toml [history_copy] event_tables` lists events tables copied for **every
+year they have partitions** (an events read is over all time, like a market table), by the same
+`build_history`, with the same layout, signature rule, memo (#814, #824), ragged-day rule and
+fallback. Nothing in the read path changes: `read_range` serves an events table from the copy for
+`as_of` None, no `own_run`, an instrument filter picking the row groups whose `instrument_id`
+min / max can hold the id (`arrow.row_groups_holding`); a year whose signatures differ (a restated
+or new ingest day) reads its partitions. A table must store `instrument_id`
+(`tests/unit/config/site/test_nightly.py`; a table without the column is skipped with a WARN).
+
+**Point in time.** The copy holds the rows `select_runs` / `merge_rows` resolve per ingest-day
+partition, with `known_from` and `knowledge_ts` as stored; `read_events` applies `known_from <=
+S` and the latest-version rule on the frame it gets, so the frame from the copy equals the
+partition frame (`tests/unit/storage/backends/test_history_events.py`: a restated day, a second
+run, a row known later, `through` before and after it). Events tables differ from market tables in no way the build handles: a restatement is a later
+run in the partition of its `session_date` (often an old one: that year's signature changes and
+the year is rebuilt, the others kept); several runs of a day resolve per `run_mode` as for any
+table; `known_from` is data, never part of the copy's key.
+
+**Size.** Measured on the clone, sources only (no copy was built outside tests): `fund_nav` 84 MB,
+`short_interest` 99, `short_volume` 97, `insider_transaction` 137, `filing` 30: about 450 MB
+(a copy is sorted by instrument and compresses as well or better). The other events tables
+(`dividend`, `earnings`, `split`, `reference_change`, ...) are under 9 MB in at most 14 partitions
+each and read in under 0.03 s: not copied. `budget_gb` rises from 2.6 to 3.2 (2.3 GB of instrument
+copies + about 0.45 GB, with year-end growth), the event copies counting in it; the disk (17 GB
+free, floor 10) holds it.
+
+**Known cost.** Validating a year checks every calendar day's partition signature: an all-time read
+checks about 8,400 days of `fund_nav` (one `stat` each once digests are held; the first read in a
+process reads each day's `_runs.json`, about 1 to 2 s cold). A per-year digest from a persisted
+per-table dates index removes it (follow-up, not part of this amendment); the copy already removes
+the per-file Parquet opens that dominate warm.

@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from algotrade.config.site.nightly import HistoryCopySettings
@@ -29,6 +30,7 @@ SESSION = date(2026, 3, 2)
 MARKET = "rollups/market/demo@v1"
 BARS = "rollups/instrument/demo@v1"
 OTHER = "rollups/instrument/other@v1"
+EVENTS = "events/demo"
 
 
 def _document(**keys: Any) -> dict[str, Any]:
@@ -36,6 +38,7 @@ def _document(**keys: Any) -> dict[str, Any]:
         "history_copy": {
             "market_prefix": "rollups/market/",
             "instrument_tables": [BARS, OTHER],
+            "event_tables": [EVENTS],
             "recent_years": 2,
             "free_disk_floor_gb": 0,  # the machine's own free space must not decide a test
             **keys,
@@ -49,8 +52,16 @@ def _ctx(root: Path, **keys: Any) -> TaskContext:
     for year in (2024, 2025, 2026):
         for n in range(3):
             day = date(year, 1, 5) + timedelta(days=n)
-            for table, ids in ((MARKET, ["MKT:US"]), (BARS, ["EQ:A", "EQ:B"]), (OTHER, ["EQ:A"])):
+            tables = (
+                (MARKET, ["MKT:US"]),
+                (BARS, ["EQ:A", "EQ:B"]),
+                (OTHER, ["EQ:A"]),
+                (EVENTS, ["EQ:A"]),
+            )
+            for table, ids in tables:
                 rows = [{"instrument_id": s, "a": float(n)} for s in ids]
+                if table == EVENTS:
+                    rows = [{**r, "ts": pd.Timestamp(day, tz="UTC")} for r in rows]
                 writer.write_table(table, day, "r1", stamped(rows, day, "r1"))
     return replace(task_ctx(writer), configs=configs)
 
@@ -60,17 +71,21 @@ def test_the_settings_come_from_nightly_toml_and_default_to_no_instrument_tables
     assert load_nightly(store).history_copy == HistoryCopySettings(
         market_prefix="rollups/market/",
         instrument_tables=(BARS, OTHER),
+        event_tables=(EVENTS,),
         budget_gb=1.5,
         free_disk_floor_gb=0.0,
     )
     assert load_nightly(MemoryConfigStore({})).history_copy.instrument_tables == ()
 
 
-def test_market_tables_get_every_year_and_instrument_tables_the_last_years(tmp_path: Path) -> None:
+def test_market_and_event_tables_get_every_year_and_instrument_tables_the_last_years(
+    tmp_path: Path,
+) -> None:
     ctx = _ctx(tmp_path)
     record = build_copies(ctx, SESSION)
     assert record.stats["built"] == {
         MARKET: [2024, 2025, 2026],
+        EVENTS: [2024, 2025, 2026],  # all years: an events read is over all time
         BARS: [2025, 2026],
         OTHER: [2025, 2026],
     }
@@ -102,11 +117,11 @@ def test_a_table_is_skipped_below_the_disk_floor(
     monkeypatch.setattr(StoreWriter, "free_bytes", lambda self: 3 * GB)
     record = build_copies(ctx, SESSION)
     assert record.stats["built"] == {}
-    assert set(record.stats["skipped"]) == {MARKET, BARS, OTHER}
+    assert set(record.stats["skipped"]) == {MARKET, EVENTS, BARS, OTHER}
     assert "below the 10.0 GB floor" in record.stats["skipped"][BARS]
     assert ctx.writer.history_size(BARS) == 0
     warns = check_history_copy(record.stats, SESSION)
-    assert {c.status for c in warns} == {"WARN"} and len(warns) == 3
+    assert {c.status for c in warns} == {"WARN"} and len(warns) == 4
 
 
 def test_the_floor_counts_the_copy_a_rebuild_keeps_beside_the_new_one(
@@ -123,8 +138,9 @@ def test_an_instrument_table_over_the_budget_is_not_started(tmp_path: Path) -> N
     ctx = _ctx(tmp_path, budget_gb=1e-6)
     record = build_copies(ctx, SESSION)
     assert MARKET in record.stats["built"]  # market tables are not budgeted
-    assert BARS in record.stats["built"]  # the first table starts: nothing is held yet
+    assert EVENTS in record.stats["built"]  # the first table starts: nothing is held yet
     assert OTHER in record.stats["skipped"] and "already hold" in record.stats["skipped"][OTHER]
+    assert BARS in record.stats["skipped"]  # events count in the same budget
     assert any(c.name == "history_copy_budget" for c in check_history_copy(record.stats, SESSION))
 
 

@@ -7,6 +7,7 @@ import pytest
 
 from algotrade.config.site.settings import NightlySettings, load_nightly
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.data.events import NO_INSTRUMENT_ROWS
 from algotrade.features.registry import GROUPS
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.schemas.registry import spec_for
@@ -23,6 +24,15 @@ def test_the_history_copy_holds_every_instrument_table_a_feature_history_reads()
     )
     stored = {g.table for g in GROUPS.values() if g.entity == "instrument"}
     assert stored - copied == set(), "add these tables to [history_copy] instrument_tables"
+
+
+def test_the_history_copy_holds_only_events_tables_that_store_instrument_ids() -> None:
+    # an all-time read of one name opens one file per day; a CIK-keyed table has no id
+    copied = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False)).history_copy
+    assert copied.event_tables, "events/fund_nav alone is 5,737 day partitions"
+    for table in copied.event_tables:
+        assert table.startswith("events/") and spec_for(table) is not None, table
+        assert table not in NO_INSTRUMENT_ROWS, f"{table} stores no instrument_id"
 
 
 def test_every_declared_backfill_names_a_stored_rollup_table() -> None:
