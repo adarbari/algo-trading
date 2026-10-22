@@ -214,4 +214,4 @@ def test_a_snapshot_from_the_window_agrees_with_the_rule() -> None:
     counts = ingestion._Counts(ctx, GRID)
     for day in (*GRID, date(2026, 10, 20)):
         for table in (DENSE, SPARSE, EMPTY):
-            assert counts.snapshot(table, day) == snapshot_on(ctx, table, day)
+            assert counts.carried(table, day) == snapshot_on(ctx, table, day)

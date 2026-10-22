@@ -125,7 +125,7 @@ class _Counts:
             self._stored[table] = stored_dates(self.ctx, table)
         return self._stored[table]
 
-    def snapshot(self, table: str, day: date) -> Snapshot | None:
+    def carried(self, table: str, day: date) -> Snapshot | None:
         """``snapshot_on``'s answer: the latest partition on or before ``day`` from the window
         when it holds one, else the rule over the whole table."""
         if self.days and min(self.days) <= day <= max(self.days):
@@ -189,7 +189,7 @@ def _chains_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
 
 
 def _snapshot_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
-    snap = counts.snapshot(d.name, day)
+    snap = counts.carried(d.name, day)
     if snap is None or snap.pre_snapshot:
         return Cell(d.name, day, "MISSING", 0, None, "no snapshot on or before")
     present, runs, _ = counts.of(d.name, snap.snapshot_date)
