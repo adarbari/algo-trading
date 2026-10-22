@@ -22,7 +22,7 @@ from algotrade.storage.backends.arrow import (
     to_arrow,
     to_frame,
 )
-from algotrade.storage.backends.partial_reads import filter_frame
+from algotrade.storage.backends.partial_reads import filter_frame, require_distinct
 from algotrade.storage.backends.runs.local_index import safe
 from algotrade.storage.backends.runs.run_compaction import (
     OVER_BUDGET,
@@ -58,11 +58,34 @@ from algotrade.storage.tables.interfaces import (
     PartitionBusyError,
     PartitionStats,
     RowFilter,
+    RunRead,
 )
 from algotrade.storage.tables.schemas import require_retention
 
 Key = tuple[str, date]  # (table, session_date)
 _PENDING = "pending"
+
+
+def _own_rows(
+    frame: pd.DataFrame | None,
+    run_id: str,
+    columns: Sequence[str] | None,
+    instruments: Sequence[str] | None,
+    where: Sequence[RowFilter],
+) -> pd.DataFrame | None:
+    """The rows of ``run_id`` in its version ``frame`` (``read_run``'s cut); ``None``: none."""
+    if frame is None:
+        return None
+    mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame.copy()
+    if instruments is not None:
+        mine = select_instruments(mine, instruments)
+    mine = filter_frame(mine, where)
+    if mine.empty:
+        return None
+    if columns is not None:
+        keep = keep_columns(columns)
+        mine = mine[[c for c in mine.columns if c in keep]]
+    return mine.reset_index(drop=True)
 
 
 class MemoryTables:
@@ -292,19 +315,28 @@ class MemoryTables:
     ) -> pd.DataFrame | None:
         def at(seq: int) -> pd.DataFrame | None:
             _, frames = self._view((table, session_date), own_run, seq)
-            frame = frames.get(run_id)
-            if frame is None:
-                return None
-            mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame.copy()
-            if instruments is not None:
-                mine = select_instruments(mine, instruments)
-            mine = filter_frame(mine, where)
-            if mine.empty:
-                return None
-            if columns is not None:
-                keep = keep_columns(columns)
-                mine = mine[[c for c in mine.columns if c in keep]]
-            return mine.reset_index(drop=True)
+            return _own_rows(frames.get(run_id), run_id, columns, instruments, where)
+
+        return read_at(at, lambda: self._seq, lambda: self._index_lock, upto)
+
+    def read_runs(
+        self,
+        table: str,
+        session_date: date,
+        runs: Sequence[RunRead],
+        own_run: str | None = None,
+        upto: int | None = None,
+    ) -> dict[str, pd.DataFrame | None]:
+        require_distinct(runs)
+
+        def at(seq: int) -> dict[str, pd.DataFrame | None]:  # one view for the whole batch
+            _, frames = self._view((table, session_date), own_run, seq)
+            return {
+                one.run_id: _own_rows(
+                    frames.get(one.run_id), one.run_id, one.columns, one.instruments, ()
+                )
+                for one in runs
+            }
 
         return read_at(at, lambda: self._seq, lambda: self._index_lock, upto)
 

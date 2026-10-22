@@ -55,7 +55,11 @@ from algotrade.storage.backends.arrow import (
     to_frame,
 )
 from algotrade.storage.backends.history import HISTORY, HistoryCopy
-from algotrade.storage.backends.partial_reads import read_run_file
+from algotrade.storage.backends.partial_reads import (
+    read_run_file,
+    read_runs_files,
+    require_distinct,
+)
 from algotrade.storage.backends.runs.local_index import (
     INDEX,
     SWAP_GRACE_S,
@@ -99,7 +103,12 @@ from algotrade.storage.backends.runs.run_selection import (
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, is_job_record_name, job_of_name, run_session
-from algotrade.storage.tables.interfaces import CompactionReport, PartitionStats, RowFilter
+from algotrade.storage.tables.interfaces import (
+    CompactionReport,
+    PartitionStats,
+    RowFilter,
+    RunRead,
+)
 from algotrade.storage.tables.schemas import require_retention
 
 
@@ -354,6 +363,39 @@ class LocalTables:
             return None
         frame = to_frame(concat(table, [data]))
         return None if frame.empty else frame.reset_index(drop=True)
+
+    def read_runs(
+        self,
+        table: str,
+        session_date: date,
+        runs: Sequence[RunRead],
+        own_run: str | None = None,
+        upto: int | None = None,
+    ) -> dict[str, pd.DataFrame | None]:
+        require_distinct(runs)
+        directory = self._dir(table, session_date)
+
+        def at(seq: int) -> dict[str, pa.Table | None]:  # one index read, one scan, one sequence
+            entries = self._entries(directory, table, session_date, own_run, seq)
+            files = {
+                one.run_id: directory / run_file(one.run_id, entries[one.run_id])
+                for one in runs
+                if one.run_id in entries
+            }
+            try:
+                return read_runs_files(files, runs)
+            except (
+                FileNotFoundError
+            ) as gone:  # a commit replaced a version: the whole batch retries
+                raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
+
+        found = read_at(at, self.commits.published, self.commits.no_commits, upto)
+        out: dict[str, pd.DataFrame | None] = {}
+        for one in runs:  # request order
+            data = found[one.run_id]
+            frame = None if data is None else to_frame(concat(table, [data]))
+            out[one.run_id] = None if frame is None or frame.empty else frame.reset_index(drop=True)
+        return out
 
     def partition_stats(
         self,

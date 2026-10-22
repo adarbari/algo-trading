@@ -1,7 +1,7 @@
 """Reads of part of one version file: the row groups a run, an instrument set or a ``RowFilter``
 can hold, decided from the footer statistics, decoded alone and then filtered exactly. The one
-place that cuts a file by its row groups for ``read_run`` (the local backend calls it; the memory
-backend filters its frames with ``filter_frame``, same rows)."""
+place that cuts files by their row groups for ``read_run`` and ``read_runs`` (the local backend
+calls it; the memory backend filters its frames with ``filter_frame``, same rows)."""
 
 from collections.abc import Sequence
 from pathlib import Path
@@ -9,10 +9,11 @@ from pathlib import Path
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
+import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
 from algotrade.storage.backends.arrow import keep_columns, row_groups_holding
-from algotrade.storage.tables.interfaces import RowFilter
+from algotrade.storage.tables.interfaces import RowFilter, RunRead
 
 
 def _column_index(meta: pq.FileMetaData, column: str) -> int | None:
@@ -133,3 +134,77 @@ def _trim(data: pa.Table, columns: Sequence[str] | None) -> pa.Table:
         return data
     keep = keep_columns(columns)
     return data.select([c for c in data.column_names if c in keep])
+
+
+def require_distinct(runs: Sequence[RunRead]) -> None:
+    """``read_runs`` answers by run id: a repeated one is ambiguous (``ValueError``)."""
+    ids = [one.run_id for one in runs]
+    if len(set(ids)) != len(ids):
+        raise ValueError(f"read_runs: a run id is requested twice: {sorted(ids)}")
+
+
+def read_runs_files(files: dict[str, Path], runs: Sequence[RunRead]) -> dict[str, pa.Table | None]:
+    """``read_run_file`` of every request in ``runs`` (``files``: run id -> its version file),
+    one dataset scan over the files filtered by ``run_id`` and (when every request names
+    instruments) ``instrument_id``: the footer statistics prune the row groups, the rest is
+    filtered exactly per run, its own columns (those of its file, in its order) and rows. A file
+    without a ``run_id`` column has all its rows (as ``read_run_file``) and is read alone.
+    ``None``: no file for the run. A file replaced mid-read raises ``FileNotFoundError``."""
+    out: dict[str, pa.Table | None] = {one.run_id: None for one in runs}
+    asked = [one for one in runs if one.run_id in files]
+    schemas = {one.run_id: pq.read_schema(files[one.run_id]) for one in asked}
+    stamped = [one for one in asked if "run_id" in schemas[one.run_id].names]
+    for one in asked:
+        if one not in stamped:
+            out[one.run_id] = read_run_file(
+                files[one.run_id], one.run_id, one.columns, one.instruments
+            )
+    if not stamped:
+        return out
+    paths = sorted({files[one.run_id] for one in stamped})
+    schema = pa.unify_schemas(
+        [schemas[one.run_id] for one in stamped], promote_options="permissive"
+    )
+    wanted = ds.field("run_id").isin(
+        pa.array([one.run_id for one in stamped], schema.field("run_id").type)
+    )
+    if all(one.instruments is not None and "instrument_id" in schema.names for one in stamped):
+        union = sorted({i for one in stamped for i in one.instruments or ()})
+        wanted = wanted & ds.field("instrument_id").isin(
+            pa.array(union, schema.field("instrument_id").type)
+        )
+    if any(one.columns is None for one in stamped):
+        columns = None
+    else:
+        keep = set().union(*(keep_columns(one.columns or ()) for one in stamped))
+        columns = [c for c in schema.names if c in keep or c == "run_id"]
+    data = ds.dataset([str(p) for p in paths], schema=schema, format="parquet").to_table(
+        columns=columns, filter=wanted
+    )
+    by_run = _split_by_run(data)
+    for one in stamped:
+        mine = by_run.get(one.run_id, data.slice(0, 0))
+        if one.instruments is not None:
+            ids = mine.column("instrument_id")
+            mine = mine.filter(
+                pc.is_in(ids, value_set=pa.array(list(one.instruments), type=ids.type))
+            )
+        own = [n for n in schemas[one.run_id].names if n in mine.column_names]
+        mine = mine.select(own)
+        out[one.run_id] = _trim(mine, one.columns)
+    return out
+
+
+def _split_by_run(data: pa.Table) -> dict[str, pa.Table]:
+    """``data``'s rows per ``run_id``, each run's in their order in ``data``: one stable sort and
+    slices, not one filter pass per run."""
+    if data.num_rows == 0:
+        return {}
+    ordered = data.take(pc.sort_indices(data, sort_keys=[("run_id", "ascending")]))
+    counts = pc.value_counts(ordered.column("run_id"))  # the sorted runs, in order
+    parts: dict[str, pa.Table] = {}
+    start = 0
+    for item in counts.to_pylist():
+        parts[item["values"]] = ordered.slice(start, item["counts"])
+        start += item["counts"]
+    return parts

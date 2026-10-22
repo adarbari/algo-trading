@@ -3,7 +3,7 @@
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 import pandas as pd
 
@@ -21,6 +21,15 @@ class CompactionReport:
     bytes_after: int = 0
     runs_dropped: int = 0
     skipped: str | None = None  # why nothing was changed (never an error)
+
+
+class RunRead(NamedTuple):
+    """One run of a ``TableStore.read_runs`` batch: its id and what ``read_run`` takes for it
+    (``None``: every column / every instrument)."""
+
+    run_id: str
+    columns: Sequence[str] | None = None
+    instruments: Sequence[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -245,6 +254,24 @@ class TableStore(Protocol):
         statistics rule out never decoded (a table clustered by the column,
         ``TableSpec.cluster_by``, skips most; an older file's mixed groups are read whole). Not
         point-in-time: a run is read as it left them."""
+        ...
+
+    def read_runs(
+        self,
+        table: str,
+        session_date: date,
+        runs: Sequence[RunRead],
+        own_run: str | None = None,
+        upto: int | None = None,
+    ) -> dict[str, pd.DataFrame | None]:
+        """``read_run`` of several runs of one partition in one read: ``{run_id: frame}`` in
+        request order, each frame exactly what ``read_run(table, day, run_id, own_run, columns,
+        instruments, upto=...)`` gives for that request (``None``: the run is not in the index,
+        or has no rows for it). Every run is resolved and read at ONE commit sequence (``upto``:
+        the caller's, else a fresh one; a ``StaleSnapshotError`` on any file restarts the whole
+        batch at a fresh sequence, never one file), so a batch never mixes versions. The local
+        backend reads the files with one dataset scan, the row groups the statistics rule out
+        never decoded. A repeated run id is a ``ValueError``."""
         ...
 
     def build_history(self, table: str, years: Sequence[int]) -> list[int]:
