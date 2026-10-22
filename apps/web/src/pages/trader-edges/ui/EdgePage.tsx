@@ -3,7 +3,7 @@
  * would change it, then a sticky navigation and the sections in reading order, each loaded when
  * it nears the viewport: Evidence (the curve and the figures), How sure (deciles, robustness,
  * decay), Where it worked (year by year, drawdown), the Live record (its state when it has none), the
- * definition and the details. The page holds the edge the list read; each section reads its own
+ * definition and the details. The page reads this one edge (so one verdict is judged); each section reads its own
  * numbers (ADR 0037). Every word and number comes from the server.
  */
 import {
@@ -16,7 +16,7 @@ import {
 } from '@algotrade/ui';
 import { Suspense } from 'react';
 
-import { useEdgeLiveStates, useEdges } from '@/entities/edge';
+import { useEdge, useEdgeLiveStates } from '@/entities/edge';
 import { EdgeHeader } from '@/widgets/edge-detail';
 import { lazyPage } from '@/shared/lib/lazy';
 
@@ -34,9 +34,9 @@ export interface EdgePageProps {
 }
 
 export function EdgePage({ id, onBack, onEdit }: EdgePageProps) {
-  const edges = useEdges();
+  const edges = useEdge(id);
   const live = useEdgeLiveStates().data?.find((s) => s.edgeId === id);
-  const edge = edges.data?.find((e) => e.id === id);
+  const edge = edges.data;
   if (edges.isPending) return <Skeleton variant="rect" label="Loading edge" />;
   if (edges.isError && !edges.data) {
     return <ErrorState title="The edge failed to load." onRetry={() => void edges.refetch()} />;

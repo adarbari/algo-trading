@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import { EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from '../model/fixtures';
-import { useEdgeDocument, useEdgeProblems, useEdges } from './edges';
+import { EDGE_ROWS_FIXTURE, EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from '../model/fixtures';
+import { useEdge, useEdgeDocument, useEdgeProblems, useEdges } from './edges';
 import { useEdgeLiveStates } from './paper';
 import { useTrackRecords } from './track-records';
 
@@ -27,14 +27,45 @@ beforeEach(() => {
 });
 
 describe('useEdges', () => {
-  it('asks the EdgesPage operation and serves the edges with their verdicts', async () => {
-    GQL.mockResolvedValue(EDGES_FIXTURE);
+  it('asks the list operation: the headline of each verdict, never the whole verdict, runs or definition', async () => {
+    GQL.mockResolvedValue(EDGE_ROWS_FIXTURE);
     const { result } = renderHook(() => useEdges(), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgesPage');
-    expect(result.current.data?.[0]?.verdict.verdict).toBe('promising');
+    const document = String(GQL.mock.calls[0]?.[0]);
+    expect(document).toContain('query EdgesPage');
+    expect(document).toContain('summary');
+    expect(document).not.toMatch(/\bverdict \{|runs|canonicalRun|definition|haircut|decay/);
+    expect(result.current.data?.[0]?.summary.verdict).toBe('promising');
+  });
+});
+
+describe('useEdge', () => {
+  it('asks the EdgeDetail operation for ONE id, with the full verdict and the runs', async () => {
+    GQL.mockResolvedValue({ edges: [EDGES_FIXTURE.edges[0]] });
+    const { result } = renderHook(() => useEdge('momentum_12_1'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    const document = String(GQL.mock.calls[0]?.[0]);
+    expect(document).toContain('query EdgeDetail');
+    expect(document).toMatch(/verdict \{/);
+    expect(document).toContain('runs {');
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ ids: ['momentum_12_1'] });
+    expect(result.current.data?.verdict.verdict).toBe('promising');
+  });
+
+  it('serves null for an edge that is not seen, and sends nothing without an id', async () => {
+    GQL.mockResolvedValue({ edges: [] });
+    const { result } = renderHook(() => useEdge('nope'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data).toBeNull();
+    GQL.mockClear();
+    renderHook(() => useEdge(null), { wrapper });
+    expect(GQL).not.toHaveBeenCalled();
   });
 });
 
@@ -60,7 +91,7 @@ describe('useEdgeDocument', () => {
 
 describe('useEdgeProblems', () => {
   it('serves the files that did not load from the same read', async () => {
-    GQL.mockResolvedValue(EDGES_FIXTURE);
+    GQL.mockResolvedValue(EDGE_ROWS_FIXTURE);
     const { result } = renderHook(() => useEdgeProblems(), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);

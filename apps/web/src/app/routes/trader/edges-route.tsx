@@ -55,8 +55,9 @@ export const edgesRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'edges',
   validateSearch: validateEdgesSearch,
-  ...pageRoute(EdgesPage, (page, client) => {
-    page.prefetchEdgesReads(client);
+  loaderDeps: ({ search }) => ({ edge: search.edge ?? null }),
+  ...pageRoute(EdgesPage, (page, client, deps: { edge: string | null }) => {
+    page.prefetchEdgesReads(client, deps.edge);
   }),
   component: EdgesIndex,
 });

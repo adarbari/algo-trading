@@ -1,5 +1,5 @@
 /**
- * Playwright route mock for the edges: the `EdgesPage`, `EdgeDocument` (the builder's one-edge read), `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record)
+ * Playwright route mock for the edges: the `EdgesPage` (the list: rows with their `summary`), `EdgeDetail` (one edge in full), `EdgeDocument` (the builder's one-edge read), `ScreenerTrackRecords`, `EdgeDesk` and `EdgePaper` (nothing followed, no paper record)
  * and the result sections (`EdgeResultCurve`, `EdgeResultDrawdown`, `EdgeResultDecay`, the regimes,
  * holding periods, costs, capacity, rolling starts and monthly map, `EdgeTrades`, `EdgeVariantGrid`) GraphQL
  * operations (POST /api/graphql). The golden store holds no edge runs, so the answers are
@@ -374,10 +374,34 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
       await route.fulfill({
         json: { data: { edges: found.map((e) => ({ ...e, variantsTried: 0 })) } },
       });
-    } else if (/query\s+EdgesPage\b/.test(query)) {
-      const all = EDGES as EdgesPageData;
+    } else if (/query\s+EdgeDetail\b/.test(query)) {
+      // One edge in full (the edge page): only the listed ids, the user's copies too.
+      const ids = body?.variables?.ids ?? [];
+      const all = [...(EDGES as EdgesPageData).data.edges, ...copies];
       await route.fulfill({
-        json: { ...all, data: { ...all.data, edges: [...all.data.edges, ...copies] } },
+        json: { data: { edges: all.filter((e) => ids.includes(String(e['id']))) } },
+      });
+    } else if (/query\s+EdgesPage\b/.test(query)) {
+      // The list: each edge's row and the headline of its verdict, as the server's `summary`.
+      const all = EDGES as EdgesPageData & { data: { edgeProblems?: unknown[] } };
+      const rows = [...all.data.edges, ...copies].map((e) => {
+        const verdict = (e['verdict'] ?? {}) as Record<string, unknown>;
+        return {
+          id: e['id'],
+          name: e['name'],
+          status: e['status'],
+          state: e['state'],
+          mine: e['mine'],
+          screeners: e['screeners'],
+          summary: {
+            verdict: verdict['verdict'],
+            result: verdict['result'],
+            trades: verdict['trades'],
+          },
+        };
+      });
+      await route.fulfill({
+        json: { ...all, data: { edgeProblems: all.data.edgeProblems ?? [], edges: rows } },
       });
     } else if (/query\s+EdgeBuilder\b/.test(query)) {
       await route.fulfill({ json: { data: { edge: BUILDER } } });

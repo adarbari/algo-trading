@@ -404,14 +404,14 @@ def load_edge_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> EdgeVe
     run = runs.load_canonical_run(ctx, edge).run
     if run is None:
         return judge(edge.id, None, edge.frozen_from, settings)
-    rows, draws = _inputs(ctx, run) if headline else (runs.load_run_rows(ctx, run), None)
+    rows, draws = _inputs(ctx, run)  # memoised: a page asking `summary` and `verdict` reads once
     return judge(
         edge.id,
         rows,
         run.split_from or edge.frozen_from,  # the split its year parts were cut at
         settings,
         run.lost_inputs,
-        draws=runs.load_run_draws(ctx, run) if draws is None else draws,
+        draws=draws,
         decoys=bool(edge.baselines),
         declared=Declared(edge.promoted, edge.basis_horizon),
         facts=EdgeFacts(

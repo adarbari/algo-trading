@@ -236,7 +236,14 @@ export type EdgeVariantGridQuery = { edgeVariants: { basis: string | null, trial
 export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, basisWhy: string, side: string, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean, referenceRate: number | null, touchRate: number | null }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null, nextClose: string | null, projections: Array<{ criterion: string, oos: boolean, have: number, needed: number, remaining: number, state: string, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null }>, atTarget: { needed: number, level: string, reasons: Array<string>, sentence: string } | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
+export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, mine: boolean, screeners: Array<string>, summary: { verdict: string, result: string, trades: number | null } }> };
+
+export type EdgeDetailQueryVariables = Exact<{
+  ids: Array<string> | string;
+}>;
+
+
+export type EdgeDetailQuery = { edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, basisWhy: string, side: string, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean, referenceRate: number | null, touchRate: number | null }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null, nextClose: string | null, projections: Array<{ criterion: string, oos: boolean, have: number, needed: number, remaining: number, state: string, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null }>, atTarget: { needed: number, level: string, reasons: Array<string>, sentence: string } | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
 export type EdgeDocumentQueryVariables = Exact<{
   ids: Array<string> | string;
@@ -1203,6 +1210,23 @@ export const EdgesPageDocument = new TypedDocumentString(`
     name
     status
     state
+    mine
+    screeners
+    summary {
+      verdict
+      result
+      trades
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+export const EdgeDetailDocument = new TypedDocumentString(`
+    query EdgeDetail($ids: [String!]!) {
+  edges(ids: $ids) {
+    id
+    name
+    status
+    state
     labels
     oosHidden
     mine
@@ -1386,7 +1410,7 @@ export const EdgesPageDocument = new TypedDocumentString(`
     }
   }
 }
-    `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+    `) as unknown as TypedDocumentString<EdgeDetailQuery, EdgeDetailQueryVariables>;
 export const EdgeDocumentDocument = new TypedDocumentString(`
     query EdgeDocument($ids: [String!]!) {
   edges(ids: $ids) {

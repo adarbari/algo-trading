@@ -16,7 +16,7 @@ import {
   useEdges,
   verdictLabel,
   VERDICT_ORDER,
-  type Edge,
+  type EdgeRow,
   type EdgeView,
 } from '@/entities/edge';
 import { GuideHelp, termHelp } from '@/features/guide-help';
@@ -31,8 +31,8 @@ export interface EdgeListProps {
   onViewChange?: (view: EdgeView) => void;
 }
 
-const GROUPS: DataTableGroupBy<Edge> = {
-  getGroup: (e) => e.verdict.verdict,
+const GROUPS: DataTableGroupBy<EdgeRow> = {
+  getGroup: (e) => e.summary.verdict,
   order: VERDICT_ORDER,
   label: (group, count) => `${verdictLabel(group)} · ${String(count)}`,
 };
@@ -90,7 +90,7 @@ export function EdgeList({ onSelect, view = 'all', onViewChange }: EdgeListProps
         errorMessage="The edges failed to load."
         onRetry={() => void edges.refetch()}
       >
-        <DataTable<Edge>
+        <DataTable<EdgeRow>
           label="Edges"
           columns={columns}
           rows={rows}

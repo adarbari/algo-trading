@@ -8,8 +8,10 @@
  * capacity, regimes and horizons, one read each). Never reads an exploratory run as a track record.
  */
 export {
+  prefetchEdge,
   prefetchEdges,
   refreshEdges,
+  useEdge,
   useEdgeDocument,
   useEdgeProblems,
   useEdges,
@@ -44,6 +46,7 @@ export {
   verdictTone,
   VERDICT_ORDER,
   type Edge,
+  type EdgeRow,
   type EdgeDocument,
   type EdgeProblem,
   type EdgeView,
@@ -130,6 +133,7 @@ export {
   DECAY_FIXTURE,
   DRAWDOWN_FIXTURE,
   edgeFixture,
+  EDGE_ROWS_FIXTURE,
   EDGES_FIXTURE,
   TRACK_RECORDS_FIXTURE,
   UNKNOWN_FIXTURE,
