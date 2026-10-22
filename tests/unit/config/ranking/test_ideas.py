@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.config.ranking import ideas
 from algotrade.config.ranking.ideas import IdeasRule, load_ideas_rule, parse_ideas_rule
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import FileConfigStore
@@ -39,3 +40,9 @@ def test_the_hash_moves_with_every_parameter_and_only_with_them() -> None:
     assert base.hash == IdeasRule(5, 20, 3).hash
     assert len({base.hash, IdeasRule(6, 20, 3).hash, IdeasRule(5, 21, 3).hash,
                 IdeasRule(5, 20, 4).hash}) == 4  # fmt: skip
+
+
+def test_the_hash_moves_with_the_rule_code_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    before = IdeasRule().hash
+    monkeypatch.setattr(ideas, "RULE_VERSION", ideas.RULE_VERSION + 1)
+    assert IdeasRule().hash != before

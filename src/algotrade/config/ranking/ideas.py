@@ -12,6 +12,7 @@ from typing import Any, Protocol
 
 from algotrade.config.site.fields import Table
 
+RULE_VERSION = 1  # bump on ANY change to services/ideas/rule.py (tie order, dedupe, max, caps)
 KIND = "ranking"
 NAME = "ideas"
 WHERE = "ideas.toml"
@@ -35,8 +36,9 @@ class IdeasRule:
 
     @property
     def hash(self) -> str:
-        """Twelve hex digits of the parameters' canonical JSON."""
-        text = json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
+        """Twelve hex digits of the parameters' and the rule code's version canonical JSON."""
+        doc = {**asdict(self), "rule_version": RULE_VERSION}
+        text = json.dumps(doc, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
