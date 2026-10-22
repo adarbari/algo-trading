@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.edges import load_edge
-from algotrade.services.read.evaluation.runs import EdgeRow, _lost
+from algotrade.services.read.evaluation.runs import Draw, EdgeRow, _lost
 from algotrade.services.read.evaluation.verdict import (
     ALL,
     BOTH,
@@ -115,6 +115,18 @@ def test_promising_names_what_works_still_needs() -> None:
     assert v.basis == "scr, 20 trading days"
     assert "Trades, and out-of-sample trades" in v.rationale
     assert v.lift_pts is not None and round(v.lift_pts) == 10
+
+
+def test_light_draws_judge_exactly_like_full_rows() -> None:
+    """Draws cut from the columns (``Draw``) carry what the statistics read: same verdict,
+    same robustness bins and beat share as the ``EdgeRow`` draws they replace."""
+    strong = result(
+        oos={"decile_t": 3.0, "decile_spread": 0.9},
+        whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
+    )
+    full = [*draws(60), *draws(0, of=3, horizon=5)]
+    light = [Draw(d.edge_variant, d.variant, d.horizon_sessions, d.lift) for d in full]
+    assert verdict(strong, draws=light) == verdict(strong, draws=full)
 
 
 def test_works_needs_every_criterion_and_the_random_pick_win() -> None:

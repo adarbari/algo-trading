@@ -146,6 +146,21 @@ class EdgeRow:
 
 
 @dataclass(frozen=True)
+class Draw:
+    """One random-pick draw of a run: the four numbers its consumers read (the verdict's and the
+    robustness panel's beat share), cut from the stored columns without decoding an ``EdgeRow``
+    (a run stores thousands; ``EdgeRow`` has the same four attributes, so either is accepted)."""
+
+    edge_variant: str
+    variant: str
+    horizon_sessions: int
+    lift: float | None
+
+
+Draws = Sequence[Draw | EdgeRow]  # what the draw statistics read: ``Draw`` or any ``EdgeRow``
+
+
+@dataclass(frozen=True)
 class SeriesRow:
     """One block of decision sessions of a run's main edge variant, one screener or baseline at
     one horizon (``results/edge_series``, ADR 0064): the window it measured (``entry_session`` to
@@ -476,10 +491,30 @@ def rows_of_record(
     return _stored(ctx, record, random=False, slice_kinds=slice_kinds)
 
 
-def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
+def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[Draw, ...]:
     """The random-pick draws the run ``record`` wrote (slice kind ``draw``, out-of-sample only),
-    each a ``lift`` and ``hit_rate`` of one draw of names chosen with no information."""
-    return _stored(ctx, record, random=True)
+    each the ``lift`` of one draw of names chosen with no information, in stored order. Built
+    straight from the columns: no ``EdgeRow`` per draw (a null ``lift`` or ``edge_variant`` reads
+    as ``_row`` reads it: None, ``main``)."""
+    frame = run_partition(ctx, result_table(EDGE_EVAL), record)
+    if frame is None:
+        return ()
+    found = frame[frame["role"].astype(str) == RANDOM]
+    if found.empty:
+        return ()
+    variant = (
+        found["edge_variant"].astype(object).where(found["edge_variant"].notna(), MAIN)
+        if "edge_variant" in found
+        else pd.Series(MAIN, index=found.index)
+    )
+    lift = pd.to_numeric(found["lift"], errors="coerce").astype(object)
+    lift = lift.where(lift.notna(), None)
+    return tuple(
+        Draw(str(ev) or MAIN, str(v), int(h), x)
+        for ev, v, h, x in zip(
+            variant, found["variant"], found["horizon_sessions"], lift, strict=True
+        )
+    )
 
 
 def load_run_rows(
@@ -520,7 +555,7 @@ def _in_sample_only(row: EdgeRow) -> bool:
     return row.slice_kind in SIDE_PARTS and row.slice_value.endswith(f":{IN_SAMPLE}")
 
 
-def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
+def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[Draw, ...]:
     """The random-pick draws ``run`` wrote; none for a run from before they were drawn, and
     none while its out-of-sample result is hidden (a draw is measured out of sample)."""
     record = ctx.reader.run(run.run_id)
