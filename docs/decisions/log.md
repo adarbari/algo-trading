@@ -456,6 +456,14 @@ follow-up PR).
 - status: final
 - Reasoning: it does not help the cold-load bar, so it does not belong in the speed phases.
 
+## 2026-10-22 | Screener "changes" (data architecture v2, decision 4) | Frozen at write, both versions recorded, a "definition changed" mark; re-runs are non-blocking with a visible status and ETA
+- Question: are a screener run's `new` / `dropped` counts recomputed when read, or frozen when the run is written? What happens when the definition changed between the two runs?
+- Options: recompute on read / freeze at write; with freeze: (i) record both versions and show a "definition changed" mark, (ii) compare only against a run of the same version, (iii) freeze silently.
+- Decision: freeze at write (the writer of a run records the previous run's id, the previous run's version and the new and dropped counts in the run's `results/screen_runs` row); (i): the counts are kept as compared with the previous run whatever its version, both versions are recorded, and the screeners list shows a "definition changed" mark (a Guide entry, ADR 0051). The per-name new/dropped tags of a results page still compare the two runs' rows for the names shown. Runs written before this change keep being recomputed on read. Editing a screener stays allowed at any time.
+- Added requirement (owner): a user can change a screener's parameters and run it again; a re-run takes about 15-30 s or more, so it must not block the user: it runs as a job, its status is clearly visible and shows an ETA. The design of that experience is written for the owner's review before it is built.
+- decided by: owner
+- status: final
+- Reasoning: frozen counts mean "what was known when this ran", stay stable when an earlier session's run is superseded, and cost one small read instead of re-resolving two sessions per screener (about 53 s over 92 screeners); the mark keeps the counts honest after a definition change.
 ## 2026-10-22 | Ideas page size (data architecture v2, decision 6) | First 50 picks, a "more" control loads the next 50, and so on
 - Question: the Ideas page returns every pick in one response; how many does a first load carry?
 - Options: top 50 plus a "more" control loading the next 50; keep the full list and virtualise it on screen.
