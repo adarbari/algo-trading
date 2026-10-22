@@ -1,13 +1,14 @@
 """Save a user's preferences (``config/users/<u>/preferences.toml``; ADR 0029, 0032): the
-Ideas screener priority, ``ideas.priority`` (screener ids, best first), and the user's views of
-a table, ``views.<scope>.view`` (columns, sort, decisions shown, and ``narrow_columns``: the
-table column ids added back on a phone, checked by shape only) and any named ones,
-``views.<scope>.views.<name>`` (a scope names a table: ``screener:<id>`` is a screener's
-results; ``services.read.screens.views``). Every id must be a screen the user can run (their
-own or a site preset) and listed once, and every column a feature of the user's catalogue, so a
-stale or mistyped name is never saved. A view belongs to the user, never to a screener version:
-saving one changes no screen and no hash. Deleting a screener forgets it here
-(``forget_screener``).
+user's views of a table, ``views.<scope>.view`` (columns, sort, decisions shown, and
+``narrow_columns``: the table column ids added back on a phone, checked by shape only) and
+any named ones, ``views.<scope>.views.<name>`` (a scope names a table: ``screener:<id>`` is a
+screener's results; ``services.read.screens.views``). Every id must be a screen the user can
+run (their own or a site preset) and listed once, and every column a feature of the user's
+catalogue, so a stale or mistyped name is never saved. A view belongs to the user, never to a
+screener version: saving one changes no screen and no hash. Deleting a screener forgets it here
+(``forget_screener``). ``ideas.priority`` (the Ideas screener order) is retired (owner decision
+2026-10-22) and never written; an old file that holds it is read without error and the entry is
+only scrubbed of a deleted screener.
 
 Read-model PR 8 moved the views from ``screeners.<id>`` to ``views."screener:<id>"``: every
 preferences write moves the old tables first (``_moved``), so a saved view is never lost and
@@ -49,22 +50,6 @@ def _moved(document: Mapping[str, Any] | None) -> dict[str, Any]:
 
 def _load(writer: ConfigWriter, user: str) -> dict[str, Any]:
     return _moved(writer.load(user, PREFERENCES, PREFERENCES))
-
-
-def save_ideas_priority(writer: ConfigWriter, user: str, priority: Sequence[str]) -> list[str]:
-    """Replace ``user``'s ``ideas.priority`` (other preferences are kept); returns it."""
-    who = author(user).user_id
-    ids = [screen_id(i) for i in priority]
-    if len(set(ids)) != len(ids):
-        raise ConfigurationError("ideas.priority lists a screener twice")
-    known = {*writer.names(who, "screeners"), *writer.names(SITE_USER, "screeners")}
-    unknown = [i for i in ids if i not in known]
-    if unknown:
-        raise ConfigurationError(f"ideas.priority: not your screeners or site presets: {unknown}")
-    current = _load(writer, who)
-    current["ideas"] = {**dict(current.get("ideas") or {}), "priority": ids}
-    writer.save_preferences(who, current)
-    return ids
 
 
 def forget_screener(writer: ConfigWriter, user: str, name: str) -> None:

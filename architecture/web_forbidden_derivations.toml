@@ -61,3 +61,8 @@ reason = "the universe size is FeatureTable.total, not a size=1 page"
 [[pattern]]
 regex = "NOT_PICKED"
 reason = "picked / not picked and new / dropped are ScreenResult.change (a stored run) and the preview's changes.entered / .left, decided on the server"
+
+# Enabled with the Ideas ranking rule (owner decision 2026-10-22: an idea is its best pick, chosen on the server):
+[[pattern]]
+regex = "decisionRank|toMetrics"
+reason = "the best pick, its display values (Idea.metrics) and the watch-outs are served from the Ideas rule's best pick (Idea.best, Idea.metrics, Idea.watchOut): never rank decisions or merge values across picks in the browser"

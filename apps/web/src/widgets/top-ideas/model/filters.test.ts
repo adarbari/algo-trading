@@ -1,19 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { IDEA_FACTS, type Idea, type IdeaPick } from '@/entities/idea';
+import { IDEA_FACTS, type Idea, type IdeaPick, type PickedBy } from '@/entities/idea';
 
 import { filterIdeas, filterOptions, optionLabel } from './filters';
 
 const pick = (decision: string): IdeaPick => ({
   screenerId: 's',
   screenerName: 'S',
-  flags: [],
-  columns: {},
-  criterionValues: {},
   criteria: [],
   decision,
   score: 1,
   reasons: '',
+});
+const by = (screenerId: string, screenerName: string): PickedBy => ({
+  screenerId,
+  screenerName,
+  own: false,
+  position: 1,
+  score: 1,
+  decision: 'QUALIFIED',
 });
 const sessions = (n: number | null) => ({
   name: IDEA_FACTS.sessionsToEarnings,
@@ -35,8 +40,9 @@ const idea = (symbol: string, decision: string, days: number | null): Idea => ({
   symbol,
   name: null,
   rank: 1,
-  picks: [pick(decision)],
+  score: 1,
   best: pick(decision),
+  pickedBy: [by('s', 'S')],
   regime: null,
   sizeMultiplier: null,
   facts: { [IDEA_FACTS.sessionsToEarnings]: sessions(days) },
@@ -48,7 +54,7 @@ const withBits = (base: Idea, bits: Partial<Idea>): Idea => ({ ...base, ...bits 
 const risky = withBits(idea('D', 'QUALIFIED', 40), {
   watchOut: [{ id: 'liquidity_risk', label: 'Liquidity risk' }],
   regime: 'CLOUDS',
-  picks: [{ ...pick('QUALIFIED'), screenerId: 'liq', screenerName: 'Liquidity' }],
+  pickedBy: [by('liq', 'Liquidity')],
 });
 const ideas = [
   idea('A', 'QUALIFIED', 30),

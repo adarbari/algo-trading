@@ -1,11 +1,12 @@
 /**
- * The idea model: the `IdeasPage` response (one row per ticker with every screener that picked
- * it, ranked on the server) turned into what the Ideas page shows: each idea's best pick
- * (decision, score), its facts by catalogue name (earnings, nearest expiry, IV: the server's
- * values for the session or why not), the screeners' stored display values and the watch-outs;
- * and the screeners in priority order with their run, picked count and best picks, all counted
- * by the server over the whole run. Pure: it chooses among served values, it never computes
- * one (docs/api/read-model.md "Presentation is not derivation").
+ * The idea model: the `IdeasPage` response (one row per ticker, ranked on the server by the Ideas
+ * rule and served from its best pick) turned into what the Ideas page shows: each idea's best
+ * pick (decision, reasons, criteria outcomes), the screeners that picked it, its facts by
+ * catalogue name (earnings, nearest expiry, IV: the server's values for the session or why not),
+ * the best pick's stored display values and watch-outs; and the screeners with their run, picked
+ * count and first picks, all counted by the server over the whole run. Pure: it renames served
+ * values, it never chooses among picks or computes one (docs/api/read-model.md "Presentation is
+ * not derivation").
  */
 import type { ServedUnknown } from '@/entities/availability';
 import type { ServedValue } from '@/entities/feature';
@@ -16,28 +17,35 @@ import { IDEA_FACTS } from './facts';
 export type IdeasResponse = gqlTypes.IdeasPageQuery;
 type ServedIdeas = NonNullable<IdeasResponse['ideas']>;
 type ServedItem = ServedIdeas['items'][number];
-type ServedPick = ServedItem['picks'][number];
 type ServedScreener = ServedIdeas['screeners'][number];
 type ServedPaused = ServedIdeas['paused'][number];
 
 /** A stored display value: a screener's column (`hv30`, `put_roc`, ...) or a criterion value. */
 export type IdeaMetric = number | string;
 
+/** The best pick of an idea: what its screener decided and why. */
 export interface IdeaPick {
   screenerId: string;
   /** The screener's display name (its id when it has none). */
   screenerName: string;
   decision: string;
+  /** The screener's own score for the ticker (not the idea's score). */
   score: number | null;
   reasons: string;
-  /** The screener's display columns for the ticker. */
-  columns: Record<string, unknown>;
-  /** What each criterion was judged on (criterion id -> value). */
-  criterionValues: Record<string, unknown>;
   /** Each criterion's served outcome (`PASS`, `NEAR`, `FAIL`, `MISSING`), in the screener's order. */
   criteria: { id: string; outcome: string }[];
-  /** The screener's flags that hold for the ticker (ids, e.g. `leveraged_inverse`). */
-  flags: string[];
+}
+
+/** One screener that picked an idea: its place in the screener's run and what it earns. */
+export interface PickedBy {
+  screenerId: string;
+  screenerName: string;
+  /** The viewer's own screener (not a site preset). */
+  own: boolean;
+  position: number;
+  /** Weight over position, as the Ideas rule scores it. */
+  score: number;
+  decision: string;
 }
 
 /** One reason to look twice at an idea (a flag, a liquidity-risk pick, earnings before expiry). */
@@ -53,22 +61,20 @@ export interface Idea {
   /** The company or fund name (null when the reference snapshot does not have the instrument). */
   name: string | null;
   rank: number;
-  /** Every screener that picked the ticker, highest priority first (the server's order). */
-  picks: IdeaPick[];
-  /** The pick with the best decision (ties: the higher-priority screener). */
+  /** The idea's score under the Ideas rule: its best pick's weight over position. */
+  score: number;
+  /** The pick the idea is served from (the server's best pick). */
   best: IdeaPick;
-  /** The regime label and size its best-priority pick was stamped with (null: not stamped). */
+  /** Every screener that picked the ticker, the best first (the server's order). */
+  pickedBy: PickedBy[];
+  /** The regime label and size its best pick was stamped with (null: not stamped). */
   regime: string | null;
   sizeMultiplier: number | null;
   /** The served facts (`IDEA_FEATURES`) by catalogue name: a value, or why it is UNKNOWN. */
   facts: Readonly<Record<string, ServedValue>>;
-  /**
-   * The display values by name, from the best pick that has one (a screener's columns, then
-   * its criterion values): `hv30`, `iv_hv_ratio`, `put_strike`, ... Only what some screener
-   * stored.
-   */
+  /** The best pick's display values by name: `hv30`, `iv_hv_ratio`, `put_strike`, ... */
   metrics: Record<string, IdeaMetric>;
-  /** Flags, liquidity risk and earnings before expiry, each once. */
+  /** Flags, liquidity risk and earnings before expiry of the best pick, each once. */
   watchOut: WatchOut[];
 }
 
@@ -94,10 +100,11 @@ export interface ScreenerSummary {
   version: number | null;
   /** How many tickers its run for the session picked (over the whole run). */
   picked: number;
-  /** Why it has no run for the session (null: it ran). */
   /** Why the screener has no run for the session (ADR 0056), else null. */
   notRun: ServedUnknown | null;
-  /** Its best picks of the run, by rank. */
+  /** The run's order follows values the viewer's licences do not cover: it adds no idea. */
+  withheld: boolean;
+  /** Its first picks that count towards the ideas, best first. */
   top: { symbol: string; score: number | null }[];
 }
 
@@ -111,16 +118,9 @@ export interface IdeasData {
   /** How many picks the gate paused over every run, and the first of them (never hidden). */
   pausedTotal: number;
   paused: PausedIdea[];
-  /** The user's screeners, highest priority first (priority list, then the rest by id). */
+  /** The viewer's screeners (their own first, then the site presets by id). */
   screeners: ScreenerSummary[];
 }
-
-const DECISION_ORDER = ['QUALIFIED', 'WATCH', 'EVENT_RISK'];
-
-const decisionRank = (decision: string): number => {
-  const index = DECISION_ORDER.indexOf(decision);
-  return index < 0 ? DECISION_ORDER.length : index;
-};
 
 const FLAG_LABELS: Record<string, string> = {
   leveraged_inverse: 'Leveraged / inverse',
@@ -147,67 +147,37 @@ export function earningsBeforeExpiry(idea: Idea): boolean {
   return factOf(idea, IDEA_FACTS.earningsBeforeExpiry)?.value === true;
 }
 
-function toWatchOut(picks: readonly IdeaPick[], beforeExpiry: boolean): WatchOut[] {
-  const ids = picks.flatMap((p) => [
-    ...p.flags,
-    ...(p.decision === 'LIQUIDITY_RISK' ? ['liquidity_risk'] : []),
-  ]);
-  if (beforeExpiry) ids.push('earnings_before_expiry');
-  return [...new Set(ids)].map((id) => ({ id, label: flagLabel(id) }));
-}
-
-function toMetrics(picks: readonly IdeaPick[]): Record<string, IdeaMetric> {
-  const out: Record<string, IdeaMetric> = {};
-  for (const pick of picks) {
-    for (const [key, value] of Object.entries({ ...pick.criterionValues, ...pick.columns })) {
-      if (!(key in out) && (typeof value === 'number' || typeof value === 'string')) {
-        out[key] = value;
-      }
-    }
-  }
-  return out;
-}
-
-const byName = <T extends { value?: unknown }>(
-  entries: readonly T[],
-  key: (entry: T) => string,
-): Record<string, unknown> => Object.fromEntries(entries.map((e) => [key(e), e.value]));
-
-function toPick(pick: ServedPick, names: ReadonlyMap<string, string>): IdeaPick {
-  return {
-    screenerId: pick.configId,
-    screenerName: names.get(pick.configId) ?? pick.configId,
-    decision: pick.decision,
-    score: pick.score ?? null,
-    reasons: pick.reasons,
-    columns: byName(pick.columns, (c) => c.name),
-    criterionValues: byName(pick.criteria, (c) => c.id),
-    criteria: pick.criteria.map((c) => ({ id: c.id, outcome: c.outcome })),
-    flags: pick.flags,
-  };
-}
-
-function toIdea(item: ServedItem, names: ReadonlyMap<string, string>): Idea | null {
-  const picks = item.picks.map((p) => toPick(p, names));
-  const strongest = [...picks].sort((a, b) => decisionRank(a.decision) - decisionRank(b.decision));
-  const best = strongest[0];
-  if (!best) return null;
+function toIdea(item: ServedItem, names: ReadonlyMap<string, string>): Idea {
+  const nameOf = (id: string): string => names.get(id) ?? id;
   const served = item.instrument?.features ?? [];
-  const facts = Object.fromEntries(served.map((v) => [v.name, v as ServedValue]));
-  const idea: Idea = {
+  return {
     instrumentId: item.instrumentId,
     symbol: item.instrument?.symbol ?? null,
     name: item.instrument?.name ?? null,
     rank: item.rank,
-    picks,
-    best,
+    score: item.score,
+    best: {
+      screenerId: item.best.configId,
+      screenerName: nameOf(item.best.configId),
+      decision: item.best.decision,
+      score: item.best.score ?? null,
+      reasons: item.best.reasons,
+      criteria: item.best.criteria,
+    },
+    pickedBy: item.pickedBy.map((p) => ({
+      screenerId: p.configId,
+      screenerName: nameOf(p.configId),
+      own: p.own,
+      position: p.position,
+      score: p.score,
+      decision: p.decision,
+    })),
     regime: item.regime ?? null,
     sizeMultiplier: item.sizeMultiplier ?? null,
-    facts,
-    metrics: toMetrics(strongest),
-    watchOut: [],
+    facts: Object.fromEntries(served.map((v) => [v.name, v as ServedValue])),
+    metrics: Object.fromEntries(item.metrics.map((m) => [m.name, m.value as IdeaMetric])),
+    watchOut: item.watchOut.map((id) => ({ id, label: flagLabel(id) })),
   };
-  return { ...idea, watchOut: toWatchOut(picks, earningsBeforeExpiry(idea)) };
 }
 
 function toScreener(entry: ServedScreener): ScreenerSummary {
@@ -218,6 +188,7 @@ function toScreener(entry: ServedScreener): ScreenerSummary {
     version: entry.run?.configVersion ?? entry.screener.version ?? null,
     picked: entry.picked,
     notRun: entry.notRun ?? null,
+    withheld: entry.withheld,
     top: entry.top.map((t) => ({
       symbol: t.instrument?.symbol ?? t.instrumentId,
       score: t.score ?? null,
@@ -254,9 +225,7 @@ export function toIdeasData(response: IdeasResponse): IdeasData {
   return {
     session: found.session,
     total: found.total,
-    ideas: found.items
-      .map((item) => toIdea(item, names))
-      .filter((idea): idea is Idea => idea !== null),
+    ideas: found.items.map((item) => toIdea(item, names)),
     hasMore: found.hasMore,
     pausedTotal: found.pausedTotal,
     paused: found.paused.map((entry) => toPaused(entry, names)),

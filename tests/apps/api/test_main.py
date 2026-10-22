@@ -332,22 +332,22 @@ OVERVIEW_NAMES = [
 ]  # fmt: skip
 IDEAS_PAGE = """query IdeasPage($first: Int!, $names: [FeatureName!]!) {
   ideas(first: $first) {
-    session priority total
+    session total
     screeners {
       screener { id name owner version } run { runId configVersion } notRun { code kind }
-      picked top { instrumentId score instrument { symbol } }
+      picked withheld top { instrumentId score instrument { symbol } }
     }
     items {
-      rank instrumentId
+      rank instrumentId score watchOut
       instrument {
         symbol
         features(names: $names) {
           name value unknown { code kind } info { format unit dtype nullMeaning }
         }
       }
-      picks {
-        configId decision score reasons flags criteria { id value } columns { name value }
-      }
+      best { configId decision score reasons criteria { id outcome } }
+      pickedBy { configId own position score decision }
+      metrics { name value }
     }
   }
 }"""

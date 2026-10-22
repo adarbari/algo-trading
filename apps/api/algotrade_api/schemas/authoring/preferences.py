@@ -1,17 +1,8 @@
-"""``PUT /preferences/ideas``: the user's screener priority for the Ideas list;
-``PUT`` / ``DELETE /preferences/views/{scope}/view``: their views of a table."""
+"""``PUT`` / ``DELETE /preferences/views/{scope}/view``: a user's views of a table."""
 
 from pydantic import BaseModel, Field
 
 from algotrade_api.schemas.health import Schema
-
-
-class IdeasPriorityBody(BaseModel):
-    priority: list[str] = Field(description="screener ids, highest priority first")
-
-
-class IdeasPriority(Schema):
-    priority: list[str]
 
 
 class TableViewBody(BaseModel):

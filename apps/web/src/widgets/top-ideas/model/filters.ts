@@ -28,7 +28,7 @@ const hasLiquidityRisk = (idea: Idea): boolean =>
   idea.watchOut.some((w) => w.id === LIQUIDITY_RISK);
 
 const MATCH: Record<IdeaFilterKey, (idea: Idea, value: string) => boolean> = {
-  screener: (idea, value) => idea.picks.some((p) => p.screenerId === value),
+  screener: (idea, value) => idea.pickedBy.some((p) => p.screenerId === value),
   decision: (idea, value) => idea.best.decision === value,
   liq: (idea, value) => hasLiquidityRisk(idea) === (value === 'risk'),
   regime: (idea, value) => idea.regime === value,
@@ -63,7 +63,9 @@ export function filterOptions(ideas: readonly Idea[], key: IdeaFilterKey): Filte
   switch (key) {
     case 'screener': {
       const names = new Map<string, string>(
-        ideas.flatMap((i) => i.picks.map((p): [string, string] => [p.screenerId, p.screenerName])),
+        ideas.flatMap((i) =>
+          i.pickedBy.map((p): [string, string] => [p.screenerId, p.screenerName]),
+        ),
       );
       return [...names].map(([value, label]) => ({ value, label }));
     }

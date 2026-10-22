@@ -27,26 +27,19 @@ beforeEach(() => {
 const item = (rank: number) => ({
   rank,
   instrumentId: `EQ:${rank}`,
+  score: 1,
   regime: null,
   sizeMultiplier: null,
+  watchOut: [],
   instrument: { symbol: `S${rank}`, name: null, features: [] },
-  picks: [
-    {
-      configId: 'vrp',
-      decision: 'QUALIFIED',
-      score: 1,
-      reasons: '',
-      flags: [],
-      criteria: [],
-      columns: [],
-    },
-  ],
+  best: { configId: 'vrp', decision: 'QUALIFIED', score: 1, reasons: '', criteria: [] },
+  pickedBy: [{ configId: 'vrp', own: false, position: 1, score: 1, decision: 'QUALIFIED' }],
+  metrics: [],
 });
 
 const page = (ranks: number[], nextCursor: string | null) => ({
   ideas: {
     session: '2026-10-02',
-    priority: [],
     total: 3,
     hasMore: nextCursor !== null,
     nextCursor,
