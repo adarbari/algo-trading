@@ -1,7 +1,8 @@
 """Keeps the read cache warm ahead of the pages (ADR 0037): a task of the served API that, at
 start and after every publish (polled every ``WARM_EVERY_S``), reads into the shared result
-cache what every caller shares: the market tables' whole history (``warm_market_frames``), so
-the regime page's charts slice a cached frame instead of reading 14 000 partitions on a
+cache what every caller shares: the market tables' whole history
+(``warm_market_frames``) and the event copies' validation (``warm_event_copies``), so the
+regime page's charts slice a cached frame instead of reading 14 000 partitions on a
 request (20 s a table cold), and the
 session's regime that every page shows (3 to 5 s on the first page after a publish), the Ideas
 table and the edge desk (the home page), the Admin Ingestion page's 10-session grid, the
@@ -35,6 +36,7 @@ from algotrade.config.edges.document import MECHANISM_KINDS
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.desk import load_edge_desk
+from algotrade.services.read.events.stored import warm_event_copies
 from algotrade.services.read.guide.edges.index import load_guide_edge_index
 from algotrade.services.read.guide.edges.mechanism import load_guide_mechanism
 from algotrade.services.read.guide.index import load_guide_index
@@ -122,6 +124,8 @@ def warm(ctx: ReadContext, extra: ExtraSteps | None = None, home: bool = True) -
         except Exception:
             log.exception("warming the read cache: the extra steps failed")
     steps.append(("market frames", lambda: warm_market_frames(ctx)))
+    # the event copies' per-day validation (a digest per stored day, 1 to 2 s cold for fund_nav)
+    steps.append(("event copies", lambda: warm_event_copies(ctx)))
     try:
         for episode in load_episodes(ctx.configs).episodes:  # the regime page's History
             steps.append(

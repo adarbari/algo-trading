@@ -322,6 +322,9 @@ class MemoryTables:
     def history_current(self, table: str, day: date) -> bool:
         return True  # no copy to be stale
 
+    def warm_history(self, table: str, upto: int | None = None) -> int:
+        return 0  # no copy
+
     def free_bytes(self) -> int:
         return 1 << 62  # memory: no volume to fill
 
