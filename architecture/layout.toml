@@ -78,7 +78,7 @@ contracts = ["Configs are pure: no storage I/O"]
 [[dir]]
 path = "src/algotrade/config/ranking"
 purpose = "L3 ranking settings: the Ideas ranking rule's parameters (config/site/ranking/ideas.toml, owner decision 2026-10-22) typed and validated, with the hash that identifies the rule (ideas.py)"
-contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
+contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/site"

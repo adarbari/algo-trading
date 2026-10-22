@@ -390,6 +390,22 @@ forbidden_modules = [
     "algotrade.storage",
     "algotrade.data",
     "algotrade.engines",
+    "algotrade.features",
+    "algotrade.quant",
+    "algotrade.strategies",
+    "algotrade.services.backtests",
+    "algotrade.services.screening",
+    "algotrade.services.drafting",
+    "algotrade.services.explaining",
+    "algotrade.services.events",
+    "algotrade.services.feedback",
+    "algotrade.services.evaluation",
+    "algotrade.services.ondemand",
+    "algotrade.services.preview",
+    "algotrade.services.live",
+    "algotrade.services.serving",
+    "algotrade.services.text_model",
+    "algotrade_sources",
 ]
 
 # ---- ADR 0037: the read model (it replaced services.explore, read-model PRs 2-10b); same rule.
