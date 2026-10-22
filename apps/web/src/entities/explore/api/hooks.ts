@@ -34,7 +34,7 @@ export function useComparePrices(symbols: readonly string[], start: string) {
   const variables = { keys: [...symbols], start };
   return useQuery({
     queryKey: queryKeys.gql('ComparePrices', variables),
-    queryFn: () => gql(ComparePrices, variables),
+    queryFn: ({ queryKey }) => gql(ComparePrices, variables, queryKey),
     select,
     enabled: symbols.length > 0,
     placeholderData: keepPreviousData,

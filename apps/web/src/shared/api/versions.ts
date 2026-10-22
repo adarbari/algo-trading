@@ -10,8 +10,11 @@
  *
  * Order: the generation only rises; a release id `{S}.{X}.f{F}` orders by (S, X, F), so an
  * answer from an older release arriving late is not a change. An answer that was in flight
- * across a write (older generation, arriving late) is refetched once it has settled, so
+ * across a write (older generation, arriving late) is refetched once its data has landed, so
  * pre-write data is never left fresh.
+ *
+ * The entry is at its byte budget: this module is not in it. `installVersions` (called by the
+ * page-cache chunk when it starts) puts it behind `active`, which `gql` and the sign-out call.
  */
 import { hashKey, type QueryKey } from '@tanstack/react-query';
 
@@ -21,63 +24,78 @@ const seen: {
   generation: number | undefined;
   release: string | undefined;
   userKeyed: Set<string>;
-} = {
-  generation: undefined,
-  release: undefined,
-  userKeyed: new Set(),
-};
+} = { generation: undefined, release: undefined, userKeyed: new Set() };
+/** Retired answers wait here, by query hash, for their data to be stored (`refetchOnLanding`). */
+const landing = new Set<string>();
+let unsubscribe: (() => void) | undefined;
 
 /** Nothing of the last user stays (sign-out, another user signing in). */
-export function forgetVersions(): void {
-  seen.generation = undefined;
-  seen.release = undefined;
+function forgetVersions(): void {
+  seen.generation = seen.release = undefined;
   seen.userKeyed.clear();
+  landing.clear();
+  unsubscribe?.();
+  unsubscribe = undefined;
 }
 
-/** `{S}.{X}.f{F}` as a comparable triple (session, sequence, format); null when it is not. */
-function order(release: string): [string, number, number] | null {
-  const m = /^([^.]+)\.(\d+)\.f(\d+)$/.exec(release);
-  return m ? [m[1] ?? '', Number(m[2]), Number(m[3])] : null;
-}
-
-/** Whether `next` is a release other than `last`, and not an older one. */
+/** Whether `next` is a release after `last`: `{S}.{X}.f{F}` read as its numbers, in order
+ * (session date, sequence, format); an equal or older one, arriving late, is not a change. */
 function moved(last: string, next: string): boolean {
-  const a = order(last);
-  const b = order(next);
-  if (a === null || b === null) return last !== next;
-  if (a[0] !== b[0]) return b[0] > a[0];
-  return b[1] !== a[1] ? b[1] > a[1] : b[2] > a[2];
+  const a = last.split(/\D+/).map(Number);
+  const b = next.split(/\D+/).map(Number);
+  const i = a.findIndex((n, k) => n !== b[k]);
+  return i >= 0 && (b[i] ?? 0) > (a[i] ?? 0);
 }
 
-function invalidateOthers(key: QueryKey, only?: ReadonlySet<string>): void {
-  const answered = hashKey(key);
+/** Every query of the operations in `only` (all gql queries without it) but the answered one. */
+function invalidateOthers(key: QueryKey | null, only?: ReadonlySet<string>): void {
+  const answered = key && hashKey(key);
   void active.client?.invalidateQueries({
     predicate: ({ queryKey, queryHash }) =>
       queryKey[0] === 'gql' && queryHash !== answered && (!only || only.has(String(queryKey[1]))),
   });
 }
 
-/** Reads the version headers of the answer to the query `key` and invalidates what they say is
- * behind. */
-export function observeVersions(key: QueryKey, headers: Headers): void {
-  const operation = String(key[1]);
+/** An answer sent before a write is stored only after `gql` returned it: invalidate that query
+ * when its fetch succeeds, or the stored data would clear the invalidation. One subscription,
+ * dropped by `forgetVersions`. */
+function refetchOnLanding(key: QueryKey): void {
+  const client = active.client;
+  if (!client) return;
+  landing.add(hashKey(key));
+  unsubscribe ??= client.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action.type !== 'success') return;
+    if (!landing.delete(event.query.queryHash)) return;
+    const stored: QueryKey = event.query.queryKey as QueryKey;
+    void Promise.resolve().then(() => client.invalidateQueries({ queryKey: stored, exact: true }));
+  });
+}
+
+/** Reads the version headers of the answer to the query `key` (`null`: asked outside a query,
+ * nothing to spare or refetch) and invalidates what they say is behind. */
+export function observeVersions(key: QueryKey | null, headers: Headers): void {
   const generation = headers.get('x-config-generation');
   if (generation !== null) {
-    seen.userKeyed.add(operation);
     const n = Number(generation);
+    if (key) seen.userKeyed.add(String(key[1]));
     if (seen.generation !== undefined && n > seen.generation) {
       invalidateOthers(key, seen.userKeyed);
-    } else if (seen.generation !== undefined && n < seen.generation) {
-      // sent before a write: refetch it once its data has landed
-      setTimeout(() => void active.client?.invalidateQueries({ queryKey: key, exact: true }), 0);
+    } else if (key && seen.generation !== undefined && n < seen.generation) {
+      refetchOnLanding(key); // sent before a write
     }
     seen.generation = Math.max(n, seen.generation ?? n);
   }
   const release = headers.get('x-release-id');
-  if (release !== null) {
-    if (seen.release === undefined || moved(seen.release, release)) {
-      if (seen.release !== undefined) invalidateOthers(key);
-      seen.release = release;
-    }
+  if (release !== null && (seen.release === undefined || moved(seen.release, release))) {
+    if (seen.release !== undefined) invalidateOthers(key);
+    seen.release = release;
   }
 }
+
+/** Starts following the versions of the answers (`gql` reads `active.observe`). */
+export function installVersions(): void {
+  active.observe = observeVersions;
+  active.forget = forgetVersions;
+}
+
+export { forgetVersions };

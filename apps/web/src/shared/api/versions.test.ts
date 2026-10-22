@@ -49,15 +49,41 @@ describe('observeVersions', () => {
     expect(stale()).toEqual([]);
   });
 
-  it('refetches an answer sent before a write once it has landed, and spares nothing else', () => {
-    vi.useFakeTimers();
-    const stale = seeded(['Ideas', 'Views']);
+  it('refetches an answer sent before a write once its data has landed, however late', async () => {
+    const client = new QueryClient();
+    active.client = client;
+    const late = key('Views');
+    let land: (value: string) => void = () => undefined;
+    // the fetch is still running (no observer) when the newer generation has been seen
+    const fetching = client.query({
+      queryKey: late,
+      queryFn: () =>
+        new Promise<string>((resolve) => {
+          land = resolve;
+        }),
+    });
     observe('Ideas', headers(3));
-    observe('Views', headers(2)); // in flight across the write, arriving after the newer one
-    expect(stale()).toEqual([]);
-    vi.advanceTimersByTime(0); // not runAllTimers: that would also expire the cache entries
-    expect(stale()).toEqual(['Views']);
-    vi.useRealTimers();
+    observeVersions(late, headers(2)); // answered before the write, its data not stored yet
+    await new Promise((resolve) => setTimeout(resolve, 5)); // a timer would have fired by now
+    expect(client.getQueryState(late)?.isInvalidated).toBe(false);
+    land('pre-write');
+    await fetching;
+    await vi.waitFor(() => {
+      expect(client.getQueryState(late)?.isInvalidated).toBe(true);
+    });
+  });
+
+  it('keys a query as its hook did, not as operation and variables', () => {
+    const client = new QueryClient();
+    active.client = client;
+    const compare = ['gql', 'EdgesPage', { compare: 'e1' }] as const; // runs EdgeCompare
+    const other = ['gql', 'EdgesPage', {}] as const;
+    client.setQueryData(compare, 1);
+    client.setQueryData(other, 2);
+    observeVersions(other, headers(2));
+    observeVersions(other, headers(3));
+    expect(client.getQueryState(compare)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(other)?.isInvalidated).toBe(false);
   });
 
   it('spares only the answered variables of the operation, not its other keys', () => {

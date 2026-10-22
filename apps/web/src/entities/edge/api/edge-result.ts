@@ -427,7 +427,7 @@ const EdgeVariantGrid = graphql(`
 export function useEdgeResultBasis(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultBasis', { id }),
-    queryFn: () => gql(ResultBasis, { id }),
+    queryFn: ({ queryKey }) => gql(ResultBasis, { id }, queryKey),
     select: (data) => data.edgeResult?.basis ?? null,
   });
 }
@@ -436,7 +436,7 @@ export function useEdgeResultBasis(id: string) {
 export function useEdgeCurve(id: string, date?: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultCurve', { id, date }),
-    queryFn: () => gql(ResultCurve, { id, date }),
+    queryFn: ({ queryKey }) => gql(ResultCurve, { id, date }, queryKey),
     select: (data) => data.edgeResult?.curve ?? null,
   });
 }
@@ -445,7 +445,7 @@ export function useEdgeCurve(id: string, date?: string) {
 export function useEdgeDrawdown(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultDrawdown', { id }),
-    queryFn: () => gql(ResultDrawdown, { id }),
+    queryFn: ({ queryKey }) => gql(ResultDrawdown, { id }, queryKey),
     select: (data) => data.edgeResult?.drawdown ?? null,
   });
 }
@@ -454,7 +454,7 @@ export function useEdgeDrawdown(id: string) {
 export function useEdgeRollingStarts(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultRollingStarts', { id }),
-    queryFn: () => gql(ResultRollingStarts, { id }),
+    queryFn: ({ queryKey }) => gql(ResultRollingStarts, { id }, queryKey),
     select: (data) => data.edgeResult?.rollingStarts ?? null,
   });
 }
@@ -463,7 +463,7 @@ export function useEdgeRollingStarts(id: string) {
 export function useEdgeMonthly(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultMonthly', { id }),
-    queryFn: () => gql(ResultMonthly, { id }),
+    queryFn: ({ queryKey }) => gql(ResultMonthly, { id }, queryKey),
     select: (data) => data.edgeResult?.monthly ?? null,
   });
 }
@@ -472,7 +472,7 @@ export function useEdgeMonthly(id: string) {
 export function useEdgeDecay(id: string, date?: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultDecay', { id, date }),
-    queryFn: () => gql(ResultDecay, { id, date }),
+    queryFn: ({ queryKey }) => gql(ResultDecay, { id, date }, queryKey),
     select: (data) => data.edgeResult?.decay ?? null,
   });
 }
@@ -481,7 +481,7 @@ export function useEdgeDecay(id: string, date?: string) {
 export function useEdgeCosts(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultCosts', { id }),
-    queryFn: () => gql(ResultCosts, { id }),
+    queryFn: ({ queryKey }) => gql(ResultCosts, { id }, queryKey),
     select: (data) => data.edgeResult?.costs ?? null,
   });
 }
@@ -490,7 +490,7 @@ export function useEdgeCosts(id: string) {
 export function useEdgeCapacity(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultCapacity', { id }),
-    queryFn: () => gql(ResultCapacity, { id }),
+    queryFn: ({ queryKey }) => gql(ResultCapacity, { id }, queryKey),
     select: (data) => data.edgeResult?.capacity ?? null,
   });
 }
@@ -499,7 +499,7 @@ export function useEdgeCapacity(id: string) {
 export function useEdgeRegimes(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultRegimes', { id }),
-    queryFn: () => gql(ResultRegimes, { id }),
+    queryFn: ({ queryKey }) => gql(ResultRegimes, { id }, queryKey),
     select: (data) => data.edgeResult?.regimes ?? null,
   });
 }
@@ -508,7 +508,7 @@ export function useEdgeRegimes(id: string) {
 export function useEdgeHorizons(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeResultHorizons', { id }),
-    queryFn: () => gql(ResultHorizons, { id }),
+    queryFn: ({ queryKey }) => gql(ResultHorizons, { id }, queryKey),
     select: (data) => data.edgeResult?.horizons ?? null,
   });
 }
@@ -517,7 +517,7 @@ export function useEdgeHorizons(id: string) {
 export function useEdgeVariants(edgeId: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeVariantGrid', { edgeId }),
-    queryFn: () => gql(EdgeVariantGrid, { edgeId }),
+    queryFn: ({ queryKey }) => gql(EdgeVariantGrid, { edgeId }, queryKey),
     select: (data) => data.edgeVariants,
   });
 }

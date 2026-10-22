@@ -13,6 +13,7 @@ export {
   type AuthSession,
 } from './auth';
 export { active } from './active-client';
+export { installVersions } from './versions';
 export { api, ApiError, errorDetail, unwrap } from './client';
 export { feature, SITE_FEATURES, type SiteFeature } from './generated/catalogue';
 export { graphql, useFragment, type FragmentType } from './generated/graphql';
@@ -21,5 +22,4 @@ export type * as gqlTypes from './generated/graphql/graphql';
 export type { components, paths } from './generated/schema';
 export { gql, GraphQLRequestError } from './graphql';
 export { queryKeys } from './query-keys';
-export { forgetVersions } from './versions';
 export { TestQueryProvider } from './test-provider';

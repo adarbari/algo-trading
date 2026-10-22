@@ -26,7 +26,7 @@ describe('gql', () => {
   it('posts the operation and its variables, and resolves to its data', async () => {
     const fetch = answer({ data: { session: { date: '2026-10-02' } } });
     vi.stubGlobal('fetch', fetch);
-    await expect(gql(document, { day: '2026-10-02' })).resolves.toEqual({
+    await expect(gql(document, { day: '2026-10-02' }, null)).resolves.toEqual({
       session: { date: '2026-10-02' },
     });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
@@ -48,7 +48,7 @@ describe('gql', () => {
         ],
       }),
     );
-    const failed = gql(document, { day: '2026-10-02' });
+    const failed = gql(document, { day: '2026-10-02' }, null);
     await expect(failed).rejects.toBeInstanceOf(GraphQLRequestError);
     await expect(failed).rejects.toMatchObject({
       codes: ['UNKNOWN_FEATURE'],
@@ -58,26 +58,26 @@ describe('gql', () => {
 
   it('rejects an HTTP failure and an answer without data', async () => {
     vi.stubGlobal('fetch', answer({}, 502));
-    await expect(gql(document, { day: 'x' })).rejects.toBeInstanceOf(ApiError);
+    await expect(gql(document, { day: 'x' }, null)).rejects.toBeInstanceOf(ApiError);
     vi.stubGlobal('fetch', answer({ data: null }));
-    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ codes: ['INTERNAL'] });
+    await expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({ codes: ['INTERNAL'] });
   });
 
   it('sends the access token as a bearer, and none when signed out', async () => {
     const fetch = answer({ data: { session: null } });
     vi.stubGlobal('fetch', fetch);
-    await gql(document, { day: 'x' });
+    await gql(document, { day: 'x' }, null);
     const bare = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1];
     expect(bare.headers).not.toHaveProperty('authorization');
     vi.mocked(accessToken).mockResolvedValue('tok-1');
-    await gql(document, { day: 'x' });
+    await gql(document, { day: 'x' }, null);
     const signed = (fetch.mock.calls[1] as unknown as [string, RequestInit])[1];
     expect(signed.headers).toMatchObject({ authorization: 'Bearer tok-1' });
   });
 
   it('ends the session on a 401 and rejects with an ApiError', async () => {
     vi.stubGlobal('fetch', answer({}, 401));
-    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 401 });
+    await expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({ status: 401 });
     expect(handleUnauthorized).toHaveBeenCalledTimes(1);
   });
 
@@ -87,7 +87,7 @@ describe('gql', () => {
     const ok = new Response(JSON.stringify({ data: { session: null } }), { status: 200 });
     const fetch = vi.fn().mockResolvedValueOnce(busy).mockResolvedValueOnce(ok);
     vi.stubGlobal('fetch', fetch);
-    const result = gql(document, { day: 'x' });
+    const result = gql(document, { day: 'x' }, null);
     await vi.advanceTimersByTimeAsync(3000); // at most 2 s * 1.5
     await expect(result).resolves.toEqual({ session: null });
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -98,7 +98,9 @@ describe('gql', () => {
     vi.useFakeTimers();
     const fetch = vi.fn(() => Promise.resolve(new Response('{}', { status: 503 })));
     vi.stubGlobal('fetch', fetch);
-    const settled = expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 503 });
+    const settled = expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({
+      status: 503,
+    });
     await vi.advanceTimersByTimeAsync(60_000);
     await settled;
     expect(fetch).toHaveBeenCalledTimes(6);
@@ -114,7 +116,7 @@ describe('gql', () => {
 
   it('keeps the session on a 403 (a user the registry does not know)', async () => {
     vi.stubGlobal('fetch', answer({}, 403));
-    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 403 });
+    await expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({ status: 403 });
     expect(handleUnauthorized).not.toHaveBeenCalled();
   });
 });

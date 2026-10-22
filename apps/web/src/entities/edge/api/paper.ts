@@ -40,7 +40,7 @@ export function useEdgeDesk() {
 function edgeDeskQuery() {
   return queryOptions({
     queryKey: queryKeys.gql('EdgeDesk', {}),
-    queryFn: () => gql(EdgeDesk, {}),
+    queryFn: ({ queryKey }) => gql(EdgeDesk, {}, queryKey),
   });
 }
 
@@ -53,7 +53,7 @@ export function prefetchEdgeDesk(client: QueryClient): void {
 export function useEdgePaper(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgePaper', { id }),
-    queryFn: () => gql(EdgePaper, { id }),
+    queryFn: ({ queryKey }) => gql(EdgePaper, { id }, queryKey),
     select: (data) => data.edgePaper,
   });
 }

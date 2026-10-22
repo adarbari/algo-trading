@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { queryKeys } from '@/shared/api';
+import { active, queryKeys } from '@/shared/api';
 
 import {
   CACHE_KEY,
@@ -89,6 +89,13 @@ afterEach(() => {
 });
 
 describe('startQueryPersistence', () => {
+  it('starts following the generation and release headers of every answer', () => {
+    delete active.observe;
+    const { stop } = start(fakeStore());
+    expect(active.observe).toBeTypeOf('function');
+    stop();
+  });
+
   it('saves page reads under the session date, throttled into one write', async () => {
     const store = fakeStore();
     const set = vi.spyOn(store, 'set');

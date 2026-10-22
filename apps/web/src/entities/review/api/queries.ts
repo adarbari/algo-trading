@@ -29,7 +29,7 @@ const LeverageReview = graphql(`
 function figiReviewQuery() {
   return queryOptions({
     queryKey: queryKeys.gql('FigiReview', {}),
-    queryFn: () => gql(FigiReview, {}),
+    queryFn: ({ queryKey }) => gql(FigiReview, {}, queryKey),
   });
 }
 
@@ -49,7 +49,7 @@ export function useFigiReview() {
 function leveragedReviewQuery() {
   return queryOptions({
     queryKey: queryKeys.gql('LeverageReview', {}),
-    queryFn: () => gql(LeverageReview, {}),
+    queryFn: ({ queryKey }) => gql(LeverageReview, {}, queryKey),
   });
 }
 

@@ -79,7 +79,7 @@ function calendarQuery(instrumentIds: readonly string[], scope: boolean) {
   const variables = { instrumentIds: [...instrumentIds], scope };
   return queryOptions({
     queryKey: queryKeys.gql('EventCalendar', variables),
-    queryFn: () => gql(EventCalendar, variables),
+    queryFn: ({ queryKey }) => gql(EventCalendar, variables, queryKey),
   });
 }
 

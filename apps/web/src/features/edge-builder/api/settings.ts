@@ -34,7 +34,7 @@ const Document = new TypedDocumentString<{ edge: EdgeSettings | null }, { id: st
 export function useEdgeSettings(id: string | null) {
   return useQuery({
     queryKey: queryKeys.gql('EdgesPage', { builder: id }),
-    queryFn: () => gql(Document, { id: id ?? '' }),
+    queryFn: ({ queryKey }) => gql(Document, { id: id ?? '' }, queryKey),
     select: (data) => data.edge,
     enabled: id !== null,
   });

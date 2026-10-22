@@ -7,7 +7,7 @@
  */
 import { hashKey, queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
-import { ApiError, forgetVersions, gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
+import { ApiError, active, gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
 
 const ViewerQuery = graphql(`
   query Viewer {
@@ -25,7 +25,7 @@ export type Viewer = gqlTypes.ViewerQuery['viewer'];
 
 async function fetchViewer(): Promise<Viewer | null> {
   try {
-    return (await gql(ViewerQuery, {})).viewer;
+    return (await gql(ViewerQuery, {}, null)).viewer;
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;
@@ -52,7 +52,7 @@ export function useViewer() {
 /** The session ended (our sign-out, another tab's, a 401): nothing of the user stays in memory; the viewer is null. */
 export function forgetUser(client: QueryClient): void {
   void client.cancelQueries();
-  forgetVersions();
+  active.forget?.();
   // The viewer query stays (set to null) so a mounted top bar sees it and leaves.
   client.removeQueries({ predicate: (query) => query.queryHash !== hashKey(viewerKey) });
   client.getMutationCache().clear();
