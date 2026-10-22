@@ -5,13 +5,15 @@
  * picked counts over the whole run, and each idea's facts by catalogue name (earnings, nearest
  * expiry, IV: ADR 0038). The cache holds the response; `select` shapes it.
  */
-import { useEffect } from 'react';
 import {
-  infiniteQueryOptions,
-  useInfiniteQuery,
+  queryOptions,
+  useQueries,
+  useQuery,
   useQueryClient,
   type QueryClient,
+  type UseQueryResult,
 } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import { gql, GraphQLRequestError, graphql, queryKeys } from '@/shared/api';
 
@@ -137,35 +139,102 @@ const IdeasPage = graphql(`
   }
 `);
 
+/** The cursors of the pages loaded after the first, in order (shared by every widget). */
+const MORE_KEY = ['ideas-more'] as const;
+const NO_CURSORS: readonly string[] = [];
+
 /**
  * The latest session's ideas (null `ideas`: nothing stored): the first page, and `fetchNextPage`
- * adds the next `IDEAS_PAGE` (the server's cursor, so no row twice and none missed). `select`
- * joins the pages into one `IdeasData`: the screeners and the paused picks are the first page's.
+ * adds the next `IDEAS_PAGE` by the server's cursor (so no row twice and none missed). One query
+ * per page, keyed by its cursor; the cursors loaded so far live in the query cache, so every
+ * widget reading the ideas shows the same pages. The pages join into one `IdeasData`: the
+ * screeners and the paused picks are the first page's. (Not `useInfiniteQuery`: its observer
+ * would sit in the entry's static graph, which is at its budget.)
  */
 export function useIdeas() {
   const client = useQueryClient();
-  const query = useInfiniteQuery({ ...ideasQuery(), select: toPagedIdeas });
-  const { error, isFetchNextPageError } = query;
+  const more = useQuery({
+    queryKey: MORE_KEY,
+    queryFn: () => NO_CURSORS,
+    initialData: NO_CURSORS,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  const cursors = more.data;
+  const state = useQueries({
+    queries: [null, ...cursors].map((after) => pageOptions(after)),
+    combine: joinPages,
+  });
+
   // A cursor the server refuses (BAD_REQUEST: the runs behind the loaded pages changed) means the
   // list is stale: start over from a fresh first page, never append to it.
+  const { refused } = state;
   useEffect(() => {
-    if (isFetchNextPageError && error instanceof GraphQLRequestError) {
-      if (error.codes.includes('BAD_REQUEST')) {
-        void client.resetQueries({ queryKey: ideasQuery().queryKey });
-      }
+    if (refused) {
+      client.setQueryData(MORE_KEY, NO_CURSORS);
+      client.removeQueries({
+        queryKey: queryKeys.gqlAll(IDEAS_OPERATION),
+        predicate: (q) => 'after' in (q.queryKey[2] as object),
+      });
+      void client.resetQueries({ queryKey: pageOptions(null).queryKey, exact: true });
     }
-  }, [client, error, isFetchNextPageError]);
-  return query;
+  }, [client, refused]);
+
+  const { next, laterFailed, refetchLater, refetchFirst } = state;
+  return {
+    data: state.data,
+    error: state.error,
+    isError: state.isError,
+    isPending: state.isPending,
+    isSuccess: state.isSuccess,
+    isFetching: state.isFetching,
+    refetch: () => {
+      client.setQueryData(MORE_KEY, NO_CURSORS);
+      return refetchFirst();
+    },
+    hasNextPage: next !== null,
+    isFetchingNextPage: state.laterLoading,
+    isFetchNextPageError: laterFailed,
+    fetchNextPage: () => {
+      if (laterFailed) return refetchLater();
+      if (next !== null) client.setQueryData(MORE_KEY, [...cursors, next]);
+      return Promise.resolve();
+    },
+  };
 }
 
-function toPagedIdeas(data: { pages: IdeasResponse[] }) {
-  const first = data.pages[0]?.ideas;
-  const last = data.pages.at(-1)?.ideas;
+type PageResult = UseQueryResult<IdeasResponse>;
+
+/** The pages loaded so far as one state (the first page decides pending / error; the later ones
+ * only whether the next page is loading or failed). Stable, so `useQueries` memoizes it. */
+function joinPages(results: PageResult[]) {
+  const [first, ...later] = results as [PageResult, ...PageResult[]];
+  const last = later.at(-1);
+  const pages = results.flatMap((r) => (r.data === undefined ? [] : [r.data]));
+  return {
+    data: first.data ? toPagedIdeas(pages) : undefined,
+    error: first.error,
+    isError: first.isError,
+    isPending: first.isPending,
+    isSuccess: first.isSuccess,
+    isFetching: first.isFetching,
+    next: pages.at(-1)?.ideas?.nextCursor ?? null,
+    laterLoading: last !== undefined && last.isFetching && last.data === undefined,
+    laterFailed: last?.isError === true,
+    refused: last?.error instanceof GraphQLRequestError && last.error.codes.includes('BAD_REQUEST'),
+    refetchFirst: () => first.refetch(),
+    refetchLater: () => (last ?? first).refetch(),
+  };
+}
+
+function toPagedIdeas(pages: IdeasResponse[]) {
+  const first = pages[0]?.ideas;
+  const last = pages.at(-1)?.ideas;
   if (!first || !last) return toIdeasData({ ideas: null });
   return toIdeasData({
     ideas: {
       ...first,
-      items: data.pages.flatMap((page) => page.ideas?.items ?? []),
+      items: pages.flatMap((page) => page.ideas?.items ?? []),
       total: last.total,
       hasMore: last.hasMore,
       nextCursor: last.nextCursor,
@@ -173,18 +242,16 @@ function toPagedIdeas(data: { pages: IdeasResponse[] }) {
   });
 }
 
-function ideasQuery() {
+/** One page: the first (no cursor) keeps the key the page cache and the route prefetch know. */
+function pageOptions(after: string | null) {
   const variables = { first: IDEAS_PAGE, names: [...IDEA_FEATURES] };
-  return infiniteQueryOptions({
-    queryKey: queryKeys.gql(IDEAS_OPERATION, variables),
-    queryFn: ({ queryKey, pageParam }) =>
-      gql(IdeasPage, { ...variables, after: pageParam }, queryKey),
-    initialPageParam: null as string | null,
-    getNextPageParam: (last) => last.ideas?.nextCursor ?? null,
+  return queryOptions({
+    queryKey: queryKeys.gql(IDEAS_OPERATION, after === null ? variables : { ...variables, after }),
+    queryFn: ({ queryKey }) => gql(IdeasPage, { ...variables, after }, queryKey),
   });
 }
 
 /** Start the ideas read before the page mounts (a route loader); the hook then joins it. */
 export function prefetchIdeas(client: QueryClient): void {
-  void client.infiniteQuery(ideasQuery()).catch(() => undefined);
+  void client.query(pageOptions(null)).catch(() => undefined);
 }

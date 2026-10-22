@@ -60,7 +60,7 @@ export function TopIdeas({
       ? 'error'
       : ideas.isPending
         ? 'loading'
-        : ideas.data.session === null || !ran
+        : !ideas.data || ideas.data.session === null || !ran
           ? 'empty'
           : 'ready';
 
@@ -93,7 +93,7 @@ export function TopIdeas({
         title="Top ideas · across all your screeners"
         description={
           ideas.data?.session
-            ? `Session ${ideas.data.session} · ${rows.length} of ${all.length}`
+            ? `Session ${ideas.data.session} · ${rows.length} of ${ideas.data.total}`
             : undefined
         }
         flush
