@@ -324,7 +324,8 @@ Stores = StoreContext | ReadContext
 def once_per_request[T](ctx: Stores, key: Hashable, compute: Callable[[], T]) -> T:
     """``compute()`` once per request under ``key`` (in ``ctx.memo``, never shared across
     requests): the resolvers of a page run side by side in the read pool, so the first caller
-    computes under a per-key lock and the rest wait for its result instead of each computing it."""
+    computes under a per-key lock and the rest wait for its result instead of each computing it.
+    The lock is not reentrant: a ``compute`` that asks for its own key deadlocks."""
     memo = ctx.memo
     if key not in memo:
         with memo.setdefault(("once-lock", key), threading.Lock()):

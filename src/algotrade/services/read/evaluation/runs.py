@@ -259,11 +259,11 @@ def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
     Kept in the request's ``ctx.memo`` (not the shared cache: an entry per edge per owner would
     evict other pages' frames) under the run-record generation (read before the records) and
     every input ``_run`` reads of the edge and the session; a reader whose records are a
-    snapshot, or a context without a memo, is not memoised. A page asks this per edge per
+    snapshot is not memoised. A page asks this per edge per
     field (4,210 reads of a page of 81 edges), each decoding every record."""
-    if ctx.reader.runs_frozen() or not isinstance(ctx, ReadContext):
+    if ctx.reader.runs_frozen():
         return _read_committed(ctx, edge, owner)
-    session = ctx.session.date
+    session = ctx.session.date if isinstance(ctx, ReadContext) else None  # as ``_run`` reads it
     key = (
         "edge-committed",
         edge.id,
@@ -274,9 +274,7 @@ def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
         session,
         ctx.reader.runs_generation(),
     )
-    if key not in ctx.memo:
-        ctx.memo[key] = tuple(_read_committed(ctx, edge, owner))
-    return list(ctx.memo[key])
+    return list(once_per_request(ctx, key, lambda: tuple(_read_committed(ctx, edge, owner))))
 
 
 def _read_committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
