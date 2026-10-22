@@ -1,6 +1,6 @@
 """The thresholds of an edge's verdict (``config/site/verdict.toml``, ED8): how many out-of-sample
 trades it takes to say anything, and what Promising and Works ask of the out-of-sample
-figures. Data, not code: the rule (``services/read/evaluation/verdict.py``) reads them from
+figures. Data, not code: the rule (``services/read/evaluation/verdict/``) reads them from
 here, and each default is the owner's decision of 2026-10-09."""
 
 from collections.abc import Mapping

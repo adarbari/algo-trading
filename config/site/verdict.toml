@@ -1,5 +1,5 @@
 # The thresholds behind an edge's verdict (Works / Promising / Not working / Not enough data /
-# Waiting on data), read by services/read/evaluation/verdict.py. A "trade" is an independent
+# Waiting on data), read by services/read/evaluation/verdict/. A "trade" is an independent
 # session of the official result. Out-of-sample (OOS) is the slice from the edge's split date.
 
 min_oos_trades = 40      # fewer out-of-sample trades than this: Not enough data (owner, 2026-10-09)
