@@ -11,7 +11,11 @@ from algotrade_api.graphql.response_cache import SHARED_OPERATIONS
 from tests.conftest import REPO_ROOT
 
 WEB_SRC = REPO_ROOT / "apps/web/src"
-DOCUMENT = re.compile(r"\bconst\s+(\w+)\s*=\s*graphql\(\s*[`'\"]\s*query\s+(\w+)")
+# a document is `graphql(`query Name ...`)` or `new TypedDocumentString<...>(`query Name ...`)`
+DOCUMENT = re.compile(
+    r"\bconst\s+(\w+)\s*=\s*(?:graphql\(|new\s+TypedDocumentString\b[^`'\"]*?\()"
+    r"\s*[`'\"]\s*query\s+(\w+)"
+)
 CALL = re.compile(r"(?<![\w.])gql\(")
 
 
@@ -40,9 +44,11 @@ def _sources() -> list[Path]:
 
 def test_every_gql_call_of_a_user_keyed_operation_passes_its_query_key() -> None:
     sources = {p: p.read_text() for p in _sources()}
-    operations = {name: op for text in sources.values() for name, op in DOCUMENT.findall(text)}
+    # a const name repeats across files (`Document`): the file's own first, then the imported
+    everywhere = {name: op for text in sources.values() for name, op in DOCUMENT.findall(text)}
     missing, seen = [], 0
     for path, text in sources.items():
+        operations = everywhere | dict(DOCUMENT.findall(text))
         for call in CALL.finditer(text):
             name = re.match(r"\s*(\w+)", text[call.end() :])
             if name is None or name.group(1) not in operations:
@@ -51,7 +57,8 @@ def test_every_gql_call_of_a_user_keyed_operation_passes_its_query_key() -> None
             operation = operations[name.group(1)]
             if operation not in SHARED_OPERATIONS and _arguments(text, call.end()) < 3:
                 missing.append(f"{path.relative_to(REPO_ROOT)}: {operation}")
-    assert seen > 40, "the parse found too few gql calls: the pattern drifted"
+    assert seen > 70, "the parse found too few gql calls: the pattern drifted"
+    assert "EdgeCompare" in everywhere.values(), "a TypedDocumentString document is not parsed"
     assert not missing, (
         "pass the queryFn context's queryKey as gql's third argument (or null outside a "
         f"query): {missing}"

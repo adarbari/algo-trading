@@ -28,6 +28,7 @@ const seen: {
 /** Retired answers wait here, by query hash, for their data to be stored (`refetchOnLanding`). */
 const landing = new Set<string>();
 let unsubscribe: (() => void) | undefined;
+const installed = new WeakSet<QueryClient>();
 
 /** Nothing of the last user stays (sign-out, another user signing in). */
 function forgetVersions(): void {
@@ -74,6 +75,8 @@ function refetchOnLanding(key: QueryKey): void {
 /** Reads the version headers of the answer to the query `key` (`null`: asked outside a query,
  * nothing to spare or refetch) and invalidates what they say is behind. */
 export function observeVersions(key: QueryKey | null | undefined, headers: Headers): void {
+  // an answer whose query is gone (its user signed out while it was in flight) says nothing
+  if (key && !active.client?.getQueryCache().find({ queryKey: key, exact: true })) return;
   const generation = headers.get('x-config-generation');
   if (generation !== null) {
     const n = Number(generation);
@@ -96,7 +99,10 @@ export function observeVersions(key: QueryKey | null | undefined, headers: Heade
  * counters are the signed-in user's, so another user (or none) in the viewer query ends them. */
 export function installVersions(client: QueryClient): void {
   active.observe = observeVersions;
-  let user: unknown;
+  if (installed.has(client)) return;
+  installed.add(client);
+  // the viewer is usually loaded before this chunk is
+  let user = client.getQueryData<{ id?: string } | null>(['gql', 'Viewer', {}])?.id;
   client.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action.type !== 'success') return;
     if ((event.query.queryKey as QueryKey)[1] !== 'Viewer') return;
