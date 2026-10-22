@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { active } from './active-client';
-import { forgetVersions, observeVersions } from './versions';
+import { forgetVersions, installVersions, observeVersions } from './versions';
 
 const headers = (generation?: number, release?: string) =>
   new Headers({
@@ -28,6 +28,27 @@ function seeded(names: string[]) {
 
 beforeEach(() => {
   forgetVersions();
+});
+
+describe('the signed-in user', () => {
+  it('ends the counters when the viewer is another user or none, not when it is the same', () => {
+    const client = new QueryClient();
+    active.client = client;
+    installVersions(client);
+    const viewer = ['gql', 'Viewer', {}] as const;
+    const ideas = ['gql', 'Ideas', {}] as const;
+    client.setQueryData(viewer, { id: 'ann' });
+    observeVersions(key('Ideas'), headers(5));
+    client.setQueryData(viewer, { id: 'ann' }); // refetched: the same user
+    client.setQueryData(ideas, 1);
+    observeVersions(key('Views'), headers(6)); // a rise: the baseline of 5 stands
+    expect(client.getQueryState(ideas)?.isInvalidated).toBe(true);
+    client.setQueryData(viewer, null); // signed out
+    client.setQueryData(ideas, 1);
+    observeVersions(key('Ideas'), headers(2)); // the next user's counter starts elsewhere
+    observeVersions(key('Views'), headers(3)); // a rise from their baseline of 2
+    expect(client.getQueryState(ideas)?.isInvalidated).toBe(true);
+  });
 });
 
 describe('observeVersions', () => {

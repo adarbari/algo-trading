@@ -171,7 +171,7 @@ const MAX_REFS = 100;
 
 async function readChunk(chunk: readonly Waiting[]): Promise<void> {
   try {
-    const { guideEntries } = await gql(GuideEntriesQuery, { refs: chunk.map((w) => w.ref) });
+    const { guideEntries } = await gql(GuideEntriesQuery, { refs: chunk.map((w) => w.ref) }, null);
     const entries: Entries = guideEntries ?? {
       indicators: [],
       episodes: [],

@@ -16,7 +16,7 @@
  * The entry is at its byte budget: this module is not in it. `installVersions` (called by the
  * page-cache chunk when it starts) puts it behind `active`, which `gql` and the sign-out call.
  */
-import { hashKey, type QueryKey } from '@tanstack/react-query';
+import { hashKey, type QueryClient, type QueryKey } from '@tanstack/react-query';
 
 import { active } from './active-client';
 
@@ -92,10 +92,18 @@ export function observeVersions(key: QueryKey | null | undefined, headers: Heade
   }
 }
 
-/** Starts following the versions of the answers (`gql` reads `active.observe`). */
-export function installVersions(): void {
+/** Starts following the versions of the answers (`gql` reads `active.observe`) in `client`; the
+ * counters are the signed-in user's, so another user (or none) in the viewer query ends them. */
+export function installVersions(client: QueryClient): void {
   active.observe = observeVersions;
-  active.forget = forgetVersions;
+  let user: unknown;
+  client.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action.type !== 'success') return;
+    if ((event.query.queryKey as QueryKey)[1] !== 'Viewer') return;
+    const id = (event.query.state.data as { id?: string } | null)?.id;
+    if (user !== undefined && id !== user) forgetVersions();
+    user = id;
+  });
 }
 
 export { forgetVersions };

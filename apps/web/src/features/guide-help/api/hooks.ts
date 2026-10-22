@@ -43,7 +43,7 @@ export function useGuideHelp(name: string, enabled = true) {
   return useQuery({
     enabled,
     queryKey: queryKeys.gql('GuideHelpField', variables),
-    queryFn: () => gql(GuideHelpField, variables),
+    queryFn: ({ queryKey }) => gql(GuideHelpField, variables, queryKey),
     select: (data) => data.guideField?.info ?? null,
     staleTime: GUIDE_STALE_MS,
     retry: false,
