@@ -31,7 +31,7 @@ def rows(frame: pd.DataFrame, mode: str) -> dict[str, Any]:
 def test_a_screen_without_groups_is_framed_as_before() -> None:
     out = frames({}, {"a": 2, "b": 0, "c": 2})
     values = out["rule_screen_values"]
-    assert set(out) == {"rule_screen", "rule_screen_values"}
+    assert set(out) == {"rule_screen", "rule_screen_values", "screen_runs", "screen_picks"}
     assert not (values["mode"] == "group").any()
     assert values["group_id"].isna().all()
     assert out["rule_screen"].iloc[0]["failed"] == "b"

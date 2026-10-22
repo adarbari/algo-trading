@@ -42,6 +42,9 @@ PARTITION_READERS = {
     "the latest date an input has: never a page read",
     SERVICES / "views.py": "run inputs: the FeatureView a screener evaluates, for the session "
     "the run names (missing data is an error, ADR 0008)",
+    SERVICES / "screening/previous.py": "the screen write path (never a page read): lists the "
+    "stored sessions of results/rule_screen to name the previous one a run's frozen changes "
+    "(results/screen_runs) are counted against, and reads that one run's own file",
     SERVICES / "datasets.py": "run inputs: the golden dataset catalogue the evaluation suite "
     "and the backtest CLI read",
     SERVICES / "evaluation/cross_section/legs/store.py": "the edge harness's own stored legs "

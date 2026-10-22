@@ -26,16 +26,15 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext, at_session
 from algotrade.services.read.screens.runs import (
-    PAUSED,
     RULE_SCREEN,
     LatestRun,
     RunKey,
     ScreenerRun,
-    is_picked,
     latest_run,
     load_latest_runs,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.services.screening.rule_results import PAUSED, is_picked
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.runs import RunRecord
 

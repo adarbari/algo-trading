@@ -16,6 +16,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.backends.run_selection import OPTIMISTIC_TRIES
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
+from algotrade.storage.tables.schemas import SCREEN_PICKS, SCREEN_RUNS
 from tests.helpers.stored_frames import T0, stamped
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
@@ -256,6 +257,66 @@ def test_result_runs_publish_together_or_not_at_all(backend: Backend) -> None:
         assert backend.tables.read("results/trades", D1) is None
     assert values(backend, "results/equity") == [1.0]
     assert values(backend, "results/trades") == [2.0]
+
+
+def _screen_run_frames(run: str, day: date = D1) -> dict[str, pd.DataFrame]:
+    key = {"user_id": "site", "config_id": "s"}
+    rows = [
+        {**key, "instrument_id": "EQ:A", "config_hash": "h", "decision": "QUALIFIED", "rank": 1}
+    ]
+    run_row = {**key, "config_hash": "h", "rows": 1, "passed": 1, "picked": 1, "paused": 0}
+    return {
+        "rule_screen": stamped(rows, day, run),
+        "screen_picks": stamped(
+            [{k: v for k, v in rows[0].items() if k != "config_hash"}], day, run
+        ),
+        "screen_runs": stamped([run_row], day, run),
+    }
+
+
+def test_a_screen_run_and_its_picks_publish_with_the_rule_screen_or_not_at_all(
+    backend: Backend,
+) -> None:
+    """ADR 0077 amendment (c): ScreenRun and ScreenPick ride the rule screen's one publish."""
+    writer = ResultWriter(backend)
+    tables = ("rule_screen", "screen_picks", "screen_runs")
+    with pytest.raises(RuntimeError), writer.publishing("s1", COMMIT):
+        for name, frame in _screen_run_frames("s1").items():
+            writer.write_result(name, D1, "s1", frame, pending=True)
+        raise RuntimeError("a later table failed")
+    assert [backend.tables.read(f"results/{n}", D1) for n in tables] == [None] * 3
+    assert backend.tables.pending_runs() == []
+    with writer.publishing("s2", COMMIT):
+        for name, frame in _screen_run_frames("s2").items():
+            writer.write_result(name, D1, "s2", frame, pending=True)
+        assert backend.tables.read("results/screen_runs", D1) is None
+    for name in tables:
+        committed = backend.tables.read(f"results/{name}", D1)
+        assert committed is not None and set(committed["run_id"]) == {"s2"}
+
+
+def test_a_rerun_without_picks_never_shows_the_earlier_runs_picks(backend: Backend) -> None:
+    """Fix for: ``screen_picks`` as whole_per_group let a rerun that picked nothing (an empty
+    frame writes no file) read as the previous run's picks through ``read_latest_runs``. Fitness:
+    only ``screen_runs`` is a group's whole result; a picks reader takes the run id from it."""
+    assert SCREEN_RUNS.whole_per_group and not SCREEN_PICKS.whole_per_group
+    writer = ResultWriter(backend)
+    for run, at, picked in (("p1", T0, 1), ("p2", T0 + timedelta(hours=1), 0)):
+        frames = _screen_run_frames(run)
+        runs = frames["screen_runs"]
+        runs["picked"], runs["knowledge_ts"] = picked, pd.Timestamp(at)
+        frames["screen_picks"] = frames["screen_picks"].iloc[:picked]
+        frames["screen_picks"]["knowledge_ts"] = pd.Timestamp(at)
+        with writer.publishing(run, at):
+            for name in ("screen_runs", "screen_picks"):
+                writer.write_result(name, D1, run, frames[name], pending=True)
+    newest = backend.tables.read_latest_runs("results/screen_runs", D1)
+    assert newest is not None and list(newest["run_id"]) == ["p2"]
+    picks = backend.tables.read_run("results/screen_picks", D1, "p2")
+    assert picks is None or picks.empty
+    # the generic latest-run reader refuses the table, so it cannot resurrect run p1's picks
+    with pytest.raises(ValueError, match="whole result"):
+        backend.tables.read_latest_runs("results/screen_picks", D1)
 
 
 # A read pins one commit sequence. Each partition keeps one older version of a run, so when
