@@ -353,7 +353,10 @@ class RunStore(Protocol):
 
     def load(self, run_id: str) -> RunRecord | None: ...
 
-    def find(self, job: str, session_date: date | None = None) -> list[RunRecord]: ...
+    def find(self, job: str, session_date: date | None = None) -> list[RunRecord]:
+        """The job's records in any id form, except that a ``new_run_id`` or ``job_id_for`` id
+        is trusted to name its record's job (``job_of_name``)."""
+        ...
 
     def find_many(self, jobs: Collection[str], first: date, last: date) -> list[RunRecord]:
         """The records of any of ``jobs`` for the sessions ``first..last``, by start time: one
