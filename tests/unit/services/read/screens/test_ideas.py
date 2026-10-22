@@ -1,3 +1,6 @@
+"""``load_ideas``: the viewer's screener pool ranked by the rule (services/ideas/rule.py), each
+idea served from its best pick only; the licence rule, NOT_RUN, the PAUSED section, paging."""
+
 from datetime import timedelta
 
 import pandas as pd
@@ -11,8 +14,8 @@ from algotrade.services.read.screens import runs as runs_module
 from algotrade.services.read.screens.ideas import (
     FIRST_PAGE,
     Ideas,
+    display_metrics,
     load_ideas,
-    screener_priority,
 )
 from algotrade.services.read.screens.runs import ScreenerRun
 from algotrade.services.read.values import UnknownCode
@@ -27,32 +30,40 @@ from tests.unit.services.read.screens.conftest import (
     write_gated,
 )
 
-PRIORITY = {("me", "preferences", "preferences"): {"ideas": {"priority": ["beta", "nope"]}}}
+OLD_PRIORITY = {("me", "preferences", "preferences"): {"ideas": {"priority": ["gamma", "nope"]}}}
+WIDE = {("site", "ranking", "ideas"): {"site_top": 500, "user_top": 500}}  # no cap: paging tests
 
 
 def _ids(found: Ideas) -> list[str]:
     return [i.instrument_id for i in found.items]
 
 
-def test_no_priority_ranks_by_score_then_tie_break(ctx: ReadContext) -> None:
+def test_ideas_are_ranked_by_their_best_pick_with_every_pick_listed(ctx: ReadContext) -> None:
     ideas = load_ideas(ctx, 10)
-    assert (ideas.session, ideas.priority, ideas.total) == (D1, (), 3)
-    # Unlisted screeners share one place: score decides (BBB 90 by beta, AAA 50, DDD 10).
-    assert _ids(ideas) == ["EQ:BBB", "EQ:AAA", "EQ:DDD"]
+    assert (ideas.session, ideas.total) == (D1, 3)
+    # me's beta (weight 3): BBB 3, DDD 3 / 2; site alpha (weight 1): AAA 1, BBB 1 / 2
+    assert _ids(ideas) == ["EQ:BBB", "EQ:DDD", "EQ:AAA"]
     first = ideas.items[0]
     assert first.rank == 1 and first.instrument is not None and first.instrument.symbol == "BBB"
-    assert [(p.config_id, p.decision) for p in first.picks] == [
-        ("beta", "QUALIFIED"), ("alpha", "WATCH")
+    assert (first.score, first.best.config_id, first.best.decision) == (3.0, "beta", "QUALIFIED")
+    assert [(p.config_id, p.own, p.position, p.score) for p in first.picked_by] == [
+        ("beta", True, 1, 3.0), ("alpha", False, 2, 0.5)
     ]  # fmt: skip
+    assert [i.score for i in ideas.items] == [3.0, 1.5, 1.0]
 
 
-def test_priority_first_and_the_users_screen_wins(reader: StoreReader) -> None:
-    ideas = load_ideas(context(reader, PRIORITY), 10)
-    assert ideas.priority == ("beta", "nope")
-    assert _ids(ideas) == ["EQ:BBB", "EQ:DDD", "EQ:AAA"]  # beta's picks first
-    # The site's beta run (CCC 99) is not me's beta: CCC is no idea.
-    assert "EQ:CCC" not in _ids(ideas)
-    assert [s.screener.id for s in ideas.screeners] == ["beta", "alpha", "gamma"]
+def test_a_stale_priority_preference_is_read_without_error_and_changes_nothing(
+    reader: StoreReader, ctx: ReadContext
+) -> None:
+    assert _ids(load_ideas(context(reader, OLD_PRIORITY), 10)) == _ids(load_ideas(ctx, 10))
+
+
+def test_the_users_screen_wins_over_the_preset_with_its_id(ctx: ReadContext) -> None:
+    ideas = load_ideas(ctx, 10)
+    assert "EQ:CCC" not in _ids(ideas)  # the site's beta run (CCC 99) is not me's beta
+    assert [(s.screener.id, s.screener.owner) for s in ideas.screeners] == [
+        ("beta", "me"), ("gamma", "me"), ("alpha", "site")
+    ]  # fmt: skip
 
 
 def test_screeners_count_the_whole_run_and_say_not_run(ctx: ReadContext) -> None:
@@ -61,8 +72,8 @@ def test_screeners_count_the_whole_run_and_say_not_run(ctx: ReadContext) -> None
     by_id = {s.screener.id: s for s in ideas.screeners}
     alpha = by_id["alpha"]
     assert alpha.run is not None and alpha.run.run_id == "r1"
-    assert (alpha.picked, alpha.not_run) == (2, None)
-    assert [r.instrument_id for r in alpha.top] == ["EQ:AAA", "EQ:BBB"]  # picks by rank
+    assert (alpha.picked, alpha.not_run, alpha.withheld) == (2, None, False)
+    assert [r.instrument_id for r in alpha.top] == ["EQ:AAA", "EQ:BBB"]  # its first pool picks
     gamma = by_id["gamma"]  # ran on D0 only: no lookback
     assert (gamma.run, gamma.picked, gamma.top) == (None, 0, ())
     assert gamma.not_run is not None and gamma.not_run.code is UnknownCode.NOT_RUN
@@ -77,18 +88,27 @@ def test_a_session_nothing_ran_for(reader: StoreReader) -> None:
     assert all(s.not_run is not None for s in ideas.screeners)
 
 
-def test_priority_is_read_from_the_users_preferences(reader: StoreReader) -> None:
-    assert screener_priority(context(reader, PRIORITY)) == ("beta", "nope")
-    assert screener_priority(context(reader)) == ()
+def test_a_run_withheld_by_a_licence_contributes_nothing_and_is_listed(reader: StoreReader) -> None:
+    # ``trader`` holds no personal licence: alpha's run read personal fields, so its rank would
+    # leak the hidden values; the site's beta stored no values to tell its fields (withheld
+    # whole). Neither is part of the pool; each is listed, with a count and no ranking.
+    ideas = load_ideas(context(reader, user="trader"), 10)
+    assert (ideas.items, ideas.total) == ((), 0)
+    by_id = {s.screener.id: s for s in ideas.screeners}
+    assert by_id["alpha"].withheld and by_id["alpha"].top == () and by_id["alpha"].picked == 2
+    assert by_id["beta"].withheld and by_id["beta"].top == ()
 
 
-def test_paused_picks_are_no_ideas_but_are_listed_apart_with_their_reason(
+def test_a_viewer_who_holds_the_licences_has_nothing_withheld(ctx: ReadContext) -> None:
+    assert not any(s.withheld for s in load_ideas(ctx, 10).screeners)
+
+
+def test_the_paused_section_follows_the_rule_and_is_no_idea(
     backend: MemoryBackend, reader: StoreReader
 ) -> None:
     write_gated(backend)
     ideas = load_ideas(context(reader), 10)
-    assert "EQ:BBB" in _ids(ideas)  # beta still picks it
-    assert [i.instrument_id for i in ideas.items if i.picks[0].config_id == "alpha"] == ["EQ:AAA"]
+    assert _ids(ideas) == ["EQ:BBB", "EQ:DDD", "EQ:AAA"]  # a paused row picks nothing
     assert ideas.paused_total == 2
     assert [(p.instrument_id, p.result.config_id) for p in ideas.paused] == [
         ("EQ:BBB", "alpha"), ("EQ:DDD", "alpha")
@@ -123,6 +143,34 @@ def test_no_paused_rows_is_an_empty_section(ctx: ReadContext) -> None:
     assert (ideas.paused_total, ideas.paused) == (0, ())
 
 
+def test_metrics_and_watch_outs_come_from_the_best_pick_alone(ctx: ReadContext) -> None:
+    by_id = {i.instrument_id: i for i in load_ideas(ctx, 10).items}
+    # AAA's best is alpha's pick: its stored column and criterion value
+    assert {m.name: m.value for m in by_id["EQ:AAA"].metrics} == {"spread": 0.05, "iv30": "high"}
+    # BBB's best is me's beta (no stored values); alpha's iv_rank 40 is not merged in
+    assert by_id["EQ:BBB"].metrics == ()
+    assert by_id["EQ:BBB"].watch_out == ("large_move",)
+    assert by_id["EQ:AAA"].watch_out == ()
+
+
+def test_display_values_are_numbers_and_strings_a_column_over_a_criterion(
+    ctx: ReadContext,
+) -> None:
+    aaa = next(i for i in load_ideas(ctx, 10).items if i.instrument_id == "EQ:AAA")
+    assert display_metrics(aaa.best) == aaa.metrics
+
+
+# ----------------------------------------------------------------------------- caps
+
+
+def test_only_the_first_picks_of_a_screener_count() -> None:
+    backend = screens_store()
+    write_big_run(backend, 30, frozen=True)  # alpha: 30 picks, a site preset: its first 5 count
+    ideas = load_ideas(context(StoreReader(backend)), 100)
+    assert _ids(ideas) == ["EQ:BBB", "EQ:DDD", *[f"EQ:S00{n}" for n in range(5)]]
+    assert [i.score for i in ideas.items][2:] == [1.0, 0.5, 1 / 3, 0.25, 0.2]
+
+
 # ----------------------------------------------------------------------------- pages
 
 PICKS = 120
@@ -141,7 +189,7 @@ def _pages(ctx: ReadContext, size: int) -> list[Ideas]:
 def _ctx(frozen: bool, picks: int = PICKS) -> ReadContext:
     backend = screens_store()
     write_big_run(backend, picks, frozen)
-    return context(StoreReader(backend))
+    return context(StoreReader(backend), WIDE)
 
 
 def test_page_two_continues_page_one_with_no_repeat_and_no_gap() -> None:
@@ -162,7 +210,7 @@ def test_the_first_page_carries_the_paused_section_and_later_pages_do_not() -> N
     backend = screens_store()
     write_gated(backend)
     ctx = context(StoreReader(backend))
-    first, second = load_ideas(ctx, 2), None
+    first = load_ideas(ctx, 2)
     second = load_ideas(ctx, 2, first.next_cursor)
     assert (first.paused_total, len(first.paused)) == (2, 2)
     assert (second.paused_total, second.paused) == (2, ())
@@ -187,7 +235,7 @@ def test_a_run_with_a_picks_file_is_ranked_without_reading_its_rows(
 
     monkeypatch.setattr(runs_module, "run_rows", guarded)
     found = load_ideas(_ctx(frozen=True), 50)
-    assert len(found.items) == 50 and found.items[0].instrument_id == "EQ:S000"
+    assert len(found.items) == 50 and found.items[2].instrument_id == "EQ:S000"
 
 
 def test_a_run_with_picks_but_no_picks_file_is_never_read_as_picking_nothing() -> None:
@@ -207,11 +255,21 @@ def test_a_malformed_cursor_is_refused() -> None:
 def test_a_cursor_from_before_a_new_run_is_refused_not_shifted() -> None:
     backend = screens_store()
     write_big_run(backend, 60, frozen=True, run_id="big")
-    cursor = load_ideas(context(StoreReader(backend)), 10).next_cursor
+    cursor = load_ideas(context(StoreReader(backend), WIDE), 10).next_cursor
     assert cursor is not None
     write_big_run(backend, 70, frozen=True, run_id="bigger")  # a newer run supersedes it
     with pytest.raises(ConfigurationError, match="changed since"):
-        load_ideas(context(StoreReader(backend)), 10, cursor)
+        load_ideas(context(StoreReader(backend), WIDE), 10, cursor)
+
+
+def test_a_cursor_from_another_rule_is_refused_not_shifted() -> None:
+    backend = screens_store()
+    write_big_run(backend, 60, frozen=True)
+    cursor = load_ideas(context(StoreReader(backend), WIDE), 10).next_cursor
+    assert cursor is not None
+    other = {("site", "ranking", "ideas"): {"site_top": 400, "user_top": 500}}
+    with pytest.raises(ConfigurationError, match="changed since"):
+        load_ideas(context(StoreReader(backend), other), 10, cursor)
 
 
 def test_a_negative_or_empty_page_is_empty_with_no_cursor_past_the_end() -> None:

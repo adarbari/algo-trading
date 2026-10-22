@@ -1,6 +1,7 @@
-"""``PUT /preferences/ideas`` and ``PUT`` / ``DELETE /preferences/views/{scope}/view``: save
-the user's screener priority and their views of a table (``scope``: ``screener:<id>`` for a
-screener's results), checked before saving. Reading a view is GraphQL (``Query.view``)."""
+"""``PUT`` / ``DELETE /preferences/views/{scope}/view``: save the user's views of a table
+(``scope``: ``screener:<id>`` for a screener's results), checked before saving. Reading a view is
+GraphQL (``Query.view``). The Ideas screener priority is retired (owner decision 2026-10-22: the
+Ideas rule ranks by position and weight)."""
 
 from typing import Annotated
 
@@ -9,20 +10,12 @@ from fastapi import APIRouter, Query
 from algotrade.services.authoring import preferences
 from algotrade_api.deps import User, Writer
 from algotrade_api.schemas.authoring.preferences import (
-    IdeasPriority,
-    IdeasPriorityBody,
     TableView,
     TableViewBody,
     ViewNames,
 )
 
 router = APIRouter(prefix="/preferences", tags=["ideas"])
-
-
-@router.put("/ideas")
-def save_ideas_priority(writer: Writer, user: User, body: IdeasPriorityBody) -> IdeasPriority:
-    saved = preferences.save_ideas_priority(writer, user, body.priority)
-    return IdeasPriority(priority=saved)
 
 
 ViewName = Annotated[

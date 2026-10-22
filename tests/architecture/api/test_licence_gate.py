@@ -37,6 +37,7 @@ GATED = {
     "services/read/instruments/series.py": "ctx.licences",  # a field's history
     "services/read/instruments/distribution.py": "ctx.licences",  # an aggregate of values
     "services/read/screens/results.py": "run_withheld(",  # stored values, score, reasons, sorts
+    "services/read/screens/ideas.py": "run_withheld(",  # a withheld run joins no pool
     "services/read/ops/quality.py": "ctx.licences",  # verification/ibkr: IBKR's values
     "services/read/regime/timeline.py": "ctx.licences",  # a shared cache keyed by the set
     "services/preview/frame.py": "hidden_fields(",  # the Builder's frame (kept per licence set)

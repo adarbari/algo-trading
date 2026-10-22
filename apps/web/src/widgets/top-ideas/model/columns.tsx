@@ -1,7 +1,7 @@
 /**
  * The top-ideas table's columns, in two sets chosen by the page's `columns` search param. Stocks
- * (default): rank, ticker, why it is here, decision, score, criteria, price
- * and the watch-outs. Options: rank, ticker, decision, score, then the served facts for the
+ * (default): rank, ticker, why it is here, who picked it, decision, score, criteria, price
+ * and the watch-outs. Options: rank, ticker, decision, score, who picked it, then the served facts for the
  * session (days to the nearest expiry, flagged when the server says earnings come first; IV30),
  * the screeners' stored display values (HV30, IV / HV and the best put) and the watch-outs. The
  * regime's size for the idea shows in both when the run stamped one; a fact or display-value
@@ -19,6 +19,7 @@ import {
   type ValueFormat,
 } from '@algotrade/ui';
 
+import { termHelp } from '@/features/guide-help';
 import { fieldColumn, valueFormat, type HelpedColumn } from '@/entities/feature';
 import {
   earningsBeforeExpiry,
@@ -170,18 +171,7 @@ const tickerColumn: DataTableColumn<Idea> = {
   },
 };
 
-/** The idea's picks, one per screener, the best pick's screener first. */
-function screenerPicks(idea: Idea): Idea['picks'] {
-  const seen = new Set<string>();
-  return [idea.best, ...idea.picks].filter((pick) => {
-    if (seen.has(pick.screenerId)) return false;
-    seen.add(pick.screenerId);
-    return true;
-  });
-}
-
-/** Why the idea is here: the best pick's reasons, then every screener that picked it (the best
- * first), each a link to that screener's results. */
+/** Why the idea is here: the best pick's reasons. */
 const whyColumn: DataTableColumn<Idea> = {
   id: 'why',
   header: "Why it's here",
@@ -190,34 +180,49 @@ const whyColumn: DataTableColumn<Idea> = {
   grow: true,
   sortable: false,
   essential: true,
+  cell: ({ row }) =>
+    row.best.reasons ? (
+      <Text size="sm" truncate title={row.best.reasons}>
+        {row.best.reasons}
+      </Text>
+    ) : null,
+};
+
+/** Every screener that picked the idea (the best first), each a link to its results with the
+ * place the ticker holds in that screener's list. */
+const pickedByColumn: DataTableColumn<Idea> = {
+  id: 'picked-by',
+  header: 'Picked by',
+  value: (idea) => idea.pickedBy.length,
+  width: 'lg',
+  grow: true,
+  sortable: false,
+  essential: true,
+  headerAction: termHelp('picked_by'),
   cell: ({ row }) => (
-    <Stack gap={0}>
-      {row.best.reasons && (
-        <Text size="sm" truncate title={row.best.reasons}>
-          {row.best.reasons}
+    <Stack direction="row" gap={1} wrap>
+      {row.pickedBy.map((pick, index, all) => (
+        <Text key={pick.screenerId} size="xs">
+          <TextLink href={screenerResultsPath(pick.screenerId)} size="inherit">
+            {pick.screenerName}
+          </TextLink>
+          <Text tone="muted">{` #${String(pick.position)}`}</Text>
+          {index < all.length - 1 && <Text tone="muted"> ·</Text>}
         </Text>
-      )}
-      <Stack direction="row" gap={1} wrap>
-        {screenerPicks(row).map((pick, index, all) => (
-          <Text key={pick.screenerId} size="xs">
-            <TextLink href={screenerResultsPath(pick.screenerId)} size="inherit">
-              {pick.screenerName}
-            </TextLink>
-            {index < all.length - 1 && <Text tone="muted"> ·</Text>}
-          </Text>
-        ))}
-      </Stack>
+      ))}
     </Stack>
   ),
 };
 
+/** The idea's score under the Ideas rule (its best pick's weight over position). */
 const scoreColumn: DataTableColumn<Idea> = {
   id: 'score',
   header: 'Score',
-  value: (idea) => idea.best.score,
-  format: { kind: 'number', digits: 0 },
+  value: (idea) => idea.score,
+  format: { kind: 'number', digits: 2 },
   width: 'xs',
   essential: true,
+  headerAction: termHelp('ideas_ranking'),
 };
 
 const decisionColumn: DataTableColumn<Idea> = {
@@ -307,7 +312,7 @@ const watchOutColumn: DataTableColumn<Idea> = {
 export function ideaColumns(
   ideas: readonly Idea[],
   set: IdeaColumnSet = 'stocks',
-): DataTableColumn<Idea>[] {
+): HelpedColumn<Idea>[] {
   const size = anyValue(ideas, (idea) => idea.sizeMultiplier) ? [SIZE] : [];
   if (set === 'options') {
     return [
@@ -315,6 +320,7 @@ export function ideaColumns(
       tickerColumn,
       decisionColumn,
       scoreColumn,
+      pickedByColumn,
       ...size,
       dteColumn,
       ...ivColumns(ideas),
@@ -326,6 +332,7 @@ export function ideaColumns(
     RANK,
     tickerColumn,
     whyColumn,
+    pickedByColumn,
     decisionColumn,
     scoreColumn,
     ...size,

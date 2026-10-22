@@ -119,3 +119,32 @@ A near miss costs 0 to 10 points by how close it came. A score criterion missed 
 by score, then by the screen's tie-break field, then by instrument.
 """
 see_also = ["near_miss", "score_mode", "qualified"]
+
+# ------------------------------------------------------------------------ the Ideas list (owner decision 2026-10-22)
+
+[[term]]
+id = "ideas_ranking"
+term = "How Ideas are ranked"
+short = "A ticker's score is its best pick's weight divided by its position in a screener's list; your own screeners weigh 3, site ones 1."
+body = """
+Only the first picks of each screener count: the first 5 of a site screener and the first 20 of one of yours. A pick at position 3 of your screener scores 3 divided by 3, which is 1, the same as the first pick of a site screener. A ticker picked by several screeners keeps the score of its best pick, never the sum, so many site screeners cannot bury your own. Ties go to the ticker more screeners picked, then to the higher total, then to the symbol. The same data always gives the same list. The numbers are in the site's ranking settings. A screener with no run for the session adds nothing and is listed as not run, and a withheld screener adds nothing either. An idea is shown from its best pick alone: the decision, reasons and display values are that screener's, never mixed from several. Don't read the score as a probability: it only orders the list.
+"""
+see_also = ["picked_by", "withheld_screener", "paused", "not_run"]
+
+[[term]]
+id = "picked_by"
+term = "Picked by"
+short = "The screeners that picked an idea, each with its position in its list; the first is the pick the idea is shown from."
+body = """
+Each entry shows the screener's name and the place the ticker holds in that screener's list, such as 2 for the second pick. Positions count only the picks the ranking keeps, not every name the screener picked. Screeners often read the same fields, so several of them agreeing is less independent than it looks. The count of screeners breaks a tie between two ideas with the same score, but it never lifts an idea above one with a better pick. Open a screener's name to see its whole run.
+"""
+see_also = ["ideas_ranking", "score"]
+
+[[term]]
+id = "withheld_screener"
+term = "Withheld screener"
+short = "A screener whose order depends on data you have no licence for, so it adds no ideas to your list."
+body = """
+Some screeners rank names by values from a source under a personal data licence. Without that licence you can see which names the screener picked, but not their order, because its first picks would reveal the hidden values. So the ranking leaves the whole screener out of your ideas and lists it as withheld, with the number of names it picked. The ideas from your other screeners are unaffected. With the licence, the screener's picks join the list again.
+"""
+see_also = ["ideas_ranking", "picked_by"]

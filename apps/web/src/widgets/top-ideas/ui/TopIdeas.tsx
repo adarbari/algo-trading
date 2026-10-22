@@ -1,13 +1,13 @@
 /**
- * "Top ideas": one row per ticker with every screener that picked it, ranked by the user's
- * screener priority then score (on the server), under the preset views and filter chips (the
+ * "Top ideas": one row per ticker with the screeners that picked it, ranked by the Ideas rule
+ * (on the server: score, then consensus), under the preset views and filter chips (the
  * page's search params). Tick tickers to compare them in Explore, or click one to open it there
  * with the screener that surfaced it. The server sends the first page; "Show more" adds the next.
  */
 import { Button, DataTable, Panel, ShowMore, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
-import { helped } from '@/features/guide-help';
+import { helped, termHelp } from '@/features/guide-help';
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
 import {
   activeFilterKeys,
@@ -64,6 +64,7 @@ export function TopIdeas({
           ? 'empty'
           : 'ready';
 
+  const withheld = ideas.data?.screeners.filter((s) => s.withheld) ?? [];
   const active = activeFilterKeys(search);
   const viewLabel = IDEA_VIEWS.find((v) => v.id === search.view)?.label;
   const because = [
@@ -113,9 +114,22 @@ export function TopIdeas({
         }
         errorMessage="The ideas failed to load."
         onRetry={() => void ideas.refetch()}
-        actions={<CompareIdeasButton symbols={symbols} onCompare={onCompare} />}
+        actions={
+          <Stack direction="row" gap={2} align="center">
+            <CompareIdeasButton symbols={symbols} onCompare={onCompare} />
+            {termHelp('ideas_ranking')}
+          </Stack>
+        }
       >
         <Stack gap={2}>
+          {withheld.length > 0 && (
+            <Stack direction="row" gap={2} align="center" wrap>
+              <Text size="sm" tone="muted">
+                {`Withheld: ${withheld.map((s) => s.name).join(', ')}`}
+              </Text>
+              {termHelp('withheld_screener')}
+            </Stack>
+          )}
           <DataTable<Idea>
             label="Top ideas"
             columns={columns.map(helped)}

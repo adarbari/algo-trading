@@ -2,7 +2,6 @@
   "data": {
     "ideas": {
       "session": "2026-10-02",
-      "priority": ["vrp-scanner", "short-premium-liquidity", "post-earnings-iv-crush"],
       "total": 6,
       "screeners": [
         {
@@ -41,7 +40,8 @@
                 "symbol": "NVDA"
               }
             }
-          ]
+          ],
+          "withheld": false
         },
         {
           "screener": {
@@ -79,7 +79,8 @@
                 "symbol": "SPY"
               }
             }
-          ]
+          ],
+          "withheld": false
         },
         {
           "screener": {
@@ -103,7 +104,8 @@
                 "symbol": "NVDA"
               }
             }
-          ]
+          ],
+          "withheld": false
         }
       ],
       "items": [
@@ -215,85 +217,84 @@
             ],
             "name": "Apple Inc."
           },
-          "picks": [
+          "regime": "STRESS",
+          "sizeMultiplier": 0.5,
+          "best": {
+            "configId": "vrp-scanner",
+            "decision": "QUALIFIED",
+            "score": 84.0,
+            "reasons": "",
+            "criteria": [
+              {
+                "id": "trend_up",
+                "outcome": "PASS"
+              },
+              {
+                "id": "iv_rank",
+                "outcome": "NEAR"
+              },
+              {
+                "id": "adv",
+                "outcome": "PASS"
+              }
+            ]
+          },
+          "pickedBy": [
             {
               "configId": "vrp-scanner",
-              "decision": "QUALIFIED",
-              "score": 84.0,
-              "reasons": "",
-              "flags": [],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "PASS",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": [
-                {
-                  "name": "hv30",
-                  "value": 0.21
-                },
-                {
-                  "name": "iv_hv_ratio",
-                  "value": 1.49
-                },
-                {
-                  "name": "put_strike",
-                  "value": 205
-                },
-                {
-                  "name": "put_delta",
-                  "value": -0.25
-                },
-                {
-                  "name": "put_premium",
-                  "value": 2.1
-                },
-                {
-                  "name": "put_roc",
-                  "value": 0.019
-                }
-              ]
+              "own": false,
+              "position": 1,
+              "score": 1.0,
+              "decision": "QUALIFIED"
             },
             {
               "configId": "short-premium-liquidity",
-              "decision": "QUALIFIED",
-              "score": 91.0,
-              "reasons": "",
-              "flags": [],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "PASS",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": []
+              "own": false,
+              "position": 2,
+              "score": 0.5,
+              "decision": "QUALIFIED"
             }
           ],
-          "regime": "STRESS",
-          "sizeMultiplier": 0.5
+          "score": 1.0,
+          "metrics": [
+            {
+              "name": "trend_up",
+              "value": 1
+            },
+            {
+              "name": "iv_rank",
+              "value": 0.41
+            },
+            {
+              "name": "adv",
+              "value": 45000000.0
+            },
+            {
+              "name": "hv30",
+              "value": 0.21
+            },
+            {
+              "name": "iv_hv_ratio",
+              "value": 1.49
+            },
+            {
+              "name": "put_strike",
+              "value": 205
+            },
+            {
+              "name": "put_delta",
+              "value": -0.25
+            },
+            {
+              "name": "put_premium",
+              "value": 2.1
+            },
+            {
+              "name": "put_roc",
+              "value": 0.019
+            }
+          ],
+          "watchOut": ["earnings_before_expiry"]
         },
         {
           "rank": 2,
@@ -403,44 +404,61 @@
             ],
             "name": "Microsoft Corp."
           },
-          "picks": [
+          "regime": null,
+          "sizeMultiplier": null,
+          "best": {
+            "configId": "vrp-scanner",
+            "decision": "QUALIFIED",
+            "score": 79.0,
+            "reasons": "",
+            "criteria": [
+              {
+                "id": "trend_up",
+                "outcome": "PASS"
+              },
+              {
+                "id": "iv_rank",
+                "outcome": "NEAR"
+              },
+              {
+                "id": "adv",
+                "outcome": "PASS"
+              }
+            ]
+          },
+          "pickedBy": [
             {
               "configId": "vrp-scanner",
-              "decision": "QUALIFIED",
-              "score": 79.0,
-              "reasons": "",
-              "flags": [],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "PASS",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": [
-                {
-                  "name": "hv30",
-                  "value": 0.2
-                },
-                {
-                  "name": "iv_hv_ratio",
-                  "value": 1.42
-                }
-              ]
+              "own": false,
+              "position": 1,
+              "score": 1.0,
+              "decision": "QUALIFIED"
             }
           ],
-          "regime": null,
-          "sizeMultiplier": null
+          "score": 1.0,
+          "metrics": [
+            {
+              "name": "trend_up",
+              "value": 1
+            },
+            {
+              "name": "iv_rank",
+              "value": 0.41
+            },
+            {
+              "name": "adv",
+              "value": 45000000.0
+            },
+            {
+              "name": "hv30",
+              "value": 0.2
+            },
+            {
+              "name": "iv_hv_ratio",
+              "value": 1.42
+            }
+          ],
+          "watchOut": ["earnings_before_expiry"]
         },
         {
           "rank": 3,
@@ -559,60 +577,60 @@
             ],
             "name": "NVIDIA Corp."
           },
-          "picks": [
+          "regime": null,
+          "sizeMultiplier": null,
+          "best": {
+            "configId": "post-earnings-iv-crush",
+            "decision": "QUALIFIED",
+            "score": 77.0,
+            "reasons": "",
+            "criteria": [
+              {
+                "id": "trend_up",
+                "outcome": "PASS"
+              },
+              {
+                "id": "iv_rank",
+                "outcome": "NEAR"
+              },
+              {
+                "id": "adv",
+                "outcome": "PASS"
+              }
+            ]
+          },
+          "pickedBy": [
             {
               "configId": "post-earnings-iv-crush",
-              "decision": "QUALIFIED",
-              "score": 77.0,
-              "reasons": "",
-              "flags": [],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "PASS",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": []
+              "own": false,
+              "position": 1,
+              "score": 1.0,
+              "decision": "QUALIFIED"
             },
             {
               "configId": "vrp-scanner",
-              "decision": "WATCH",
-              "score": 70.0,
-              "reasons": "",
-              "flags": [],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "PASS",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": []
+              "own": false,
+              "position": 2,
+              "score": 0.5,
+              "decision": "WATCH"
             }
           ],
-          "regime": null,
-          "sizeMultiplier": null
+          "score": 1.0,
+          "metrics": [
+            {
+              "name": "trend_up",
+              "value": 1
+            },
+            {
+              "name": "iv_rank",
+              "value": 0.41
+            },
+            {
+              "name": "adv",
+              "value": 45000000.0
+            }
+          ],
+          "watchOut": []
         },
         {
           "rank": 4,
@@ -725,35 +743,53 @@
             ],
             "name": "Coca-Cola Co."
           },
-          "picks": [
+          "regime": null,
+          "sizeMultiplier": null,
+          "best": {
+            "configId": "short-premium-liquidity",
+            "decision": "LIQUIDITY_RISK",
+            "score": 66.0,
+            "reasons": "ADV below target",
+            "criteria": [
+              {
+                "id": "trend_up",
+                "outcome": "PASS"
+              },
+              {
+                "id": "iv_rank",
+                "outcome": "NEAR"
+              },
+              {
+                "id": "adv",
+                "outcome": "FAIL"
+              }
+            ]
+          },
+          "pickedBy": [
             {
               "configId": "short-premium-liquidity",
-              "decision": "LIQUIDITY_RISK",
-              "score": 66.0,
-              "reasons": "ADV below target",
-              "flags": ["leveraged_inverse"],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "FAIL",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": []
+              "own": false,
+              "position": 1,
+              "score": 1.0,
+              "decision": "LIQUIDITY_RISK"
             }
           ],
-          "regime": null,
-          "sizeMultiplier": null
+          "score": 1.0,
+          "metrics": [
+            {
+              "name": "trend_up",
+              "value": 1
+            },
+            {
+              "name": "iv_rank",
+              "value": 0.41
+            },
+            {
+              "name": "adv",
+              "value": 45000000.0
+            }
+          ],
+          "watchOut": ["leveraged_inverse", "liquidity_risk"]
         },
         {
           "rank": 5,
@@ -866,35 +902,53 @@
             ],
             "name": "Tesla Inc."
           },
-          "picks": [
+          "regime": null,
+          "sizeMultiplier": null,
+          "best": {
+            "configId": "vrp-scanner",
+            "decision": "EVENT_RISK",
+            "score": 63.0,
+            "reasons": "Earnings in 6 sessions",
+            "criteria": [
+              {
+                "id": "trend_up",
+                "outcome": "PASS"
+              },
+              {
+                "id": "iv_rank",
+                "outcome": "NEAR"
+              },
+              {
+                "id": "adv",
+                "outcome": "PASS"
+              }
+            ]
+          },
+          "pickedBy": [
             {
               "configId": "vrp-scanner",
-              "decision": "EVENT_RISK",
-              "score": 63.0,
-              "reasons": "Earnings in 6 sessions",
-              "flags": ["large_move"],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "PASS",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": []
+              "own": false,
+              "position": 1,
+              "score": 1.0,
+              "decision": "EVENT_RISK"
             }
           ],
-          "regime": null,
-          "sizeMultiplier": null
+          "score": 1.0,
+          "metrics": [
+            {
+              "name": "trend_up",
+              "value": 1
+            },
+            {
+              "name": "iv_rank",
+              "value": 0.41
+            },
+            {
+              "name": "adv",
+              "value": 45000000.0
+            }
+          ],
+          "watchOut": ["large_move", "earnings_before_expiry"]
         },
         {
           "rank": 6,
@@ -1008,35 +1062,53 @@
             ],
             "name": "SPDR S&P 500 ETF Trust"
           },
-          "picks": [
+          "regime": null,
+          "sizeMultiplier": null,
+          "best": {
+            "configId": "short-premium-liquidity",
+            "decision": "QUALIFIED",
+            "score": 88.0,
+            "reasons": "",
+            "criteria": [
+              {
+                "id": "trend_up",
+                "outcome": "PASS"
+              },
+              {
+                "id": "iv_rank",
+                "outcome": "NEAR"
+              },
+              {
+                "id": "adv",
+                "outcome": "PASS"
+              }
+            ]
+          },
+          "pickedBy": [
             {
               "configId": "short-premium-liquidity",
-              "decision": "QUALIFIED",
-              "score": 88.0,
-              "reasons": "",
-              "flags": [],
-              "criteria": [
-                {
-                  "id": "trend_up",
-                  "outcome": "PASS",
-                  "value": 1
-                },
-                {
-                  "id": "iv_rank",
-                  "outcome": "NEAR",
-                  "value": 0.41
-                },
-                {
-                  "id": "adv",
-                  "outcome": "PASS",
-                  "value": 45000000.0
-                }
-              ],
-              "columns": []
+              "own": false,
+              "position": 1,
+              "score": 1.0,
+              "decision": "QUALIFIED"
             }
           ],
-          "regime": null,
-          "sizeMultiplier": null
+          "score": 1.0,
+          "metrics": [
+            {
+              "name": "trend_up",
+              "value": 1
+            },
+            {
+              "name": "iv_rank",
+              "value": 0.41
+            },
+            {
+              "name": "adv",
+              "value": 45000000.0
+            }
+          ],
+          "watchOut": []
         }
       ],
       "pausedTotal": 1,
