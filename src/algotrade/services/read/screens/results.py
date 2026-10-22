@@ -60,6 +60,7 @@ from algotrade.storage.tables.schemas import (
 )
 
 RULE_SCREEN_VALUES = result_table("rule_screen_values")
+FIELD_COLUMNS = ("user_id", "config_id", "mode", "field")  # what ``_run_fields`` reads of the file
 VALUE_COLUMNS = (
     "user_id", "config_id", "criterion_id", "mode", "field", "outcome", "value_num", "value_str",
     "distance", "group_id",
@@ -247,7 +248,7 @@ def _values(
     if not keep:
         return _read_values(ctx, runs, ids, wanted)
     asked = tuple(
-        (r.run_id, None if wanted is None else tuple(sorted(wanted.get(r.run_id) or ())))
+        (r.run_id, None if wanted is None else tuple(sorted(set(wanted.get(r.run_id) or ()))))
         for r in runs
     )
     key = (
@@ -275,7 +276,7 @@ def _read_values(
     out: dict[ResultKey, list[Mapping[str, Any]]] = {}
     for run in runs:
         if wanted is not None:
-            asked: Sequence[str] | None = wanted.get(run.run_id)
+            asked: Sequence[str] | None = sorted(set(wanted.get(run.run_id) or ()))
             if not asked:
                 continue
         else:
@@ -372,7 +373,7 @@ def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     held: Held[tuple[str, ...]] = ctx.cache.get_or_compute(key, Held)
 
     def read() -> tuple[str, ...]:
-        stored = run_rows_of(ctx, RULE_SCREEN_VALUES, run.run_id, VALUE_COLUMNS)
+        stored = run_rows_of(ctx, RULE_SCREEN_VALUES, run.run_id, FIELD_COLUMNS)
         if stored.empty:
             return ()
         mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]

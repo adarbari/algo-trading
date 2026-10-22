@@ -52,7 +52,7 @@ from algotrade.services.read.evaluation.robustness import (
     load_haircut,
     load_robustness,
 )
-from algotrade.services.read.evaluation.runs import EdgeRow
+from algotrade.services.read.evaluation.runs import Draws, EdgeRow
 
 WORKS: Final = "works"
 PROMISING: Final = "promising"
@@ -280,7 +280,7 @@ def _words(x: VerdictCriterion) -> str:
     return f"{x.label} is {x.value}; it needs {x.threshold}"
 
 
-def _random(c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow]) -> tuple[str, bool | None]:
+def _random(c: _Candidate, t: VerdictSettings, draws: Draws) -> tuple[str, bool | None]:
     """What the out-of-sample lift beats of the random-pick draws at the candidate's holding
     period, in words, and whether that reaches ``random_beat_share`` (None: not measured)."""
     share, n = beat_share(c.oos.lift, draws, c.horizon, c.variant)
@@ -368,7 +368,7 @@ def _portfolio_criteria(
 def _criteria(
     c: _Candidate,
     t: VerdictSettings,
-    draws: Sequence[EdgeRow],
+    draws: Draws,
     decoys: bool,
     portfolio: bool = False,
 ) -> tuple[VerdictCriterion, ...]:
@@ -377,7 +377,7 @@ def _criteria(
 
 
 def _all_criteria(
-    c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
+    c: _Candidate, t: VerdictSettings, draws: Draws, decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
     oos, whole = c.oos, c.whole
     trades = whole.sessions
@@ -619,7 +619,7 @@ def _haircut(c: _Candidate, facts: EdgeFacts) -> EdgeHaircut | None:
 def _at_target(
     c: _Candidate,
     t: VerdictSettings,
-    draws: Sequence[EdgeRow],
+    draws: Draws,
     decoys: bool,
     gap: VerdictCriterion | None,
     facts: EdgeFacts,
@@ -650,7 +650,7 @@ def _at_target(
 
 
 def _judge_one(
-    c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool, facts: EdgeFacts
+    c: _Candidate, t: VerdictSettings, draws: Draws, decoys: bool, facts: EdgeFacts
 ) -> EdgeVerdict:
     c = replace(c, timed=facts.base == OUT_OF_WINDOW)
     crit = _criteria(c, t, draws, decoys, facts.portfolio)
@@ -908,7 +908,7 @@ def choose_basis(
 def _judge_candidate(
     c: _Candidate,
     t: VerdictSettings,
-    draws: Sequence[EdgeRow],
+    draws: Draws,
     decoys: bool,
     lost_inputs: Sequence[str],
     facts: EdgeFacts,
@@ -928,7 +928,7 @@ def judge(
     split: date | None,
     t: VerdictSettings,
     lost_inputs: Sequence[str] = (),
-    draws: Sequence[EdgeRow] = (),
+    draws: Draws = (),
     decoys: bool = True,
     declared: Declared = UNDECLARED,
     basis: BasisChoice | None = None,

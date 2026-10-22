@@ -220,6 +220,7 @@ def load_ideas(ctx: ReadContext, limit: int, after: str | None = None) -> Ideas:
     held = _paused(runs, rows, limit) if start == 0 else []  # the paused section is page one's
     for run_id, iid in held:
         wanted[run_id].append(iid)
+    wanted = {run_id: list(dict.fromkeys(ids)) for run_id, ids in wanted.items()}  # each read once
     results = load_results(ctx, wanted, runs)
     items = tuple(
         Idea(

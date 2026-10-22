@@ -207,3 +207,58 @@ def test_run_picks_are_read_once_per_run_not_per_pick_or_per_hit(
     assert not [r for r in reads if r[2] and r[0] == RULE_SCREEN and r[1] in {"r1", "rb", "r-1"}], (
         "a framed run's every row is never read for its picks"
     )
+
+
+# ---- the reads of one request: each file once, the heaviest one column-pruned --------------------
+
+
+def _counted_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[str, str, tuple[str, ...], tuple[str, ...]]]:
+    """Every ``run_rows_of`` read of the run files: (table, run id, columns, instruments)."""
+    reads: list[tuple[str, str, tuple[str, ...], tuple[str, ...]]] = []
+    real = results.run_rows_of
+
+    def counting(ctx_: ReadContext, table: str, run_id: str, columns=None, instruments=None):  # type: ignore[no-untyped-def]
+        reads.append((table, run_id, tuple(columns or ()), tuple(instruments or ())))
+        return real(ctx_, table, run_id, columns, instruments)
+
+    for module in (runs, results):
+        monkeypatch.setattr(module, "run_rows_of", counting)
+    return reads
+
+
+def test_a_viewer_without_every_licence_reads_the_fields_of_a_run_from_four_columns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fields a run read were taken from the run's whole values file with all ten columns
+    (the heaviest read of an Ideas or hits request on a fresh process); four are used."""
+    reads = _counted_reads(monkeypatch)
+    ctx = context(StoreReader(_store(FRAMED)), user="trader")  # holds no personal-data licence
+    load_screener_hits(ctx, IDS)
+    whole = [r for r in reads if r[0] == "results/rule_screen_values" and not r[3]]
+    assert whole, "the fields of a run are read from its whole values file"
+    assert all(r[2] == results.FIELD_COLUMNS for r in whole)
+
+
+@pytest.mark.parametrize("viewer", ["me", "trader"])
+def test_a_request_reads_each_run_file_once_per_table_and_instrument_set(
+    monkeypatch: pytest.MonkeyPatch, viewer: str
+) -> None:
+    """Read-count test: hits and Ideas read a run's values and rows once for the instruments
+    asked (an id listed twice, as a top pick that is also on the page, is read once), and a run's
+    picks once however many instruments, hits or screeners ask."""
+    from algotrade.services.read.screens.ideas import load_ideas  # noqa: PLC0415
+
+    reads = _counted_reads(monkeypatch)
+    reader = StoreReader(_store(FRAMED))
+    load_screener_hits(context(reader, user=viewer), IDS)  # one request each, nothing shared
+    del reads[:]
+    load_ideas(context(reader, user=viewer), 50)
+    asked = [r for r in reads if r[3]]
+    assert all(len(set(r[3])) == len(r[3]) for r in asked), "an instrument asked twice in one read"
+    # Ideas asks a run for the union of its tops and the page in one read, never one per pick
+    values = [(r[1], r[3]) for r in asked if r[0] == "results/rule_screen_values"]
+    assert len(values) == len(set(values))
+    picks = [run_id for table, run_id, _, _ in reads if table == SCREEN_PICKS]
+    assert len(picks) == len(set(picks))  # Ideas reads each run's picks once for its whole ranking

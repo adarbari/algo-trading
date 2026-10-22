@@ -12,7 +12,7 @@ import numpy as np
 
 from algotrade.quant.edges.statistics import haircut_sharpe, percentile_of
 from algotrade.services.read.evaluation import runs
-from algotrade.services.read.evaluation.runs import EdgeRow
+from algotrade.services.read.evaluation.runs import Draws
 
 BINS = 20
 
@@ -108,7 +108,7 @@ def load_haircut(
     )
 
 
-def draw_lifts(draws: Sequence[EdgeRow], horizon: int, variant: str) -> list[float]:
+def draw_lifts(draws: Draws, horizon: int, variant: str) -> list[float]:
     """The lifts of the random draws matched to screener ``variant`` of the edge itself at
     ``horizon`` (a draw with no lift, a base rate of zero, is not a draw)."""
     return [
@@ -122,7 +122,7 @@ def draw_lifts(draws: Sequence[EdgeRow], horizon: int, variant: str) -> list[flo
 
 
 def beat_share(
-    lift: float | None, draws: Sequence[EdgeRow], horizon: int, variant: str
+    lift: float | None, draws: Draws, horizon: int, variant: str
 ) -> tuple[float | None, int]:
     """``(share of the draws ``lift`` beats, how many draws)``; the share is None without a lift
     or draws."""
@@ -144,7 +144,7 @@ def _binned(lifts: Sequence[float], lift: float) -> tuple[RobustnessBin, ...]:
 
 def load_robustness(
     lift: float | None,
-    draws: Sequence[EdgeRow],
+    draws: Draws,
     horizon: int,
     variant: str,
     trials: int | None,
