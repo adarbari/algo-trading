@@ -74,7 +74,7 @@ from algotrade_ingestion.tasks.reference import (
     universe_build,
     universe_import,
 )
-from algotrade_ingestion.tasks.screens import screen_runs_backfill
+from algotrade_ingestion.tasks.screens import screen_runs_backfill, screen_values_recluster
 from algotrade_ingestion.tasks.shorting import restamp, short_interest, short_volume
 from algotrade_ingestion.tasks.verification import verify
 
@@ -825,6 +825,21 @@ TASKS: dict[str, Task] = {
                 FROM,
                 TO,
                 Param("limit", ("--limit",), int, "frame at most N runs this run"),
+            ),
+        ),
+        Task(
+            "screen-values-recluster",
+            "rewrite the stored rule_screen and rule_screen_values files sorted by instrument_id "
+            "in 8,192-row row groups, as new runs are written (idempotent, resumable, same run "
+            "ids and knowledge_ts; --limit caps the runs rewritten)",
+            screen_values_recluster,
+            ("results/rule_screen", "results/rule_screen_values"),
+            entries_ops.run_screen_values_recluster,
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "rewrite this one session only"),
+                FROM,
+                TO,
+                Param("limit", ("--limit",), int, "rewrite at most N runs this run"),
             ),
         ),
         Task(

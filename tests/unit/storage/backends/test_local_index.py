@@ -3,13 +3,16 @@
 publishes an index naming a file that is not there, and a killed writer's temp file is swept."""
 
 import dataclasses
+import json
 import os
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
 
+from algotrade.storage.backends import local_index
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.local_index import SWAP_GRACE_S, read_index
 from algotrade.storage.tables.interfaces import PartitionBusyError
@@ -120,3 +123,30 @@ def test_a_pinned_chain_keeps_its_files_through_sweeps_and_recommits_and_gap_rou
     backend.tables.unpin("release-a")
     put(backend, "r1", DAY, True)
     assert len(files(backend)) == 2  # head and the one before: the pinned ones are deleted
+
+
+def test_an_unchanged_index_is_parsed_once_and_a_replaced_one_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The memo of ``read_index`` is keyed by the file's identity: reads of an unchanged index
+    parse nothing, a write (a rename onto a new inode) is seen by the next read, and a caller's
+    edit of the returned dict never reaches the memo."""
+    backend = LocalBackend(tmp_path)
+    put(backend, "r1", DAY, commit=True)
+    directory = tmp_path / "tables" / TABLE / f"date={DAY.isoformat()}"
+    local_index._PARSED.clear()
+    parsed: list[int] = []
+    real = json.loads
+
+    def counting(text: str) -> Any:
+        parsed.append(1)
+        return real(text)
+
+    monkeypatch.setattr(json, "loads", counting)
+    first = read_index(directory)
+    first.clear()  # a caller editing its copy before write_index
+    assert set(read_index(directory)) == {"r1"} and set(read_index(directory)) == {"r1"}
+    assert len(parsed) == 1
+    put(backend, "r2", DAY, commit=True)
+    assert set(read_index(directory)) == {"r1", "r2"}
+    assert len(parsed) == 2

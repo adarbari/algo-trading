@@ -23,7 +23,7 @@ from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     ibkr_contracts,
 )
-from algotrade_ingestion.tasks.screens import screen_runs_backfill
+from algotrade_ingestion.tasks.screens import screen_runs_backfill, screen_values_recluster
 from algotrade_ingestion.tasks.shorting import restamp
 from algotrade_ingestion.tasks.verification import verify
 from algotrade_sources.framework.base import (
@@ -112,6 +112,14 @@ def run_screen_runs_backfill(ctx: TaskContext, p: Params) -> RunRecord:
     if p.get("session") and not (start or end):
         start = end = p["session"]
     return screen_runs_backfill.backfill_screen_runs(ctx, start, end, p.get("limit"))
+
+
+def run_screen_values_recluster(ctx: TaskContext, p: Params) -> RunRecord:
+    """``--date D`` is the window [D, D]; no flag at all is every stored session."""
+    start, end = p.get("start"), p.get("end")
+    if p.get("session") and not (start or end):
+        start = end = p["session"]
+    return screen_values_recluster.recluster_screen_values(ctx, start, end, p.get("limit"))
 
 
 def run_purge(ctx: TaskContext, p: Params) -> RunRecord:

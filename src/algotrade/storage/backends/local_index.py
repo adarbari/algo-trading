@@ -37,6 +37,7 @@ import shutil
 import tempfile
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -128,12 +129,39 @@ def _value(entry: RunEntry) -> str | dict[str, Any]:
     return out["knowledge_ts"] if len(out) == 1 else out
 
 
+_PARSED_MAX = 1024  # partitions whose parsed index is kept (a page reads a few dozen)
+_PARSED: OrderedDict[str, tuple[tuple[int, int, int], dict[str, RunEntry]]] = OrderedDict()
+_PARSED_LOCK = threading.Lock()
+
+
 def read_index(directory: Path) -> dict[str, RunEntry]:
+    """The partition's index as a new dict (callers edit it before ``write_index``). The parsed
+    entries (frozen) are remembered by the file's identity, ``(inode, mtime_ns, size)``: every
+    write replaces the file by a rename (``atomic_write``), so a changed index is a new inode
+    and is parsed again; an unchanged one, read again and again by a page's reads, is not."""
     path = directory / INDEX
-    if not path.exists():
+    try:
+        status = path.stat()
+    except FileNotFoundError:
         return {}
-    loaded: dict[str, str | dict[str, Any]] = json.loads(path.read_text())
-    return {run: _entry(value) for run, value in loaded.items()}
+    identity = (status.st_ino, status.st_mtime_ns, status.st_size)
+    key = str(path)
+    with _PARSED_LOCK:
+        held = _PARSED.get(key)
+        if held is not None and held[0] == identity:
+            _PARSED.move_to_end(key)
+            return dict(held[1])
+    try:
+        loaded: dict[str, str | dict[str, Any]] = json.loads(path.read_text())
+    except FileNotFoundError:  # removed between the stat and the read
+        return {}
+    entries = {run: _entry(value) for run, value in loaded.items()}
+    with _PARSED_LOCK:
+        _PARSED[key] = (identity, entries)
+        _PARSED.move_to_end(key)
+        while len(_PARSED) > _PARSED_MAX:
+            _PARSED.popitem(last=False)
+    return dict(entries)
 
 
 def write_index(directory: Path, entries: dict[str, RunEntry]) -> None:
@@ -576,3 +604,29 @@ def drop_unreferenced(directory: Path, run_id: str) -> None:
     for path in candidates:
         if path.name not in keep:
             path.unlink(missing_ok=True)
+
+
+def stored_tables(root: Path) -> list[str]:
+    """Table paths (relative, posix) with an indexed partition, found by walking directories
+    only: a directory is a table when one of its ``date=*`` children holds an index, which
+    ends its scan (so the cost is the number of table directories, not of partitions or
+    files; was ``root.glob("**/date=*/_runs.json")``: 20 s on 54,000 partitions). A directory
+    with no indexed partition is searched below, apart from ``_txn`` at the root."""
+    found: list[str] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        below: list[str] = []
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if not entry.is_dir():
+                    continue
+                if entry.name.startswith("date="):
+                    if (Path(entry.path) / INDEX).exists():
+                        found.append(directory.relative_to(root).as_posix())
+                        below = []
+                        break
+                elif not (directory == root and entry.name == TXN):
+                    below.append(entry.path)
+        pending.extend(Path(p) for p in below)
+    return found

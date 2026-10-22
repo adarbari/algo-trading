@@ -2,8 +2,10 @@
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
@@ -223,3 +225,51 @@ def publish(backend: MemoryBackend | LocalBackend, run: str, table: str, *days: 
         frame = stamped([{"instrument_id": "EQ:A", "value": 1.0}], day, run)
         writer.write_table(table, day, run, frame, pending=True)
     backend.tables.commit_run(run, T0 + timedelta(minutes=5))
+
+
+def screen_values_rows(
+    instruments: int, per: int = 3, user: str = "site"
+) -> list[dict[str, object]]:
+    """``results/rule_screen_values`` rows of one config, instruments in a fixed shuffled order
+    (what an unclustered writer stored): ``per`` criterion rows each."""
+    order = sorted(range(instruments), key=lambda n: (n * 7919) % instruments)
+    return [
+        {
+            "instrument_id": f"EQ:{n:05d}",
+            "user_id": user,
+            "config_id": "cfg",
+            "criterion_id": f"c{k}",
+            "field": "price",
+            "mode": "criterion",
+            "outcome": "PASS",
+            "value_num": float(n * 10 + k),
+        }
+        for n in order
+        for k in range(per)
+    ]
+
+
+def screen_rows(instruments: int, user: str = "site") -> list[dict[str, object]]:
+    """``results/rule_screen`` rows of one config, in the same shuffled instrument order."""
+    order = sorted(range(instruments), key=lambda n: (n * 7919) % instruments)
+    return [
+        {
+            "instrument_id": f"EQ:{n:05d}",
+            "user_id": user,
+            "config_id": "cfg",
+            "config_hash": "h",
+            "decision": "PICK" if n % 2 else "DROP",
+            "rank": n,
+            "score": float(n),
+        }
+        for n in order
+    ]
+
+
+def make_unclustered(directory: Path) -> None:
+    """Rewrite every data file under ``directory`` as the writer did before row groups were
+    clustered: its rows out of instrument order, one big group (a store from before the change)."""
+    for path in directory.glob("run=*.parquet"):
+        data = pq.read_table(path)
+        data = data.take(list(range(data.num_rows))[::-1])  # not in instrument order
+        pq.write_table(data, path, compression="zstd", row_group_size=1 << 20)

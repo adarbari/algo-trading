@@ -91,6 +91,11 @@ class StoreWriter(ResultWriter):
         the partition. Ingestion only (``compact-runs``)."""
         return self._backend.tables.compact_runs(table, session_date, dry_run, verify, budget_s)
 
+    def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
+        """Which runs of one partition are laid out as the table declares
+        (``TableStore.run_layouts``): what ``screen-values-recluster`` finds its work by."""
+        return self._backend.tables.run_layouts(table, session_date)
+
     def sweep_orphans(self, table: str, session_date: date) -> int:
         """Delete the files of one partition no run names (``TableStore.sweep_orphans``): what a
         compaction swap superseded, once its grace has passed."""

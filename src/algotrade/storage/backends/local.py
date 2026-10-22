@@ -46,10 +46,11 @@ import pyarrow.parquet as pq
 
 from algotrade.storage.backends.arrow import (
     concat,
+    encode,
     file_groups,
     file_stats,
+    is_clustered,
     keep_columns,
-    parquet_bytes,
     row_groups_holding,
     table_spec,
     to_arrow,
@@ -59,7 +60,6 @@ from algotrade.storage.backends.history import HISTORY, HistoryCopy
 from algotrade.storage.backends.local_index import (
     INDEX,
     SWAP_GRACE_S,
-    TXN,
     Commits,
     atomic_write,
     created_seq,
@@ -69,6 +69,7 @@ from algotrade.storage.backends.local_index import (
     read_index,
     run_file,
     safe,
+    stored_tables,
     write_index,
 )
 from algotrade.storage.backends.run_compaction import (
@@ -106,32 +107,6 @@ def _parquet_bytes(frame: pd.DataFrame) -> bytes:
     return frame.to_parquet(index=False, engine="pyarrow", compression="zstd")
 
 
-def _stored_tables(root: Path) -> list[str]:
-    """Table paths (relative, posix) with an indexed partition, found by walking directories
-    only: a directory is a table when one of its ``date=*`` children holds an index, which
-    ends its scan (so the cost is the number of table directories, not of partitions or
-    files; was ``root.glob("**/date=*/_runs.json")``: 20 s on 54,000 partitions). A directory
-    with no indexed partition is searched below, apart from ``_txn`` at the root."""
-    found: list[str] = []
-    pending = [root]
-    while pending:
-        directory = pending.pop()
-        below: list[str] = []
-        with os.scandir(directory) as entries:
-            for entry in entries:
-                if not entry.is_dir():
-                    continue
-                if entry.name.startswith("date="):
-                    if (Path(entry.path) / INDEX).exists():
-                        found.append(directory.relative_to(root).as_posix())
-                        below = []
-                        break
-                elif not (directory == root and entry.name == TXN):
-                    below.append(entry.path)
-        pending.extend(Path(p) for p in below)
-    return found
-
-
 class LocalTables:
     def __init__(self, root: Path) -> None:
         self.root = root / "tables"
@@ -157,7 +132,7 @@ class LocalTables:
         pending: bool = False,
     ) -> None:
         directory = self._dir(table, session_date)
-        data = parquet_bytes(to_arrow(table, frame))
+        data = encode(table, to_arrow(table, frame))
         known = None if frame.empty else pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
         if pending:
             file = self.commits.stage(table, session_date, safe(run_id), known, restates)
@@ -587,7 +562,7 @@ class LocalTables:
     def names(self, own_run: str | None = None) -> list[str]:
         found = {t for t, _ in self._own_partitions(own_run)}
         if self.root.exists():
-            found |= set(_stored_tables(self.root))
+            found |= set(stored_tables(self.root))
         return sorted(found)
 
     @staticmethod
@@ -625,6 +600,13 @@ class LocalTables:
 
     def sweep_orphans(self, table: str, session_date: date) -> int:
         return self.commits.sweep(self._dir(table, session_date))
+
+    def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
+        directory = self._dir(table, session_date)
+        return {
+            r: is_clustered(directory / run_file(r, e), table)
+            for r, e in read_index(directory).items()
+        }
 
     def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
         return self.commits.remove_runs(self._dir(table, session_date), runs)
@@ -675,7 +657,7 @@ class LocalTables:
             return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
         fresh = {r: f"run={r}~{secrets.token_hex(4)}.parquet" for r in plan.rewritten}
         kept = kept_entries(expected, plan, fresh)
-        encoded = {r: parquet_bytes(plan.kept[r]) for r in plan.rewritten}
+        encoded = {r: encode(table, plan.kept[r]) for r in plan.rewritten}
         size_after = sum(len(encoded[r]) if r in encoded else sizes[r] for r in plan.kept)
         report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))
         if dry_run:

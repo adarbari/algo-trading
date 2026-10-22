@@ -380,6 +380,9 @@ class MemoryTables:
             entries = self._partitions.get((table, session_date), {})
             return sorted(entries, key=lambda r: (entries[r].seq or -1, r))
 
+    def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
+        return dict.fromkeys(self.partition_runs(table, session_date), True)  # no files
+
     def sweep_orphans(self, table: str, session_date: date) -> int:
         with self._index_lock:
             if any((table, session_date) in writes for writes in self._pending.values()):

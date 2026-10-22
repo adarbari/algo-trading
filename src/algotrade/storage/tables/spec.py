@@ -44,7 +44,11 @@ class TableSpec:
     (``purge_before``); every other table is history, kept forever. ``whole_per_group``: each
     run's file holds its (user, config) group's whole result, so the group's newest run alone
     answers a read (``TableStore.read_latest_runs``); a table that compaction trims to changed
-    rows (ADR 0078) never sets it."""
+    rows (ADR 0078) never sets it. ``cluster_by``, when set, is a column every file of the table
+    is written sorted by (stable: equal keys keep their order, so the bytes are deterministic),
+    in row groups of ``row_group_rows`` rows (``backends.arrow.encode``): the group statistics
+    then let a read of a few values skip most groups (``row_groups_holding``). A file written
+    before is read whole and filtered, the same rows (task ``screen-values-recluster``)."""
 
     name: str
     grain: str
@@ -55,6 +59,8 @@ class TableSpec:
     key: tuple[str, ...] = ()
     retention_days: int | None = None
     whole_per_group: bool = False
+    cluster_by: str | None = None
+    row_group_rows: int | None = None
 
     def __post_init__(self) -> None:
         if self.runs not in RUN_MODES:
@@ -65,6 +71,12 @@ class TableSpec:
             raise ValueError(
                 f"{self.name}: whole_per_group needs a merge table keyed by user, config"
             )
+        if (self.cluster_by is None) != (self.row_group_rows is None) or (
+            self.row_group_rows is not None and self.row_group_rows < 1
+        ):
+            raise ValueError(f"{self.name}: cluster_by and a positive row_group_rows go together")
+        if self.cluster_by is not None and self.column(self.cluster_by) is None:
+            raise ValueError(f"{self.name}: cluster_by {self.cluster_by!r} is not a column")
 
     def column(self, name: str) -> Column | None:
         return next((c for c in self.columns if c.name == name), None)
@@ -89,10 +101,13 @@ def fixed(
     key: tuple[str, ...] = (),
     retention_days: int | None = None,
     whole_per_group: bool = False,
+    cluster_by: str | None = None,
+    row_group_rows: int | None = None,
 ) -> TableSpec:
     spec = TableSpec(
         name, grain, required, columns=columns_of(*columns), runs=runs, key=key,
         retention_days=retention_days, whole_per_group=whole_per_group,
+        cluster_by=cluster_by, row_group_rows=row_group_rows,
     )  # fmt: skip
     undeclared = [c for c in (*COMMON, *required, *key) if spec.column(c) is None]
     if undeclared:

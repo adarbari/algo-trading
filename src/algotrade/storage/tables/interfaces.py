@@ -304,6 +304,13 @@ class TableStore(Protocol):
         (``services/feedback/retention.py``), never part of a run."""
         ...
 
+    def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
+        """Per run of one partition's index, whether its file is laid out as the table's spec
+        declares (``TableSpec.cluster_by``: sorted, in row groups of ``row_group_rows``), read
+        from the file's footer. A table that declares none, and a backend that keeps no files,
+        answer ``True``: there is nothing to cluster."""
+        ...
+
     def sweep_orphans(self, table: str, session_date: date) -> int:
         """Delete the data files of one partition that no run of its index names (what a crash
         between rewriting the index and deleting a file leaves); a pending run's files are never
