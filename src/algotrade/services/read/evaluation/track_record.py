@@ -114,7 +114,7 @@ def load_track_records_for(
         if not listed:
             continue
         found = runs.load_canonical_run(ctx, edge)
-        stored = runs.load_run_rows(ctx, found.run) if found.run is not None else ()
+        stored = runs.load_run_rows(ctx, found.run, (FROZEN,)) if found.run is not None else ()
         for screener_id in sorted(listed):
             out[screener_id].append(_entry(edge, screener_id, found, stored))
     return {i: tuple(entries) for i, entries in out.items()}
