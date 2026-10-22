@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from algotrade.storage.backends.local import LocalBackend
-from algotrade.storage.backends.local_index import SWAP_GRACE_S, read_index
+from algotrade.storage.backends.runs.local_index import SWAP_GRACE_S, read_index
 from algotrade.storage.tables.interfaces import PartitionBusyError
 from tests.helpers.stored_frames import T0, stamped
 

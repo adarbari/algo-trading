@@ -26,7 +26,7 @@ from algotrade.storage.backends.release.interfaces import (
     Reservation,
 )
 from algotrade.storage.backends.release.manifest import Manifest
-from algotrade.storage.backends.run_selection import StaleSnapshotError
+from algotrade.storage.backends.runs.run_selection import StaleSnapshotError
 
 FORMAT = 1
 MAX_TRIES = 3

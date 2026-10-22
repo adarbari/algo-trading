@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 from algotrade.data import StoreReader
 from algotrade.storage.backends.release.interfaces import ReleaseError, ReleaseStore
-from algotrade.storage.backends.run_selection import StaleSnapshotError
+from algotrade.storage.backends.runs.run_selection import StaleSnapshotError
 from algotrade.storage.factory import open_backend, open_release_store
 
 SUPPORTED_FORMATS = frozenset(

@@ -12,7 +12,7 @@ Each table also declares how its runs combine (``TableSpec.runs``, ``RUN_MODES``
 ``snapshot`` run is the partition's full contents (the latest run known at ``as_of`` replaces
 the others); a ``merge`` run is a window or increment (reads union every run known at
 ``as_of``, the latest run's row winning per ``table_key``). Backends apply it
-(``storage/backends/run_selection.py``).
+(``storage/backends/runs/run_selection.py``).
 
 The schemas are split by table family: ``market``, ``reference``, ``events``, ``results``
 and ``outcomes`` declare the specs, ``registry`` resolves a table name to its spec and

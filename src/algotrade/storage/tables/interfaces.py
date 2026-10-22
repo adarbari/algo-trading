@@ -58,7 +58,7 @@ class TableStore(Protocol):
 
     Writing the same (table, date, run) again replaces it (idempotent). A different run for
     the same date is kept alongside. Which runs a read at ``as_of`` sees follows the table's
-    run mode (``TableSpec.runs``; ``storage/backends/run_selection.py``): a ``snapshot``
+    run mode (``TableSpec.runs``; ``storage/backends/runs/run_selection.py``): a ``snapshot``
     table gives the latest run known at ``as_of``; a ``merge`` table (events) the union of
     the runs known at ``as_of``, the latest run's row winning per table key, starting from
     the latest run written with ``restates=True`` (a rewrite of the whole partition).

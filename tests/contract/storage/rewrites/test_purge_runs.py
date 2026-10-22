@@ -12,9 +12,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from algotrade.storage.backends import local_index
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.backends.runs import local_index
 from algotrade.storage.tables.interfaces import Backend, PartitionBusyError
 from tests.helpers.stored_frames import T0, stamped
 

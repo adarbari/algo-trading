@@ -9,15 +9,15 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
-from algotrade.storage.backends import run_compaction as rc
-from algotrade.storage.backends.run_compaction import (
+from algotrade.storage.backends.runs import run_compaction as rc
+from algotrade.storage.backends.runs.run_compaction import (
     Budget,
     CompactionOverBudgetError,
     CompactionVerificationError,
     plan_compaction,
     verify_plan,
 )
-from algotrade.storage.backends.run_selection import RunEntry, select_runs
+from algotrade.storage.backends.runs.run_selection import RunEntry, select_runs
 from tests.helpers.stored_frames import T0
 
 TABLE = "events/dividend"

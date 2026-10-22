@@ -13,10 +13,10 @@ import pandas as pd
 import pytest
 
 from algotrade.storage.backends import local as local_module
-from algotrade.storage.backends import local_index, run_compaction
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.backends.run_selection import StaleSnapshotError
+from algotrade.storage.backends.runs import local_index, run_compaction
+from algotrade.storage.backends.runs.run_selection import StaleSnapshotError
 from algotrade.storage.tables.interfaces import Backend, PartitionBusyError
 from tests.helpers.stored_frames import T0, stamped
 

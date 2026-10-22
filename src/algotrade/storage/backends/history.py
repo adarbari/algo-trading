@@ -60,8 +60,8 @@ from algotrade.storage.backends.arrow import (
     parquet_bytes,
     row_groups_holding,
 )
-from algotrade.storage.backends.local_index import INDEX, atomic_write, read_index
-from algotrade.storage.backends.run_selection import StaleSnapshotError, pinned_read
+from algotrade.storage.backends.runs.local_index import INDEX, atomic_write, read_index
+from algotrade.storage.backends.runs.run_selection import StaleSnapshotError, pinned_read
 from algotrade.storage.locks import FileLock, held
 
 log = logging.getLogger(__name__)
