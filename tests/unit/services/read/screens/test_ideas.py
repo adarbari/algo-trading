@@ -282,9 +282,27 @@ def test_a_negative_or_empty_page_is_empty_with_no_cursor_past_the_end() -> None
 def test_a_cursor_from_a_viewer_with_other_licences_is_refused_not_shifted(
     reader: StoreReader,
 ) -> None:
-    # ``me`` holds the personal licence, ``trader`` does not: same runs, other pool
-    wide = {**WIDE, ("site", "ranking", "ideas"): {"site_top": 1, "user_top": 1}}
-    cursor = load_ideas(context(reader, wide), 1).next_cursor
+    # Two viewers with the same screeners (the site presets) and the same runs: ``full`` holds
+    # the personal licence, ``bare`` does not, so a run is withheld from one and not the other.
+    docs = {
+        ("site", "ranking", "ideas"): {"site_top": 1, "user_top": 1},
+        ("site", "settings", "users"): {
+            "user": [
+                {"id": "admin", "role": "admin"},
+                {"id": "full", "role": "trader", "licences": ["personal"]},
+                {"id": "bare", "role": "trader"},
+            ]
+        },
+    }
+    full, bare = context(reader, docs, user="full"), context(reader, docs, user="bare")
+    assert [r.run_id for r in _runs(full)] == [r.run_id for r in _runs(bare)]
+    assert not any(s.withheld for s in load_ideas(full, 5).screeners)
+    assert all(s.withheld for s in load_ideas(bare, 5).screeners if s.run is not None)
+    cursor = load_ideas(full, 1).next_cursor
     assert cursor is not None
     with pytest.raises(ConfigurationError, match="changed since"):
-        load_ideas(context(reader, wide, user="trader"), 1, cursor)
+        load_ideas(bare, 1, cursor)
+
+
+def _runs(ctx: ReadContext) -> list[ScreenerRun]:
+    return [s.run for s in load_ideas(ctx, 1).screeners if s.run is not None]
