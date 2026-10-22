@@ -2,8 +2,10 @@
 `scripts/perf/api_latency.py`: pure logic only (a fake pstats table, no server, no store)."""
 
 import asyncio
+import cProfile
 import importlib.util
 import os
+import pstats
 import signal
 import sys
 import threading
@@ -427,3 +429,108 @@ def test_a_cut_unwinds_a_blocking_call_inside_an_asyncio_task() -> None:
     assert res.cut == "limit" and res.elapsed < 2
     assert not [t for t in asyncio.all_tasks(loop) if not t.done()]
     loop.close()
+
+
+# ---- review fixes: snapshots keep the stack, atomic flush, Cut inside an exception group ------
+
+
+def _leaf() -> int:
+    return sum(range(2000))
+
+
+def _mid() -> None:
+    end = time.perf_counter() + 0.4
+    while time.perf_counter() < end:
+        _leaf()
+
+
+def _outer() -> None:
+    _mid()
+
+
+def _entry(stats: dict, name: str) -> tuple:
+    return next(v for k, v in stats.items() if k[2] == name and "test_page_profile" in k[0])
+
+
+def test_a_mid_run_snapshot_leaves_callers_and_cumulative_time_intact() -> None:
+    res = pp.run_profiled(_outer, limit_s=None, snapshot_s=0.05)
+    assert len(res.snapshots) >= 3  # ticks happened while _mid was on the stack
+    leaf, mid, outer = (_entry(res.stats, n) for n in ("_leaf", "_mid", "_outer"))
+    assert any(k[2] == "_mid" for k in leaf[4])  # the leaf calls after a snapshot keep a caller
+    assert any(k[2] == "_outer" for k in mid[4])
+    assert outer[3] > 0.9 * res.elapsed and mid[3] > 0.9 * res.elapsed  # outer frames kept gaining
+    # and the leaf time reaches the outer frames' bucket path: the table is a connected graph
+    assert sum(r[1] for r in leaf[4].values()) == leaf[1]
+
+
+def test_stats_now_matches_pstats_after_the_profile_stops() -> None:
+    prof = cProfile.Profile()
+    prof.enable()
+    _outer_short()
+    prof.disable()
+    mine, theirs = pp.stats_now(prof), pstats.Stats(prof).stats
+    assert mine.keys() == theirs.keys()
+    for key in mine:
+        assert mine[key][:2] == theirs[key][:2] and set(mine[key][4]) == set(theirs[key][4])
+
+
+def _outer_short() -> None:
+    for _ in range(50):
+        _leaf()
+
+
+def test_flush_is_atomic_and_a_signal_during_it_never_truncates_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "page-profiles.md"
+    pp._flush(out, "/a", [{**_ROW}])
+    before = out.read_text()
+    real_render = pp.render_page
+
+    def render_then_signal(route: str, rows: list) -> str:
+        os.kill(os.getpid(), signal.SIGTERM)  # arrives mid-flush: must be held back
+        return real_render(route, rows)
+
+    monkeypatch.setattr(pp, "render_page", render_then_signal)
+    old = signal.signal(signal.SIGTERM, pp._on_signal)
+    try:
+        with pytest.raises(pp.Cut):  # delivered once the flush is done
+            pp._flush(out, "/b", [{**_ROW}])
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    text = out.read_text()
+    assert "## `/a`" in text and "## `/b`" in text and text.startswith(before.split("##")[0])
+    assert [p.name for p in tmp_path.iterdir()] == ["page-profiles.md"]  # no temp file left
+
+
+def test_a_failed_write_keeps_the_old_file_and_removes_the_temp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "p.md"
+    pp._flush(out, "/a", [{**_ROW}])
+    before = out.read_text()
+
+    def boom(*_: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "replace", boom)
+    with pytest.raises(OSError):
+        pp._flush(out, "/b", [{**_ROW}])
+    assert out.read_text() == before and [p.name for p in tmp_path.iterdir()] == ["p.md"]
+
+
+def test_a_cut_wrapped_in_exception_groups_is_still_a_cut() -> None:
+    def nested() -> None:
+        raise BaseExceptionGroup(
+            "tg", [ValueError("x"), BaseExceptionGroup("in", [pp.Cut("limit")])]
+        )
+
+    res = pp.run_profiled(nested, limit_s=None)
+    assert res.cut == "limit"
+    assert pp.find_cut(ValueError("plain")) is None
+
+    def other() -> None:
+        raise BaseExceptionGroup("tg", [ValueError("x")])
+
+    with pytest.raises(BaseExceptionGroup):
+        pp.run_profiled(other, limit_s=None)

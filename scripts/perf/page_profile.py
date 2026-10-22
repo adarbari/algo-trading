@@ -18,12 +18,12 @@ import asyncio
 import cProfile
 import itertools
 import os
-import pstats
 import re
 import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -399,6 +399,63 @@ class Profiled:
     elapsed: float = 0.0
 
 
+def label(code: Any) -> Key:
+    """pstats' key of a profiler entry's code (a string for a built-in)."""
+    return (
+        ("~", 0, code)
+        if isinstance(code, str)
+        else (code.co_filename, code.co_firstlineno, code.co_name)
+    )
+
+
+def stats_now(prof: cProfile.Profile) -> dict[Key, tuple]:
+    """The pstats table of ``prof`` WHILE IT RUNS, built from ``getstats()`` as cProfile's
+    ``snapshot_stats`` does but without ``disable()`` (which, like ``pstats.Stats(prof)``, drops
+    the frames still on the stack: later calls would have no caller and the outer frames would
+    stop gaining time). Only calls that have returned are in it; a pending frame appears when it
+    returns."""
+    entries = prof.getstats()
+    stats: dict[Key, tuple] = {}
+    callers_of: dict[int, dict] = {}
+    for e in entries:
+        callers_of[id(e.code)] = callers = {}
+        stats[label(e.code)] = (
+            e.callcount - e.reccallcount,
+            e.callcount,
+            e.inlinetime,
+            e.totaltime,
+            callers,
+        )
+    for e in entries:
+        for sub in e.calls or []:
+            callers = callers_of.get(id(sub.code))
+            if callers is None:
+                continue
+            nc, cc, tt, ct = (
+                sub.callcount,
+                sub.callcount - sub.reccallcount,
+                sub.inlinetime,
+                sub.totaltime,
+            )
+            prev = callers.get(label(e.code))
+            if prev:
+                nc, cc, tt, ct = nc + prev[0], cc + prev[1], tt + prev[2], ct + prev[3]
+            callers[label(e.code)] = (nc, cc, tt, ct)
+    return stats
+
+
+def find_cut(err: BaseException) -> Cut | None:
+    """The ``Cut`` in ``err`` or inside any (nested) exception group: anyio's task groups wrap
+    what is raised in them."""
+    if isinstance(err, Cut):
+        return err
+    for sub in getattr(err, "exceptions", ()):
+        found = find_cut(sub)
+        if found:
+            return found
+    return None
+
+
 def snapshot_of(stats: dict[Key, tuple], elapsed: float) -> dict:
     """The bucket seconds and call counters of a profile so far."""
     return {"t": elapsed, "buckets": attribute(stats), "counts": call_counts(stats)}
@@ -422,15 +479,13 @@ def run_profiled(
 
     def tick(_signum: int, _frame: object) -> None:
         elapsed = clock() - t0
-        prof.disable()
-        snaps.append(snapshot_of(pstats.Stats(prof).stats, elapsed))  # type: ignore[attr-defined]
+        snaps.append(snapshot_of(stats_now(prof), elapsed))  # the profiler stays on
         if limit_s is not None and elapsed >= limit_s - 0.001:
             raise Cut("limit")
         signal.setitimer(
             signal.ITIMER_REAL,
             snapshot_s if limit_s is None else max(0.001, min(snapshot_s, limit_s - elapsed)),
         )
-        prof.enable()
 
     old = signal.signal(signal.SIGALRM, tick)
     result = Profiled()
@@ -439,17 +494,17 @@ def run_profiled(
     prof.enable()
     try:
         result.value = call()
-    except Cut as err:
-        result.cut = err.reason
+    except BaseException as err:
+        found = find_cut(err)
+        if found is None:
+            raise
+        result.cut = found.reason
     finally:
         prof.disable()
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, old)
     result.elapsed = clock() - t0
-    try:
-        result.stats = pstats.Stats(prof).stats  # type: ignore[attr-defined]
-    except TypeError:  # nothing was profiled (cut at once)
-        result.stats = {}
+    result.stats = stats_now(prof)
     result.snapshots = snaps
     if result.cut:
         result.snapshots = [*snaps, snapshot_of(result.stats, result.elapsed)]
@@ -474,10 +529,28 @@ def partial_row(name: str, res: Profiled) -> dict:
     }
 
 
-def _flush(out: Path, label: str, done: list[dict]) -> None:
-    current = out.read_text() if out.exists() else ""
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(upsert_section(current, label, render_page(label, done)))
+CUT_SIGNALS = {signal.SIGTERM, signal.SIGHUP, signal.SIGINT}
+
+
+def _flush(out: Path, route: str, done: list[dict]) -> None:
+    """Rewrite the page's section atomically (a temp file in the same directory, then
+    ``os.replace``) with the cut signals blocked, so a signal never leaves a truncated file; one
+    that arrives meanwhile is delivered after the write."""
+    old = signal.pthread_sigmask(signal.SIG_BLOCK, CUT_SIGNALS)
+    try:
+        current = out.read_text() if out.exists() else ""
+        out.parent.mkdir(parents=True, exist_ok=True)
+        text = upsert_section(current, route, render_page(route, done))
+        fd, tmp = tempfile.mkstemp(dir=out.parent, prefix=f".{out.name}.")
+        try:
+            with os.fdopen(fd, "w") as handle:
+                handle.write(text)
+            Path(tmp).replace(out)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, old)
 
 
 def _on_signal(signum: int, _frame: object) -> None:
@@ -569,8 +642,11 @@ def _profile_all(
                 flush=True,
             )
             _flush(out, label, done)
-    except Cut as err:  # a signal between operations: what ran is already written
-        print(f"cut ({err.reason}) between operations", file=sys.stderr)
+    except BaseException as err:
+        found = find_cut(err)
+        if found is None:
+            raise
+        print(f"cut ({found.reason}) between operations", file=sys.stderr)  # what ran is written
         code = EXIT_LOW_SWAP
     finally:
         for sig, old in olds.items():

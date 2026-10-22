@@ -93,3 +93,9 @@ line (`shares stable` when the last 3 snapshots' shares each moved under 5 point
 moving (treat as indicative)`). Shares are meaningful, absolute seconds are lower bounds. The same
 flush runs on SIGTERM, SIGHUP and Ctrl-C (exit code 3); after a limit cut the next operation
 runs. The clone-only rule and the swap / disk guards are unchanged.
+
+Snapshots are taken from the running profiler (`getstats()`, never `disable()`, which drops the
+frames on the stack): they hold calls that have returned, so a long-running frame (one big read)
+shows in the trend only when it returns, and the final profile of a cut call includes the frames
+the cut unwound. The page file is rewritten atomically (temp file, `os.replace`) with the cut
+signals blocked; a `Cut` inside an anyio task group's exception group is recognised too.
