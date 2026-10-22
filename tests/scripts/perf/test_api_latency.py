@@ -1,6 +1,7 @@
 """`scripts/perf/api_latency.py`: the operation inventory from a capture, the row count, the
 per-page totals and the rendered table (no server)."""
 
+import asyncio
 import importlib.util
 import sys
 from pathlib import Path
@@ -9,6 +10,7 @@ import pytest
 
 import algotrade.services.read.context as cx
 import algotrade_api.graphql.response_cache as rc
+from algotrade_api.graphql import warm
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "perf" / "api_latency.py"
 _spec = importlib.util.spec_from_file_location("perf_api_latency", SCRIPT)
@@ -107,6 +109,7 @@ def test_launch_patches_by_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     for cls, names in (
         (rc.ResponseCache, ("get", "get_stale")),
         (cx.ResultCache, ("get", "get_or_compute")),
+        (warm.CacheWarmer, ("run", "warm_home", "replay_operations")),
     ):
         for n in names:
             monkeypatch.setattr(cls, n, getattr(cls, n))  # restored after the test
@@ -126,6 +129,15 @@ def test_launch_patches_by_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cache.get_or_compute("k", lambda: calls.append(1) or 5) == 5
     assert len(calls) == 2  # never answered from the cache
     assert cache.get("k") is None
+    assert asyncio.run(warm.CacheWarmer.run(object())) is None  # the warmer is idle
+    assert warm.CacheWarmer.warm_home(object()) is None
+
+
+def test_patch_asserts_its_targets_exist(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["-c", "0", "2"])
+    monkeypatch.delattr(warm.CacheWarmer, "replay_operations")
+    with pytest.raises(AssertionError, match="targets moved"):
+        exec(lat.PATCH, {})
 
 
 def test_check_target_refuses_the_real_store(tmp_path: Path) -> None:
@@ -139,7 +151,26 @@ def test_check_target_refuses_the_real_store(tmp_path: Path) -> None:
         lat.check_target(f"file://{tmp_path}", stores, confirmed=False, need_url=True)
     assert lat.check_target(f"file://{real}", stores, confirmed=True, need_url=True)
     clone = f"file://{tmp_path / 'clone'}"
-    assert lat.check_target(clone, stores, confirmed=False, need_url=True) == clone
+    assert lat.check_target(clone, stores, confirmed=False, need_url=True) == (
+        f"file://{(tmp_path / 'clone').resolve()}"
+    )
+
+
+def test_check_target_sees_another_spelling_and_relative_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = tmp_path / "Var" / "data"
+    real.mkdir(parents=True)
+    link = tmp_path / "alias"
+    link.symlink_to(real)
+    with pytest.raises(lat.RefusalError):  # a symlink to it (case-insensitive volumes alike)
+        lat.check_target(f"file://{link}", [real.resolve()], confirmed=False, need_url=True)
+    monkeypatch.setattr(lat, "REPO", tmp_path)  # a relative URL resolves against the repo
+    with pytest.raises(lat.RefusalError):
+        lat.check_target("file://./Var/data", [real.resolve()], confirmed=False, need_url=True)
+    assert lat.check_target("file://./clone", [real.resolve()], False, True) == (
+        f"file://{(tmp_path / 'clone').resolve()}"
+    )
 
 
 def test_check_target_needs_a_url_for_uncached_but_not_for_the_baseline() -> None:
@@ -164,13 +195,49 @@ def test_uncached_config_turns_release_reads_off(tmp_path: Path) -> None:
     site.mkdir(parents=True)
     (site / "nightly.toml").write_text("[serving]\nrelease_reads = true  # kill switch\n")
     out = lat.uncached_config(tmp_path / "cfg", tmp_path / "out")
+    (tmp_path / "cfg" / "users").mkdir()
+    (tmp_path / "cfg" / "users" / "u.toml").write_text("x")
+    out = lat.uncached_config(tmp_path / "cfg", tmp_path / "out2")
+    assert (out / "users" / "u.toml").exists()  # the whole root is copied
     assert "release_reads = false" in (out / "site" / "nightly.toml").read_text()
     assert "release_reads = true" in (site / "nightly.toml").read_text()  # the source is untouched
 
 
-def test_free_port_prefers_the_worktree_block() -> None:
+def test_free_port_stays_in_the_worktree_block_and_never_falls_back() -> None:
     port = lat.free_port({"ALGOTRADE_PORT_BASE": "14120"})
-    assert 14128 <= port <= 14139 or port > 0
+    assert 14128 <= port <= 14139
+    with pytest.raises(RuntimeError):
+        lat.free_port({})
+
+
+def test_response_error_flags_http_and_graphql_errors() -> None:
+    assert lat.response_error(200, b'{"data": {"a": 1}}') is None
+    assert lat.response_error(503, b"") == "HTTP 503"
+    assert lat.response_error(200, b'{"errors": [{"message": "boom"}]}') == "boom"
+    assert lat.response_error(200, b"<html>") == "not JSON"
+
+
+def test_uncached_table_flags_failed_calls() -> None:
+    m = {
+        **_full(1.0, 2.0),
+        "failed_calls": 3,
+        "first_error": "boom",
+        "uncached_p95_ms": 2.0,
+        "load_p95_ms": 4.0,
+        "rows": 0,
+    }
+    text = lat.render_uncached(
+        {
+            "generated": "g",
+            "target": "t",
+            "uncached_repeats": 5,
+            "load_clients": 4,
+            "remaining_memos": [],
+            "operations": {"X": m},
+            "pages": {},
+        }
+    )
+    assert "FAILED x3: boom" in text
 
 
 def test_page_report_compares_static_and_capture_and_lists_gaps() -> None:

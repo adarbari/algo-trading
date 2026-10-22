@@ -33,6 +33,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import statistics
 import subprocess
@@ -65,21 +66,35 @@ MODES = {"cache": "0", "nocache": "1", "uncached": "2"}
 RELEASE_READS = re.compile(r"^(release_reads\s*=\s*)\w+", re.M)
 # argv: port, mode ('0' cache on, '1' response cache never answers, '2' neither it nor the
 # loaders' ResultCache answers: `get` finds nothing and `get_or_compute` always computes).
-PATCH = (
-    "import sys;"
-    "mode = sys.argv[2];"
-    "import algotrade_api.graphql.response_cache as rc;"
-    "import algotrade.services.read.context as cx;"
-    "[mode in ('1', '2') and setattr(rc.ResponseCache, n, lambda self, key: None)"
-    " for n in ('get', 'get_stale')];"
-    "mode == '2' and setattr(cx.ResultCache, 'get', lambda self, key: None);"
-    "mode == '2' and setattr(cx.ResultCache, 'get_or_compute',"
-    " lambda self, key, compute: compute());"
-)
+PATCH = """
+import sys
+mode = sys.argv[2]
+import algotrade_api.graphql.response_cache as rc
+import algotrade_api.graphql.warm as w
+import algotrade.services.read.context as cx
+assert all(hasattr(c, n) for c, n in [
+    (rc.ResponseCache, 'get'), (rc.ResponseCache, 'get_stale'),
+    (cx.ResultCache, 'get'), (cx.ResultCache, 'get_or_compute'),
+    (w.CacheWarmer, 'run'), (w.CacheWarmer, 'warm_home'), (w.CacheWarmer, 'replay_operations'),
+]), 'the perf patch targets moved: update PATCH in scripts/perf/api_latency.py'
+async def _idle(self, *args):
+    return None
+if mode in ('1', '2'):
+    rc.ResponseCache.get = lambda self, key: None
+    rc.ResponseCache.get_stale = lambda self, key: None
+if mode == '2':
+    cx.ResultCache.get = lambda self, key: None
+    cx.ResultCache.get_or_compute = lambda self, key, compute: compute()
+    # the warmer replays every seeded operation in the background at start-up: uncached it
+    # would load the process while COLD and the first UNCACHED calls are timed
+    w.CacheWarmer.run = _idle
+    w.CacheWarmer.replay_operations = _idle
+    w.CacheWarmer.warm_home = lambda self, *args: None
+"""
 LAUNCH = (
-    PATCH + "import uvicorn;"
-    "from algotrade_api.app import app;"
-    "uvicorn.run(app, host='127.0.0.1', port=int(sys.argv[1]), log_level='warning')"
+    PATCH + "import uvicorn\n"
+    "from algotrade_api.app import app\n"
+    "uvicorn.run(app, host='127.0.0.1', port=int(sys.argv[1]), log_level='warning')\n"
 )
 # What still memoises under UNCACHED (listed in the generated doc; not bypassed).
 REMAINING_MEMOS = (
@@ -103,6 +118,18 @@ def percentile(values: list[float], q: float) -> float:
     lo = int(pos)
     hi = min(lo + 1, len(ordered) - 1)
     return ordered[lo] + (ordered[hi] - ordered[lo]) * (pos - lo)
+
+
+def response_error(status: int, content: bytes) -> str | None:
+    """Why a response is not a success: its HTTP status, or the first GraphQL error message
+    (a fast error is not a fast call)."""
+    if status != 200:
+        return f"HTTP {status}"
+    try:
+        errors = json.loads(content).get("errors")
+    except ValueError:
+        return "not JSON"
+    return str(errors[0].get("message", errors[0]))[:80] if errors else None
 
 
 def largest_list(data: object) -> int:
@@ -131,18 +158,19 @@ def inventory(pages: dict[str, list[dict]]) -> tuple[dict[str, dict], dict[str, 
 
 
 def free_port(env: dict[str, str] | None = None) -> int:
-    """A spare port: the first free one of ALGOTRADE_PORT_BASE + 8..19 when the base is set
-    (`source worktree.env`), else any free port."""
+    """A spare port: the first free one of ALGOTRADE_PORT_BASE + 8..19 (`source worktree.env`);
+    never another port: the base unset, or every port busy, is an error."""
     base = (env if env is not None else os.environ).get("ALGOTRADE_PORT_BASE", "")
-    candidates = [int(base) + PORT_OFFSET + i for i in range(12)] if base.isdigit() else []
-    for port in [*candidates, 0]:
+    if not base.isdigit():
+        raise RuntimeError("ALGOTRADE_PORT_BASE is not set: `source worktree.env` first")
+    for port in range(int(base) + PORT_OFFSET, int(base) + PORT_OFFSET + 12):
         with socket.socket() as s:
             try:
                 s.bind(("127.0.0.1", port))
             except OSError:
                 continue
-            return int(s.getsockname()[1])
-    raise RuntimeError("no free port")
+            return port
+    raise RuntimeError(f"no free port in {int(base) + PORT_OFFSET}..{int(base) + PORT_OFFSET + 11}")
 
 
 class RefusalError(Exception):
@@ -154,7 +182,8 @@ def store_path(url: str) -> Path:
     parsed = urlparse(url)
     if parsed.scheme != "file":
         raise RefusalError(f"data URL {url!r}: only file:// stores are supported")
-    return Path(parsed.netloc + parsed.path).expanduser().resolve()
+    path = Path(parsed.netloc + parsed.path).expanduser()
+    return (path if path.is_absolute() else REPO / path).resolve()  # as the API resolves it
 
 
 def real_stores(env: dict[str, str], repo: Path, main_checkout: Path | None) -> list[Path]:
@@ -194,20 +223,35 @@ def check_target(
         return None
     path = store_path(data_url)
     for real in stores:
-        if path == real or real in path.parents or path in real.parents:
+        if overlaps(path, real):
             if confirmed:
-                return data_url
+                return f"file://{path}"
             raise RefusalError(
                 f"--data-url {data_url} is the real local store {real}: run on a clone, or pass "
                 "--i-know-this-is-the-real-store"
             )
-    return data_url
+    return f"file://{path}"
+
+
+def _chain(path: Path) -> list[Path]:
+    """``path`` and its parents that exist (samefile needs them on disk)."""
+    return [p for p in (path, *path.parents) if p.exists()]
+
+
+def overlaps(a: Path, b: Path) -> bool:
+    """Whether ``a`` is ``b``, inside it or contains it, by ``samefile`` (so a case-insensitive
+    volume's other spelling or a symlink cannot slip through)."""
+    inside = any(x.samefile(b) for x in _chain(a)) if b.exists() else False
+    contains = a.exists() and any(a.samefile(y) for y in _chain(b))
+    lexical = a == b or b in a.parents or a in b.parents  # neither need exist yet
+    return inside or contains or lexical
 
 
 def uncached_config(config_dir: Path, to: Path) -> Path:
-    """A config root at ``to`` (``site/`` copied from ``config_dir``) with ``release_reads``
-    false: the serving release answers listed operations from a persisted copy otherwise."""
-    shutil.copytree(config_dir / "site", to / "site")
+    """A copy of the whole config root ``config_dir`` at ``to`` with ``release_reads`` false in
+    ``site/nightly.toml``: the serving release answers listed operations from a persisted copy
+    otherwise."""
+    shutil.copytree(config_dir, to)
     nightly = to / "site" / "nightly.toml"
     text = nightly.read_text()
     if not RELEASE_READS.search(text):
@@ -251,8 +295,13 @@ class Api:
                     return
             except httpx.HTTPError:
                 time.sleep(0.2)
+            if self.proc.poll() is not None:  # e.g. the patch's assert failed
+                self.client.close()
+                raise RuntimeError(f"the API exited with {self.proc.returncode} at start-up")
         self.close()
         raise RuntimeError("the API did not start")
+
+    last_error: str | None = None
 
     def call(self, op: dict) -> tuple[float, int, int, int]:
         """(ms, status, decoded bytes, longest list) of one GraphQL call."""
@@ -261,6 +310,7 @@ class Api:
         r = self.client.post(f"{self.url}/graphql", json=body)
         ms = (time.perf_counter() - t0) * 1000
         rows = 0
+        self.last_error = response_error(r.status_code, r.content)
         if r.status_code == 200:
             rows = largest_list(r.json().get("data"))
         return ms, r.status_code, len(r.content), rows
@@ -268,7 +318,11 @@ class Api:
     def close(self) -> None:
         self.client.close()
         self.proc.terminate()
-        self.proc.wait(timeout=15)
+        try:
+            self.proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.wait(timeout=15)
 
 
 def measure(ops: dict[str, dict], **target: object) -> dict[str, dict]:
@@ -390,42 +444,58 @@ def measure_cold(ops: dict[str, dict], **target: object) -> dict[str, dict]:
     return out
 
 
-async def load_samples(url: str, op: dict, clients: int, repeats: int) -> list[float]:
-    """ms of every call of ``clients`` concurrent clients, each firing ``repeats`` calls back to
-    back (one HTTP client each, as separate browsers): the contention of one process's threads."""
+async def load_samples(
+    url: str, op: dict, clients: int, repeats: int
+) -> list[tuple[float, str | None]]:
+    """(ms, error) of every call of ``clients`` concurrent clients, each firing ``repeats`` calls
+    back to back (one HTTP client each, as separate browsers): the contention of one process's
+    threads."""
     body = {"query": op["query"], "variables": op["variables"]}
 
-    async def one() -> list[float]:
-        times: list[float] = []
+    async def one() -> list[tuple[float, str | None]]:
+        out: list[tuple[float, str | None]] = []
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             for _ in range(repeats):
                 t0 = time.perf_counter()
-                await client.post(f"{url}/graphql", json=body)
-                times.append((time.perf_counter() - t0) * 1000)
-        return times
+                r = await client.post(f"{url}/graphql", json=body)
+                out.append(
+                    ((time.perf_counter() - t0) * 1000, response_error(r.status_code, r.content))
+                )
+        return out
 
     return [t for ts in await asyncio.gather(*(one() for _ in range(clients))) for t in ts]
 
 
 def measure_uncached(ops: dict[str, dict], **target: object) -> dict[str, dict]:
-    """UNCACHED: one process whose response cache and loader ResultCache never answer; per
+    """UNCACHED: one process whose response cache, loader ResultCache and warmer are off; per
     operation ``UNCACHED_REPEATS`` calls (none discarded as priming), then the same op from
-    ``LOAD_CLIENTS`` concurrent clients (UNCACHED-UNDER-LOAD)."""
+    ``LOAD_CLIENTS`` concurrent clients (UNCACHED-UNDER-LOAD). Calls that fail (HTTP status,
+    GraphQL errors) are counted and the first error kept: the row is flagged."""
     out: dict[str, dict] = {}
     api = Api("uncached", **target)  # type: ignore[arg-type]
     try:
         for name, op in ops.items():
-            solo = [api.call(op)[0] for _ in range(UNCACHED_REPEATS)]
-            loaded = asyncio.run(load_samples(api.url, op, LOAD_CLIENTS, UNCACHED_REPEATS))
+            solo: list[float] = []
+            errors: list[str] = []
+            for _ in range(UNCACHED_REPEATS):
+                solo.append(api.call(op)[0])
+                if api.last_error:
+                    errors.append(api.last_error)
+            sampled = asyncio.run(load_samples(api.url, op, LOAD_CLIENTS, UNCACHED_REPEATS))
+            loaded = [ms for ms, _ in sampled]
+            errors += [e for _, e in sampled if e]
             out[name] = {
                 "uncached_p50_ms": statistics.median(solo),
                 "uncached_p95_ms": percentile(solo, 95),
                 "load_p50_ms": statistics.median(loaded),
                 "load_p95_ms": percentile(loaded, 95),
+                "failed_calls": len(errors),
+                "first_error": errors[0] if errors else None,
             }
             print(
                 f"  {name}: uncached p50 {out[name]['uncached_p50_ms']:.1f} ms, "
                 f"under load p50 {out[name]['load_p50_ms']:.1f} ms"
+                + (f"  FAILED x{len(errors)}: {errors[0]}" if errors else "")
             )
     finally:
         api.close()
@@ -648,6 +718,8 @@ def render_uncached(report: dict) -> str:
     for name, m in sorted(ops.items(), key=lambda kv: -kv[1]["uncached_p50_ms"]):
         ratio = m["load_p50_ms"] / m["uncached_p50_ms"] if m["uncached_p50_ms"] else 0.0
         note = "" if m["status"] == 200 else f" (HTTP {m['status']})"
+        if m.get("failed_calls"):
+            note += f" **FAILED x{m['failed_calls']}: {m['first_error']}** (timings are errors)"
         lines.append(
             f"| {name}{note} | {m['cold_ms']:.0f} | {m['uncached_p50_ms']:.1f} | "
             f"{m['uncached_p95_ms']:.1f} | {m['load_p50_ms']:.1f} | {m['load_p95_ms']:.1f} | "
@@ -741,6 +813,8 @@ def main(argv: list[str] | None = None) -> int:
         help="allow --data-url to be the real local store (and --uncached without one)",
     )
     args = p.parse_args(argv)
+    # a SIGTERM (a stopped run) must unwind through the `finally` that stops the API processes
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     try:
         args.data_url = check_target(
             args.data_url,
