@@ -60,6 +60,21 @@ from algotrade_api.graphql.scalars import SCALARS
 from algotrade_api.graphql.types.query import Query
 
 REPLAY_BUDGET_S = 30.0  # the longest one replay pass takes (start, or after a publish)
+# Operations whose recompute is seconds of CPU (measured: docs/perf/, round 6): the replay runs
+# them after every other one and only while no request holds the pool, because their threads
+# hold the GIL against a user's first request (3.6-4.5 s right after a start, 0.4 s settled).
+HEAVY_REPLAY_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "InstrumentEvents",
+        "InstrumentScreenerHits",
+        "InstrumentFeatureValues",
+        "RegimeBands",
+        "RegimeSignals",
+        "IdeasPage",
+        "EdgesPage",
+    }
+)
+REPLAY_HEAVY_PAUSE_S = 0.05  # the event loop and the pool are left free this long after a heavy one
 _logger = logging.getLogger(__name__)
 PATH = "/graphql"
 GZIP_LEVEL = 5  # a cached answer is compressed once and read many times
@@ -314,13 +329,22 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
     ) -> int:
         """Recompute, one after the other (the pool is shared with the pages), every operation
         ``ops`` names (default: the log) whose answer is not fresh; how many were recomputed.
+        Cheap operations first, ``HEAVY_REPLAY_OPERATIONS`` last (each kind in the order given),
+        the loop yielded to between operations so a request is served while the replay runs.
         Stops after ``budget_s``, and while the read pool is busy with requests (the next
-        publish tries again); an operation that fails is dropped from the log."""
+        publish tries again; a heavy one waits for the pool to be idle); an operation that fails
+        is dropped from the log."""
         done = 0
         deadline = time.monotonic() + budget_s
-        for op in ops if ops is not None else self._log.items():
-            if time.monotonic() > deadline or self._admission.taken >= READ_THREADS:
+        pending = list(ops if ops is not None else self._log.items())
+        heavy = [op for op in pending if operation_name(op.document) in HEAVY_REPLAY_OPERATIONS]
+        cheap = [op for op in pending if op not in heavy]
+        for op in [*cheap, *heavy]:
+            busy = self._admission.taken >= READ_THREADS
+            if time.monotonic() > deadline or busy:
                 break
+            if op in heavy and self._admission.taken > 0:
+                break  # a request is running: its first answer must not wait on a heavy replay
             try:
                 outcome = await self.refresh(op, only_missing=True)
             except Exception:
@@ -330,6 +354,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
                 self._log.discard(op)
             else:
                 done += outcome
+            await asyncio.sleep(REPLAY_HEAVY_PAUSE_S if op in heavy else 0)
         return done
 
 
