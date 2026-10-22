@@ -381,20 +381,123 @@ def test_vite_group_is_killed_not_just_npx(monkeypatch: pytest.MonkeyPatch) -> N
                 raise cap.subprocess.TimeoutExpired("x", timeout)
 
     sent: list = [None]
-    cap.stop_group(Proc(False), lambda pid, sig: sent.append((pid, sig)) or None)
-    assert sent[1:] == [(4242, cap.signal.SIGTERM)]
+
+    def alive_after(pid: int, sig: int) -> None:
+        sent.append(sig)
+        if sig == 0 and sent.count(0) > 1:
+            raise ProcessLookupError
+
+    # the leader exits on SIGTERM; the probe finds a surviving child, which gets the SIGKILL
+    cap.stop_group(Proc(False), alive_after)
+    assert sent[1:] == [cap.signal.SIGTERM, 0, cap.signal.SIGKILL]
+    sent[:] = [None]
+
+    def clean(pid: int, sig: int) -> None:
+        sent.append(sig)
+        if sig == 0:
+            raise ProcessLookupError  # nothing of the group is left
+
+    cap.stop_group(Proc(False), clean)
+    assert sent[1:] == [cap.signal.SIGTERM, 0]
     sent[:] = [None]
 
     def kill(pid: int, sig: int) -> None:
         sent.append(sig)
+        if sig == 0:
+            raise ProcessLookupError
 
     cap.stop_group(Proc(True), kill)
-    assert sent[1:] == [cap.signal.SIGTERM, cap.signal.SIGKILL]
+    assert sent[1:] == [cap.signal.SIGTERM, cap.signal.SIGKILL, 0]
 
     def gone(pid: int, sig: int) -> None:
         raise ProcessLookupError
 
     cap.stop_group(Proc(False), gone)  # already dead: no error
+
+    class Denied(Proc):
+        terminated = False
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+    def no_permission(pid: int, sig: int) -> None:
+        raise PermissionError
+
+    d = Denied(False)
+    cap.stop_group(d, no_permission)  # the group cannot be signalled, nor probed: no error
+    assert d.terminated is True
+
+
+def test_signal_handlers_are_installed_before_the_servers_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list = []
+    monkeypatch.setattr(cap.signal, "signal", lambda sig, h: events.append(("signal", sig)))
+    monkeypatch.setattr(cap, "check_crawl", lambda *a, **k: "file:///c")
+    monkeypatch.setattr(cap.al, "real_stores", lambda *a: [])
+    monkeypatch.setattr(cap.al, "main_checkout_of", lambda *a: None)
+
+    def start(_: str) -> None:
+        events.append("start")
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(cap, "start_servers", start)
+    with pytest.raises(RuntimeError):
+        cap.main(["--data-url", "file:///c", "--views-file", str(tmp_path / "v.json")])
+    assert events == [("signal", cap.signal.SIGTERM), ("signal", cap.signal.SIGHUP), "start"]
+
+
+def test_cleanup_ignores_a_second_sigterm_and_sighup(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list = []
+    monkeypatch.setattr(cap.signal, "signal", lambda sig, h: events.append((sig, h)))
+
+    class Api:
+        def close(self) -> None:
+            events.append("api closed")
+
+    cap.stop_all(Api(), object(), lambda vite: events.append("vite stopped"))
+    assert events == [
+        (cap.signal.SIGTERM, cap.signal.SIG_IGN),
+        (cap.signal.SIGHUP, cap.signal.SIG_IGN),
+        "api closed",
+        "vite stopped",
+    ]
+
+
+def test_an_interrupt_during_api_startup_stops_the_api_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ctrl-C / SIGTERM inside Api.__init__ (up to 90 s): there is no object yet to close."""
+    stopped: list = []
+
+    class Proc:
+        returncode = None
+
+        def poll(self) -> None:
+            return None
+
+        def terminate(self) -> None:
+            stopped.append("terminate")
+
+        def wait(self, timeout: float) -> None:
+            stopped.append("wait")
+
+    class Client:
+        def __init__(self, **kw: object) -> None:
+            pass
+
+        def get(self, url: str) -> None:
+            raise KeyboardInterrupt  # the interrupt lands in the start-up wait
+
+        def close(self) -> None:
+            stopped.append("client closed")
+
+    monkeypatch.setattr(cap.al, "free_port", lambda: 11368)
+    monkeypatch.setattr(cap.al.subprocess, "Popen", lambda *a, **k: Proc())
+    monkeypatch.setattr(cap.al.httpx, "Client", Client)
+    with pytest.raises(KeyboardInterrupt):
+        cap.al.Api("uncached", data_url="file:///c")
+    assert stopped == ["client closed", "terminate", "wait"]
 
 
 def test_crawler_refuses_early_without_web_node_modules(tmp_path: Path) -> None:

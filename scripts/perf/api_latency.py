@@ -347,6 +347,7 @@ class Api:
         data_url: str | None = None,
         config_dir: Path | None = None,
     ) -> None:
+        self.mode = mode
         self.port = free_port()
         self.url = f"http://127.0.0.1:{self.port}"
         env = {
@@ -358,14 +359,21 @@ class Api:
             env["ALGOTRADE_DATA_URL"] = data_url
         if config_dir:
             env["ALGOTRADE_CONFIG_DIR"] = str(config_dir)
+        self.client = httpx.Client(timeout=TIMEOUT)
+        try:
+            self._start(env)
+        except BaseException:  # a Ctrl-C / SIGTERM during start-up must not orphan the process
+            self.close()
+            raise
+
+    def _start(self, env: dict[str, str]) -> None:
         self.proc = subprocess.Popen(
-            [sys.executable, "-c", LAUNCH, str(self.port), MODES[mode]],
+            [sys.executable, "-c", LAUNCH, str(self.port), MODES[self.mode]],
             cwd=REPO,
             env={**os.environ, **env},
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        self.client = httpx.Client(timeout=TIMEOUT)
         end = time.monotonic() + 90
         while time.monotonic() < end:
             try:
@@ -374,9 +382,7 @@ class Api:
             except httpx.HTTPError:
                 time.sleep(0.2)
             if self.proc.poll() is not None:  # e.g. the patch's assert failed
-                self.client.close()
                 raise RuntimeError(f"the API exited with {self.proc.returncode} at start-up")
-        self.close()
         raise RuntimeError("the API did not start")
 
     last_error: str | None = None
@@ -401,6 +407,8 @@ class Api:
 
     def close(self) -> None:
         self.client.close()
+        if not hasattr(self, "proc"):  # never started
+            return
         self.proc.terminate()
         try:
             self.proc.wait(timeout=15)

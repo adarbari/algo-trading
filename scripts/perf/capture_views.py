@@ -129,8 +129,8 @@ def start_servers(data_url: str, api_factory=al.Api, popen=subprocess.Popen):  #
 
 def stop_group(proc, killpg=os.killpg) -> None:  # type: ignore[no-untyped-def]
     """Stop a server and what it spawned (npx -> vite): SIGTERM its group, SIGKILL after 15 s.
-    Where the group cannot be signalled (PermissionError: e.g. it never became a group leader),
-    the process itself is terminated; a process already gone is fine."""
+    Where the group cannot be signalled (PermissionError) the process itself is terminated; and
+    once the leader is gone the group is probed (signal 0) and killed if a child survived."""
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
             killpg(proc.pid, sig)
@@ -140,14 +140,28 @@ def stop_group(proc, killpg=os.killpg) -> None:  # type: ignore[no-untyped-def]
             (proc.terminate if sig == signal.SIGTERM else proc.kill)()
         try:
             proc.wait(timeout=15)
-            return
+            break
         except subprocess.TimeoutExpired:
             continue
+    try:
+        killpg(proc.pid, 0)  # the leader is gone: is anything of its group left?
+        killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        return
+
+
+def install_stop_handlers() -> None:
+    """A stopped run (SIGTERM / SIGHUP) unwinds through the `finally` that stops the servers."""
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda *_: sys.exit(143))
 
 
 def stop_all(api, vite, stop=stop_group) -> None:  # type: ignore[no-untyped-def]
     """Stop every server, each in its own try/finally: the API first (the memory hog), then Vite;
-    one failing stop never skips the other."""
+    one failing stop never skips the other. Further SIGTERM / SIGHUP are ignored meanwhile: a
+    second one would raise inside the stop and leave a server running."""
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)
     try:
         api.close()
     finally:
@@ -182,10 +196,8 @@ def main(argv: list[str] | None = None) -> int:
     except al.RefusalError as err:
         print(f"refused: {err}", file=sys.stderr)
         return 2
+    install_stop_handlers()  # BEFORE the servers: the API takes up to 90 s to start
     api, vite, web_url = start_servers(data_url)
-    # a stopped run (SIGTERM / SIGHUP) unwinds through the `finally` below
-    for sig in (signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, lambda *_: sys.exit(143))
     try:
         wait_for(f"{web_url}/api/health")  # through Vite's proxy: it reaches our API
         return subprocess.run(
