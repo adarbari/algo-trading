@@ -331,4 +331,6 @@ licence (confirmed)").
     `source_seq`, `screeners_hash` and `rule_hash`, with a live fallback. It is built only
     after the rule and smaller-response loader PRs and their re-measure. Every other page
     stays under decision 25. Decision 16 stays: IdeasPage is a run operation, never
-    release-shared, and the index is not in the release manifest.
+    release-shared, and the index is not in the release manifest. For Ideas this supersedes
+    the last sentence of decision 27 (ADR 0005 and the `CLAUDE.md` writes line change, by
+    their amendments of the same date).

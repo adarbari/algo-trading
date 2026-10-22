@@ -26,7 +26,7 @@ with the freedom to move to object storage or a database later.
 
 ## Amendment 2026-10-22: SQLite as a derived, rebuildable index beside Parquet (Ideas only)
 Owner decision 2026-10-22 (`docs/decisions/log.md`, "Ideas ranking rule, store and licence
-(confirmed)"). Parquet stays the store of domain facts; this adds one **derived index store**
+(confirmed)"). Parquet stays the store of domain facts; this adds one **derived index store** (planned; built after the Ideas rule and loader PRs and their re-measure)
 and no second source of truth.
 
 - **What:** the per-viewer Ideas lists (pointers and ranks with a stamp), in one SQLite file

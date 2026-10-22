@@ -28,7 +28,7 @@ See [0077](0077-serving-release.md): ingestion writes serving releases (`serve-r
 
 ## Amendment 2026-10-22: the derived Ideas index
 Owner decision 2026-10-22 (`docs/decisions/log.md`, "Ideas ranking rule, store and licence
-(confirmed)"). Write class **derived Ideas index** (ADR 0006 amendment): ingestion writes the
+(confirmed)"). Planned (built after the Ideas rule and loader PRs and their re-measure). Write class **derived Ideas index** (ADR 0006 amendment): ingestion writes the
 nightly lists (the `ideas` step, not critical); the API additionally rebuilds the affected
 viewers' Ideas rows in the on-request screener run job, after the Parquet publish is durable
 and before the run record is saved. The index is derived and rebuildable, holds pointers and
