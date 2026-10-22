@@ -34,10 +34,13 @@ def rollup_rows(
     end: date,
     as_of: datetime | None = None,
     instruments: Sequence[str] | None = None,
+    columns: Sequence[str] | None = None,
 ) -> pd.DataFrame | None:
     """Rows with ``start <= session_date <= end`` sorted by (session_date, instrument_id)
-    (only ``instruments``' rows when given), or ``None`` when nothing is stored in the range."""
-    return _rows(reader.table_range(table, start, end, as_of, instruments))
+    (only ``instruments``' rows when given), or ``None`` when nothing is stored in the range.
+    ``columns``: only these (+ ``session_date`` and ``instrument_id``), a column the table lacks
+    absent."""
+    return _rows(reader.table_range(table, start, end, as_of, instruments, columns))
 
 
 def feature_rows(

@@ -30,11 +30,12 @@ class RegimeBand:
 
 
 def _labels(ctx: ReadContext, start: date, end: date) -> dict[date, RegimeLabel]:
-    """The stored label of each session of ``start..end`` that has one."""
+    """The stored label of each session of ``start..end`` that has one: the one label column of
+    those sessions (``span``), not every column of the table's whole history."""
     if LABEL not in ctx.features.field_types("market"):
         return {}
     mid = market_id(US)
-    series = load_series(ctx, [mid], [LABEL], start, end, entity="market")[mid]
+    series = load_series(ctx, [mid], [LABEL], start, end, "market", (start, end))[mid]
     known = {label.value: label for label in KNOWN}
     found = ((p.session, known.get(str(p.values[0]))) for p in series.points)
     return {day: label for day, label in found if label is not None}
