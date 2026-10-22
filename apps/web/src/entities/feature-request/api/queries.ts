@@ -34,7 +34,7 @@ const FeatureRequestsQuery = graphql(`
 export function useFeatureRequests() {
   return useQuery({
     queryKey: queryKeys.gql('FeatureRequests', {}),
-    queryFn: () => gql(FeatureRequestsQuery, {}),
+    queryFn: ({ queryKey }) => gql(FeatureRequestsQuery, {}, queryKey),
     select: (data) => data.featureRequests,
   });
 }

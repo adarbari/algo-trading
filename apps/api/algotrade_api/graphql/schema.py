@@ -126,17 +126,19 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         # one Serving (one clock reading) per request: the key and the context both use it
         request.state.release, request.state.pinned = release, pinned
         request.state.serving = serving
+        generation: int | None = None  # the generation the key used, stamped on the answer
         if parsed is not None and viewer is not None and cacheable(parsed[0]):
             document, variables = parsed
             self._log.note(viewer, document, variables)
-            key = await self._key(viewer, document, variables, release, pinned, serving)
+            generation = self._stamped_generation(viewer, document, pinned)  # key and header agree
+            key = await self._key(viewer, document, variables, release, pinned, serving, generation)
             body = self._cache.get(key) if key is not None else None
             if body is not None:
-                return await _served(body, request)
+                return await _served(body, request, generation, release)
             stale = self._cache.get_stale(key) if key is not None else None
             if stale is not None and key is not None:  # stale-while-revalidate: answer now,
                 self._revalidate(key, Served(viewer, document, variables))  # recompute behind it
-                return await _served(stale, request)
+                return await _served(stale, request, generation, release)
         else:
             request.state.release = None
         inline = parsed is not None and only_inline(cast(Hashable, self.schema), parsed[0])
@@ -160,8 +162,8 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         if key is not None and response.status_code == 200 and not failed:
             packed = await asyncio.to_thread(gzip.compress, bytes(response.body), GZIP_LEVEL)
             self._cache.put(key, packed)
-            return await _served(packed, request)
-        return response
+            return await _served(packed, request, generation, release)
+        return _stamped(response, generation, getattr(request.state, "release", None))
 
     def _generation(self, viewer: UserRecord, name: str | None) -> int | None:
         """The viewer's config generation, read before the answer is computed; ``None`` when a
@@ -170,6 +172,14 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         if name in SHARED_OPERATIONS:
             return 0
         return self._config_generation(viewer.user_id, viewer.role is Role.ADMIN)
+
+    def _stamped_generation(self, viewer: UserRecord, document: str, pinned: bool) -> int | None:
+        """The generation the answer is keyed on and stamped with, read once; ``None`` for a
+        shared or release-pinned operation (its key holds none) or a write in flight."""
+        name = operation_name(document)
+        if pinned or name in SHARED_OPERATIONS:
+            return None
+        return self._generation(viewer, name)
 
     def serving_now(self) -> Any:
         """What the default session is resolved by now (the current release's ``Serving``), or
@@ -206,6 +216,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         release: Any = None,
         pinned: bool = False,
         serving: Any = None,
+        generation: int | None = None,
     ) -> str | None:
         """The cache key of this operation for ``viewer`` now (``None``: not cacheable at this
         moment); every state the answer depends on is read before it is computed (ADR 0022).
@@ -215,8 +226,9 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             return response_key(0, viewer, document, variables, name, release=release.release_id)
         if self._releases is not None and name in RELEASE_SHARED_OPERATIONS:
             return None  # the fallback to the live path (no release to trust): never kept
-        generation = self._generation(viewer, name)
-        if generation is None:
+        if name in SHARED_OPERATIONS:
+            generation = 0  # holds no user state
+        if generation is None:  # a write of the caller's in flight (or unreadable): never kept
             return None
         # resolved once per publish / saved record; under a release, the release's session
         args = () if serving is None else (serving,)
@@ -262,7 +274,10 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         left alone. False when it was skipped or refused (a busy pool), None when it failed (never
         kept)."""
         release, pinned, serving = await self._follow(operation_name(op.document), op.document)
-        key = await self._key(op.viewer, op.document, op.variables, release, pinned, serving)
+        generation = self._stamped_generation(op.viewer, op.document, pinned)
+        key = await self._key(
+            op.viewer, op.document, op.variables, release, pinned, serving, generation
+        )
         if key is None:  # a write of the caller's is in flight: nothing to keep
             return False
         if only_missing and self._cache.get(key) is not None:
@@ -318,7 +333,24 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         return done
 
 
-async def _served(packed: bytes, request: Request) -> Response:
+GENERATION_HEADER, RELEASE_HEADER = "x-config-generation", "x-release-id"
+
+
+def _stamped(response: Response, generation: int | None, release: Any) -> Response:
+    """The version the answer was built from, for the web client's page cache (ADR 0077
+    decision 18): the caller's config generation as the key used it and the serving release's
+    id; a header is left off when there is none (a write in flight, a shared operation, the
+    live path)."""
+    if generation is not None:
+        response.headers[GENERATION_HEADER] = str(generation)
+    if release is not None:
+        response.headers[RELEASE_HEADER] = str(release.release_id)
+    return response
+
+
+async def _served(
+    packed: bytes, request: Request, generation: int | None = None, release: Any = None
+) -> Response:
     """A cached (gzip) body as the answer: as is, with ``Content-Encoding: gzip``, when the
     client accepts gzip (the ``GZipMiddleware`` leaves an encoded response alone, so nothing
     is compressed per hit); else inflated off the event loop (bounded: one pass over a body
@@ -326,9 +358,13 @@ async def _served(packed: bytes, request: Request) -> Response:
     headers = {"Vary": "Accept-Encoding"}
     if _accepts_gzip(request.headers.get("accept-encoding", "")):
         headers["Content-Encoding"] = "gzip"
-        return Response(packed, media_type="application/json", headers=headers)
+        return _stamped(
+            Response(packed, media_type="application/json", headers=headers), generation, release
+        )
     body = await asyncio.to_thread(gzip.decompress, packed)
-    return Response(body, media_type="application/json", headers=headers)
+    return _stamped(
+        Response(body, media_type="application/json", headers=headers), generation, release
+    )
 
 
 def _accepts_gzip(header: str) -> bool:

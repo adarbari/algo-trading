@@ -138,7 +138,7 @@ function ideasQuery() {
   const variables = { limit: IDEAS_LIMIT, names: [...IDEA_FEATURES] };
   return queryOptions({
     queryKey: queryKeys.gql(IDEAS_OPERATION, variables),
-    queryFn: () => gql(IdeasPage, variables),
+    queryFn: ({ queryKey }) => gql(IdeasPage, variables, queryKey),
   });
 }
 

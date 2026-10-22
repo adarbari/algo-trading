@@ -102,7 +102,7 @@ export function useChainCoverage() {
 function completenessQuery(sessions = SESSIONS) {
   return queryOptions({
     queryKey: queryKeys.gql('IngestionCompleteness', { sessions }),
-    queryFn: () => gql(IngestionCompleteness, { sessions }),
+    queryFn: ({ queryKey }) => gql(IngestionCompleteness, { sessions }, queryKey),
   });
 }
 
@@ -125,7 +125,7 @@ export function useCellDetail(cell: CellRef | null) {
   const variables = { dataset: cell?.dataset ?? '', date: cell?.session ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('IngestionCell', variables),
-    queryFn: () => gql(IngestionCell, variables),
+    queryFn: ({ queryKey }) => gql(IngestionCell, variables, queryKey),
     select: (data) => data.ingestionCell,
     enabled: cell !== null,
   });

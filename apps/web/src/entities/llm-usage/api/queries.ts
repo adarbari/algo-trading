@@ -194,7 +194,7 @@ const LlmUsageQuery = graphql(`
 function llmUsageQuery(recent = RECENT_CALLS) {
   return queryOptions({
     queryKey: queryKeys.gql('LlmUsage', { recent }),
-    queryFn: () => gql(LlmUsageQuery, { recent }),
+    queryFn: ({ queryKey }) => gql(LlmUsageQuery, { recent }, queryKey),
   });
 }
 

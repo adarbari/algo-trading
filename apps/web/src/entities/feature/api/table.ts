@@ -109,7 +109,7 @@ export function useFeatureTable(query: FeatureTableQuery, enabled = true) {
   const variables = tableVariables(query);
   return useQuery({
     queryKey: queryKeys.gql('FeatureTable', variables),
-    queryFn: () => gql(FeatureTable, variables),
+    queryFn: ({ queryKey }) => gql(FeatureTable, variables, queryKey),
     select,
     enabled,
     placeholderData: keepPreviousData,

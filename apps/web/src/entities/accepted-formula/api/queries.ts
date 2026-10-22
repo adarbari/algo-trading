@@ -33,7 +33,7 @@ const AcceptedFormulasQuery = graphql(`
 export function useAcceptedFormulas() {
   return useQuery({
     queryKey: queryKeys.gql('AcceptedFormulas', {}),
-    queryFn: () => gql(AcceptedFormulasQuery, {}),
+    queryFn: ({ queryKey }) => gql(AcceptedFormulasQuery, {}, queryKey),
     select: (data) => data.acceptedFormulas,
   });
 }

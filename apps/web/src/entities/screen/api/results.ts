@@ -198,7 +198,7 @@ export function useScreenerResults(id: string, query: ScreenResultsQuery, enable
   const variables = resultsVariables(id, query);
   return useQuery({
     queryKey: queryKeys.gql(SCREENER_RESULTS_OPERATION, variables),
-    queryFn: () => gql(ScreenerResults, variables),
+    queryFn: ({ queryKey }) => gql(ScreenerResults, variables, queryKey),
     placeholderData: keepPreviousData,
     enabled,
   });

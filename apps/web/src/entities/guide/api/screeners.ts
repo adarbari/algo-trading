@@ -13,9 +13,9 @@ const GUIDE_STALE_MS = 10 * 60_000;
 export function useGuideScreenerIndex() {
   return useQuery({
     queryKey: queryKeys.gql('GuideScreenerIndex', {}),
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       const { GuideScreenerIndexQuery } = await import('./screeners-doc');
-      return gql(GuideScreenerIndexQuery, {});
+      return gql(GuideScreenerIndexQuery, {}, queryKey);
     },
     select: (data) => data.guideScreenerIndex,
     staleTime: GUIDE_STALE_MS,
@@ -27,9 +27,9 @@ export function useGuideScreenerCategory(id: string) {
   const variables = { id };
   return useQuery({
     queryKey: queryKeys.gql('GuideScreenerCategory', variables),
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       const { GuideScreenerCategoryQuery } = await import('./screeners-doc');
-      return gql(GuideScreenerCategoryQuery, variables);
+      return gql(GuideScreenerCategoryQuery, variables, queryKey);
     },
     select: (data) => data.guideScreenerCategory,
     staleTime: GUIDE_STALE_MS,

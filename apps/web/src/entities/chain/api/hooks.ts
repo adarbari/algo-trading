@@ -59,7 +59,7 @@ export function useOptionChain(key: string | null) {
   const variables = { key: key ?? '', names: [...CHAIN_FEATURES] };
   return useQuery({
     queryKey: queryKeys.gql('OptionChain', variables),
-    queryFn: () => gql(OptionChain, variables),
+    queryFn: ({ queryKey }) => gql(OptionChain, variables, queryKey),
     select: (data: gqlTypes.OptionChainQuery) => data.instrument,
     enabled: Boolean(key),
   });
@@ -97,7 +97,7 @@ export function useOptionQuotes(key: string | null, expiry: string | null, sessi
   const variables = { key: key ?? '', expiry: expiry ?? '', date: session ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('OptionQuotes', variables),
-    queryFn: () => gql(OptionQuotes, variables),
+    queryFn: ({ queryKey }) => gql(OptionQuotes, variables, queryKey),
     select: (data: gqlTypes.OptionQuotesQuery) => data.instrument?.chain?.quotes ?? [],
     enabled: Boolean(key) && expiry !== null && session !== null,
     // Another expiry of the same underlying keeps the table on screen while it loads.

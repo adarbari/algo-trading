@@ -219,7 +219,7 @@ export function useEdgeProblems() {
 const edgesQuery = () =>
   queryOptions({
     queryKey: queryKeys.gql('EdgesPage', {}),
-    queryFn: () => gql(EdgesPage, {}),
+    queryFn: ({ queryKey }) => gql(EdgesPage, {}, queryKey),
   });
 
 /** Start reading the edges before the page opens (a link was hovered): a no-op while fresh. */

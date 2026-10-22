@@ -13,6 +13,7 @@ export {
   type AuthSession,
 } from './auth';
 export { active } from './active-client';
+export { installVersions } from './versions';
 export { api, ApiError, errorDetail, unwrap } from './client';
 export { feature, SITE_FEATURES, type SiteFeature } from './generated/catalogue';
 export { graphql, useFragment, type FragmentType } from './generated/graphql';

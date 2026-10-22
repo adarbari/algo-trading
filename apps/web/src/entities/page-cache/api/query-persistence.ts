@@ -14,7 +14,7 @@
 import { dehydrate, hashKey, hydrate, type Query, type QueryClient } from '@tanstack/react-query';
 import { createStore, del, get, set } from 'idb-keyval';
 
-import { queryKeys } from '@/shared/api';
+import { installVersions, queryKeys } from '@/shared/api';
 
 import { fitToCap, isPersistableKey, type StoredQuery } from '../model/persist-cap';
 import { fetchSessionDate } from './session-date';
@@ -121,6 +121,7 @@ export function startQueryPersistence(
   deps: PersistDeps = defaultDeps(),
 ): () => void {
   const { store, fetchSession, now } = deps;
+  installVersions(); // the generation / release headers of every answer (ADR 0077 decision 18)
   if (running?.client === client) return running.stop; // one per client, however many pages ask
   running?.stop();
   running = undefined;

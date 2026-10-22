@@ -48,7 +48,7 @@ function screenerHitsQuery(key: string) {
   const variables = { key };
   return queryOptions({
     queryKey: queryKeys.gql('InstrumentScreenerHits', variables),
-    queryFn: () => gql(InstrumentScreenerHits, variables),
+    queryFn: ({ queryKey }) => gql(InstrumentScreenerHits, variables, queryKey),
   });
 }
 

@@ -37,7 +37,7 @@ const Document = new TypedDocumentString<
 export function useEdgeCompare(id: string) {
   return useQuery({
     queryKey: queryKeys.gql('EdgesPage', { compare: id }),
-    queryFn: () => gql(Document, { id }),
+    queryFn: ({ queryKey }) => gql(Document, { id }, queryKey),
     select: (data) => data.edge?.compare ?? null,
   });
 }

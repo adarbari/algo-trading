@@ -144,7 +144,7 @@ export type TradesRequest = {
 export function useEdgeTrades(request: TradesRequest) {
   return useQuery({
     queryKey: queryKeys.gql('EdgeTrades', request),
-    queryFn: () => gql(EdgeTrades, request),
+    queryFn: ({ queryKey }) => gql(EdgeTrades, request, queryKey),
     select: (data) => data.edgeTrades,
     placeholderData: keepPreviousData,
   });

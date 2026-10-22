@@ -14,9 +14,9 @@ const GUIDE_STALE_MS = 10 * 60_000;
 export function useGuideEdgeIndex({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.gql('GuideEdgeIndex', {}),
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       const { GuideEdgeIndexQuery } = await import('./edges-doc');
-      return gql(GuideEdgeIndexQuery, {});
+      return gql(GuideEdgeIndexQuery, {}, queryKey);
     },
     select: (data) => data.guideEdgeIndex,
     enabled,
@@ -29,9 +29,9 @@ export function useGuideMechanism(id: string) {
   const variables = { id };
   return useQuery({
     queryKey: queryKeys.gql('GuideMechanism', variables),
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       const { GuideMechanismQuery } = await import('./edges-doc');
-      return gql(GuideMechanismQuery, variables);
+      return gql(GuideMechanismQuery, variables, queryKey);
     },
     select: (data) => data.guideMechanism,
     staleTime: GUIDE_STALE_MS,
@@ -44,9 +44,9 @@ export function useGuideEdge(id: string) {
   const variables = { id };
   return useQuery({
     queryKey: queryKeys.gql('GuideEdge', variables),
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       const { GuideEdgeQuery } = await import('./edges-doc');
-      return gql(GuideEdgeQuery, variables);
+      return gql(GuideEdgeQuery, variables, queryKey);
     },
     select: (data) => data.guideEdge,
     staleTime: GUIDE_STALE_MS,
@@ -58,9 +58,9 @@ export function useGuideEdge(id: string) {
 export function useGuideMechanisms() {
   return useQuery({
     queryKey: queryKeys.gql('GuideMechanisms', {}),
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       const { GuideMechanismsQuery } = await import('./edges-doc');
-      return gql(GuideMechanismsQuery, {});
+      return gql(GuideMechanismsQuery, {}, queryKey);
     },
     select: (data) => data.guideIndex?.mechanisms ?? [],
     staleTime: GUIDE_STALE_MS,
@@ -72,9 +72,9 @@ export function useGuideScreenerEdges(id: string) {
   const variables = { id };
   return useQuery({
     queryKey: queryKeys.gql('GuideScreenerEdges', variables),
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       const { GuideScreenerEdgesQuery } = await import('./edges-doc');
-      return gql(GuideScreenerEdgesQuery, variables);
+      return gql(GuideScreenerEdgesQuery, variables, queryKey);
     },
     select: (data) => data.guideScreener?.edges ?? [],
     staleTime: GUIDE_STALE_MS,

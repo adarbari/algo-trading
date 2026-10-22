@@ -78,7 +78,7 @@ export function useInstrumentFacts(key: string | null, names: readonly SiteFeatu
   const variables = { key: key ?? '', names: [...names] };
   return useQuery({
     queryKey: queryKeys.gql('InstrumentFacts', variables),
-    queryFn: () => gql(InstrumentFacts, variables),
+    queryFn: ({ queryKey }) => gql(InstrumentFacts, variables, queryKey),
     enabled: Boolean(key),
   });
 }

@@ -35,7 +35,7 @@ export function useEtfHoldings(key: string | null, top: number) {
   const variables = { key: key ?? '', top };
   return useQuery({
     queryKey: queryKeys.gql('EtfHoldings', variables),
-    queryFn: () => gql(EtfHoldings, variables),
+    queryFn: ({ queryKey }) => gql(EtfHoldings, variables, queryKey),
     select: (data: gqlTypes.EtfHoldingsQuery) => data.instrument,
     enabled: Boolean(key),
   });
