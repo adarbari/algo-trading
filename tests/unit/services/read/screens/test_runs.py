@@ -496,8 +496,9 @@ def test_the_common_path_probes_no_rule_screen(monkeypatch: pytest.MonkeyPatch) 
     backend = screens_store()
     freeze(backend)
     reader = StoreReader(backend)
+    ctx = context(reader)  # resolving the session probes tables; the loader is what is counted
     seen: list[str] = []
     real = reader.has_partition
     monkeypatch.setattr(reader, "has_partition", lambda t, *a: (seen.append(t), real(t, *a))[1])
-    load_latest_runs(context(reader), [("site", "alpha"), ("me", "beta")])
+    load_latest_runs(ctx, [("site", "alpha"), ("me", "beta")])
     assert RULE_SCREEN not in seen
