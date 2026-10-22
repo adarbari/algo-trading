@@ -196,4 +196,4 @@ purpose = "tests for the operator scripts in scripts/ops/ (deploy, check_lock, g
 
 [[test_dir]]
 path = "tests/scripts/perf"
-purpose = "tests for the manual API load test in scripts/perf/ (load.py: percentiles, page-mix parsing, report; api_latency.py: inventory, page totals, table; release_writer_run.py: guards, plan, verdicts)"
+purpose = "tests for the manual API load test in scripts/perf/ (load.py: percentiles, page-mix parsing, report; api_latency.py: inventory, page totals, table, uncached mode guards and calls per page; web_page_ops.py: route enumeration, static page-operation walk; release_writer_run.py: guards, plan, verdicts)"
