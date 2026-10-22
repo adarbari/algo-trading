@@ -319,7 +319,7 @@ def run_screener(
         lineage = replace(
             previous_lineage(reader, run_job_name(config.config.id, user), session_date),
             started_at=now,
-            finished_at=max(now, datetime.now(UTC)),
+            finished_at=max(now, clock()),
         )
     _write(writer, config, run, rules, stamp, lineage)
     complete = run.coverage is RunCoverage.COMPLETE
