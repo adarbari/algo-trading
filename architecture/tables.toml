@@ -596,7 +596,7 @@ note = "ScreenRun (ADR 0077 amendment (c)): one row per run of a rule screen, fr
 [[table]]
 name = "results/screen_picks"
 owner = "src/algotrade/storage/tables/result_writer.py"
-note = "ScreenPick (ADR 0077 amendment (c)): the picked and PAUSED rows of results/rule_screen (same columns, equal), one file per run, sorted by instrument_id, published with it by the same framer; holds no field value (those stay in results/rule_screen_values under their licence)"
+note = "ScreenPick (ADR 0077 amendment (c)): the picked and PAUSED rows of results/rule_screen (same columns, equal), one file per run, sorted by instrument_id, published with it by the same framer; holds no field value (those stay in results/rule_screen_values under their licence); read by the run_id taken from results/screen_runs (read_run), never as a group's newest file (a run with no picks writes none)"
 
 [[table]]
 name = "results/edge_eval"

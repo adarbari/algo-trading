@@ -196,16 +196,25 @@ class Lineage:
     finished_at: datetime | None = None
 
 
+def change_of(decision: str, was: str | None) -> str | None:
+    """``"new"`` (picked now, not before), ``"dropped"`` (picked before, not now) or None, for a
+    name's ``decision`` and its previous run's (None: not in it): the one rule of the frozen
+    counts and of the read model's per-name tags."""
+    now_picked, was_picked = is_picked(decision), was is not None and is_picked(was)
+    if now_picked and not was_picked:
+        return "new"
+    return "dropped" if was_picked and not now_picked else None
+
+
 def change_counts(decisions: Mapping[str, str], before: Mapping[str, str]) -> tuple[int, int]:
     """``(new, dropped)`` of a run's ``decisions`` (per instrument) against ``before`` (the
     previous run's): new = picked now and not before, dropped = picked before and not now,
     counted over the names of this run (the read model's per-name tags)."""
     new = dropped = 0
     for instrument, decision in decisions.items():
-        was = before.get(instrument)
-        now_picked, was_picked = is_picked(decision), was is not None and is_picked(was)
-        new += now_picked and not was_picked
-        dropped += was_picked and not now_picked
+        change = change_of(decision, before.get(instrument))
+        new += change == "new"
+        dropped += change == "dropped"
     return new, dropped
 
 

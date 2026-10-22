@@ -226,6 +226,8 @@ SCREEN_RUNS = fixed(
 # ``results/rule_screen`` whose decision is a pick or a regime-gate ``PAUSED`` (the same columns,
 # equal), one file per run, sorted by ``instrument_id``. No field value: those stay in
 # ``results/rule_screen_values`` under their licence, so this table adds no licence surface.
+# Not ``whole_per_group``: a run with no picks writes no file, so the newest file of a group can
+# be an older run's. Read it by the ``run_id`` taken from ``results/screen_runs`` (``read_run``).
 SCREEN_PICKS = fixed(
     "results/screen_picks",
     "results",
@@ -241,5 +243,4 @@ SCREEN_PICKS = fixed(
     "size_multiplier float64",
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
-    whole_per_group=True,
 )

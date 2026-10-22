@@ -183,3 +183,21 @@ def test_a_failed_object_frame_publishes_none_of_the_three(
         run_screener(reader, writer, config(), DAY, now=T0, held=HARNESS_ALL)
     for name in ("rule_screen", "rule_screen_values", "screen_runs", "screen_picks"):
         assert reader.table(f"results/{name}", DAY) is None, name
+
+
+def test_a_rerun_with_no_picks_shows_no_picks() -> None:
+    """Fix for: ``screen_picks`` as whole_per_group let a rerun that picked nothing (no file
+    written) read as the previous run's picks. Its run is read by the id from screen_runs."""
+    reader, writer = seeded()
+    run_screener(reader, writer, config(), DAY, now=T0, held=HARNESS_ALL)
+    rows = [
+        {"instrument_id": f"EQ:{n}", "underlying_price": 10.0, "chain_oi": 1, "put_tier": "C"}
+        for n in ("AAA", "BBB", "ETF1")
+    ]
+    later = T0 + timedelta(hours=1)
+    writer.write_table(FEATURES, DAY, "f2", stamped(rows, DAY, "f2", later))
+    second = run_screener(reader, writer, config(), DAY, now=later, held=HARNESS_ALL)
+    runs = table(reader, "screen_runs").sort_values("knowledge_ts")
+    assert list(runs["picked"]) == [2, 0]
+    picks = reader.read_run("results/screen_picks", DAY, second.run_id)
+    assert picks is None or picks.empty
