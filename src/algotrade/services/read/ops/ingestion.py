@@ -5,7 +5,7 @@ that wrote it).
 
 An inventory of what is stored, not a fact for a session: it reads partitions on the sessions
 of the window it names through the context's inventory reads (``stored_dates``,
-``partition_on``, ``snapshot_on``). Expected rows, per kind of dataset:
+``partition_stats_on``, ``snapshot_on``). Expected rows, per kind of dataset:
 
 - ``session`` (bars, rollups): the rows of the dataset's previous stored session (a drop is the
   signal, as the quality checks use it); COMPLETE at 98% or more, PARTIAL below, MISSING
@@ -35,7 +35,7 @@ from algotrade.services.read.context import (
     ReadContext,
     Stores,
     partition,
-    partition_on,
+    partition_stats_on,
     snapshot_on,
     stored_dates,
     stored_dates_in,
@@ -150,13 +150,10 @@ class _Counts:
     def of(self, table: str, day: date) -> tuple[int, tuple[str, ...], tuple[str, ...]]:
         """-> (rows, run ids, statuses when the table has a ``status`` column)."""
         if (table, day) not in self._seen:
-            frame = partition_on(self.ctx, table, day)
-            if frame is None:
-                self._seen[(table, day)] = (0, (), ())
-            else:
-                runs = tuple(sorted(map(str, frame["run_id"].unique())))
-                statuses = tuple(map(str, frame["status"])) if "status" in frame else ()
-                self._seen[(table, day)] = (len(frame), runs, statuses)
+            found = partition_stats_on(self.ctx, table, day, "status")
+            self._seen[(table, day)] = (
+                (0, (), ()) if found is None else (found.rows, found.run_ids, found.values)
+            )
         return self._seen[(table, day)]
 
 

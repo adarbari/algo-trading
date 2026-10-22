@@ -7,7 +7,13 @@ from typing import Any
 
 import pytest
 
-from algotrade.services.read.context import ReadContext, ResultCache, open_context, snapshot_on
+from algotrade.services.read.context import (
+    ReadContext,
+    ResultCache,
+    open_context,
+    partition_on,
+    snapshot_on,
+)
 from algotrade.services.read.ops import ingestion
 from algotrade.services.read.ops.ingestion import (
     Cell,
@@ -111,13 +117,13 @@ def test_the_grid_is_kept_until_the_next_publish(
     # the status strip of every page asks for a one-session grid: 430 partitions read a page
     ctx = _ctx(api_golden)
     read: list[str] = []
-    real = ingestion.partition_on
+    real = ingestion.partition_stats_on
 
-    def counting(c: Any, table: str, day: date) -> Any:
+    def counting(c: Any, table: str, day: date, column: str | None = None) -> Any:
         read.append(table)
-        return real(c, table, day)
+        return real(c, table, day, column)
 
-    monkeypatch.setattr(ingestion, "partition_on", counting)
+    monkeypatch.setattr(ingestion, "partition_stats_on", counting)
     first = load_completeness(ctx, 2, NOW)
     once = len(read)
     assert once > 0
@@ -215,3 +221,38 @@ def test_a_snapshot_from_the_window_agrees_with_the_rule() -> None:
     for day in (*GRID, date(2026, 10, 20)):
         for table in (DENSE, SPARSE, EMPTY):
             assert counts.carried(table, day) == snapshot_on(ctx, table, day)
+
+
+# ---- counted from metadata: the same cells as reading every partition in full --------------------
+def _read_in_full(self: Any, table: str, day: date) -> Any:
+    """``_Counts.of`` as it was: the whole partition decoded to count its rows."""
+    frame = partition_on(self.ctx, table, day)
+    if frame is None:
+        return (0, (), ())
+    runs = tuple(sorted(map(str, frame["run_id"].unique())))
+    return (len(frame), runs, tuple(map(str, frame["status"])) if "status" in frame else ())
+
+
+def test_counting_from_metadata_gives_the_cells_of_reading_every_partition(
+    api_golden: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fast = load_completeness(_ctx(api_golden), 3, NOW).cells
+    monkeypatch.setattr(ingestion._Counts, "of", _read_in_full)
+    slow = load_completeness(_ctx(api_golden), 3, NOW).cells
+    assert fast == slow and any(c.run_ids for c in fast)
+
+
+def test_no_count_cell_decodes_a_whole_partition(
+    api_golden: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _ctx(api_golden)
+    decoded: list[str] = []
+    real = type(ctx.reader).table
+
+    def counting(self: Any, table: str, *args: Any, **kw: Any) -> Any:
+        decoded.append(table)
+        return real(self, table, *args, **kw)
+
+    monkeypatch.setattr(type(ctx.reader), "table", counting)
+    load_completeness(ctx, 3, NOW)
+    assert not [t for t in decoded if t != "universe"]  # the universe snapshot sizes the chains
