@@ -3,10 +3,13 @@ partition stored the row, among the rows known on or before the session (``known
 0050), in an explicit window, sorted, stamps dropped; one read for many."""
 
 from datetime import date, timedelta
+from typing import Any
 
 import pandas as pd
+import pytest
 
 from algotrade.services.read.events.stored import event_tables, load_events
+from algotrade.storage.backends.memory import MemoryTables
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_dividends, write_split
 from tests.helpers.stored_frames import T0, stamped
@@ -98,3 +101,63 @@ def test_no_event_tables_is_no_events() -> None:
     empty = context(store_with())
     assert event_tables(empty) == ()
     assert load_events(empty, ["EQ:AAA"], None, None) == {"EQ:AAA": ()}
+
+
+def _with_filing_text(writer: StoreWriter) -> None:
+    _events(writer)
+    row = {
+        "instrument_id": None,
+        "ts": pd.Timestamp(D0, tz="UTC"),
+        "cik": "1",
+        "form": "10-K",
+        "accession": "a-1",
+        "filing_date": D0,
+        "char_count": 10,
+        "item": "1A",
+        "quality": "OK",
+        "method": "parse",
+        "parser_version": 1,
+        "text": "x" * 10,
+    }
+    run = "ft"
+    writer.write_table("events/filing_text", D0, run, stamped([{**row, "known_from": D0}], D0, run))
+
+
+def _spy_reads(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    reads: list[str] = []
+    real = MemoryTables.read_range
+
+    def spy(self: MemoryTables, table: str, *args: Any, **kwargs: Any) -> Any:
+        reads.append(table)
+        return real(self, table, *args, **kwargs)
+
+    monkeypatch.setattr(MemoryTables, "read_range", spy)
+    return reads
+
+
+def test_filing_text_partitions_are_never_opened_for_an_instrument_events_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = context(store_with(_with_filing_text))
+    reads = _spy_reads(monkeypatch)
+    found = load_events(ctx, ["EQ:AAA"], None, None)["EQ:AAA"]
+    assert "events/filing_text" not in reads and "events/split" in reads
+    assert "events/filing_text" not in event_tables(ctx)
+    # equivalence: the same events as a store with no filing_text partition
+    plain = load_events(context(store_with(_events)), ["EQ:AAA"], None, None)["EQ:AAA"]
+    assert found == plain
+
+
+def test_a_repeated_events_read_reads_nothing_and_a_new_instrument_reads_only_itself(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = context(store_with(_events))
+    first = load_events(ctx, ["EQ:AAA"], None, None)
+    reads = _spy_reads(monkeypatch)
+    assert load_events(ctx, ["EQ:AAA"], None, None) == first
+    assert reads == []  # held
+    both = load_events(ctx, ["EQ:AAA", "EQ:ETFX"], None, None)
+    assert both["EQ:AAA"] == first["EQ:AAA"] and len(both["EQ:ETFX"]) == 1
+    assert reads and reads.count("events/split") == 1  # one read for the instrument not held
+    other_window = load_events(ctx, ["EQ:AAA"], date(2026, 1, 1), None)["EQ:AAA"]
+    assert [e.kind for e in other_window] == ["dividend"]  # the window is part of the key
