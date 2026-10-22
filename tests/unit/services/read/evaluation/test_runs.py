@@ -486,6 +486,7 @@ def test_a_page_of_edges_decodes_each_edges_records_once_however_many_fields_ask
             load_edge_verdict(ctx, edge)
             load_edge_runs(ctx, edge)
     assert len(seen) == len(set(seen)) <= 2 * len(edges)  # O(edges), not O(edges x resolvers)
+    assert len(ctx.cache._items) <= 2  # the shared cache is not flooded by a page of edges
 
 
 def test_the_cached_runs_and_verdicts_equal_the_uncached_ones(

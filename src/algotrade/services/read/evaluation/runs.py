@@ -242,13 +242,14 @@ def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
     """The committed runs of ``owner``, newest first; the site's include the records of
     ``LEGACY_SITE_OWNERS`` (built as the site's, the old owner disclosed).
 
-    Kept in ``ctx.cache`` per run-record generation (read before the records, so a saved record
-    is never answered from an older entry) with every input ``_run`` reads of the edge and the
-    session; a reader whose records are a snapshot is not cached. A page asks this per edge per
+    Kept in the request's ``ctx.memo`` (not the shared cache: an entry per edge per owner would
+    evict other pages' frames) under the run-record generation (read before the records) and
+    every input ``_run`` reads of the edge and the session; a reader whose records are a
+    snapshot, or a context without a memo, is not memoised. A page asks this per edge per
     field (4,210 reads of a page of 81 edges), each decoding every record."""
-    if ctx.reader.runs_frozen():
+    if ctx.reader.runs_frozen() or not isinstance(ctx, ReadContext):
         return _read_committed(ctx, edge, owner)
-    session = ctx.session.date if isinstance(ctx, ReadContext) else None
+    session = ctx.session.date
     key = (
         "edge-committed",
         edge.id,
@@ -259,7 +260,9 @@ def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
         session,
         ctx.reader.runs_generation(),
     )
-    return list(ctx.cache.get_or_compute(key, lambda: tuple(_read_committed(ctx, edge, owner))))
+    if key not in ctx.memo:
+        ctx.memo[key] = tuple(_read_committed(ctx, edge, owner))
+    return list(ctx.memo[key])
 
 
 def _read_committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
