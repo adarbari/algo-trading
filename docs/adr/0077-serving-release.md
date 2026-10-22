@@ -84,12 +84,12 @@ requests use. The owner accepts data up to a day stale and wants fast loads alwa
    `StatusStrip` and `SessionDate` key on it, and `served_token` leaves every other key.
 8. **What does not come from the release** (*correction*: `visible_seq` leaves every
    default-session page key, not every key): user expression features (evaluated over the
-   release's feature frame), the user's on-request screen runs (ADR 0033, composed with the
-   release's preset picks; keyed by user and runs generation), admin ops pages (live; a lane capped at a thread count the plan sets), live quotes and usage logs, Builder previews (pinned per 3), and an explicit
+   pinned feature store), the user's on-request screen runs (ADR 0033, composed with the
+   pinned `results/screen_picks`; keyed by user and runs generation), admin ops pages (live; a lane capped at a thread count the plan sets), live quotes and usage logs, Builder previews (pinned per 3), and an explicit
    date other than the release's (ADR 0036). These keep their keys. (*Amended by 14*: the
    list of live keys is inverted into an allow-list of release-shared operations; a live key is
    never listed.)
-9. **Roles and licences.** The release stores every name with its licence and the full `Cause`
+9. **Roles and licences.** The pinned reads carry every name with its licence and the full `Cause`
    chain; the API filters by the viewer's licences (0069) and redacts causes for non-admins
    (0056). Nothing is pre-rendered per role; a missing value is null with its kind and reason.
 10. **Cache keys:** `(release_id, operation, variables, role, user if not shared, licences)`.
