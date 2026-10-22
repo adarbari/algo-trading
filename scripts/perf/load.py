@@ -559,6 +559,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--publish-every", type=float, default=5.0, help="writer mode: seconds")
     p.add_argument("--writer-cmd", help="writer mode: a command to run during the measurement")
+    p.add_argument("--out", type=Path, default=OUT_DIR, help="directory for the JSON report")
     args = p.parse_args(argv)
     port = int(args.url.rsplit(":", 1)[-1].split("/")[0])
     pid = args.pid or pid_on_port(port)
@@ -568,11 +569,11 @@ def main(argv: list[str] | None = None) -> int:
         report = asyncio.run(run(args, pid))
     if args.writer_store or args.writer_cmd:
         report["writer"] = writer
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUT_DIR / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
+    args.out.mkdir(parents=True, exist_ok=True)
+    out = args.out / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     out.write_text(json.dumps(report, indent=2))
     print(render_table(report))
-    print(f"\nwritten {out.relative_to(REPO)}")
+    print(f"\nwritten {out.relative_to(REPO) if out.is_relative_to(REPO) else out}")
     return 0
 
 
