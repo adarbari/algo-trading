@@ -473,6 +473,7 @@ follow-up PR).
 ## 2026-10-22 | Domain-aligned derived data (data architecture v2) | Business objects in existing homes; two new results tables; the release only pins
 - Question: how is read-optimised derived data stored: page-shaped release tables, or business objects?
 - Decision: business objects in their existing homes, no new table class and no copies in the release (design `domain-derived-data.md`, shared notes). New: `results/screen_runs` (ScreenRun) and `results/screen_picks` (ScreenPick), written by the screen's own writer in the same atomic publish as `rule_screen` (ADR 0022); `market.macro_asof@v1` only if profiling blames the regime provenance read; edge evaluations read by run from `results/edge_eval`; the regime-signals table, `results/edge_runs` and the run ledger are deferred by profile. Sub-decisions: (1) ADR 0077 decisions 1 and 23 are amended (no page-shaped release tables; the release pins); (2) ADR 0077 decision 16 stays (run operations not release-shared); (3) Ideas starts at 50 picks, "more" loads 50 (above); (4) pick history stays 20 sessions; (5) accepted over-1-s exceptions until their named fix, each re-measured after it: ScreenerResults, RegimeSignals, MarketHistory, InstrumentEvents, HarnessRuns (admin), InstrumentFacts.
-- decided by: owner ("The domain tables look good. Let us go with them")
-- status: final; the run ledger is built when the re-measure or a trigger says so (lookup over 100 ms warm, about 100,000 run files, admin page over 1 s)
+- decided by: owner
+- status: final
+- Note: the run ledger is built when the re-measure or a trigger says so (lookup over 100 ms warm, about 100,000 run files, admin page over 1 s).
 - Reasoning: one way to make reads fast, no second implementation of any loader, and the stored objects serve the edge harness, paper record and ML as well as the pages.
