@@ -54,9 +54,16 @@ from algotrade.services.read.ops import (
 )
 from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
+from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
 from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext
-from algotrade_api.graphql.limits import MAX_DAYS, MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.limits import (
+    MAX_DAYS,
+    MAX_IDEAS_PAGE,
+    MAX_NAMES,
+    MAX_PAGE,
+    MaxItems,
+)
 from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
@@ -214,14 +221,17 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The tickers the user's screeners picked in the session, ranked by their "
-        "screener priority then score (the first `limit`); a screener with no run for the "
-        "session is listed NOT_RUN. Null: nothing stored",
-        extensions=[MaxItems("limit", MAX_PAGE)],
+        "screener priority then score (`first` of them from the `after` cursor, `nextCursor` "
+        "the next page's); a screener with no run for the session is listed NOT_RUN. Null: "
+        "nothing stored",
+        extensions=[MaxItems("first", MAX_IDEAS_PAGE)],
     )
-    async def ideas(self, info: Ctx, limit: int = 50, date: Day = None) -> Ideas | None:
+    async def ideas(
+        self, info: Ctx, first: int = IDEAS_FIRST_PAGE, after: str | None = None, date: Day = None
+    ) -> Ideas | None:
         ctx = await info.context.aread(date)
         # Off the event loop (a whole-run read); the items' `features` loads still batch.
-        found = await off_loop(ideas.load_ideas, ctx, limit) if ctx is not None else None
+        found = await off_loop(ideas.load_ideas, ctx, first, after) if ctx is not None else None
         return Ideas.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]

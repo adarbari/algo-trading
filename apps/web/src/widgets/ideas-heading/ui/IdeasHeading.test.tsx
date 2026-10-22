@@ -18,6 +18,7 @@ describe('IdeasHeading', () => {
     const data: IdeasData = {
       session: '2026-10-02',
       total: 0,
+      hasMore: false,
       ideas: [],
       pausedTotal: 0,
       paused: [],

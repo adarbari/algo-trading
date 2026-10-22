@@ -22,14 +22,14 @@ records of the last six sessions), so a gap the acceptance check tolerates is st
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import last_closed_session, sessions_ending
 from algotrade.data.chains import CHAIN_STATUS, OPTION_QUOTES
-from algotrade.data.reference import UNIVERSE_TABLE, load_universe
+from algotrade.data.reference import UNIVERSE_TABLE, Snapshot, load_universe
 from algotrade.features.registry import GROUPS
 from algotrade.services.read.context import (
     ReadContext,
@@ -38,6 +38,7 @@ from algotrade.services.read.context import (
     partition_on,
     snapshot_on,
     stored_dates,
+    stored_dates_in,
 )
 from algotrade.services.read.ops.runs import FailureGroup, RunDetail, failure_groups, run_detail
 from algotrade.services.read.values import Unknown
@@ -51,6 +52,7 @@ from algotrade.services.run_items import (
 
 COMPLETE_SHARE = 0.98
 MAX_SESSIONS = 60
+LOOKBACK_DAYS = 31  # how far before a window a cell looks for the session it compares with
 
 
 @dataclass(frozen=True)
@@ -97,19 +99,53 @@ class Completeness:
 
 class _Counts:
     """Row counts and run ids per (table, date), each partition read once, and each table's
-    stored dates listed once (listing walks every partition directory of the table: the grid
-    asks it for every cell)."""
+    stored dates over the grid's window probed once (``LOOKBACK_DAYS`` before its first session
+    to its last: a probe per day, where listing the table walks every partition directory)."""
 
-    def __init__(self, ctx: Stores) -> None:
+    def __init__(self, ctx: Stores, days: Sequence[date] = ()) -> None:
         self.ctx = ctx
+        self.days = tuple(days)
         self._seen: dict[tuple[str, date], tuple[int, tuple[str, ...], tuple[str, ...]]] = {}
+        self._window: dict[str, tuple[date, ...]] = {}
         self._stored: dict[str, tuple[date, ...]] = {}
 
+    def window(self, table: str) -> tuple[date, ...]:
+        """The dates ``table`` stores from ``LOOKBACK_DAYS`` before the first session on."""
+        if table not in self._window:
+            first, last = min(self.days), max(self.days)
+            self._window[table] = stored_dates_in(
+                self.ctx, table, first - timedelta(days=LOOKBACK_DAYS), last
+            )
+        return self._window[table]
+
     def stored(self, table: str) -> tuple[date, ...]:
-        """``stored_dates`` of ``table``, listed once for this grid."""
+        """``stored_dates`` of ``table``, listed once for this grid: only a cell with no earlier
+        day in the lookback needs it."""
         if table not in self._stored:
             self._stored[table] = stored_dates(self.ctx, table)
         return self._stored[table]
+
+    def carried(self, table: str, day: date) -> Snapshot | None:
+        """``snapshot_on``'s answer: the latest partition on or before ``day`` from the window
+        when it holds one, else the rule over the whole table."""
+        if self.days and min(self.days) <= day <= max(self.days):
+            found = [s for s in self.window(table) if s <= day]
+            if found:
+                return Snapshot(table, found[-1], day)
+        return snapshot_on(self.ctx, table, day)
+
+    def around(self, table: str, day: date) -> tuple[bool, date | None]:
+        """-> (``day`` is stored, the last stored day before ``day``), as the listing says."""
+        if not self.days or not min(self.days) <= day <= max(self.days):
+            window: tuple[date, ...] = ()
+        else:
+            window = self.window(table)
+        earlier = [s for s in window if s < day]
+        if earlier:
+            return day in window, earlier[-1]
+        stored = self.stored(table)  # nothing in the lookback: the whole table decides
+        before = [s for s in stored if s < day]
+        return day in stored, before[-1] if before else None
 
     def of(self, table: str, day: date) -> tuple[int, tuple[str, ...], tuple[str, ...]]:
         """-> (rows, run ids, statuses when the table has a ``status`` column)."""
@@ -133,11 +169,10 @@ def _share_status(present: int, expected: int | None) -> str:
 
 
 def _session_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
-    stored = counts.stored(d.name)
-    earlier = [s for s in stored if s < day]
-    expected = counts.of(d.name, earlier[-1])[0] if earlier else None
-    basis = f"rows on {earlier[-1]}" if earlier else "no earlier session"
-    present, runs, _ = counts.of(d.name, day) if day in stored else (0, (), ())
+    is_stored, previous = counts.around(d.name, day)
+    expected = counts.of(d.name, previous)[0] if previous else None
+    basis = f"rows on {previous}" if previous else "no earlier session"
+    present, runs, _ = counts.of(d.name, day) if is_stored else (0, (), ())
     return Cell(d.name, day, _share_status(present, expected), present, expected, basis, runs)
 
 
@@ -154,7 +189,7 @@ def _chains_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
 
 
 def _snapshot_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
-    snap = snapshot_on(counts.ctx, d.name, day)
+    snap = counts.carried(d.name, day)
     if snap is None or snap.pre_snapshot:
         return Cell(d.name, day, "MISSING", 0, None, "no snapshot on or before")
     present, runs, _ = counts.of(d.name, snap.snapshot_date)
@@ -212,7 +247,7 @@ def load_completeness(
 
 
 def _cells(ctx: ReadContext, days: Sequence[date]) -> tuple[Cell, ...]:
-    counts = _Counts(ctx)
+    counts = _Counts(ctx, days)
     return tuple(_cell(counts, d, day) for d in DATASETS for day in days)
 
 
@@ -235,7 +270,7 @@ def load_cell_detail(ctx: ReadContext, dataset: str) -> CellDetail | None:
     if d is None:
         return None
     day = ctx.session.date
-    cell = _cell(_Counts(ctx), d, day)
+    cell = _cell(_Counts(ctx, (day,)), d, day)
     run_ids = [*cell.run_ids, *(r.run_id for r in ctx.reader.runs(d.job, day))]
     records = [r for r in (ctx.reader.run(i) for i in dict.fromkeys(run_ids)) if r is not None]
     items: dict[str, str] = {}

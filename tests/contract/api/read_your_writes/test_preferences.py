@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from tests.contract.api.read_your_writes.conftest import Gate
 
-IDEAS = "query IdeasPage($limit: Int!) { ideas(limit: $limit) { priority } }"
+IDEAS = "query IdeasPage($first: Int!) { ideas(first: $first) { priority } }"
 VIEW = """query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) { scope saved columns sort decisions names }
 }"""
@@ -17,12 +17,12 @@ BODY = {"columns": [CLOSE], "sort": f"-{CLOSE}", "decisions": ["QUALIFIED"]}
 
 def test_ideas_priority_shows_the_saved_order(gate: Gate, writer_client: TestClient) -> None:
     c = writer_client
-    assert gate.warm(c, IDEAS, limit=5)["priority"] == []
+    assert gate.warm(c, IDEAS, first=5)["priority"] == []
     assert c.put("/preferences/ideas", json={"priority": ["vrp"]}).status_code == 200
-    assert gate.fresh(c, IDEAS, limit=5)["priority"] == ["vrp"]
-    gate.warm(c, IDEAS, limit=5)
+    assert gate.fresh(c, IDEAS, first=5)["priority"] == ["vrp"]
+    gate.warm(c, IDEAS, first=5)
     assert c.put("/preferences/ideas", json={"priority": []}).status_code == 200
-    assert gate.fresh(c, IDEAS, limit=5)["priority"] == []
+    assert gate.fresh(c, IDEAS, first=5)["priority"] == []
 
 
 def test_view_put_shows_the_saved_view(

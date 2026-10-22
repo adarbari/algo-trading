@@ -98,6 +98,8 @@ const response: IdeasResponse = {
     session: '2026-10-02',
     priority: ['vrp', 'liq'],
     total: 4,
+    hasMore: false,
+    nextCursor: null,
     pausedTotal: 0,
     paused: [],
     screeners: [screener('vrp', 'VRP scanner'), screener('liq', 'Liquidity')],
@@ -309,6 +311,34 @@ describe('TopIdeas', () => {
     expect(
       within(within(grid()).getByRole('row', { name: /AAPL/ })).getByText('50%'),
     ).toBeVisible();
+  });
+
+  it('offers the next page under the table when the server has more, and not otherwise', async () => {
+    const fetchNextPage = vi.fn(() => Promise.resolve());
+    hooks.useIdeas.mockReturnValue({
+      ...fakeQuery<IdeasData>({ ...data, total: 312, hasMore: true }),
+      fetchNextPage,
+    });
+    const more = setup();
+    expect(screen.getByRole('status')).toHaveTextContent(`Showing ${data.ideas.length} of 312`);
+    await userEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    more.unmount();
+    hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(data));
+    setup();
+    expect(screen.queryByRole('button', { name: /Show .* more/ })).toBeNull();
+  });
+
+  it('keeps "Show more" while the server has more, even when a filter hides every loaded row', async () => {
+    const fetchNextPage = vi.fn(() => Promise.resolve());
+    hooks.useIdeas.mockReturnValue({
+      ...fakeQuery<IdeasData>({ ...data, total: 312, hasMore: true }),
+      fetchNextPage,
+    });
+    setup({ screener: 'no-such-screener' });
+    expect(screen.getByText(/No idea matches/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
   it('shows the watch-outs as chips', () => {

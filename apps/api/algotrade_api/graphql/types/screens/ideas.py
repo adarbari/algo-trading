@@ -82,8 +82,10 @@ class PausedIdea:
 
 @strawberry.type(
     description="The ideas for the session: `screeners` in the user's priority order (then the "
-    "rest by id), `items` the first `limit` of `total` picked tickers, `paused` the first `limit` "
-    "of `pausedTotal` picks the regime gate held back (never counted in `total`)"
+    "rest by id), `items` one page of the `total` picked tickers (`nextCursor`, for the `after` "
+    "argument, starts the next; null on the last page, `hasMore` false), `paused` the first "
+    "`first` of `pausedTotal` picks the regime gate held back on the first page only (never "
+    "counted in `total`)"
 )
 class Ideas:
     session: dt.date
@@ -93,6 +95,13 @@ class Ideas:
     items: list[Idea]
     paused_total: int
     paused: list[PausedIdea]
+    next_cursor: str | None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Whether another page follows this one"
+    )
+    def has_more(self) -> bool:
+        return self.next_cursor is not None
 
     @classmethod
     def of(cls, d: ideas.Ideas, ctx: ReadContext) -> Self:
@@ -104,4 +113,5 @@ class Ideas:
             items=[Idea.of(i, ctx) for i in d.items],
             paused_total=d.paused_total,
             paused=[PausedIdea.of(p, ctx) for p in d.paused],
+            next_cursor=d.next_cursor,
         )

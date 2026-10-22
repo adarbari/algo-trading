@@ -49,7 +49,7 @@ GAPS_QUERY = f"""query($date: Date, $names: [FeatureName!]!, $dist: FeatureName!
   regime(date: $date) {{ unknownReason {{ {UNKNOWN} }} }}
   distribution(name: $dist, date: $date) {{ unknown {{ {UNKNOWN} }} }}
   table(columns: $names, date: $date) {{ kindTexts {{ kind text }} session {{ {GAPS} }} {GAPS} }}
-  ideas(limit: 3, date: $date) {{
+  ideas(first: 3, date: $date) {{
     screeners {{
       notRun {{ {UNKNOWN} }}
       run {{ audit {GAPS} }}

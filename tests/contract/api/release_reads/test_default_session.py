@@ -78,7 +78,7 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 def days(w: World) -> dict[str, Any]:
     """The default session each kind of operation shows."""
-    ideas = w.post(IDEAS, {"limit": 3, "names": []}).json()["data"]["ideas"]["session"]
+    ideas = w.post(IDEAS, {"first": 3, "names": []}).json()["data"]["ideas"]["session"]
     strip = w.post(STRIP, {"admin": False}).json()["data"]["session"]
     plain = w.post(DATE, {}).json()["data"]["session"]["date"]
     prices = w.post(PRICES, PRICES_VARIABLES).json()["data"]["instrument"]["prices"]

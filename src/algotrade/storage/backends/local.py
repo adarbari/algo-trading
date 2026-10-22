@@ -134,7 +134,9 @@ class LocalTables:
     def __init__(self, root: Path) -> None:
         self.root = root / "tables"
         self.commits = Commits(self.root)
-        self.history = HistoryCopy(self.root, self.commits.published, self.commits.no_commits)
+        self.history = HistoryCopy(
+            self.root, self.commits.published, self.commits.no_commits, self.commits.epoch
+        )
         self.swap_grace_s = SWAP_GRACE_S  # tests shorten it
         self._dates_memo: OrderedDict[tuple[str, int, int], frozenset[date]] = OrderedDict()
         self._dates_lock = threading.Lock()
@@ -161,7 +163,6 @@ class LocalTables:
                 atomic_write(directory / file, data)
             return
         self.commits.bump_epoch()  # no sequence: every pin sees it, so no release is trusted
-        born = not (directory / INDEX).exists()
         # a rewrite of a run already indexed goes to a new file name, recorded in the entry: the
         # index then differs byte for byte (the history copy signs its content), and a reader of
         # the old entry never meets half-replaced rows
@@ -174,8 +175,9 @@ class LocalTables:
             if known is not None:
                 index[run_id] = RunEntry(pd.Timestamp(known), restates, ref=ref)
             write_index(directory, index)
-        if born:  # a listing taken since the bump above lacks it and moves no sequence: re-key
-            self.commits.bump_epoch()
+        # a listing or history verdict taken since the bump above saw the old index (or lacks a
+        # new partition) and moves no sequence: re-key after every direct write
+        self.commits.bump_epoch()
         drop_unreferenced(directory, run_id)
 
     def commit_run(self, run_id: str, at: datetime) -> int:

@@ -18,6 +18,7 @@ MAX_ALIASES = 10
 MAX_TOKENS = 5000
 MAX_NAMES = 60  # features(names)
 MAX_PAGE = 1000  # first / size
+MAX_IDEAS_PAGE = 100  # ideas(first): the Ideas page loads 50 and a "more" adds 50
 MAX_DAYS = 366  # eventStudy(days), eventCalendar(days): calendar days ahead
 MAX_MONTHS = 120  # eventStudy(months): months of filings
 

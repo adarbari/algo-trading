@@ -179,3 +179,60 @@ def write_gated(backend: MemoryBackend) -> None:
     ]  # fmt: skip
     knowledge = T + timedelta(hours=2)
     StoreWriter(backend).write_result("rule_screen", D1, "r2", stamped(frame, D1, "r2", knowledge))
+
+
+def write_picks(
+    backend: MemoryBackend,
+    day: date,
+    run_id: str,
+    rows: list[dict[str, object]],
+    knowledge: datetime,
+) -> None:
+    """The run's ``results/screen_picks`` file, framed from its ``rule_screen`` ``rows`` as the
+    screen task writes it: the picked and PAUSED rows, ordered by instrument."""
+    kept = [r for r in rows if r["decision"] not in ("REJECT", "SKIPPED", "UNKNOWN", "EXCLUDED")]
+    columns = ["instrument_id", "user_id", "config_id", "config_version", "decision", "score",
+               "rank", "regime", "size_multiplier"]  # fmt: skip
+    frame = [{c: r.get(c) for c in columns} for r in sorted(kept, key=lambda r: r["instrument_id"])]  # type: ignore[arg-type,return-value]
+    StoreWriter(backend).write_result(
+        "screen_picks", day, run_id, stamped(frame, day, run_id, knowledge)
+    )
+
+
+def write_big_run(
+    backend: MemoryBackend, picks: int, frozen: bool, run_id: str = "big", criteria: int = 0
+) -> None:
+    """A later ``alpha`` run (``run_id``, supersedes ``r1``) of ``picks`` QUALIFIED tickers
+    ``S000``.. in rank order, scores falling by one per three (ties broken by rank), then a
+    REJECT; ``criteria`` stored values and a display column per pick. ``frozen``: its
+    ``screen_picks`` file is written too."""
+    rows = [
+        {"instrument_id": f"EQ:S{n:03d}", "user_id": "site", "config_id": "alpha",
+         "config_version": 1, "config_hash": "h", "decision": "QUALIFIED", "score": 500.0 - n // 3,
+         "rank": n + 1, "tie_break": float(-n), "flags": "", "reasons": f"S{n:03d} passes alpha",
+         "failed": "", "near_missed": "", "missing": ""}
+        for n in range(picks)
+    ]  # fmt: skip
+    rows.append(
+        {"instrument_id": "EQ:REJ", "user_id": "site", "config_id": "alpha", "config_version": 1,
+         "config_hash": "h", "decision": "REJECT", "score": 0.0, "rank": picks + 1,
+         "tie_break": None, "flags": "", "reasons": "", "failed": "", "near_missed": "",
+         "missing": ""}
+    )  # fmt: skip
+    knowledge = T + timedelta(hours=3)
+    writer = StoreWriter(backend)
+    writer.write_result("rule_screen", D1, run_id, stamped(rows, D1, run_id, knowledge))
+    values = [
+        {"instrument_id": f"EQ:S{n:03d}", "user_id": "site", "config_id": "alpha",
+         "criterion_id": f"c{k}", "field": f"feature.c{k}", "mode": "hard" if k else "column",
+         "value_num": n + k / 10, "value_str": None, "outcome": "PASS" if k else "INFO",
+         "distance": None}
+        for n in range(picks)
+        for k in range(criteria)
+    ]  # fmt: skip
+    if values:
+        writer.write_result(
+            "rule_screen_values", D1, run_id, stamped(values, D1, run_id, knowledge)
+        )
+    if frozen:
+        write_picks(backend, D1, run_id, rows, knowledge)

@@ -415,12 +415,13 @@ export type EtfHoldingsQueryVariables = Exact<{
 export type EtfHoldingsQuery = { instrument: { instrumentId: string, isEtf: boolean, holdings: { asOf: string | null, source: string | null, total: number, items: Array<{ rank: number, name: string, symbol: string | null, weight: number, assetClass: string | null, instrument: { symbol: string } | null }> } | null } | null };
 
 export type IdeasPageQueryVariables = Exact<{
-  limit: number;
+  first: number;
+  after?: string | null | undefined;
   names: Array<string> | string;
 }>;
 
 
-export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, regime: string | null, sizeMultiplier: number | null, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, outcome: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
+export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, hasMore: boolean, nextCursor: string | null, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, regime: string | null, sizeMultiplier: number | null, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, outcome: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
 
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
@@ -2628,11 +2629,13 @@ export const EtfHoldingsDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<EtfHoldingsQuery, EtfHoldingsQueryVariables>;
 export const IdeasPageDocument = new TypedDocumentString(`
-    query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
-  ideas(limit: $limit) {
+    query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!) {
+  ideas(first: $first, after: $after) {
     session
     priority
     total
+    hasMore
+    nextCursor
     pausedTotal
     paused {
       instrumentId

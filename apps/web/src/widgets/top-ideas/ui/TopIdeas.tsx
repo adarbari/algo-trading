@@ -2,9 +2,9 @@
  * "Top ideas": one row per ticker with every screener that picked it, ranked by the user's
  * screener priority then score (on the server), under the preset views and filter chips (the
  * page's search params). Tick tickers to compare them in Explore, or click one to open it there
- * with the screener that surfaced it.
+ * with the screener that surfaced it. The server sends the first page; "Show more" adds the next.
  */
-import { Button, DataTable, Panel, Stack, Text } from '@algotrade/ui';
+import { Button, DataTable, Panel, ShowMore, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { helped } from '@/features/guide-help';
@@ -12,6 +12,7 @@ import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-comp
 import {
   activeFilterKeys,
   IDEA_VIEWS,
+  IDEAS_PAGE,
   useIdeas,
   type Idea,
   type IdeasSearch,
@@ -59,7 +60,7 @@ export function TopIdeas({
       ? 'error'
       : ideas.isPending
         ? 'loading'
-        : ideas.data.session === null || !ran
+        : !ideas.data || ideas.data.session === null || !ran
           ? 'empty'
           : 'ready';
 
@@ -92,7 +93,7 @@ export function TopIdeas({
         title="Top ideas · across all your screeners"
         description={
           ideas.data?.session
-            ? `Session ${ideas.data.session} · ${rows.length} of ${all.length}`
+            ? `Session ${ideas.data.session} · ${rows.length} of ${ideas.data.total}`
             : undefined
         }
         flush
@@ -114,26 +115,39 @@ export function TopIdeas({
         onRetry={() => void ideas.refetch()}
         actions={<CompareIdeasButton symbols={symbols} onCompare={onCompare} />}
       >
-        <DataTable<Idea>
-          label="Top ideas"
-          columns={columns.map(helped)}
-          rows={rows}
-          getRowId={(idea) => idea.instrumentId}
-          getRowLabel={(idea) => idea.symbol ?? idea.instrumentId}
-          defaultSort={{ columnId: 'rank', direction: 'asc' }}
-          selectable
-          selectedIds={selected}
-          onSelectionChange={setSelected}
-          onRowActivate={(idea) => {
-            if (idea.symbol) onOpen(idea.symbol, idea.best.screenerId);
-          }}
-          canActivate={(idea) => Boolean(idea.symbol)}
-          emptyMessage={
-            all.length === 0 ? 'No screener picked anything in this session.' : filteredEmpty
-          }
-          rowLines={search.columns === 'options' ? 2 : 3}
-          visibleRows={14}
-        />
+        <Stack gap={2}>
+          <DataTable<Idea>
+            label="Top ideas"
+            columns={columns.map(helped)}
+            rows={rows}
+            getRowId={(idea) => idea.instrumentId}
+            getRowLabel={(idea) => idea.symbol ?? idea.instrumentId}
+            defaultSort={{ columnId: 'rank', direction: 'asc' }}
+            selectable
+            selectedIds={selected}
+            onSelectionChange={setSelected}
+            onRowActivate={(idea) => {
+              if (idea.symbol) onOpen(idea.symbol, idea.best.screenerId);
+            }}
+            canActivate={(idea) => Boolean(idea.symbol)}
+            emptyMessage={
+              all.length === 0 ? 'No screener picked anything in this session.' : filteredEmpty
+            }
+            rowLines={search.columns === 'options' ? 2 : 3}
+            visibleRows={14}
+          />
+          {state === 'ready' && ((ideas.data?.total ?? 0) > IDEAS_PAGE || ideas.data?.hasMore) && (
+            <ShowMore
+              shown={all.length}
+              total={ideas.data?.total ?? 0}
+              pageSize={IDEAS_PAGE}
+              status={
+                ideas.isFetchNextPageError ? 'error' : ideas.isFetchingNextPage ? 'loading' : 'idle'
+              }
+              onMore={() => void ideas.fetchNextPage()}
+            />
+          )}
+        </Stack>
       </Panel>
     </Stack>
   );

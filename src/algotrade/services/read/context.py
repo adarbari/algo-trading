@@ -173,6 +173,11 @@ class Held[T]:
                 if self._flights.get(key) is flight:  # not a newer caller's
                     del self._flights[key]
 
+    def holds(self, key: Hashable) -> bool:
+        """Whether ``key`` is already read."""
+        with self._lock:
+            return key in self._items
+
     def weight_bytes(self) -> int:
         with self._lock:
             return self._bytes
@@ -535,6 +540,14 @@ def stored_dates(ctx: Stores, table: str) -> tuple[date, ...]:
     if table not in listed:
         listed[table] = tuple(ctx.reader.dates(table))
     return listed[table]
+
+
+def stored_dates_in(ctx: Stores, table: str, start: date, end: date) -> tuple[date, ...]:
+    """The dates of ``start..end`` ``table`` has a partition for, oldest first: exactly
+    ``stored_dates`` restricted to the span, from a probe per day, never a listing of the table
+    (the ingestion grid placed ten sessions by listing 228,948 partitions: 15.8 s cold, 55.9 s
+    under a serving-release pin)."""
+    return tuple(ctx.reader.dates_in(table, start, end))
 
 
 def partition_on(ctx: Stores, table: str, day: date) -> pd.DataFrame | None:

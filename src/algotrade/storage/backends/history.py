@@ -24,10 +24,11 @@ serves a read only when every calendar day of the requested range inside that ye
 signature the build recorded (``None`` for a day with no partition): a changed, new or purged
 partition, or a store restored from one with other indexes, fails the check and the read falls
 back to the partitions. The check is one ``stat`` per requested day once a file's digest is held
-in process (the first check of a file, or of a cloned one, reads it). It is stricter than
-comparing commit sequence numbers, which move on every commit to any table, and never looser: a
-signature can only match an index whose content did not change since the build, and the build
-refuses sources a commit had applied but not yet published.
+in process (the first check of a file, or of a cloned one, reads it), and a year's verdict is
+kept per published sequence and destructive epoch, so a repeat check costs no ``stat``. It is
+stricter than comparing commit sequence numbers, which move on every commit to any table, and
+never looser: a signature can only match an index whose content did not change since the build,
+and the build refuses sources a commit had applied but not yet published.
 
 Only the ingestion writer builds (``build``); the files are written to a unique name and the
 manifest, replaced atomically last, is what makes them visible. A copy that cannot be read is
@@ -41,6 +42,7 @@ import logging
 import secrets
 import shutil
 import threading
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
@@ -72,6 +74,7 @@ DAY = "__day"
 POS = "__pos"
 FORMAT = 1
 MAX_DIGESTS = 100_000  # index digests kept in process (a few MB)
+MAX_VERDICTS = 4096  # year verdicts ``usable`` keeps (one per table, year and range)
 
 
 @dataclass(frozen=True)
@@ -97,10 +100,17 @@ class HistoryCopy:
         tables_root: Path,
         published: Callable[[], int],
         no_commits: Callable[[], AbstractContextManager[object]],
+        epoch: Callable[[], int] = lambda: 0,
     ) -> None:
         self.root = tables_root
         self._published = published
         self._no_commits = no_commits
+        self._epoch = epoch
+        # (table, year, low, high) -> (published sequence, destructive epoch, the copy judged,
+        # verdict): see ``usable``
+        self._verdicts: OrderedDict[
+            tuple[str, int, date, date], tuple[int, int, YearCopy, bool]
+        ] = OrderedDict()
         # table -> (the manifest file's stat when parsed, its years): parsed once per version
         self._parsed: dict[str, tuple[tuple[int, int, int], dict[int, YearCopy]]] = {}
         self._guard = threading.Lock()
@@ -174,6 +184,9 @@ class HistoryCopy:
         instruments) captured at commit ``upto``: every requested day of the year still has the
         signature the build recorded. A year read for all instruments over a short stretch is
         left to its partitions (``MIN_UNFILTERED_DAYS``)."""
+        # Read before any signature: a commit landing mid-check re-keys the verdicts (as in
+        # ``LocalTables._committed_dates``).
+        key = (self._published(), self._epoch())
         out: dict[int, YearCopy] = {}
         for year, copy in self.years(table).items():
             low, high = max(start, date(year, 1, 1)), min(end, date(year, 12, 31))
@@ -181,13 +194,38 @@ class HistoryCopy:
                 continue
             if not filtered and (high - low).days + 1 < MIN_UNFILTERED_DAYS:
                 continue
-            if all(
-                self._signature(table, day) == copy.days.get(day.isoformat())
-                and day.isoformat() not in copy.ragged
-                for day in _each_day(low, high)
-            ):
+            if self._verdict(table, year, low, high, copy, key):
                 out[year] = copy
         return out
+
+    def _verdict(
+        self, table: str, year: int, low: date, high: date, copy: YearCopy, key: tuple[int, int]
+    ) -> bool:
+        """Whether every day of ``[low, high]`` still has the signature ``copy`` recorded, kept
+        per (table, year, range) for one (published sequence, destructive epoch) and one parsed
+        copy. A day's index changes only by a commit or restate (the sequence moves), a direct
+        write of a new partition, a drop or a purge (the epoch moves), and a rebuild replaces
+        the parsed copy; so a repeat asks the filesystem nothing. The answer describes the
+        store as published, whatever commit a pinned reader reads at (that is the ``copy.seq``
+        check in ``usable``); pending writes are in no index, and reads naming an ``own_run``
+        or ``as_of`` never come here."""
+        memo = (table, year, low, high)
+        with self._guard:
+            held_ = self._verdicts.get(memo)
+            if held_ is not None:
+                self._verdicts.move_to_end(memo)
+        if held_ is not None and held_[:2] == key and held_[2] is copy:
+            return held_[3]
+        ok = all(
+            self._signature(table, day) == copy.days.get(day.isoformat())
+            and day.isoformat() not in copy.ragged
+            for day in _each_day(low, high)
+        )
+        with self._guard:
+            self._verdicts[memo] = (*key, copy, ok)
+            while len(self._verdicts) > MAX_VERDICTS:
+                self._verdicts.popitem(last=False)
+        return ok
 
     def read_year(
         self,
