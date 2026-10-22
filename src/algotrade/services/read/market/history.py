@@ -10,7 +10,7 @@ Only stored ``market.`` fields have a history: a ``feature.*`` expression would 
 every session of the window on read (thousands), so it is a request error; the numbers it
 needs are stored by their group."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -127,10 +127,13 @@ def load_market_history(
     )
 
 
-def warm_market_frames(ctx: ReadContext, market: str = US) -> tuple[str, ...]:
+def warm_market_frames(
+    ctx: ReadContext, market: str = US, pause: Callable[[], None] | None = None
+) -> tuple[str, ...]:
     """Read every stored table of the market catalogue into ``ctx.cache`` (``market_frame``)
     for ``ctx``'s session and published state, so the first chart after a publish or a start
-    does not read thousands of partitions on a request; the tables read, in name order."""
+    does not read thousands of partitions on a request; the tables read, in name order.
+    ``pause`` is called before each table (the warmer lets a request go first)."""
     tables = sorted(
         {
             field_source(name)[0]
@@ -139,5 +142,7 @@ def warm_market_frames(ctx: ReadContext, market: str = US) -> tuple[str, ...]:
         }
     )
     for table in tables:
+        if pause is not None:
+            pause()
         market_frame(ctx, table, [market_id(market)])
     return tuple(tables)

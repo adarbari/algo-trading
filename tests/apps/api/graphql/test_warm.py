@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -357,3 +358,44 @@ def test_it_validates_the_event_copies_after_the_market_frames(
     monkeypatch.setattr(warm, "load_episodes", lambda configs: type("E", (), {"episodes": []}))
     warm.warm(type("C", (), {"configs": None})())  # type: ignore[arg-type]
     assert ran == ["frames", "event copies"]
+
+
+def test_a_request_is_served_while_finish_is_mid_run_and_finish_resumes_after() -> None:
+    """The rest of the warm (``finish``) waits between its steps while a request holds the pool,
+    then goes on: the steps' threads hold the GIL against the user's request."""
+    request_in_flight = threading.Event()
+    request_in_flight.set()
+    first_done, ran = threading.Event(), []
+
+    def first() -> None:
+        ran.append("first")
+        first_done.set()
+
+    steps = [("first", first), ("second", lambda: ran.append("second"))]
+    pacer = warm.Pacer(request_in_flight.is_set)
+    worker = threading.Thread(target=warm._run, args=(steps, pacer))
+    worker.start()
+    time.sleep(0.2)
+    assert ran == []  # a request is in flight: not even the first step started
+    request_in_flight.clear()  # the request was served
+    worker.join(5)
+    assert ran == ["first", "second"] and first_done.is_set()
+
+
+def test_steady_traffic_cannot_starve_finish_forever(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(warm, "PAUSE_POLL_S", 0.001)
+    ran: list[str] = []
+    pacer = warm.Pacer(lambda: True, budget_s=0.05)  # always busy
+    started = time.monotonic()
+    warm._run([("a", lambda: ran.append("a")), ("b", lambda: ran.append("b"))], pacer)
+    assert ran == ["a", "b"] and time.monotonic() - started < 2  # the budget bounds the waiting
+
+
+def test_finish_paces_its_steps_when_the_warmer_knows_the_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[object] = []
+    monkeypatch.setattr(warm, "warm", lambda c, _f, home, pause: seen.append(pause))
+    ctx = _Ctx(_Session(date(2026, 10, 8)), _Reader())
+    warmer = CacheWarmer(lambda: ctx, busy=lambda: False)  # type: ignore[arg-type, return-value]
+    assert _once(warmer) and isinstance(seen[0], warm.Pacer)
