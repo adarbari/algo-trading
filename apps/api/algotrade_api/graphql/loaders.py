@@ -22,7 +22,7 @@ from algotrade.services.read.events.instrument_events import (
     InstrumentEvents,
     load_instrument_events,
 )
-from algotrade.services.read.events.stored import Event, load_events
+from algotrade.services.read.events.stored import Event, load_timeline_events
 from algotrade.services.read.instruments.chains import (
     OptionChain,
     OptionQuote,
@@ -40,7 +40,7 @@ from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_
 from algotrade_api.graphql.offload import off_loop
 
 FeatureKey = tuple[str, tuple[str, ...]]  # (instrument_id, catalogue names in the order asked)
-EventKey = tuple[str, date | None, date | None]  # (instrument_id, start, end)
+EventKey = tuple[str, date | None, date | None, tuple[str, ...] | None]  # id, start, end, kinds
 EventStudyKey = tuple[str, int, int]  # (instrument_id, days, months)
 QuoteKey = tuple[str, date]  # (underlying_id, expiry)
 HoldingsKey = tuple[str, int]  # (fund_id, top)
@@ -121,7 +121,7 @@ class Loaders:
             load_fn=feature_values
         )
         self.instruments: DataLoader[tuple[str], Instrument | None] = _loader(load_instruments, ctx)
-        self.events: DataLoader[EventKey, tuple[Event, ...]] = _loader(load_events, ctx)
+        self.events: DataLoader[EventKey, tuple[Event, ...]] = _loader(load_timeline_events, ctx)
         self.instrument_events: DataLoader[EventStudyKey, InstrumentEvents | None] = _loader(
             load_instrument_events, ctx
         )

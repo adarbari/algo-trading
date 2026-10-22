@@ -68,16 +68,25 @@ class Instrument:
         return [FeatureValue.of(v) for v in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="Stored events (earnings, dividends, splits, reference changes) with "
+        description="Stored events of `kinds` (default: the calendar kinds the page shows: "
+        "earnings, dividends, splits, reference and index changes; a kind is a stored "
+        "`events/<kind>` table, e.g. insider_transaction; "
+        "an unknown kind is a BAD_REQUEST error) with "
         "their event date in `start..end` (null: unbounded), oldest first, among the rows "
         "known on or before the session (`known_from`, else the session that stored the row; "
         "ADR 0050); splits, dividends, reference and index changes unbounded (facts of record "
-        "the adjusted prices use)"
+        "the adjusted prices use)",
+        extensions=[MaxItems("kinds", MAX_NAMES)],
     )
     async def events(
-        self, info: Info, start: dt.date | None = None, end: dt.date | None = None
+        self,
+        info: Info,
+        start: dt.date | None = None,
+        end: dt.date | None = None,
+        kinds: list[str] | None = None,
     ) -> list[Event]:
-        found = await self.ctx.loaders.events.load((self.instrument_id, start, end))
+        asked = None if kinds is None else tuple(kinds)
+        found = await self.ctx.loaders.events.load((self.instrument_id, start, end, asked))
         return [Event.of(e) for e in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
