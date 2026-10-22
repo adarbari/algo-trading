@@ -16,7 +16,7 @@ from algotrade.services.read.evaluation.decay import (
 )
 from algotrade.services.read.evaluation.edges import EdgePublished, EdgeSource
 from algotrade.services.read.evaluation.verdict import EdgeFacts, judge
-from tests.unit.services.read.evaluation.verdict.test_judge import SPLIT, T, result, row
+from tests.unit.services.read.evaluation.verdict.test_rule import SPLIT, T, result, row
 
 SOURCE = EdgeSource("Jegadeesh and Titman, 1993", "https://example.org/jt")
 

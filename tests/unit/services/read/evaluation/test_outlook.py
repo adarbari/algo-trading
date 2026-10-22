@@ -14,7 +14,7 @@ from algotrade.services.read.evaluation.evidence import (
     UNPROJECTABLE,
 )
 from algotrade.services.read.evaluation.verdict import EdgeFacts, counts_wins, judge
-from tests.unit.services.read.evaluation.verdict.test_judge import SPLIT, T, draws, result, verdict
+from tests.unit.services.read.evaluation.verdict.test_rule import SPLIT, T, draws, result, verdict
 
 
 def outlook(rows, **facts):  # type: ignore[no-untyped-def]

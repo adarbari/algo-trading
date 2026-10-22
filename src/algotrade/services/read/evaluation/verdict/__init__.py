@@ -3,8 +3,8 @@ Waiting on data, judged on its official result (the canonical run) by one determ
 
 Split by kind: ``model`` (the status words and the records), ``criteria`` (each test of Promising
 and Works), ``level`` (a candidate's level and columns), ``basis`` (the basis choice, ADR 0065:
-fixed on the in-sample figures alone, before the frozen period is read) and ``judge`` (the rule,
-``judge`` and ``load_edge_verdict``). The thresholds are site data (``config/site/verdict.toml``);
+fixed on the in-sample figures alone, before the frozen period is read) and ``rule`` (``judge``
+and ``load_edge_verdict``). The thresholds are site data (``config/site/verdict.toml``);
 the statistics are the stored rows' (``quant/edges/statistics.py``), never recomputed; the
 sentences are the server's, the browser words nothing. Importers use this package's names."""
 
@@ -31,27 +31,6 @@ from algotrade.services.read.evaluation.verdict.criteria import (
 )
 from algotrade.services.read.evaluation.verdict.criteria import (
     PORTFOLIO_BASE as PORTFOLIO_BASE,
-)
-from algotrade.services.read.evaluation.verdict.judge import (
-    EdgeFacts as EdgeFacts,
-)
-from algotrade.services.read.evaluation.verdict.judge import (
-    counts_wins as counts_wins,
-)
-from algotrade.services.read.evaluation.verdict.judge import (
-    is_chain as is_chain,
-)
-from algotrade.services.read.evaluation.verdict.judge import (
-    is_factor_neutral as is_factor_neutral,
-)
-from algotrade.services.read.evaluation.verdict.judge import (
-    judge as judge,
-)
-from algotrade.services.read.evaluation.verdict.judge import (
-    load_edge_verdict as load_edge_verdict,
-)
-from algotrade.services.read.evaluation.verdict.judge import (
-    projection_of as projection_of,
 )
 from algotrade.services.read.evaluation.verdict.model import (
     ALL as ALL,
@@ -124,4 +103,25 @@ from algotrade.services.read.evaluation.verdict.model import (
 )
 from algotrade.services.read.evaluation.verdict.model import (
     YearRow as YearRow,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    EdgeFacts as EdgeFacts,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    counts_wins as counts_wins,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    is_chain as is_chain,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    is_factor_neutral as is_factor_neutral,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    judge as judge,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    load_edge_verdict as load_edge_verdict,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    projection_of as projection_of,
 )

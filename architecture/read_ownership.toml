@@ -59,7 +59,7 @@ detect = [{ call = "official_basis" }, { call = "load_basis_series" }, { call = 
 id = "edge-verdict"
 description = "An edge's verdict (ED8, ADR 0053): Works, Promising, Not working, Not enough data or Waiting on data from its official result (the canonical run's stored rows: one basis, the declared screen and holding period, else the best in-sample, fixed before the frozen period is read (ADR 0065), one deterministic rule, the one-line reason, the criteria with value, threshold and pass / fail / not measured, the year-by-year rows, the outlook: the first test not passed and the trades missing, ADR 0064; the decay of the published figure and the haircut Sharpe ratio), its thresholds typed from config/site/verdict.toml; the statistics are the stored rows', never recomputed, and the browser derives nothing of it"
 owner = [
-    "src/algotrade/services/read/evaluation/verdict/judge.py",  # the rule; model.py, criteria.py, level.py and basis.py are its parts
+    "src/algotrade/services/read/evaluation/verdict/rule.py",  # the rule; model.py, criteria.py, level.py and basis.py are its parts
     "src/algotrade/services/read/evaluation/verdict/basis.py",
     "src/algotrade/services/read/evaluation/verdict/criteria.py",
     "src/algotrade/services/read/evaluation/verdict/level.py",
