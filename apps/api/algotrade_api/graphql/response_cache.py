@@ -319,8 +319,8 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "IngestionCell",
     }
 )
-# The run operations whose loader reads the clock (``load_completeness``: the last session the
-# exchange closed): the closed session is in their key too.
+# The run operations whose loader reads the clock (``load_completeness_window``: the last
+# session the exchange closed): the closed session is in their key too.
 CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", "StatusStrip"})
 # Never kept: the caller's identity
 # (answered inline, no context opened) and the caller's own missing-feature requests (a draft

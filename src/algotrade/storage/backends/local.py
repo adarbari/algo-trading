@@ -95,7 +95,7 @@ from algotrade.storage.backends.run_selection import (
     visible_entries,
 )
 from algotrade.storage.locks import FileLock, held
-from algotrade.storage.runs import RunRecord, job_of_name, run_session
+from algotrade.storage.runs import RunRecord, is_job_record_name, job_of_name, run_session
 from algotrade.storage.tables.interfaces import CompactionReport
 from algotrade.storage.tables.schemas import require_retention
 
@@ -162,12 +162,17 @@ class LocalTables:
             return
         self.commits.bump_epoch()  # no sequence: every pin sees it, so no release is trusted
         born = not (directory / INDEX).exists()
+        # a rewrite of a run already indexed goes to a new file name, recorded in the entry: the
+        # index then differs byte for byte (the history copy signs its content), and a reader of
+        # the old entry never meets half-replaced rows
+        again = known is not None and run_id in read_index(directory)
+        ref = f"run={safe(run_id)}~{secrets.token_hex(6)}.parquet" if again else None
         if known is not None:
-            atomic_write(directory / default_file(safe(run_id)), data)
+            atomic_write(directory / (ref or default_file(safe(run_id))), data)
         with held(index_lock(directory)):
             index = read_index(directory)
             if known is not None:
-                index[run_id] = RunEntry(pd.Timestamp(known), restates)
+                index[run_id] = RunEntry(pd.Timestamp(known), restates, ref=ref)
             write_index(directory, index)
         if born:  # a listing taken since the bump above lacks it and moves no sequence: re-key
             self.commits.bump_epoch()
@@ -835,8 +840,10 @@ class LocalStaging:
 DATES_MEMO = 256  # (table, sequence, epoch) listings ``dates(upto=...)`` keeps
 PROBE_DAYS = 31  # a range this short probes its days instead of listing the table
 MAX_PARSED_BYTES = 64 * 1024 * 1024  # the run files ``LocalRuns`` keeps parsed, by file size
-# a file above this is parsed on each read and never kept: one 6 MB ``job-edge-eval`` record
-# would evict the ~0.3 MB nightly records every page needs (a scan must not empty the cache)
+# a file above this is parsed on each read and never kept; and a ``services/jobs`` record
+# (``is_job_record_name``) is never kept whatever its size: the 164 mid-size ``job-edge-eval``
+# files total 110 MB, so one ``find("job:edge-eval")`` would evict the ~27 MB of nightly records
+# every page needs (measured 2026-10-22: only 5 of them exceed 4 MB)
 MAX_PARSED_RECORD_BYTES = 4 * 1024 * 1024
 MAX_PARSED_RECORDS = 4096  # and at most this many records, whatever their sizes
 
@@ -898,7 +905,7 @@ class LocalRuns:
             old = self._parsed.pop(name, None)
             if old is not None:
                 self._parsed_bytes -= old[0][2]
-            if size > MAX_PARSED_RECORD_BYTES:
+            if size > MAX_PARSED_RECORD_BYTES or is_job_record_name(Path(name).stem):
                 return
             self._parsed[name] = held
             self._parsed_bytes += size

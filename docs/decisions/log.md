@@ -463,3 +463,25 @@ follow-up PR).
 - status: final
 - Note: engine and structure are final; build timing follows the triggers.
 - Reasoning: the call patterns of run records are small, mutable, key-based reads and writes from several processes, which fit an indexed transactional store and not immutable columnar partitions; SQLite is in the Python standard library, so there is no new dependency; keeping domain facts in one engine keeps one place to read a business fact.
+## 2026-10-22 | Ideas page size (data architecture v2, decision 6) | First 50 picks, a "more" control loads the next 50, and so on
+- Question: the Ideas page returns every pick in one response; how many does a first load carry?
+- Options: top 50 plus a "more" control loading the next 50; keep the full list and virtualise it on screen.
+- Decision: the first load carries the top 50 picks; a "more" control loads the next 50, repeatedly. The first load stays within a 300 KB budget.
+- decided by: owner
+- status: final
+- Reasoning: the response size and the server read stay small on phones and desktops; virtualising only hides rows already sent.
+
+## 2026-10-22 | Screener re-run experience | Measure the full wait after a re-run first; build the progress experience only after
+- Question: build the non-blocking re-run experience (status, ETA) now, or measure first?
+- Decision: measure first (the run itself, then the results page's cold reload), and only then build the experience. The architect's design is `screener-rerun-experience.md` (shared notes).
+- decided by: owner
+- status: final
+- Reasoning: on the clone a screener run took a median of 1.3 s (p90 3.1 s); the 15-30 s the owner sees is probably the cold reload of the results page, which the read-path fixes shorten.
+
+## 2026-10-22 | Domain-aligned derived data (data architecture v2) | Business objects in existing homes; two new results tables; the release only pins
+- Question: how is read-optimised derived data stored: page-shaped release tables, or business objects?
+- Decision: business objects in their existing homes, no new table class and no copies in the release (design `domain-derived-data.md`, shared notes). New: `results/screen_runs` (ScreenRun) and `results/screen_picks` (ScreenPick), written by the screen's own writer in the same atomic publish as `rule_screen` (ADR 0022); `market.macro_asof@v1` only if profiling blames the regime provenance read; edge evaluations read by run from `results/edge_eval`; the regime-signals table, `results/edge_runs` and the run ledger are deferred by profile. Sub-decisions: (1) ADR 0077 decisions 1 and 23 are amended (no page-shaped release tables; the release pins); (2) ADR 0077 decision 16 stays (run operations not release-shared); (3) Ideas starts at 50 picks, "more" loads 50 (above); (4) pick history stays 20 sessions; (5) accepted over-1-s exceptions until their named fix, each re-measured after it: ScreenerResults, RegimeSignals, MarketHistory, InstrumentEvents, HarnessRuns (admin), InstrumentFacts.
+- decided by: owner
+- status: final
+- Note: the run ledger is built when the re-measure or a trigger says so (lookup over 100 ms warm, about 100,000 run files, admin page over 1 s).
+- Reasoning: one way to make reads fast, no second implementation of any loader, and the stored objects serve the edge harness, paper record and ML as well as the pages.

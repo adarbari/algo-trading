@@ -7,7 +7,9 @@ from typing import Self
 
 import strawberry
 
+from algotrade.services.read.context import ReadContext
 from algotrade.services.read.ops import ingestion
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.ops.run import FailureGroup, RunDetail
 
 
@@ -46,17 +48,25 @@ class IngestionCell:
 class Completeness:
     sessions: list[dt.date]
     datasets: list[str]
-    cells: list[IngestionCell]
     last_closed: dt.date
+    ctx: strawberry.Private[ReadContext]
 
     @classmethod
-    def of(cls, d: ingestion.Completeness) -> Self:
+    def of(cls, d: ingestion.CompletenessWindow, ctx: ReadContext) -> Self:
         return cls(
             sessions=list(d.sessions),
             datasets=list(d.datasets),
-            cells=[IngestionCell.of(c) for c in d.cells],
             last_closed=d.last_closed,
+            ctx=ctx,
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Every dataset x `sessions`: built (the partition walk) only when the "
+        "query selects it"
+    )
+    async def cells(self) -> list[IngestionCell]:
+        found = await off_loop(ingestion.load_cells, self.ctx, self.sessions)
+        return [IngestionCell.of(c) for c in found]
 
 
 @strawberry.type(

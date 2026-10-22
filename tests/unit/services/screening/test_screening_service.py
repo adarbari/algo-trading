@@ -211,3 +211,16 @@ def test_wrong_kind_or_missing_selection_is_rejected() -> None:
     )
     with pytest.raises(ConfigurationError, match="needs a selection"):
         run_screener(reader, writer, no_selection, DAY, held=HARNESS_ALL)
+
+
+def test_a_finished_screen_run_record_stores_its_real_duration() -> None:
+    """The record's finish is the clock after the save, not the start time again."""
+    reader, writer = seeded()
+    ticks = iter([T0 + timedelta(seconds=7)])
+    outcome = run_screener(
+        reader, writer, preset(), DAY, now=T0, held=HARNESS_ALL, clock=lambda: next(ticks)
+    )
+    (record,) = writer.runs_for(f"screen-{preset().config.id}-{SITE_USER}", DAY)
+    assert record.run_id == outcome.run_id
+    assert record.finished_at is not None and record.finished_at > record.started_at
+    assert record.finished_at - record.started_at == timedelta(seconds=7)
