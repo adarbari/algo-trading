@@ -49,11 +49,14 @@ machine with no free memory, run one page at a time.
 - **Memory guard**: before every operation (and between them) the tool reads `sysctl
   vm.swapusage` and stops when free swap is under `--min-free-swap-mb` (default 500): exit code
   3, the results so far printed (profile mode: already in the file). An unreadable value does not
-  block.
-- **COLD is checked**: each row records the first GraphQL error and an empty-`data` check next to
+  block. Free disk under the clone below 8 GB stops the run the same way. Any `--page` / `--ops` /
+  `--profile` run needs `--data-url` (a clone); `--profile` refuses the real store even with
+  `--i-know-this-is-the-real-store`.
+- **COLD is checked**: each row records the first GraphQL error (and a non-JSON answer) next to
   the HTTP status; a failure is a FAILED row (`COLD FAILED: <message>`), printed in the progress
   line with the bytes and rows. COLD in the uncached run now uses the uncached mode, so no cache or
-  warmer replay can answer it; the row is also flagged `COLD SUSPECT` when its answer is under
+  warmer replay can answer it; an all-null / empty `data` is noted `EMPTY (check)` (a page can be
+  legitimately empty: not a failure); the row is also flagged `COLD SUSPECT` when its answer is under
   half the bytes of the later uncached calls. Why a fresh process could answer fast (code
   read, not measured): the old COLD pass ran in the default cache mode, where the start-up warmer
   replays the seeded page operations into the response cache, so a call made once `/health`
@@ -61,7 +64,10 @@ machine with no free memory, run one page at a time.
   only the status was recorded.
 - **`--profile --page ROUTE`** (one page per run, a clone URL required: the real-store refusal
   applies) profiles each operation once, uncached, in process (same patches as the uncached mode,
-  warmer off, TestClient on `http://127.0.0.1:8000`) under cProfile and rewrites that page's
+  warmer off) under cProfile, all on the main thread (cProfile watches only the thread that
+  enables it: the app is driven through an ASGI transport and the read pool's `to_thread` calls
+  run inline; a profile with no stat calls and no algotrade function is marked `PROFILE SAW
+  NOTHING (thread issue)`) and rewrites that page's
   section of `docs/perf/page-profiles.md` after every operation. An unprofiled
   `session { date }` call first builds the schema and store handles. Per operation: profiled wall
   seconds (cProfile inflates pure-Python time: read shares, not absolutes), bytes, rows, stat

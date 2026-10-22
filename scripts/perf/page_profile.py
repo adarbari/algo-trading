@@ -14,10 +14,12 @@ absolute split). Nothing here touches a store: `run_profile` is only called with
 
 from __future__ import annotations
 
+import asyncio
 import cProfile
 import os
 import pstats
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -27,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 MIN_FREE_SWAP_MB = 500.0
+MIN_FREE_DISK_GB = 8.0
 EXIT_LOW_SWAP = 3
 PRIME = "query SessionDate { session { date } }"
 TOP_N = 12
@@ -69,12 +72,23 @@ def read_swap_free_mb() -> float | None:
 
 
 def swap_guard(
-    min_free_mb: float = MIN_FREE_SWAP_MB, reader: Callable[[], float | None] = read_swap_free_mb
+    min_free_mb: float = MIN_FREE_SWAP_MB,
+    reader: Callable[[], float | None] = read_swap_free_mb,
+    disk_path: Path | None = None,
+    disk_free_gb: Callable[[Path], float] = lambda p: shutil.disk_usage(p).free / 1024**3,
+    min_disk_gb: float = MIN_FREE_DISK_GB,
 ) -> None:
-    """Raise SwapLowError when free swap is under ``min_free_mb``; an unreadable value passes."""
+    """Raise SwapLowError when free swap is under ``min_free_mb``, or the disk holding
+    ``disk_path`` (the clone) has under ``min_disk_gb`` free; an unreadable swap value passes."""
     free = reader()
     if free is not None and free < min_free_mb:
         raise SwapLowError(f"free swap {free:.0f} MB is below {min_free_mb:.0f} MB")
+    if disk_path is not None:
+        gb = disk_free_gb(disk_path)
+        if gb < min_disk_gb:
+            raise SwapLowError(
+                f"free disk {gb:.1f} GB under {disk_path} is below {min_disk_gb:.0f} GB"
+            )
 
 
 # ---- selection ------------------------------------------------------------------------------
@@ -194,6 +208,12 @@ def short(key: Key) -> str:
     return f"{file}:{line}({name})"
 
 
+def saw_nothing(stats: dict[Key, tuple]) -> bool:
+    """A profile with no stat calls and no algotrade function: the work ran in a thread the
+    profiler did not watch."""
+    return call_counts(stats)["stat calls"] == 0 and not any("algotrade" in k[0] for k in stats)
+
+
 def top_functions(stats: dict[Key, tuple], n: int = TOP_N) -> list[dict]:
     """The ``n`` functions of algotrade and pyarrow with the largest cumulative time."""
     mine = [(k, r) for k, r in stats.items() if "algotrade" in k[0] or "pyarrow" in k[0]]
@@ -208,6 +228,13 @@ def render_page(route: str, rows: list[dict]) -> str:
     lines = [f"## `{route}`", ""]
     for r in rows:
         status = f" **FAILED: {r['error']}** (timings are of an error)" if r["error"] else ""
+        status += f" **{r['note']}**" if r.get("note") else ""
+        status += (
+            " **PROFILE SAW NOTHING (thread issue)**: no stat calls and no algotrade function; "
+            "do not read the buckets"
+            if r.get("saw_nothing")
+            else ""
+        )
         total = sum(r["buckets"].values()) or 1.0
         lines += [
             f"### {r['op']}{status}",
@@ -257,10 +284,14 @@ def run_profile(
     problem: Callable[[int, bytes], str | None],
     rows_of: Callable[[Any], int],
     min_free_mb: float = MIN_FREE_SWAP_MB,
+    disk_path: Path | None = None,
+    notes_of: Callable[[int, bytes], str | None] = lambda *_: None,
 ) -> int:
     """One uncached call per operation under cProfile, in this process (the caller starts one
     process per page): the same patches as the uncached mode, the warmer off, a TestClient. The
     page's section in ``out`` is rewritten after every operation, so a stop keeps what ran."""
+    if not data_url:
+        raise ValueError("--profile needs a clone's data URL")
     os.environ.update(
         ALGOTRADE_AUTH="off",
         ALGOTRADE_LLM="off",
@@ -273,17 +304,52 @@ def run_profile(
         exec(compile(patch, "<perf-patch>", "exec"), {"__name__": "perf_patch"})
     finally:
         sys.argv = argv
-    from fastapi.testclient import TestClient  # noqa: PLC0415
+    return asyncio.run(
+        _profile_all(ops, label, out, problem, rows_of, min_free_mb, disk_path, notes_of)
+    )
+
+
+async def _inline_sync(func: Callable[..., Any], *args: Any, **_: Any) -> Any:
+    return func(*args)
+
+
+async def _inline_thread(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    return func(*args, **kwargs)
+
+
+async def _profile_all(
+    ops: dict[str, dict],
+    label: str,
+    out: Path,
+    problem: Callable[[int, bytes], str | None],
+    rows_of: Callable[[Any], int],
+    min_free_mb: float,
+    disk_path: Path | None,
+    notes_of: Callable[[int, bytes], str | None],
+) -> int:
+    """Everything on this thread (cProfile watches only the thread that enables it): the app is
+    driven through an ASGI transport on this event loop, and the read pool's ``to_thread`` calls
+    (anyio's, asyncio's) run inline, so the resolvers, gzip and storage reads are in the profile."""
+    import anyio.to_thread  # noqa: PLC0415
+    import httpx2 as httpx  # noqa: PLC0415
 
     from algotrade_api.app import app  # noqa: PLC0415  (after the environment is set)
 
+    anyio.to_thread.run_sync = _inline_sync  # type: ignore[assignment]
+    asyncio.to_thread = _inline_thread  # type: ignore[assignment]
     done: list[dict] = []
     code = 0
-    with TestClient(app, base_url="http://127.0.0.1:8000") as client:
-        client.post("/graphql", json={"query": PRIME})  # schema, store handles: not the op's cost
+    transport = httpx.ASGITransport(app=app)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
+            transport=transport, base_url="http://127.0.0.1:8000", timeout=None
+        ) as client,
+    ):
+        await client.post("/graphql", json={"query": PRIME})  # schema, store handles
         for name, op in ops.items():
             try:
-                swap_guard(min_free_mb)
+                swap_guard(min_free_mb, disk_path=disk_path)
             except SwapLowError as err:
                 print(f"aborted before {name}: {err}", file=sys.stderr)
                 code = EXIT_LOW_SWAP
@@ -292,12 +358,12 @@ def run_profile(
             prof = cProfile.Profile()
             t0 = time.perf_counter()
             prof.enable()
-            r = client.post("/graphql", json=body)
+            r = await client.post("/graphql", json=body)
             prof.disable()
             wall = time.perf_counter() - t0
             stats = pstats.Stats(prof).stats  # type: ignore[attr-defined]
             err_text = problem(r.status_code, r.content)
-            rows = rows_of(r.json().get("data")) if r.status_code == 200 else 0
+            rows = rows_of(r.json().get("data")) if r.status_code == 200 and not err_text else 0
             done.append(
                 {
                     "op": name,
@@ -305,14 +371,19 @@ def run_profile(
                     "bytes": len(r.content),
                     "rows": rows,
                     "error": err_text,
+                    "note": notes_of(r.status_code, r.content),
+                    "saw_nothing": saw_nothing(stats),
                     "buckets": attribute(stats),
                     "counts": call_counts(stats),
                     "top": top_functions(stats),
                 }
             )
+            flag = "  PROFILE SAW NOTHING" if done[-1]["saw_nothing"] else ""
             print(
                 f"  {name}: {wall:.2f} s, {len(r.content):,} B, {rows} rows"
-                + (f"  FAILED: {err_text}" if err_text else ""),
+                + (f"  FAILED: {err_text}" if err_text else "")
+                + (f"  {done[-1]['note']}" if done[-1]["note"] else "")
+                + flag,
                 flush=True,
             )
             current = out.read_text() if out.exists() else ""

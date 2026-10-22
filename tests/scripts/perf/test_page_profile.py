@@ -1,8 +1,10 @@
 """`scripts/perf/page_profile.py` and the page / memory-guard / failure-flag parts of
 `scripts/perf/api_latency.py`: pure logic only (a fake pstats table, no server, no store)."""
 
+import asyncio
 import importlib.util
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -165,6 +167,18 @@ def test_upsert_section_replaces_one_page_and_keeps_the_others() -> None:
     assert "bee" in doc and doc.startswith("# Page profiles")
 
 
+_ROW = {
+    "op": "Op",
+    "wall_s": 1.5,
+    "bytes": 1234,
+    "rows": 7,
+    "error": None,
+    "buckets": {"other": 1.0},
+    "counts": {"stat calls": 9, "files opened": 2},
+    "top": [],
+}
+
+
 def test_render_page_lists_buckets_flags_and_top_functions() -> None:
     row = {
         "op": "Op",
@@ -184,13 +198,23 @@ def test_render_page_lists_buckets_flags_and_top_functions() -> None:
 # ---- failure flagging in api_latency ------------------------------------------------------
 
 
-def test_answer_problem_flags_graphql_errors_empty_data_and_http_errors() -> None:
+def test_answer_problem_flags_graphql_errors_and_http_errors_not_empty_pages() -> None:
     ok = b'{"data": {"session": {"date": "2026-10-20"}}}'
     assert lat.answer_problem(200, ok) is None
     assert lat.answer_problem(503, b"") == "HTTP 503"
     assert lat.answer_problem(200, b'{"data": null, "errors": [{"message": "boom"}]}') == "boom"
-    assert "empty" in (lat.answer_problem(200, b'{"data": {"x": null, "y": []}}') or "")
-    assert "empty" in (lat.answer_problem(200, b'{"data": null}') or "")
+    assert lat.answer_problem(200, b'{"data": {"x": null, "y": []}}') is None  # not a failure
+    assert lat.answer_problem(200, b"<html>") == "not JSON"
+    assert lat.answer_problem(200, b"[1, 2]") == "not JSON"  # JSON, but not an object
+    assert lat.answer_problem(200, b'{"errors": ["plain"]}') == "plain"
+
+
+def test_empty_note_marks_empty_pages_for_a_look_without_failing_them() -> None:
+    assert "EMPTY (check)" in (lat.empty_note(200, b'{"data": {"x": null, "y": []}}') or "")
+    assert "EMPTY (check)" in (lat.empty_note(200, b'{"data": null}') or "")
+    assert lat.empty_note(200, b'{"data": {"d": "x"}}') is None
+    assert lat.empty_note(500, b"") is None
+    assert lat.empty_note(200, b"not json") is None
 
 
 def test_cold_suspect_flags_a_cold_answer_much_smaller_than_the_uncached_one() -> None:
@@ -213,7 +237,9 @@ def test_profile_and_page_runs_need_a_clone_url() -> None:
         lat.check_target(None, [], False, need_url=True)
     assert lat.run_needs_url(lat.parse_args(["--profile", "--page", "/x"])) is True
     assert lat.run_needs_url(lat.parse_args(["--uncached"])) is True
-    assert lat.run_needs_url(lat.parse_args(["--page", "/x"])) is False
+    assert lat.run_needs_url(lat.parse_args(["--page", "/x"])) is True  # a subset run starts an API
+    assert lat.run_needs_url(lat.parse_args(["--ops", "A"])) is True
+    assert lat.run_needs_url(lat.parse_args([])) is False
 
 
 def test_profile_with_the_real_store_is_refused_before_anything_starts() -> None:
@@ -229,3 +255,54 @@ def test_profile_accepts_one_page_only() -> None:
     assert lat.profile_selection_error(lat.parse_args(["--profile"]))
     assert not lat.profile_selection_error(lat.parse_args(["--profile", "--page", "/a"]))
     assert not lat.profile_selection_error(lat.parse_args(["--profile", "--ops", "A", "B"]))
+
+
+def test_profile_refuses_the_real_store_even_when_confirmed() -> None:
+    real = lat.REPO / "var" / "data"
+    argv = ["--profile", "--page", "/x", "--i-know-this-is-the-real-store"]
+    assert lat.main([*argv, "--data-url", f"file://{real}"]) == 2
+    assert lat.main(argv) == 2  # and never without a URL
+
+
+def test_run_profile_never_sets_a_missing_data_url() -> None:
+    with pytest.raises(ValueError, match="data URL"):
+        pp.run_profile(
+            {},
+            "/x",
+            patch="",
+            data_url="",
+            config_dir=Path(),
+            out=Path("x"),
+            problem=lambda *_: None,
+            rows_of=lambda _: 0,
+        )
+
+
+def test_swap_guard_stops_on_low_disk_under_the_clone() -> None:
+    def low(_: Path) -> float:
+        return 3.0
+
+    def high(_: Path) -> float:
+        return 40.0
+
+    with pytest.raises(pp.SwapLowError, match="disk"):
+        pp.swap_guard(500, reader=lambda: 9000.0, disk_path=Path("/c"), disk_free_gb=low)
+    pp.swap_guard(500, reader=lambda: 9000.0, disk_path=Path("/c"), disk_free_gb=high)
+    pp.swap_guard(500, reader=lambda: 9000.0, disk_path=None, disk_free_gb=low)
+
+
+def test_saw_nothing_flags_a_profile_without_stat_calls_or_algotrade_code() -> None:
+    thread_only = _stats({_fn("/py/asyncio/base_events.py", "run_forever"): (1, 1.0, 1.0, {})})
+    assert pp.saw_nothing(thread_only) is True
+    assert pp.saw_nothing(_fake()) is False
+    md = pp.render_page("/p", [{**_ROW, "saw_nothing": True}])
+    assert "PROFILE SAW NOTHING (thread issue)" in md
+
+
+def test_the_read_pool_calls_run_inline_on_the_calling_thread() -> None:
+    async def go() -> tuple[int, int]:
+        a = await pp._inline_sync(threading.get_ident, limiter=object())
+        b = await pp._inline_thread(threading.get_ident)
+        return a, b
+
+    assert asyncio.run(go()) == (threading.get_ident(), threading.get_ident())

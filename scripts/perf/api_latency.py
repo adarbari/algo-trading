@@ -73,6 +73,7 @@ REPEATS = 10
 UNCACHED_REPEATS = 5
 LOAD_CLIENTS = 4
 TIMEOUT = 180.0
+GUARD_PATH: list[Path | None] = [None]  # the clone: its disk is watched too (set in main)
 SWAP_FLOOR_MB = [pp.MIN_FREE_SWAP_MB]  # --min-free-swap-mb overrides it for the run
 PORT_OFFSET = 8  # spare ports: ALGOTRADE_PORT_BASE + 8 .. + 19 (release_writer_run.py uses + 7)
 MODES = {"cache": "0", "nocache": "1", "uncached": "2"}
@@ -140,9 +141,12 @@ def response_error(status: int, content: bytes) -> str | None:
         return f"HTTP {status}"
     try:
         errors = json.loads(content).get("errors")
-    except ValueError:
+    except (ValueError, AttributeError):
         return "not JSON"
-    return str(errors[0].get("message", errors[0]))[:80] if errors else None
+    if not errors:
+        return None
+    first = errors[0]
+    return str(first.get("message", first) if isinstance(first, dict) else first)[:80]
 
 
 def has_content(data: object) -> bool:
@@ -155,12 +159,21 @@ def has_content(data: object) -> bool:
 
 
 def answer_problem(status: int, content: bytes) -> str | None:
-    """Why an answer is not a real one: ``response_error``, or an empty ``data`` (all null / empty
-    lists). A fast error or empty answer is not a fast call, in any mode."""
-    error = response_error(status, content)
-    if error or status != 200:
-        return error
-    return None if has_content(json.loads(content).get("data")) else "empty data (all null)"
+    """Why an answer is a failure: ``response_error`` (HTTP status, GraphQL error, non-JSON). An
+    empty ``data`` is not one (a page can be legitimately empty): see ``empty_note``."""
+    return response_error(status, content)
+
+
+def empty_note(status: int, content: bytes) -> str | None:
+    """ "EMPTY (check)" for a 200 answer whose ``data`` holds nothing but nulls and empty lists:
+    to be looked at, not a failure."""
+    if status != 200:
+        return None
+    try:
+        data = json.loads(content).get("data")
+    except (ValueError, AttributeError):
+        return None
+    return None if has_content(data) else "EMPTY (check): data is all null / empty"
 
 
 def cold_suspect(cold_bytes: int, uncached_bytes: int, ratio: float = 0.5) -> str | None:
@@ -174,16 +187,21 @@ def cold_suspect(cold_bytes: int, uncached_bytes: int, ratio: float = 0.5) -> st
     return None
 
 
-def cold_line(name: str, ms: float, size: int, rows: int, error: str | None) -> str:
+def cold_line(
+    name: str, ms: float, size: int, rows: int, error: str | None, note: str | None = None
+) -> str:
     """The progress line of one COLD call: time, bytes, rows and the first error."""
-    return f"  {name}: cold {ms:.0f} ms, {size:,} B, {rows} rows" + (
-        f"  FAILED: {error}" if error else ""
+    return (
+        f"  {name}: cold {ms:.0f} ms, {size:,} B, {rows} rows"
+        + (f"  FAILED: {error}" if error else "")
+        + (f"  {note}" if note else "")
     )
 
 
 def guard() -> None:
-    """Stop (SwapLowError) before an operation when free swap is under the floor."""
-    pp.swap_guard(SWAP_FLOOR_MB[0])
+    """Stop (SwapLowError) before an operation when free swap is under the floor or the clone's
+    disk has under 8 GB free."""
+    pp.swap_guard(SWAP_FLOOR_MB[0], disk_path=GUARD_PATH[0])
 
 
 def largest_list(data: object) -> int:
@@ -356,6 +374,7 @@ class Api:
         raise RuntimeError("the API did not start")
 
     last_error: str | None = None
+    last_note: str | None = None
 
     def call(self, op: dict) -> tuple[float, int, int, int]:
         """(ms, status, decoded bytes, longest list) of one GraphQL call."""
@@ -369,6 +388,7 @@ class Api:
         ms = (time.perf_counter() - t0) * 1000
         rows = 0
         self.last_error = answer_problem(r.status_code, r.content)
+        self.last_note = empty_note(r.status_code, r.content)
         if r.status_code == 200:
             rows = largest_list(r.json().get("data"))
         return ms, r.status_code, len(r.content), rows
@@ -520,7 +540,7 @@ def measure_cold(ops: dict[str, dict], mode: str = "cache", **target: object) ->
         api = Api(mode, **target)  # type: ignore[arg-type]
         try:
             ms, status, size, rows = api.call(op)
-            error = api.last_error
+            error, note = api.last_error, api.last_note
         finally:
             api.close()
         out[name] = {
@@ -529,8 +549,9 @@ def measure_cold(ops: dict[str, dict], mode: str = "cache", **target: object) ->
             "bytes": size,
             "rows": rows,
             "cold_error": error,
+            "cold_note": note,
         }
-        print(cold_line(name, ms, size, rows, error), flush=True)
+        print(cold_line(name, ms, size, rows, error, note), flush=True)
     return out
 
 
@@ -646,6 +667,8 @@ def render_uncached(report: dict) -> str:
             note += f" **FAILED x{m['failed_calls']}: {m['first_error']}** (timings are errors)"
         if m.get("cold_error"):
             note += f" **COLD FAILED: {m['cold_error']}** (cold ms is an error)"
+        if m.get("cold_note"):
+            note += f" **{m['cold_note']}**"
         if m.get("cold_flag"):
             note += f" **COLD SUSPECT: {m['cold_flag']}**"
         lines.append(
@@ -759,6 +782,8 @@ def run_profile(args: argparse.Namespace, ops: dict[str, dict]) -> int:
             problem=answer_problem,
             rows_of=largest_list,
             min_free_mb=SWAP_FLOOR_MB[0],
+            disk_path=GUARD_PATH[0],
+            notes_of=empty_note,
         )
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -800,8 +825,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def run_needs_url(args: argparse.Namespace) -> bool:
-    """The modes that must name a clone: the uncached run and the profile."""
-    return bool(args.uncached or args.profile)
+    """The modes that must name a clone: any run but the whole-site baseline (a subset run
+    starts an API too, and would otherwise default to the real store)."""
+    return bool(args.uncached or args.profile or args.page or args.only)
 
 
 def profile_selection_error(args: argparse.Namespace) -> str | None:
@@ -826,12 +852,13 @@ def main(argv: list[str] | None = None) -> int:
         args.data_url = check_target(
             args.data_url,
             real_stores(dict(os.environ), REPO, main_checkout_of(REPO)),
-            args.i_know_this_is_the_real_store,
+            args.i_know_this_is_the_real_store and not args.profile,  # never for --profile
             need_url=run_needs_url(args),
         )
     except RefusalError as err:
         print(f"refused: {err}", file=sys.stderr)
         return 2
+    GUARD_PATH[0] = store_path(args.data_url) if args.data_url else None
     pages = json.loads(PAGES_FILE.read_text())["pages"]
     ops, by_page = inventory(pages)
     args.subset = bool(args.only or args.page)
