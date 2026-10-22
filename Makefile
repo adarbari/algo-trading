@@ -149,6 +149,9 @@ load:            ## API load test by hand on an idle machine (an API on :8011 fi
 api-latency-capture: ## what each web route sends on load (own API + Vite, real store) -> benchmarks/api_latency_pages.json
 	node scripts/perf/capture_page_ops.mjs
 
+api-latency-docs: ## check the recorded operation documents against the web's generated gql.ts; ARGS=--write rewrites them (no server, no store)
+	$(PY) scripts/perf/page_docs.py $(ARGS)
+
 api-latency-views: ## enumerate every web VIEW (route + search + tabs) statically -> benchmarks/api_latency_views.json + docs/perf/view-coverage.md (no store, no server)
 	$(PY) scripts/perf/view_coverage.py
 
