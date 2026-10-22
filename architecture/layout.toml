@@ -619,6 +619,11 @@ purpose = "table backends (local Parquet, memory): the only code that knows phys
 contracts = ["Parquet / Arrow I/O lives only in storage backends"]
 
 [[dir]]
+path = "src/algotrade/storage/backends/runs"
+purpose = "run records of the table backends: which runs a read sees (run_selection), the partition index files (local_index), compaction of a partition's runs (run_compaction), the cached directory listing (run_listing)"
+contracts = ["Parquet / Arrow I/O lives only in storage backends"]
+
+[[dir]]
 path = "src/algotrade/storage/backends/release"
 purpose = "the serving release store (ADR 0077): manifest, shared rules, local and memory stores of the derived per-session snapshots and their atomic CURRENT"
 contracts = ["Parquet / Arrow I/O lives only in storage backends"]

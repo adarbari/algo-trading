@@ -9,8 +9,8 @@ from typing import Any
 
 import pytest
 
-from algotrade.storage.backends import local_index
 from algotrade.storage.backends.local import LocalBackend
+from algotrade.storage.backends.runs import local_index
 from algotrade.storage.tables.interfaces import PartitionBusyError
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.maintenance.compaction.sweep import RollingSweep

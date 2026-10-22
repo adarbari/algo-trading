@@ -12,7 +12,7 @@ import pytest
 
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.backends.run_selection import StaleSnapshotError
+from algotrade.storage.backends.runs.run_selection import StaleSnapshotError
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.readers import StoreReader
 from tests.helpers.stored_frames import T0, stamped

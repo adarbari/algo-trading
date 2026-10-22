@@ -21,8 +21,8 @@ import pytest
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.jobs.exclusive import INGEST_LOCK
 from algotrade.storage.backends.local import LocalBackend
-from algotrade.storage.backends.local_index import _named, read_index
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.backends.runs.local_index import _named, read_index
 from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext

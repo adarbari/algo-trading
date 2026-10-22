@@ -6,7 +6,7 @@ from contextlib import nullcontext
 import pandas as pd
 import pytest
 
-from algotrade.storage.backends.run_selection import (
+from algotrade.storage.backends.runs.run_selection import (
     RunEntry,
     StaleSnapshotError,
     chain,

@@ -21,7 +21,6 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from algotrade.storage.backends.local_index import atomic_write
 from algotrade.storage.backends.release.base import DRAFT_TTL_S, ReleaseStoreBase
 from algotrade.storage.backends.release.interfaces import (
     Draft,
@@ -29,6 +28,7 @@ from algotrade.storage.backends.release.interfaces import (
     ReleaseInvalidError,
 )
 from algotrade.storage.backends.release.manifest import MAX_RELEASE_BYTES, Manifest
+from algotrade.storage.backends.runs.local_index import atomic_write
 from algotrade.storage.tables.interfaces import TableStore
 
 MANIFEST = "manifest.json"
