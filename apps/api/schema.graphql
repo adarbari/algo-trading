@@ -2032,7 +2032,7 @@ type IdeaScreener {
   run: ScreenerRun
   notRun: Unknown
   picked: Int!
-  top: [ScreenResult!]!
+  top: [TopPick!]!
   withheld: Boolean!
 }
 
@@ -3455,6 +3455,16 @@ type TableView {
 type TextPart {
   text: String!
   url: String
+}
+
+"""
+One of a screener's first picks: who it is, its `position` in the screener's run and the `score` the run stored for it (null: none stored)
+"""
+type TopPick {
+  instrumentId: String!
+  instrument: Instrument
+  position: Int!
+  score: Float
 }
 
 """

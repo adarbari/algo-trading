@@ -24,7 +24,7 @@ IDEAS = """query Ideas($first: Int!, $after: String, $names: [FeatureName!]!, $d
       run { runId status configVersion picked paused regime decisions { decision count } }
       notRun { code kind }
       picked withheld
-      top { rank instrumentId instrument { symbol } }
+      top { position score instrumentId instrument { symbol } }
     }
     items {
       rank instrumentId score regime sizeMultiplier watchOut
@@ -61,6 +61,7 @@ def test_ideas_rank_the_runs_of_the_session_and_serve_the_best_pick(graph: Graph
     }  # fmt: skip
     assert (screener["picked"], screener["notRun"]) == (2, None)
     assert [t["instrument"]["symbol"] for t in screener["top"]] == ["AAA", "BBB"]
+    assert [t["position"] for t in screener["top"]] == [1, 2]
     first, second = ideas["items"]
     assert (first["rank"], first["instrument"]["symbol"]) == (1, "AAA")  # the run's first pick
     assert second["instrument"]["symbol"] == "BBB"  # its second, though it scored higher (90 > 80)

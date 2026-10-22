@@ -8,8 +8,9 @@ Each screener contributes its run for exactly ``ctx.session.date`` (``runs`` THE
 rule); one with no run for it is listed ``NOT_RUN`` and picks nothing (no lookback), and one
 whose rank follows values the viewer's licences do not cover (``run_withheld``) is listed
 ``withheld`` and contributes nothing, so its ranking is never listed. Its ``picked`` count is
-over the whole run; its ``top`` are its first pool picks. Per-ticker facts (earnings, expiry,
-IV) are not here: the page asks ``Instrument.features(names)``.
+over the whole run; its ``top`` are its first pool picks, built from the run's ``screen_picks``
+rows and the reference snapshot alone (no ``rule_screen`` / values read). Per-ticker facts
+(earnings, expiry, IV) are not here: the page asks ``Instrument.features(names)``.
 
 An idea is served from its best pick only (no merging across picks): ``best`` with its stored
 values, the regime and size multiplier it was stamped with, the display ``metrics`` and the
@@ -55,7 +56,7 @@ from algotrade.services.ideas.rule import (
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.instruments.features import load_feature_values
-from algotrade.services.read.instruments.identity import Instrument
+from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.screens.results import ScreenResult, load_results, run_withheld
 from algotrade.services.read.screens.runs import (
     LatestRun,
@@ -65,7 +66,7 @@ from algotrade.services.read.screens.runs import (
     run_picks,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
-from algotrade.services.read.values import Unknown
+from algotrade.services.read.values import Unknown, to_scalar
 from algotrade.services.screening.rule_results import PAUSED
 
 FIRST_PAGE = 50  # the page the Ideas page loads first and each "more" adds
@@ -73,6 +74,18 @@ LIQUIDITY_RISK = "LIQUIDITY_RISK"  # a decision (ADR 0054) that is also a watch-
 WATCH_LIQUIDITY = "liquidity_risk"
 WATCH_EARNINGS = "earnings_before_expiry"
 EARNINGS_BEFORE_EXPIRY = "feature.earnings_before_expiry"  # the stored fact behind that watch-out
+
+
+@dataclass(frozen=True)
+class TopPick:
+    """One of a screener's first pool picks: ``position`` in the run (1 is the first), the run's
+    stored ``score`` for it (as ``ScreenResult.score``; None: stored none) and who it is in the
+    session's reference snapshot (None: not in it)."""
+
+    instrument_id: str
+    instrument: Instrument | None
+    position: int
+    score: float | None
 
 
 @dataclass(frozen=True)
@@ -85,7 +98,7 @@ class IdeaScreener:
     run: ScreenerRun | None
     not_run: Unknown | None
     picked: int
-    top: tuple[ScreenResult, ...]
+    top: tuple[TopPick, ...]
     withheld: bool = False
 
 
@@ -160,10 +173,12 @@ def _pool(
     ctx: ReadContext,
     screeners: Sequence[Screener],
     latest: dict[tuple[str, str], LatestRun],
-) -> list[PoolRun]:
+) -> tuple[list[PoolRun], dict[tuple[str, str], float | None]]:
     """One ``PoolRun`` per screener: its picked and paused rows in the run's rank order; a run
-    withheld from the viewer is not read at all (its rows would leak a ranking)."""
+    withheld from the viewer is not read at all (its rows would leak a ranking). Also the stored
+    score of every picked row by (run id, instrument id), for the screeners' ``top``."""
     pool = []
+    scores: dict[tuple[str, str], float | None] = {}
     for s in screeners:
         found = latest[(s.owner, s.id)]
         own = s.owner != SITE_USER
@@ -177,6 +192,8 @@ def _pool(
             rows = run_picks(ctx, run)
             picked = rows[picked_mask(rows["decision"])]
             held = rows[rows["decision"].astype(str) == PAUSED]
+            for iid, score in zip(picked["instrument_id"], picked["score"], strict=True):
+                scores.setdefault((run.run_id, str(iid)), _score(score))
             pool.append(
                 PoolRun(
                     s.owner,
@@ -189,7 +206,12 @@ def _pool(
                     _rows(held),
                 )
             )
-    return pool
+    return pool, scores
+
+
+def _score(value: object) -> float | None:
+    found = to_scalar(value)
+    return None if found is None else float(found)
 
 
 def _rows(frame: pd.DataFrame) -> tuple[PoolRow, ...]:
@@ -275,13 +297,14 @@ def _standing(
     s: PoolStanding,
     screener: Screener,
     found: LatestRun,
-    results: dict[tuple[str, str], ScreenResult],
+    scores: dict[tuple[str, str], float | None],
+    instruments: dict[str, Instrument],
 ) -> IdeaScreener:
     run = found.run
     top = tuple(
-        results[(p.run_id, p.instrument_id)]
+        TopPick(p.instrument_id, instruments.get(p.instrument_id), p.position, scores[key])
         for p in s.top
-        if (p.run_id, p.instrument_id) in results
+        if (key := (p.run_id, p.instrument_id)) in scores
     )
     return IdeaScreener(
         screener, run, found.not_run, 0 if run is None else run.picked, top, s.status == WITHHELD
@@ -294,7 +317,7 @@ def load_ideas(ctx: ReadContext, limit: int, after: str | None = None) -> Ideas:
     rule = load_ideas_rule(ctx.configs)
     screeners = load_screeners(ctx)
     latest = load_latest_runs(ctx, [(s.owner, s.id) for s in screeners])
-    pool = _pool(ctx, screeners, latest)
+    pool, scores = _pool(ctx, screeners, latest)
     stamp = _fingerprint(ctx.session.date, pool, rule)
     start = decode_cursor(after, stamp)
     ranked = rank_ideas(pool, rule)
@@ -303,9 +326,6 @@ def load_ideas(ctx: ReadContext, limit: int, after: str | None = None) -> Ideas:
     standings = pool_standing(pool, rule)
     held: list[PausedPick] = rank_paused(pool, rule)[: max(limit, 0)] if start == 0 else []
     wanted: dict[str, list[str]] = {}
-    for st in standings:
-        for p in st.top:
-            wanted.setdefault(p.run_id, []).append(p.instrument_id)
     for idea in shown:
         wanted.setdefault(idea.best.run_id, []).append(idea.instrument_id)
     for h in held:
@@ -313,6 +333,8 @@ def load_ideas(ctx: ReadContext, limit: int, after: str | None = None) -> Ideas:
     wanted = {run_id: list(dict.fromkeys(ids)) for run_id, ids in wanted.items()}  # each read once
     runs = [r for s in screeners if (r := latest[(s.owner, s.id)].run) is not None]
     results = load_results(ctx, wanted, runs)
+    top_ids = sorted({p.instrument_id for st in standings for p in st.top})
+    instruments = load_instruments(ctx, top_ids)
     early = _earnings_first(ctx, [i.instrument_id for i in shown])
     items = []
     for idea in shown:
@@ -338,7 +360,13 @@ def load_ideas(ctx: ReadContext, limit: int, after: str | None = None) -> Ideas:
     )
     by_key = {(s.owner, s.id): s for s in screeners}
     listed = tuple(
-        _standing(st, by_key[(st.owner, st.config_id)], latest[(st.owner, st.config_id)], results)
+        _standing(
+            st,
+            by_key[(st.owner, st.config_id)],
+            latest[(st.owner, st.config_id)],
+            scores,
+            instruments,
+        )
         for st in standings
     )
     read = {p.run_id for p in pool if p.status == RAN}  # a withheld run's held rows are not counted
