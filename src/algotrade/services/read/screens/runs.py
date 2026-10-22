@@ -43,6 +43,7 @@ from algotrade.services.read.context import (
 )
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.services.screening.rule_results import NOT_PICKED, PAUSED, is_picked
+from algotrade.services.screening.run import run_job_name
 from algotrade.storage.tables.schemas import result_table
 
 RULE_SCREEN = result_table("rule_screen")
@@ -240,14 +241,27 @@ def _recounted(ctx: ReadContext) -> RunSummaries | Unknown:
     return found
 
 
+def _from_rows(ctx: ReadContext, key: RunKey, run_id: str) -> RunSummary | None:
+    """``key``'s run ``run_id`` counted from its own ``rule_screen`` file in ``ctx``'s session
+    (None: it stored no rows there)."""
+    stored = run_rows_of(ctx, RULE_SCREEN, run_id, ROW_COLUMNS)
+    mine = stored[(stored["user_id"] == key[0]) & (stored["config_id"] == key[1])]
+    return None if mine.empty else _summary(mine)
+
+
 def _unfrozen(ctx: ReadContext, key: RunKey) -> RunSummary | None:
     """``key``'s run counted from its rows when it has no ``screen_runs`` row (a run written
     before the table, in a session that has one): missing data never passes as ``NOT_RUN``.
-    Probes the ``rule_screen`` partition first; None: neither table has the run."""
-    if not ctx.reader.has_partition(RULE_SCREEN, ctx.session.date):
-        return None
-    counted = _recounted(ctx)
-    return None if isinstance(counted, Unknown) else counted.by_key.get(key)
+    Found from the screen job's run records for the day (no ``rule_screen`` row is read for a
+    config that never ran); the newest record that stored rows wins. None: neither has it."""
+    job = run_job_name(key[1], key[0])
+    for record in sorted(
+        ctx.reader.runs(job, ctx.session.date), key=lambda r: r.started_at, reverse=True
+    ):
+        found = _from_rows(ctx, key, record.run_id)
+        if found is not None:
+            return found
+    return None
 
 
 def _version(value: object) -> int | None:
@@ -441,9 +455,10 @@ def load_previous_run(ctx: ReadContext, run: ScreenerRun) -> ScreenerRun | None:
             return None
         there = at_session(ctx, frozen.previous_session)
         found = _frozen_run(there, run, frozen.previous_run_id)
-        if found is not None:
-            return found
-        # the previous run predates the table: its rows are what there is
+        if found is None:  # the previous run predates the table: its own rows are what there is
+            counted = _from_rows(there, (run.owner, run.config_id), frozen.previous_run_id)
+            found = None if counted is None else _run(there, run.owner, run.config_id, counted)
+        return found  # the run the row names, never another session's
     day = previous_session(ctx, RULE_SCREEN)
     if day is None:
         return None

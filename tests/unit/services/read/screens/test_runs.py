@@ -471,8 +471,8 @@ def test_the_frozen_path_reads_no_row_of_any_run(
 
         monkeypatch.setattr(reader, name, counting)
     ctx = context(reader)
-    found = load_latest_runs(ctx, KEYS[:3])  # every one has a frozen row
-    for key in KEYS[:3]:
+    found = load_latest_runs(ctx, KEYS)  # gamma never ran: NOT_RUN, no row read
+    for key in KEYS:
         run = found[key].run
         if run is not None:
             results.load_change_summary(ctx, run)
@@ -502,3 +502,17 @@ def test_the_common_path_probes_no_rule_screen(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(reader, "has_partition", lambda t, *a: (seen.append(t), real(t, *a))[1])
     load_latest_runs(ctx, [("site", "alpha"), ("me", "beta")])
     assert RULE_SCREEN not in seen
+
+
+def test_a_previous_run_before_the_table_is_read_from_the_frozen_run_id() -> None:
+    backend = screens_store()
+    freeze(backend, days=(D1,))  # D0's runs have no row: alpha's previous (r-1) is rows only
+    ctx = context(StoreReader(backend))
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None and run.frozen is not None
+    assert run.frozen.previous_run_id == "r-1"
+    before = load_previous_run(ctx, run)
+    assert before is not None and (before.run_id, before.session) == ("r-1", D0)
+    assert before.frozen is None
+    changes = results.load_run_changes(ctx, run)
+    assert changes.by_instrument["EQ:AAA"] == ("new", "REJECT")
