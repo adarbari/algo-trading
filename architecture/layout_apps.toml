@@ -256,6 +256,11 @@ purpose = "reference-data tasks: universe, instrument ids, classification, histo
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/screens"
+purpose = "screen tasks: the screen-runs-backfill job that frames ScreenRun and ScreenPick rows (results/screen_runs, results/screen_picks) for the rule-screen runs stored before those tables existed (ADR 0077 amendment (c))"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/shorting"
 purpose = "FINRA short-interest tasks (EB D9): short interest into events/short_interest and the daily short-sale volume into events/short_volume, one loop over dates; both tables are no_ml"
 kind = "task-domain"

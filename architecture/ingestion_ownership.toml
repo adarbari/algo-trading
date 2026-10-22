@@ -341,6 +341,17 @@ section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-
 detect = [{ call = "stamp" }]
 
 [[responsibility]]
+id = "screen-runs-backfill"
+description = "Frame results/screen_runs (ScreenRun) and results/screen_picks (ScreenPick) for the rule-screen runs stored before those tables existed (ADR 0077 amendment (c), data architecture v2 phase 5): per stored run, from its own results/rule_screen rows and its run record, through the live framer (services/screening/rule_results.stored_run_frames) and the live atomic publish (ResultWriter.publishing) under the original run id and knowledge_ts (never now), the previous run found as the live path does (services/screening/previous.py); idempotent and resumable by the store (a framed run is skipped, a count that differs from rule_screen is reported as a MISMATCH, never overwritten), an unknown version stored null with its reason, progress in the run record, run under the ingest lock and the lowered priority, acceptance check per session; owner-run, never in the nightly"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/screens/screen_runs_backfill.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_ops.py",  # the task's entry
+]
+section = "docs/adr/0077-serving-release.md#amendment-2026-10-22-c-the-release-pins-business-objects-it-never-copies-them"
+detect = [{ call = "stored_run_frames" }]
+
+[[responsibility]]
 id = "serve-release-job"
 description = "The serve-release workflow (ADR 0077 decision 4): under the serve lock, a no-op while CURRENT serves the default session (unless rebuild), else build the release, promote it unless CURRENT already names it, prune (which records what the pins hold), with its own serve-release run record, FAILED and CURRENT untouched on any failure; started by the CLI after a nightly or post-session finished, never a nightly step"
 owner = ["apps/ingestion/algotrade_ingestion/workflows/serve_release/serve_release.py"]

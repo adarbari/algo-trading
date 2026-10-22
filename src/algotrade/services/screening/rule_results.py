@@ -3,8 +3,9 @@
 screen rows also carry the session's ``regime`` and ``size_multiplier`` (ADR 0049). The same
 frames' run objects, ``results/screen_runs`` (ScreenRun: the summary and the changes against the
 previous run, frozen at write) and ``results/screen_picks`` (ScreenPick: the picked and PAUSED
-rows), are framed here from the same rows, so the three published together cannot differ. Also
-the one rule for what a pick is (``is_picked``)."""
+rows), are framed here from the same rows, so the three published together cannot differ; a run
+already stored is framed from its own rows by ``stored_run_frames`` (the backfill, same builders).
+Also the one rule for what a pick is (``is_picked``)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -58,7 +59,9 @@ class Stamp:
     config_hash: str
     config_version: int | None
     regime: str | None = None  # the session's regime label (ADR 0049; None: gate off / unknown)
-    size_multiplier: float = 1.0  # the regime's size for this screener (1.0 with the gate off)
+    # the regime's size for this screener (1.0 with the gate off; None: a stored run that never
+    # recorded it, the backfill)
+    size_multiplier: float | None = 1.0
 
     def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
         frame["user_id"], frame["config_id"] = self.user_id, self.config_id
@@ -230,21 +233,38 @@ def runs_frame(
 ) -> pd.DataFrame:
     """The run's one ``results/screen_runs`` row: ``result.summary`` (the run record's), the
     picked and PAUSED counts, and the changes against ``lineage``'s previous run, frozen here."""
-    decisions = dict(result.summary.decisions)
+    return _runs_row(
+        result.summary.rows,
+        result.summary.passed,
+        dict(result.summary.decisions),
+        {r.instrument_id: r.decision.value for r in result.rows},
+        stamp,
+        lineage,
+    )
+
+
+def _runs_row(
+    rows: int,
+    passed: int,
+    decisions: Mapping[str, int],
+    by_instrument: Mapping[str, str],
+    stamp: Stamp,
+    lineage: Lineage,
+) -> pd.DataFrame:
+    """The one ``screen_runs`` row from a run's counts and its decision per instrument: the one
+    way a row is built, whether the run was just evaluated or is framed from its stored rows."""
     picked = sum(n for d, n in decisions.items() if is_picked(d))
     before = lineage.previous_decisions
     new = dropped = None
     if before is not None:
-        new, dropped = change_counts(
-            {r.instrument_id: r.decision.value for r in result.rows}, before
-        )
+        new, dropped = change_counts(by_instrument, before)
     record = {
         "user_id": stamp.user_id,
         "config_id": stamp.config_id,
         "config_hash": stamp.config_hash,
         "config_version": stamp.config_version,
-        "rows": result.summary.rows,
-        "passed": result.summary.passed,
+        "rows": rows,
+        "passed": passed,
         "picked": picked,
         "paused": decisions.get(PAUSED, 0),
         "decision_names": list(decisions),
@@ -261,6 +281,31 @@ def runs_frame(
     for name in ("config_version", "previous_version", "new_picks", "dropped"):
         frame[name] = frame[name].astype("Int64")
     return stamp.apply(frame)
+
+
+def counts_of(screen: pd.DataFrame) -> tuple[int, int, dict[str, int]]:
+    """``(rows, passed, decisions)`` of a stored run's ``results/rule_screen`` rows, as
+    ``strategies.screeners.rules.summary.summarise`` counts them (decisions sorted by name,
+    ``passed`` the QUALIFIED ones): what the run's summary must equal."""
+    counted = screen["decision"].astype(str).value_counts()
+    decisions = {str(d): int(n) for d, n in sorted(counted.items())}
+    return len(screen), decisions.get(Decision.QUALIFIED.value, 0), decisions
+
+
+def stored_run_frames(
+    screen: pd.DataFrame, stamp: Stamp, lineage: Lineage
+) -> dict[str, pd.DataFrame]:
+    """``{SCREEN_RUNS: ..., SCREEN_PICKS: ...}`` of a run already stored (the backfill): the same
+    two frames ``rule_frames`` frames at the run, from the run's own ``results/rule_screen`` rows
+    (``screen``) instead of its in-memory result, through the same builders."""
+    rows, passed, decisions = counts_of(screen)
+    by_instrument = dict(
+        zip(screen["instrument_id"].astype(str), screen["decision"].astype(str), strict=True)
+    )
+    return {
+        SCREEN_RUNS: _runs_row(rows, passed, decisions, by_instrument, stamp, lineage),
+        SCREEN_PICKS: picks_frame(screen),
+    }
 
 
 def rule_frames(
