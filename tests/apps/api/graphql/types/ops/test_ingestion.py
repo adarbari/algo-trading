@@ -1,6 +1,9 @@
 """``Query.{completeness,ingestionCell}`` over the golden API store: the grid of datasets x a
 window of sessions, one cell's drill-down, null for a dataset the grid does not list."""
 
+import pytest
+
+from algotrade.services.read.ops import ingestion
 from tests.apps.api.graphql.conftest import Graph
 
 GRID = """query G($sessions: Int!) { completeness(sessions: $sessions) {
@@ -24,6 +27,24 @@ def test_the_grid(graph: Graph) -> None:
     cells = {(c["dataset"], c["session"]): c for c in grid["cells"]}
     bars = cells[("bars/1d", "2022-11-23")]
     assert (bars["status"], bars["present"], bars["expected"]) == ("COMPLETE", 11, 11)
+
+
+def test_the_cells_are_built_only_when_selected(
+    graph: Graph, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The status strip asks the window only: the partition walk (~25% of its uncached cost)
+    runs for a query that selects `cells`, never for one that does not."""
+    walks: list[int] = []
+    real = ingestion.load_cells
+
+    def counting(ctx, days):  # type: ignore[no-untyped-def]
+        walks.append(len(days))
+        return real(ctx, days)
+
+    monkeypatch.setattr(ingestion, "load_cells", counting)
+    strip = "query S { completeness(sessions: 1) { sessions lastClosed } }"
+    assert "errors" not in graph(strip) and walks == []
+    assert "errors" not in graph(GRID, {"sessions": 2}) and walks == [2]
 
 
 def test_the_window_is_capped(graph: Graph) -> None:

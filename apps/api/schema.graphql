@@ -246,8 +246,12 @@ Ingestion completeness: every dataset x the window's `sessions` (oldest first, e
 type Completeness {
   sessions: [Date!]!
   datasets: [String!]!
-  cells: [IngestionCell!]!
   lastClosed: Date!
+
+  """
+  Every dataset x `sessions`: built (the partition walk) only when the query selects it
+  """
+  cells: [IngestionCell!]!
 }
 
 """

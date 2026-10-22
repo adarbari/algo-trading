@@ -694,11 +694,10 @@ class Query:
         self, info: Ctx, sessions: int = 10, date: Day = None
     ) -> Completeness | None:
         ctx = await info.context.aread(date)
-        # Off the event loop: one partition read per dataset and session of the window.
-        found = (
-            await off_loop(ingestion.load_completeness, ctx, sessions) if ctx is not None else None
-        )
-        return Completeness.of(found) if found is not None else None
+        # The window only; `cells` (one partition read per dataset and session) resolves
+        # lazily, so the status strip's selection never walks them.
+        found = ingestion.load_completeness_window(ctx, sessions) if ctx is not None else None
+        return Completeness.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="One completeness cell, `dataset` on the session `date`, with the reasons "
