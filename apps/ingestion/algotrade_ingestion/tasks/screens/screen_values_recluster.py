@@ -31,7 +31,6 @@ item, so a rewrite that changed a value never becomes visible.
   D2 [--limit N]``.
 """
 
-from collections import Counter
 from datetime import date
 
 import pandas as pd
@@ -42,6 +41,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.interfaces import PartitionBusyError
 from algotrade.storage.tables.schemas import result_table
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.screens.windowed_pass import WindowedPass
 
 TASK = "screen_values_recluster"
 TABLES = (result_table(RULE_SCREEN), result_table(RULE_SCREEN_VALUES))
@@ -61,12 +61,8 @@ class RewriteChangedRowsError(RuntimeError):
     """The pending files of a run read back with other rows than the run held."""
 
 
-class _Pass:
+class _Pass(WindowedPass):
     """One recluster run's state: what each run did, and what to report."""
-
-    def __init__(self, run: IngestRun, limit: int | None) -> None:
-        self.run, self.limit = run, limit
-        self.counts: Counter[str] = Counter()
 
     def todo(self, day: date) -> dict[str, list[str]]:
         """The runs of ``day`` whose file is not laid out as declared, with their tables."""
@@ -117,23 +113,6 @@ class _Pass:
             except PartitionBusyError:  # a pending run wrote there: the next run tidies
                 self.counts["tidy_deferred"] += 1
 
-    def _note(self, key: str, status: str, count: str) -> None:
-        self.run.record_item(key, status)
-        self.counts[count] += 1
-
-    def finish(self, days: list[date], start: date | None, end: date | None) -> None:
-        run, counts = self.run, self.counts
-        run.stats.update(counts)
-        run.stats.update(
-            window=[start and start.isoformat(), end and end.isoformat()],
-            first=days[0].isoformat() if days else None,
-            last=days[-1].isoformat() if days else None,
-            sessions=len(days),
-            limit=self.limit,
-        )
-        if counts["not_reached"]:
-            run.partial(f"{counts['not_reached']} runs left by --limit: run it again to continue")
-
 
 def recluster_screen_values(
     ctx: TaskContext, start: date | None, end: date | None, limit: int | None
@@ -158,5 +137,5 @@ def recluster_screen_values(
             run.checkpoint()
         for day in days:
             work.tidy(day)  # this run's own, where the grace has passed
-        work.finish(days, start, end)
+        work.finish_window(days, start, end)
     return run.record
