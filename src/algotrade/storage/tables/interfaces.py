@@ -224,6 +224,13 @@ class TableStore(Protocol):
         sequence (a backfilled old date or a later session committed after it is not listed)."""
         ...
 
+    def has_partition(
+        self, table: str, session_date: date, own_run: str | None = None, upto: int | None = None
+    ) -> bool:
+        """Whether ``dates(table, own_run, upto)`` lists ``session_date``, without listing the
+        table: one question about one partition (the local backend probes a single index)."""
+        ...
+
     def names(self, own_run: str | None = None) -> list[str]:
         """Every table with at least one partition, sorted."""
         ...

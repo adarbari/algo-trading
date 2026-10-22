@@ -214,6 +214,10 @@ class StoreReader:
     def dates(self, table: str) -> list[date]:
         return self._backend.tables.dates(table, self.own_run, self._pin)
 
+    def has_partition(self, table: str, day: date) -> bool:
+        """Whether ``dates(table)`` lists ``day``: one probe, not a listing of the table."""
+        return self._backend.tables.has_partition(table, day, self.own_run, self._pin)
+
     def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
         """The last partition date (on or before a date). Picking the snapshot a reader
         should see is ``algotrade.data.reference.snapshot``, not this."""
@@ -484,6 +488,10 @@ class RecordingReader(StoreReader):
         if recording:
             self._log_dates(table, found)
         return found
+
+    def has_partition(self, table: str, day: date) -> bool:
+        """A membership test is a read of the listing: recorded as one (its digest)."""
+        return day in self.dates(table)
 
     def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
         recording = self._open()

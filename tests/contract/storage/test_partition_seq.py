@@ -120,3 +120,72 @@ def test_an_empty_frame_commit_lists_the_partition_with_stamp_zero_on_any_backen
     backend.tables.write(TABLE, D1, "r1", empty, pending=True)
     backend.tables.commit_run("r1", AT)
     assert backend.tables.partition_seq(TABLE, D1, D3) == {D1: 0}  # listed by dates() too, no entry
+
+
+# ---------------------------------------------------- has_partition and the live dates listing
+
+
+def listed(backend: Backend, table: str = TABLE) -> list[date]:
+    """``dates`` and ``has_partition`` must always agree: both are checked here."""
+    found = backend.tables.dates(table)
+    for day in (D1, D2, D3):
+        assert backend.tables.has_partition(table, day) == (day in found)
+    return found
+
+
+def test_has_partition_agrees_with_dates_for_committed_pending_and_pinned(
+    backend: Backend,
+) -> None:
+    first = publish(backend, "r1", D1)
+    publish(backend, "r2", D2)
+    backend.tables.write(TABLE, D3, "open", frame(D3, "open"), pending=True)
+    assert listed(backend) == [D1, D2]
+    assert not backend.tables.has_partition(TABLE, D3)  # another run's pending write is unseen
+    assert backend.tables.has_partition(TABLE, D3, own_run="open")  # its own is
+    assert backend.tables.dates(TABLE, own_run="open") == [D1, D2, D3]
+    assert backend.tables.has_partition(TABLE, D1, upto=first)
+    assert not backend.tables.has_partition(TABLE, D2, upto=first)  # committed after the pin
+    assert backend.tables.dates(TABLE, upto=first) == [D1]
+    assert not backend.tables.has_partition("rollups/instrument/none@v1", D1)
+
+
+def test_the_reader_has_partition_follows_its_pin_and_its_own_run(backend: Backend) -> None:
+    first = publish(backend, "r1", D1)
+    publish(backend, "r2", D2)
+    assert StoreReader(backend).has_partition(TABLE, D2)
+    assert not StoreReader(backend, pin=first).has_partition(TABLE, D2)
+    backend.tables.write(TABLE, D3, "open", frame(D3, "open"), pending=True)
+    assert StoreReader(backend, "open").has_partition(TABLE, D3)
+    assert not StoreReader(backend).has_partition(TABLE, D3)
+
+
+def test_a_partition_changed_after_a_listing_is_seen_by_the_next_call(backend: Backend) -> None:
+    """The live listing is kept; every way a partition appears or goes must re-key it."""
+    assert listed(backend) == []
+    publish(backend, "r1", D1)  # a commit
+    assert listed(backend) == [D1]
+    backend.tables.write(TABLE, D2, "direct", frame(D2, "direct"))  # a direct (not pending) write
+    assert listed(backend) == [D1, D2]
+    publish(backend, "r2", D3)
+    assert listed(backend) == [D1, D2, D3]
+    assert backend.tables.purge_before(LIVE, D3) == 0
+    other = "rollups/instrument/b@v1"
+    backend.tables.write(other, D1, "r3", frame(D1, "r3"), pending=True)
+    backend.tables.commit_run("r3", AT)
+    assert listed(backend, other) == [D1]
+    assert backend.tables.drop(other) == 1  # a drop
+    assert listed(backend, other) == []
+    assert listed(backend) == [D1, D2, D3]  # the other table's listing is unaffected
+
+
+def test_a_purge_is_seen_by_the_next_listing(backend: Backend) -> None:
+    for day in (D1, D2):
+        row = {
+            "instrument_id": f"OPT:{day}", "underlying_id": "EQ:A", "expiry": day,
+            "ts": pd.Timestamp(day, tz="UTC"), "right": "C", "strike": 100.0, "bid": 1.0,
+        }  # fmt: skip
+        backend.tables.write(LIVE, day, "r1", stamped([row], day, "r1"), pending=True)
+    backend.tables.commit_run("r1", AT)
+    assert listed(backend, LIVE) == [D1, D2]
+    assert backend.tables.purge_before(LIVE, D2) == 1
+    assert listed(backend, LIVE) == [D2]

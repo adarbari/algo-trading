@@ -459,6 +459,18 @@ class MemoryTables:
             keys = held | set(self._pending.get(own_run or "", {}))
         return sorted(d for (t, d) in keys if t == table)
 
+    def has_partition(
+        self, table: str, session_date: date, own_run: str | None = None, upto: int | None = None
+    ) -> bool:
+        key = (table, session_date)
+        with self._index_lock:
+            if key in self._pending.get(own_run or "", {}):
+                return True
+            entries = self._partitions.get(key)
+            return entries is not None and (
+                upto is None or listed_at(entries, self._created.get(key), upto)
+            )
+
     def partition_seq(
         self, table: str, start: date, end: date, upto: int | None = None
     ) -> dict[date, int]:

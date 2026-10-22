@@ -138,6 +138,7 @@ class LocalTables:
         self.swap_grace_s = SWAP_GRACE_S  # tests shorten it
         self._dates_memo: OrderedDict[tuple[str, int, int], frozenset[date]] = OrderedDict()
         self._dates_lock = threading.Lock()
+        self._live_dates: dict[str, tuple[tuple[int, int], frozenset[date]]] = {}
 
     def _dir(self, table: str, session_date: date) -> Path:
         return self.root / table / f"date={session_date.isoformat()}"
@@ -160,6 +161,7 @@ class LocalTables:
                 atomic_write(directory / file, data)
             return
         self.commits.bump_epoch()  # no sequence: every pin sees it, so no release is trusted
+        born = not (directory / INDEX).exists()
         if known is not None:
             atomic_write(directory / default_file(safe(run_id)), data)
         with held(index_lock(directory)):
@@ -167,6 +169,8 @@ class LocalTables:
             if known is not None:
                 index[run_id] = RunEntry(pd.Timestamp(known), restates)
             write_index(directory, index)
+        if born:  # a listing taken since the bump above lacks it and moves no sequence: re-key
+            self.commits.bump_epoch()
         drop_unreferenced(directory, run_id)
 
     def commit_run(self, run_id: str, at: datetime) -> int:
@@ -447,7 +451,41 @@ class LocalTables:
         found |= self._committed_dates(table) if upto is None else self._dates_at(table, upto)
         return sorted(found)
 
+    def has_partition(
+        self, table: str, session_date: date, own_run: str | None = None, upto: int | None = None
+    ) -> bool:
+        """``session_date in dates(table, own_run, upto)`` from one index probe (see there)."""
+        if own_run is not None and (table, session_date) in self._own_partitions(own_run):
+            return True
+        directory = self._dir(table, session_date)
+        if upto is None:
+            return (directory / INDEX).exists()
+        if not (directory / INDEX).exists():
+            return False
+        return listed_at(read_index(directory), created_seq(directory), upto)
+
     def _committed_dates(self, table: str) -> set[date]:
+        """The partitions with an index, kept per (table, published sequence, destructive epoch).
+        Every way a partition appears or goes changes one of the two: a commit and a purge move
+        the sequence (the sequence is read first, so a commit landing mid-listing re-keys it), a
+        direct write of a new partition, a drop and a purge bump the epoch (after the change as
+        well as before it where the sequence does not move). Pending writes are not here: they
+        are merged on top by ``dates``, never kept. A crash between a change and its final
+        sequence / epoch move (a purge killed after the rmtree before the sequence write, a drop
+        or a direct write before its second bump) leaves a stale listing in another process until
+        the next commit or epoch bump; ``dates`` and ``has_partition`` can disagree in that
+        window, and it heals itself."""
+        key = (self.commits.published(), self.commits.epoch())
+        with self._dates_lock:
+            held_ = self._live_dates.get(table)
+        if held_ is not None and held_[0] == key:
+            return set(held_[1])
+        found = self._list_dates(table)
+        with self._dates_lock:
+            self._live_dates[table] = (key, frozenset(found))
+        return found
+
+    def _list_dates(self, table: str) -> set[date]:
         base = self.root / table
         if not base.exists():
             return set()
@@ -526,6 +564,7 @@ class LocalTables:
         self.commits.bump_epoch()  # before the files go: a release is never trusted over a hole
         self._remove(days)
         shutil.rmtree(base, ignore_errors=True)
+        self.commits.bump_epoch()  # drop moves no sequence: a listing taken meanwhile is re-keyed
         return len(days)
 
     def purge_before(self, table: str, cutoff: date, keep: Collection[date] = ()) -> int:
