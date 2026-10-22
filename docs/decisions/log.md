@@ -438,3 +438,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the profiles of 20 pages (1,310 s of work) show 39% in run-record decoding (every lookup decodes the 572 `job-<kind>-<hash>` files), 25% in the status strip's unused completeness grid and 16-20% in market-history reads; these are code fixes that need no migration; the owner wants cold loads under 1 s and wants to approve any exception.
+
+## 2026-10-22 | Shaped tables for the 1 s cold-load bar | Allowed where needed, each one reviewed and confirmed by the owner before it is built
+- Question: may the nightly write small precomputed ("shaped") tables (Regime card, preset picks, market panel, track summaries, ...) to bring operations under the 1 s cold-load bar?
+- Options: yes without review / yes, each design reviewed and confirmed by the owner first / no (accept exceptions to the bar).
+- Decision: yes where required to meet the bar, but no shaped table is built before the owner has reviewed its design card (what it holds, who writes it and when, size, the operations that read it, the fallback when it is missing or stale, the expected saving) and confirmed it.
+- decided by: owner
+- status: final
+- Reasoning: the architect's bar gap analysis (docs of 2026-10-22) shows no page reaches 1 s with code fixes alone; 11 operations need a shaped table or the run ledger; each new table is a new derived artifact with a freshness rule, so the owner wants to review each.
