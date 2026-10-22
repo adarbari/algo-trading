@@ -3,7 +3,7 @@ Explore detail pane's "Screener hits"): every screener the user sees (``screener
 for exactly the session by THE latest-run rule (``runs``; a screener not run for it has no
 hit, never an older run's), and the instrument's result in that run when it is a pick
 (``runs.is_picked``). A small index says which runs picked each instrument (``PickIndex``, from
-the runs' cached light rows); the result itself (its criteria, values and reasons, read from the
+the runs' cached picks); the result itself (its criteria, values and reasons, read from the
 run's own files for that instrument only) is built when the instrument is asked for and kept in
 a bounded ``HitsHeld``."""
 
@@ -26,7 +26,8 @@ from algotrade.services.read.screens.results import (
 from algotrade.services.read.screens.runs import (
     ScreenerRun,
     load_latest_runs,
-    run_rows,
+    picked_mask,
+    run_picks,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
 from algotrade.services.screening.rule_results import is_picked
@@ -180,10 +181,9 @@ def _pick_index(ctx: ReadContext) -> tuple[PickIndex, tuple[object, ...]]:
 def _index(ctx: ReadContext, runs: list[tuple[Screener, ScreenerRun]]) -> PickIndex:
     picked_by: dict[str, list[int]] = {}
     for n, (_, run) in enumerate(runs):
-        rows = run_rows(ctx, run)
-        for iid, decision in zip(rows["instrument_id"], rows["decision"], strict=True):
-            if is_picked(str(decision)):
-                picked_by.setdefault(str(iid), []).append(n)
+        rows = run_picks(ctx, run)  # the run's picks alone, read once (screen_picks by run id)
+        for iid in rows["instrument_id"][picked_mask(rows["decision"])]:
+            picked_by.setdefault(str(iid), []).append(n)
     return PickIndex(runs, {i: tuple(at) for i, at in picked_by.items()})
 
 

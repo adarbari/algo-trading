@@ -59,6 +59,8 @@ DETAIL_COLUMNS = (
 )  # fmt: skip
 
 SCREEN_RUNS = result_table("screen_runs")
+SCREEN_PICKS = result_table("screen_picks")
+PICK_COLUMNS = ("user_id", "config_id", "decision", "score", "rank")
 # What a frozen run is read from (the run id and ``knowledge_ts`` come with the row key).
 FROZEN_COLUMNS = (
     "config_version", "decision_names", "decision_counts", "regime", "picked", "paused",
@@ -429,6 +431,36 @@ def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
     rows, added = held.get_or_read(run.run_id, read)
     if added:
         ctx.cache.put(key, held)  # its weight changed: the cache bounds what it really holds
+    return rows
+
+
+RunPicks = Held[pd.DataFrame]  # one publish's run picks (``run_picks``), a container per publish
+
+
+def run_picks(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
+    """``run``'s picked and ``PAUSED`` rows in rank order (``instrument_id``, ``decision``,
+    ``score``, ``rank``): from its ``screen_picks`` file (a few columns of the picked rows, never
+    the run's every row); a run with picks but no such file (a run before the table) from its
+    ``rule_screen`` rows, never read as having no picks. Read once per run and published state
+    and kept in one ``RunPicks`` in ``ctx.cache`` (ADR 0022), shared by Ideas and the hits; only
+    read by callers."""
+    key = ("run_picks", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
+    held: RunPicks = ctx.cache.get_or_compute(key, RunPicks)
+
+    def read() -> pd.DataFrame:
+        stored = run_rows_of(ctx, SCREEN_PICKS, run.run_id, PICK_COLUMNS)
+        rows = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
+        if rows.empty and run.picked + run.paused > 0:
+            rows = run_rows(ctx, run)
+            rows = rows[picked_mask(rows["decision"]) | (rows["decision"].astype(str) == PAUSED)]
+        cols = ["instrument_id", "decision", "score", "rank"]
+        return (
+            rows[cols].sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
+        )
+
+    rows, added = held.get_or_read(run.run_id, read)
+    if added:
+        ctx.cache.put(key, held)  # its weight changed
     return rows
 
 
