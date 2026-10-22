@@ -50,6 +50,12 @@ FACTS_OF_RECORD = frozenset(
 # 4.3 GB read for 0 rows). ``events/ipo_lockup`` is not here: its later versions carry the id.
 # Fitness test: ``tests/architecture/ingestion/test_events_no_instrument_rows.py``.
 NO_INSTRUMENT_ROWS = frozenset({"events/filing_text"})
+# Tables whose writer stores rows for ONE kind of instrument (closed-end funds, ``reference.
+# is_closed_end``): 1.3 M rows over 5,737 day partitions for 280 funds, 2.1 s of an AAPL events
+# read for 0 rows. A per-instrument read leaves them out for an instrument the session's
+# reference snapshot knows is of another kind, and reads them for one it does not know.
+# Fitness test: ``tests/architecture/ingestion/test_events_single_kind_tables.py``.
+CLOSED_END_FUND_ROWS = frozenset({"events/fund_nav"})
 
 
 @dataclass(frozen=True)

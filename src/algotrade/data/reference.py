@@ -13,6 +13,7 @@ keeps the latest stored row per instrument.
 """
 
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -38,6 +39,8 @@ if TYPE_CHECKING:  # ``data.listings`` reads this module: the type only, no impo
 UNIVERSE_TABLE = "universe"
 IBKR_CONTRACTS = "instruments/ibkr_contracts"
 UNIVERSE_HINT = "algotrade-ingest universe import --stocks <csv> --etfs <csv> --version <v>"
+CEF = "CEF"  # the reference's security_type of a closed-end fund (Massive FUND)
+CLOSED_END_NAME = re.compile(r"closed[- ]end fund", re.IGNORECASE)
 REFERENCE_HINT = "run the ingestion job that loads instrument reference data"
 
 
@@ -92,6 +95,18 @@ def instruments(
 ) -> pd.DataFrame:
     """The ``instruments/reference`` snapshot for ``on`` (see ``snapshot``)."""
     return read_snapshot(reader, REFERENCE_TABLE, on, REFERENCE_HINT, as_of, ids)[0]
+
+
+def is_closed_end(reference: pd.DataFrame) -> pd.Series:
+    """Which ``instruments/reference`` rows are closed-end funds: ``security_type = CEF`` plus the
+    common stocks whose name says ``Closed End Fund`` (the vendor types the Calamos funds as
+    stocks). The one definition: ``tasks/market/fund_nav`` writes ``events/fund_nav`` for exactly
+    these, and the events read leaves that table out for every other instrument."""
+    kind = reference["security_type"].astype(str).eq(CEF)
+    named = reference["security_type"].astype(str).eq("COMMON_STOCK") & reference["name"].astype(
+        str
+    ).str.contains(CLOSED_END_NAME)
+    return (kind | named) & reference["symbol"].astype(str).ne("")
 
 
 def companies(

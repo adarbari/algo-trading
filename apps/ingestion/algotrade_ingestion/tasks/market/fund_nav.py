@@ -7,10 +7,11 @@ and pace as ``bars-history``. Rows are staged per fund and published together wh
 (ADR 0022), one partition per NAV date (``session_date`` = the NAV date), merged on
 (instrument, series, date).
 
-- **Funds**: the reference snapshot's ``security_type = CEF`` (Massive's ``FUND``) plus the
-  common stocks whose name says ``Closed End Fund`` (the vendor types the Calamos funds as
-  stocks). The id is the fund's own ``instrument_id`` (ADR 0018), never built from the NAV
-  symbol, which is not an instrument. A fund is MAPPED only when Tiingo's listing holds
+- **Funds** (``data.reference.is_closed_end``, also the read side's test for skipping this table
+  for other instruments): the reference snapshot's ``security_type = CEF`` (Massive's
+  ``FUND``) plus the common stocks whose name says ``Closed End Fund`` (the vendor types the
+  Calamos funds as stocks). The id is the fund's own ``instrument_id`` (ADR 0018), never built
+  from the NAV symbol, which is not an instrument. A fund is MAPPED only when Tiingo's listing holds
   ``X<ticker>X`` under ``NMFQS``; the others (no NAV published: a fund under $75 M, a fund the
   vendor does not carry) are counted and named in ``stats["unmapped"]``. A NAV symbol whose
   series ended before the window is skipped (``ended``, from the listing's last day). BDCs are
@@ -41,7 +42,6 @@ and pace as ``bars-history``. Rows are staged per fund and published together wh
   ``STOP_AFTER_FAILED`` unanswered funds in a row end the run.
 """
 
-import re
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -51,7 +51,7 @@ from typing import cast
 import pandas as pd
 
 from algotrade.core.time.calendar import exchange_date, next_session
-from algotrade.data.reference import instruments
+from algotrade.data.reference import instruments, is_closed_end
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     FETCH_ERROR,
@@ -66,8 +66,6 @@ from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "fund_nav"
 TABLE = "events/fund_nav"
-CEF = "CEF"  # the reference's security_type of a closed-end fund (Massive FUND)
-CLOSED_END_NAME = re.compile(r"closed[- ]end fund", re.IGNORECASE)
 LOOKBACK_DAYS = 10  # the nightly window when --from is not given
 DONE = ("OK", "NO_DATA")
 UNMAPPED_SHOWN = 50  # unmapped funds named in the stats (the rest are counted)
@@ -89,15 +87,6 @@ class Fund:
 def nav_symbol(ticker: str) -> str:
     """``PHK`` -> ``XPHKX`` (Nasdaq MFQS's rule); a share class keeps Tiingo's hyphen."""
     return f"X{ticker.strip().upper().replace('.', '-')}X"
-
-
-def is_closed_end(reference: pd.DataFrame) -> pd.Series:
-    """Which reference rows are closed-end funds (module docstring)."""
-    kind = reference["security_type"].astype(str).eq(CEF)
-    named = reference["security_type"].astype(str).eq("COMMON_STOCK") & reference["name"].astype(
-        str
-    ).str.contains(CLOSED_END_NAME)
-    return (kind | named) & reference["symbol"].astype(str).ne("")
 
 
 def map_funds(

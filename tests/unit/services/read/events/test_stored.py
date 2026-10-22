@@ -11,7 +11,7 @@ import pytest
 from algotrade.services.read.events.stored import event_tables, load_events
 from algotrade.storage.backends.memory import MemoryTables
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.rollup_store import write_dividends, write_split
+from tests.helpers.rollup_store import write_dividends, write_rows, write_split
 from tests.helpers.stored_frames import T0, stamped
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 
@@ -161,3 +161,59 @@ def test_a_repeated_events_read_reads_nothing_and_a_new_instrument_reads_only_it
     assert reads and reads.count("events/split") == 1  # one read for the instrument not held
     other_window = load_events(ctx, ["EQ:AAA"], date(2026, 1, 1), None)["EQ:AAA"]
     assert [e.kind for e in other_window] == ["dividend"]  # the window is part of the key
+
+
+def _with_fund_nav(writer: StoreWriter, nav_rows: bool = True) -> None:
+    """A newer reference snapshot (D1) with a stock, an ETF, a CEF and a stock named a closed-end
+    fund, and a NAV row for each of the funds and (wrongly stored, to prove the skip) the stock."""
+    base = {"asset_class": "EQ", "multiplier": 1.0, "status": "ACTIVE", "exchange": "NYSE"}
+    kinds = {  # symbol -> (security type, name)
+        "AAA": ("COMMON_STOCK", "AAA Inc"), "ETFX": ("ETF", "ETFX Inc"),
+        "CEFA": ("CEF", "CEFA Fund"), "CEFN": ("COMMON_STOCK", "CEFN Closed End Fund"),
+    }  # fmt: skip
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "name": n, "security_type": t,
+         "is_etf": t == "ETF", **base}
+        for s, (t, n) in kinds.items()
+    ]  # fmt: skip
+    write_rows(writer, "instruments/reference", D1, rows)
+    if not nav_rows:
+        return
+    nav = [
+        {
+            "instrument_id": f"EQ:{s}",
+            "ts": pd.Timestamp(D0, tz="UTC"),
+            "known_from": D0,
+            "series": "nav",
+            "nav": 9.0,
+            "nav_symbol": "X",
+        }
+        for s in ("AAA", "CEFA", "CEFN", "ZZZ")
+    ]
+    writer.write_table("events/fund_nav", D0, "nav", stamped(nav, D0, "nav"))
+
+
+def _with_fund_nav_reference(writer: StoreWriter) -> None:
+    _with_fund_nav(writer, nav_rows=False)
+
+
+def test_fund_nav_partitions_are_never_opened_for_an_equity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = context(store_with(_events, _with_fund_nav))
+    reads = _spy_reads(monkeypatch)
+    equity = load_events(ctx, ["EQ:AAA", "EQ:ETFX"], None, None)
+    assert "events/fund_nav" not in reads and "events/split" in reads
+    assert all(e.table != "events/fund_nav" for e in equity["EQ:AAA"])
+    # equivalence: the same events as a store that has no NAV rows at all
+    plain = context(store_with(_events, _with_fund_nav_reference))
+    assert equity == load_events(plain, ["EQ:AAA", "EQ:ETFX"], None, None)
+
+
+def test_a_fund_still_gets_its_nav_events_and_an_unknown_kind_reads_everything() -> None:
+    ctx = context(store_with(_events, _with_fund_nav))
+    found = load_events(ctx, ["EQ:AAA", "EQ:CEFA", "EQ:CEFN", "EQ:ZZZ"], None, None)
+    assert [e.table for e in found["EQ:CEFA"]] == ["events/fund_nav"]
+    assert [e.table for e in found["EQ:CEFN"]] == ["events/fund_nav"]  # typed a stock, named a fund
+    assert [e.table for e in found["EQ:ZZZ"]] == ["events/fund_nav"]  # not in the reference: read
+    assert [e.table for e in found["EQ:AAA"]] == ["events/split", "events/dividend"]
