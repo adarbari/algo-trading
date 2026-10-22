@@ -167,6 +167,14 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "fill_order" }]
 
 [[responsibility]]
+id = "ideas-ranking"
+description = "The Ideas ranking rule (owner decision 2026-10-22, docs/decisions/log.md \"Ideas list\"): a pure function of the viewer's screener pool and the rule's parameters (config/site/ranking/ideas.toml: site_top 5, user_top 20, user_weight 3, IdeasRule with its hash): each screener's run for the session in its stored rank order, a site preset's first site_top picks and the viewer's own first user_top, a pick scoring weight / position as an exact fraction, an idea scored by its best pick (max, never a sum) with picked_by every pool pick, ordered by score, consensus, the sum of pick scores, then instrument id; a screener of the viewer's with a preset's id replaces it; a run withheld by a data licence contributes nothing (WITHHELD) and a screener with no run is NOT_RUN with its reason; the regime-gated picks follow the same rule in a section of their own; no read, no clock, no float in an ordering"
+owner = ["src/algotrade/services/ideas/*"]
+allowed = ["src/algotrade/services/read/screens/ideas.py"]  # the loader builds the pool and calls the rule
+section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
+detect = [{ call = "rank_ideas" }, { call = "rank_paused" }, { call = "pool_standing" }]
+
+[[responsibility]]
 id = "job-execution"
 description = "Execute long-running work: threads, locks, recovery, idempotency; apps run jobs through services.jobs.run_job, fan-out through services.jobs.as_completed"
 owner = ["src/algotrade/services/jobs/*"]

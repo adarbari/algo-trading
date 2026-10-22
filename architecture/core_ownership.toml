@@ -22,6 +22,7 @@ description = "Expression feature definitions: config/site/features/*/*.toml and
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/features/*",
+    "src/algotrade/config/ranking/*",
     "src/algotrade/features/expressions/definitions.py",
     "src/algotrade/features/expressions/feature_set.py",
     "src/algotrade/features/site.py",

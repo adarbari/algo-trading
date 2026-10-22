@@ -379,6 +379,19 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true  # the backtest / screen use cases' naming helpers sit beside their writers
 
+[[tool.importlinter.contracts]]
+name = "Ideas rule is pure: config and core only (no read, storage, data or other use case)"
+type = "forbidden"
+source_modules = ["algotrade.services.ideas"]
+forbidden_modules = [
+    "algotrade.services.read",
+    "algotrade.services.jobs",
+    "algotrade.services.authoring",
+    "algotrade.storage",
+    "algotrade.data",
+    "algotrade.engines",
+]
+
 # ---- ADR 0037: the read model (it replaced services.explore, read-model PRs 2-10b); same rule.
 
 [[tool.importlinter.contracts]]
