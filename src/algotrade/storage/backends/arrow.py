@@ -10,6 +10,7 @@ written before the schemas were typed (``string`` vs ``large_string``, all-null 
 
 import io
 from collections.abc import Collection, Iterable, Sequence
+from itertools import pairwise
 from pathlib import Path
 
 import pandas as pd
@@ -116,6 +117,27 @@ def parquet_bytes(data: pa.Table, row_group_size: int = ROW_GROUP_SIZE) -> bytes
     pq.write_table(
         data, sink, compression="zstd", row_group_size=row_group_size, write_page_index=True
     )
+    return sink.getvalue()
+
+
+def table_parquet_bytes(table: str, data: pa.Table) -> bytes:
+    """``data`` as ``table``'s file: ``parquet_bytes``, or, for a table declaring ``cluster_by``,
+    its rows stably sorted by those columns and one run of row groups per distinct value
+    combination, so the footer statistics name each group's values (``row_groups_passing``).
+    Deterministic: the same rows give the same bytes."""
+    spec = table_spec(table)
+    if spec is None or not spec.cluster_by or data.num_rows == 0:
+        return parquet_bytes(data)
+    by = [c for c in spec.cluster_by if c in data.column_names]
+    if not by:
+        return parquet_bytes(data)
+    data = data.take(pc.sort_indices(data, sort_keys=[(c, "ascending") for c in by]))
+    keys = data.select(by).to_pylist()
+    starts = [0, *(i for i in range(1, len(keys)) if keys[i] != keys[i - 1]), len(keys)]
+    sink = io.BytesIO()
+    with pq.ParquetWriter(sink, data.schema, compression="zstd", write_page_index=True) as writer:
+        for begin, end in pairwise(starts):
+            writer.write_table(data.slice(begin, end - begin), row_group_size=ROW_GROUP_SIZE)
     return sink.getvalue()
 
 
