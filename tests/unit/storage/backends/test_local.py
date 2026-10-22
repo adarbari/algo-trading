@@ -252,7 +252,7 @@ def test_find_lists_the_runs_directory_once_per_generation(
         listed.append(stem)
         return original(stem)
 
-    monkeypatch.setattr(local, "run_session", spy)
+    monkeypatch.setattr(runs._listing, "_session_of", spy)
     first = runs.find("job")
     assert runs.find("job") == first and runs.find("job", D1) == first
     assert len(listed) == 1  # one listing (one file) for three finds

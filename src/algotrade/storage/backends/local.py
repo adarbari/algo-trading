@@ -27,7 +27,6 @@ only when its run commits, in every partition at once (``local_index.py``).
 """
 
 import contextlib
-import glob
 import gzip
 import os
 import secrets
@@ -79,6 +78,7 @@ from algotrade.storage.backends.run_compaction import (
     plan_compaction,
     verify_plan,
 )
+from algotrade.storage.backends.run_listing import RunListing
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
@@ -871,26 +871,8 @@ class LocalRuns:
         self._parsed: OrderedDict[str, tuple[tuple[int, int, int], RunRecord]] = OrderedDict()
         self._parsed_bytes = 0
         self._parsed_lock = threading.Lock()
-        # the directory's file stems with their session (``run_session``), listed again only once
-        # ``generation`` changes: ``find`` ran once per edge and owner, each over ~10 000 files
-        self._listing: tuple[tuple[int, int], list[tuple[str, date | None]]] | None = None
-
-    def _stems(self) -> list[tuple[str, date | None]]:
-        """``(stem, run_session(stem))`` of every ``.json`` file; the stamp is read before the
-        listing, so a save during it leaves a stale stamp and the next call lists again."""
-        stamp = self.generation()
-        with self._parsed_lock:
-            held = self._listing
-        if held is not None and held[0] == stamp:
-            return held[1]
-        stems = [
-            (stem, run_session(stem))
-            for path in self.root.iterdir()
-            if path.suffix == ".json" and (stem := path.stem)
-        ]
-        with self._parsed_lock:
-            self._listing = (stamp, stems)
-        return stems
+        # the directory's file stems, listed again only once ``generation`` changes (run_listing)
+        self._listing = RunListing(self.root, self.generation, run_session)
 
     def _record(self, name: str) -> RunRecord | None:
         """The record in file ``name``, parsed once per version of the file; a copy (its
@@ -957,7 +939,7 @@ class LocalRuns:
         prefix = f"{safe(job)}-"
         names = [
             f"{stem}.json"
-            for stem, day in self._stems()
+            for stem, day in self._listing.all()
             if (
                 (stem.startswith(prefix) and session_date in (None, day))
                 if day is not None
@@ -976,13 +958,13 @@ class LocalRuns:
         # evaluation's runs are large, is never read)
         # a job whose name is a prefix of another's matches the other's files too: each file
         # is read once, and a record counts only for the job it names
-        paths = {
-            path
-            for job in jobs
-            for path in self.root.glob(f"{glob.escape(safe(job))}-*.json")
-            if (day := run_session(path.stem)) is not None and first <= day <= last
-        }
-        records = [r for path in sorted(paths) if (r := self._record(path.name)) is not None]
+        names = sorted(
+            f"{stem}.json"
+            for job in set(jobs)
+            for stem, day in self._listing.prefixed(f"{safe(job)}-")
+            if day is not None and first <= day <= last
+        )
+        records = [r for name in dict.fromkeys(names) if (r := self._record(name)) is not None]
         hits = [r for r in records if r.job in jobs]
         return sorted(hits, key=lambda r: r.started_at)
 
