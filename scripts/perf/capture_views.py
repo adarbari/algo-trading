@@ -53,7 +53,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def check_crawl(args: argparse.Namespace, stores: list[Path]) -> str:
+def check_crawl(args: argparse.Namespace, stores: list[Path], web: Path | None = None) -> str:
     """The clone's ``file://`` URL, or an ``al.RefusalError``: no ``--data-url``, the real
     store (or inside / around it), or a bound out of range."""
     if not args.data_url:
@@ -67,6 +67,9 @@ def check_crawl(args: argparse.Namespace, stores: list[Path]) -> str:
         raise al.RefusalError(f"--max-views must be 1..{MAX_VIEWS_CAP}")
     if args.view_timeout < 5 or args.depth < 0 or args.max_controls < 0:
         raise al.RefusalError("--view-timeout must be >= 5 s, --depth and --max-controls >= 0")
+    web = web or WEB
+    if not (web / "node_modules").is_dir():
+        raise al.RefusalError(f"{web}/node_modules is missing: run `npm ci` there (Vite needs it)")
     if not Path(args.views_file).is_file():
         raise al.RefusalError(f"{args.views_file} does not exist: run view_coverage.py first")
     return checked
@@ -125,17 +128,44 @@ def start_servers(data_url: str, api_factory=al.Api, popen=subprocess.Popen):  #
 
 
 def stop_group(proc, killpg=os.killpg) -> None:  # type: ignore[no-untyped-def]
-    """Stop a server and what it spawned (npx -> vite): SIGTERM its group, SIGKILL after 15 s."""
+    """Stop a server and what it spawned (npx -> vite): SIGTERM its group, SIGKILL after 15 s.
+    Where the group cannot be signalled (PermissionError) the process itself is terminated; and
+    once the leader is gone the group is probed (signal 0) and killed if a child survived."""
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
             killpg(proc.pid, sig)
         except ProcessLookupError:
             return
+        except PermissionError:
+            (proc.terminate if sig == signal.SIGTERM else proc.kill)()
         try:
             proc.wait(timeout=15)
-            return
+            break
         except subprocess.TimeoutExpired:
             continue
+    try:
+        killpg(proc.pid, 0)  # the leader is gone: is anything of its group left?
+        killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        return
+
+
+def install_stop_handlers() -> None:
+    """A stopped run (SIGTERM / SIGHUP) unwinds through the `finally` that stops the servers."""
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda *_: sys.exit(143))
+
+
+def stop_all(api, vite, stop=stop_group) -> None:  # type: ignore[no-untyped-def]
+    """Stop every server, each in its own try/finally: the API first (the memory hog), then Vite;
+    one failing stop never skips the other. Further SIGTERM / SIGHUP are ignored meanwhile: a
+    second one would raise inside the stop and leave a server running."""
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)
+    try:
+        api.close()
+    finally:
+        stop(vite)
 
 
 def node_command(args: argparse.Namespace, api_url: str, web_url: str) -> list[str]:
@@ -166,18 +196,15 @@ def main(argv: list[str] | None = None) -> int:
     except al.RefusalError as err:
         print(f"refused: {err}", file=sys.stderr)
         return 2
+    install_stop_handlers()  # BEFORE the servers: the API takes up to 90 s to start
     api, vite, web_url = start_servers(data_url)
-    # a stopped run (SIGTERM / SIGHUP) unwinds through the `finally` below
-    for sig in (signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, lambda *_: sys.exit(143))
     try:
         wait_for(f"{web_url}/api/health")  # through Vite's proxy: it reaches our API
         return subprocess.run(
             node_command(args, api.url, web_url), cwd=REPO, check=False
         ).returncode
     finally:
-        stop_group(vite)
-        api.close()
+        stop_all(api, vite)
 
 
 if __name__ == "__main__":
