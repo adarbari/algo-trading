@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.config.edges.verdict import VerdictSettings
+from algotrade.services.read.evaluation.runs import EdgeRun
 from algotrade.services.read.evaluation.verdict.rule import JudgeCall
 
 JUDGE_VERSION = 1  # bump on a semantic change of the judge outside JUDGED_CODE (a parse, a column)
@@ -154,14 +155,18 @@ def _without_callables(call: JudgeCall) -> JudgeCall:
     )
 
 
-def fingerprint(call: JudgeCall, judged_run_id: str, settings: VerdictSettings) -> str:
-    """The fingerprint of the headline of ``call`` judged on run ``judged_run_id``: equal only
-    when the run, every judge input, the settings, the judge's source and ``JUDGE_VERSION`` are."""
+def fingerprint(call: JudgeCall, run: EdgeRun, settings: VerdictSettings) -> str:
+    """The fingerprint of the headline of ``call`` judged on ``run``: equal only when the run id,
+    whether its out-of-sample result is hidden (``load_run_rows`` and ``load_run_draws`` serve
+    other rows for the same run id: in-sample only), every judge input, the settings, the judge's
+    source and ``JUDGE_VERSION`` are. Nothing else decides the rows read: they are the run's own
+    partition, cut by ``oos_hidden`` alone (never by viewer, user, session or split)."""
     body = {
         "judge_version": JUDGE_VERSION,
         "judge_digest": judge_digest(),
         "settings_hash": settings_hash(settings),
-        "judged_run_id": judged_run_id,
+        "judged_run_id": run.run_id,
+        "oos_hidden": run.oos_hidden,
         "call": _without_callables(call),
     }
     return hashlib.sha256(canonical_json(body).encode()).hexdigest()

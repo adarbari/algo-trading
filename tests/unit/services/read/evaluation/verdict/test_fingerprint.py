@@ -47,8 +47,8 @@ from tests.unit.services.read.evaluation.verdict.test_rule import SPLIT, T, draw
 PACKAGE = Path(fp.__file__).parent
 # judge's arguments the fingerprint does not carry, each with the reason
 NOT_IN_CALL = {
-    "rows": "the judged run's rows: covered by judged_run_id (immutable per run)",
-    "draws": "the judged run's draws: covered by judged_run_id",
+    "rows": "the run's rows: its id and oos_hidden (both hashed) decide them; immutable per run",
+    "draws": "the run's draws: its id and oos_hidden (both hashed) decide them",
     "t": "the settings: covered by settings_hash",
     "headline": "a stored row is always the headline",
     "basis": "only a hidden copy's (never stored); load_edge_verdict never passes it",
@@ -252,28 +252,27 @@ def test_the_digest_changes_with_the_judge_code_and_ignores_docstrings_and_comme
 
 def test_the_fingerprint_moves_with_every_input_and_is_stable() -> None:
     call, run = judge_call(_edge(), _run(), True), _run()
-    base = fingerprint(call, run.run_id, VerdictSettings())
-    assert base == fingerprint(judge_call(_edge(), _run(), True), run.run_id, VerdictSettings())
+    base = fingerprint(call, run, VerdictSettings())
+    assert base == fingerprint(judge_call(_edge(), _run(), True), run, VerdictSettings())
     assert len(base) == 64
     changed: list[Any] = [
-        fingerprint(call, "other-run", VerdictSettings()),
-        fingerprint(call, run.run_id, replace(VerdictSettings(), min_oos_trades=41)),
-        fingerprint(replace(call, decoys=not call.decoys), run.run_id, VerdictSettings()),
-        fingerprint(replace(call, split=date(2020, 1, 1)), run.run_id, VerdictSettings()),
-        fingerprint(replace(call, lost_inputs=("x",)), run.run_id, VerdictSettings()),
-        fingerprint(replace(call, declared=Declared("x", 5)), run.run_id, VerdictSettings()),
-        fingerprint(
-            replace(call, facts=replace(call.facts, wins=True)), run.run_id, VerdictSettings()
-        ),
+        fingerprint(call, replace(run, run_id="other-run"), VerdictSettings()),
+        fingerprint(call, replace(run, oos_hidden=True), VerdictSettings()),
+        fingerprint(call, run, replace(VerdictSettings(), min_oos_trades=41)),
+        fingerprint(replace(call, decoys=not call.decoys), run, VerdictSettings()),
+        fingerprint(replace(call, split=date(2020, 1, 1)), run, VerdictSettings()),
+        fingerprint(replace(call, lost_inputs=("x",)), run, VerdictSettings()),
+        fingerprint(replace(call, declared=Declared("x", 5)), run, VerdictSettings()),
+        fingerprint(replace(call, facts=replace(call.facts, wins=True)), run, VerdictSettings()),
     ]
     assert base not in changed and len(set(changed)) == len(changed)
 
 
 def test_the_fingerprint_follows_the_judge_version(monkeypatch: pytest.MonkeyPatch) -> None:
     call, run = judge_call(_edge(), _run(), True), _run()
-    before = fingerprint(call, run.run_id, VerdictSettings())
+    before = fingerprint(call, run, VerdictSettings())
     monkeypatch.setattr(fp, "JUDGE_VERSION", JUDGE_VERSION + 1)
-    assert fingerprint(call, run.run_id, VerdictSettings()) != before
+    assert fingerprint(call, run, VerdictSettings()) != before
 
 
 def test_floats_hash_by_the_python_repr_not_numpy_s() -> None:
@@ -297,9 +296,7 @@ def test_the_fingerprint_is_the_same_for_every_viewer() -> None:
         edge = load_edge(ctx, "drift")
         run = runs.load_canonical_run(ctx, edge).run
         assert run is not None
-        prints.append(
-            fingerprint(judge_call(edge, run, True), run.run_id, load_verdict(ctx.configs))
-        )
+        prints.append(fingerprint(judge_call(edge, run, True), run, load_verdict(ctx.configs)))
     assert prints[0] == prints[1]
 
 
@@ -492,3 +489,12 @@ def test_a_judge_change_without_a_version_bump_fails() -> None:
         "the judge's output changed under an unchanged JUDGE_VERSION: bump it and add the new "
         "expectations to EXPECTED"
     )
+
+
+def test_a_hidden_and_a_revealed_copy_of_one_run_fingerprint_differently() -> None:
+    """``load_run_rows`` serves in-sample rows only while ``oos_hidden``: a stored headline must
+    not outlive a hide or a reveal (it would leak, or understate, the out-of-sample result)."""
+    run = _run()
+    call = judge_call(_edge(), run, True)
+    shown = fingerprint(call, replace(run, oos_hidden=False), VerdictSettings())
+    assert shown != fingerprint(call, replace(run, oos_hidden=True), VerdictSettings())
