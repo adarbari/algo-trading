@@ -16,21 +16,26 @@ from __future__ import annotations
 
 import asyncio
 import cProfile
+import itertools
 import os
 import pstats
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 MIN_FREE_SWAP_MB = 500.0
 MIN_FREE_DISK_GB = 8.0
 EXIT_LOW_SWAP = 3
+SNAPSHOT_S = 60.0
+STABLE_POINTS = 0.05
 PRIME = "query SessionDate { session { date } }"
 TOP_N = 12
 HEADER = (
@@ -224,11 +229,64 @@ def top_functions(stats: dict[Key, tuple], n: int = TOP_N) -> list[dict]:
 # ---- the generated page file ----------------------------------------------------------------
 
 
+def shares(snap: dict) -> dict[str, float]:
+    total = sum(snap["buckets"].values()) or 1.0
+    return {b: snap["buckets"].get(b, 0.0) / total for b in BUCKETS}
+
+
+def stability(snaps: list[dict]) -> str:
+    """The STABILITY line: the last 3 snapshots' bucket shares each moved under 5 points."""
+    if len(snaps) < 3:
+        return "STABILITY: too few snapshots to judge (treat as indicative)"
+    last = [shares(x) for x in snaps[-3:]]
+    moved = max(abs(b[k] - a[k]) for a, b in itertools.pairwise(last) for k in BUCKETS)
+    if moved < STABLE_POINTS:
+        return "STABILITY: shares stable"
+    return "STABILITY: shares still moving (treat as indicative)"
+
+
+def trend_table(snaps: list[dict]) -> list[str]:
+    """Per snapshot: elapsed, share per bucket, stat calls and files opened so far and per s."""
+    lines = [
+        "| elapsed s | "
+        + " | ".join(BUCKETS)
+        + " | stat calls | files opened | stat/s | files/s |",
+        "|---:|" + "---:|" * (len(BUCKETS) + 4),
+    ]
+    for x in snaps:
+        sh, c, t = shares(x), x["counts"], x["t"] or 1.0
+        lines.append(
+            f"| {x['t']:.0f} | "
+            + " | ".join(f"{sh[b]:.0%}" for b in BUCKETS)
+            + f" | {c['stat calls']:,} | {c['files opened']:,} | {c['stat calls'] / t:,.0f} | "
+            f"{c['files opened'] / t:,.0f} |"
+        )
+    return lines
+
+
+def partial_lines(part: dict) -> list[str]:
+    return [
+        "Bucket SHARES are meaningful; absolute seconds are lower bounds (the call was cut). "
+        "Rows and bytes are not known for a cut call.",
+        "",
+        *trend_table(part["snapshots"]),
+        "",
+        stability(part["snapshots"]),
+        "",
+    ]
+
+
 def render_page(route: str, rows: list[dict]) -> str:
     lines = [f"## `{route}`", ""]
     for r in rows:
         status = f" **FAILED: {r['error']}** (timings are of an error)" if r["error"] else ""
         status += f" **{r['note']}**" if r.get("note") else ""
+        part = r.get("partial")
+        if part:
+            status += (
+                f" **PARTIAL: profiled for {part['elapsed']:.0f} s, the call had not finished "
+                f"({part['reason']})**"
+            )
         status += (
             " **PROFILE SAW NOTHING (thread issue)**: no stat calls and no algotrade function; "
             "do not read the buckets"
@@ -250,6 +308,7 @@ def render_page(route: str, rows: list[dict]) -> str:
                 for b, s in sorted(r["buckets"].items(), key=lambda kv: -kv[1])
             ],
             "",
+            *(partial_lines(part) if part else []),
             f"| top {len(r['top'])} by cumulative (algotrade, pyarrow) | cumulative s | calls |",
             "|---|---:|---:|",
             *[
@@ -286,6 +345,8 @@ def run_profile(
     min_free_mb: float = MIN_FREE_SWAP_MB,
     disk_path: Path | None = None,
     notes_of: Callable[[int, bytes], str | None] = lambda *_: None,
+    limit_s: float | None = None,
+    snapshot_s: float = SNAPSHOT_S,
 ) -> int:
     """One uncached call per operation under cProfile, in this process (the caller starts one
     process per page): the same patches as the uncached mode, the warmer off, a TestClient. The
@@ -304,8 +365,8 @@ def run_profile(
         exec(compile(patch, "<perf-patch>", "exec"), {"__name__": "perf_patch"})
     finally:
         sys.argv = argv
-    return asyncio.run(
-        _profile_all(ops, label, out, problem, rows_of, min_free_mb, disk_path, notes_of)
+    return _profile_all(
+        ops, label, out, problem, rows_of, min_free_mb, disk_path, notes_of, limit_s, snapshot_s
     )
 
 
@@ -317,7 +378,113 @@ async def _inline_thread(func: Callable[..., Any], *args: Any, **kwargs: Any) ->
     return func(*args, **kwargs)
 
 
-async def _profile_all(
+class Cut(KeyboardInterrupt):
+    """A private stop raised in the profiling thread: the time limit, or SIGTERM / SIGHUP / SIGINT.
+    A KeyboardInterrupt, so asyncio's task step lets it out of the loop and nothing in the app's
+    ``except Exception`` can swallow it."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+@dataclass
+class Profiled:
+    """What ``run_profiled`` saw: the call's value, the profile, the snapshots, why it was cut."""
+
+    value: Any = None
+    stats: dict = field(default_factory=dict)
+    snapshots: list[dict] = field(default_factory=list)
+    cut: str | None = None
+    elapsed: float = 0.0
+
+
+def snapshot_of(stats: dict[Key, tuple], elapsed: float) -> dict:
+    """The bucket seconds and call counters of a profile so far."""
+    return {"t": elapsed, "buckets": attribute(stats), "counts": call_counts(stats)}
+
+
+def run_profiled(
+    call: Callable[[], Any],
+    *,
+    limit_s: float | None,
+    snapshot_s: float = SNAPSHOT_S,
+    clock: Callable[[], float] = time.perf_counter,
+    on_cut: Callable[[], None] = lambda: None,
+) -> Profiled:
+    """``call()`` under cProfile in this (the main) thread. A SIGALRM every ``snapshot_s`` disables
+    the profiler, keeps a snapshot, and re-enables it; at ``limit_s`` it raises ``Cut`` inside the
+    call instead, and a ``Cut`` from a signal handler (SIGTERM...) ends it the same way. A cut
+    call still returns its profile (``cut`` says why); ``on_cut`` cleans up what it left running."""
+    prof = cProfile.Profile()
+    snaps: list[dict] = []
+    t0 = clock()
+
+    def tick(_signum: int, _frame: object) -> None:
+        elapsed = clock() - t0
+        prof.disable()
+        snaps.append(snapshot_of(pstats.Stats(prof).stats, elapsed))  # type: ignore[attr-defined]
+        if limit_s is not None and elapsed >= limit_s - 0.001:
+            raise Cut("limit")
+        signal.setitimer(
+            signal.ITIMER_REAL,
+            snapshot_s if limit_s is None else max(0.001, min(snapshot_s, limit_s - elapsed)),
+        )
+        prof.enable()
+
+    old = signal.signal(signal.SIGALRM, tick)
+    result = Profiled()
+    first = snapshot_s if limit_s is None else min(snapshot_s, limit_s)
+    signal.setitimer(signal.ITIMER_REAL, first)
+    prof.enable()
+    try:
+        result.value = call()
+    except Cut as err:
+        result.cut = err.reason
+    finally:
+        prof.disable()
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old)
+    result.elapsed = clock() - t0
+    try:
+        result.stats = pstats.Stats(prof).stats  # type: ignore[attr-defined]
+    except TypeError:  # nothing was profiled (cut at once)
+        result.stats = {}
+    result.snapshots = snaps
+    if result.cut:
+        result.snapshots = [*snaps, snapshot_of(result.stats, result.elapsed)]
+        on_cut()
+    return result
+
+
+def partial_row(name: str, res: Profiled) -> dict:
+    """The row of a call that was cut: final buckets, top functions, the trend and the reason."""
+    return {
+        "op": name,
+        "wall_s": res.elapsed,
+        "bytes": 0,
+        "rows": 0,
+        "error": None,
+        "note": None,
+        "saw_nothing": saw_nothing(res.stats),
+        "buckets": attribute(res.stats),
+        "counts": call_counts(res.stats),
+        "top": top_functions(res.stats),
+        "partial": {"reason": res.cut, "elapsed": res.elapsed, "snapshots": res.snapshots},
+    }
+
+
+def _flush(out: Path, label: str, done: list[dict]) -> None:
+    current = out.read_text() if out.exists() else ""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(upsert_section(current, label, render_page(label, done)))
+
+
+def _on_signal(signum: int, _frame: object) -> None:
+    raise Cut(signal.Signals(signum).name)
+
+
+def _profile_all(
     ops: dict[str, dict],
     label: str,
     out: Path,
@@ -326,10 +493,14 @@ async def _profile_all(
     min_free_mb: float,
     disk_path: Path | None,
     notes_of: Callable[[int, bytes], str | None],
+    limit_s: float | None,
+    snapshot_s: float,
 ) -> int:
     """Everything on this thread (cProfile watches only the thread that enables it): the app is
-    driven through an ASGI transport on this event loop, and the read pool's ``to_thread`` calls
-    (anyio's, asyncio's) run inline, so the resolvers, gzip and storage reads are in the profile."""
+    driven through an ASGI transport on an event loop run from here, and the read pool's
+    ``to_thread`` calls (anyio's, asyncio's) run inline, so the resolvers, gzip and storage reads
+    are in the profile. The page's section is rewritten after every operation, and when the run
+    is cut (limit, SIGTERM, SIGHUP, Ctrl-C) with what the cut call had gathered."""
     import anyio.to_thread  # noqa: PLC0415
     import httpx2 as httpx  # noqa: PLC0415
 
@@ -339,14 +510,16 @@ async def _profile_all(
     asyncio.to_thread = _inline_thread  # type: ignore[assignment]
     done: list[dict] = []
     code = 0
-    transport = httpx.ASGITransport(app=app)
-    async with (
-        app.router.lifespan_context(app),
-        httpx.AsyncClient(
-            transport=transport, base_url="http://127.0.0.1:8000", timeout=None
-        ) as client,
-    ):
-        await client.post("/graphql", json={"query": PRIME})  # schema, store handles
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    olds = {s: signal.signal(s, _on_signal) for s in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT)}
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1:8000", timeout=None
+    )
+    lifespan = app.router.lifespan_context(app)
+    try:
+        loop.run_until_complete(lifespan.__aenter__())
+        loop.run_until_complete(client.post("/graphql", json={"query": PRIME}))  # schema, handles
         for name, op in ops.items():
             try:
                 swap_guard(min_free_mb, disk_path=disk_path)
@@ -355,19 +528,28 @@ async def _profile_all(
                 code = EXIT_LOW_SWAP
                 break
             body = {"query": op["query"], "variables": op["variables"]}
-            prof = cProfile.Profile()
-            t0 = time.perf_counter()
-            prof.enable()
-            r = await client.post("/graphql", json=body)
-            prof.disable()
-            wall = time.perf_counter() - t0
-            stats = pstats.Stats(prof).stats  # type: ignore[attr-defined]
+            res = run_profiled(
+                lambda body=body: loop.run_until_complete(client.post("/graphql", json=body)),
+                limit_s=limit_s,
+                snapshot_s=snapshot_s,
+                on_cut=lambda: _drain(loop),
+            )
+            if res.cut:
+                done.append(partial_row(name, res))
+                print(f"  {name}: CUT ({res.cut}) after {res.elapsed:.0f} s", flush=True)
+                _flush(out, label, done)
+                if res.cut != "limit":
+                    code = EXIT_LOW_SWAP
+                    break
+                continue
+            r = res.value
+            stats = res.stats
             err_text = problem(r.status_code, r.content)
             rows = rows_of(r.json().get("data")) if r.status_code == 200 and not err_text else 0
             done.append(
                 {
                     "op": name,
-                    "wall_s": wall,
+                    "wall_s": res.elapsed,
                     "bytes": len(r.content),
                     "rows": rows,
                     "error": err_text,
@@ -380,13 +562,38 @@ async def _profile_all(
             )
             flag = "  PROFILE SAW NOTHING" if done[-1]["saw_nothing"] else ""
             print(
-                f"  {name}: {wall:.2f} s, {len(r.content):,} B, {rows} rows"
+                f"  {name}: {res.elapsed:.2f} s, {len(r.content):,} B, {rows} rows"
                 + (f"  FAILED: {err_text}" if err_text else "")
                 + (f"  {done[-1]['note']}" if done[-1]["note"] else "")
                 + flag,
                 flush=True,
             )
-            current = out.read_text() if out.exists() else ""
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(upsert_section(current, label, render_page(label, done)))
+            _flush(out, label, done)
+    except Cut as err:  # a signal between operations: what ran is already written
+        print(f"cut ({err.reason}) between operations", file=sys.stderr)
+        code = EXIT_LOW_SWAP
+    finally:
+        for sig, old in olds.items():
+            signal.signal(sig, old)
+        _close(loop, client, lifespan)
     return code
+
+
+def _drain(loop: asyncio.AbstractEventLoop) -> None:
+    """Cancel what a cut call left pending and let it unwind (best effort)."""
+    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+    for t in pending:
+        t.cancel()
+    if pending:
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+
+
+def _close(loop: asyncio.AbstractEventLoop, client: Any, lifespan: Any) -> None:
+    """Close the client and the app's lifespan; a failure here never hides the results."""
+    try:
+        loop.run_until_complete(client.aclose())
+        loop.run_until_complete(lifespan.__aexit__(None, None, None))
+    except BaseException as err:
+        print(f"closing the app failed: {err!r}", file=sys.stderr)
+    finally:
+        loop.close()

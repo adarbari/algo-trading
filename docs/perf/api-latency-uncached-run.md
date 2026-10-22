@@ -79,3 +79,17 @@ machine with no free memory, run one page at a time.
   function splits its own time over its callers' buckets in proportion to the caller-edge time,
   recursively; unnamed code is "other". The buckets therefore sum to the profile's total and
   nothing is counted twice (summing the cumulative time of nested entry points would).
+
+### `--profile-limit SECONDS` (a profile that cannot finish still tells you something)
+
+`--profile --page ROUTE --profile-limit 600 [--profile-snapshot 60]`: a SIGALRM in the profiling
+(main) thread every `--profile-snapshot` seconds disables the profiler, keeps a snapshot (bucket
+seconds, stat calls, files opened) and re-enables it; at the limit it raises a private `Cut` inside
+the running call (a `KeyboardInterrupt` subclass, so asyncio lets it out and the app cannot
+swallow it), the pending tasks are cancelled, and the page's section is written as `PARTIAL:
+profiled for T s, the call had not finished` with the final buckets, the top 12, the trend table
+(elapsed, share per bucket, stat calls and files opened so far and per second) and a STABILITY
+line (`shares stable` when the last 3 snapshots' shares each moved under 5 points, else `still
+moving (treat as indicative)`). Shares are meaningful, absolute seconds are lower bounds. The same
+flush runs on SIGTERM, SIGHUP and Ctrl-C (exit code 3); after a limit cut the next operation
+runs. The clone-only rule and the swap / disk guards are unchanged.

@@ -790,6 +790,8 @@ def run_profile(args: argparse.Namespace, ops: dict[str, dict]) -> int:
             min_free_mb=SWAP_FLOOR_MB[0],
             disk_path=GUARD_PATH[0],
             notes_of=empty_note,
+            limit_s=args.profile_limit,
+            snapshot_s=args.profile_snapshot,
         )
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -823,6 +825,20 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         "cProfile -> docs/perf/page-profiles.md",
     )
     p.add_argument(
+        "--profile-limit",
+        type=float,
+        metavar="SECONDS",
+        help="--profile: cut an operation after this long and write its partial profile "
+        "(default: never)",
+    )
+    p.add_argument(
+        "--profile-snapshot",
+        type=float,
+        default=pp.SNAPSHOT_S,
+        metavar="SECONDS",
+        help="--profile: take a profile snapshot (the trend table) this often (default 60)",
+    )
+    p.add_argument(
         "--min-free-swap-mb",
         type=float,
         default=pp.MIN_FREE_SWAP_MB,
@@ -846,6 +862,8 @@ def run_needs_url(args: argparse.Namespace) -> bool:
 
 def profile_selection_error(args: argparse.Namespace) -> str | None:
     """--profile runs one page (one process per page) or named operations, never none or two."""
+    if (args.profile_limit is not None and args.profile_limit <= 0) or args.profile_snapshot <= 0:
+        return "--profile-limit and --profile-snapshot must be positive seconds"
     if not args.profile:
         return None
     if len(args.page) + len(args.view) > 1:
