@@ -31,7 +31,7 @@ from algotrade.config.site.guide.glossary import load_guide_glossary
 from algotrade.config.site.guide.mechanisms import load_guide_mechanisms
 from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.config.site.settings import site_document
-from algotrade.services.configs import catalog_of
+from algotrade.services.configs import field_catalog
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.edges.schedule import trigger_term
 from algotrade.services.read.guide.edges.site_edges import SiteEdge, screeners_of, site_edges
@@ -186,7 +186,7 @@ def load_guide_edge(ctx: Stores, edge_id: str) -> GuideEdgeEntry | None:
     if found is None:
         return None
     edge = found.edge
-    fields = catalog_of(ctx.features).fields
+    fields = field_catalog(ctx.configs).fields
     terms = {t.id for t in load_guide_glossary(ctx.configs).terms}
     mechanisms = load_guide_mechanisms(ctx.configs)
     prose = mechanisms.get(found.mechanism) if found.mechanism is not None else None
