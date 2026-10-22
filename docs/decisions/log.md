@@ -547,3 +547,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the browser overlaps requests, so the sum overstates the wait; the shell is shared by every screen and served in milliseconds in production by the release, warmer and response cache, so it gets its own small budget instead of being charged to each page.
+
+## 2026-10-22 | Regime provenance dates for personal-licence series (data architecture v2) | Shown to viewers without the licence; values stay gated
+- Question: the regime sources show, per macro series, the last observation date, the vintage date and kind, and the first vintage. Four of the seven series are licensed (BAMLH0A0HYM2 from ICE, SPX from S&P, VIX and VIX3M from Cboe). Should a viewer without the personal licence see those dates and kinds?
+- Options: (a) keep showing them (release dates are not the licensed content; no values are shown); (b) gate the provenance fields for non-holders.
+- Decision: (a). The provenance dates and kinds are shown to every viewer, as they are today; the licensed values stay gated. The `market.macro_asof@v1` columns over those series keep `licence = "personal"`, and the provenance read is an explicit exemption in the licence-gate test.
+- decided by: owner
+- status: final
+- Reasoning: release dates and vintage kinds are not the licensed content, and hiding them would make the regime cards say less about how fresh their inputs are, with no licence benefit.
