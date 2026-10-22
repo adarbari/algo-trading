@@ -2,7 +2,8 @@
 
 **Status:** proposed (2026-10-19; owner approved the direction the same day; amended
 2026-10-21 with the owner-approved decisions 14-22 below, which win over 8, 10 and 13 where
-they differ; design: the
+they differ; amended 2026-10-22 (c): decisions 1 and 23 no longer create purpose-shaped
+tables, the release pins business objects; design: the
 architect's memo, which corrected four points of the first sketch, marked below). Amends
 [0022](0022-atomic-run-publication.md) (a pinned read of the history copy, a build-wide pin and retained versions), [0060](0060-history-copy.md) (how the copy serves a pinned read), [0044](0044-hosting-from-the-owners-mac.md) (a second port, blue/green),
 [0062](0062-reads-serve-the-last-complete-session.md) (the default session is the current
@@ -20,10 +21,11 @@ therefore empties the caches, and the warmer (`graphql/warm.py`) re-warms in the
 requests use. The owner accepts data up to a day stale and wants fast loads always.
 
 ## Decision
-1. **A serving release is a derived, immutable snapshot for one session S**: small
-   purpose-shaped Parquet tables (session record, picks by instrument, per-instrument Explore
-   facts and feature frame, home, ideas, edge desk), stable additive schemas, a `format`
-   version and a manifest (S, the build seq X, input tables and partitions with their
+1. **A serving release is a derived, immutable snapshot for one session S**: *(amended
+   2026-10-22 (c): it holds a session record and a manifest, and pins stored business objects;
+   it copies no read object, see the amendment below. The text that follows is the original
+   wording, kept for the record where (c) does not replace it.)* the session record, stable
+   additive schemas, a `format` version and a manifest (S, the build seq X, input tables and partitions with their
    `partition_seq`, row counts, content hash). It is not serialised GraphQL. Id
    `"{S}.{X}.f{F}"`. **It is a derived cache like the history copy (ADR 0060: dropping it
    loses nothing), not a second source**, so 0005 and 0007 stand; rows keep `knowledge_ts`,
@@ -82,12 +84,12 @@ requests use. The owner accepts data up to a day stale and wants fast loads alwa
    `StatusStrip` and `SessionDate` key on it, and `served_token` leaves every other key.
 8. **What does not come from the release** (*correction*: `visible_seq` leaves every
    default-session page key, not every key): user expression features (evaluated over the
-   release's feature frame), the user's on-request screen runs (ADR 0033, composed with the
-   release's preset picks; keyed by user and runs generation), admin ops pages (live; a lane capped at a thread count the plan sets), live quotes and usage logs, Builder previews (pinned per 3), and an explicit
+   pinned feature store), the user's on-request screen runs (ADR 0033, composed with the
+   pinned `results/screen_picks`; keyed by user and runs generation), admin ops pages (live; a lane capped at a thread count the plan sets), live quotes and usage logs, Builder previews (pinned per 3), and an explicit
    date other than the release's (ADR 0036). These keep their keys. (*Amended by 14*: the
    list of live keys is inverted into an allow-list of release-shared operations; a live key is
    never listed.)
-9. **Roles and licences.** The release stores every name with its licence and the full `Cause`
+9. **Roles and licences.** The pinned reads carry every name with its licence and the full `Cause`
    chain; the API filters by the viewer's licences (0069) and redacts causes for non-admins
    (0056). Nothing is pre-rendered per role; a missing value is null with its kind and reason.
 10. **Cache keys:** `(release_id, operation, variables, role, user if not shared, licences)`.
@@ -247,10 +249,10 @@ code PRs is refined (21's order stands for (1)-(3); (4) the separate warmer and 
     destructive_epoch, code_sha, inputs, content_hash}` plus the session record
     (`session.parquet`); default-session reads go through `StoreReader.pinned(X)` and every
     loader key holds `StoreReader.version()` (`("pin", X)` or `("live", visible_seq())`) instead
-    of `visible_seq()` (a fitness test bans `visible_seq()` under `services/read`). Purpose-shaped
-    tables (picks, Explore facts, home, ideas, edge desk) are added one operation at a time and
-    only when a measured cold compute is over budget; the deploy-time format rebuild gate comes
-    with the first of them. A format mismatch falls back to live.
+    of `visible_seq()` (a fitness test bans `visible_seq()` under `services/read`). *(Replaced by
+    amendment (c): no purpose-shaped tables. Read-optimised derived data is stored as business
+    objects in the existing homes and the release pins them; the deploy-time format rebuild gate
+    waits for the first release format that carries a table other than the session record.)* A format mismatch falls back to live.
     - **Pinned reads** take `upto` on `TableStore.read/read_range/read_run/dates/partition_seq`;
       with `upto` set a read never retries at a fresh seq and raises `StaleSnapshotError`;
       `dates(upto)` drops partitions with no version at or below it.
@@ -267,7 +269,7 @@ code PRs is refined (21's order stands for (1)-(3); (4) the separate warmer and 
       or backfilled current session), not only for a new session; `begin` pins a provisional X
       and records the epoch before any read; the run records (`complete`, `cutoff`) are read
       before X is taken and are not pinned (a COMPLETE record is saved after its commits).
-    - **Amends 11 and 12:** the deploy-time rebuild gate waits for the first shaped table;
+    - **Amends 11 and 12:** the deploy-time rebuild gate waits for the first release table beyond the session record;
       until then the API warms on promote inside the process.
     - **Fallback (today's path exactly, answer not cached):** no CURRENT, unknown format, hash or
       epoch mismatch, `StaleSnapshotError`, or the kill switch `serving.release_reads = false`.
@@ -289,3 +291,29 @@ code PRs is refined (21's order stands for (1)-(3); (4) the separate warmer and 
 
 Owner decision 2026-10-21 (logged in `docs/decisions/log.md`): "try the pin first approach and
 measure the impact"; the deferral in 24 is revisited with the load-test numbers.
+
+## Amendment 2026-10-22 (c): the release pins business objects, it never copies them
+Owner decision 2026-10-22 ("The domain tables look good. Let us go with them", logged in
+`docs/decisions/log.md`, "Domain-aligned derived data"). Design: the architect's
+`domain-derived-data.md` (shared notes folder), which replaces the page-shaped cards.
+
+25. **Replaces decisions 1 and 23 where they name purpose-shaped Parquet tables (picks,
+    Explore facts, feature frame, home, ideas, edge desk).** Read-optimised derived data is
+    stored as business objects, each at its natural grain and key, written by its owner in an
+    existing home: a feature group (ADR 0023), a `results/` table (ADRs 0022, 0053) or a run
+    record. The release **pins** them (`StoreReader.pinned(X)`) and never copies them: no
+    release-held read object, no second implementation of a loader, no per-read input seq
+    check. The page shape (composition, projection, limits, pagination) is made on read in
+    `services/read`. A table that only one page could ever read is a page table and is
+    rejected.
+26. **Planned homes (the build PRs add them, each with its `architecture/tables.toml` entry
+    and owner; nothing exists yet):**
+    - `results/screen_runs` (ScreenRun, one row per screener run) and `results/screen_picks`
+      (ScreenPick, a run's picked and paused instruments), written by the screen's own writer
+      in the same atomic publish as `rule_screen` (ADR 0022);
+    - `market.macro_asof@v1`, a market feature group, built only if profiling shows the regime
+      provenance read is most of the regime page cost.
+27. **Decision 16 stays unchanged:** run operations are not release-shared and keep the
+    runs generation; the two results tables make them fast enough live. ADR 0005 and the
+    writers line in `CLAUDE.md` do not change (the on-request run already writes `results/`,
+    ADR 0033).
