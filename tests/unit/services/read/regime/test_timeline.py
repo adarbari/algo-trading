@@ -226,3 +226,47 @@ def test_an_episode_s_signals_are_computed_once_per_published_state(
     seq = ctx.reader.visible_seq()
     monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
     assert load_episode_signals(ctx, "ep") == first and computed == ["ep", "ep"]
+
+
+def _three_episodes(rows: dict[date, dict[str, Any]], day: date | None = None) -> ReadContext:
+    other = {**EPISODE, "key": "overlap", "peak": SEP24, "trough": SEP29, "known_from": SEP29}
+    far = {**EPISODE, "key": "far", "peak": ODD_PEAK, "trough": date(2026, 8, 10),
+           "known_from": date(2026, 8, 10)}  # fmt: skip
+    doc = {**DOC, "episode": [EPISODE, other, far]}
+    return with_regime(
+        context(store_with(_write(rows)), day), docs={("site", "regime", "episodes"): doc}
+    )
+
+
+def test_each_episodes_signals_equal_the_per_episode_whole_history_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = {**ROWS, date(2026, 8, 3): {"label": "STRESS", "curve_on": True, "trend_on": False}}
+    expected = {}
+    for key in ("ep", "overlap", "far"):  # the old read: no union span, one frame per call
+        monkeypatch.setattr(timeline, "_union", lambda *_: None)
+        expected[key] = load_episode_signals(_three_episodes(rows), key)
+    monkeypatch.undo()
+    ctx = _three_episodes(rows)
+    assert {k: load_episode_signals(ctx, k) for k in expected} == expected
+    assert all(v is not None for v in expected.values())
+
+
+def test_a_request_reads_each_table_once_for_every_episode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
+
+    ctx = _three_episodes(ROWS)
+    reads: list[str] = []
+    original = ctx.reader.table_range
+
+    def spy(table: str, *args: Any, **kwargs: Any) -> Any:
+        reads.append(table)
+        return original(table, *args, **kwargs)
+
+    monkeypatch.setattr(ctx.reader, "table_range", spy)
+    with ThreadPoolExecutor(3) as pool:  # the API runs a request's loaders on several threads
+        done = list(pool.map(lambda k: load_episode_signals(ctx, k), ("ep", "overlap", "far")))
+    assert all(d is not None for d in done)
+    assert sorted(reads) == ["rollups/market/regime@v3", "rollups/market/regime_indicators@v1"]

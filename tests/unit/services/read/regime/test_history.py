@@ -75,3 +75,45 @@ def test_an_unrecognised_or_null_label_is_unknown() -> None:
 def test_a_window_that_ends_before_it_starts_is_refused() -> None:
     with pytest.raises(ConfigurationError, match=f"end {SEP28} is before start {D1}"):
         load_regime_bands(regime_ctx(), D1, SEP28)
+
+
+def _restated(writer: object) -> None:
+    for day in (SEP28, SEP29):
+        write_regime(writer, day, "CALM")
+    from algotrade.core.model.instruments import market_id  # noqa: PLC0415
+    from tests.helpers.rollup_store import stamped  # noqa: PLC0415
+
+    row = {"instrument_id": market_id("US"), "label": "CRISIS", "macro_risk": None,
+           "market_stress": None, "fragility": None, "macro_early": None,
+           "macro_confirming": None}  # fmt: skip
+    writer.write_table(  # type: ignore[attr-defined]
+        "rollups/market/regime@v3", SEP29, "restate", stamped([row], SEP29, "restate"), True
+    )
+
+
+def test_bands_read_one_column_of_the_window_and_equal_the_whole_history_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from algotrade.core.model.instruments import market_id  # noqa: PLC0415
+    from algotrade.services.read.instruments.series import load_series  # noqa: PLC0415
+    from algotrade.services.read.regime.fields import LABEL  # noqa: PLC0415
+
+    ctx = with_regime(context(store_with(_restated)))
+    calls: list[tuple[date, date, object]] = []
+    original = ctx.reader.table_range
+
+    def spy(table: str, start: date, end: date, *args: object, **kwargs: object) -> object:
+        calls.append((start, end, args[2] if len(args) > 2 else kwargs.get("columns")))
+        return original(table, start, end, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(ctx.reader, "table_range", spy)
+    bands = load_regime_bands(ctx, SEP28, SEP30)
+    assert calls == [(SEP28, SEP30, ["label"])]  # the window, one column; never date.min
+    mid = market_id("US")
+    old = load_series(ctx, [mid], [LABEL], SEP28, SEP30, entity="market")[mid]  # whole history
+    assert [(p.session, p.values[0]) for p in old.points] == [(SEP28, "CALM"), (SEP29, "CRISIS")]
+    assert bands == (
+        RegimeBand(SEP28, SEP28, CALM),
+        RegimeBand(SEP29, SEP29, RegimeLabel.CRISIS),
+        RegimeBand(SEP30, SEP30, UNKNOWN),
+    )  # the restated day's label, as the old read gave it

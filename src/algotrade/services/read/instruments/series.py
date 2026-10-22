@@ -12,6 +12,7 @@ caller's catalogue (``UnknownFeatureError``). The rows of a stored table are sha
 the published state; the read is the table's whole history up to the session and a window is
 a slice of it), so every chart of a published state reads the store once."""
 
+import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -94,6 +95,7 @@ def _frame(
     start: date,
     end: date,
     entity: str,
+    span: tuple[date, date] | None = None,
 ) -> pd.DataFrame | None:
     if table == EXPRESSIONS:  # computed from the caller's formulas: never shared
         return read_expressions(
@@ -109,12 +111,20 @@ def _frame(
         # Instrument reads come in batches (dataloaders) and would evict the session's and
         # the screens' entries; a run's pending writes do not move visible_seq.
         return rollup_rows(ctx.reader, table, start, end, instruments=ids)
-    frame = market_frame(ctx, table, ids)
+    held = ctx.cache.get(_frame_key(ctx, table, ids)) if span is not None else None
+    if span is not None and held is None:  # the whole history is not already read: just the span
+        frame = span_frame(ctx, table, columns, ids, span)
+    else:
+        frame = held[0] if held is not None else market_frame(ctx, table, ids)
     if frame is None:
         return None
     days = frame["session_date"]
     window = frame[(days >= start) & (days <= end)]
     return None if window.empty else window
+
+
+def _frame_key(ctx: ReadContext, table: str, ids: Sequence[str]) -> tuple[object, ...]:
+    return ("series-frame", table, tuple(ids), ctx.session.date, ctx.reader.version())
 
 
 def market_frame(ctx: ReadContext, table: str, ids: Sequence[str]) -> pd.DataFrame | None:
@@ -126,12 +136,30 @@ def market_frame(ctx: ReadContext, table: str, ids: Sequence[str]) -> pd.DataFra
     episodes and its scores chart each read thousands of partitions again (150 s). The API
     reads it ahead of the first request (``warm_market_frames``). The frame is only read,
     never changed, by its callers."""
-    key = ("series-frame", table, tuple(ids), ctx.session.date, ctx.reader.version())
+    key = _frame_key(ctx, table, ids)
     cached: tuple[pd.DataFrame | None] = ctx.cache.get_or_compute(
         key,
         lambda: (rollup_rows(ctx.reader, table, date.min, ctx.session.date, instruments=ids),),
     )
     return cached[0]
+
+
+def span_frame(
+    ctx: ReadContext, table: str, columns: list[str], ids: Sequence[str], span: tuple[date, date]
+) -> pd.DataFrame | None:
+    """``columns`` of market table ``table`` for ``ids`` over ``span`` only (never the table's
+    whole history), read once per request: kept in ``ctx.memo`` (not ``ctx.cache``: a span per
+    caller would evict the shared frames), under a lock because a request's loaders run on
+    several threads. The read goes through the history copy (ADR 0060) as one column of the
+    years the span touches, as ``market_frame`` does for every column of all of them; the rows
+    of a day are the same (``table_range``'s point-in-time resolution, pin and ``session_date``
+    bound), so a slice of this frame is the slice of ``market_frame``'s."""
+    low, high = span[0], min(span[1], ctx.session.date)
+    key = ("series-span", table, tuple(sorted(columns)), tuple(ids), low, high, ctx.session.date)
+    with ctx.memo.setdefault(("series-span-lock",), threading.Lock()):
+        if key not in ctx.memo:
+            ctx.memo[key] = (rollup_rows(ctx.reader, table, low, high, None, list(ids), columns),)
+        return ctx.memo[key][0]  # type: ignore[no-any-return]
 
 
 def load_series(
@@ -141,11 +169,14 @@ def load_series(
     start: date,
     end: date | None = None,
     entity: str = "instrument",
+    span: tuple[date, date] | None = None,
 ) -> dict[str, FeatureSeries]:
     """``names`` (catalogue fields, in the order asked; repeats dropped) of each instrument
     for every stored session of ``start..end`` (``end``: the session's date): one read per
     table for them all. ``entity``: whose catalogue and ids (``market``: ``market_id("US")``,
-    ADR 0047)."""
+    ADR 0047). ``span`` (market only): read just those columns over ``span`` (a window that
+    covers ``start..end``, shared by calls of one request) instead of the table's whole
+    history: for a caller that wants one window of a few columns (``span_frame``)."""
     wanted = tuple(dict.fromkeys(names))
     last = end if end is not None else ctx.session.date
     if last > ctx.session.date:  # a window past the session would show what it did not know
@@ -162,7 +193,7 @@ def load_series(
     )
     by_day: dict[tuple[str, date], dict[str, Any]] = {}
     for table, fields in _groups(ctx, wanted, entity).items():
-        frame = _frame(ctx, table, [c for _, c in fields], ids, start, last, entity)
+        frame = _frame(ctx, table, [c for _, c in fields], ids, start, last, entity, span)
         if frame is None or frame.empty:
             continue
         for row in frame.to_dict("records"):

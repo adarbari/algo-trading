@@ -25,7 +25,7 @@ from datetime import date
 from enum import StrEnum
 
 from algotrade.config.site.regime.cards import load_cards
-from algotrade.config.site.regime.episodes import load_episodes
+from algotrade.config.site.regime.episodes import Episode, Episodes, Timeline, load_episodes
 from algotrade.core.model.instruments import market_id
 from algotrade.core.time.calendar import (
     next_session,
@@ -168,20 +168,35 @@ def load_episode_signals(ctx: ReadContext, episode_key: str) -> EpisodeSignals |
     return cached[0]
 
 
+def _window(ctx: ReadContext, episode: Episode, window: Timeline) -> tuple[date, date]:
+    """The first and last session an episode's signals read."""
+    start = sessions_ending(episode.peak, window.lookback_sessions + 1)[0]
+    return start, min(ctx.session.date, _after(episode.trough, window.clear_horizon_sessions))
+
+
+def _union(ctx: ReadContext, config: Episodes) -> tuple[date, date]:
+    """The window covering every episode the session knows: read once per request and sliced
+    per episode (the regime page asks for all of them at once, each its own loader call)."""
+    spans = [_window(ctx, e, config.timeline) for e in config.episodes
+             if e.known_from <= ctx.session.date]  # fmt: skip
+    return min(s for s, _ in spans), max(e for _, e in spans)
+
+
 def _signals(ctx: ReadContext, episode_key: str) -> EpisodeSignals | None:
     config = load_episodes(ctx.configs)
     found = next((e for e in config.episodes if e.key == episode_key), None)
     if found is None or found.known_from > ctx.session.date:
         return None
     window = config.timeline
-    start = sessions_ending(found.peak, window.lookback_sessions + 1)[0]
-    end = min(ctx.session.date, _after(found.trough, window.clear_horizon_sessions))
+    start, end = _window(ctx, found, window)
     cards = load_cards(ctx.configs).cards
     catalogue = ctx.features.field_types("market")
     names = [n for n in (LABEL, *(c.feature + ON for c in cards)) if n in catalogue]
     mid = market_id(US)
     points = (
-        load_series(ctx, [mid], names, start, end, entity="market")[mid].points if names else ()
+        load_series(ctx, [mid], names, start, end, "market", _union(ctx, config))[mid].points
+        if names
+        else ()
     )
     index = {n: i for i, n in enumerate(names)}
 
