@@ -211,3 +211,23 @@ def test_the_shell_regime_never_reads_the_vintages_and_the_sources_query_reads_t
     assert reads == [] and shell["indicators"]
     found = _data(graph(PROVENANCE))["regime"]["indicators"]
     assert len(reads) == 1 and any(s["series"] for i in found for s in i["sources"])
+
+
+def test_a_failing_provenance_read_is_attempted_once_and_every_field_reports_it(
+    graph: Graph, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 4xN lazy provenance fields share one outcome: a loader that raises is called once,
+    not once per field, and each selected field carries the same error."""
+    reads: list[int] = []
+
+    def failing(ctx):  # type: ignore[no-untyped-def]
+        reads.append(1)
+        raise RuntimeError("vintage read failed")
+
+    monkeypatch.setattr(indicators, "load_indicator_provenance", failing)
+    body = graph(PROVENANCE)
+    assert len(reads) == 1
+    errors = body["errors"]
+    assert errors and {e["message"] for e in errors} == {"vintage read failed"}
+    paths = {tuple(e["path"][-1:]) for e in errors}
+    assert paths == {("lastObservation",), ("vintageDate",), ("vintageKind",), ("firstVintage",)}

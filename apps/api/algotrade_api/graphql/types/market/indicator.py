@@ -58,18 +58,26 @@ class TextPart:
 class LazyProvenance:
     """The provenance of every source of one request, read on first use and shared: the
     provenance fields of all the indicators' sources resolve at once, and only the first of
-    them does the stored-vintage read."""
+    them does the stored-vintage read. The outcome is memoised, a failure too: a read that
+    raises is not repeated by each of the other fields, they all re-raise the same error."""
 
     def __init__(self, ctx: ReadContext) -> None:
         self._ctx = ctx
         self._lock = asyncio.Lock()
         self._found: dict[str, sources.SeriesProvenance] | None = None
+        self._error: Exception | None = None
 
     async def of(self, series: str | None) -> sources.SeriesProvenance:
         """The series' provenance (none stored, or a table: all fields null)."""
         async with self._lock:
-            if self._found is None:
-                self._found = await off_loop(indicators.load_indicator_provenance, self._ctx)
+            if self._found is None and self._error is None:
+                try:
+                    self._found = await off_loop(indicators.load_indicator_provenance, self._ctx)
+                except Exception as exc:
+                    self._error = exc
+        if self._error is not None:
+            raise self._error
+        assert self._found is not None
         return self._found.get(series or "", sources.NO_PROVENANCE)
 
 
