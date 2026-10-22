@@ -29,6 +29,7 @@ PAGE = """query EdgesPage {
   edgeProblems { edgeId reason }
   edges { id status mine followed oosHidden extends compare { reason rows { kind } } }
 }"""
+BUILDER = """query EdgeBuilder($id: String!) { edge(id: $id) { settings { topK } } }"""
 PUBLISHED = "query PublishedEdge($id: String!) { publishedEdgeDocument(id: $id) }"
 
 
@@ -70,6 +71,15 @@ def test_save_shows_the_new_document(gate: Gate, client: TestClient) -> None:
     assert "top_k = 2" in gate.warm(client, PUBLISHED, id="mine")
     assert client.put("/edges/mine", json={"document": doc | {"top_k": 3}}).status_code == 200
     assert "top_k = 3" in gate.fresh(client, PUBLISHED, id="mine")
+
+
+def test_save_shows_in_the_edge_builder(gate: Gate, client: TestClient) -> None:
+    assert client.post("/edges/drift/copy", json={"new_id": "mine"}).status_code == 201
+    doc = {"extends": "drift", "top_k": 2}
+    assert client.put("/edges/mine", json={"document": doc}).status_code == 200
+    assert gate.warm(client, BUILDER, id="mine")["settings"]["topK"] == 2
+    assert client.put("/edges/mine", json={"document": doc | {"top_k": 3}}).status_code == 200
+    assert gate.fresh(client, BUILDER, id="mine")["settings"]["topK"] == 3
 
 
 def test_delete_removes_the_edge(gate: Gate, client: TestClient) -> None:

@@ -44,8 +44,8 @@ from algotrade_api.main import create_app
 from tests.helpers.api_store import END, as_user
 from tests.helpers.stored_frames import T0, stamped
 
-SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
-VIEWER = "query Day { viewer { id role } }"
+SESSION = "query Regime { session { date } }"  # a cached operation (USER_OPERATIONS)
+VIEWER = "query Viewer { viewer { id role } }"
 SHARED = "query RegimeBands { viewer { id role } }"  # a SHARED_OPERATIONS name
 RUNS = "query AcceptedFormulas { session { date } }"  # in NEVER_CACHED
 USAGE = "query LlmUsage { session { date } }"  # USER_OPERATIONS + TODAY_OPERATIONS
@@ -218,31 +218,51 @@ def test_a_probe_or_a_preview_post_leaves_the_cache_alone(harness: Harness) -> N
 
 def test_an_errored_answer_is_not_kept(harness: Harness) -> None:
     client = harness.client()
-    bad = _post(client, "query Day { nonsense }")
+    bad = _post(client, "query Regime { nonsense }")
     assert "errors" in bad.json()
     assert harness.cache.held == 0
 
 
+WEB_SRC = Path(__file__).parents[4] / "apps/web/src"
+HAND_WRITTEN = re.compile(r"""[`'"]\s*(?:query|mutation)\s+(\w+)""")
+
+
 def web_operations() -> set[str]:
-    """The names of the operations the web sends (the documents of the generated gql.ts)."""
+    """The names of the operations the web sends: the documents of the generated gql.ts, plus
+    the hand-written ``query <Name>`` template strings of the app code (tests and stories apart)."""
     names = set()
     for m in re.finditer(r'^\s+("(?:[^"\\]|\\.)*"): typeof', GQL_TS.read_text(), re.M):
         head = re.search(r"\b(?:query|mutation)\s+(\w+)", json.loads(m.group(1)))
         if head:
             names.add(head.group(1))
+    for path in WEB_SRC.rglob("*.ts*"):
+        if "generated" in path.parts or re.search(r"\.(test|stories)\.", path.name):
+            continue
+        names.update(HAND_WRITTEN.findall(path.read_text()))
     return names
+
+
+def test_the_hand_written_operations_are_seen() -> None:
+    hand_written = {"EdgeDesk", "EdgePaper", "EdgeBuilder", "EdgeCompare", "PublishedEdge"}
+    assert hand_written <= web_operations()
 
 
 def test_every_web_operation_is_in_exactly_one_group() -> None:
     groups = [SHARED_OPERATIONS, USER_OPERATIONS, RUN_OPERATIONS, NEVER_CACHED]
     names = web_operations()
-    assert len(names) > 40  # the parse found the documents
+    assert len(names) > 80  # the parse found the documents (76 in gql.ts + 5 hand-written)
     for name in sorted(names):
         in_groups = [i for i, group in enumerate(groups) if name in group]
         assert len(in_groups) == 1, f"{name} is in groups {in_groups}: classify it in one"
     for i, group in enumerate(groups):
         assert all(not group & other for other in groups[i + 1 :])
     assert CLOSED_SESSION_OPERATIONS <= RUN_OPERATIONS
+
+
+def test_no_group_keeps_an_operation_the_web_no_longer_sends() -> None:
+    sent = web_operations()
+    for group in (SHARED_OPERATIONS, USER_OPERATIONS, RUN_OPERATIONS, NEVER_CACHED):
+        assert not group - sent, f"classified but sent by no web document: {sorted(group - sent)}"
 
 
 def test_a_run_operation_is_kept_until_a_run_record_is_saved(harness: Harness) -> None:
@@ -428,7 +448,7 @@ def test_a_stale_entry_is_served_at_once_and_recomputed_behind_the_answer(
 
 def _key(harness: Harness) -> str:
     return response_key(
-        harness.seq, UserRecord("ana", Role.ADMIN), SESSION, None, "Day",
+        harness.seq, UserRecord("ana", Role.ADMIN), SESSION, None, "Regime",
         served=harness.served,
     )  # fmt: skip
 
@@ -466,7 +486,7 @@ def test_a_replay_stops_when_the_pool_is_busy_and_drops_a_failing_operation(
 ) -> None:
     with harness.client() as client:
         _post(client, SESSION)
-        _post(client, "query Day { nosuchfield }")  # errors: never kept, never replayed again
+        _post(client, "query Regime { nosuchfield }")  # errors: never kept, never replayed again
         harness.seq = 2
         assert client.portal is not None
         router = harness.router
@@ -476,7 +496,7 @@ def test_a_replay_stops_when_the_pool_is_busy_and_drops_a_failing_operation(
         assert client.portal.call(router.replay) >= 1
         assert client.portal.call(router.replay, None, 0.0) == 0  # no budget: nothing recomputed
         documents = [op.document for op in router._log.items()]
-        assert "query Day { nosuchfield }" not in documents and SESSION in documents
+        assert "query Regime { nosuchfield }" not in documents and SESSION in documents
 
 
 def test_closing_the_router_cancels_the_background_recomputes(harness: Harness) -> None:
@@ -592,7 +612,7 @@ def test_a_run_compaction_leaves_the_cache_key_unchanged(tmp_path: Path) -> None
 
     def key() -> str:
         return response_key(
-            reader.visible_seq(), who, SESSION, None, "Day", reader.runs_generation()
+            reader.visible_seq(), who, SESSION, None, "Regime", reader.runs_generation()
         )
 
     before = key()
