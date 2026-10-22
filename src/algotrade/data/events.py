@@ -48,7 +48,7 @@ FACTS_OF_RECORD = frozenset(
 # reader maps the CIK through ``instruments/company``): an ``instruments`` filter finds nothing in
 # them, so a per-instrument read leaves them out instead of decoding them (``events/filing_text``:
 # 4.3 GB read for 0 rows). ``events/ipo_lockup`` is not here: its later versions carry the id.
-# Fitness test: ``tests/architecture/data/test_events_no_instrument_rows.py``.
+# Fitness test: ``tests/architecture/ingestion/test_events_no_instrument_rows.py``.
 NO_INSTRUMENT_ROWS = frozenset({"events/filing_text"})
 
 

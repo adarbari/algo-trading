@@ -1,7 +1,7 @@
 """Every events table whose writer stores ``instrument_id`` NULL is in
 ``data.events.NO_INSTRUMENT_ROWS`` (the tables a per-instrument events read never opens), and
 nothing else is: a new CIK-keyed table cannot be silently decoded per instrument (47 s of
-``events/filing_text`` read for 0 rows). A writer module is one under ``tasks/events/`` that
+``events/filing_text`` read for 0 rows). A writer module is one under ``tasks/`` (any folder) that
 names its ``TABLE`` and builds rows with a literal ``instrument_id=None`` / ``"instrument_id":
 None``; a table that stores the id on a later version (``events/ipo_lockup``) passes it through
 a parameter and is not a literal."""
@@ -11,17 +11,25 @@ import ast
 from algotrade.data.events import NO_INSTRUMENT_ROWS
 from tests.conftest import REPO_ROOT
 
-WRITERS = REPO_ROOT / "apps" / "ingestion" / "algotrade_ingestion" / "tasks" / "events"
+WRITERS = REPO_ROOT / "apps" / "ingestion" / "algotrade_ingestion" / "tasks"
 
 
 def _is_none(node: ast.expr | None) -> bool:
     return isinstance(node, ast.Constant) and node.value is None
 
 
+def _is_instrument_key(node: ast.expr) -> bool:
+    return isinstance(node, ast.Constant) and node.value == "instrument_id"
+
+
 def _stores_null_id(tree: ast.AST) -> bool:
     for node in ast.walk(tree):
         if isinstance(node, ast.keyword) and node.arg == "instrument_id" and _is_none(node.value):
             return True
+        if isinstance(node, ast.Assign) and _is_none(node.value):
+            for target in node.targets:
+                if isinstance(target, ast.Subscript) and _is_instrument_key(target.slice):
+                    return True
         if isinstance(node, ast.Dict):
             for key, value in zip(node.keys, node.values, strict=True):
                 named = isinstance(key, ast.Constant) and key.value == "instrument_id"
@@ -43,7 +51,7 @@ def _table_of(tree: ast.Module) -> str | None:
 
 def _null_id_tables() -> set[str]:
     found: set[str] = set()
-    for path in sorted(WRITERS.glob("*.py")):
+    for path in sorted(WRITERS.rglob("*.py")):
         tree = ast.parse(path.read_text())
         table = _table_of(tree)
         if table is not None and _stores_null_id(tree):
