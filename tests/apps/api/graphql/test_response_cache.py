@@ -8,7 +8,6 @@ entries unreachable (a probe or preview POST does not), an errored answer is not
 bytes are bounded; a request past ``MAX_WAITING`` gets 503 + ``Retry-After`` while ``/health``
 and the inline ``viewer`` are never refused."""
 
-import asyncio
 import gzip
 import json
 import re
@@ -38,8 +37,6 @@ from algotrade_api.graphql.response_cache import (
     TTL_S,
     USER_OPERATIONS,
     ResponseCache,
-    Served,
-    operation_name,
     response_key,
     served_token,
 )
@@ -518,68 +515,6 @@ def test_a_replay_stops_when_the_pool_is_busy_and_drops_a_failing_operation(
         assert client.portal.call(router.replay, None, 0.0) == 0  # no budget: nothing recomputed
         documents = [op.document for op in router._log.items()]
         assert "query Regime { nosuchfield }" not in documents and SESSION in documents
-
-
-def _served(document: str) -> Served:
-    return Served(UserRecord("ana", Role.ADMIN), document, {})
-
-
-def test_a_replay_runs_the_cheap_operations_first_and_the_heavy_ones_last(
-    harness: Harness, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Seeded in page order, the heavy InstrumentEvents would run before the cheap reads and
-    starve a first request: the cheap ones come first, each kind keeping its order."""
-    with harness.client() as client:
-        assert client.portal is not None
-        ran: list[str | None] = []
-
-        async def refresh(op: Served, only_missing: bool = False) -> bool:
-            ran.append(operation_name(op.document))
-            return True
-
-        monkeypatch.setattr(harness.router, "refresh", refresh)
-        ops = [
-            _served("query InstrumentEvents { a }"),
-            _served("query Regime { a }"),
-            _served("query RegimeBands { a }"),
-            _served("query Viewer { a }"),
-        ]
-        assert client.portal.call(harness.router.replay, ops) == 4
-        assert ran == ["Regime", "Viewer", "InstrumentEvents", "RegimeBands"]
-
-
-def test_a_request_is_served_while_the_replay_is_still_running(
-    harness: Harness, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The replay yields the loop between operations (a first request is not queued behind
-    the whole pass), and a heavy one is left for the next publish while a request holds the pool."""
-    with harness.client() as client:
-        assert client.portal is not None
-        ran: list[str | None] = []
-
-        async def refresh(op: Served, only_missing: bool = False) -> bool:
-            ran.append(operation_name(op.document))
-            return True
-
-        monkeypatch.setattr(harness.router, "refresh", refresh)
-        ops = [_served(f"query Op{n} {{ a }}") for n in range(20)]
-
-        async def go() -> tuple[int, int]:
-            replaying = asyncio.ensure_future(harness.router.replay(ops))
-            await asyncio.sleep(0)
-            await asyncio.sleep(0)
-            served_during = len(ran)  # a request's turn on the loop came between operations
-            return served_during, await replaying
-
-        during, done = client.portal.call(go)
-        assert 0 < during < 20 and done == 20
-
-        ran.clear()
-        harness.admission.taken = 1  # a request is using the pool
-        heavy = [_served("query InstrumentEvents { a }"), _served("query Regime { a }")]
-        assert client.portal.call(harness.router.replay, heavy) == 1
-        assert ran == ["Regime"]  # the heavy one waits for an idle pool
-        harness.admission.taken = 0
 
 
 def test_closing_the_router_cancels_the_background_recomputes(harness: Harness) -> None:

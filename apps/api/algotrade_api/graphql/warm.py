@@ -54,6 +54,9 @@ from algotrade_api.ops.footprint import OwnFootprint
 WARM_EVERY_S = 60.0
 INGESTION_SESSIONS = 10  # the Admin Ingestion grid's window (entities/ingestion SESSIONS)
 
+PAUSE_POLL_S = 0.02  # how often a paused step looks whether the requests are done
+PAUSE_BUDGET_S = 120.0  # all the waiting one ``finish`` may do: steady traffic never starves it
+
 log = logging.getLogger(__name__)
 _footprint = OwnFootprint()  # MB of this process, re-read at most every few seconds
 
@@ -62,8 +65,27 @@ type Step = tuple[str, Callable[[], object]]
 type ExtraSteps = Callable[[ReadContext], list[Step]]
 
 
-def _run(steps: list[Step]) -> None:
+class Pacer:
+    """Lets requests go first: ``__call__`` blocks (in the warming thread) while ``busy()``,
+    polling every ``PAUSE_POLL_S``, until the requests are done or the waiting spent by this
+    pacer reaches ``budget_s`` (then it returns at once: the warm still completes). A step's
+    threads hold the GIL, so a request met mid-step is slow; the pause is between steps and
+    between a step's chunks (market frames: one table each)."""
+
+    def __init__(self, busy: Callable[[], bool], budget_s: float = PAUSE_BUDGET_S) -> None:
+        self._busy = busy
+        self._left = budget_s
+
+    def __call__(self) -> None:
+        while self._left > 0 and self._busy():
+            time.sleep(PAUSE_POLL_S)
+            self._left -= PAUSE_POLL_S
+
+
+def _run(steps: list[Step], pause: Callable[[], None] | None = None) -> None:
     for name, step in steps:  # one failing step does not stop (or repeat) the others
+        if pause is not None:
+            pause()
         started = time.monotonic()
         try:
             step()
@@ -108,7 +130,12 @@ def warm_guide(ctx: ReadContext) -> None:
         load_guide_mechanism(ctx, kind)
 
 
-def warm(ctx: ReadContext, extra: ExtraSteps | None = None, home: bool = True) -> None:
+def warm(
+    ctx: ReadContext,
+    extra: ExtraSteps | None = None,
+    home: bool = True,
+    pause: Callable[[], None] | None = None,
+) -> None:
     """Read what every page shares for ``ctx``'s session and published state (``home_steps``
     first, unless ``home`` is False because the caller read them already: seconds, not the
     market frames' minutes, stand between a publish and the home page), then the steps
@@ -123,7 +150,12 @@ def warm(ctx: ReadContext, extra: ExtraSteps | None = None, home: bool = True) -
             steps.extend(extra(ctx))  # a second or two each
         except Exception:
             log.exception("warming the read cache: the extra steps failed")
-    steps.append(("market frames", lambda: warm_market_frames(ctx)))
+    frames = (
+        partial(warm_market_frames, ctx)
+        if pause is None
+        else partial(warm_market_frames, ctx, pause=pause)
+    )
+    steps.append(("market frames", frames))
     # the event copies' per-day validation (a digest per stored day, 1 to 2 s cold for fund_nav)
     steps.append(("event copies", lambda: warm_event_copies(ctx)))
     try:
@@ -133,7 +165,7 @@ def warm(ctx: ReadContext, extra: ExtraSteps | None = None, home: bool = True) -
             )
     except Exception:
         log.exception("warming the read cache: the episodes failed")
-    _run(steps)
+    _run(steps, pause)
 
 
 class CacheWarmer:
@@ -148,7 +180,9 @@ class CacheWarmer:
         extra: ExtraSteps | None = None,
         replay: Callable[[], Awaitable[int]] | None = None,
         stale: Callable[[], str | None] | None = None,
+        busy: Callable[[], bool] | None = None,
     ):
+        self._busy = busy
         self._stale = stale
         self._stale_logged: str | None = None
         self._replay = replay
@@ -194,7 +228,10 @@ class CacheWarmer:
     def finish(self, pending: tuple[ReadContext, Hashable]) -> None:
         """The rest of the warm (``warm``) for what ``begin`` returned. Blocking."""
         ctx, state = pending
-        warm(ctx, self._extra, home=False)
+        if self._busy is None:
+            warm(ctx, self._extra, home=False)
+        else:  # the rest runs after the API serves: a request goes before each step
+            warm(ctx, self._extra, home=False, pause=Pacer(self._busy))
         self._warmed = state
 
     async def run(self) -> None:
