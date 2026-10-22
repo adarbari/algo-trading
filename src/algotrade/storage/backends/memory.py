@@ -50,7 +50,7 @@ from algotrade.storage.backends.run_selection import (
     visible_entries,
 )
 from algotrade.storage.locks import ThreadLock
-from algotrade.storage.runs import RunRecord, run_session
+from algotrade.storage.runs import RunRecord, job_of_name, run_session
 from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
 from algotrade.storage.tables.schemas import require_retention
 
@@ -560,7 +560,12 @@ class MemoryRuns:
         return RunRecord.from_json(text) if text else None
 
     def find(self, job: str, session_date: date | None = None) -> list[RunRecord]:
-        records = [RunRecord.from_json(t) for t in self._data.values()]
+        # as ``LocalRuns``: a run id that names another job cannot match, so it is not decoded
+        records = [
+            RunRecord.from_json(t)
+            for run_id, t in self._data.items()
+            if (implied := job_of_name(run_id)) is None or implied == job
+        ]
         hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]
         return sorted(hits, key=lambda r: r.started_at)
 

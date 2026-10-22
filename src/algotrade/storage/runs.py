@@ -100,3 +100,20 @@ def run_session(run_id: str) -> date | None:
     """The session date encoded by ``new_run_id``; ``None`` for ids in any other form."""
     match = _RUN_SESSION.search(run_id)
     return date.fromisoformat(match.group(1)) if match else None
+
+
+_JOB_RECORD = re.compile(r"^job-(.+)-[0-9a-f]{16}$")
+_RUN_JOB = re.compile(r"^(.+)-\d{4}-\d{2}-\d{2}-\d{8}T\d{6}Z$")
+
+
+def job_of_name(stem: str) -> str | None:
+    """The job a run file's name implies, so a lookup can skip files that cannot match.
+
+    ``job-<kind>-<16 hex>`` (a ``services/jobs`` id, whose record's job is ``job:<kind>``) gives
+    ``job:<kind>``; a ``new_run_id`` stem gives the job it was built from; a name in any other
+    form gives ``None`` (it implies nothing: such a file is still opened)."""
+    match = _JOB_RECORD.match(stem)
+    if match:
+        return f"job:{match.group(1)}"
+    match = _RUN_JOB.match(stem)
+    return match.group(1) if match else None

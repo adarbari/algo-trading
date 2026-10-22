@@ -95,7 +95,7 @@ from algotrade.storage.backends.run_selection import (
     visible_entries,
 )
 from algotrade.storage.locks import FileLock, held
-from algotrade.storage.runs import RunRecord, run_session
+from algotrade.storage.runs import RunRecord, job_of_name, run_session
 from algotrade.storage.tables.interfaces import CompactionReport
 from algotrade.storage.tables.schemas import require_retention
 
@@ -835,6 +835,10 @@ class LocalStaging:
 DATES_MEMO = 256  # (table, sequence, epoch) listings ``dates(upto=...)`` keeps
 PROBE_DAYS = 31  # a range this short probes its days instead of listing the table
 MAX_PARSED_BYTES = 64 * 1024 * 1024  # the run files ``LocalRuns`` keeps parsed, by file size
+# a file above this is parsed on each read and never kept: one 6 MB ``job-edge-eval`` record
+# would evict the ~0.3 MB nightly records every page needs (a scan must not empty the cache)
+MAX_PARSED_RECORD_BYTES = 4 * 1024 * 1024
+MAX_PARSED_RECORDS = 4096  # and at most this many records, whatever their sizes
 
 
 class LocalRuns:
@@ -888,14 +892,19 @@ class LocalRuns:
         return replace(record, items=dict(record.items), stats=dict(record.stats))
 
     def _remember(self, name: str, held: tuple[tuple[int, int, int], RunRecord], size: int) -> None:
-        """Keep ``held`` as the most recent entry; evict the least recent past the byte bound."""
+        """Keep ``held`` as the most recent entry (a file above ``MAX_PARSED_RECORD_BYTES`` is not
+        kept); evict the least recent past the byte and record bounds."""
         with self._parsed_lock:
             old = self._parsed.pop(name, None)
             if old is not None:
                 self._parsed_bytes -= old[0][2]
+            if size > MAX_PARSED_RECORD_BYTES:
+                return
             self._parsed[name] = held
             self._parsed_bytes += size
-            while self._parsed_bytes > MAX_PARSED_BYTES and len(self._parsed) > 1:
+            while (
+                self._parsed_bytes > MAX_PARSED_BYTES or len(self._parsed) > MAX_PARSED_RECORDS
+            ) and len(self._parsed) > 1:
                 _, (evicted, _record) = self._parsed.popitem(last=False)
                 self._parsed_bytes -= evicted[2]
 
@@ -922,11 +931,17 @@ class LocalRuns:
         # a ``new_run_id`` file names its job and session: only the job's own (of the session
         # asked for) are opened; a file in any other form (a services/jobs id) is opened too
         # (parsing every record took 0.9 s a call over 6 400 files: the edges page made 26)
+        # a ``services/jobs`` id names its job too (``job-<kind>-<hash>``, job ``job:<kind>``):
+        # opened only for that job; a name that implies no job is opened whatever is asked
         prefix = f"{safe(job)}-"
         names = [
             f"{stem}.json"
             for stem, day in self._stems()
-            if day is None or (stem.startswith(prefix) and session_date in (None, day))
+            if (
+                (stem.startswith(prefix) and session_date in (None, day))
+                if day is not None
+                else (implied := job_of_name(stem)) is None or implied == job
+            )
         ]
         records = [r for name in names if (r := self._record(name)) is not None]
         hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]

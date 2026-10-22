@@ -13,7 +13,7 @@ docs/roadmap.md); the listing's is 0.2 s."""
 import os
 import shutil
 import time
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -199,8 +199,8 @@ def test_find_opens_only_the_job_s_files_and_parses_a_file_once_per_version(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Every record of a store was parsed on every ``find`` (6 400 files, 0.9 s a call, 26
-    calls for the edges page): only the job's own ``new_run_id`` files (and files in another
-    id form) are opened, and a file is parsed again only once it changed."""
+    calls for the edges page): only the job's own ``new_run_id`` files (and files whose name implies
+    no job) are opened, and a file is parsed again only once it changed."""
     runs = LocalBackend(tmp_path).runs
     for n, job in enumerate(["job", "other", "other", "other"]):
         runs.save(start_run(job, D1, T0 + timedelta(n)))
@@ -215,13 +215,13 @@ def test_find_opens_only_the_job_s_files_and_parses_a_file_once_per_version(
 
     monkeypatch.setattr(local.RunRecord, "from_json", staticmethod(spy))
     assert [r.job for r in runs.find("job")] == ["job"]
-    assert sorted(parsed) == ["job", "job:screen"]  # never another job's records
+    assert parsed == ["job"]  # never another job's records, nor a job record of another kind
     runs.find("job")
-    assert len(parsed) == 2  # unchanged files: nothing parsed again
+    assert len(parsed) == 1  # unchanged files: nothing parsed again
     record = runs.find("job")[0]
     time.sleep(0.01)
     runs.save(record.finish(T0 + timedelta(1)))
-    assert runs.find("job")[0].status is RunStatus.COMPLETE and len(parsed) == 3
+    assert runs.find("job")[0].status is RunStatus.COMPLETE and len(parsed) == 2
 
 
 def test_the_parsed_run_cache_evicts_past_its_byte_bound(
@@ -399,3 +399,42 @@ def test_another_process_sees_every_change_on_its_next_call(tmp_path: Path) -> N
     assert reader.tables.dates(live) == [START, d2]
     assert writer.tables.purge_before(live, d2) == 1  # a purge
     assert reader.tables.dates(live) == [d2] and not reader.tables.has_partition(live, START)
+
+
+def test_the_run_parse_cache_resists_a_scan_of_big_records(tmp_path: Path) -> None:
+    """A scan over many large records must not evict the small hot ones, and a record above
+    ``MAX_PARSED_RECORD_BYTES`` is never kept (a nightly lookup's records stay parsed)."""
+    at = datetime(2026, 10, 1, tzinfo=UTC)
+    runs = local.LocalRuns(tmp_path)
+    hot = [
+        RunRecord(f"nightly-2026-10-0{n}-20261003T010203Z", "nightly", date(2026, 10, n), at)
+        for n in range(1, 4)
+    ]
+    for r in hot:
+        runs.save(r)
+    big = RunRecord(
+        "job-edge-eval-0123456789abcdef",
+        "job:edge-eval",
+        date(2026, 10, 1),
+        at,
+        stats={"rows": "x" * (local.MAX_PARSED_RECORD_BYTES + 1)},
+    )
+    runs.save(big)
+    assert len(runs.find("nightly")) == 3
+    kept = set(runs._parsed)
+    assert len(kept) == 3
+    for _ in range(3):
+        assert runs._record("job-edge-eval-0123456789abcdef.json") is not None
+    assert set(runs._parsed) == kept  # the big one is not cached and evicted nothing
+
+
+def test_the_run_parse_cache_is_bounded_in_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(local, "MAX_PARSED_RECORDS", 3)
+    at = datetime(2026, 10, 1, tzinfo=UTC)
+    runs = local.LocalRuns(tmp_path)
+    for n in range(1, 8):
+        runs.save(RunRecord(f"x-2026-10-0{n}-20261003T010203Z", "x", date(2026, 10, n), at))
+    assert len(runs.find("x")) == 7
+    assert len(runs._parsed) == 3

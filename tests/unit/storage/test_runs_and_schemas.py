@@ -1,16 +1,22 @@
-from datetime import UTC, date, datetime
+from collections.abc import Iterator
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
 from algotrade.core.model.errors import DataValidationError
+from algotrade.storage.backends.local import LocalBackend
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import (
     RunRecord,
     RunStatus,
     done_sessions,
+    job_of_name,
     new_run_id,
     published,
     run_session,
 )
+from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.schemas import FORWARD_RETURNS, spec_for, table_key, validate_frame
 from algotrade.storage.tables.spec import Column, TableSpec
 from tests.helpers.stored_frames import stamped
@@ -231,3 +237,90 @@ def test_a_run_is_published_only_when_complete_or_partial() -> None:
         for status in RunStatus
     }
     assert {s for s, ok in flags.items() if ok} == {RunStatus.COMPLETE, RunStatus.PARTIAL}
+
+
+# find by the job a file name implies (both backends)
+FIND_AT = datetime(2026, 10, 1, 12, tzinfo=UTC)
+
+
+@pytest.fixture(params=["memory", "local"])
+def backend(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Backend]:
+    yield MemoryBackend() if request.param == "memory" else LocalBackend(tmp_path / "data")
+
+
+@pytest.fixture
+def decodes(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The ``job`` of every record decoded by ``RunRecord.from_json`` while it is active."""
+    seen: list[str] = []
+    original = RunRecord.from_json.__func__  # type: ignore[attr-defined]
+
+    def counting(cls: type[RunRecord], text: str) -> RunRecord:
+        record = original(cls, text)
+        seen.append(record.job)
+        return record
+
+    monkeypatch.setattr(RunRecord, "from_json", classmethod(counting))
+    return seen
+
+
+def populate(backend: Backend) -> list[str]:
+    ids: list[str] = []
+    save = backend.runs.save
+
+    def keep(record: RunRecord) -> None:
+        ids.append(record.run_id)
+        save(record)
+
+    for n in range(5):
+        day = date(2026, 10, 1) + timedelta(days=n)
+        started = FIND_AT + timedelta(days=n)
+        keep(RunRecord(new_run_id("nightly", day, started), "nightly", day, started))
+        keep(RunRecord(new_run_id("screen", day, started), "screen", day, started))
+    for kind, count in (("screen", 4), ("edge-eval", 3), ("nightly", 2)):
+        for n in range(count):
+            keep(
+                RunRecord(
+                    f"job-{kind}-{n:016x}", f"job:{kind}", date(2026, 10, 2), FIND_AT + timedelta(n)
+                )
+            )
+    return ids
+
+
+def test_job_of_name() -> None:
+    assert job_of_name("job-edge-eval-0123456789abcdef") == "job:edge-eval"
+    assert job_of_name("job-nightly-0123456789abcdef") == "job:nightly"
+    assert job_of_name("nightly-2026-10-02-20261003T010203Z") == "nightly"
+    assert job_of_name("evaluation-edge-x-2026-10-02-20261003T010203Z") == "evaluation-edge-x"
+    assert job_of_name("legacy-name") is None
+    assert job_of_name("job-nightly-nothex") is None
+
+
+def test_find_decodes_only_the_files_that_can_match(backend: Backend, decodes: list[str]) -> None:
+    populate(backend)
+    found = backend.runs.find("nightly")
+    assert len(found) == 5  # job records of kind nightly have the job ``job:nightly``
+    assert set(decodes) == {"nightly"} and len(decodes) == 5
+    decodes.clear()
+    assert len(backend.runs.find("job:nightly")) == 2
+    assert set(decodes) == {"job:nightly"} and len(decodes) == 2
+
+
+def test_find_equals_an_unfiltered_scan(backend: Backend) -> None:
+    everything = [r for run_id in populate(backend) if (r := backend.runs.load(run_id))]
+    for job in ("nightly", "screen", "job:screen", "job:edge-eval", "absent"):
+        reference = sorted((r for r in everything if r.job == job), key=lambda r: r.started_at)
+        assert backend.runs.find(job) == reference
+        day = date(2026, 10, 2)
+        assert backend.runs.find(job, day) == [r for r in reference if r.session_date == day]
+
+
+def test_a_file_with_an_unparseable_name_is_still_considered(
+    backend: Backend, decodes: list[str]
+) -> None:
+    populate(backend)
+    odd = RunRecord("odd-name", "nightly", date(2026, 10, 9), FIND_AT + timedelta(days=9))
+    backend.runs.save(odd)
+    decodes.clear()
+    found = backend.runs.find("nightly")
+    assert odd in found and len(found) == 6
+    assert len(decodes) == 6  # the five nightly ones and the odd one; no job record
