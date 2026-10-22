@@ -25,11 +25,11 @@ from algotrade.services.read.screens.results import (
 )
 from algotrade.services.read.screens.runs import (
     ScreenerRun,
-    is_picked,
     load_latest_runs,
     run_rows,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
+from algotrade.services.screening.rule_results import is_picked
 
 MAX_HELD_INSTRUMENTS = 512  # the instruments whose hits one publish keeps (oldest asked go first)
 

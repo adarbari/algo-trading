@@ -31,13 +31,14 @@ from algotrade.services.configs import resolve_config, resolve_rule_draft
 from algotrade.services.features import config_features
 from algotrade.services.preview.frame import FieldFrame, field_frame
 from algotrade.services.read.context import ReadContext, ResultCache, open_context
-from algotrade.services.read.screens.runs import is_picked, latest_run, run_rows
+from algotrade.services.read.screens.runs import latest_run, run_rows
 from algotrade.services.read.screens.screeners import (
     ScreenColumn,
     ScreenCriterion,
     load_screener,
     load_screeners,
 )
+from algotrade.services.screening.rule_results import is_picked
 from algotrade.services.screening.run import rule_run, settle_coverage
 from algotrade.services.views import to_value
 from algotrade.strategies.screeners.base import Decision

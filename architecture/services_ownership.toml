@@ -328,7 +328,8 @@ id = "screen-execution"
 description = "Run a configured screen (select, screen, audit, write results; coverage counts required tables only, an optional source's missing table is audited apart, ADR 0055); nightly submits `screen` jobs (workflows/nightly/screens.py) and warns on optional misses; the stale chains the chains gate tolerated (data.chains.tolerated_stale) are EXCLUDED from the run with a reason and out of its coverage (ADR 0054)"
 owner = [
     "src/algotrade/services/screening/run.py",
-    "src/algotrade/services/screening/rule_results.py",  # a rule screen's result frames
+    "src/algotrade/services/screening/rule_results.py",  # a rule screen's result frames and its run objects (ScreenRun, ScreenPick)
+    "src/algotrade/services/screening/previous.py",  # the previous run a screen's frozen changes are counted against
     "src/algotrade/services/jobs/handlers.py",
     "src/algotrade/engines/screening/exclusions.py",  # EXCLUDED rows: names out of the run with a reason (ADR 0054)
 ]
