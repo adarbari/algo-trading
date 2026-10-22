@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -115,11 +116,26 @@ def start_servers(data_url: str, api_factory=al.Api, popen=subprocess.Popen):  #
             env=vite_env(api.url, dict(os.environ)),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            start_new_session=True,  # its own process group: npx's child dies with it
         )
     except BaseException:
         api.close()
         raise
     return api, vite, web_url
+
+
+def stop_group(proc, killpg=os.killpg) -> None:  # type: ignore[no-untyped-def]
+    """Stop a server and what it spawned (npx -> vite): SIGTERM its group, SIGKILL after 15 s."""
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            killpg(proc.pid, sig)
+        except ProcessLookupError:
+            return
+        try:
+            proc.wait(timeout=15)
+            return
+        except subprocess.TimeoutExpired:
+            continue
 
 
 def node_command(args: argparse.Namespace, api_url: str, web_url: str) -> list[str]:
@@ -151,17 +167,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"refused: {err}", file=sys.stderr)
         return 2
     api, vite, web_url = start_servers(data_url)
+    # a stopped run (SIGTERM / SIGHUP) unwinds through the `finally` below
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda *_: sys.exit(143))
     try:
         wait_for(f"{web_url}/api/health")  # through Vite's proxy: it reaches our API
         return subprocess.run(
             node_command(args, api.url, web_url), cwd=REPO, check=False
         ).returncode
     finally:
-        vite.terminate()
-        try:
-            vite.wait(timeout=15)
-        except subprocess.TimeoutExpired:
-            vite.kill()
+        stop_group(vite)
         api.close()
 
 

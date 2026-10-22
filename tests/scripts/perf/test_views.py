@@ -358,6 +358,39 @@ def test_servers_on_the_live_port_are_refused_and_the_api_is_stopped(
         cap.vite_env("http://127.0.0.1:8000", {})
 
 
+def test_vite_group_is_killed_not_just_npx(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cap.al, "free_port", lambda: 11369)
+    kw: dict = {}
+    cap.start_servers("file:///c", api_factory=_FakeApi, popen=lambda c, **k: kw.update(k))
+    assert kw["start_new_session"] is True
+
+    class Proc:
+        pid = 4242
+
+        def __init__(self, stubborn: bool) -> None:
+            self.stubborn = stubborn
+
+        def wait(self, timeout: float) -> None:
+            if self.stubborn and not sent[-1] == cap.signal.SIGKILL:
+                raise cap.subprocess.TimeoutExpired("x", timeout)
+
+    sent: list = [None]
+    cap.stop_group(Proc(False), lambda pid, sig: sent.append((pid, sig)) or None)
+    assert sent[1:] == [(4242, cap.signal.SIGTERM)]
+    sent[:] = [None]
+
+    def kill(pid: int, sig: int) -> None:
+        sent.append(sig)
+
+    cap.stop_group(Proc(True), kill)
+    assert sent[1:] == [cap.signal.SIGTERM, cap.signal.SIGKILL]
+
+    def gone(pid: int, sig: int) -> None:
+        raise ProcessLookupError
+
+    cap.stop_group(Proc(False), gone)  # already dead: no error
+
+
 def test_node_command_carries_the_bounds(tmp_path: Path) -> None:
     cmd = cap.node_command(_args(tmp_path, only_route="/edges", retry=True), "http://a", "http://w")
     assert cmd[-2:] == ["--only-route", "/edges"] and "--max-views" in cmd
