@@ -36,3 +36,46 @@ while ingest, compaction or a backfill runs.
 checkout's and the main checkout's `var/data`) is refused unless
 `--i-know-this-is-the-real-store` is passed; `--uncached` without `--data-url` is refused the same
 way. The plain baseline run keeps today's behaviour (real store by default).
+
+## Run it page by page (small memory footprint)
+
+The whole-site run holds one process per operation and a 4 MB answer in several copies; on a
+machine with no free memory, run one page at a time.
+
+- `--page ROUTE` (repeatable) measures only the operations of that route (the capture's, else
+  the static on-load map's); `--ops NAME ...` (same as `--only`) names operations. A subset run
+  writes nothing: it prints the JSON. Example:
+  `make api-latency ARGS="--uncached --page /ideas --data-url file://<clone>"`.
+- **Memory guard**: before every operation (and between them) the tool reads `sysctl
+  vm.swapusage` and stops when free swap is under `--min-free-swap-mb` (default 500): exit code
+  3, the results so far printed (profile mode: already in the file). An unreadable value does not
+  block. Free disk under the clone below 8 GB stops the run the same way. Any `--page` / `--ops` /
+  `--profile` run needs `--data-url` (a clone); `--profile` refuses the real store even with
+  `--i-know-this-is-the-real-store`.
+- **COLD is checked**: each row records the first GraphQL error (and a non-JSON answer) next to
+  the HTTP status; a failure is a FAILED row (`COLD FAILED: <message>`), printed in the progress
+  line with the bytes and rows. COLD in the uncached run now uses the uncached mode, so no cache or
+  warmer replay can answer it; an all-null / empty `data` is noted `EMPTY (check)` (a page can be
+  legitimately empty: not a failure); the row is also flagged `COLD SUSPECT` when its answer is under
+  half the bytes of the later uncached calls. Why a fresh process could answer fast (code
+  read, not measured): the old COLD pass ran in the default cache mode, where the start-up warmer
+  replays the seeded page operations into the response cache, so a call made once `/health`
+  answers could be a cache hit or an error answered with status 200 (`errors` in the body), and
+  only the status was recorded.
+- **`--profile --page ROUTE`** (one page per run, a clone URL required: the real-store refusal
+  applies) profiles each operation once, uncached, in process (same patches as the uncached mode,
+  warmer off) under cProfile, all on the main thread (cProfile watches only the thread that
+  enables it: the app is driven through an ASGI transport and the read pool's `to_thread` calls
+  run inline; a profile with no stat calls and no algotrade function is marked `PROFILE SAW
+  NOTHING (thread issue)`) and rewrites that page's
+  section of `docs/perf/page-profiles.md` after every operation. An unprofiled
+  `session { date }` call first builds the schema and store handles. Per operation: profiled wall
+  seconds (cProfile inflates pure-Python time: read shares, not absolutes), bytes, rows, stat
+  calls, files opened, the bucket split and the top 12 functions of `algotrade` and `pyarrow` by
+  cumulative time.
+- **Bucket method**: each function's own time (`tottime`) goes to exactly one bucket. A function
+  a rule names (filesystem calls, `storage/runs.py from_json` and `local.py _record` / `find`,
+  anything in pyarrow, pandas / numpy, GraphQL / JSON encoders) keeps its own time; any other
+  function splits its own time over its callers' buckets in proportion to the caller-edge time,
+  recursively; unnamed code is "other". The buckets therefore sum to the profile's total and
+  nothing is counted twice (summing the cumulative time of nested entry points would).

@@ -23,6 +23,15 @@ requests per operation (repeats counted), their bytes and the share of the page'
 `--data-url` (a CLONE of the store: the real one is refused unless
 `--i-know-this-is-the-real-store`); `--config-dir` picks the config root (default ./config).
 Runbook: docs/perf/api-latency-uncached-run.md.
+
+Every run records, per call, the HTTP status, the first GraphQL error and an empty-`data` check
+(a fast failure is a FAILED row, never a fast call), the response bytes and the rows. The
+uncached run's COLD pass uses the uncached mode (no cache or warmer replay can answer it) and is
+flagged when its answer is far smaller than the later uncached one. `--page ROUTE` (repeatable)
+and `--ops NAME ...` measure only those operations (writes nothing); `--profile --page ROUTE`
+profiles each of the page's operations once, uncached, in process (`page_profile.py`, ->
+docs/perf/page-profiles.md). Every mode stops with exit code 3 (partial results kept) when free
+swap is under `--min-free-swap-mb` (500).
 """
 
 from __future__ import annotations
@@ -48,6 +57,8 @@ from urllib.parse import urlparse
 import httpx2 as httpx  # the httpx API; installed with the test dependencies
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import page_map
+import page_profile as pp
 import web_page_ops as wpo
 
 REPO = Path(__file__).resolve().parents[2]
@@ -57,10 +68,13 @@ JSON_OUT = REPO / "benchmarks/api_latency.json"
 DOC_OUT = REPO / "docs/perf/api-latency-baseline.md"
 UNCACHED_JSON_OUT = REPO / "benchmarks/api_latency_uncached.json"
 UNCACHED_DOC_OUT = REPO / "docs/perf/api-latency-uncached.md"
+PROFILE_DOC_OUT = REPO / "docs/perf/page-profiles.md"
 REPEATS = 10
 UNCACHED_REPEATS = 5
 LOAD_CLIENTS = 4
 TIMEOUT = 180.0
+GUARD_PATH: list[Path | None] = [None]  # the clone: its disk is watched too (set in main)
+SWAP_FLOOR_MB = [pp.MIN_FREE_SWAP_MB]  # --min-free-swap-mb overrides it for the run
 PORT_OFFSET = 8  # spare ports: ALGOTRADE_PORT_BASE + 8 .. + 19 (release_writer_run.py uses + 7)
 MODES = {"cache": "0", "nocache": "1", "uncached": "2"}
 RELEASE_READS = re.compile(r"^(release_reads\s*=\s*)\w+", re.M)
@@ -127,9 +141,67 @@ def response_error(status: int, content: bytes) -> str | None:
         return f"HTTP {status}"
     try:
         errors = json.loads(content).get("errors")
-    except ValueError:
+    except (ValueError, AttributeError):
         return "not JSON"
-    return str(errors[0].get("message", errors[0]))[:80] if errors else None
+    if not errors:
+        return None
+    first = errors[0]
+    return str(first.get("message", first) if isinstance(first, dict) else first)[:80]
+
+
+def has_content(data: object) -> bool:
+    """Whether ``data`` holds any non-null scalar (an answer of nulls and empty lists does not)."""
+    if isinstance(data, list):
+        return any(has_content(x) for x in data)
+    if isinstance(data, dict):
+        return any(has_content(v) for v in data.values())
+    return data is not None
+
+
+def answer_problem(status: int, content: bytes) -> str | None:
+    """Why an answer is a failure: ``response_error`` (HTTP status, GraphQL error, non-JSON). An
+    empty ``data`` is not one (a page can be legitimately empty): see ``empty_note``."""
+    return response_error(status, content)
+
+
+def empty_note(status: int, content: bytes) -> str | None:
+    """ "EMPTY (check)" for a 200 answer whose ``data`` holds nothing but nulls and empty lists:
+    to be looked at, not a failure."""
+    if status != 200:
+        return None
+    try:
+        data = json.loads(content).get("data")
+    except (ValueError, AttributeError):
+        return None
+    return None if has_content(data) else "EMPTY (check): data is all null / empty"
+
+
+def cold_suspect(cold_bytes: int, uncached_bytes: int, ratio: float = 0.5) -> str | None:
+    """A message when the COLD answer is much smaller than the later uncached one (the cold call
+    did not go through the resolver: a cache or an error answered it)."""
+    if uncached_bytes and cold_bytes < ratio * uncached_bytes:
+        return (
+            f"cold answer {cold_bytes:,} B vs {uncached_bytes:,} B uncached: "
+            "it did not go through the resolver"
+        )
+    return None
+
+
+def cold_line(
+    name: str, ms: float, size: int, rows: int, error: str | None, note: str | None = None
+) -> str:
+    """The progress line of one COLD call: time, bytes, rows and the first error."""
+    return (
+        f"  {name}: cold {ms:.0f} ms, {size:,} B, {rows} rows"
+        + (f"  FAILED: {error}" if error else "")
+        + (f"  {note}" if note else "")
+    )
+
+
+def guard() -> None:
+    """Stop (SwapLowError) before an operation when free swap is under the floor or the clone's
+    disk has under 8 GB free."""
+    pp.swap_guard(SWAP_FLOOR_MB[0], disk_path=GUARD_PATH[0])
 
 
 def largest_list(data: object) -> int:
@@ -302,6 +374,7 @@ class Api:
         raise RuntimeError("the API did not start")
 
     last_error: str | None = None
+    last_note: str | None = None
 
     def call(self, op: dict) -> tuple[float, int, int, int]:
         """(ms, status, decoded bytes, longest list) of one GraphQL call."""
@@ -314,7 +387,8 @@ class Api:
             return (time.perf_counter() - t0) * 1000, 0, 0, 0
         ms = (time.perf_counter() - t0) * 1000
         rows = 0
-        self.last_error = response_error(r.status_code, r.content)
+        self.last_error = answer_problem(r.status_code, r.content)
+        self.last_note = empty_note(r.status_code, r.content)
         if r.status_code == 200:
             rows = largest_list(r.json().get("data"))
         return ms, r.status_code, len(r.content), rows
@@ -332,14 +406,26 @@ class Api:
 def measure(ops: dict[str, dict], **target: object) -> dict[str, dict]:
     """Cold (a new process per operation), then warm (same process) per operation, then nocache."""
     out: dict[str, dict] = {}
+    try:
+        _measure_into(out, ops, **target)
+    except pp.SwapLowError as err:
+        err.partial = out  # type: ignore[attr-defined]
+        raise
+    return out
+
+
+def _measure_into(out: dict[str, dict], ops: dict[str, dict], **target: object) -> None:
     for name, op in ops.items():
+        guard()
         api = Api(**target)  # type: ignore[arg-type]
         try:
             cold, status, size, rows = api.call(op)
+            cold_error = api.last_error
             warm = [api.call(op)[0] for _ in range(REPEATS)]
         finally:
             api.close()
         out[name] = {
+            "error": cold_error,
             "status": status,
             "cold_ms": cold,
             "warm_p50_ms": statistics.median(warm),
@@ -347,17 +433,20 @@ def measure(ops: dict[str, dict], **target: object) -> dict[str, dict]:
             "bytes": size,
             "rows": rows,
         }
-        print(f"  {name}: cold {cold:.0f} ms, warm p50 {statistics.median(warm):.1f} ms")
+        print(
+            cold_line(name, cold, size, rows, cold_error)
+            + f", warm p50 {statistics.median(warm):.1f} ms"
+        )
     api = Api("nocache", **target)  # type: ignore[arg-type]
     try:
         for name, op in ops.items():
+            guard()
             api.call(op)  # primed: the process-level state is warm, only the cache is absent
             raw = [api.call(op)[0] for _ in range(REPEATS)]
             out[name]["nocache_p50_ms"] = statistics.median(raw)
             out[name]["nocache_p95_ms"] = percentile(raw, 95)
     finally:
         api.close()
-    return out
 
 
 def page_totals(by_page: dict[str, list[str]], ops: dict[str, dict]) -> dict[str, dict]:
@@ -403,6 +492,8 @@ def render(report: dict) -> str:
         n_more = len(used[name]) - 4
         where = ", ".join(used[name][:4]) + (f" +{n_more}" if n_more > 0 else "")
         note = "" if m["status"] == 200 else f" (HTTP {m['status']})"
+        if m.get("error"):
+            note += f" **COLD FAILED: {m['error']}**"
         lines.append(
             f"| {name}{note} | {where or '-'} | {m['cold_ms']:.0f} | {m['warm_p50_ms']:.1f} | "
             f"{m['warm_p95_ms']:.1f} | {m['nocache_p50_ms']:.1f} | {m['bytes']:,} | {m['rows']} |"
@@ -434,18 +525,33 @@ def render(report: dict) -> str:
 # ---- --uncached: the truly uncached cost, and the calls per page ----------------------------
 
 
-def measure_cold(ops: dict[str, dict], **target: object) -> dict[str, dict]:
-    """COLD: the first call on a freshly started process, one new process per operation."""
+def measure_cold(ops: dict[str, dict], mode: str = "cache", **target: object) -> dict[str, dict]:
+    """COLD: the first call on a freshly started process, one new process per operation. The
+    row keeps the first GraphQL error or empty-data problem (``cold_error``): a fast failure is
+    flagged, never read as a fast call. ``mode`` "uncached" makes the call go through the
+    resolver by construction (no cache, no warmer replay can answer it)."""
     out: dict[str, dict] = {}
     for name, op in ops.items():
-        api = Api(**target)  # type: ignore[arg-type]
+        try:
+            guard()
+        except pp.SwapLowError as err:
+            err.partial = out  # type: ignore[attr-defined]
+            raise
+        api = Api(mode, **target)  # type: ignore[arg-type]
         try:
             ms, status, size, rows = api.call(op)
+            error, note = api.last_error, api.last_note
         finally:
             api.close()
-        out[name] = {"status": status, "cold_ms": ms, "bytes": size, "rows": rows}
-        note = f" ({api.last_error})" if status != 200 else ""
-        print(f"  {name}: cold {ms:.0f} ms{note}", flush=True)
+        out[name] = {
+            "status": status,
+            "cold_ms": ms,
+            "bytes": size,
+            "rows": rows,
+            "cold_error": error,
+            "cold_note": note,
+        }
+        print(cold_line(name, ms, size, rows, error, note), flush=True)
     return out
 
 
@@ -486,10 +592,18 @@ def measure_uncached(ops: dict[str, dict], **target: object) -> dict[str, dict]:
     api = Api("uncached", **target)  # type: ignore[arg-type]
     try:
         for name, op in ops.items():
+            try:
+                guard()
+            except pp.SwapLowError as err:
+                err.partial = out  # type: ignore[attr-defined]
+                raise
             solo: list[float] = []
             errors: list[str] = []
+            size = 0
             for _ in range(UNCACHED_REPEATS):
-                solo.append(api.call(op)[0])
+                call = api.call(op)
+                solo.append(call[0])
+                size = max(size, call[2])
                 if api.last_error:
                     errors.append(api.last_error)
             sampled = asyncio.run(load_samples(api.url, op, LOAD_CLIENTS, UNCACHED_REPEATS))
@@ -500,6 +614,7 @@ def measure_uncached(ops: dict[str, dict], **target: object) -> dict[str, dict]:
                 "uncached_p95_ms": percentile(solo, 95),
                 "load_p50_ms": statistics.median(loaded),
                 "load_p95_ms": percentile(loaded, 95),
+                "uncached_bytes": size,
                 "failed_calls": len(errors),
                 "first_error": errors[0] if errors else None,
             }
@@ -513,191 +628,10 @@ def measure_uncached(ops: dict[str, dict], **target: object) -> dict[str, dict]:
     return out
 
 
-def request_counts(pages: dict[str, list[dict]]) -> dict[str, dict[str, int]]:
-    """Per route: operation name -> requests sent on load (repeats counted, GraphQL only)."""
-    counts: dict[str, dict[str, int]] = {}
-    for route, calls in pages.items():
-        per: dict[str, int] = {}
-        for call in calls:
-            if call["kind"] == "graphql":
-                per[call["op"]] = per.get(call["op"], 0) + 1
-        counts[route] = per
-    return counts
-
-
-TIME_KEYS = ("cold_ms", "uncached_p50_ms", "load_p50_ms")
-
-
-def calls_per_page(counts: dict[str, dict[str, int]], ops: dict[str, dict]) -> dict[str, dict]:
-    """Per route: requests per operation with their bytes, ms and share of the page's time, the
-    distinct operations, total requests, and for cold / uncached p50 / under-load p50 the sum
-    (every request back to back, repeats counted) and the critical path (the slowest distinct
-    operation: the browser sends them in parallel). Share = count * ms / sum, per time key."""
-    pages: dict[str, dict] = {}
-    for route, per in counts.items():
-        total = sum(per.values())
-        row: dict = {"distinct": len(per), "requests": total, "bytes": 0, "ops": {}}
-        sums = {k: sum(n * ops[o][k] for o, n in per.items() if o in ops) for k in TIME_KEYS}
-        for name, n in sorted(per.items(), key=lambda kv: -kv[1]):
-            m = ops.get(name, {})
-            entry = {"count": n, "bytes": n * m.get("bytes", 0), "unit_bytes": m.get("bytes", 0)}
-            for k in TIME_KEYS:
-                entry[k] = m.get(k, 0.0)
-                entry[f"share_{k}"] = n * m.get(k, 0.0) / sums[k] if sums[k] else 0.0
-            row["bytes"] += entry["bytes"]
-            row["ops"][name] = entry
-        for k in TIME_KEYS:
-            row[f"sum_{k}"] = sums[k]
-            row[f"critical_{k}"] = max((ops[o][k] for o in per if o in ops), default=0.0)
-        pages[route] = row
-    return pages
-
-
-def captured_by_route(
-    routes: list[str], capture: dict[str, list[dict]]
-) -> tuple[dict[str, dict[str, int]], dict[str, list[str]], list[str]]:
-    """Per route pattern: the requests per operation of its capture entries (the highest count
-    over its URLs), the URLs it matched, and the capture URLs no route matches."""
-    urls, orphans = wpo.match_capture(routes, list(capture))
-    counts = request_counts(capture)
-    merged: dict[str, dict[str, int]] = {}
-    for route, matched in urls.items():
-        per: dict[str, int] = {}
-        for url in matched:
-            for op, n in counts[url].items():
-                per[op] = max(per.get(op, 0), n)
-        merged[route] = per
-    return merged, urls, orphans
-
-
-def page_report(
-    routes: list[wpo.Route],
-    static: dict[str, dict[str, int]],
-    shell: dict[str, int],
-    capture: dict[str, list[dict]],
-    ops: dict[str, dict],
-    all_ops: set[str],
-) -> dict:
-    """The Pages section: per route the static classes, the captured counts, their differences
-    and the times (from the capture when there is one, else the static on-load operations)."""
-    patterns = [r.path for r in routes]
-    captured, urls, orphans = captured_by_route(patterns, capture)
-    shell_ops = set(shell)
-    counts: dict[str, dict[str, int]] = {}
-    rows: dict[str, dict] = {}
-    for route in routes:
-        st = static[route.path]
-        cap = captured[route.path]
-        cap_page = {o: n for o, n in cap.items() if o not in shell_ops}
-        on_load = {o for o, k in st.items() if k == wpo.LOAD}
-        diff = []
-        if urls[route.path]:
-            for o in sorted(set(cap_page) - set(st)):
-                diff.append(f"{o}: captured, not in the static map (capture is right)")
-            for o in sorted(on_load - set(cap_page)):
-                diff.append(f"{o}: static on-load, not captured (capture used one parameter value)")
-        counts[route.path] = (
-            cap if urls[route.path] else {**dict.fromkeys(shell, 1), **dict.fromkeys(on_load, 1)}
-        )
-        rows[route.path] = {
-            "kind": route.kind,
-            "search_params": route.search,
-            "file": route.file,
-            "capture_urls": urls[route.path],
-            "static_on_load": sorted(on_load),
-            "static_uncertain": sorted(o for o, k in st.items() if k == wpo.MAYBE),
-            "static_interaction": sorted(o for o, k in st.items() if k == wpo.HANDLER),
-            "captured": cap_page,
-            "differences": diff,
-            "basis": "capture" if urls[route.path] else "static on-load",
-        }
-    timed = calls_per_page(counts, ops)
-    for route, row in rows.items():
-        t = timed[route]
-        row.update({k: t[k] for k in t if k.startswith(("sum_", "critical_"))})
-        row["requests"] = t["requests"]
-    reached = set(shell) | {
-        o
-        for r in rows.values()
-        for k in ("static_on_load", "static_uncertain", "static_interaction")
-        for o in r[k]
-    }
-    reached |= {o for per in captured.values() for o in per}
-    return {
-        "pages": rows,
-        "shell": dict(sorted(shell.items())),
-        "routes_without_capture": [r for r, u in urls.items() if not u],
-        "capture_without_route": orphans,
-        "operations_without_page": sorted(all_ops - reached),
-        "pages_without_data": [
-            r
-            for r, row in rows.items()
-            if not row["captured"]
-            and not row["static_on_load"]
-            and not row["static_uncertain"]
-            and not row["static_interaction"]
-        ],
-    }
-
-
-def render_pages(rep: dict) -> list[str]:
-    cls = {wpo.LOAD: "on-load", wpo.MAYBE: "uncertain", wpo.HANDLER: "interaction"}
-    shell = ", ".join(f"{o} ({cls[k]})" for o, k in rep["shell"].items())
-    lines = [
-        "",
-        "## Pages",
-        "",
-        "Every leaf route of the web router (`apps/web/src/app/routes`) with its path pattern "
-        "(`$x` is a parameter; **search** = it declares search params). **Static** = the import "
-        "walk from the route's page down to the `graphql()` documents "
-        "(`scripts/perf/web_page_ops.py`), classed on-load (rendered or called "
-        "unconditionally), uncertain (behind `&&`, `?`, an `enabled` option or a self-gated "
-        "hook) or interaction-only (inside a handler or callback); the shell's operations are "
-        f"listed once and removed from each page. Shell: {shell or '-'}. **Captured** = what the "
-        "browser sent (`api_latency_pages.json`, requests per operation, shell excluded). The walk "
-        "reads source text: a read reached through a prop, context or registry is not seen "
-        "(the capture is right then); a conditional it cannot read counts as on-load. Times use "
-        "the capture's requests (shell included) where the route has a capture, else the static "
-        "on-load operations plus the shell once; sum = every request back to back, critical = "
-        "the slowest operation.",
-        "",
-        "| page | kind | static on-load | captured (requests) | differences | interaction-only "
-        "(uncertain) | sum uncached p50 | critical uncached p50 | critical cold | basis |",
-        "|---|---|---|---|---|---|---:|---:|---:|---|",
-    ]
-    for route, r in sorted(rep["pages"].items()):
-        cap = ", ".join(f"{o} x{n}" if n > 1 else o for o, n in r["captured"].items()) or "-"
-        extra = r["static_interaction"] + [f"{o}?" for o in r["static_uncertain"]]
-        lines.append(
-            f"| `{route}`{' search' if r['search_params'] else ''} | {r['kind']} | "
-            f"{', '.join(r['static_on_load']) or '-'} | {cap} | "
-            f"{'; '.join(r['differences']) or '-'} | {', '.join(extra) or '-'} | "
-            f"{r['sum_uncached_p50_ms']:.0f} | {r['critical_uncached_p50_ms']:.0f} | "
-            f"{r['critical_cold_ms']:.0f} | {r['basis']} |"
-        )
-    params = [f"`{u}`" for r in rep["pages"].values() for u in r["capture_urls"]]
-    lines += [
-        "",
-        "Capture URLs (the parameter values the capture used): " + (", ".join(params) or "-"),
-        "",
-        "Routes with no capture entry: "
-        + (", ".join(f"`{r}`" for r in rep["routes_without_capture"]) or "none"),
-        "",
-        "Capture entries that match no route: "
-        + (", ".join(f"`{r}`" for r in rep["capture_without_route"]) or "none"),
-        "",
-        "### Operations without a page",
-        "",
-        "Query documents in the web source that no route reaches (statically, shell included) "
-        "and the capture never sent: " + (", ".join(rep["operations_without_page"]) or "none"),
-        "",
-        "### Pages without data",
-        "",
-        "Routes with no operation, static or captured: "
-        + (", ".join(f"`{r}`" for r in rep["pages_without_data"]) or "none"),
-        "",
-    ]
-    return lines
+request_counts = page_map.request_counts
+calls_per_page = page_map.calls_per_page
+page_report = page_map.page_report
+render_pages = page_map.render_pages
 
 
 def render_uncached(report: dict) -> str:
@@ -731,6 +665,12 @@ def render_uncached(report: dict) -> str:
         note = "" if m["status"] == 200 else f" (HTTP {m['status']})"
         if m.get("failed_calls"):
             note += f" **FAILED x{m['failed_calls']}: {m['first_error']}** (timings are errors)"
+        if m.get("cold_error"):
+            note += f" **COLD FAILED: {m['cold_error']}** (cold ms is an error)"
+        if m.get("cold_note"):
+            note += f" **{m['cold_note']}**"
+        if m.get("cold_flag"):
+            note += f" **COLD SUSPECT: {m['cold_flag']}**"
         lines.append(
             f"| {name}{note} | {m['cold_ms']:.0f} | {m['uncached_p50_ms']:.1f} | "
             f"{m['uncached_p95_ms']:.1f} | {m['load_p50_ms']:.1f} | {m['load_p95_ms']:.1f} | "
@@ -778,17 +718,31 @@ def render_uncached(report: dict) -> str:
 def run_uncached(
     args: argparse.Namespace, ops: dict[str, dict], counts: dict, capture: dict
 ) -> int:
-    """The --uncached run: cold, uncached and under-load per operation, then the page tables."""
+    """The --uncached run: cold, uncached and under-load per operation, then the page tables. COLD
+    runs in the uncached mode (the resolver answers by construction); a cold answer much smaller
+    than the uncached one, or a cold error, flags the row."""
     target: dict[str, object] = {"data_url": args.data_url}
     tmp = Path(tempfile.mkdtemp(prefix="api-latency-config-"))
+    measured: dict[str, dict] = {}
     try:
         target["config_dir"] = uncached_config(Path(args.config_dir or REPO / "config"), tmp / "c")
-        measured = measure_cold(ops, **target)
-        for name, m in measure_uncached(ops, **target).items():
-            measured[name].update(m)
+        try:
+            measured.update(measure_cold(ops, "uncached", **target))
+            for name, m in measure_uncached(ops, **target).items():
+                measured[name].update(m)
+        except pp.SwapLowError as err:
+            for name, m in getattr(err, "partial", {}).items():
+                measured.setdefault(name, {}).update(m)
+            print(f"aborted: {err}; partial results:", file=sys.stderr)
+            print(json.dumps(measured, indent=1))
+            return pp.EXIT_LOW_SWAP
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    if args.only:
+    for m in measured.values():
+        m["cold_flag"] = (
+            None if m.get("cold_error") else cold_suspect(m["bytes"], m["uncached_bytes"])
+        )
+    if args.subset:
         print(json.dumps(measured, indent=1))
         return 0
     report = {
@@ -812,10 +766,54 @@ def run_uncached(
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def run_profile(args: argparse.Namespace, ops: dict[str, dict]) -> int:
+    """--profile: one uncached call per operation of the page, in this process, under cProfile."""
+    tmp = Path(tempfile.mkdtemp(prefix="api-latency-config-"))
+    try:
+        config = uncached_config(Path(args.config_dir or REPO / "config"), tmp / "c")
+        label = args.page[0] if args.page else "ops: " + ", ".join(ops)
+        return pp.run_profile(
+            ops,
+            label,
+            patch=PATCH,
+            data_url=args.data_url,
+            config_dir=config,
+            out=PROFILE_DOC_OUT,
+            problem=answer_problem,
+            rows_of=largest_list,
+            min_free_mb=SWAP_FLOOR_MB[0],
+            disk_path=GUARD_PATH[0],
+            notes_of=empty_note,
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
-    p.add_argument("--only", nargs="+", help="measure only these operations (writes nothing)")
+    p.add_argument(
+        "--only", "--ops", nargs="+", help="measure only these operations (writes nothing)"
+    )
+    p.add_argument(
+        "--page",
+        action="append",
+        default=[],
+        metavar="ROUTE",
+        help="measure only the operations of this route (repeatable; writes nothing)",
+    )
     p.add_argument("--uncached", action="store_true", help="truly uncached + calls per page")
+    p.add_argument(
+        "--profile",
+        action="store_true",
+        help="one uncached call per operation of ONE --page (or of --ops) in process under "
+        "cProfile -> docs/perf/page-profiles.md",
+    )
+    p.add_argument(
+        "--min-free-swap-mb",
+        type=float,
+        default=pp.MIN_FREE_SWAP_MB,
+        help="abort (exit 3, partial results kept) when free swap falls below this",
+    )
     p.add_argument("--data-url", help="the store to serve (a clone); default: the real local store")
     p.add_argument("--config-dir", help="the config root (default ./config)")
     p.add_argument(
@@ -823,33 +821,79 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="allow --data-url to be the real local store (and --uncached without one)",
     )
-    args = p.parse_args(argv)
+    return p.parse_args(argv)
+
+
+def run_needs_url(args: argparse.Namespace) -> bool:
+    """The modes that must name a clone: any run but the whole-site baseline (a subset run
+    starts an API too, and would otherwise default to the real store)."""
+    return bool(args.uncached or args.profile or args.page or args.only)
+
+
+def profile_selection_error(args: argparse.Namespace) -> str | None:
+    """--profile runs one page (one process per page) or named operations, never none or two."""
+    if not args.profile:
+        return None
+    if len(args.page) > 1:
+        return "--profile takes one --page per run (one process per page)"
+    if not args.page and not args.only:
+        return "--profile needs --page ROUTE or --ops NAME ..."
+    return None
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    SWAP_FLOOR_MB[0] = args.min_free_swap_mb
     # a SIGTERM (a stopped run) must unwind through the `finally` that stops the API processes
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     try:
+        if message := profile_selection_error(args):
+            raise RefusalError(message)
         args.data_url = check_target(
             args.data_url,
             real_stores(dict(os.environ), REPO, main_checkout_of(REPO)),
-            args.i_know_this_is_the_real_store,
-            need_url=args.uncached,
+            args.i_know_this_is_the_real_store and not args.profile,  # never for --profile
+            need_url=run_needs_url(args),
         )
     except RefusalError as err:
         print(f"refused: {err}", file=sys.stderr)
         return 2
+    GUARD_PATH[0] = store_path(args.data_url) if args.data_url else None
     pages = json.loads(PAGES_FILE.read_text())["pages"]
     ops, by_page = inventory(pages)
-    if args.only:
-        ops = {k: v for k, v in ops.items() if k in args.only}
-    print(f"{len(ops)} operations, {len(by_page)} pages")
+    args.subset = bool(args.only or args.page)
+    if args.subset:
+        try:
+            ops = pp.select_operations(
+                ops, by_page, args.page, args.only or [], static_routes(args.page, by_page)
+            )
+        except pp.SelectionError as err:
+            print(f"refused: {err}", file=sys.stderr)
+            return 2
+    print(f"{len(ops)} operations, {len(by_page)} pages", flush=True)
+    if args.profile:
+        return run_profile(args, ops)
     if args.uncached:
         return run_uncached(args, ops, request_counts(pages), pages)
+    return run_baseline(args, ops, by_page)
+
+
+def run_baseline(
+    args: argparse.Namespace, ops: dict[str, dict], by_page: dict[str, list[str]]
+) -> int:
+    """The plain baseline: cold, warm and nocache per operation."""
     target: dict[str, object] = {}
     if args.data_url:
         target["data_url"] = args.data_url
     if args.config_dir:
         target["config_dir"] = Path(args.config_dir)
-    measured = measure(ops, **target)
-    if args.only:
+    try:
+        measured = measure(ops, **target)
+    except pp.SwapLowError as err:
+        print(f"aborted: {err}; partial results:", file=sys.stderr)
+        print(json.dumps(getattr(err, "partial", {}), indent=1))
+        return pp.EXIT_LOW_SWAP
+    if args.subset:
         print(json.dumps(measured, indent=1))
         return 0
     report = {
@@ -863,6 +907,19 @@ def main(argv: list[str] | None = None) -> int:
     DOC_OUT.write_text(render(report))
     print(f"written {JSON_OUT.relative_to(REPO)}, {DOC_OUT.relative_to(REPO)}")
     return 0
+
+
+def static_routes(routes: list[str], by_page: dict[str, list[str]]) -> dict[str, list[str]]:
+    """The static on-load operations of the --page routes the capture has no entry for."""
+    missing = [r for r in routes if r not in by_page]
+    if not missing or not WEB_SRC.is_dir():
+        return {}
+    static, shell = wpo.static_page_ops(WEB_SRC, wpo.enumerate_routes(WEB_SRC))
+    return {
+        r: [*shell, *(o for o, k in static[r].items() if k == wpo.LOAD)]
+        for r in missing
+        if r in static
+    }
 
 
 if __name__ == "__main__":
