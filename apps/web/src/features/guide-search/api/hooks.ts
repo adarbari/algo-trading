@@ -33,7 +33,7 @@ export function useGuideSearchResults(q: string) {
   const variables = { q, limit: SEARCH_LIMIT_PER_KIND };
   return useQuery({
     queryKey: queryKeys.gql('GuideSearch', variables),
-    queryFn: () => gql(GuideSearchQuery, variables),
+    queryFn: ({ queryKey }) => gql(GuideSearchQuery, variables, queryKey),
     select: (data) => data.guideSearch?.groups ?? [],
     enabled: q !== '',
     // The server computes from the sources per request: never serve an old answer as fresh.

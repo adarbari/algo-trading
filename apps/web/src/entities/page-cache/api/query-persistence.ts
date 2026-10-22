@@ -121,7 +121,7 @@ export function startQueryPersistence(
   deps: PersistDeps = defaultDeps(),
 ): () => void {
   const { store, fetchSession, now } = deps;
-  installVersions(); // the generation / release headers of every answer (ADR 0077 decision 18)
+  installVersions(client); // the generation / release headers of every answer (ADR 0077 decision 18)
   if (running?.client === client) return running.stop; // one per client, however many pages ask
   running?.stop();
   running = undefined;
