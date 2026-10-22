@@ -205,6 +205,11 @@ class StoreReader:
         run records, read before them like ``visible_seq`` (ADR 0022)."""
         return self._backend.runs.generation()
 
+    def runs_frozen(self) -> bool:
+        """Whether ``runs`` answers from a snapshot (``with_runs_frozen``) that ``runs_generation``
+        does not track: a cache over run records is not kept for such a reader."""
+        return False
+
     def history_current(self, table: str, day: date) -> bool:
         """Whether the table's history copy (ADR 0060) holds ``day`` as it is now: how an
         operator learns the nightly's ``history-copy`` step is behind (``make doctor``)."""
@@ -277,6 +282,9 @@ class _FrozenRuns(StoreReader):
         if job not in self._frozen:
             return super().runs(job, session_date)
         return [r for r in self._frozen[job] if session_date in (None, r.session_date)]
+
+    def runs_frozen(self) -> bool:
+        return True
 
     def pinned(self, seq: int) -> "StoreReader":
         return _FrozenRuns(self._backend, self.own_run, seq, self._frozen)
