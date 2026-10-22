@@ -214,6 +214,7 @@ const EdgeDocument = graphql(`
   query EdgeDocument($ids: [String!]!) {
     edges(ids: $ids) {
       id
+      variantsTried
       name
       state
       mine

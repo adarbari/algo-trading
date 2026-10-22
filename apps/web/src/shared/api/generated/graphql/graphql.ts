@@ -243,7 +243,7 @@ export type EdgeDocumentQueryVariables = Exact<{
 }>;
 
 
-export type EdgeDocumentQuery = { edges: Array<{ id: string, name: string, state: string, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string } }> };
+export type EdgeDocumentQuery = { edges: Array<{ id: string, variantsTried: number, name: string, state: string, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string } }> };
 
 export type EdgeTradesQueryVariables = Exact<{
   edgeId: string;
@@ -1391,6 +1391,7 @@ export const EdgeDocumentDocument = new TypedDocumentString(`
     query EdgeDocument($ids: [String!]!) {
   edges(ids: $ids) {
     id
+    variantsTried
     name
     state
     mine

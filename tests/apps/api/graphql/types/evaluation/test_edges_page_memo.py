@@ -100,6 +100,11 @@ def test_the_document_query_returns_the_ids_asked_and_never_judges(
     backend = MemoryBackend()
     judged: list[str] = []
     read_runs: list[str] = []
+    sites: list[int] = []
+    real_site = runs_module._site_trials
+    monkeypatch.setattr(runs_module, "_site_trials", lambda c: sites.append(1) or real_site(c))
+    for k, trials in enumerate((3, 5)):
+        write_run(backend, f"d{k}", FROZEN, 0.6, minutes=k, edge="e2", trials_counted=trials)
     real_verdict, real_read = verdict_module.load_edge_verdict, runs_module._read_committed
     monkeypatch.setattr(
         verdict_module, "load_edge_verdict", lambda c, e: judged.append(e.id) or real_verdict(c, e)
@@ -109,7 +114,7 @@ def test_the_document_query_returns_the_ids_asked_and_never_judges(
     )
     query = (
         "query EdgeDocument($ids: [String!]!) { edges(ids: $ids) "
-        "{ id name state mine extends definition { picks } } }"
+        "{ id name state mine extends variantsTried definition { picks } } }"
     )
     result = asyncio.run(
         schema.execute(
@@ -118,7 +123,16 @@ def test_the_document_query_returns_the_ids_asked_and_never_judges(
     )
     assert result.errors is None
     assert [e["id"] for e in result.data["edges"]] == ["e2"]  # type: ignore[index]
-    assert judged == [] and read_runs == []
+    assert judged == [] and sites == []  # no verdict, never the site-wide trials
+    assert set(read_runs) == {"e2"}  # one edge's run records only (per owner, once each)
+    assert result.data["edges"][0]["variantsTried"] == 5  # type: ignore[index]
+    old = asyncio.run(
+        schema.execute(
+            "{ edges { id runs { trialsCounted } } }", context_value=_request(backend, False)
+        )
+    )
+    e2 = next(e for e in old.data["edges"] if e["id"] == "e2")  # type: ignore[index]
+    assert max(r["trialsCounted"] or 0 for r in e2["runs"]) == 5  # what the notice read before
     everything = asyncio.run(
         schema.execute("{ edges { id } }", context_value=_request(backend, False))
     )

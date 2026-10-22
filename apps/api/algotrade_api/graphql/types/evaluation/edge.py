@@ -290,6 +290,13 @@ class Edge:
         return [EdgeRun.of(r, self.ctx) for r in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The most variants any run of the edge recorded as tried (the multiple-testing "
+        "disclosure the builder shows); 0: none. Reads this edge's run records only"
+    )
+    async def variants_tried(self, info: Info) -> int:
+        return await off_loop(runs.load_edge_variants_tried, self.ctx, self.edge)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
         description="The verdict on the official result (a site edge: the canonical run; the "
         "user's own edge: their latest run, judged on in-sample figures while `oosHidden`): "
         "Works, Promising, Not working, Not enough data or Waiting on data, with the reason, "

@@ -70,7 +70,7 @@ beforeEach(() => {
   PUT.mockReset();
   clearStash('my_momentum');
   clearStash(NEW_KEY);
-  documentOf('my_momentum', { sources: [{ title: 'JT 1993', url: '' }] });
+  documentOf('my_momentum', { sources: [{ title: 'JT 1993', url: '' }], variantsTried: 4 });
   hooks.useEdgeSettings.mockReturnValue(fakeQuery(served));
   hooks.useScreeners.mockReturnValue(
     fakeQuery([
@@ -239,6 +239,15 @@ describe('EdgeBuilder', () => {
     documentOf('my_momentum', { state: 'trial' });
     setup();
     expect(screen.getByText('New version of an edge')).toBeInTheDocument();
+  });
+
+  it('discloses the variants tried (the most any run recorded), and nothing when none', () => {
+    const { unmount } = setup();
+    expect(screen.getByText('4 variants tried')).toBeInTheDocument();
+    unmount();
+    documentOf('my_momentum', { variantsTried: 0 });
+    setup();
+    expect(screen.queryByText(/variants tried/)).not.toBeInTheDocument();
   });
 
   it('asks for no edge document when the edge is new (and never the whole edges page)', () => {

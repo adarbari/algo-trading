@@ -200,7 +200,7 @@ function Builder({ id, edge, served, onSaved, onCancel, onOpenScreen }: BuilderP
         <TestStep
           draft={draft}
           onChange={change}
-          trials={0}
+          trials={edge?.variantsTried ?? 0}
           ready={blocked.length === 0}
           saving={save.isPending}
           onSave={submit}
