@@ -33,17 +33,19 @@ export function ShowMore({ shown, total, pageSize = 50, status = 'idle', onMore 
         ? `All ${total} shown`
         : `Showing ${shown} of ${total}`;
   return (
-    <Stack direction="row" gap={3} align="center" wrap>
-      <span className={styles.line} role="status" aria-live="polite">
-        <Text size="sm" tone={status === 'error' ? 'negative' : 'muted'}>
-          {line}
-        </Text>
-      </span>
-      {left > 0 && (
-        <Button size="sm" loading={status === 'loading'} onClick={onMore}>
-          {status === 'error' ? 'Try again' : `Show ${next} more`}
-        </Button>
-      )}
-    </Stack>
+    <div className={styles.root}>
+      <Stack direction="row" gap={3} align="center" wrap>
+        <span className={styles.line} role="status" aria-live="polite">
+          <Text size="sm" tone={status === 'error' ? 'negative' : 'muted'}>
+            {line}
+          </Text>
+        </span>
+        {left > 0 && (
+          <Button size="sm" loading={status === 'loading'} onClick={onMore}>
+            {status === 'error' ? 'Try again' : `Show ${next} more`}
+          </Button>
+        )}
+      </Stack>
+    </div>
   );
 }

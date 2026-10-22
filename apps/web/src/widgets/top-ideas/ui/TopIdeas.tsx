@@ -4,7 +4,7 @@
  * page's search params). Tick tickers to compare them in Explore, or click one to open it there
  * with the screener that surfaced it. The server sends the first page; "Show more" adds the next.
  */
-import { Box, Button, DataTable, Panel, ShowMore, Stack, Text } from '@algotrade/ui';
+import { Button, DataTable, Panel, ShowMore, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { helped } from '@/features/guide-help';
@@ -137,21 +137,15 @@ export function TopIdeas({
             visibleRows={14}
           />
           {state === 'ready' && ((ideas.data?.total ?? 0) > IDEAS_PAGE || ideas.data?.hasMore) && (
-            <Box padding={3}>
-              <ShowMore
-                shown={all.length}
-                total={ideas.data?.total ?? 0}
-                pageSize={IDEAS_PAGE}
-                status={
-                  ideas.isFetchNextPageError
-                    ? 'error'
-                    : ideas.isFetchingNextPage
-                      ? 'loading'
-                      : 'idle'
-                }
-                onMore={() => void ideas.fetchNextPage()}
-              />
-            </Box>
+            <ShowMore
+              shown={all.length}
+              total={ideas.data?.total ?? 0}
+              pageSize={IDEAS_PAGE}
+              status={
+                ideas.isFetchNextPageError ? 'error' : ideas.isFetchingNextPage ? 'loading' : 'idle'
+              }
+              onMore={() => void ideas.fetchNextPage()}
+            />
           )}
         </Stack>
       </Panel>
