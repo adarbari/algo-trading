@@ -148,12 +148,13 @@ def test_run_store(backend: Backend) -> None:
 def test_find_returns_the_job_s_records_in_any_id_form_and_copies_of_them(
     backend: Backend,
 ) -> None:
-    """A job's records whatever their id (a services/jobs id does not name its session), none
+    """A job's records whatever their id (a name that implies no job is still opened; a
+    ``job-<kind>-<hash>`` services/jobs id implies ``job:<kind>``, ``job_of_name``), none
     of a job sharing its prefix, and a record a caller changes is not changed in the store."""
     mine = start_run("job", D1, T0)
     backend.runs.save(mine)
     backend.runs.save(start_run("job-extra", D1, T0))
-    odd = RunRecord("job-screen-0123456789abcdef", "job", D2, T0 + timedelta(1))
+    odd = RunRecord("legacy-run-2", "job", D2, T0 + timedelta(1))
     backend.runs.save(odd)
     found = backend.runs.find("job")
     assert [r.run_id for r in found] == [mine.run_id, odd.run_id]
