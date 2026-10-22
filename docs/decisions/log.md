@@ -462,3 +462,10 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the response size and the server read stay small on phones and desktops; virtualising only hides rows already sent.
+
+## 2026-10-22 | Screener re-run experience | Measure the full wait after a re-run first; build the progress experience only after
+- Question: build the non-blocking re-run experience (status, ETA) now, or measure first?
+- Decision: measure first (the run itself, then the results page's cold reload), and only then build the experience. The architect's design is `screener-rerun-experience.md` (shared notes).
+- decided by: owner
+- status: final
+- Reasoning: on the clone a screener run took a median of 1.3 s (p90 3.1 s); the 15-30 s the owner sees is probably the cold reload of the results page, which the read-path fixes shorten.
