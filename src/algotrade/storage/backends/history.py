@@ -16,14 +16,18 @@ publish; deleting the folder loses nothing)::
                                 the partition path's row order exactly)
 
 **Staleness (exact, per partition).** A partition's index (``_runs.json``) is replaced by a
-rename on every commit, restate or purge, so its ``(inode, mtime, size)`` names the version of
-everything that partition resolves to. A year's copy serves a read only when every calendar day
-of the requested range inside that year has the signature the build recorded (``None`` for a
-day with no partition): a changed, new or purged partition, or a restored store, fails the
-check and the read falls back to the partitions. The check is one ``stat`` per requested day.
-It is stricter than comparing commit sequence numbers, which move on every commit to any
-table, and never looser: a signature can only match an index that was not replaced since the
-build, and the build refuses sources a commit had applied but not yet published.
+rename on every commit, restate or purge, and its content names the version of everything that
+partition resolves to (every entry carries its commit ``seq``, and a rewrite of a run already
+indexed goes to a new file name recorded in its entry); the signature is the size and digest of
+those bytes, never an inode or mtime, so a cloned or copied store is not stale. A year's copy
+serves a read only when every calendar day of the requested range inside that year has the
+signature the build recorded (``None`` for a day with no partition): a changed, new or purged
+partition, or a store restored from one with other indexes, fails the check and the read falls
+back to the partitions. The check is one ``stat`` per requested day once a file's digest is held
+in process (the first check of a file, or of a cloned one, reads it). It is stricter than
+comparing commit sequence numbers, which move on every commit to any table, and never looser: a
+signature can only match an index whose content did not change since the build, and the build
+refuses sources a commit had applied but not yet published.
 
 Only the ingestion writer builds (``build``); the files are written to a unique name and the
 manifest, replaced atomically last, is what makes them visible. A copy that cannot be read is
@@ -31,6 +35,7 @@ treated as stale. The copy serves reads with ``as_of`` None and no ``own_run`` (
 to exactly what it holds); anything else reads partitions.
 """
 
+import hashlib
 import json
 import logging
 import secrets
@@ -66,6 +71,7 @@ MIN_UNFILTERED_DAYS = 180  # an all-instrument read of fewer days opens fewer pa
 DAY = "__day"
 POS = "__pos"
 FORMAT = 1
+MAX_DIGESTS = 100_000  # index digests kept in process (a few MB)
 
 
 @dataclass(frozen=True)
@@ -98,6 +104,7 @@ class HistoryCopy:
         # table -> (the manifest file's stat when parsed, its years): parsed once per version
         self._parsed: dict[str, tuple[tuple[int, int, int], dict[int, YearCopy]]] = {}
         self._guard = threading.Lock()
+        self._digests: dict[Path, tuple[tuple[int, int, int], str]] = {}
 
     def _folder(self, table: str) -> Path:
         return self.root / table / HISTORY
@@ -107,12 +114,26 @@ class HistoryCopy:
         return self.root / table / f"date={name}"
 
     def _signature(self, table: str, day: date | str) -> str | None:
-        """The version of a partition's index: changes on every commit, restate or purge."""
+        """The version of a partition's index: its content (size and digest), which names every
+        run entry with its commit ``seq``, so it changes on every commit, restate or purge and
+        survives a file copy or an APFS clone (inode and mtime do not)."""
+        path = self._partition(table, day) / INDEX
         try:
-            st = (self._partition(table, day) / INDEX).stat()
+            st = path.stat()
+            stamp = (st.st_ino, st.st_mtime_ns, st.st_size)
+            with self._guard:
+                held_ = self._digests.get(path)
+            if held_ is not None and held_[0] == stamp:
+                return held_[1]
+            data = path.read_bytes()
         except FileNotFoundError:
             return None
-        return f"{st.st_ino}:{st.st_mtime_ns}:{st.st_size}"
+        digest = f"{len(data)}:{hashlib.sha1(data, usedforsecurity=False).hexdigest()}"
+        with self._guard:  # the file's stat names which bytes were digested, not the version
+            if len(self._digests) >= MAX_DIGESTS:
+                self._digests.clear()
+            self._digests[path] = (stamp, digest)
+        return digest
 
     # ------------------------------------------------------------------------ reading
 

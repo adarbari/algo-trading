@@ -177,10 +177,7 @@ def test_a_failing_step_does_not_stop_the_others(
     monkeypatch.setattr(warm, "load_episode_signals", lambda c, k: ran.append(f"episode {k}"))
     ctx = type("C", (), {"configs": None})()
     warm.warm(ctx)  # type: ignore[arg-type]
-    assert (
-        ran == ["completeness", "completeness", "frames", "episode a"]
-        and "regime failed" in caplog.text
-    )
+    assert ran == ["completeness", "frames", "episode a"] and "regime failed" in caplog.text
 
 
 def test_it_runs_the_extra_steps_after_the_screen_rows_and_before_the_market_frames(
@@ -237,7 +234,6 @@ def test_warm_home_reads_only_the_home_steps(monkeypatch: pytest.MonkeyPatch) ->
     ran: list[str] = []
     for name in ("load_screeners", "run_summaries", "load_regime", "load_edge_desk"):
         monkeypatch.setattr(warm, name, lambda c, _n=name: ran.append(_n))
-    monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append("load_completeness"))
     monkeypatch.setattr(warm, "load_ideas", lambda c, n: ran.append("load_ideas"))
     monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
     monkeypatch.setattr(warm, "warm_guide", lambda c: ran.append("guide"))
@@ -295,7 +291,7 @@ def test_it_warms_the_admin_ingestion_grid_after_the_home_steps_not_before_servi
     assert "grid 10" not in ran
     ran.clear()
     warm.warm(cast(Any, type("C", (), {"configs": None})()))
-    assert ran.index("grid 1") < ran.index("load_ideas") < ran.index("grid 10")
+    assert "grid 1" not in ran and ran.index("load_ideas") < ran.index("grid 10")
 
 
 def test_it_does_not_warm_while_the_checkout_is_ahead_of_the_running_code(
