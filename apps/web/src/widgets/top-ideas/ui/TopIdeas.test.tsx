@@ -220,11 +220,11 @@ describe('TopIdeas', () => {
       'IV rank high, spread tight',
     );
     expect(within(aapl).getByRole('link', { name: 'VRP scanner' })).toBeInTheDocument();
-    expect(within(aapl).getByRole('link', { name: 'Liquidity' })).toBeInTheDocument();
+    expect(within(aapl).getByRole('link', { name: /^Liquidity/ })).toBeInTheDocument();
     expect(within(aapl).getByText('200.50')).toBeInTheDocument();
     expect(within(aapl).getByText('−1.2%')).toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
-    expect(within(ko).getByRole('link', { name: 'Liquidity' })).toBeInTheDocument();
+    expect(within(ko).getByRole('link', { name: /^Liquidity/ })).toBeInTheDocument();
     expect(within(ko).queryByRole('link', { name: 'VRP scanner' })).not.toBeInTheDocument();
     expect(within(ko).queryByText(/more/)).not.toBeInTheDocument();
   });
@@ -285,7 +285,7 @@ describe('TopIdeas', () => {
       'href',
       '/screeners/vrp',
     );
-    const liquidity = within(aapl).getByRole('link', { name: 'Liquidity' });
+    const liquidity = within(aapl).getByRole('link', { name: /^Liquidity/ });
     expect(liquidity).toHaveAttribute('href', '/screeners/liq');
     await userEvent.click(liquidity);
     expect(onOpen).not.toHaveBeenCalled();

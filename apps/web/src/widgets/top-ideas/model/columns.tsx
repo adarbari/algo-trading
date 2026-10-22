@@ -202,12 +202,9 @@ const pickedByColumn: DataTableColumn<Idea> = {
   cell: ({ row }) => (
     <Stack direction="row" gap={1} wrap>
       {row.pickedBy.map((pick) => (
-        <Text key={pick.screenerId} size="xs">
-          <TextLink href={screenerResultsPath(pick.screenerId)} size="inherit">
-            {pick.screenerName}
-          </TextLink>
-          {pick.position > 1 && <Text tone="muted">{` #${String(pick.position)}`}</Text>}
-        </Text>
+        <TextLink key={pick.screenerId} href={screenerResultsPath(pick.screenerId)} size="sm">
+          {pick.position > 1 ? `${pick.screenerName} #${String(pick.position)}` : pick.screenerName}
+        </TextLink>
       ))}
     </Stack>
   ),
