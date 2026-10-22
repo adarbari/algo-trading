@@ -163,12 +163,16 @@ export function useIdeas() {
   const cursors = more.data;
   const state = useQueries({
     queries: [null, ...cursors].map((after) => pageOptions(after)),
-    combine: joinPages,
+    combine: (results) => joinPages(results, cursors),
   });
 
   // A cursor the server refuses (BAD_REQUEST: the runs behind the loaded pages changed) means the
   // list is stale: start over from a fresh first page, never append to it.
-  const { refused } = state;
+  const { refused, keep, asked } = state;
+  // Pages that no longer link up (see `linked`) leave the list for good: the cursors go with them.
+  useEffect(() => {
+    if (keep < asked) client.setQueryData(MORE_KEY, cursors.slice(0, keep - 1));
+  }, [client, keep, asked, cursors]);
   useEffect(() => {
     if (refused) {
       client.setQueryData(MORE_KEY, NO_CURSORS);
@@ -205,9 +209,27 @@ export function useIdeas() {
 
 type PageResult = UseQueryResult<IdeasResponse>;
 
+/**
+ * How many leading pages still link up: page i stays only while page i-1 has data and its
+ * `nextCursor` is the cursor page i was asked with. A refreshed first page over an older second
+ * page, or a page that failed with later ones cached, breaks the chain there: the rest is never
+ * shown, so a list has no gap and no stale tail.
+ */
+function linked(results: PageResult[], cursors: readonly string[]): number {
+  let n = 1;
+  while (n < results.length) {
+    const before = results[n - 1]?.data?.ideas;
+    if (!before || before.nextCursor !== cursors[n - 1]) break;
+    n += 1;
+  }
+  return n;
+}
+
 /** The pages loaded so far as one state (the first page decides pending / error; the later ones
  * only whether the next page is loading or failed). Stable, so `useQueries` memoizes it. */
-function joinPages(results: PageResult[]) {
+function joinPages(all: PageResult[], cursors: readonly string[]) {
+  const keep = linked(all, cursors);
+  const results = all.slice(0, keep);
   const [first, ...later] = results as [PageResult, ...PageResult[]];
   const last = later.at(-1);
   const pages = results.flatMap((r) => (r.data === undefined ? [] : [r.data]));
@@ -218,6 +240,8 @@ function joinPages(results: PageResult[]) {
     isPending: first.isPending,
     isSuccess: first.isSuccess,
     isFetching: first.isFetching,
+    keep,
+    asked: all.length,
     next: pages.at(-1)?.ideas?.nextCursor ?? null,
     laterLoading: last !== undefined && last.isFetching && last.data === undefined,
     laterFailed: last?.isError === true,
