@@ -408,6 +408,7 @@ def create_app(
             lambda: reads(user, None, serving=gql.serving_now()),
             extra=partial(warm_steps, app.state.store.preview_cache),
             replay=gql.replay,
+            busy=gql.busy,
             stale=lambda: checkout_moved(app.state.build),
         )
         if settings.live

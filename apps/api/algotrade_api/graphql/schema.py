@@ -181,6 +181,10 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             return None
         return self._generation(viewer, name)
 
+    def busy(self) -> bool:
+        """Whether a request holds the read pool (the warmer's background steps wait on it)."""
+        return self._admission.taken > 0
+
     def serving_now(self) -> Any:
         """What the default session is resolved by now (the current release's ``Serving``), or
         ``None``: for the warmer, which warms the session the pages will read."""
