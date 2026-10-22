@@ -461,5 +461,5 @@ follow-up PR).
 - Decision: freeze at write (the writer of a run records the previous run's id, the previous run's version and the new and dropped counts in the run's `results/screen_runs` row); (i): the counts are kept as compared with the previous run whatever its version, both versions are recorded, and the screeners list shows a "definition changed" mark (a Guide entry, ADR 0051). The per-name new/dropped tags of a results page still compare the two runs' rows for the names shown. Runs written before this change keep being recomputed on read. Editing a screener stays allowed at any time.
 - Added requirement (owner): a user can change a screener's parameters and run it again; a re-run takes about 15-30 s or more, so it must not block the user: it runs as a job, its status is clearly visible and shows an ETA. The design of that experience is written for the owner's review before it is built.
 - decided by: owner
-- status: final (freeze, (i)); the re-run experience is confirmed after its design is reviewed
+- status: final
 - Reasoning: frozen counts mean "what was known when this ran", stay stable when an earlier session's run is superseded, and cost one small read instead of re-resolving two sessions per screener (about 53 s over 92 screeners); the mark keeps the counts honest after a definition change.
