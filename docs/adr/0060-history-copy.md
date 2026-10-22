@@ -120,7 +120,7 @@ whole for one name) 0.1 to 0.25 s each. `events/filing_text` is left out of the 
 
 **Decision.** `nightly.toml [history_copy] event_tables` lists events tables copied for **every
 year they have partitions** (an events read is over all time, like a market table), by the same
-`build_history`, with the same layout, signature rule, memo (#814; #824 pending), ragged-day rule and
+`build_history`, with the same layout, signature rule, memo (#814, #824), ragged-day rule and
 fallback. Nothing in the read path changes: `read_range` serves an events table from the copy for
 `as_of` None, no `own_run`, an instrument filter picking the row groups whose `instrument_id`
 min / max can hold the id (`arrow.row_groups_holding`); a year whose signatures differ (a restated
