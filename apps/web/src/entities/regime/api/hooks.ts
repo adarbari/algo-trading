@@ -324,7 +324,7 @@ export function useRegime() {
 function regimeQuery() {
   return queryOptions({
     queryKey: queryKeys.gql(REGIME_OPERATION, {}),
-    queryFn: ({ queryKey }) => gql(RegimeQuery, {}, queryKey),
+    queryFn: () => gql(RegimeQuery, {}),
   });
 }
 
@@ -341,7 +341,7 @@ export function useRegimeBands(start: string, end: string | undefined) {
   const variables = { start, end: end ?? '' };
   return useQuery({
     queryKey: queryKeys.gql(REGIME_BANDS_OPERATION, variables),
-    queryFn: ({ queryKey }) => gql(RegimeBandsQuery, variables, queryKey),
+    queryFn: () => gql(RegimeBandsQuery, variables),
     enabled: end !== undefined,
     select: (data): readonly RegimeBand[] => data.regime?.bands ?? [],
   });
@@ -350,7 +350,7 @@ export function useRegimeBands(start: string, end: string | undefined) {
 function regimeEpisodesQuery() {
   return queryOptions({
     queryKey: queryKeys.gql(REGIME_EPISODES_OPERATION, {}),
-    queryFn: ({ queryKey }) => gql(RegimeEpisodesQuery, {}, queryKey),
+    queryFn: () => gql(RegimeEpisodesQuery, {}),
   });
 }
 
@@ -377,7 +377,7 @@ export function useRegimeEpisodes() {
 function regimeSignalsQuery() {
   return queryOptions({
     queryKey: queryKeys.gql(REGIME_SIGNALS_OPERATION, {}),
-    queryFn: ({ queryKey }) => gql(RegimeSignalsQuery, {}, queryKey),
+    queryFn: () => gql(RegimeSignalsQuery, {}),
   });
 }
 
@@ -417,7 +417,7 @@ export function useMarketHistory(
   const variables = { names: [...names], start, end: end ?? '', points };
   return useQuery({
     queryKey: queryKeys.gql(MARKET_HISTORY_OPERATION, variables),
-    queryFn: ({ queryKey }) => gql(MarketHistoryQuery, variables, queryKey),
+    queryFn: () => gql(MarketHistoryQuery, variables),
     enabled: end !== undefined && names.length > 0,
     select: (data): readonly SeriesHistory[] => data.market?.history ?? [],
   });

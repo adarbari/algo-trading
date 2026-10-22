@@ -14,5 +14,5 @@ const SessionDateQuery = graphql(`
 
 /** The session's date, or null when nothing is stored yet. */
 export async function fetchSessionDate(): Promise<string | null> {
-  return (await gql(SessionDateQuery, {}, null)).session?.date ?? null;
+  return (await gql(SessionDateQuery, {})).session?.date ?? null;
 }

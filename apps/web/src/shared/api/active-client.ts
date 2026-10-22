@@ -8,6 +8,6 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query';
 /** `client` is set when the app makes its client; undefined in tests that render a page alone. */
 export const active: {
   client?: QueryClient;
-  observe?: (key: QueryKey | null, headers: Headers) => void;
+  observe?: (key: QueryKey | null | undefined, headers: Headers) => void;
   forget?: () => void;
 } = {};

@@ -131,7 +131,7 @@ const FeatureDistribution = graphql(`
 function featureCatalogueQuery() {
   return queryOptions({
     queryKey: queryKeys.gql('FeatureCatalogue', {}),
-    queryFn: ({ queryKey }) => gql(FeatureCatalogue, {}, queryKey),
+    queryFn: () => gql(FeatureCatalogue, {}),
     staleTime: CATALOGUE_STALE_MS,
   });
 }
@@ -161,7 +161,7 @@ export function useFeatureCatalogueDetail(enabled = true) {
   return useQuery({
     enabled,
     queryKey: queryKeys.gql('FeatureCatalogueDetail', {}),
-    queryFn: ({ queryKey }) => gql(FeatureCatalogueDetail, {}, queryKey),
+    queryFn: () => gql(FeatureCatalogueDetail, {}),
     select: (data) => data.catalogue,
     staleTime: CATALOGUE_STALE_MS,
   });
@@ -180,7 +180,7 @@ export function useFeatureDistribution(name: string | null) {
   const variables = { name: name ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('FeatureDistribution', variables),
-    queryFn: ({ queryKey }) => gql(FeatureDistribution, variables, queryKey),
+    queryFn: () => gql(FeatureDistribution, variables),
     select: (data) => data.distribution,
     enabled: Boolean(name),
     staleTime: CATALOGUE_STALE_MS,

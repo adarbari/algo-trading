@@ -71,4 +71,4 @@ export function useMoveEdge(id: string, mine = false) {
 
 /** The edge as one TOML document (admin only: the API refuses anyone else); null: none. */
 export const publishedDocument = async (id: string): Promise<string | null> =>
-  (await gql(PublishedEdge, { id }, null)).publishedEdgeDocument ?? null;
+  (await gql(PublishedEdge, { id })).publishedEdgeDocument ?? null;

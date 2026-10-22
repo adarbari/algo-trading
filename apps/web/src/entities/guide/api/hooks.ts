@@ -170,7 +170,7 @@ export function useGuideStartPage(id: string) {
 function guideIndexQuery() {
   return queryOptions({
     queryKey: queryKeys.gql('GuideIndex', {}),
-    queryFn: ({ queryKey }) => gql(GuideIndexQuery, {}, queryKey),
+    queryFn: () => gql(GuideIndexQuery, {}),
     staleTime: GUIDE_STALE_MS,
   });
 }
@@ -192,7 +192,7 @@ export function useGuideField(name: string | null) {
   const variables = { name: name ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('GuideField', variables),
-    queryFn: ({ queryKey }) => gql(GuideFieldQuery, variables, queryKey),
+    queryFn: () => gql(GuideFieldQuery, variables),
     select: (data) => data.guideField,
     enabled: Boolean(name),
     staleTime: GUIDE_STALE_MS,
@@ -204,9 +204,9 @@ export function useGuideScreener(id: string) {
   const variables = { id };
   return useQuery({
     queryKey: queryKeys.gql('GuideScreener', variables),
-    queryFn: async ({ queryKey }) => {
+    queryFn: async () => {
       const { GuideScreenerQuery } = await import('./screeners-doc');
-      return gql(GuideScreenerQuery, variables, queryKey);
+      return gql(GuideScreenerQuery, variables);
     },
     select: (data) => data.guideScreener,
     staleTime: GUIDE_STALE_MS,
@@ -218,7 +218,7 @@ export function useGuideSituation(slug: string) {
   const variables = { slug };
   return useQuery({
     queryKey: queryKeys.gql('GuideSituation', variables),
-    queryFn: ({ queryKey }) => gql(GuideSituationQuery, variables, queryKey),
+    queryFn: () => gql(GuideSituationQuery, variables),
     select: (data) => data.guideSituation,
     staleTime: GUIDE_STALE_MS,
   });

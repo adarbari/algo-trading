@@ -53,11 +53,11 @@ export function busyDelayMs(retryAfter: string | null, attempt: number): number 
 
 /** Runs `document` with `variables`; rejects on an HTTP failure or any GraphQL error. `key` is
  * the query key of the hook that asked (its `queryFn` context's `queryKey`; `null` outside a
- * query): the answer's version headers are read against it (ADR 0077 decision 18). */
+ * query; left out by a hook of a shared read, which carries no generation and loses nothing): the answer's version headers are read against it (ADR 0077 decision 18). */
 export async function gql<TResult, TVariables>(
   document: TypedDocumentString<TResult, TVariables>,
   variables: TVariables,
-  key: QueryKey | null,
+  key?: QueryKey | null,
 ): Promise<TResult> {
   const token = await accessToken();
   const init = {

@@ -48,7 +48,7 @@ describe('gql', () => {
         ],
       }),
     );
-    const failed = gql(document, { day: '2026-10-02' }, null);
+    const failed = gql(document, { day: '2026-10-02' });
     await expect(failed).rejects.toBeInstanceOf(GraphQLRequestError);
     await expect(failed).rejects.toMatchObject({
       codes: ['UNKNOWN_FEATURE'],
@@ -66,11 +66,11 @@ describe('gql', () => {
   it('sends the access token as a bearer, and none when signed out', async () => {
     const fetch = answer({ data: { session: null } });
     vi.stubGlobal('fetch', fetch);
-    await gql(document, { day: 'x' }, null);
+    await gql(document, { day: 'x' });
     const bare = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1];
     expect(bare.headers).not.toHaveProperty('authorization');
     vi.mocked(accessToken).mockResolvedValue('tok-1');
-    await gql(document, { day: 'x' }, null);
+    await gql(document, { day: 'x' });
     const signed = (fetch.mock.calls[1] as unknown as [string, RequestInit])[1];
     expect(signed.headers).toMatchObject({ authorization: 'Bearer tok-1' });
   });
@@ -87,7 +87,7 @@ describe('gql', () => {
     const ok = new Response(JSON.stringify({ data: { session: null } }), { status: 200 });
     const fetch = vi.fn().mockResolvedValueOnce(busy).mockResolvedValueOnce(ok);
     vi.stubGlobal('fetch', fetch);
-    const result = gql(document, { day: 'x' }, null);
+    const result = gql(document, { day: 'x' });
     await vi.advanceTimersByTimeAsync(3000); // at most 2 s * 1.5
     await expect(result).resolves.toEqual({ session: null });
     expect(fetch).toHaveBeenCalledTimes(2);

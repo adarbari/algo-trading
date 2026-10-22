@@ -48,7 +48,7 @@ function moved(last: string, next: string): boolean {
 }
 
 /** Every query of the operations in `only` (all gql queries without it) but the answered one. */
-function invalidateOthers(key: QueryKey | null, only?: ReadonlySet<string>): void {
+function invalidateOthers(key: QueryKey | null | undefined, only?: ReadonlySet<string>): void {
   const answered = key && hashKey(key);
   void active.client?.invalidateQueries({
     predicate: ({ queryKey, queryHash }) =>
@@ -73,7 +73,7 @@ function refetchOnLanding(key: QueryKey): void {
 
 /** Reads the version headers of the answer to the query `key` (`null`: asked outside a query,
  * nothing to spare or refetch) and invalidates what they say is behind. */
-export function observeVersions(key: QueryKey | null, headers: Headers): void {
+export function observeVersions(key: QueryKey | null | undefined, headers: Headers): void {
   const generation = headers.get('x-config-generation');
   if (generation !== null) {
     const n = Number(generation);
