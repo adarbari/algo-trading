@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react';
 
 import {
   currentSession,
-  active,
   signInWithPassword,
   signOutSession,
   subscribeSession,
@@ -57,7 +56,6 @@ export function useSignIn(): SignIn {
       await signInWithPassword(email, password);
       // Another user may have been here before: nothing of theirs stays cached.
       client.removeQueries();
-      active.forget?.();
       try {
         const viewer = await client.query({ ...viewerQuery(), staleTime: 0 });
         if (!viewer) throw new Error('The server did not accept the sign-in; try again.');

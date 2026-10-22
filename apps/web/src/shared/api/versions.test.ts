@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { active } from './active-client';
-import { forgetVersions, observeVersions } from './versions';
+import { forgetVersions, installVersions, observeVersions } from './versions';
 
 const headers = (generation?: number, release?: string) =>
   new Headers({
@@ -12,8 +12,13 @@ const headers = (generation?: number, release?: string) =>
 
 const key = (name: string, variables: Record<string, unknown> = {}) =>
   ['gql', name, variables] as const;
+/** Observes an answer of a query that is in the cache, as a running fetch's is. */
+const answer = (k: readonly unknown[], h: Headers) => {
+  active.client?.getQueryCache().build(active.client, { queryKey: k });
+  observeVersions(k, h);
+};
 const observe = (name: string, h: Headers, variables: Record<string, unknown> = {}) => {
-  observeVersions(key(name, variables), h);
+  answer(key(name, variables), h);
 };
 
 /** A client holding one answer per operation; `stale()` lists the operations marked stale. */
@@ -28,6 +33,76 @@ function seeded(names: string[]) {
 
 beforeEach(() => {
   forgetVersions();
+});
+
+describe('the signed-in user', () => {
+  it('ends the counters when the viewer is another user or none, not when it is the same', () => {
+    const client = new QueryClient();
+    active.client = client;
+    installVersions(client);
+    const viewer = ['gql', 'Viewer', {}] as const;
+    const ideas = ['gql', 'Ideas', {}] as const;
+    client.setQueryData(viewer, { id: 'ann' });
+    answer(key('Ideas'), headers(5));
+    client.setQueryData(viewer, { id: 'ann' }); // refetched: the same user
+    client.setQueryData(ideas, 1);
+    answer(key('Views'), headers(6)); // a rise: the baseline of 5 stands
+    expect(client.getQueryState(ideas)?.isInvalidated).toBe(true);
+    client.setQueryData(viewer, null); // signed out
+    client.setQueryData(ideas, 1);
+    answer(key('Ideas'), headers(2)); // the next user's counter starts elsewhere
+    answer(key('Views'), headers(3)); // a rise from their baseline of 2
+    expect(client.getQueryState(ideas)?.isInvalidated).toBe(true);
+  });
+});
+
+describe('the signed-in user, seeded', () => {
+  it('knows a viewer loaded before it was installed, and installs once per client', () => {
+    const client = new QueryClient();
+    active.client = client;
+    const viewer = ['gql', 'Viewer', {}] as const;
+    client.setQueryData(viewer, { id: 'ann' });
+    const subscribe = vi.spyOn(client.getQueryCache(), 'subscribe');
+    installVersions(client);
+    installVersions(client); // a second page chunk asks again
+    answer(key('Ideas'), headers(5));
+    client.setQueryData(viewer, null); // signed out: the counters end
+    client.setQueryData(key('Ideas'), 1);
+    answer(key('Ideas'), headers(2)); // the next user's counter starts elsewhere
+    answer(key('Views'), headers(3));
+    expect(client.getQueryState(key('Ideas'))?.isInvalidated).toBe(true);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores an answer whose query left the cache (a user who has gone)', () => {
+    const stale = seeded(['Ideas', 'Views']);
+    observe('Ideas', headers(9));
+    observeVersions(key('Gone'), headers(20)); // removed on sign-out while in flight
+    observe('Views', headers(10)); // not 20 + 1: the gone answer set no baseline
+    expect(stale()).toEqual(['Ideas']);
+    observe('Ideas', headers(10));
+    expect(stale()).toEqual(['Ideas']); // and nothing is refetched as late
+  });
+});
+
+describe('an answer asked outside a query', () => {
+  it('sets no generation baseline, even after the user it was asked for has gone', async () => {
+    const stale = seeded(['Ideas', 'Views']);
+    observeVersions(null, headers(20)); // landed after forgetVersions: the previous user's
+    observe('Ideas', headers(2)); // the next user's first answer is the baseline
+    observe('Views', headers(2));
+    observe('Ideas', headers(2));
+    active.client?.setQueryData(key('Ideas'), 3); // its data lands: a late answer would be stale now
+    await Promise.resolve();
+    expect(stale()).toEqual([]); // not refetched as late against 20
+  });
+
+  it('still reads the release', () => {
+    const stale = seeded(['Ideas', 'Views']);
+    observe('Ideas', headers(undefined, 'r1'));
+    observeVersions(null, headers(undefined, 'r2'));
+    expect(stale()).toEqual(['Ideas', 'Views']);
+  });
 });
 
 describe('observeVersions', () => {
@@ -80,8 +155,8 @@ describe('observeVersions', () => {
     const other = ['gql', 'EdgesPage', {}] as const;
     client.setQueryData(compare, 1);
     client.setQueryData(other, 2);
-    observeVersions(other, headers(2));
-    observeVersions(other, headers(3));
+    answer(other, headers(2));
+    answer(other, headers(3));
     expect(client.getQueryState(compare)?.isInvalidated).toBe(true);
     expect(client.getQueryState(other)?.isInvalidated).toBe(false);
   });

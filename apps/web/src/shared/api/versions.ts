@@ -16,7 +16,7 @@
  * The entry is at its byte budget: this module is not in it. `installVersions` (called by the
  * page-cache chunk when it starts) puts it behind `active`, which `gql` and the sign-out call.
  */
-import { hashKey, type QueryKey } from '@tanstack/react-query';
+import { hashKey, type QueryClient, type QueryKey } from '@tanstack/react-query';
 
 import { active } from './active-client';
 
@@ -28,6 +28,7 @@ const seen: {
 /** Retired answers wait here, by query hash, for their data to be stored (`refetchOnLanding`). */
 const landing = new Set<string>();
 let unsubscribe: (() => void) | undefined;
+const installed = new WeakSet<QueryClient>();
 
 /** Nothing of the last user stays (sign-out, another user signing in). */
 function forgetVersions(): void {
@@ -74,13 +75,16 @@ function refetchOnLanding(key: QueryKey): void {
 /** Reads the version headers of the answer to the query `key` (`null`: asked outside a query,
  * nothing to spare or refetch) and invalidates what they say is behind. */
 export function observeVersions(key: QueryKey | null | undefined, headers: Headers): void {
+  // an answer whose query is gone (its user signed out while it was in flight) says nothing
+  if (key && !active.client?.getQueryCache().find({ queryKey: key, exact: true })) return;
   const generation = headers.get('x-config-generation');
-  if (generation !== null) {
+  // asked outside a query, its user may have gone: no baseline from it
+  if (generation !== null && key) {
     const n = Number(generation);
-    if (key) seen.userKeyed.add(String(key[1]));
+    seen.userKeyed.add(String(key[1]));
     if (seen.generation !== undefined && n > seen.generation) {
       invalidateOthers(key, seen.userKeyed);
-    } else if (key && seen.generation !== undefined && n < seen.generation) {
+    } else if (seen.generation !== undefined && n < seen.generation) {
       refetchOnLanding(key); // sent before a write
     }
     seen.generation = Math.max(n, seen.generation ?? n);
@@ -92,10 +96,21 @@ export function observeVersions(key: QueryKey | null | undefined, headers: Heade
   }
 }
 
-/** Starts following the versions of the answers (`gql` reads `active.observe`). */
-export function installVersions(): void {
+/** Starts following the versions of the answers (`gql` reads `active.observe`) in `client`; the
+ * counters are the signed-in user's, so another user (or none) in the viewer query ends them. */
+export function installVersions(client: QueryClient): void {
   active.observe = observeVersions;
-  active.forget = forgetVersions;
+  if (installed.has(client)) return;
+  installed.add(client);
+  // the viewer is usually loaded before this chunk is
+  let user = client.getQueryData<{ id?: string } | null>(['gql', 'Viewer', {}])?.id;
+  client.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action.type !== 'success') return;
+    if ((event.query.queryKey as QueryKey)[1] !== 'Viewer') return;
+    const id = (event.query.state.data as { id?: string } | null)?.id;
+    if (user !== undefined && id !== user) forgetVersions();
+    user = id;
+  });
 }
 
 export { forgetVersions };

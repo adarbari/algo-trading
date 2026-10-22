@@ -9,5 +9,4 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query';
 export const active: {
   client?: QueryClient;
   observe?: (key: QueryKey | null | undefined, headers: Headers) => void;
-  forget?: () => void;
 } = {};
