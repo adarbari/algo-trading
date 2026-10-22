@@ -19,7 +19,6 @@ import {
   type ValueFormat,
 } from '@algotrade/ui';
 
-import { termHelp } from '@/features/guide-help';
 import { fieldColumn, valueFormat, type HelpedColumn } from '@/entities/feature';
 import {
   earningsBeforeExpiry,
@@ -198,7 +197,6 @@ const pickedByColumn: DataTableColumn<Idea> = {
   grow: true,
   sortable: false,
   essential: true,
-  headerAction: termHelp('picked_by'),
   cell: ({ row }) => (
     <Stack direction="row" gap={1} wrap>
       {row.pickedBy.map((pick) => (

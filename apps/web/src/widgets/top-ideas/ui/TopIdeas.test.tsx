@@ -498,11 +498,10 @@ describe('TopIdeas field headers', () => {
           name: /^What is .*\?$/,
         },
       );
-    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(4);
+    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(3);
     expect(help(/Expiry DTE/)).toBeVisible();
     expect(help(/IV30/)).toBeVisible();
     expect(help(/Score/)).toBeNull();
-    expect(help(/Picked by/)).toBeVisible();
     expect(help(/Decision/)).toBeNull();
   });
 });
