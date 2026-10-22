@@ -1,14 +1,32 @@
+from datetime import date
+
 import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context, weigh
-from algotrade.services.read.screens import results
+from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.hits import ScreenerHit, load_screener_hits
 from algotrade.services.read.screens.results import load_results, load_run_changes
-from algotrade.services.read.screens.runs import is_picked, load_latest_runs, run_rows
+from algotrade.services.read.screens.runs import (
+    RULE_SCREEN,
+    RUN_COLUMNS,
+    SCREEN_PICKS,
+    is_picked,
+    load_latest_runs,
+    run_rows,
+)
 from algotrade.services.read.screens.screeners import load_screeners
-from tests.unit.services.read.screens.conftest import D0, context
+from algotrade.storage.backends.memory import MemoryBackend
+from tests.unit.services.read.screens.conftest import (
+    D0,
+    D1,
+    T,
+    context,
+    screens_store,
+    write_gated,
+    write_picks,
+)
 
 
 def _hits(found: dict[str, tuple], iid: str) -> list[tuple[str, str]]:  # type: ignore[type-arg]
@@ -108,3 +126,84 @@ def test_the_index_weighs_who_picked_what_not_their_results(reader: StoreReader)
     index = [w for k, w in ctx.cache._weights.items() if k[-1] == "index"]
     assert len(index) == 1 and 0 < index[0] < 5_000
     assert weigh(_old_session_hits(ctx)) > 10 * index[0]  # the old entry held every result
+
+
+# ---- the pick index from the runs' stored picks (results/screen_picks) --------------------------
+
+IDS = ["EQ:AAA", "EQ:BBB", "EQ:CCC", "EQ:DDD", "EQ:ZZZ"]
+
+
+def _frame(backend: MemoryBackend, framed: tuple[tuple[date, str], ...]) -> None:
+    """Write the ``screen_picks`` file of each ``(day, run id)`` from its stored rule rows."""
+    reader = StoreReader(backend)
+    for day, run_id in framed:
+        at = open_context(reader, context(reader).configs, UserContext("me"), day)
+        rows = runs.run_rows_of(at, RULE_SCREEN, run_id)
+        write_picks(backend, day, run_id, rows.to_dict("records"), T)
+
+
+def _store(framed: tuple[tuple[date, str], ...], gated: bool = False) -> MemoryBackend:
+    backend = screens_store()
+    if gated:
+        write_gated(backend)  # r2 supersedes r1; BBB and DDD PAUSED
+    _frame(backend, framed)
+    return backend
+
+
+# r0 is superseded by r1 (its DDD pick must never show); rs and rg stay unframed: they fall back
+FRAMED = ((D1, "r0"), (D1, "r1"), (D1, "rb"), (D0, "r-1"))
+
+
+@pytest.mark.parametrize("gated", [False, True])
+@pytest.mark.parametrize("session", [D1, D0])  # D0: every run there is a first run, no change
+def test_hits_from_the_stored_picks_equal_the_hits_from_the_rows(
+    gated: bool, session: date
+) -> None:
+    """Equivalence (owner brief): one store with framed, superseded, PAUSED, first and unframed
+    runs; the hits of every instrument equal those of the oracle built from every row."""
+    framed = (*FRAMED, (D1, "r2")) if gated else FRAMED
+    backend = _store(framed, gated)
+    reader = StoreReader(backend)
+    configs = context(reader).configs
+    at = lambda: open_context(reader, configs, UserContext("me"), session)  # noqa: E731
+    oracle = _old_session_hits(at())
+    found = load_screener_hits(at(), IDS)
+    for iid in IDS:
+        assert found[iid] == oracle.get(iid, ())
+    assert any(oracle.values())
+
+
+def test_a_run_with_no_picks_file_falls_back_to_its_rows_never_to_no_picks() -> None:
+    backend = _store(())  # no run framed: every run is read from its rule_screen rows
+    ctx = context(StoreReader(backend))
+    found = load_screener_hits(ctx, IDS)
+    assert _hits(found, "EQ:BBB") == [("alpha", "WATCH"), ("beta", "QUALIFIED")]
+    assert _hits(found, "EQ:DDD") == [("beta", "QUALIFIED")]
+
+
+def test_run_picks_are_read_once_per_run_not_per_pick_or_per_hit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from algotrade.services.read.screens.ideas import load_ideas  # noqa: PLC0415
+
+    reads: list[tuple[str, str, bool]] = []
+    real = runs.run_rows_of
+
+    def counting(ctx_: ReadContext, table: str, run_id: str, columns=None, instruments=None):  # type: ignore[no-untyped-def]
+        reads.append((table, run_id, columns == RUN_COLUMNS))
+        return real(ctx_, table, run_id, columns, instruments)
+
+    monkeypatch.setattr(runs, "run_rows_of", counting)
+    monkeypatch.setattr(results, "run_rows_of", counting)
+    ctx = context(StoreReader(_store(FRAMED)))
+    load_screener_hits(ctx, IDS)
+    for iid in IDS:  # one by one: still no new read of the picks
+        load_screener_hits(ctx, [iid])
+    load_ideas(ctx, 50)
+    picks = [run_id for table, run_id, _ in reads if table == SCREEN_PICKS]
+    # each run's picks once: alpha's r1 (not the superseded r0), beta's rb, and alpha's previous
+    # run r-1 (the change of a hit); rs is a site beta the user's own beta shadows
+    assert sorted(picks) == ["r-1", "r1", "rb"]
+    assert not [r for r in reads if r[2] and r[0] == RULE_SCREEN and r[1] in {"r1", "rb", "r-1"}], (
+        "a framed run's every row is never read for its picks"
+    )

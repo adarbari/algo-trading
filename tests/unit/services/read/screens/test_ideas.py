@@ -7,7 +7,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
-from algotrade.services.read.screens import ideas as ideas_module
+from algotrade.services.read.screens import runs as runs_module
 from algotrade.services.read.screens.ideas import (
     FIRST_PAGE,
     Ideas,
@@ -179,13 +179,13 @@ def test_ranks_are_the_same_with_and_without_the_picks_table() -> None:
 def test_a_run_with_a_picks_file_is_ranked_without_reading_its_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real = ideas_module.run_rows
+    real = runs_module.run_rows
 
     def guarded(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
         assert run.run_id != "big", "ranked from screen_picks, not the run's every row"
         return real(ctx, run)
 
-    monkeypatch.setattr(ideas_module, "run_rows", guarded)
+    monkeypatch.setattr(runs_module, "run_rows", guarded)
     found = load_ideas(_ctx(frozen=True), 50)
     assert len(found.items) == 50 and found.items[0].instrument_id == "EQ:S000"
 

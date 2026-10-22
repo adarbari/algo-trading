@@ -42,8 +42,10 @@ from algotrade.services.read.instruments.features import cell_codes, load_featur
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.instruments.table import DEFAULT_SIZE, catalogue_values
 from algotrade.services.read.screens.runs import (
+    RULE_SCREEN,
     ScreenerRun,
     load_previous_run,
+    run_picks,
     run_row_details,
     run_rows,
 )
@@ -141,23 +143,38 @@ class RunChanges:
     by_instrument: Mapping[str, Change] = field(repr=False)
 
 
+def _decisions(ctx: ReadContext, run: ScreenerRun, wanted: set[str]) -> dict[str, str]:
+    """``run``'s decision for each of ``wanted`` it has a row for: a pick or a ``PAUSED`` row from
+    the run's cached picks (``run_picks``), any other (a name it did not pick) from its own
+    ``rule_screen`` file for those names only, never the run's every row."""
+    picks = run_picks(ctx, run)
+    found = picks[picks["instrument_id"].isin(wanted)]
+    out = {str(i): str(d) for i, d in zip(found["instrument_id"], found["decision"], strict=True)}
+    rest = sorted(wanted - out.keys())
+    if rest:
+        stored = run_rows_of(
+            ctx, RULE_SCREEN, run.run_id, ("user_id", "config_id", "decision"), rest
+        )
+        mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
+        out.update(
+            (str(i), str(d)) for i, d in zip(mine["instrument_id"], mine["decision"], strict=True)
+        )
+    return out
+
+
 def load_instrument_changes(ctx: ReadContext, run: ScreenerRun, ids: Sequence[str]) -> RunChanges:
     """``run`` against the screener's run in the previous stored session for ``ids`` only (the
     same ``Change`` as ``load_run_changes``; no counts): what one instrument's hits need, without
-    comparing every row of the run. Reads the two runs' cached light rows."""
+    comparing every row of the run. Reads the two runs' cached picks (``run_picks``) and, for a
+    name neither picked, its own row."""
     previous = load_previous_run(ctx, run)
-    wanted = set(ids)
-    now = run_rows(ctx, run)
-    now = now[now["instrument_id"].isin(wanted)]
     if previous is None:
         return RunChanges(None, (), {})
-    before_rows = run_rows(at_session(ctx, previous.session), previous)
-    before_rows = before_rows[before_rows["instrument_id"].isin(wanted)]
-    before = {
-        str(i): str(d)
-        for i, d in zip(before_rows["instrument_id"], before_rows["decision"], strict=True)
-    }
-    return RunChanges(previous.session, (), _compare(now, before))
+    wanted = set(ids)
+    now = _decisions(ctx, run, wanted)
+    before = _decisions(at_session(ctx, previous.session), previous, wanted)
+    moved = {i: (change_of(d, before.get(i)), before.get(i)) for i, d in now.items()}
+    return RunChanges(previous.session, (), moved)
 
 
 @dataclass(frozen=True)

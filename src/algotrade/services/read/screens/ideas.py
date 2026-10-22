@@ -32,24 +32,21 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.read.context import ReadContext, run_rows_of
+from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.identity import Instrument
 from algotrade.services.read.screens.results import ScreenResult, load_results, run_withheld
 from algotrade.services.read.screens.runs import (
     ScreenerRun,
     load_latest_runs,
     picked_mask,
-    run_rows,
+    run_picks,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
 from algotrade.services.read.values import Unknown, to_scalar
 from algotrade.services.screening.rule_results import PAUSED
-from algotrade.storage.tables.schemas import result_table
 
 PREFERENCES = "preferences"
 TOP_PER_SCREENER = 3
-SCREEN_PICKS = result_table("screen_picks")
-PICK_COLUMNS = ("user_id", "config_id", "decision", "score", "rank")
 FIRST_PAGE = 50  # the page the Ideas page loads first and each "more" adds
 
 
@@ -121,19 +118,6 @@ def _or(value: object, missing: float) -> float:
     return missing if found is None else float(found)
 
 
-def _run_picks(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
-    """``run``'s picked and ``PAUSED`` rows in rank order (``instrument_id``, ``decision``,
-    ``score``, ``rank``): from its ``screen_picks`` file; a run with picks but no such file (a
-    run before the table) from its ``rule_screen`` rows."""
-    stored = run_rows_of(ctx, SCREEN_PICKS, run.run_id, PICK_COLUMNS)
-    rows = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
-    if rows.empty and run.picked + run.paused > 0:
-        rows = run_rows(ctx, run)
-        rows = rows[picked_mask(rows["decision"]) | (rows["decision"].astype(str) == PAUSED)]
-    cols = ["instrument_id", "decision", "score", "rank"]
-    return rows[cols].sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
-
-
 def _picks(
     ctx: ReadContext, runs: Sequence[ScreenerRun], priority: Sequence[str]
 ) -> tuple[dict[str, list[tuple[Any, str]]], dict[str, pd.DataFrame]]:
@@ -145,7 +129,7 @@ def _picks(
     out: dict[str, list[tuple[Any, str]]] = {}
     held: dict[str, pd.DataFrame] = {}
     for run in runs:
-        rows = held[run.run_id] = _run_picks(ctx, run)
+        rows = held[run.run_id] = run_picks(ctx, run)
         picked = rows[picked_mask(rows["decision"])]
         hidden = bool(run_withheld(ctx, run))  # a screen seen by names only: no order by values
         for iid, score, rank in zip(
