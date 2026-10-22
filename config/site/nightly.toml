@@ -132,8 +132,15 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/volume@v1",
     "rollups/instrument/volume_profile@v1",   # 51 MB
 ]
+event_tables = [                 # events tables read per instrument over ALL_TIME, one file per ingest day each: every year
+    "events/fund_nav",           # 5,737 day partitions (2.1 s for any instrument); copy 3 MB
+    "events/short_interest",     # 211 partitions; copy 38 MB
+    "events/short_volume",       # 252 partitions; copy 32 MB
+    "events/insider_transaction",   # 2 partitions; copy 157 MB, row groups skip the other names
+    "events/filing",             # 12 partitions; copy 30 MB
+]                                # not events/filing_text (no instrument rows, 4.5 GB); the other tables are under 9 MB and a dozen files
 recent_years = 2                 # calendar years kept: the session's and the one before
-budget_gb = 2.6                  # the instrument tables' copies together (1.8 GB measured 2026-10-17, ~2.0 by year end); the step skips (WARN) a table
+budget_gb = 3.0                  # the event and instrument tables' copies together (2.3 GB instrument + 0.26 GB events measured, ~2.7 by year end); the step skips (WARN) a table
                                  # whose copy would not fit. Add a table only after measuring its size
 free_disk_floor_gb = 10.0        # no build when the disk has less free (WARN): a rebuilt year exists twice
 

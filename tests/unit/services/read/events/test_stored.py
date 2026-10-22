@@ -3,13 +3,19 @@ partition stored the row, among the rows known on or before the session (``known
 0050), in an explicit window, sorted, stamps dropped; one read for many."""
 
 from datetime import date, timedelta
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
 import pytest
 
-from algotrade.services.read.events.stored import event_tables, load_events
+from algotrade.data.events import ALL_TIME, read_events
+from algotrade.services.read.events.stored import event_tables, load_events, warm_event_copies
+from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryTables
+from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_dividends, write_split
 from tests.helpers.stored_frames import T0, stamped
@@ -161,3 +167,35 @@ def test_a_repeated_events_read_reads_nothing_and_a_new_instrument_reads_only_it
     assert reads and reads.count("events/split") == 1  # one read for the instrument not held
     other_window = load_events(ctx, ["EQ:AAA"], date(2026, 1, 1), None)["EQ:AAA"]
     assert [e.kind for e in other_window] == ["dividend"]  # the window is part of the key
+
+
+def test_warming_the_event_copies_leaves_the_first_events_read_no_index_digest_to_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Validating a copy digests each stored day's ``_runs.json`` once per process (8,400 files
+    for ``events/fund_nav``, 1 to 2 s cold): the API's warmer pays it, the first read does not."""
+    table = "events/demo"
+    seed = LocalBackend(tmp_path / "data")
+    for n in range(30):
+        day = date(2025, 12, 20) + timedelta(days=n)
+        rows = pd.DataFrame([{"instrument_id": "EQ:A", "ts": pd.Timestamp(day, tz="UTC"), "a": n}])
+        seed.tables.write(table, day, "r1", stamped(rows.to_dict("records"), day, "r1"))
+    assert seed.tables.build_history(table, [2025, 2026]) == [2025, 2026]
+    backend = LocalBackend(tmp_path / "data")  # a fresh process: no digest held
+    configs = MemoryConfigStore(
+        {("site", "settings", "nightly"): {"history_copy": {"event_tables": [table]}}}
+    )
+    ctx: Any = SimpleNamespace(reader=StoreReader(backend), configs=configs)
+    digests: list[Path] = []
+    real = Path.read_bytes
+
+    def spy(self: Path) -> bytes:
+        digests.append(self) if self.name == "_runs.json" else None
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", spy)
+    assert warm_event_copies(ctx) == (table,)
+    assert len(digests) >= 30  # one per stored day
+    digests.clear()
+    frame = read_events(ctx.reader, table, *ALL_TIME, ["EQ:A"]).frame
+    assert len(frame) == 30 and digests == []

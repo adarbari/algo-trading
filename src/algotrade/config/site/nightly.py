@@ -35,9 +35,12 @@ class HistoryCopySettings:
     enabled: bool = True
     market_prefix: str = ""  # every table under it, all years (nightly.toml names it; "": none)
     instrument_tables: tuple[str, ...] = ()  # the Explore charts' tables, the last years only
+    event_tables: tuple[
+        str, ...
+    ] = ()  # events tables read per instrument over all time: every year
     recent_years: int = 2  # calendar years (the session's and the ones before) kept for those
     budget_gb: float = (
-        2.0  # the instrument tables' copies together; one that would not fit is skipped
+        2.0  # the instrument and event tables' copies together; one that would not fit is skipped
     )
     free_disk_floor_gb: float = (
         10.0  # no build below this much free disk (a rebuilt year exists twice)
@@ -50,6 +53,7 @@ class HistoryCopySettings:
             enabled=section.boolean("enabled", d.enabled),
             market_prefix=section.text("market_prefix", d.market_prefix),
             instrument_tables=section.strings("instrument_tables", d.instrument_tables),
+            event_tables=section.strings("event_tables", d.event_tables),
             recent_years=section.integer("recent_years", d.recent_years, 1),
             budget_gb=section.number("budget_gb", d.budget_gb, 0),
             free_disk_floor_gb=section.number("free_disk_floor_gb", d.free_disk_floor_gb, 0),
@@ -194,7 +198,8 @@ class NightlySettings:
             root.table(
                 "history_copy",
                 [
-                    *("enabled", "market_prefix", "instrument_tables", "recent_years"),
+                    *("enabled", "market_prefix", "instrument_tables", "event_tables"),
+                    "recent_years",
                     *("budget_gb", "free_disk_floor_gb"),
                 ],
             )
