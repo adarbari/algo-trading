@@ -3,15 +3,18 @@ frozen split, an exploratory or null-split run is never canonical, no such run i
 the reason, and a run's rows are its own even when another run shares the partition."""
 
 from datetime import date, timedelta
+from typing import Any
 
 import pytest
 
 from algotrade.core.time.calendar import is_session
 from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.context import ResultCache
+from algotrade.services.read.evaluation import runs as runs_module
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
     _row,
+    draws_of_record,
     load_canonical_run,
     load_edge_runs,
     load_run_draws,
@@ -19,6 +22,7 @@ from algotrade.services.read.evaluation.runs import (
     load_run_series,
     load_site_trials,
     measured_sessions,
+    rows_of_record,
 )
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -369,3 +373,68 @@ def test_a_row_serves_its_side_and_one_from_before_sides_is_long() -> None:
     assert _row(base).side == "long"  # no column: a run from before sides
     assert _row({**base, "side": float("nan")}).side == "long"  # a null in a frame is NaN
     assert _row({**base, "side": "short"}).side == "short"
+
+
+def _mixed_run(backend: MemoryBackend) -> Any:
+    """A run with random draws, screener frozen rows, an exploratory row and an in-sample row."""
+    draws = [
+        row("random", "draw", 0.4, FROZEN, role="random", slice_value=str(i)) for i in range(5)
+    ]
+    extra = [
+        *draws,
+        row("momo", "frozen", 0.3, FROZEN, exploratory=True, slice_value="x"),
+        row("momo", "in_sample", 0.2, FROZEN, in_sample=True),
+        row("momo", "year", 0.5, FROZEN),
+    ]
+    write_run(backend, "canon", FROZEN, 0.66, extra=extra)
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    run = load_canonical_run(ctx, edge).run
+    assert run is not None
+    record = ctx.reader.run(run.run_id)
+    assert record is not None
+    return ctx, record
+
+
+def _decoded_after_filtering(ctx: Any, record: Any) -> list[Any]:
+    """The decode of the whole partition, filtered afterwards (what the reader did before)."""
+    frame = runs_module.run_partition(ctx, runs_module.result_table(runs_module.EDGE_EVAL), record)
+    assert frame is not None
+    return [runs_module._row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records")]
+
+
+def test_filtering_the_frame_before_decoding_serves_the_same_rows_as_after(
+    backend: MemoryBackend,
+) -> None:
+    ctx, record = _mixed_run(backend)
+    everything = _decoded_after_filtering(ctx, record)
+    assert rows_of_record(ctx, record) == tuple(r for r in everything if r.role != "random")
+    assert draws_of_record(ctx, record) == tuple(r for r in everything if r.role == "random")
+    assert len(draws_of_record(ctx, record)) == 5
+    frozen = rows_of_record(ctx, record, ("frozen",))
+    assert frozen == tuple(r for r in everything if r.role != "random" and r.slice_kind == "frozen")
+    assert {r.exploratory for r in frozen} == {False, True}  # the caller still drops these
+
+
+def test_random_rows_are_never_converted_to_edge_rows_for_the_screener_rows(
+    backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx, record = _mixed_run(backend)
+    total = len(_decoded_after_filtering(ctx, record))
+    seen: list[str] = []
+    real = runs_module._row
+
+    def counting(r: Any) -> Any:
+        seen.append(str(r["role"]))
+        return real(r)
+
+    monkeypatch.setattr(runs_module, "_row", counting)
+    rows_of_record(ctx, record)
+    assert seen and "random" not in seen
+    seen.clear()
+    rows_of_record(ctx, record, ("frozen",))
+    assert seen and len(seen) < total - 5
+    seen.clear()
+    draws_of_record(ctx, record)
+    assert seen == ["random"] * 5

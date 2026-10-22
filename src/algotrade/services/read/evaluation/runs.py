@@ -15,7 +15,7 @@ viewer does not hold as ``Unknown(LICENCE)``, and a ledger the retention purge r
 its admin cause (ADR 0056). ``ledger_keep`` says which partitions the
 purge spares: those of each edge's canonical run, latest run per user and cited run."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any, Final
@@ -410,34 +410,52 @@ def _series_row(row: Mapping[str, Any]) -> SeriesRow:
     )
 
 
-def _stored(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
+def _stored(
+    ctx: Stores,
+    record: RunRecord,
+    *,
+    random: bool,
+    slice_kinds: Collection[str] | None = None,
+) -> tuple[EdgeRow, ...]:
+    """The rows of the run's partition that are (``random``) or are not random-pick draws, only
+    of ``slice_kinds`` when given. The cut is made on the frame, before any row is decoded: the
+    draws are most of the partition and every consumer drops them (or all else) afterwards."""
     frame = run_partition(ctx, result_table(EDGE_EVAL), record)
     if frame is None:
         return ()
-    return tuple(_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records"))
+    keep = (frame["role"].astype(str) == RANDOM) == random
+    if slice_kinds is not None:
+        keep &= frame["slice_kind"].astype(str).isin(set(slice_kinds))
+    return tuple(_row({str(k): v for k, v in r.items()}) for r in frame[keep].to_dict("records"))
 
 
-def rows_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
+def rows_of_record(
+    ctx: Stores, record: RunRecord, slice_kinds: Collection[str] | None = None
+) -> tuple[EdgeRow, ...]:
     """The screener and baseline rows the run ``record`` wrote, as it left them; none when its
     partition holds none of its own. The random-pick draws are not among them (the one filter
-    every verdict, record and promotion consumer reads through): ``draws_of_record``."""
-    return tuple(r for r in _stored(ctx, record) if r.role != RANDOM)
+    every verdict, record and promotion consumer reads through): ``draws_of_record``. With
+    ``slice_kinds`` only rows of those slice kinds are decoded."""
+    return _stored(ctx, record, random=False, slice_kinds=slice_kinds)
 
 
 def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[EdgeRow, ...]:
     """The random-pick draws the run ``record`` wrote (slice kind ``draw``, out-of-sample only),
     each a ``lift`` and ``hit_rate`` of one draw of names chosen with no information."""
-    return tuple(r for r in _stored(ctx, record) if r.role == RANDOM)
+    return _stored(ctx, record, random=True)
 
 
-def load_run_rows(ctx: Stores, run: EdgeRun) -> tuple[EdgeRow, ...]:
+def load_run_rows(
+    ctx: Stores, run: EdgeRun, slice_kinds: Collection[str] | None = None
+) -> tuple[EdgeRow, ...]:
     """The rows ``run`` wrote, as it left them; none when its partition holds none of its own.
     A run whose out-of-sample result is hidden serves its ``in_sample`` rows only: the whole
     history, the years and the regimes all contain out-of-sample sessions, so they are withheld
     here, in the one reader, not in the browser. A cost row is cut by period (ADR 0064 decision
-    3): the ``in_sample:`` ones stay, by the harness's period, never by a date."""
+    3): the ``in_sample:`` ones stay, by the harness's period, never by a date. ``slice_kinds``
+    decodes only rows of those kinds (a caller that reads one kind, e.g. the track record)."""
     record = ctx.reader.run(run.run_id)
-    found = rows_of_record(ctx, record) if record is not None else ()
+    found = rows_of_record(ctx, record, slice_kinds) if record is not None else ()
     if not run.oos_hidden:
         return found
     return tuple(_without_oos_counts(r) for r in found if _in_sample_only(r))
