@@ -8,6 +8,8 @@ import pytest
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
+from algotrade.services.features import catalogue
+from algotrade.services.licences import hidden_stored
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.screens import results, runs
@@ -347,7 +349,7 @@ def test_a_viewers_same_named_open_expression_does_not_open_a_stored_personal_va
     assert (seen.score, seen.rank, seen.reasons) == (None, None, "")
 
 
-@pytest.mark.parametrize("recorded", [None, {}, {"feature.other": "open"}])
+@pytest.mark.parametrize("recorded", [None, {}])
 def test_a_stored_field_with_no_recorded_licence_is_hidden(
     backend: MemoryBackend, reader: StoreReader, recorded: dict[str, str] | None
 ) -> None:
@@ -475,3 +477,82 @@ def test_an_open_only_run_withholds_a_field_the_site_made_personal_since(
     assert run_withheld(trader, run) == {PERSONAL_FIELD}
     seen = load_results(trader, {"r3": ["EQ:AAA"]}, [run])[("r3", "EQ:AAA")]
     assert seen.criteria[0].value is None and seen.score is None and seen.rank is None
+
+
+def _old_withheld(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
+    """``run_withheld`` as it was before the record skipped the values file: the stored fields
+    are always read from the file and joined with the recorded ones."""
+    at_run = run.audit.get("licences")
+    within = isinstance(at_run, list | tuple) and set(at_run) <= set(ctx.licences)
+    recorded = run.audit.get("field_licences")
+    known = dict(recorded) if isinstance(recorded, dict) else {}
+    stored = results._run_fields(ctx, run)
+    fields = stored | frozenset(known)
+    if within:
+        known = {**dict.fromkeys(fields, "open"), **known}
+    hidden = hidden_stored(catalogue(ctx.configs), known, fields, ctx.licences)
+    if within:
+        return hidden
+    return hidden | {"*"} if not stored and not known and run.decisions else hidden
+
+
+@pytest.mark.parametrize("user", ["trader", "me"])  # without and with every licence
+@pytest.mark.parametrize(
+    ("field_name", "recorded", "audit"),
+    [
+        (OPEN_FIELD, {OPEN_FIELD: "open"}, None),
+        (PERSONAL_FIELD, {PERSONAL_FIELD: "personal"}, None),
+        (PERSONAL_FIELD, {PERSONAL_FIELD: "open"}, None),  # reclassified since the run
+        (OWN_FIELD, {OWN_FIELD: "personal"}, None),
+        (OPEN_FIELD, {OPEN_FIELD: "open", PERSONAL_FIELD: "personal"}, None),  # a tie-break
+        (PERSONAL_FIELD, {PERSONAL_FIELD: "personal"}, {"licences": ["open"]}),  # within
+        (PERSONAL_FIELD, {PERSONAL_FIELD: "personal"}, {"licences": ["open", "personal"]}),
+    ],
+)
+def test_a_recorded_run_hides_what_the_values_file_path_hid_without_reading_the_file(
+    backend: MemoryBackend,
+    reader: StoreReader,
+    monkeypatch: pytest.MonkeyPatch,
+    user: str,
+    field_name: str,
+    recorded: dict[str, str],
+    audit: dict[str, Any] | None,
+) -> None:
+    """Equivalence on fixtures: a run that recorded its fields gives the same withheld set as
+    reading its values file (licensed and unlicensed viewer), and shows nothing the old path
+    hid, with no values read (4.3 s of an Ideas read for a viewer without ``personal``)."""
+    viewer, run = _later_run(backend, reader, user, recorded, field_name, audit=audit)
+    expected = _old_withheld(viewer, run)  # reads the file: the reference
+    reads: list[str] = []
+    real = results.run_rows_of
+
+    def counting(*args: Any, **kwargs: Any) -> Any:
+        reads.append(args[1])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(results, "run_rows_of", counting)
+    fresh = context(reader, None, user=user)  # no cached fields from the reference
+    assert run_withheld(fresh, run) == expected
+    assert "results/rule_screen_values" not in reads
+    if user == "me":
+        assert expected == frozenset()  # the holder of every licence hides nothing
+
+
+def test_a_run_without_a_record_still_reads_its_values_file(
+    backend: MemoryBackend, reader: StoreReader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No record (a run before ``field_licences``, or an empty one): the file is read and the
+    stored personal field is withheld, as before."""
+    for recorded in (None, {}):
+        trader, run = _later_run(backend, reader, "trader", recorded, PERSONAL_FIELD)
+        reads: list[str] = []
+        real = results.run_rows_of
+
+        def counting(*args: Any, _real: Any = real, _reads: list[str] = reads, **kw: Any) -> Any:
+            _reads.append(args[1])
+            return _real(*args, **kw)
+
+        monkeypatch.setattr(results, "run_rows_of", counting)
+        assert run_withheld(trader, run) == {PERSONAL_FIELD}
+        assert reads == ["results/rule_screen_values"]
+        monkeypatch.undo()

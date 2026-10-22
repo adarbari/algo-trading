@@ -408,3 +408,18 @@ def test_a_run_records_every_fields_licence_for_the_read_to_gate_by() -> None:
     recorded = outcome.audit["field_licences"]
     assert outcome.rules is not None and set(recorded) == set(outcome.rules.spec.fields())
     assert recorded["feature.vrp_iv30"] == "personal"
+
+
+def test_every_field_a_run_stores_a_value_for_is_in_its_recorded_field_licences() -> None:
+    """The invariant behind ``run_withheld`` not reading a recorded run's values file: criteria,
+    flags, display columns and the tie-break read distinct fields, and every ``field`` the run
+    writes to ``rule_screen_values`` is a key of ``audit["field_licences"]``."""
+    reader, writer = seeded()
+    config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
+    outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
+    recorded = set(outcome.audit["field_licences"])
+    values = reader.table("results/rule_screen_values", DAY)
+    assert values is not None and not values.empty
+    stored = set(values["field"].dropna())
+    assert {f"{LIQ}.underlying_price", f"{LIQ}.chain_oi", f"{LIQ}.put_tier"} <= stored
+    assert stored <= recorded
