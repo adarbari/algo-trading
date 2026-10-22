@@ -262,7 +262,10 @@ export async function crawlView(page, view, picks, opts) {
   }
   const blocked = [...new Set((opts.blocked ?? []).slice(blockedFrom))];
   if (blocked.length) note = `${note} blocked: ${blocked.slice(0, 8).join('; ')}`.trim();
-  return { status, note, requests: fold(state.entries), controls };
+  const sent = {};
+  for (const e of state.entries) sent[e.op] = (sent[e.op] ?? 0) + 1;
+  const duplicates = Object.fromEntries(Object.entries(sent).filter(([, n]) => n > 1));
+  return { status, note, requests: fold(state.entries), duplicates, controls };
 }
 
 /** A discovered control as a child view of ``parent`` (the same route, one more click). */

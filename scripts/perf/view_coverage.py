@@ -103,6 +103,13 @@ def render(doc: dict, report: dict, generated: str) -> str:
     lines += [f"- `{v}`" for v in report["no_data"]] or ["None."]
     lines += ["", "## Views not captured yet", ""]
     lines += [f"- `{v}`" for v in report["uncaptured"]] or ["None."]
+    twice = {vid: v.duplicates(view) for vid, view in doc.get("views", {}).items()}
+    lines += ["", "## Operations a view sends more than once", ""]
+    lines += [
+        f"- `{vid}`: " + ", ".join(f"{o} x{n}" for o, n in dup.items())
+        for vid, dup in twice.items()
+        if dup
+    ] or ["None."]
     lines += ["", "## Per view: operations and request counts", ""]
     for vid, view in doc.get("views", {}).items():
         cap = view.get("captured")
@@ -122,6 +129,11 @@ def render(doc: dict, report: dict, generated: str) -> str:
                     f"| {r['op']} | {r.get('count', 1)} | {r.get('trigger', 'load')} | "
                     f"{r.get('bytes', 0):,} |"
                 )
+        if dup := v.duplicates(view):
+            lines += [
+                "",
+                "Sent more than once: " + ", ".join(f"{o} x{n}" for o, n in dup.items()) + ".",
+            ]
         if view.get("uncertain"):
             lines += ["", f"Statically uncertain: {', '.join(view['uncertain'])}."]
         lines.append("")
@@ -135,6 +147,7 @@ def main() -> int:
     """Re-enumerate the views (keeping what the crawler captured), write the views file and the
     coverage doc. No store, no server: safe on a busy machine."""
     merged = v.merge_static(v.load_views(), v.enumerate_views(WEB_SRC))
+    v.annotate_duplicates(merged)
     v.save_views(merged)
     doc = v.load_views()
     pages = json.loads(PAGES_FILE.read_text())["pages"] if PAGES_FILE.is_file() else {}
