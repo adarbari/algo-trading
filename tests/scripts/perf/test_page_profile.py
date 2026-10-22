@@ -12,6 +12,7 @@ import threading
 import time
 from pathlib import Path
 
+import graphql
 import pytest
 
 PERF = Path(__file__).resolve().parents[3] / "scripts" / "perf"
@@ -534,3 +535,98 @@ def test_a_cut_wrapped_in_exception_groups_is_still_a_cut() -> None:
 
     with pytest.raises(BaseExceptionGroup):
         pp.run_profiled(other, limit_s=None)
+
+
+# ---- the capped EdgesPage run produced no section: a cut inside an executor task -------------
+
+
+def _slow_graphql(loop: asyncio.AbstractEventLoop):  # type: ignore[no-untyped-def]
+    """A real graphql-core execution whose async resolver is a long CPU loop (the shape of the
+    edge resolvers): the Cut lands inside the executor's task, not in the awaiting caller."""
+    schema = graphql.build_schema("type Query { slow: String }")
+
+    async def slow(*_: object) -> str:
+        end = time.perf_counter() + 5
+        while time.perf_counter() < end:
+            _leaf()
+        return "x"
+
+    return lambda: loop.run_until_complete(
+        graphql.graphql(schema, "{ slow }", root_value={"slow": slow})
+    )
+
+
+def test_a_cut_inside_a_graphql_executor_task_still_yields_the_partial_result() -> None:
+    loop = asyncio.new_event_loop()
+    seen: list[pp.Profiled] = []
+    res = pp.run_profiled(
+        _slow_graphql(loop),
+        limit_s=0.3,
+        snapshot_s=0.1,
+        on_cut=lambda: pp._drain(loop),
+        on_partial=seen.append,
+    )
+    assert res.cut == "limit" and res.stats and len(res.snapshots) >= 3
+    assert len(seen) == 1 and seen[0].cut == "limit"  # written from the handler, once
+    loop.close()
+
+
+def test_the_partial_is_written_even_if_the_cut_never_reaches_the_caller() -> None:
+    seen: list[pp.Profiled] = []
+
+    def swallowed() -> None:  # the Cut is caught and dropped by "the app": a task swallowed it
+        try:
+            end = time.perf_counter() + 5
+            while time.perf_counter() < end:
+                _leaf()
+        except pp.Cut:
+            pass
+        raise RuntimeError("stray")
+
+    with pytest.raises(RuntimeError):
+        pp.run_profiled(swallowed, limit_s=0.2, snapshot_s=0.1, on_partial=seen.append)
+    assert len(seen) == 1 and seen[0].cut == "limit"
+
+
+def test_a_failing_on_cut_or_drain_after_a_cut_is_not_fatal() -> None:
+    def boom() -> None:
+        raise pp.Cut("again")
+
+    res = pp.run_profiled(lambda: (_ for _ in ()).throw(pp.Cut("limit")), limit_s=None, on_cut=boom)
+    assert res.cut == "limit"
+
+    loop = asyncio.new_event_loop()
+
+    async def reraises_on_cancel() -> None:
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            raise pp.Cut("late") from None
+
+    task = loop.create_task(reraises_on_cancel())
+    loop.run_until_complete(asyncio.sleep(0))
+    pp._drain(loop)  # must not raise
+    assert task.done()
+    loop.close()
+
+
+def test_a_sigterm_mid_operation_writes_the_partial_before_unwinding() -> None:
+    seen: list[pp.Profiled] = []
+    old = signal.signal(signal.SIGTERM, pp._on_signal)
+    try:
+        res = pp.run_profiled(
+            lambda: os.kill(os.getpid(), signal.SIGTERM) or time.sleep(1),
+            limit_s=None,
+            on_partial=seen.append,
+        )
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    assert res.cut == "SIGTERM" and [s.cut for s in seen] == ["SIGTERM"]
+    assert not pp.CURRENT  # the running operation is cleared after the call
+
+
+def test_an_operation_running_is_never_classified_as_between_operations() -> None:
+    assert pp.running_operation() is None
+    seen: list[str | None] = []
+    pp.run_profiled(lambda: seen.append(pp.running_operation()), limit_s=None, name="Op")
+    assert seen == ["Op"] and pp.running_operation() is None

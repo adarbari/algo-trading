@@ -99,3 +99,8 @@ frames on the stack): they hold calls that have returned, so a long-running fram
 shows in the trend only when it returns, and the final profile of a cut call includes the frames
 the cut unwound. The page file is rewritten atomically (temp file, `os.replace`) with the cut
 signals blocked; a `Cut` inside an anyio task group's exception group is recognised too.
+
+A cut never depends on the exception travelling back through the app: the alarm (or signal)
+handler writes the partial section itself, from a snapshot, before it raises (`CURRENT` marks the
+running operation; the write is atomic with the cut signals blocked), a task that re-raises the
+`Cut` while being cancelled is logged, and a failed clean-up after a cut is never fatal.

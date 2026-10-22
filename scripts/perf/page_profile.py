@@ -461,6 +461,35 @@ def snapshot_of(stats: dict[Key, tuple], elapsed: float) -> dict:
     return {"t": elapsed, "buckets": attribute(stats), "counts": call_counts(stats)}
 
 
+CURRENT: dict[str, Any] = {}  # the operation being profiled: {"name", "emit"}; empty between
+
+
+def running_operation() -> str | None:
+    """The name of the operation under profile now, None between operations."""
+    return CURRENT.get("name")
+
+
+def _partial(
+    prof: cProfile.Profile,
+    snaps: list[dict],
+    elapsed: float,
+    reason: str,
+    on_partial: Callable[[Profiled], None] | None,
+) -> Profiled:
+    """The result of a cut call (final snapshot included), handed to ``on_partial``; a failure
+    to write it is logged so it never masks the cut."""
+    stats = stats_now(prof)
+    res = Profiled(
+        stats=stats, snapshots=[*snaps, snapshot_of(stats, elapsed)], cut=reason, elapsed=elapsed
+    )
+    if on_partial is not None:
+        try:
+            on_partial(res)
+        except Exception as err:
+            print(f"writing the partial profile failed: {err!r}", file=sys.stderr)
+    return res
+
+
 def run_profiled(
     call: Callable[[], Any],
     *,
@@ -468,19 +497,30 @@ def run_profiled(
     snapshot_s: float = SNAPSHOT_S,
     clock: Callable[[], float] = time.perf_counter,
     on_cut: Callable[[], None] = lambda: None,
+    on_partial: Callable[[Profiled], None] | None = None,
+    name: str = "",
 ) -> Profiled:
-    """``call()`` under cProfile in this (the main) thread. A SIGALRM every ``snapshot_s`` disables
-    the profiler, keeps a snapshot, and re-enables it; at ``limit_s`` it raises ``Cut`` inside the
-    call instead, and a ``Cut`` from a signal handler (SIGTERM...) ends it the same way. A cut
-    call still returns its profile (``cut`` says why); ``on_cut`` cleans up what it left running."""
+    """``call()`` under cProfile in this (the main) thread. A SIGALRM every ``snapshot_s`` keeps a
+    snapshot (the profiler stays on); at ``limit_s`` the handler first hands the partial result
+    to ``on_partial`` (so it is written even if the ``Cut`` never reaches this frame: a task may
+    swallow it or re-raise it elsewhere), then raises ``Cut`` inside the call. A signal cut
+    (``_on_signal``) does the same through ``CURRENT``. A cut call returns its profile (``cut``
+    says why); ``on_cut`` cleans up and its failure is logged, never fatal."""
     prof = cProfile.Profile()
     snaps: list[dict] = []
     t0 = clock()
+    emitted: list[Profiled] = []
+
+    def emit(reason: str) -> None:
+        """The partial result, once: final snapshot included, handed to ``on_partial``."""
+        if not emitted:
+            emitted.append(_partial(prof, snaps, clock() - t0, reason, on_partial))
 
     def tick(_signum: int, _frame: object) -> None:
         elapsed = clock() - t0
         snaps.append(snapshot_of(stats_now(prof), elapsed))  # the profiler stays on
         if limit_s is not None and elapsed >= limit_s - 0.001:
+            emit("limit")
             raise Cut("limit")
         signal.setitimer(
             signal.ITIMER_REAL,
@@ -488,6 +528,7 @@ def run_profiled(
         )
 
     old = signal.signal(signal.SIGALRM, tick)
+    CURRENT.update(name=name or "operation", emit=emit)
     result = Profiled()
     first = snapshot_s if limit_s is None else min(snapshot_s, limit_s)
     signal.setitimer(signal.ITIMER_REAL, first)
@@ -498,17 +539,22 @@ def run_profiled(
         found = find_cut(err)
         if found is None:
             raise
-        result.cut = found.reason
+        emit(found.reason)
     finally:
         prof.disable()
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, old)
+        CURRENT.clear()
+    if emitted:
+        result = emitted[0]
+        try:
+            on_cut()
+        except BaseException as err:
+            print(f"cleaning up after the cut failed: {err!r}", file=sys.stderr)
+        return result
     result.elapsed = clock() - t0
     result.stats = stats_now(prof)
     result.snapshots = snaps
-    if result.cut:
-        result.snapshots = [*snaps, snapshot_of(result.stats, result.elapsed)]
-        on_cut()
     return result
 
 
@@ -530,6 +576,30 @@ def partial_row(name: str, res: Profiled) -> dict:
 
 
 CUT_SIGNALS = {signal.SIGTERM, signal.SIGHUP, signal.SIGINT}
+
+
+def finished_row(
+    name: str,
+    res: Profiled,
+    problem: Callable[[int, bytes], str | None],
+    rows_of: Callable[[Any], int],
+    notes_of: Callable[[int, bytes], str | None],
+) -> dict:
+    """The row of a call that finished: answer checks, buckets, counters, top functions."""
+    r = res.value
+    err_text = problem(r.status_code, r.content)
+    return {
+        "op": name,
+        "wall_s": res.elapsed,
+        "bytes": len(r.content),
+        "rows": rows_of(r.json().get("data")) if r.status_code == 200 and not err_text else 0,
+        "error": err_text,
+        "note": notes_of(r.status_code, r.content),
+        "saw_nothing": saw_nothing(res.stats),
+        "buckets": attribute(res.stats),
+        "counts": call_counts(res.stats),
+        "top": top_functions(res.stats),
+    }
 
 
 def _flush(out: Path, route: str, done: list[dict]) -> None:
@@ -554,7 +624,12 @@ def _flush(out: Path, route: str, done: list[dict]) -> None:
 
 
 def _on_signal(signum: int, _frame: object) -> None:
-    raise Cut(signal.Signals(signum).name)
+    """SIGTERM / SIGHUP / SIGINT: write the running operation's partial result, then unwind."""
+    reason = signal.Signals(signum).name
+    emit = CURRENT.get("emit")
+    if emit is not None:
+        emit(reason)
+    raise Cut(reason)
 
 
 def _profile_all(
@@ -606,6 +681,10 @@ def _profile_all(
                 limit_s=limit_s,
                 snapshot_s=snapshot_s,
                 on_cut=lambda: _drain(loop),
+                on_partial=lambda part, name=name: _flush(
+                    out, label, [*done, partial_row(name, part)]
+                ),
+                name=name,
             )
             if res.cut:
                 done.append(partial_row(name, res))
@@ -616,29 +695,13 @@ def _profile_all(
                     break
                 continue
             r = res.value
-            stats = res.stats
-            err_text = problem(r.status_code, r.content)
-            rows = rows_of(r.json().get("data")) if r.status_code == 200 and not err_text else 0
-            done.append(
-                {
-                    "op": name,
-                    "wall_s": res.elapsed,
-                    "bytes": len(r.content),
-                    "rows": rows,
-                    "error": err_text,
-                    "note": notes_of(r.status_code, r.content),
-                    "saw_nothing": saw_nothing(stats),
-                    "buckets": attribute(stats),
-                    "counts": call_counts(stats),
-                    "top": top_functions(stats),
-                }
-            )
-            flag = "  PROFILE SAW NOTHING" if done[-1]["saw_nothing"] else ""
+            done.append(finished_row(name, res, problem, rows_of, notes_of))
+            row = done[-1]
             print(
-                f"  {name}: {res.elapsed:.2f} s, {len(r.content):,} B, {rows} rows"
-                + (f"  FAILED: {err_text}" if err_text else "")
-                + (f"  {done[-1]['note']}" if done[-1]["note"] else "")
-                + flag,
+                f"  {name}: {res.elapsed:.2f} s, {len(r.content):,} B, {row['rows']} rows"
+                + (f"  FAILED: {row['error']}" if row["error"] else "")
+                + (f"  {row['note']}" if row["note"] else "")
+                + ("  PROFILE SAW NOTHING" if row["saw_nothing"] else ""),
                 flush=True,
             )
             _flush(out, label, done)
@@ -646,7 +709,11 @@ def _profile_all(
         found = find_cut(err)
         if found is None:
             raise
-        print(f"cut ({found.reason}) between operations", file=sys.stderr)  # what ran is written
+        where = running_operation()
+        print(
+            f"cut ({found.reason}) " + (f"during {where}" if where else "between operations"),
+            file=sys.stderr,
+        )  # what ran, and the cut operation's partial, is written
         code = EXIT_LOW_SWAP
     finally:
         for sig, old in olds.items():
@@ -656,12 +723,16 @@ def _profile_all(
 
 
 def _drain(loop: asyncio.AbstractEventLoop) -> None:
-    """Cancel what a cut call left pending and let it unwind (best effort)."""
-    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-    for t in pending:
-        t.cancel()
-    if pending:
-        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    """Cancel what a cut call left pending and let it unwind (best effort: a task that re-raises
+    the ``Cut`` while unwinding, or any failure here, is logged, never fatal)."""
+    try:
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        for t in pending:
+            t.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    except BaseException as err:
+        print(f"draining the cut call failed: {err!r}", file=sys.stderr)
 
 
 def _close(loop: asyncio.AbstractEventLoop, client: Any, lifespan: Any) -> None:
