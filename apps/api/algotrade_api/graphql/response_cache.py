@@ -249,6 +249,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
     {
         "Regime",
         "PublishedEdge",
+        "EdgeBuilder",  # the viewer's own edge document and the site files: config_generation
         "FeatureTable",
         "FeatureDistribution",
         "FeatureCatalogue",
@@ -257,18 +258,13 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "InstrumentFeatureValues",
         "InstrumentHistory",
         "ComparePrices",
-        "Day",
         "EventCalendar",
         "InstrumentEventStudy",
         "TableView",
-        "GuideEpisode",
         "GuideField",
         "GuideHelpField",
-        "GuideIndicator",
         "GuideScreener",
         "GuideSituation",
-        "GuideStartPage",
-        "GuideTerm",
         "GuideSearch",
         "GuideEntries",
         "OptionChain",  # stored chains and features: no live source
@@ -290,6 +286,7 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "EdgesPage",
         "EdgeDesk",  # the paper record plus the official run it is judged against
         "EdgePaper",
+        "EdgeCompare",  # the viewer's edge against its parent: evaluation run records
         "EdgeTrades",  # the verdict basis's ledger (a run's rows) and the paper record
         "EdgeVariantGrid",
         # the sections of an edge's result: the official run's stored series, the verdict's basis
