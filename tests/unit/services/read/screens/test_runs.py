@@ -321,7 +321,9 @@ def _decisions(ctx: ReadContext, run_id: str, owner: str, config: str) -> dict[s
     return {str(i): str(d) for i, d in zip(mine["instrument_id"], mine["decision"], strict=True)}
 
 
-def freeze(backend: MemoryBackend, days: tuple[date, ...] = (D0, D1)) -> None:
+def freeze(
+    backend: MemoryBackend, days: tuple[date, ...] = (D0, D1), skip: tuple[str, ...] = ()
+) -> None:
     """Write the ``screen_runs`` row of every run of the store, as the writer would have: from
     the rows, the previous run being the config's newest in the previous stored session."""
     reader = StoreReader(backend)
@@ -331,7 +333,7 @@ def freeze(backend: MemoryBackend, days: tuple[date, ...] = (D0, D1)) -> None:
         keys = [("site", "alpha"), ("site", "beta"), ("me", "beta"), ("me", "gamma")]
         for owner, config in keys:
             found = latest_run(now, owner, config).run
-            if found is None:
+            if found is None or (config in skip and owner == "site"):
                 continue
             decisions = _decisions(now, found.run_id, owner, config)
             before = load_previous_run(now, found)
@@ -469,10 +471,33 @@ def test_the_frozen_path_reads_no_row_of_any_run(
 
         monkeypatch.setattr(reader, name, counting)
     ctx = context(reader)
-    found = load_latest_runs(ctx, KEYS)
-    for key in KEYS:
+    found = load_latest_runs(ctx, KEYS[:3])  # every one has a frozen row
+    for key in KEYS[:3]:
         run = found[key].run
         if run is not None:
             results.load_change_summary(ctx, run)
     assert read and set(read) == {f"results/{SCREEN_RUNS}"}
     assert RULE_SCREEN not in read
+
+
+def test_a_config_with_no_frozen_row_in_a_session_that_has_some_is_recounted_not_not_run() -> None:
+    backend = screens_store()
+    freeze(backend, skip=("alpha",))  # a screen_runs partition; alpha has a rule_screen run only
+    ctx = context(StoreReader(backend))
+    found = load_latest_runs(ctx, [("site", "alpha"), ("me", "beta"), ("me", "nobody")])
+    alpha = found[("site", "alpha")].run
+    assert alpha is not None and alpha.frozen is None and alpha.run_id == "r1"
+    assert found[("me", "beta")].run is not None and found[("me", "beta")].run.frozen
+    nobody = found[("me", "nobody")].not_run  # neither table has it
+    assert nobody is not None and nobody.code is UnknownCode.NOT_RUN
+
+
+def test_the_common_path_probes_no_rule_screen(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = screens_store()
+    freeze(backend)
+    reader = StoreReader(backend)
+    seen: list[str] = []
+    real = reader.has_partition
+    monkeypatch.setattr(reader, "has_partition", lambda t, *a: (seen.append(t), real(t, *a))[1])
+    load_latest_runs(context(reader), [("site", "alpha"), ("me", "beta")])
+    assert RULE_SCREEN not in seen

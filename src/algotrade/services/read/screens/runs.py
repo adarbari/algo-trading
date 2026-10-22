@@ -207,14 +207,25 @@ def run_summaries(ctx: ReadContext) -> RunSummaries | Unknown:
 
     def build() -> RunSummaries | Unknown:
         frozen = partition(ctx, SCREEN_RUNS, FROZEN_COLUMNS, newest_runs=True)
-        if not isinstance(frozen, Unknown):  # one small row per run, never the rows counted
-            return RunSummaries(
-                {
-                    (str(row["user_id"]), str(row["config_id"])): _frozen_summary(row)
-                    for _, row in frozen.iterrows()
-                }
-            )
-        # no ``screen_runs`` partition: a session written before the table; recount its rows
+        if isinstance(frozen, Unknown):  # a session written before the table: recount its rows
+            return _recounted(ctx)
+        return RunSummaries(  # one small row per run, never the rows counted
+            {
+                (str(row["user_id"]), str(row["config_id"])): _frozen_summary(row)
+                for _, row in frozen.iterrows()
+            }
+        )
+
+    found: RunSummaries | Unknown = ctx.cache.get_or_compute(key, build)
+    return found
+
+
+def _recounted(ctx: ReadContext) -> RunSummaries | Unknown:
+    """The old path: every config's newest run counted from its ``rule_screen`` rows (cached per
+    publish; read only for a session without ``screen_runs`` or a config with no frozen row)."""
+    key = ("run_summaries_recount", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
+
+    def build() -> RunSummaries | Unknown:
         stored = partition(ctx, RULE_SCREEN, ROW_COLUMNS, newest_runs=True)
         if isinstance(stored, Unknown):
             return stored
@@ -227,6 +238,16 @@ def run_summaries(ctx: ReadContext) -> RunSummaries | Unknown:
 
     found: RunSummaries | Unknown = ctx.cache.get_or_compute(key, build)
     return found
+
+
+def _unfrozen(ctx: ReadContext, key: RunKey) -> RunSummary | None:
+    """``key``'s run counted from its rows when it has no ``screen_runs`` row (a run written
+    before the table, in a session that has one): missing data never passes as ``NOT_RUN``.
+    Probes the ``rule_screen`` partition first; None: neither table has the run."""
+    if not ctx.reader.has_partition(RULE_SCREEN, ctx.session.date):
+        return None
+    counted = _recounted(ctx)
+    return None if isinstance(counted, Unknown) else counted.by_key.get(key)
 
 
 def _version(value: object) -> int | None:
@@ -358,7 +379,7 @@ def load_latest_runs(ctx: ReadContext, keys: Sequence[RunKey]) -> dict[RunKey, L
         return {k: LatestRun(None, why) for k in keys}
     out: dict[RunKey, LatestRun] = {}
     for owner, config_id in keys:
-        found = stored.by_key.get((owner, config_id))
+        found = stored.by_key.get((owner, config_id)) or _unfrozen(ctx, (owner, config_id))
         if found is None:
             detail = f"{config_id} ({owner}) has no run in {RULE_SCREEN} for {day}"
             cause = run_cause(config_id, detail, ctx.session.date)
