@@ -2,14 +2,17 @@
 frozen split, an exploratory or null-split run is never canonical, no such run is NOT_RUN with
 the reason, and a run's rows are its own even when another run shares the partition."""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from typing import Any
 
 import pytest
 
+from algotrade.config.user import UserContext
 from algotrade.core.time.calendar import is_session
 from algotrade.quant.edges.statistics import window_weights
-from algotrade.services.read.context import ResultCache
+from algotrade.services.read.context import ResultCache, open_stores
+from algotrade.services.read.evaluation import edges as edges_module
 from algotrade.services.read.evaluation import runs as runs_module
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
@@ -29,6 +32,7 @@ from algotrade.services.read.evaluation.runs import (
 from algotrade.services.read.evaluation.verdict import load_edge_verdict
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
 from tests.unit.services.read.evaluation.conftest import (
@@ -593,3 +597,86 @@ def test_the_site_trial_count_is_taken_once_per_request(
     for _ in range(50):
         load_site_trials(ctx)
     assert len(taken) == 1
+
+
+# The page's resolvers share one ``StoreContext`` (``RequestContext.stores()``: no session, so no
+# ``ReadContext``): the once-per-request reads must hold there, and from threads side by side.
+
+
+def _spy_parses(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    seen: list[str] = []
+    real = edges_module.loading.load_edges
+
+    def spy(configs: Any, user: str = "site", catalog: Any = None) -> Any:
+        seen.append(user)
+        return real(configs, user, catalog)
+
+    monkeypatch.setattr(edges_module.loading, "load_edges", spy)
+    return seen
+
+
+def test_a_page_of_80_verdicts_on_the_stores_context_counts_site_trials_once(
+    backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _filled(backend)
+    ctx = stores(backend, docs=_docs())
+    taken: list[int] = []
+    real = runs_module._site_trials
+    monkeypatch.setattr(runs_module, "_site_trials", lambda c: taken.append(1) or real(c))
+    edges = load_edges(ctx)
+
+    def verdict(edge: Any) -> Any:  # a judged edge with a Sharpe asks for the count
+        return load_edge_verdict(ctx, edge), load_site_trials(ctx)
+
+    with ThreadPoolExecutor(6) as pool:  # the read pool's side-by-side resolvers
+        list(pool.map(verdict, [e for _ in range(12) for e in edges]))
+    assert len(taken) == 1
+    assert len(ctx.cache._items) <= 2  # one entry for the count, not one per resolver
+
+
+def test_the_edge_documents_are_parsed_once_per_request_and_generation(
+    backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _filled(backend)
+    ctx = stores(backend, docs=_docs())
+    seen = _spy_parses(monkeypatch)
+    for _ in range(20):
+        for edge in load_edges(ctx):
+            load_edge_verdict(ctx, edge)
+            load_site_trials(ctx)
+    assert sorted(seen) == ["me", "site"]  # the viewer's own list, the site's for the count
+    assert load_edges(stores(backend, docs=_docs())) == load_edges(ctx)  # a request: its own memo
+    assert len(seen) == 3
+
+
+def test_a_config_write_or_a_new_run_is_seen_by_the_same_context_keys(
+    backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _filled(backend)
+    store = MemoryConfigStore(_docs())
+    ctx = open_stores(StoreReader(backend), store, UserContext("me"))
+    seen = _spy_parses(monkeypatch)
+    load_edges(ctx)
+    store.generation = lambda user: 2  # type: ignore[method-assign]  # a finished write
+    load_edges(ctx)
+    assert seen.count("me") == 2  # a new generation re-parses: no stale edge after an edit
+    store.generation = lambda user: 3  # type: ignore[method-assign]  # a write in flight
+    load_edges(ctx)
+    load_edges(ctx)
+    assert seen.count("me") == 4  # an odd generation is never memoised
+    before = load_site_trials(ctx)
+    write_run(backend, "late", FROZEN, 0.6, minutes=99, edge="e0", trials_counted=50)
+    assert load_site_trials(ctx) == before + 50 - 4 - 1  # e0's canonical run is the new one
+
+
+def test_the_memoised_page_equals_one_read_without_sharing(backend: MemoryBackend) -> None:
+    _filled(backend)
+    shared = stores(backend, docs=_docs())
+
+    def page(ctx_of: Any) -> list[Any]:
+        return [
+            (e, load_edge_verdict(ctx_of(), e), load_site_trials(ctx_of()))
+            for e in load_edges(ctx_of())
+        ]
+
+    assert page(lambda: shared) == page(lambda: stores(backend, docs=_docs()))

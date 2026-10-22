@@ -312,10 +312,26 @@ class StoreContext:
     user: UserContext
     features: FeatureSet = field(repr=False)
     cache: ResultCache = field(compare=False, repr=False)
+    # The request's own scratch, as ``ReadContext.memo``: ``RequestContext.stores()`` hands every
+    # resolver of a request the same object, so a result they all ask for is derived once.
+    memo: dict[Hashable, Any] = field(default_factory=dict, compare=False, repr=False)
 
 
 # What a session-free loader takes: a ``StoreContext``, or a ``ReadContext`` (a superset).
 Stores = StoreContext | ReadContext
+
+
+def once_per_request[T](ctx: Stores, key: Hashable, compute: Callable[[], T]) -> T:
+    """``compute()`` once per request under ``key`` (in ``ctx.memo``, never shared across
+    requests): the resolvers of a page run side by side in the read pool, so the first caller
+    computes under a per-key lock and the rest wait for its result instead of each computing it.
+    The lock is not reentrant: a ``compute`` that asks for its own key deadlocks."""
+    memo = ctx.memo
+    if key not in memo:
+        with memo.setdefault(("once-lock", key), threading.Lock()):
+            if key not in memo:
+                memo[key] = compute()
+    return memo[key]  # type: ignore[no-any-return]
 
 
 def catalogue_key(ctx: Stores) -> str:
