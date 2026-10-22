@@ -372,6 +372,7 @@ def create_app(
         allow_origins=list(settings.cors_origins),
         allow_methods=["GET", "PUT", "POST", "DELETE"],
         allow_headers=["*"],
+        expose_headers=["x-config-generation", "x-release-id"],  # ADR 0077 decision 18
     )
     for error, handler in (
         (NotFoundError, _not_found),

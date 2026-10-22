@@ -18,6 +18,7 @@ import { apiBaseUrl } from '@/shared/config';
 import { accessToken, handleUnauthorized } from './auth';
 import { ApiError } from './client';
 import type { TypedDocumentString } from './generated/graphql/graphql';
+import { observeVersions } from './versions';
 
 export interface GraphQLErrorEntry {
   message: string;
@@ -48,12 +49,18 @@ export function busyDelayMs(retryAfter: string | null, attempt: number): number 
   return (Number(retryAfter) || 1) * 1000 * (1 + attempt / 2) * (0.5 + Math.random());
 }
 
+const OPERATION = /^\s*(?:query|mutation)\s+(\w+)/;
+
+/** The name of the operation in `query`, `''` when it has none. */
+const operationName = (query: string): string => OPERATION.exec(query)?.[1] ?? '';
+
 /** Runs `document` with `variables`; rejects on an HTTP failure or any GraphQL error. */
 export async function gql<TResult, TVariables>(
   document: TypedDocumentString<TResult, TVariables>,
   variables: TVariables,
 ): Promise<TResult> {
   const token = await accessToken();
+  const query = document.toString();
   const init = {
     method: 'POST',
     headers: {
@@ -61,7 +68,7 @@ export async function gql<TResult, TVariables>(
       accept: 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ query: document.toString(), variables }),
+    body: JSON.stringify({ query, variables }),
   };
   let response = await fetch(`${apiBaseUrl}/graphql`, init);
   for (let attempt = 0; response.status === 503 && attempt < BUSY_RETRIES; attempt++) {
@@ -71,6 +78,7 @@ export async function gql<TResult, TVariables>(
   }
   if (response.status === 401) await handleUnauthorized();
   if (!response.ok) throw new ApiError(response.status, response.statusText);
+  observeVersions(operationName(query), response.headers);
   const body = (await response.json()) as Body<TResult>;
   if (body.errors?.length) throw new GraphQLRequestError(body.errors);
   if (body.data == null) throw new GraphQLRequestError([{ message: 'no data in the response' }]);

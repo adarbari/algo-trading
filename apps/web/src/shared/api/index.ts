@@ -21,4 +21,5 @@ export type * as gqlTypes from './generated/graphql/graphql';
 export type { components, paths } from './generated/schema';
 export { gql, GraphQLRequestError } from './graphql';
 export { queryKeys } from './query-keys';
+export { forgetVersions } from './versions';
 export { TestQueryProvider } from './test-provider';
