@@ -497,12 +497,24 @@ def load_previous_run(ctx: ReadContext, run: ScreenerRun) -> ScreenerRun | None:
     return latest_run(at_session(ctx, day), run.owner, run.config_id).run
 
 
+FrozenRows = Held[pd.DataFrame]  # one publish's ``screen_runs`` files (``_frozen_run``)
+
+
 def _frozen_run(ctx: ReadContext, run: ScreenerRun, run_id: str) -> ScreenerRun | None:
     """``run``'s screener's run ``run_id`` in ``ctx``'s session, from its ``screen_runs`` row
-    (None: it has none)."""
-    row = run_rows_of(ctx, SCREEN_RUNS, run_id, ("user_id", "config_id", *FROZEN_COLUMNS))
-    if row.empty:
-        return None
+    (None: it has none). The run's file (one row per screener it ran: small) is read once per run
+    id and published state and kept in one ``FrozenRows`` in ``ctx.cache`` (ADR 0022), under the
+    session and the view (``own_run``) like ``run_picks``; the owner and config are cut out of it
+    per call, so a request asking for the previous run of every screener reads each file once."""
+    key = ("frozen_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
+    held: FrozenRows = ctx.cache.get_or_compute(key, FrozenRows)
+
+    def read() -> pd.DataFrame:
+        return run_rows_of(ctx, SCREEN_RUNS, run_id, ("user_id", "config_id", *FROZEN_COLUMNS))
+
+    row, added = held.get_or_read(run_id, read)
+    if added:
+        ctx.cache.put(key, held)  # its weight changed
     mine = row[(row["user_id"] == run.owner) & (row["config_id"] == run.config_id)]
     if mine.empty:
         return None
