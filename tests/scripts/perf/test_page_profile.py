@@ -2,6 +2,7 @@
 `scripts/perf/api_latency.py`: pure logic only (a fake pstats table, no server, no store)."""
 
 import asyncio
+import contextlib
 import cProfile
 import importlib.util
 import os
@@ -12,6 +13,7 @@ import threading
 import time
 from pathlib import Path
 
+import graphql
 import pytest
 
 PERF = Path(__file__).resolve().parents[3] / "scripts" / "perf"
@@ -482,24 +484,30 @@ def _outer_short() -> None:
 def test_flush_is_atomic_and_a_signal_during_it_never_truncates_the_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Deterministic: the stop signal is injected inside the temp-file write (a hook, no timing).
+    Mid-way the old page is intact; the signal is held back, the new content lands, and only
+    then the Cut is delivered."""
     out = tmp_path / "page-profiles.md"
     pp._flush(out, "/a", [{**_ROW}])
-    before = out.read_text()
-    real_render = pp.render_page
+    old = out.read_text()
+    mid: list[str] = []
+    real_fchmod = os.fchmod
 
-    def render_then_signal(route: str, rows: list) -> str:
-        os.kill(os.getpid(), signal.SIGTERM)  # arrives mid-flush: must be held back
-        return real_render(route, rows)
+    def hook(fd: int, mode: int) -> None:
+        os.kill(os.getpid(), signal.SIGTERM)  # the handler runs here, in the main thread
+        mid.append(out.read_text())  # the page is still the old one, untruncated
+        real_fchmod(fd, mode)
 
-    monkeypatch.setattr(pp, "render_page", render_then_signal)
-    old = signal.signal(signal.SIGTERM, pp._on_signal)
+    monkeypatch.setattr(pp.os, "fchmod", hook)
+    prev = signal.signal(signal.SIGTERM, pp._on_signal)
     try:
-        with pytest.raises(pp.Cut):  # delivered once the flush is done
+        with pytest.raises(pp.Cut) as cut:  # delivered once the flush is done
             pp._flush(out, "/b", [{**_ROW}])
     finally:
-        signal.signal(signal.SIGTERM, old)
+        signal.signal(signal.SIGTERM, prev)
+    assert mid == [old] and cut.value.reason == "SIGTERM"
     text = out.read_text()
-    assert "## `/a`" in text and "## `/b`" in text and text.startswith(before.split("##")[0])
+    assert "## `/a`" in text and "## `/b`" in text
     assert [p.name for p in tmp_path.iterdir()] == ["page-profiles.md"]  # no temp file left
 
 
@@ -534,3 +542,202 @@ def test_a_cut_wrapped_in_exception_groups_is_still_a_cut() -> None:
 
     with pytest.raises(BaseExceptionGroup):
         pp.run_profiled(other, limit_s=None)
+
+
+# ---- the capped EdgesPage run produced no section: a cut inside an executor task -------------
+
+
+def _slow_graphql(loop: asyncio.AbstractEventLoop):  # type: ignore[no-untyped-def]
+    """A real graphql-core execution whose async resolver is a long CPU loop (the shape of the
+    edge resolvers): the Cut lands inside the executor's task, not in the awaiting caller."""
+    schema = graphql.build_schema("type Query { slow: String }")
+
+    async def slow(*_: object) -> str:
+        end = time.perf_counter() + 5
+        while time.perf_counter() < end:
+            _leaf()
+        return "x"
+
+    return lambda: loop.run_until_complete(
+        graphql.graphql(schema, "{ slow }", root_value={"slow": slow})
+    )
+
+
+def test_a_cut_inside_a_graphql_executor_task_still_yields_the_partial_result() -> None:
+    loop = asyncio.new_event_loop()
+    seen: list[pp.Profiled] = []
+    res = pp.run_profiled(
+        _slow_graphql(loop),
+        limit_s=0.3,
+        snapshot_s=0.1,
+        on_cut=lambda: pp._drain(loop),
+        on_partial=seen.append,
+    )
+    assert res.cut == "limit" and res.stats and len(res.snapshots) >= 3
+    assert len(seen) == 1 and seen[0].cut == "limit"  # written from the handler, once
+    loop.close()
+
+
+def test_the_partial_is_written_even_if_the_cut_never_reaches_the_caller() -> None:
+    seen: list[pp.Profiled] = []
+
+    def swallowed() -> None:  # the Cut is caught and dropped by "the app": a task swallowed it
+        try:
+            end = time.perf_counter() + 5
+            while time.perf_counter() < end:
+                _leaf()
+        except pp.Cut:
+            pass
+        raise RuntimeError("stray")
+
+    with pytest.raises(RuntimeError):
+        pp.run_profiled(swallowed, limit_s=0.2, snapshot_s=0.1, on_partial=seen.append)
+    assert len(seen) == 1 and seen[0].cut == "limit"
+
+
+def test_a_failing_on_cut_or_drain_after_a_cut_is_not_fatal() -> None:
+    def boom() -> None:
+        raise pp.Cut("limit")
+
+    res = pp.run_profiled(lambda: (_ for _ in ()).throw(pp.Cut("limit")), limit_s=None, on_cut=boom)
+    assert res.cut == "limit"
+
+    loop = asyncio.new_event_loop()
+
+    async def reraises_on_cancel() -> None:
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            raise pp.Cut("limit") from None
+
+    task = loop.create_task(reraises_on_cancel())
+    loop.run_until_complete(asyncio.sleep(0))
+    pp._drain(loop)  # must not raise
+    assert task.done()
+    loop.close()
+
+
+def test_a_sigterm_mid_operation_writes_the_partial_before_unwinding() -> None:
+    seen: list[pp.Profiled] = []
+    old = signal.signal(signal.SIGTERM, pp._on_signal)
+    try:
+        res = pp.run_profiled(
+            lambda: os.kill(os.getpid(), signal.SIGTERM) or time.sleep(1),
+            limit_s=None,
+            on_partial=seen.append,
+        )
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    assert res.cut == "SIGTERM" and [s.cut for s in seen] == ["SIGTERM"]
+    assert not pp.CURRENT  # the running operation is cleared after the call
+
+
+def test_an_operation_running_is_never_classified_as_between_operations() -> None:
+    assert pp.running_operation() is None
+    seen: list[str | None] = []
+    pp.run_profiled(lambda: seen.append(pp.running_operation()), limit_s=None, name="Op")
+    assert seen == ["Op"] and pp.running_operation() is None
+
+
+# ---- follow-up: stop signals survive clean-up, emit once, bounded drain, swallowed Cut -------
+
+
+def test_a_stop_signal_cut_during_clean_up_is_not_swallowed_but_a_limit_cut_is() -> None:
+    def stop() -> None:
+        raise pp.Cut("SIGTERM")
+
+    with pytest.raises(pp.Cut, match="SIGTERM"):
+        pp.run_profiled(lambda: (_ for _ in ()).throw(pp.Cut("limit")), limit_s=None, on_cut=stop)
+    assert pp.survivable(pp.Cut("limit")) and not pp.survivable(pp.Cut("SIGHUP"))
+    assert pp.survivable(ValueError("x"))
+    assert not pp.survivable(BaseExceptionGroup("g", [pp.Cut("SIGINT")]))
+
+
+def test_emit_runs_once_even_if_a_signal_arrives_while_it_computes() -> None:
+    calls: list[int] = []
+
+    def on_partial(_res: pp.Profiled) -> None:
+        calls.append(1)
+        os.kill(os.getpid(), signal.SIGTERM)  # a second stop, mid-handler: held back, not a re-run
+
+    def spin() -> None:
+        end = time.perf_counter() + 5
+        while time.perf_counter() < end:
+            _leaf()
+
+    old = signal.signal(signal.SIGTERM, pp._on_signal)
+    try:
+        res = pp.run_profiled(spin, limit_s=0.2, snapshot_s=0.1, on_partial=on_partial)
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    assert calls == [1] and res.cut in ("limit", "SIGTERM")
+
+
+def test_a_resolver_that_swallows_the_cut_still_gets_its_section_and_the_run_ends() -> None:
+    """The mechanism of the capped EdgesPage run: the Cut lands in a resolver that catches
+    BaseException and carries on. The section is written from the handler and the run ends."""
+    loop = asyncio.new_event_loop()
+    schema = graphql.build_schema("type Query { slow: String }")
+    seen: list[pp.Profiled] = []
+
+    async def slow(*_: object) -> str:
+        end = time.perf_counter() + 0.6
+        while time.perf_counter() < end:
+            with contextlib.suppress(BaseException):  # the swallowing resolver
+                _leaf()
+        return "x"
+
+    res = pp.run_profiled(
+        lambda: loop.run_until_complete(
+            graphql.graphql(schema, "{ slow }", root_value={"slow": slow})
+        ),
+        limit_s=0.2,
+        snapshot_s=0.1,
+        on_cut=lambda: pp._drain(loop),
+        on_partial=seen.append,
+    )
+    assert len(seen) == 1 and seen[0].cut == "limit" and res.cut == "limit"
+    loop.close()
+
+
+def test_drain_is_bounded_when_a_sibling_task_is_in_long_cpu_work() -> None:
+    loop = asyncio.new_event_loop()
+
+    async def cpu_on_cancel() -> None:
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            end = time.perf_counter() + 20
+            while time.perf_counter() < end:
+                _leaf()
+
+    task = loop.create_task(cpu_on_cancel())
+    loop.run_until_complete(asyncio.sleep(0))
+    t0 = time.perf_counter()
+    pp._drain(loop, timeout_s=0.3)
+    assert time.perf_counter() - t0 < 3 and task is not None
+    loop.close()
+
+
+def test_drain_does_not_report_the_original_cut_again(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    loop = asyncio.new_event_loop()
+
+    async def reraises() -> None:
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            raise pp.Cut("limit") from None
+
+    task = loop.create_task(reraises())
+    loop.run_until_complete(asyncio.sleep(0))
+    pp._drain(loop)
+    assert "draining the cut call failed" not in capsys.readouterr().err and task.done()
+    loop.close()
+
+
+def test_the_page_file_is_world_readable_not_0600(tmp_path: Path) -> None:
+    out = tmp_path / "p.md"
+    pp._flush(out, "/a", [{**_ROW}])
+    assert out.stat().st_mode & 0o777 == 0o644

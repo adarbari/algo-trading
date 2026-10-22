@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -445,6 +446,15 @@ def test_signal_handlers_are_installed_before_the_servers_start(
     with pytest.raises(RuntimeError):
         cap.main(["--data-url", "file:///c", "--views-file", str(tmp_path / "v.json")])
     assert events == [("signal", cap.signal.SIGTERM), ("signal", cap.signal.SIGHUP), "start"]
+
+
+@pytest.fixture(autouse=True)
+def _restore_stop_signals():  # type: ignore[no-untyped-def]
+    """stop_all ignores SIGTERM / SIGHUP for real in some tests: put the handlers back."""
+    saved = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGHUP)}
+    yield
+    for sig, handler in saved.items():
+        signal.signal(sig, handler)
 
 
 def test_cleanup_ignores_a_second_sigterm_and_sighup(monkeypatch: pytest.MonkeyPatch) -> None:
