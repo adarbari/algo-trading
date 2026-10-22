@@ -430,3 +430,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the architect found pages are slow because every loader key holds the published sequence, so a pin removes most of the churn with far less machinery; the owner asked on 2026-10-21 to try the pin first and measure the impact.
+
+## 2026-10-22 | Data architecture v2 (page latency) | Cheap code fixes first; cold load bar under 1 s with explicit owner exceptions
+- Question: build the SQLite run ledger and the dates catalogue first (option a), or fix the measured causes in code first and decide on the ledger from a re-measure (option b)? And what is the bar for a page's cold load?
+- Options: (a) ledger and catalogue first / (b) five cheap code fixes first (skip run-record files by job name and keep the parse cache scan-resistant; build the status strip's completeness cells only when asked; make the history-copy freshness check not depend on inode numbers and read each market table once per request; read only the listed columns of the event tables; freeze screener changes at write) then re-measure / a bar of 3 s per operation.
+- Decision: (b). The bar is a cold page load under 1 s; any operation or page that stays above it needs an explicit exception from the owner (the architect lists the expected exceptions after P1-P5 so they can be decided). The run ledger (SQLite, derived and rebuildable) and the dates catalogue are built only if a re-measure after the fixes shows lookups still dominate or the run files keep growing.
+- decided by: owner
+- status: final
+- Reasoning: the profiles of 20 pages (1,310 s of work) show 39% in run-record decoding (every lookup decodes the 572 `job-<kind>-<hash>` files), 25% in the status strip's unused completeness grid and 16-20% in market-history reads; these are code fixes that need no migration; the owner wants cold loads under 1 s and wants to approve any exception.
