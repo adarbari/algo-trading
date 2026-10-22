@@ -270,6 +270,12 @@ def test_coverage_lists_untriggered_operations_with_where_they_should_be() -> No
 # ---- the crawler's real-store guard -----------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _web_installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "web" / "node_modules").mkdir(parents=True)
+    monkeypatch.setattr(cap, "WEB", tmp_path / "web")
+
+
 def _args(tmp_path: Path, **over: object) -> argparse.Namespace:
     views = tmp_path / "views.json"
     views.write_text('{"views": {}}')
@@ -389,6 +395,77 @@ def test_vite_group_is_killed_not_just_npx(monkeypatch: pytest.MonkeyPatch) -> N
         raise ProcessLookupError
 
     cap.stop_group(Proc(False), gone)  # already dead: no error
+
+
+def test_crawler_refuses_early_without_web_node_modules(tmp_path: Path) -> None:
+    (tmp_path / "web" / "node_modules").rmdir()
+    with pytest.raises(cap.al.RefusalError, match="node_modules is missing"):
+        cap.check_crawl(_args(tmp_path), [])
+
+
+def test_a_failing_vite_stop_never_leaves_the_api_running() -> None:
+    """The orphan API (507 MB, 9 minutes): killpg raised PermissionError in the cleanup path."""
+
+    class Api:
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Vite:
+        pid, calls = 7, []
+
+        def terminate(self) -> None:
+            self.calls.append("terminate")
+
+        def wait(self, timeout: float) -> None:
+            return None
+
+    def denied(pid: int, sig: int) -> None:
+        raise PermissionError
+
+    vite = Vite()
+    cap.stop_group(vite, denied)  # falls back to terminating the process itself
+    assert vite.calls == ["terminate"]
+
+    api = Api()
+
+    def boom(_: object) -> None:
+        raise RuntimeError("stop failed")
+
+    with pytest.raises(RuntimeError):
+        cap.stop_all(api, Vite(), boom)
+    assert api.closed is True
+
+    class BadApi(Api):
+        def close(self) -> None:
+            raise OSError("api stop failed")
+
+    stopped: list = []
+    with pytest.raises(OSError):
+        cap.stop_all(BadApi(), Vite(), stopped.append)
+    assert len(stopped) == 1  # Vite was still stopped
+
+
+def test_duplicates_note_lists_operations_sent_more_than_once() -> None:
+    view = {
+        "captured": {
+            "status": "ok",
+            "requests": [
+                {"op": "SessionDate", "count": 2, "trigger": "load"},
+                {"op": "EventCalendar", "count": 1, "trigger": "load"},
+                {"op": "EventCalendar", "count": 1, "trigger": "scroll"},
+                {"op": "Once", "count": 1},
+            ],
+        }
+    }
+    assert vw.duplicates(view) == {"EventCalendar": 2, "SessionDate": 2}
+    views = {"/c": view, "/todo": {}}
+    vw.annotate_duplicates(views)
+    assert views["/c"]["captured"]["duplicates"] == {"EventCalendar": 2, "SessionDate": 2}
+    assert "captured" not in views["/todo"]
+    text = cov.render({"views": views}, cov.coverage({"views": views}, {"Once"}), "now")
+    assert "EventCalendar x2" in text and "## Operations a view sends more than once" in text
 
 
 def test_node_command_carries_the_bounds(tmp_path: Path) -> None:

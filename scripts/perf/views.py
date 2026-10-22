@@ -328,6 +328,22 @@ def op_key(name: str, vid: str) -> str:
     return f"{name} [{vid}]"
 
 
+def duplicates(view: dict) -> dict[str, int]:
+    """Operations a captured view sent more than once: {op: requests} (all variables, all
+    triggers): the same read twice on one view is a finding for the web team."""
+    total: dict[str, int] = {}
+    for req in captured_requests(view):
+        total[req["op"]] = total.get(req["op"], 0) + req.get("count", 1)
+    return {op: n for op, n in sorted(total.items()) if n > 1}
+
+
+def annotate_duplicates(views: dict[str, dict]) -> None:
+    """Write ``captured.duplicates`` into every captured view."""
+    for view in views.values():
+        if "captured" in view:
+            view["captured"]["duplicates"] = duplicates(view)
+
+
 def view_operations(
     doc: dict, view_ids: list[str], known: dict[str, dict]
 ) -> tuple[dict[str, dict], dict[str, list[str]]]:
