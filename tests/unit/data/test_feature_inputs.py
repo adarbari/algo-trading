@@ -673,3 +673,28 @@ def test_unbounded_inputs_are_exactly_the_ledgers_served_to_every_session() -> N
     ledger = inputs._filing_reads(reader, [END], 0)
     assert isinstance(ledger, inputs._EverySession)
     assert list(ledger.frame.columns) == ["cik", "session_date", "covers_since"]
+
+
+def test_first_vintages_are_each_series_earliest_alfred_vintage_known_by_the_session() -> None:
+    writer, reader = store()
+    rows = [
+        {"instrument_id": iid, "series": iid[6:], "obs_date": obs, "vintage_date": seen,
+         "value": 1.0, "vintage_kind": kind}
+        for iid, obs, seen, kind in (
+            ("MACRO:UR", date(1960, 1, 1), date(1964, 6, 1), "alfred"),
+            ("MACRO:UR", date(2020, 1, 1), date(2020, 2, 7), "alfred"),
+            ("MACRO:LG", date(2020, 1, 1), date(2020, 1, 2), "lagged"),  # unrevised: none
+            ("MACRO:LATE", date(2020, 1, 1), END + timedelta(days=3), "alfred"),  # after END
+        )
+    ]  # fmt: skip
+    writer.write_table(MACRO_SERIES, END, "r1", stamped(rows, END, "r1"))
+    loaded = inputs.load_input(reader, inputs.MACRO_FIRST_VINTAGES, [END], 0)
+    seen = loaded.at(END, 0)
+    assert seen is not None
+    assert dict(zip(seen["instrument_id"], seen["first_vintage"], strict=True)) == {
+        "MACRO:UR": date(1964, 6, 1)
+    }
+    assert loaded.at(date(1964, 5, 31), 0) is None  # nothing known yet
+    only = inputs.load_input(reader, inputs.MACRO_FIRST_VINTAGES, [END], 0, ids=("MACRO:LATE",))
+    assert only.at(END, 0) is None and only.at(END + timedelta(days=3), 0) is not None
+    assert inputs.has_input(inputs.MACRO_FIRST_VINTAGES)
