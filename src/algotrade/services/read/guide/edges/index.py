@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from algotrade.config.edges.document import MECHANISM_KINDS, STATUSES
 from algotrade.config.site.guide.mechanisms import MechanismProse, load_guide_mechanisms
 from algotrade.config.site.guide.sections import EdgeGroup, load_guide_sections
-from algotrade.services.configs import catalog_of
-from algotrade.services.read.context import Stores, catalogue_key
+from algotrade.services.configs import field_catalog
+from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.edges.edge import ASSET_TEXT, GuideEdgeRow, edge_row
 from algotrade.services.read.guide.edges.ideas import GuideIdea, not_built
 from algotrade.services.read.guide.edges.schedule import BANDS
@@ -96,8 +96,8 @@ class GuideEdgeIndex:
 
 
 def load_guide_edge_index(ctx: Stores) -> GuideEdgeIndex:
-    """The Edges section's top page (module docstring), built once per cache and catalogue."""
-    key = ("guide-edge-index", catalogue_key(ctx))
+    """The Edges section's top page (module docstring), built once per cache (site files only)."""
+    key = ("guide-edge-index",)
     return ctx.cache.get_or_compute(key, lambda: _edge_index(ctx))  # type: ignore[no-any-return]
 
 
@@ -110,7 +110,7 @@ def _edge_index(ctx: Stores) -> GuideEdgeIndex:
         for kind in MECHANISM_KINDS
         if (m := prose.get(kind)) is not None
     )
-    fields = catalog_of(ctx.features).fields
+    fields = field_catalog(ctx.configs).fields
     group = _group(ctx, "set_aside")
     ideas_group = _group(ctx, "not_built")
     set_aside = tuple(

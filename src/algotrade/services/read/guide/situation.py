@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from algotrade.config.site.field_guide import Situation
 from algotrade.config.site.settings import load_field_guide
-from algotrade.services.configs import catalog_of
+from algotrade.services.configs import field_catalog
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.prose import LinkedProse, link_prose
 from algotrade.services.read.guide.screeners.site_screeners import SiteScreener, site_screeners
@@ -39,7 +39,7 @@ def load_guide_situation(ctx: Stores, slug: str) -> GuideSituationDetail | None:
     situation = next((s for s in load_field_guide(ctx.configs).situations if s.slug == slug), None)
     if situation is None:
         return None
-    fields = catalog_of(ctx.features).fields
+    fields = field_catalog(ctx.configs).fields
     found = (
         GuideSituationScreener(p.id, p.name, fooled(p, situation)) for p in site_screeners(ctx)
     )
