@@ -23,6 +23,7 @@ from algotrade.storage.backends.arrow import (
     to_frame,
 )
 from algotrade.storage.backends.local_index import safe
+from algotrade.storage.backends.partial_reads import filter_frame
 from algotrade.storage.backends.run_compaction import (
     OVER_BUDGET,
     Budget,
@@ -52,7 +53,12 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, job_of_name, run_session
-from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError, PartitionStats
+from algotrade.storage.tables.interfaces import (
+    CompactionReport,
+    PartitionBusyError,
+    PartitionStats,
+    RowFilter,
+)
 from algotrade.storage.tables.schemas import require_retention
 
 Key = tuple[str, date]  # (table, session_date)
@@ -281,6 +287,7 @@ class MemoryTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
         upto: int | None = None,
     ) -> pd.DataFrame | None:
         def at(seq: int) -> pd.DataFrame | None:
@@ -291,6 +298,7 @@ class MemoryTables:
             mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame.copy()
             if instruments is not None:
                 mine = select_instruments(mine, instruments)
+            mine = filter_frame(mine, where)
             if mine.empty:
                 return None
             if columns is not None:

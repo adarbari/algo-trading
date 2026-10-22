@@ -24,6 +24,18 @@ class CompactionReport:
 
 
 @dataclass(frozen=True)
+class RowFilter:
+    """A cut of a read on one column's text values (``TableStore.read_run``): the rows whose
+    ``column`` is in ``values`` (``keep``) or is not (a null is not in any set). A backend skips
+    the row groups whose footer statistics prove none of their rows qualify, then filters the
+    rest exactly: the rows are the same as filtering the whole read."""
+
+    column: str
+    values: frozenset[str]
+    keep: bool = True
+
+
+@dataclass(frozen=True)
 class PartitionStats:
     """What a partition holds, counted without decoding its rows (``TableStore.partition_stats``):
     ``rows``, the sorted ``run_ids`` its rows carry and, when a column was asked for and the
@@ -220,6 +232,7 @@ class TableStore(Protocol):
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
         upto: int | None = None,
     ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (those stamped with its ``run_id``),
@@ -227,8 +240,11 @@ class TableStore(Protocol):
         file (ADR 0064). ``None``: the run has no committed rows there (``own_run`` also
         sees that run's pending write). ``columns``: only those (plus ``read_range``'s key and
         point-in-time columns) are decoded; ``instruments``: only their rows (row groups that cannot
-        hold them are skipped; ``None`` when it matches none of the run's). Not point-in-time: a
-        run is read as it left them."""
+        hold them are skipped; ``None`` when it matches none of the run's). ``where``: only rows
+        passing every filter, same rows as filtering the whole read, the row groups the
+        statistics rule out never decoded (a table clustered by the column,
+        ``TableSpec.cluster_by``, skips most; an older file's mixed groups are read whole). Not
+        point-in-time: a run is read as it left them."""
         ...
 
     def build_history(self, table: str, years: Sequence[int]) -> list[int]:

@@ -44,11 +44,12 @@ class TableSpec:
     (``purge_before``); every other table is history, kept forever. ``whole_per_group``: each
     run's file holds its (user, config) group's whole result, so the group's newest run alone
     answers a read (``TableStore.read_latest_runs``); a table that compaction trims to changed
-    rows (ADR 0078) never sets it. ``cluster_by``, when set, is a column every file of the table
-    is written sorted by (stable: equal keys keep their order, so the bytes are deterministic),
-    in row groups of ``row_group_rows`` rows (``backends.arrow.encode``): the group statistics
-    then let a read of a few values skip most groups (``row_groups_holding``). A file written
-    before is read whole and filtered, the same rows (task ``screen-values-recluster``)."""
+    rows (ADR 0078) never sets it. ``cluster_by``, when set, names the columns every file of the
+    table is written sorted by (stable: equal keys keep their order: deterministic bytes),
+    one run of row groups per distinct combination (``backends.arrow.table_parquet_bytes``), or,
+    with ``row_group_rows``, in groups of that many rows (for a many-valued column): the group
+    statistics then let a read of a few values skip most groups (``row_groups_holding``). A file
+    written before is read whole and filtered, the same rows (task ``screen-values-recluster``)."""
 
     name: str
     grain: str
@@ -59,8 +60,10 @@ class TableSpec:
     key: tuple[str, ...] = ()
     retention_days: int | None = None
     whole_per_group: bool = False
-    cluster_by: str | None = None
-    row_group_rows: int | None = None
+    cluster_by: tuple[str, ...] = ()
+    row_group_rows: int | None = (
+        None  # cap a file's row groups at this many rows (else one per key)
+    )
 
     def __post_init__(self) -> None:
         if self.runs not in RUN_MODES:
@@ -71,12 +74,11 @@ class TableSpec:
             raise ValueError(
                 f"{self.name}: whole_per_group needs a merge table keyed by user, config"
             )
-        if (self.cluster_by is None) != (self.row_group_rows is None) or (
-            self.row_group_rows is not None and self.row_group_rows < 1
-        ):
-            raise ValueError(f"{self.name}: cluster_by and a positive row_group_rows go together")
-        if self.cluster_by is not None and self.column(self.cluster_by) is None:
-            raise ValueError(f"{self.name}: cluster_by {self.cluster_by!r} is not a column")
+        if self.row_group_rows is not None and (self.row_group_rows < 1 or not self.cluster_by):
+            raise ValueError(f"{self.name}: row_group_rows is positive and needs cluster_by")
+        for name in self.cluster_by:
+            if self.column(name) is None:
+                raise ValueError(f"{self.name}: cluster_by {name!r} is not a column")
 
     def column(self, name: str) -> Column | None:
         return next((c for c in self.columns if c.name == name), None)
@@ -101,15 +103,15 @@ def fixed(
     key: tuple[str, ...] = (),
     retention_days: int | None = None,
     whole_per_group: bool = False,
-    cluster_by: str | None = None,
+    cluster_by: tuple[str, ...] = (),
     row_group_rows: int | None = None,
 ) -> TableSpec:
     spec = TableSpec(
         name, grain, required, columns=columns_of(*columns), runs=runs, key=key,
-        retention_days=retention_days, whole_per_group=whole_per_group,
-        cluster_by=cluster_by, row_group_rows=row_group_rows,
+        retention_days=retention_days, whole_per_group=whole_per_group, cluster_by=cluster_by,
+        row_group_rows=row_group_rows,
     )  # fmt: skip
-    undeclared = [c for c in (*COMMON, *required, *key) if spec.column(c) is None]
+    undeclared = [c for c in (*COMMON, *required, *key, *cluster_by) if spec.column(c) is None]
     if undeclared:
         raise ValueError(f"{name}: required columns without a type: {undeclared}")
     return spec

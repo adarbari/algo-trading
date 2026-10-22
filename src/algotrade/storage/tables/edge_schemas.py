@@ -69,6 +69,7 @@ EDGE_EVAL = fixed(
         "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "slice_kind",
         "slice_value", "range_from", "split_from",
     ),
+    cluster_by=("role", "slice_kind"),  # the random draws (most rows) read apart from the rest
 )  # fmt: skip
 # The edge harness's per-session series (ADR 0064), framed by ``cross_section/detail/series.py``
 # from the run's pooled legs and published with the run's ``edge_eval`` rows (same partition, the

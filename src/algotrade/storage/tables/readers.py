@@ -15,7 +15,7 @@ import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.storage.runs import RunRecord
-from algotrade.storage.tables.interfaces import Backend, PartitionStats
+from algotrade.storage.tables.interfaces import Backend, PartitionStats, RowFilter
 
 DATES_IN_PROBE_MAX = 366  # a longer ``dates_in`` span lists the table once instead of probing
 
@@ -167,11 +167,12 @@ class StoreReader:
         run_id: str,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
     ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (``TableStore.read_run``)."""
         tables = self._backend.tables
         return tables.read_run(
-            table, session_date, run_id, self.own_run, columns, instruments, self._pin
+            table, session_date, run_id, self.own_run, columns, instruments, where, self._pin
         )
 
     def partition_stats(
@@ -483,9 +484,10 @@ class RecordingReader(StoreReader):
         run_id: str,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
     ) -> pd.DataFrame | None:
         recording = self._open()
-        frame = super().read_run(table, session_date, run_id, columns, instruments)
+        frame = super().read_run(table, session_date, run_id, columns, instruments, where)
         if recording:
             self._log_rows(table, session_date, session_date)
         return frame

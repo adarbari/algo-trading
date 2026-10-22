@@ -12,7 +12,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from algotrade.storage.backends.arrow import encode, is_clustered, to_arrow
+from algotrade.storage.backends.arrow import is_clustered, table_parquet_bytes, to_arrow
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.tables.schemas.results import CLUSTER_ROWS
 from tests.helpers.stored_frames import make_unclustered, screen_values_rows, stamped
@@ -33,7 +33,7 @@ def file_of(root: Path, run: str = "r1") -> Path:
 
 def test_a_clustered_table_is_written_sorted_in_declared_row_groups() -> None:
     frame = values_frame()
-    parquet = pq.ParquetFile(io.BytesIO(encode(VALUES, to_arrow(VALUES, frame))))
+    parquet = pq.ParquetFile(io.BytesIO(table_parquet_bytes(VALUES, to_arrow(VALUES, frame))))
     ids = parquet.read(columns=["instrument_id"]).column(0).to_pylist()
     assert ids == sorted(ids) and len(ids) == INSTRUMENTS * 3
     sizes = [parquet.metadata.row_group(g).num_rows for g in range(parquet.num_row_groups)]
@@ -42,18 +42,22 @@ def test_a_clustered_table_is_written_sorted_in_declared_row_groups() -> None:
 
 def test_the_same_rows_give_the_same_bytes_twice_and_in_either_input_order() -> None:
     frame = values_frame()
-    first = encode(VALUES, to_arrow(VALUES, frame))
-    assert encode(VALUES, to_arrow(VALUES, frame)) == first
+    first = table_parquet_bytes(VALUES, to_arrow(VALUES, frame))
+    assert table_parquet_bytes(VALUES, to_arrow(VALUES, frame)) == first
     # the stable sort keeps the order of equal instrument ids, so a frame already sorted by
     # (instrument, criterion) is a fixed point of the writer
     again = pq.read_table(io.BytesIO(first))
-    assert encode(VALUES, again) == first
+    assert table_parquet_bytes(VALUES, again) == first
 
 
 def test_a_table_without_clustering_is_written_as_it_was() -> None:
     frame = stamped([{"instrument_id": f"EQ:{n}", "a": 1.0} for n in (3, 1, 2)], DAY, "r1")
     data = to_arrow(PLAIN, frame)
-    ids = pq.read_table(io.BytesIO(encode(PLAIN, data))).column("instrument_id").to_pylist()
+    ids = (
+        pq.read_table(io.BytesIO(table_parquet_bytes(PLAIN, data)))
+        .column("instrument_id")
+        .to_pylist()
+    )
     assert ids == ["EQ:3", "EQ:1", "EQ:2"]
 
 

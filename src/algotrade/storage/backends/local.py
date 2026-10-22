@@ -27,7 +27,6 @@ only when its run commits, in every partition at once (``local_index.py``).
 """
 
 import contextlib
-import glob
 import gzip
 import os
 import secrets
@@ -46,12 +45,11 @@ import pyarrow.parquet as pq
 
 from algotrade.storage.backends.arrow import (
     concat,
-    encode,
     file_groups,
     file_stats,
     is_clustered,
     keep_columns,
-    row_groups_holding,
+    table_parquet_bytes,
     table_spec,
     to_arrow,
     to_frame,
@@ -72,6 +70,7 @@ from algotrade.storage.backends.local_index import (
     stored_tables,
     write_index,
 )
+from algotrade.storage.backends.partial_reads import read_run_file
 from algotrade.storage.backends.run_compaction import (
     OVER_BUDGET,
     Budget,
@@ -80,6 +79,7 @@ from algotrade.storage.backends.run_compaction import (
     plan_compaction,
     verify_plan,
 )
+from algotrade.storage.backends.run_listing import RunListing
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
@@ -99,7 +99,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, is_job_record_name, job_of_name, run_session
-from algotrade.storage.tables.interfaces import CompactionReport, PartitionStats
+from algotrade.storage.tables.interfaces import CompactionReport, PartitionStats, RowFilter
 from algotrade.storage.tables.schemas import require_retention
 
 
@@ -132,7 +132,7 @@ class LocalTables:
         pending: bool = False,
     ) -> None:
         directory = self._dir(table, session_date)
-        data = encode(table, to_arrow(table, frame))
+        data = table_parquet_bytes(table, to_arrow(table, frame))
         known = None if frame.empty else pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
         if pending:
             file = self.commits.stage(table, session_date, safe(run_id), known, restates)
@@ -332,6 +332,7 @@ class LocalTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
         upto: int | None = None,
     ) -> pd.DataFrame | None:
         directory = self._dir(table, session_date)
@@ -342,8 +343,8 @@ class LocalTables:
             if entry is None:
                 return None
             try:
-                return _read_run_file(
-                    directory / run_file(run_id, entry), run_id, columns, instruments
+                return read_run_file(
+                    directory / run_file(run_id, entry), run_id, columns, instruments, where
                 )
             except FileNotFoundError as gone:  # a commit replaced the version
                 raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
@@ -666,7 +667,7 @@ class LocalTables:
             return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
         fresh = {r: f"run={r}~{secrets.token_hex(4)}.parquet" for r in plan.rewritten}
         kept = kept_entries(expected, plan, fresh)
-        encoded = {r: encode(table, plan.kept[r]) for r in plan.rewritten}
+        encoded = {r: table_parquet_bytes(table, plan.kept[r]) for r in plan.rewritten}
         size_after = sum(len(encoded[r]) if r in encoded else sizes[r] for r in plan.kept)
         report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))
         if dry_run:
@@ -729,37 +730,6 @@ def _read_file(
         keep = None if columns is None else keep_columns(columns)
         present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
         data = parquet.read(columns=present)
-    if instruments is None:
-        return data
-    ids = data.column("instrument_id")
-    return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
-
-
-def _read_run_file(
-    path: Path,
-    run_id: str,
-    columns: Sequence[str] | None = None,
-    instruments: Sequence[str] | None = None,
-) -> pa.Table:
-    """One version file's rows stamped ``run_id``: the row groups whose ``run_id`` statistics
-    cannot hold it (nor, with ``instruments``, any of them in ``instrument_id``) are skipped
-    (not decoded), then the rest is filtered exactly. ``columns``: only those and
-    ``keep_columns`` are decoded."""
-    with pq.ParquetFile(path) as parquet:
-        keep = None if columns is None else keep_columns(columns)
-        present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
-        if "run_id" not in parquet.schema_arrow.names:
-            return parquet.read(columns=present)
-        groups = row_groups_holding(parquet, "run_id", [run_id])
-        if instruments is not None and "instrument_id" in parquet.schema_arrow.names:
-            near = set(row_groups_holding(parquet, "instrument_id", instruments))
-            groups = [g for g in groups if g in near]
-        data = (
-            parquet.read_row_groups(groups, columns=present)
-            if groups
-            else parquet.schema_arrow.empty_table().select(present or parquet.schema_arrow.names)
-        )
-    data = data.filter(pc.equal(data.column("run_id"), run_id))
     if instruments is None:
         return data
     ids = data.column("instrument_id")
@@ -862,26 +832,8 @@ class LocalRuns:
         self._parsed: OrderedDict[str, tuple[tuple[int, int, int], RunRecord]] = OrderedDict()
         self._parsed_bytes = 0
         self._parsed_lock = threading.Lock()
-        # the directory's file stems with their session (``run_session``), listed again only once
-        # ``generation`` changes: ``find`` ran once per edge and owner, each over ~10 000 files
-        self._listing: tuple[tuple[int, int], list[tuple[str, date | None]]] | None = None
-
-    def _stems(self) -> list[tuple[str, date | None]]:
-        """``(stem, run_session(stem))`` of every ``.json`` file; the stamp is read before the
-        listing, so a save during it leaves a stale stamp and the next call lists again."""
-        stamp = self.generation()
-        with self._parsed_lock:
-            held = self._listing
-        if held is not None and held[0] == stamp:
-            return held[1]
-        stems = [
-            (stem, run_session(stem))
-            for path in self.root.iterdir()
-            if path.suffix == ".json" and (stem := path.stem)
-        ]
-        with self._parsed_lock:
-            self._listing = (stamp, stems)
-        return stems
+        # the directory's file stems, listed again only once ``generation`` changes (run_listing)
+        self._listing = RunListing(self.root, self.generation, run_session)
 
     def _record(self, name: str) -> RunRecord | None:
         """The record in file ``name``, parsed once per version of the file; a copy (its
@@ -948,7 +900,7 @@ class LocalRuns:
         prefix = f"{safe(job)}-"
         names = [
             f"{stem}.json"
-            for stem, day in self._stems()
+            for stem, day in self._listing.all()
             if (
                 (stem.startswith(prefix) and session_date in (None, day))
                 if day is not None
@@ -967,13 +919,13 @@ class LocalRuns:
         # evaluation's runs are large, is never read)
         # a job whose name is a prefix of another's matches the other's files too: each file
         # is read once, and a record counts only for the job it names
-        paths = {
-            path
-            for job in jobs
-            for path in self.root.glob(f"{glob.escape(safe(job))}-*.json")
-            if (day := run_session(path.stem)) is not None and first <= day <= last
-        }
-        records = [r for path in sorted(paths) if (r := self._record(path.name)) is not None]
+        names = sorted(
+            f"{stem}.json"
+            for job in set(jobs)
+            for stem, day in self._listing.prefixed(f"{safe(job)}-")
+            if day is not None and first <= day <= last
+        )
+        records = [r for name in dict.fromkeys(names) if (r := self._record(name)) is not None]
         hits = [r for r in records if r.job in jobs]
         return sorted(hits, key=lambda r: r.started_at)
 

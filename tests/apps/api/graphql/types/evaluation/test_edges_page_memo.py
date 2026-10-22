@@ -16,6 +16,7 @@ from algotrade.config.user import UserContext
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.evaluation import edges as edges_module
 from algotrade.services.read.evaluation import runs as runs_module
+from algotrade.services.read.evaluation import verdict as verdict_module
 from algotrade.services.read.serving.current import CurrentRelease
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
@@ -89,3 +90,50 @@ def test_the_page_reads_each_thing_once_per_request(
     asyncio.run(schema.execute(PAGE, context_value=again))
     assert parses["me"] == 2  # a second request: its own memo, nothing carried over
     assert first.stores().memo is not again.stores().memo  # type: ignore[union-attr]
+
+
+def test_the_document_query_returns_the_ids_asked_and_never_judges(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``EdgeDocument`` (the builder's read): ``edges(ids:)`` serves only those documents, and
+    with no ``verdict`` or ``runs`` selected no verdict is judged and no run record is read."""
+    backend = MemoryBackend()
+    judged: list[str] = []
+    read_runs: list[str] = []
+    sites: list[int] = []
+    real_site = runs_module._site_trials
+    monkeypatch.setattr(runs_module, "_site_trials", lambda c: sites.append(1) or real_site(c))
+    for k, trials in enumerate((3, 5)):
+        write_run(backend, f"d{k}", FROZEN, 0.6, minutes=k, edge="e2", trials_counted=trials)
+    real_verdict, real_read = verdict_module.load_edge_verdict, runs_module._read_committed
+    monkeypatch.setattr(
+        verdict_module, "load_edge_verdict", lambda c, e: judged.append(e.id) or real_verdict(c, e)
+    )
+    monkeypatch.setattr(
+        runs_module, "_read_committed", lambda c, e, o: read_runs.append(e.id) or real_read(c, e, o)
+    )
+    query = (
+        "query EdgeDocument($ids: [String!]!) { edges(ids: $ids) "
+        "{ id name state mine extends variantsTried definition { picks } } }"
+    )
+    result = asyncio.run(
+        schema.execute(
+            query, variable_values={"ids": ["e2"]}, context_value=_request(backend, False)
+        )
+    )
+    assert result.errors is None
+    assert [e["id"] for e in result.data["edges"]] == ["e2"]  # type: ignore[index]
+    assert judged == [] and sites == []  # no verdict, never the site-wide trials
+    assert set(read_runs) == {"e2"}  # one edge's run records only (per owner, once each)
+    assert result.data["edges"][0]["variantsTried"] == 5  # type: ignore[index]
+    old = asyncio.run(
+        schema.execute(
+            "{ edges { id runs { trialsCounted } } }", context_value=_request(backend, False)
+        )
+    )
+    e2 = next(e for e in old.data["edges"] if e["id"] == "e2")  # type: ignore[index]
+    assert max(r["trialsCounted"] or 0 for r in e2["runs"]) == 5  # what the notice read before
+    everything = asyncio.run(
+        schema.execute("{ edges { id } }", context_value=_request(backend, False))
+    )
+    assert len(everything.data["edges"]) == len(IDS) + 1  # type: ignore[index]

@@ -18,6 +18,7 @@ from algotrade_api.graphql.types.evaluation.verdict import (
     EdgeDefinition,
     EdgeSettings,
     EdgeSource,
+    EdgeSummary,
     EdgeVerdict,
 )
 from algotrade_api.graphql.types.instruments.feature import Unknown
@@ -290,6 +291,13 @@ class Edge:
         return [EdgeRun.of(r, self.ctx) for r in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The most variants any run of the edge recorded as tried (the multiple-testing "
+        "disclosure the builder shows); 0: none. Reads this edge's run records only"
+    )
+    async def variants_tried(self, info: Info) -> int:
+        return await off_loop(runs.load_edge_variants_tried, self.ctx, self.edge)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
         description="The verdict on the official result (a site edge: the canonical run; the "
         "user's own edge: their latest run, judged on in-sample figures while `oosHidden`): "
         "Works, Promising, Not working, Not enough data or Waiting on data, with the reason, "
@@ -298,6 +306,14 @@ class Edge:
     async def verdict(self, info: Info) -> EdgeVerdict:
         found = await off_loop(versions.load_verdict, self.ctx, self.edge)
         return EdgeVerdict.of(found)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The headline of `verdict` (label, result, trades, lift, basis) for a list: "
+        "always equal to those fields of `verdict`, read without the pieces a list never shows"
+    )
+    async def summary(self, info: Info) -> EdgeSummary:
+        found = await off_loop(versions.load_summary, self.ctx, self.edge)
+        return EdgeSummary.of(found)
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's own edge against the edge it extends and its baselines, "

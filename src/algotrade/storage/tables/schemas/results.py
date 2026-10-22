@@ -139,7 +139,7 @@ RULE_SCREEN = fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
     whole_per_group=True,  # a run's file is its config's whole result (ADR 0029 amendment)
-    cluster_by="instrument_id",
+    cluster_by=("instrument_id",),
     row_group_rows=CLUSTER_ROWS,
 )
 
@@ -191,7 +191,7 @@ RULE_SCREEN_VALUES = fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
     whole_per_group=True,
-    cluster_by="instrument_id",  # a page reads a few instruments: its row groups skip the rest
+    cluster_by=("instrument_id",),  # a page reads a few instruments: its row groups skip the rest
     row_group_rows=CLUSTER_ROWS,
 )
 

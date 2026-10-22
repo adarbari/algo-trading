@@ -15,7 +15,7 @@ import { clearStash, NEW_KEY, unstash } from '../model/stash';
 import { EdgeBuilder, type EdgeBuilderProps } from './EdgeBuilder';
 
 const hooks = vi.hoisted(() => ({
-  useEdges: vi.fn(),
+  useEdgeDocument: vi.fn(),
   useEdgeSettings: vi.fn(),
   useScreeners: vi.fn(),
 }));
@@ -23,7 +23,7 @@ vi.mock('@/entities/edge', async (importOriginal) => {
   const { Text } = await import('@algotrade/ui');
   return {
     ...(await importOriginal<Record<string, unknown>>()),
-    useEdges: hooks.useEdges,
+    useEdgeDocument: hooks.useEdgeDocument,
     ScreenerRecord: ({ screenerId }: { screenerId: string }) => (
       <Text>{`record ${screenerId}`}</Text>
     ),
@@ -58,17 +58,19 @@ const served: EdgeSettings = {
 
 stubElementSize();
 
+/** The one-edge document read: the fixture edge ``id`` (null id: nothing asked, nothing served). */
+function documentOf(id: string, over: Record<string, unknown> = {}) {
+  hooks.useEdgeDocument.mockImplementation((asked: string | null) => {
+    const edge = EDGES_FIXTURE.edges.find((e) => e.id === asked);
+    return fakeQuery(edge ? { ...edge, ...(asked === id ? over : {}) } : null);
+  });
+}
+
 beforeEach(() => {
   PUT.mockReset();
   clearStash('my_momentum');
   clearStash(NEW_KEY);
-  hooks.useEdges.mockReturnValue(
-    fakeQuery(
-      EDGES_FIXTURE.edges.map((e) =>
-        e.id === 'my_momentum' ? { ...e, sources: [{ title: 'JT 1993', url: '' }] } : e,
-      ),
-    ),
-  );
+  documentOf('my_momentum', { sources: [{ title: 'JT 1993', url: '' }], variantsTried: 4 });
   hooks.useEdgeSettings.mockReturnValue(fakeQuery(served));
   hooks.useScreeners.mockReturnValue(
     fakeQuery([
@@ -224,22 +226,33 @@ describe('EdgeBuilder', () => {
   });
 
   it('shows a loading state and a failure', () => {
-    hooks.useEdges.mockReturnValue(fakeQuery(undefined, { isPending: true }));
+    hooks.useEdgeDocument.mockReturnValue(fakeQuery(undefined, { isPending: true }));
     const { unmount } = setup();
     expect(screen.getByText('Loading the edge…')).toBeInTheDocument();
     unmount();
-    hooks.useEdges.mockReturnValue(fakeQuery(undefined, { isError: true }));
+    hooks.useEdgeDocument.mockReturnValue(fakeQuery(undefined, { isError: true }));
     setup();
     expect(screen.getByText('The edge could not be loaded.')).toBeInTheDocument();
   });
 
   it('names a trial edge a new version', () => {
-    hooks.useEdges.mockReturnValue(
-      fakeQuery(
-        EDGES_FIXTURE.edges.map((e) => (e.id === 'my_momentum' ? { ...e, state: 'trial' } : e)),
-      ),
-    );
+    documentOf('my_momentum', { state: 'trial' });
     setup();
     expect(screen.getByText('New version of an edge')).toBeInTheDocument();
+  });
+
+  it('discloses the variants tried (the most any run recorded), and nothing when none', () => {
+    const { unmount } = setup();
+    expect(screen.getByText('4 variants tried')).toBeInTheDocument();
+    unmount();
+    documentOf('my_momentum', { variantsTried: 0 });
+    setup();
+    expect(screen.queryByText(/variants tried/)).not.toBeInTheDocument();
+  });
+
+  it('asks for no edge document when the edge is new (and never the whole edges page)', () => {
+    setup({ id: null });
+    expect(hooks.useEdgeDocument).toHaveBeenCalledWith(null);
+    expect(hooks.useEdgeDocument).not.toHaveBeenCalledWith('my_momentum');
   });
 });

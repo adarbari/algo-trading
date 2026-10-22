@@ -9,6 +9,8 @@ import type { gqlTypes } from '@/shared/api';
 
 export type EdgesResponse = gqlTypes.EdgesPageQuery;
 export type Edge = EdgesResponse['edges'][number];
+/** One edge's document, as the builder reads it (no verdict, no runs). */
+export type EdgeDocument = gqlTypes.EdgeDocumentQuery['edges'][number];
 export type EdgeVerdict = Edge['verdict'];
 export type VerdictCriterion = EdgeVerdict['criteria'][number];
 export type EdgeProblem = EdgesResponse['edgeProblems'][number];

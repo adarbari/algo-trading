@@ -38,6 +38,7 @@ from algotrade.services.read.evaluation.edges import Edge, load_edges, parsed_ed
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.tables.interfaces import RowFilter
 from algotrade.storage.tables.schemas import result_table
 
 EDGE_EVAL = "edge_eval"
@@ -303,6 +304,12 @@ def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:
     return tuple(sorted(runs.values(), key=lambda r: r.knowledge_ts, reverse=True))
 
 
+def load_edge_variants_tried(ctx: Stores, edge: Edge) -> int:
+    """The variants tried on ``edge``: the most ``trials_counted`` any run it shows recorded (0:
+    none), read from this edge's own run records only (never the site's trials)."""
+    return max((r.trials_counted or 0 for r in load_edge_runs(ctx, edge)), default=0)
+
+
 def load_runs_of(ctx: Stores, edge_id: str) -> tuple[EdgeRun, ...]:
     """``load_edge_runs`` by edge id; none for an edge the user does not have."""
     edge = next((e for e in load_edges(ctx) if e.id == edge_id), None)
@@ -465,15 +472,17 @@ def _stored(
     slice_kinds: Collection[str] | None = None,
 ) -> tuple[EdgeRow, ...]:
     """The rows of the run's partition that are (``random``) or are not random-pick draws, only
-    of ``slice_kinds`` when given. The cut is made on the frame, before any row is decoded: the
-    draws are most of the partition and every consumer drops them (or all else) afterwards."""
-    frame = run_partition(ctx, result_table(EDGE_EVAL), record)
+    of ``slice_kinds`` when given. The cut is the storage read's (``where``: the row groups the
+    footer statistics rule out are never decoded, and a file written without clustering reads
+    whole and is cut exactly), before any row is decoded: the draws are most of the partition and
+    every consumer drops them (or all else) afterwards."""
+    cut = [RowFilter("role", frozenset({RANDOM}), keep=random)]
+    if slice_kinds is not None:
+        cut.append(RowFilter("slice_kind", frozenset(slice_kinds)))
+    frame = run_partition(ctx, result_table(EDGE_EVAL), record, where=cut)
     if frame is None:
         return ()
-    keep = (frame["role"].astype(str) == RANDOM) == random
-    if slice_kinds is not None:
-        keep &= frame["slice_kind"].astype(str).isin(set(slice_kinds))
-    return tuple(_row({str(k): v for k, v in r.items()}) for r in frame[keep].to_dict("records"))
+    return tuple(_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records"))
 
 
 def rows_of_record(
@@ -491,11 +500,10 @@ def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[Draw, ...]:
     each the ``lift`` of one draw of names chosen with no information, in stored order. Built
     straight from the columns: no ``EdgeRow`` per draw (a null ``lift`` or ``edge_variant`` reads
     as ``_row`` reads it: None, ``main``)."""
-    frame = run_partition(ctx, result_table(EDGE_EVAL), record)
-    if frame is None:
-        return ()
-    found = frame[frame["role"].astype(str) == RANDOM]
-    if found.empty:
+    found = run_partition(
+        ctx, result_table(EDGE_EVAL), record, where=[RowFilter("role", frozenset({RANDOM}))]
+    )
+    if found is None or found.empty:
         return ()
     variant = (
         found["edge_variant"].astype(object).where(found["edge_variant"].notna(), MAIN)

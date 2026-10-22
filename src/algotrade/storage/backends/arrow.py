@@ -10,6 +10,7 @@ written before the schemas were typed (``string`` vs ``large_string``, all-null 
 
 import io
 from collections.abc import Collection, Iterable, Sequence
+from itertools import pairwise
 from pathlib import Path
 
 import pandas as pd
@@ -119,42 +120,55 @@ def parquet_bytes(data: pa.Table, row_group_size: int = ROW_GROUP_SIZE) -> bytes
     return sink.getvalue()
 
 
-def encode(table: str, data: pa.Table) -> bytes:
-    """The bytes a file of ``table`` is written as: ``parquet_bytes``, but a table that declares
-    ``cluster_by`` is first stably sorted by that column and cut into ``row_group_rows``-row
-    groups, so the same rows always give the same bytes and a read of a few values of the
-    column decodes only the groups whose statistics can hold them."""
+def table_parquet_bytes(table: str, data: pa.Table) -> bytes:
+    """``data`` as ``table``'s file: ``parquet_bytes``, or, for a table declaring ``cluster_by``,
+    its rows stably sorted by those columns and one run of row groups per distinct value
+    combination, so the footer statistics name each group's values (``row_groups_passing``).
+    A table that also declares ``row_group_rows`` is cut into groups of that many rows instead
+    (several values share a group, its min / max still bound them: a many-valued column such as
+    ``instrument_id``). Deterministic: the same rows give the same bytes."""
     spec = table_spec(table)
-    if spec is None or spec.cluster_by is None or spec.row_group_rows is None:
+    if spec is None or not spec.cluster_by or data.num_rows == 0:
         return parquet_bytes(data)
-    order = pc.sort_indices(data, sort_keys=[(spec.cluster_by, "ascending")])
-    return parquet_bytes(data.take(order), spec.row_group_rows)
+    by = [c for c in spec.cluster_by if c in data.column_names]
+    if not by:
+        return parquet_bytes(data)
+    data = data.take(pc.sort_indices(data, sort_keys=[(c, "ascending") for c in by]))
+    if spec.row_group_rows is not None:
+        return parquet_bytes(data, spec.row_group_rows)
+    keys = data.select(by).to_pylist()
+    starts = [0, *(i for i in range(1, len(keys)) if keys[i] != keys[i - 1]), len(keys)]
+    sink = io.BytesIO()
+    with pq.ParquetWriter(sink, data.schema, compression="zstd", write_page_index=True) as writer:
+        for begin, end in pairwise(starts):
+            writer.write_table(data.slice(begin, end - begin), row_group_size=ROW_GROUP_SIZE)
+    return sink.getvalue()
 
 
 def is_clustered(path: Path, table: str) -> bool:
-    """Whether the file at ``path`` is laid out as ``table`` declares (``encode``): every row
-    group within ``row_group_rows`` and the ``cluster_by`` column non-decreasing over the file.
-    The footer answers first (a group over the size, or one whose range starts below the one
-    before's end); only a file that passes it has the one column read. A table that declares no
-    clustering is always laid out as declared."""
+    """Whether the file at ``path`` is laid out as ``table`` declares when it declares
+    ``row_group_rows`` (``table_parquet_bytes``): every row group within that size and the first
+    ``cluster_by`` column non-decreasing over the file. The footer answers first; only a file that
+    passes it has the one column read. Any other table is always laid out as declared."""
     spec = table_spec(table)
-    if spec is None or spec.cluster_by is None or spec.row_group_rows is None:
+    if spec is None or not spec.cluster_by or spec.row_group_rows is None:
         return True
+    first = spec.cluster_by[0]
     with pq.ParquetFile(path) as parquet:
         meta = parquet.metadata
         names = {meta.schema.column(i).path: i for i in range(meta.num_columns)}
-        if spec.cluster_by not in names:
+        if first not in names:
             return True  # an empty file or one from before the column: nothing to cluster
         highest: object = None
         for number in range(meta.num_row_groups):
             group = meta.row_group(number)
-            stats = group.column(names[spec.cluster_by]).statistics
+            stats = group.column(names[first]).statistics
             if group.num_rows > spec.row_group_rows or stats is None or not stats.has_min_max:
                 return False
             if highest is not None and stats.min < highest:
                 return False
             highest = stats.max
-        column = parquet.read(columns=[spec.cluster_by]).column(0).combine_chunks()
+        column = parquet.read(columns=[first]).column(0).combine_chunks()
     return len(column) < 2 or bool(pc.all(pc.less_equal(column[:-1], column[1:])).as_py())
 
 

@@ -50,7 +50,7 @@ from algotrade.storage.backends.arrow_memory import limit_threads, release_unuse
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
-from algotrade.storage.tables.interfaces import PartitionStats
+from algotrade.storage.tables.interfaces import PartitionStats, RowFilter
 
 __all__ = [
     "ConfigStore",
@@ -503,13 +503,14 @@ def _run_file_rows(
     columns: Sequence[str] | None,
     instruments: Sequence[str] | None,
     why: str,
+    where: Sequence[RowFilter] = (),
 ) -> pd.DataFrame | None:
     """One run's own rows of the session-grain ``table`` on ``day`` (``read_run``: only that run's
     file, ADR 0064); ``None``: it has none. ``ValueError`` for a table that is not session grain."""
     grain = grain_of(table)
     if grain is not Grain.SESSION:
         raise ValueError(f"{table} is {grain} grain: {why}")
-    return ctx.reader.read_run(table, day, run_id, columns, instruments)
+    return ctx.reader.read_run(table, day, run_id, columns, instruments, where)
 
 
 def run_rows_of(
@@ -529,14 +530,26 @@ def run_rows_of(
 
 
 def run_partition(
-    ctx: Stores, table: str, run: RunRecord, columns: Sequence[str] | None = None
+    ctx: Stores,
+    table: str,
+    run: RunRecord,
+    columns: Sequence[str] | None = None,
+    where: Sequence[RowFilter] = (),
 ) -> pd.DataFrame | None:
     """The rows ``run`` wrote to the session-grain ``table`` (a ``results/*`` table it
     publishes to its own end session), read as the run left them whatever later run shares
     the partition (``read_run``: only that run's file, ADR 0064). ``None``: nothing
-    stored for it. ``ValueError`` for a table that is not session grain."""
+    stored for it. ``where``: only rows passing those filters, the row groups that cannot hold
+    one never decoded (``RowFilter``). ``ValueError`` for a table that is not session grain."""
     return _run_file_rows(
-        ctx, table, run.session_date, run.run_id, columns, None, "a run's results are session grain"
+        ctx,
+        table,
+        run.session_date,
+        run.run_id,
+        columns,
+        None,
+        "a run's results are session grain",
+        where,
     )
 
 
