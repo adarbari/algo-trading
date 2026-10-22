@@ -216,8 +216,6 @@ SCREEN_RUNS = fixed(
     "previous_version int64",
     "new_picks int64",
     "dropped int64",
-    "started_at timestamp_utc",
-    "finished_at timestamp_utc",
     runs="merge",
     key=("user_id", "config_id", "run_id"),
     whole_per_group=True,  # every run writes its row, so a group's newest run is its latest run

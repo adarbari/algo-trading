@@ -316,11 +316,7 @@ def run_screener(
         stamp = replace(stamp, regime=gate.regime, size_multiplier=gate.size_multiplier)
     lineage = None
     if rules is not None:  # the run's object row records what it was compared with (frozen)
-        lineage = replace(
-            previous_lineage(reader, run_job_name(config.config.id, user), session_date),
-            started_at=now,
-            finished_at=max(now, clock()),
-        )
+        lineage = previous_lineage(reader, run_job_name(config.config.id, user), session_date)
     _write(writer, config, run, rules, stamp, lineage)
     complete = run.coverage is RunCoverage.COMPLETE
     writer.save_run(record.finish(max(now, clock()), complete=complete, stats=audit))

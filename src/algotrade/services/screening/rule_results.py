@@ -186,14 +186,12 @@ def values_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
 class Lineage:
     """What a run's ``results/screen_runs`` row records beside its own rows: the config's run in
     the previous stored session it is compared with (None: there was none, or no row of it is
-    stored) and when the run started and finished (None: not recorded)."""
+    stored). Timing is the run record's, not repeated here."""
 
     previous_run_id: str | None = None
     previous_session: date | None = None
     previous_version: int | None = None
     previous_decisions: Mapping[str, str] | None = None  # that run's decision per instrument
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
 
 
 def change_of(decision: str, was: str | None) -> str | None:
@@ -258,14 +256,10 @@ def runs_frame(
         "previous_version": lineage.previous_version,
         "new_picks": new,
         "dropped": dropped,
-        "started_at": None if lineage.started_at is None else pd.Timestamp(lineage.started_at),
-        "finished_at": None if lineage.finished_at is None else pd.Timestamp(lineage.finished_at),
     }
     frame = pd.DataFrame.from_records([record])
     for name in ("config_version", "previous_version", "new_picks", "dropped"):
         frame[name] = frame[name].astype("Int64")
-    for name in ("started_at", "finished_at"):
-        frame[name] = pd.to_datetime(frame[name], utc=True)
     return stamp.apply(frame)
 
 

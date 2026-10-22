@@ -116,7 +116,7 @@ def test_the_changes_are_frozen_at_write_against_the_previous_run() -> None:
     moved = _compare(now, dict(zip(was["instrument_id"], was["decision"], strict=True)))
     assert sorted(c for c, _ in moved.values() if c) == ["dropped", "new"]
     assert second.run_id != first.run_id
-    assert row["started_at"] == pd.Timestamp(T0) and row["finished_at"] >= row["started_at"]
+    assert "started_at" not in row and "finished_at" not in row  # the duration is the run record's
 
 
 def test_a_changed_definition_keeps_both_versions() -> None:
@@ -140,7 +140,7 @@ def test_the_frames_are_deterministic_and_the_row_is_the_runs() -> None:
     outcome = run_screener(reader, writer, config(), DAY, now=T0, held=HARNESS_ALL)
     assert outcome.rules is not None
     stamp = Stamp(DAY, outcome.run_id, T0, SITE_USER, "big_liquid", config().hash, 4)
-    lineage = Lineage("p", PREVIOUS, 3, {"EQ:AAA": "REJECT"}, T0, T0 + timedelta(seconds=3))
+    lineage = Lineage("p", PREVIOUS, 3, {"EQ:AAA": "REJECT"})
     one, two = (rule_frames(outcome.rules, stamp, lineage) for _ in range(2))
     for name in one:
         pd.testing.assert_frame_equal(one[name], two[name])
