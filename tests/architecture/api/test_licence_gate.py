@@ -65,6 +65,9 @@ EXEMPT = {
     "services/read/market/history.py": GATED_LOADERS,
     "services/read/regime/fields.py": GATED_LOADERS,
     "services/read/regime/history.py": GATED_LOADERS,
+    "services/read/regime/sources.py": "provenance dates and kinds of a card's series (never a "
+    "value), shown to every viewer as the stored-vintage read always was: macro_asof's columns "
+    "carry the series' licence, but this read ignores it (owner decision pending, PR)",
     "services/read/events/instrument_events.py": STORED_OPEN,
     "services/read/instruments/chains.py": STORED_OPEN,
     "services/read/ops/ingestion.py": STORED_OPEN,
