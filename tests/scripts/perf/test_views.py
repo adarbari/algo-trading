@@ -114,6 +114,7 @@ def test_enumerates_routes_search_values_ids_tabs_and_disclosures(tmp_path: Path
     found = vw.enumerate_views(tree(tmp_path))
     with_edge = "/items?edge={edge}"
     assert set(found) == {
+        "(shell)",
         "/items",
         "/items?view=mine",
         "/items?view=rejected",
@@ -196,8 +197,21 @@ def test_view_operations_prefer_the_capture_then_the_static_ops() -> None:
     }
     known = {"Known": {"query": "q", "variables": {}}}
     ops, by_view = vw.view_operations(doc, ["/v", "/static"], known)
-    assert ops["Rows"]["variables"] == {"id": 1} and by_view["/v"] == ["Rows"]
-    assert by_view["/static"] == ["Known"]
+    assert ops["Rows [/v]"]["variables"] == {"id": 1} and by_view["/v"] == ["Rows [/v]"]
+    assert by_view["/static"] == ["Known [/static]"]
+    # a second view of the same operation keeps its own variables
+    two = {
+        "views": {
+            "/a": doc["views"]["/v"],
+            "/b": {
+                "captured": {"requests": [{"op": "Rows", "query": "q", "variables": {"id": 9}}]}
+            },
+        }
+    }
+    again, _ = vw.view_operations(two, ["/a", "/b"], known)
+    assert again["Rows [/a]"]["variables"] == {"id": 1} and again["Rows [/b]"]["variables"] == {
+        "id": 9
+    }
     with pytest.raises(vw.SelectionError, match="not in the views file"):
         vw.view_operations(doc, ["/nope"], known)
     with pytest.raises(vw.SelectionError, match="no operation"):
@@ -250,7 +264,7 @@ def test_coverage_lists_untriggered_operations_with_where_they_should_be() -> No
     assert rep["no_data"] == ["/empty"] and rep["uncaptured"] == ["/todo"]
     assert rep["delta"]["added_ops"] == ["B"] and rep["delta"]["old_routes"] == 1
     text = cov.render(doc, rep, "now")
-    assert "| Dead | nowhere (dead code?) |" in text and "`/todo`" in text
+    assert "| Dead | nowhere" in text and "`/todo`" in text
 
 
 # ---- the crawler's real-store guard -----------------------------------------------------------
@@ -260,13 +274,12 @@ def _args(tmp_path: Path, **over: object) -> argparse.Namespace:
     views = tmp_path / "views.json"
     views.write_text('{"views": {}}')
     base = {
-        "api_url": "http://127.0.0.1:8100",
-        "web_url": "http://127.0.0.1:5173",
         "data_url": f"file://{tmp_path / 'clone'}",
         "max_views": 20,
         "only_route": None,
         "view_timeout": 60,
         "depth": 2,
+        "max_controls": 40,
         "retry": False,
         "views_file": str(views),
     }
@@ -285,27 +298,76 @@ def test_crawler_refuses_without_a_clone_or_on_the_real_store(tmp_path: Path) ->
     assert cap.check_crawl(_args(tmp_path), [real]).endswith("clone")
 
 
-def test_crawler_refuses_non_local_urls_and_unbounded_runs(tmp_path: Path) -> None:
-    with pytest.raises(cap.al.RefusalError, match="only a local server"):
-        cap.check_crawl(_args(tmp_path, api_url="https://prod.example.com"), [])
-    with pytest.raises(cap.al.RefusalError, match="--max-views"):
-        cap.check_crawl(_args(tmp_path, max_views=0), [])
-    with pytest.raises(cap.al.RefusalError, match="--max-views"):
-        cap.check_crawl(_args(tmp_path, max_views=10_000), [])
+def test_crawler_refuses_unbounded_runs_and_a_missing_views_file(tmp_path: Path) -> None:
+    for over in ({"max_views": 0}, {"max_views": 10_000}):
+        with pytest.raises(cap.al.RefusalError, match="--max-views"):
+            cap.check_crawl(_args(tmp_path, **over), [])
     with pytest.raises(cap.al.RefusalError, match="does not exist"):
         cap.check_crawl(_args(tmp_path, views_file=str(tmp_path / "none.json")), [])
 
 
+def test_only_loopback_and_never_the_live_port() -> None:
+    assert cap.check_local("http://127.0.0.1:11368") == "http://127.0.0.1:11368"
+    for bad in ("http://127.0.0.1:8000", "https://prod.example.com:11368", "http://127.0.0.1"):
+        with pytest.raises(cap.al.RefusalError):
+            cap.check_local(bad)
+
+
+class _FakeApi:
+    def __init__(self, mode: str, data_url: str | None = None) -> None:
+        self.mode, self.data_url, self.url, self.closed = (
+            mode,
+            data_url,
+            "http://127.0.0.1:11368",
+            False,
+        )
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def test_vite_is_started_with_our_api_as_its_proxy_target(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The leak the architect found: Vite's default proxy target is the live API on :8000."""
+    monkeypatch.setattr(cap.al, "free_port", lambda: 11369)
+    seen: dict = {}
+
+    def popen(cmd, **kw):  # type: ignore[no-untyped-def]
+        seen.update(cmd=cmd, env=kw["env"])
+        return object()
+
+    api, _, web = cap.start_servers("file:///clone", api_factory=_FakeApi, popen=popen)
+    assert api.mode == "uncached" and api.data_url == "file:///clone"
+    assert seen["env"]["API_PROXY_TARGET"] == api.url == "http://127.0.0.1:11368"
+    assert web == "http://127.0.0.1:11369" and seen["cmd"][-2:] == ["--port", "11369"]
+
+
+def test_servers_on_the_live_port_are_refused_and_the_api_is_stopped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cap.al, "free_port", lambda: 8000)
+    made: list = []
+
+    def factory(mode: str, data_url: str | None = None) -> _FakeApi:
+        made.append(_FakeApi(mode, data_url))
+        return made[-1]
+
+    with pytest.raises(cap.al.RefusalError):
+        cap.start_servers("file:///clone", api_factory=factory, popen=lambda *a, **k: object())
+    assert made[0].closed is True
+    with pytest.raises(cap.al.RefusalError):
+        cap.vite_env("http://127.0.0.1:8000", {})
+
+
 def test_node_command_carries_the_bounds(tmp_path: Path) -> None:
-    cmd = cap.node_command(_args(tmp_path, only_route="/edges", retry=True))
+    cmd = cap.node_command(_args(tmp_path, only_route="/edges", retry=True), "http://a", "http://w")
     assert cmd[-2:] == ["--only-route", "/edges"] and "--max-views" in cmd
-    assert cmd[cmd.index("--retry") + 1] == "true"
+    assert cmd[cmd.index("--retry") + 1] == "true" and cmd[cmd.index("--max-controls") + 1] == "40"
 
 
 # ---- the crawl loop, on a fake Playwright page ------------------------------------------------
 
 FAKE = """
-import { crawl, resolveUrl, crawlView, signature } from %(crawler)s;
+import { crawl, resolveUrl, decide, denied, installGuard, routeMatches, pending } from %(crawler)s;
 
 class FakePage {
   constructor(site) { this.site = site; this.handlers = {}; this.url = ''; this.clicked = []; this.closed = false; }
@@ -319,24 +381,34 @@ class FakePage {
   async goto(url) { this.url = url; this.clicked = []; for (const op of this.site.load(url)) await this.fire(op); }
   async waitForLoadState() {}
   async waitForTimeout() {}
-  async evaluate(fn, arg) { return arg ? undefined : this.site.controls(this.url, this.clicked); }
-  getByRole(role, { name }) {
-    const page = this;
-    return {
-      count: async () => (page.site.has(role, name) ? 1 : 0),
-      nth: () => ({ click: async () => { page.clicked.push(name); for (const op of page.site.click(name)) await page.fire(op); } }),
-    };
+  async evaluate(fn, arg) {
+    if (arg?.mode === 'discover') return this.site.controls(this.url, this.clicked);
+    if (arg?.mode === 'click') {
+      if (!this.site.has(arg.kind, arg.name)) return false;
+      this.clicked.push(arg.name);
+      for (const op of this.site.click(arg.name)) await this.fire(op);
+      return true;
+    }
+    return undefined;
   }
   async close() { this.closed = true; }
 }
 
 const site = {
   load: (url) => (url.startsWith('/edges') ? ['Edges', 'Edges'] : ['Home']),
-  controls: (url, clicked) => (clicked.length ? [] : [{ kind: 'tab', name: 'Trades', nth: 0 }, { kind: 'expand', name: 'More', nth: 0 }]),
+  controls: (url, clicked) => (clicked.length ? [] : [{ kind: 'tab', name: 'Trades', nth: 0 }, { kind: 'expand', name: 'More', nth: 0 }, { kind: 'expand', name: 'Save as draft', nth: 0 }].filter((c) => !denied(c.name))),
   has: (role, name) => name !== 'Gone',
   click: (name) => (name === 'Trades' ? ['EdgeTrades'] : []),
 };
-const opts = { webUrl: '', maxViews: %(max)d, onlyRoute: undefined, viewTimeoutMs: 1000, depth: 1, maxControls: 10, retry: false };
+const blocked = [];
+const opts = { webUrl: '', maxViews: %(max)d, onlyRoute: undefined, viewTimeoutMs: 1000, depth: 1, maxControls: 10, retry: false, blocked };
+const routed = [];
+await installGuard({ route: async (_pattern, handler) => {
+  const mk = (method, url) => ({ request: () => ({ method: () => method, url: () => url, postData: () => null }), continue: () => routed.push('continue'), abort: (why) => routed.push(why) });
+  await handler(mk('GET', 'http://w/api/health'));
+  await handler(mk('POST', 'http://w/api/regime/explain'));
+  await handler(mk('GET', 'https://fonts.example/x'));
+} }, 'http://w', blocked);
 const doc = { views: {
   '/edges': { route: '/edges', search: {}, clicks: [], params: {} },
   '/home': { route: '/home', search: {}, clicks: [], params: {} },
@@ -346,7 +418,19 @@ const doc = { views: {
 const pages = [];
 const saves = [];
 const result = await crawl(doc, { instrument: 'AAPL' }, opts, async () => { const p = new FakePage(site); pages.push(p); return p; }, (d) => saves.push(JSON.stringify(d)));
-console.log(JSON.stringify({ result, doc, closed: pages.every((p) => p.closed), saves: saves.length,
+console.log(JSON.stringify({ routed, blocked, result, doc, closed: pages.every((p) => p.closed), saves: saves.length,
+  guard: [
+    decide('GET', 'http://w/api/health', null, 'http://w').allow,
+    decide('POST', 'http://w/api/graphql', JSON.stringify({ query: 'query A { a }' }), 'http://w').allow,
+    decide('POST', 'http://w/api/graphql', JSON.stringify([{ query: 'query A { a }' }, { query: 'mutation M { m }' }]), 'http://w').allow,
+    decide('POST', 'http://w/api/regime/explain', '{}', 'http://w').allow,
+    decide('DELETE', 'http://w/api/x', null, 'http://w').allow,
+    decide('GET', 'http://127.0.0.1:8000/health', null, 'http://w').allow,
+    decide('POST', 'http://w/api/graphql', 'not json', 'http://w').allow,
+  ],
+  routes: [routeMatches('/edges/:id', '/edges'), routeMatches('/edgesx', '/edges'), routeMatches('/guide/a', '/guide/*'), routeMatches('/x', undefined), routeMatches('/edges', '/guide/*')],
+  denied: ['Save as draft', 'Delete', 'Follow edge', 'Regime', 'Where it worked'].map(denied),
+  pendingOnly: pending({ views: { a: { route: '/a' }, b: { route: '/b', captured: {} }, c: { route: '/a/x' } } }, { onlyRoute: '/a' }),
   url: resolveUrl({ route: '/e/:id', search: { s: '{instrument}' }, params: { id: 'edge' } }, { edge: 'm 1', instrument: 'AAPL' }),
   nourl: resolveUrl({ route: '/e', search: { s: '{edge}' }, params: {} }, {}) }));
 """
@@ -382,6 +466,15 @@ def test_crawl_records_requests_per_view_and_discovers_controls() -> None:
         "click:tab:Trades"
     )
     assert views["/edges > tab:View:Gone"]["captured"]["status"] == "missing"
+    # the save-like control is never offered as a view
+    assert not [k for k in views if "Save" in k]
+    # context guard: reads continue, the REST write and the off-origin call are aborted and named
+    assert out["routed"] == ["continue", "blockedbyclient", "blockedbyclient"]
+    assert out["blocked"] == ["POST /api/regime/explain", "off-origin https://fonts.example"]
+    assert out["guard"] == [True, True, False, False, False, False, False]
+    assert out["routes"] == [True, False, True, True, False]
+    assert out["denied"] == [True, True, True, False, False]
+    assert out["pendingOnly"] == ["a", "c"]
     assert views["/edges/:id"]["captured"]["status"] == "skipped"  # no edge id was picked
     assert out["closed"] is True and out["saves"] >= 4
     assert out["url"] == "/e/m%201?s=AAPL" and out["nourl"] is None

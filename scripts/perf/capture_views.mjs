@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { crawl, resolveUrl } from './view_crawler.mjs';
+import { crawl, installGuard, pending, resolveUrl } from './view_crawler.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire(resolve(repo, 'apps/web/package.json'))('@playwright/test');
@@ -32,6 +32,7 @@ const opts = {
   depth: Number(args.depth ?? 2),
   maxControls: Number(args['max-controls'] ?? 40),
   retry: args.retry === 'true',
+  blocked: [],
 };
 
 const gql = async (query) => {
@@ -67,7 +68,9 @@ async function pickIds() {
 async function scrapeLinks(doc, picks, context) {
   const page = await context.newPage();
   try {
-    for (const view of Object.values(doc.views)) {
+    // only the views this run will visit (--max-views, --only-route), never the whole file
+    const visiting = pending(doc, opts).slice(0, opts.maxViews).map((id) => doc.views[id]);
+    for (const view of visiting) {
       for (const [param, kind] of Object.entries(view.params ?? {})) {
         const key = `param:${view.route}:${param}`;
         if (kind !== 'link' || picks[key] !== undefined) continue;
@@ -98,6 +101,7 @@ const doc = JSON.parse(readFileSync(file, 'utf8'));
 const browser = await chromium.launch();
 try {
   const context = await browser.newContext();
+  await installGuard(context, webUrl, opts.blocked); // reads of the web origin only
   const picks = await pickIds();
   await scrapeLinks(doc, picks, context);
   console.log('picks', JSON.stringify(picks));

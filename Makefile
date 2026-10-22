@@ -152,7 +152,7 @@ api-latency-capture: ## what each web route sends on load (own API + Vite, real 
 api-latency-views: ## enumerate every web VIEW (route + search + tabs) statically -> benchmarks/api_latency_views.json + docs/perf/view-coverage.md (no store, no server)
 	$(PY) scripts/perf/view_coverage.py
 
-api-latency-views-capture: ## crawl the views on a CLONE: ARGS="--api-url http://127.0.0.1:P --web-url http://127.0.0.1:Q --data-url file://<clone> [--max-views N --only-route /edges]" (docs/perf/view-coverage.md)
+api-latency-views-capture: ## crawl the views on a CLONE (starts its own API on it and a Vite proxying to it; writes blocked): ARGS="--data-url file://<clone> [--max-views N --only-route /edges]" (docs/perf/view-coverage.md)
 	$(PY) scripts/perf/capture_views.py $(ARGS)
 
 api-latency:     ## per-API latency baseline (cold / warm / nocache) on its own API, real store -> docs/perf/api-latency-baseline.md; idle machine; ARGS="--uncached --data-url file://<clone>" for the truly uncached run (docs/perf/api-latency-uncached-run.md)

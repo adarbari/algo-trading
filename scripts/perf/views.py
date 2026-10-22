@@ -32,6 +32,7 @@ import web_page_ops as wpo
 
 VIEWS_FILE = Path(__file__).resolve().parents[2] / "benchmarks/api_latency_views.json"
 SEP = " > "
+SHELL_ID = "(shell)"
 # search param name -> the kind of real id the crawler picks from the clone
 PICK_PARAMS = {
     "edge": "edge",
@@ -39,7 +40,6 @@ PICK_PARAMS = {
     "symbol": "instrument",
     "ticker": "instrument",
     "screener": "screener",
-    "via": "screener",
     "run": "run",
     "session": "session",
 }
@@ -124,27 +124,50 @@ def tab_targets(texts: list[tuple[Path, str]], tab_id: str) -> list[tuple[Path, 
     return [(p, c) for p, text in texts for pat in pats for c in re.findall(pat, text)]
 
 
+def _literals(text: str, spec: str) -> list[str]:
+    """String values of ``spec``: an inline ``['a', 'b']`` or the name of an array constant."""
+    if spec.lstrip().startswith("["):
+        return re.findall(r"'([^']+)'", spec)
+    for arr in ARRAY_RE.finditer(text):
+        if arr.group(1) == spec.strip():
+            body = text[arr.end() - 1 : wpo.match_close(text, arr.end() - 1) + 1]
+            return re.findall(r"'([^']+)'", body)
+    return []
+
+
+ONE_OF_RE = re.compile(r"\boneOf\(\s*(\[[^\]]*\](?:\s*as const)?|\w+)\s*,\s*raw\['(\w+)'\]")
+
+
 def search_params(source: wpo.Source, route: wpo.Route) -> tuple[dict[str, list[str]], list[str]]:
-    """({param: literal values} the route's validator accepts, [string-valued params])."""
+    """({param: literal values} the route's validator accepts, [string-valued params]).
+
+    Three shapes are read: ``typeof x === 'string'`` with ``VIEWS.find((v) => v === x)``,
+    ``text(raw['x'])`` and ``oneOf(CONST | [..], raw['x'])``."""
     if route.validator is None:
         return {}, []
     path, name = route.validator
     m = source.module(path)
     span = m.decls.get(name)
     body = m.text[span[0] : span[1]] if span else ""
-    strings = re.findall(r"typeof\s+(\w+)\s*===\s*'string'", body)
+    strings = [
+        *re.findall(r"typeof\s+(\w+)\s*===\s*'string'", body),
+        *re.findall(r"\btext\(\s*raw\['(\w+)'\]", body),
+    ]
     enums: dict[str, list[str]] = {}
+    for spec, param in ONE_OF_RE.findall(body):
+        if values := _literals(m.text, spec):
+            enums[param] = values
     for arr in ARRAY_RE.finditer(m.text):
         values = re.findall(
             r"'([^']+)'", m.text[arr.end() - 1 : wpo.match_close(m.text, arr.end() - 1) + 1]
         )
         use = re.search(
             rf"\b{arr.group(1)}\.(?:find|some|includes)\(\(?\w*\)?\s*(?:=>\s*\w+\s*===\s*)?(\w+)\)",
-            m.text,
+            body,
         )
         if values and use:
             enums[use.group(1)] = values
-    return enums, strings
+    return enums, list(dict.fromkeys(strings))
 
 
 def _reach_texts(walk: wpo.Walk, roots: list[wpo.Node]) -> list[tuple[Path, str]]:
@@ -184,6 +207,16 @@ def enumerate_views(src: Path) -> dict[str, dict]:
     walk = wpo.Walk(source)
     static, shell = wpo.static_page_ops(src, routes)
     views: dict[str, dict] = {}
+    # the shell (top bar, status strip, guards) sends its reads on every page: one view of its own
+    views[SHELL_ID] = _view(
+        "/ideas",
+        {},
+        [],
+        ops=sorted(o for o, k in shell.items() if k != wpo.HANDLER),
+        uncertain=sorted(o for o, k in shell.items() if k == wpo.MAYBE),
+        interaction=sorted(o for o, k in shell.items() if k == wpo.HANDLER),
+        shell=True,
+    )
     for route in routes:
         ops = static[route.path]
         expected = {o for o, k in ops.items() if k != wpo.HANDLER}
@@ -206,6 +239,8 @@ def enumerate_views(src: Path) -> dict[str, dict]:
         if picks:
             anchor = views[view_id(route.path, {picks[0]: "{" + PICK_PARAMS[picks[0]] + "}"}, [])]
         for param, values in enums.items():
+            if param == "tab":
+                continue  # the tab clicks below are these views
             for value in values:
                 search = {param: value}
                 views[view_id(route.path, search, [])] = _view(
@@ -287,14 +322,21 @@ def captured_requests(view: dict) -> list[dict]:
     return (view.get("captured") or {}).get("requests", [])
 
 
+def op_key(name: str, vid: str) -> str:
+    """The key a view's operation is measured under: operation x view, so a second view never
+    replays the first view's variables."""
+    return f"{name} [{vid}]"
+
+
 def view_operations(
     doc: dict, view_ids: list[str], known: dict[str, dict]
 ) -> tuple[dict[str, dict], dict[str, list[str]]]:
-    """({operation: {query, variables}}, {view id: its distinct operation names}) for the views.
+    """({op_key: {query, variables}}, {view id: its op keys}) for the views.
 
-    A captured view gives the documents and variables the browser sent; a view the crawler has
-    not visited falls back to its static operations, with the documents of ``known``. An id the
-    file does not hold, or a view with no operation at all, is a ``SelectionError``."""
+    A captured view gives the documents and variables the browser sent for it (the first request
+    of each operation); a view the crawler has not visited falls back to its static operations,
+    with the documents of ``known``. An id the file does not hold, or a view with no operation
+    at all, is a ``SelectionError``."""
     views = doc.get("views", {})
     ops: dict[str, dict] = {}
     by_view: dict[str, list[str]] = {}
@@ -303,18 +345,19 @@ def view_operations(
             raise SelectionError(
                 f"--view {vid}: not in the views file (known: {sorted(views)[:8]}...)"
             )
-        names: list[str] = []
+        keys: list[str] = []
         for req in captured_requests(views[vid]):
-            ops.setdefault(req["op"], {"query": req["query"], "variables": req["variables"]})
-            if req["op"] not in names:
-                names.append(req["op"])
-        if not names:
+            key = op_key(req["op"], vid)
+            if key not in ops:
+                ops[key] = {"query": req["query"], "variables": req["variables"]}
+                keys.append(key)
+        if not keys:
             for name in views[vid].get("ops", []):
                 if name not in known:
                     raise SelectionError(f"--view {vid}: operation {name} has no captured document")
-                ops.setdefault(name, known[name])
-                names.append(name)
-        if not names:
+                ops[op_key(name, vid)] = known[name]
+                keys.append(op_key(name, vid))
+        if not keys:
             raise SelectionError(f"--view {vid}: no operation (not captured, none expected)")
-        by_view[vid] = names
+        by_view[vid] = keys
     return ops, by_view

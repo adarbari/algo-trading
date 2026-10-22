@@ -36,6 +36,7 @@ SHELL_ROOTS = (
     ("app/layouts/GuideLayout.tsx", "GuideLayout"),
     ("app/workspaces/guard.ts", "workspaceGuard"),
     ("app/workspaces/guard.ts", "viewerGuard"),
+    ("entities/page-cache/api/query-persistence.ts", "defaultDeps"),  # the session stamp
 )
 
 IMPORT_RE = re.compile(
@@ -43,6 +44,8 @@ IMPORT_RE = re.compile(
     re.M,
 )
 REEXPORT_RE = re.compile(r"^export\s+(?!type\b)\{([^}]*)\}\s*from\s*['\"]([^'\"]+)['\"]", re.M)
+# `const { Doc } = await import('./doc')`: a document loaded on first use is still the hook's
+DYNAMIC_RE = re.compile(r"\{([\w\s,]*)\}\s*=\s*await\s+import\(\s*['\"]([^'\"]+)['\"]\s*\)")
 STAR_RE = re.compile(r"^export\s+\*\s+from\s*['\"]([^'\"]+)['\"]", re.M)
 LOCAL_EXPORT_RE = re.compile(r"^export\s+(?!type\b)\{([^}]*)\}\s*;?\s*$", re.M)
 DECL_RE = re.compile(
@@ -163,6 +166,11 @@ class Source:
                 m.imports[default] = (target, "default")
             for imported, local in _names(named):
                 m.imports[local] = (target, imported)
+        for block, spec in DYNAMIC_RE.findall(text):
+            target = resolve_module(spec, path, self.src)
+            for imported, local in _names(block):
+                if target is not None and local not in m.imports:
+                    m.imports[local] = (target, imported)
         for block, spec in REEXPORT_RE.findall(text):
             target = resolve_module(spec, path, self.src)
             for imported, local in _names(block):
@@ -558,7 +566,10 @@ def _page_symbols(source: Source, r: _Raw, route: Route) -> None:
         for n in dict.fromkeys(candidates)
         if n in m.lazies or n in m.imports
     ]
-    for prefetch in re.findall(r"\.(prefetch\w+)\(", r.block):
+    # a route that spreads a loader built above it (`...loading`, `...guideLoading(Page)`) keeps
+    # its `page.prefetchXReads(client)` call in the file, not in its own block
+    scope = r.block + (r.local_text if re.search(r"\.\.\.\w+", r.block) else "")
+    for prefetch in dict.fromkeys(re.findall(r"\.(prefetch\w+)\(", scope)):
         for module in modules:
             found = source.resolve_export(module, prefetch)
             if found and found not in route.prefetch:

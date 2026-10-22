@@ -9,6 +9,57 @@
 
 export const GRAPHQL_PATH = '/api/graphql';
 const SETTLE_MS = 800;
+
+// A control the crawler never clicks: its name starts with a verb that writes or runs something.
+// The network guard below is the real backstop; this keeps the page from trying.
+const DENY =
+  /^\W*(save|delete|remove|finali[sz]e|copy|duplicate|run (now|again|screener|it)|evaluate|follow|unfollow|publish|submit|apply|create|reset|clear|discard|approve|reject|waive|retry|send|sign out|log ?out|accept|dismiss|pause|resume|add|new|start)\b/i;
+export const denied = (name) => DENY.test(name);
+
+/**
+ * Whether a browser request may leave: only the web origin (Vite, which proxies to the clone's
+ * API), only reads: GET / HEAD / OPTIONS, and POST /api/graphql when no document is a mutation.
+ * Everything else (REST writes such as /regime/explain, /screens/*\/run, previews, saves) is
+ * aborted and named in the view's note.
+ */
+export function decide(method, url, postData, webOrigin) {
+  const u = new URL(url);
+  if (u.origin !== webOrigin) return { allow: false, reason: `off-origin ${u.origin}` };
+  if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return { allow: true };
+  if (method === 'POST' && u.pathname === GRAPHQL_PATH) {
+    try {
+      const body = JSON.parse(postData ?? '');
+      const docs = (Array.isArray(body) ? body : [body]).map((q) => String(q.query ?? ''));
+      if (!docs.some((d) => /\bmutation\b/.test(d))) return { allow: true };
+      return { allow: false, reason: 'POST /graphql mutation' };
+    } catch {
+      return { allow: false, reason: 'POST /graphql unreadable body' };
+    }
+  }
+  return { allow: false, reason: `${method} ${u.pathname}` };
+}
+
+/** Install the guard on a browser context; every refused request is pushed to ``blocked``. */
+export async function installGuard(context, webUrl, blocked) {
+  const origin = new URL(webUrl).origin;
+  await context.route('**/*', (route) => {
+    const req = route.request();
+    const d = decide(req.method(), req.url(), req.postData(), origin);
+    if (d.allow) return route.continue();
+    blocked.push(d.reason);
+    return route.abort('blockedbyclient');
+  });
+}
+
+/** A route pattern: equal, a path prefix (`/edges` covers `/edges/:id`) or a `*` glob. */
+export function routeMatches(route, pattern) {
+  if (!pattern) return true;
+  if (pattern.includes('*')) {
+    const re = new RegExp(`^${pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`);
+    return re.test(route);
+  }
+  return route === pattern || route.startsWith(`${pattern.replace(/\/$/, '')}/`);
+}
 const SCROLL_STEPS = 12;
 
 /** `{edge}` placeholders of a view's search / route params -> real ids; null when one is missing. */
@@ -103,14 +154,48 @@ const settle = async (page, ms) => {
 };
 
 const RETRY = new Set(['skipped', 'timeout', 'error', 'missing']);
-const ROLE = { tab: 'tab', expand: 'button', radio: 'radio' };
+/**
+ * Runs in the page (self-contained): finds the controls ONE way for both discovery and clicking
+ * (same selector, same label, same nth among the controls of that kind and label), so a
+ * discovered control is the one that gets clicked. mode "discover" lists the tabs not selected,
+ * the collapsed expanders and the unchecked radios; mode "click" clicks the nth one named so.
+ */
+export function inPage(arg) {
+  const SEL = { tab: '[role="tab"]', expand: 'button[aria-expanded]', radio: '[role="radio"]' };
+  const on = {
+    tab: (el) => el.getAttribute('aria-selected') === 'true',
+    expand: (el) => el.getAttribute('aria-expanded') === 'true',
+    radio: (el) => el.getAttribute('aria-checked') === 'true',
+  };
+  const label = (el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().replace(/\s+/g, ' ');
+  const seen = new Map();
+  const found = [];
+  for (const kind of Object.keys(SEL)) {
+    for (const el of document.querySelectorAll(SEL[kind])) {
+      const name = label(el);
+      if (arg.mode === 'click') {
+        if (kind !== arg.kind || !(name === arg.name || name.startsWith(`${arg.name} `))) continue;
+        const n = seen.get('c') ?? 0;
+        seen.set('c', n + 1);
+        if (n === arg.nth) {
+          el.click();
+          return true;
+        }
+      } else if (name) {
+        const key = `${kind}:${name}`;
+        const nth = seen.get(key) ?? 0;
+        seen.set(key, nth + 1);
+        if (!on[kind](el)) found.push({ kind, name, nth });
+      }
+    }
+  }
+  return arg.mode === 'click' ? false : found;
+}
 
-/** Click one step of a view's path; false when the control is not on the page. */
-export async function applyClick(page, click, ms) {
-  const loc = page.getByRole(ROLE[click.kind] ?? 'button', { name: click.name, exact: true });
-  if ((await loc.count()) <= (click.nth ?? 0)) return false;
-  await loc.nth(click.nth ?? 0).click({ timeout: ms });
-  return true;
+/** Click one step of a view's path; false when the control is not on the page (or is denied). */
+export async function applyClick(page, click) {
+  if (denied(click.name)) return false;
+  return page.evaluate(inPage, { mode: 'click', kind: click.kind, name: click.name, nth: click.nth ?? 0 });
 }
 
 /** Scroll top to bottom in steps so lazy sections (intersection observers) load. */
@@ -125,24 +210,10 @@ export async function scrollThrough(page) {
   }
 }
 
-/** The controls on the page now: tabs not selected, collapsed expanders, unchecked radios. */
+/** The controls on the page now (see ``inPage``), the denied ones dropped. */
 export async function discover(page) {
-  return page.evaluate(() => {
-    const name = (el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().replace(/\s+/g, ' ');
-    const count = new Map();
-    const pick = (selector, kind) =>
-      [...document.querySelectorAll(selector)].flatMap((el) => {
-        const n = name(el);
-        const nth = count.get(`${kind}:${n}`) ?? 0;
-        count.set(`${kind}:${n}`, nth + 1);
-        return n ? [{ kind, name: n, nth }] : [];
-      });
-    return [
-      ...pick('[role="tab"]:not([aria-selected="true"])', 'tab'),
-      ...pick('button[aria-expanded="false"]', 'expand'),
-      ...pick('[role="radio"]:not([aria-checked="true"])', 'radio'),
-    ];
-  });
+  const found = await page.evaluate(inPage, { mode: 'discover' });
+  return found.filter((c) => !denied(c.name));
 }
 
 const withTimeout = (promise, ms) =>
@@ -160,6 +231,7 @@ export async function crawlView(page, view, picks, opts) {
   const url = resolveUrl(view, picks);
   if (url === null) return { status: 'skipped', note: 'no real id to fill a placeholder', requests: [], controls: [] };
   record(page, state);
+  const blockedFrom = opts.blocked?.length ?? 0;
   let status = 'ok';
   let note = '';
   let controls = [];
@@ -168,9 +240,9 @@ export async function crawlView(page, view, picks, opts) {
     await settle(page, opts.viewTimeoutMs);
     for (const click of view.clicks ?? []) {
       state.trigger = `click:${click.kind}:${click.name}`;
-      if (!(await applyClick(page, click, 5000))) {
+      if (!(await applyClick(page, click))) {
         status = 'missing';
-        note = `${click.kind} "${click.name}" is not on the page`;
+        note = `${click.kind} "${click.name}" is not on the page (or is a denied action)`;
         return;
       }
       await settle(page, opts.viewTimeoutMs);
@@ -188,6 +260,8 @@ export async function crawlView(page, view, picks, opts) {
     status = 'error';
     note = done.error.slice(0, 200);
   }
+  const blocked = [...new Set((opts.blocked ?? []).slice(blockedFrom))];
+  if (blocked.length) note = `${note} blocked: ${blocked.slice(0, 8).join('; ')}`.trim();
   return { status, note, requests: fold(state.entries), controls };
 }
 
@@ -206,6 +280,17 @@ export function childView(parent, control) {
   };
 }
 
+/** The view ids this run would visit, in file order (not captured yet, or retried). */
+export function pending(doc, opts) {
+  return Object.entries(doc.views)
+    .filter(
+      ([, v]) =>
+        (!v.captured || (opts.retry && RETRY.has(v.captured.status))) &&
+        routeMatches(v.route, opts.onlyRoute),
+    )
+    .map(([id]) => id);
+}
+
 /**
  * Crawl the views file: queue = views not yet captured (resumable), at most `maxViews` this run,
  * `onlyRoute` restricts to a route pattern, `retry` revisits the views that did not finish. Discovered controls become child views, saved into
@@ -214,13 +299,7 @@ export function childView(parent, control) {
  */
 export async function crawl(doc, picks, opts, newPage, save, log = () => {}) {
   const seen = new Set(Object.values(doc.views).map(signature));
-  const queue = Object.entries(doc.views)
-    .filter(
-      ([, v]) =>
-        (!v.captured || (opts.retry && RETRY.has(v.captured.status))) &&
-        (!opts.onlyRoute || v.route === opts.onlyRoute),
-    )
-    .map(([id]) => id);
+  const queue = pending(doc, opts);
   let visited = 0;
   while (queue.length && visited < opts.maxViews) {
     const id = queue.shift();

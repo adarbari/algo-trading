@@ -17,6 +17,7 @@ from views import captured_requests
 REPO = Path(__file__).resolve().parents[2]
 WEB_SRC = REPO / "apps/web/src"
 PAGES_FILE = REPO / "benchmarks/api_latency_pages.json"
+NOWHERE = "nowhere (reached through a prop or registry the walk cannot see, or dead code)"
 DOC_OUT = REPO / "docs/perf/view-coverage.md"
 
 
@@ -95,9 +96,7 @@ def render(doc: dict, report: dict, generated: str) -> str:
     elif report["untriggered"]:
         lines += ["| operation | where the static walk expects it |", "|---|---|"]
         for op, where in report["untriggered"].items():
-            lines.append(
-                f"| {op} | {', '.join(f'`{w}`' for w in where) or 'nowhere (dead code?)'} |"
-            )
+            lines.append(f"| {op} | {', '.join(f'`{w}`' for w in where) or NOWHERE} |")
     else:
         lines.append("None: every operation is triggered by a view.")
     lines += ["", "## Views with no data call", ""]
