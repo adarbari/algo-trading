@@ -19,7 +19,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass, replace
-from datetime import date
+from datetime import date, timedelta
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -537,13 +537,27 @@ def stored_dates(ctx: Stores, table: str) -> tuple[date, ...]:
     return listed[table]
 
 
+def stored_dates_in(ctx: Stores, table: str, start: date, end: date) -> tuple[date, ...]:
+    """The dates of ``start..end`` ``table`` has a partition for, oldest first: exactly
+    ``stored_dates`` restricted to the span, from a probe per day, never a listing of the table
+    (the ingestion grid placed ten sessions by listing 228,948 partitions: 15.8 s cold, 55.9 s
+    under a serving-release pin)."""
+    return tuple(ctx.reader.dates_in(table, start, end))
+
+
 def partition_on(ctx: Stores, table: str, day: date) -> pd.DataFrame | None:
     """``table``'s partition for exactly ``day``, whatever its grain (``None``: none stored):
     an ops loader counting what is stored on each session of a window it names."""
     return ctx.reader.table(table, day)
 
 
-def snapshot_on(ctx: Stores, table: str, day: date) -> Snapshot | None:
+def snapshot_on(ctx: Stores, table: str, day: date, lookback: int | None = None) -> Snapshot | None:
     """The snapshot of ``table`` a read for ``day`` sees (ADR 0007's one rule,
-    ``data.reference.snapshot``); ``None``: the table has no partition at all."""
+    ``data.reference.snapshot``); ``None``: the table has no partition at all. ``lookback``:
+    first probe the ``lookback`` days up to ``day`` and take the latest partition found (the
+    same answer, without listing the table); none there: the rule as it stands."""
+    if lookback is not None:
+        found = ctx.reader.dates_in(table, day - timedelta(days=lookback), day)
+        if found:
+            return Snapshot(table, found[-1], day)
     return snapshot(ctx.reader, table, day)
