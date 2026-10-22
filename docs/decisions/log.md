@@ -446,6 +446,7 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the architect's bar gap analysis (docs of 2026-10-22) shows no page reaches 1 s with code fixes alone; 11 operations need a shaped table or the run ledger; each new table is a new derived artifact with a freshness rule, so the owner wants to review each.
+- Superseded 2026-10-22 by "Domain-aligned derived data" (ADR 0077 amendment (c))
 
 ## 2026-10-22 | Run records (data architecture v2, decision 3) | Slimming the edge-eval job records is on hold
 - Question: after the architect's check showed slimming does not reduce runtime (edge pages read small `edge-eval:<edge>:<user>` records; the 6 MB `job:edge-eval` records are read only by three evaluation-start guards), implement it now?
@@ -463,6 +464,14 @@ follow-up PR).
 - status: final
 - Note: direction is final; the link target (the SEC EDGAR filing page built from cik and accession, one link per filing not per item) is confirmed in the phase 4 design.
 - Reasoning: the text bodies are 4.5 GB of the 56 s uncached read of one name's events and nothing on the page displays them; a link keeps the page useful and the read narrow.
+## 2026-10-22 | Screener "changes" (data architecture v2, decision 4) | Frozen at write, both versions recorded, a "definition changed" mark; re-runs are non-blocking with a visible status and ETA
+- Question: are a screener run's `new` / `dropped` counts recomputed when read, or frozen when the run is written? What happens when the definition changed between the two runs?
+- Options: recompute on read / freeze at write; with freeze: (i) record both versions and show a "definition changed" mark, (ii) compare only against a run of the same version, (iii) freeze silently.
+- Decision: freeze at write (the writer of a run records the previous run's id, the previous run's version and the new and dropped counts in the run's `results/screen_runs` row); (i): the counts are kept as compared with the previous run whatever its version, both versions are recorded, and the screeners list shows a "definition changed" mark (a Guide entry, ADR 0051). The per-name new/dropped tags of a results page still compare the two runs' rows for the names shown. Runs written before this change keep being recomputed on read. Editing a screener stays allowed at any time.
+- Added requirement (owner): a user can change a screener's parameters and run it again; a re-run takes about 15-30 s or more, so it must not block the user: it runs as a job, its status is clearly visible and shows an ETA. The design of that experience is written for the owner's review before it is built.
+- decided by: owner
+- status: final
+- Reasoning: frozen counts mean "what was known when this ran", stay stable when an earlier session's run is superseded, and cost one small read instead of re-resolving two sessions per screener (about 53 s over 92 screeners); the mark keeps the counts honest after a definition change.
 ## 2026-10-22 | Ideas page size (data architecture v2, decision 6) | First 50 picks, a "more" control loads the next 50, and so on
 - Question: the Ideas page returns every pick in one response; how many does a first load carry?
 - Options: top 50 plus a "more" control loading the next 50; keep the full list and virtualise it on screen.

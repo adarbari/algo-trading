@@ -43,13 +43,13 @@ from algotrade.services.read.instruments.identity import Instrument, load_instru
 from algotrade.services.read.instruments.table import DEFAULT_SIZE, catalogue_values
 from algotrade.services.read.screens.runs import (
     ScreenerRun,
-    is_picked,
     load_previous_run,
     run_row_details,
     run_rows,
 )
 from algotrade.services.read.screens.screeners import ScreenGroup
 from algotrade.services.read.values import UnknownCode, to_scalar
+from algotrade.services.screening.rule_results import change_of
 from algotrade.storage.tables.schemas import (
     is_criterion_row,
     is_display_column,
@@ -496,9 +496,7 @@ def _compare(now: pd.DataFrame, before: Mapping[str, str]) -> dict[str, Change]:
     out: dict[str, Change] = {}
     for iid, decision in zip(now["instrument_id"], now["decision"], strict=True):
         was = before.get(str(iid))
-        now_picked, was_picked = is_picked(str(decision)), was is not None and is_picked(was)
-        change = "new" if now_picked and not was_picked else None
-        out[str(iid)] = ("dropped" if was_picked and not now_picked else change, was)
+        out[str(iid)] = (change_of(str(decision), was), was)
     return out
 
 

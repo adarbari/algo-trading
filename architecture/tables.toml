@@ -589,6 +589,16 @@ owner = "src/algotrade/storage/tables/result_writer.py"
 note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row)"
 
 [[table]]
+name = "results/screen_runs"
+owner = "src/algotrade/storage/tables/result_writer.py"
+note = "ScreenRun (ADR 0077 amendment (c)): one row per run of a rule screen, framed by services/screening/rule_results.py from the run's summary and the previous run (found by services/screening/previous.py), written by services/screening/run.py in the run's one publish with results/rule_screen (ADR 0022) for the nightly screen and the API's on-request run; new_picks / dropped are frozen at write against previous_run_id (null: no earlier run), both versions kept; decision counts as parallel arrays; a reader takes the newest knowledge_ts per (user, config); runs before this table have no row and are recomputed on read until the backfill"
+
+[[table]]
+name = "results/screen_picks"
+owner = "src/algotrade/storage/tables/result_writer.py"
+note = "ScreenPick (ADR 0077 amendment (c)): the picked and PAUSED rows of results/rule_screen (same columns, equal), one file per run, sorted by instrument_id, published with it by the same framer; holds no field value (those stay in results/rule_screen_values under their licence); read by the run_id taken from results/screen_runs (read_run), never as a group's newest file (a run with no picks writes none)"
+
+[[table]]
 name = "results/edge_eval"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false

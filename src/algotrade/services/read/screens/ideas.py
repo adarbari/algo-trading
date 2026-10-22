@@ -21,7 +21,6 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.identity import Instrument
 from algotrade.services.read.screens.results import ScreenResult, load_results, run_withheld
 from algotrade.services.read.screens.runs import (
-    PAUSED,
     ScreenerRun,
     load_latest_runs,
     picked_mask,
@@ -29,6 +28,7 @@ from algotrade.services.read.screens.runs import (
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
 from algotrade.services.read.values import Unknown, to_scalar
+from algotrade.services.screening.rule_results import PAUSED
 
 PREFERENCES = "preferences"
 TOP_PER_SCREENER = 3
