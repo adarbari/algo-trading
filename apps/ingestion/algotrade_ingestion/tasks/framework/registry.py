@@ -74,6 +74,7 @@ from algotrade_ingestion.tasks.reference import (
     universe_build,
     universe_import,
 )
+from algotrade_ingestion.tasks.screens import screen_runs_backfill
 from algotrade_ingestion.tasks.shorting import restamp, short_interest, short_volume
 from algotrade_ingestion.tasks.verification import verify
 
@@ -809,6 +810,21 @@ TASKS: dict[str, Task] = {
                     None,
                     "with --dry-run: also verify the plan (slow), as a live run does",
                 ),
+            ),
+        ),
+        Task(
+            "screen-runs-backfill",
+            "frame results/screen_runs and results/screen_picks for the rule-screen runs stored "
+            "before them, from rule_screen and the run records (idempotent, resumable; --limit "
+            "caps the runs framed)",
+            screen_runs_backfill,
+            ("results/screen_runs", "results/screen_picks"),
+            entries_ops.run_screen_runs_backfill,
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "frame this one session only"),
+                FROM,
+                TO,
+                Param("limit", ("--limit",), int, "frame at most N runs this run"),
             ),
         ),
         Task(

@@ -500,9 +500,24 @@ def _compare(now: pd.DataFrame, before: Mapping[str, str]) -> dict[str, Change]:
     return out
 
 
+def load_change_summary(ctx: ReadContext, run: ScreenerRun) -> RunChanges:
+    """``run``'s previous session and ``new`` / ``dropped`` counts, without the per-name tags
+    (``by_instrument`` is empty): a frozen run (a ``screen_runs`` row) reads them as stored, no
+    row of either run; a run before the table is recounted (``load_run_changes``)."""
+    frozen = run.frozen
+    if frozen is None:
+        return load_run_changes(ctx, run)
+    if frozen.previous_run_id is None or frozen.new_picks is None or frozen.dropped is None:
+        return RunChanges(None, (), {})
+    counted = {"new": frozen.new_picks, "dropped": frozen.dropped}
+    counts = tuple(ChangeCount(c, counted[c]) for c in CHANGES)
+    return RunChanges(frozen.previous_session, counts, {})
+
+
 def load_run_changes(ctx: ReadContext, run: ScreenerRun) -> RunChanges:
     """``run`` against the screener's run in the previous stored session (cached per run and
-    published state)."""
+    published state): every name's ``Change`` from the two runs' rows, the counts as frozen when
+    the run has a ``screen_runs`` row, else counted from those rows."""
     key = ("run_changes", run.run_id, ctx.session.date, ctx.reader.version())
     found: RunChanges | None = ctx.cache.get(key)
     if found is not None:
@@ -518,12 +533,13 @@ def load_run_changes(ctx: ReadContext, run: ScreenerRun) -> RunChanges:
             for i, d in zip(before_rows["instrument_id"], before_rows["decision"], strict=True)
         }
         moved = _compare(run_rows(ctx, run), before)
-        counted = pd.Series([c for c, _ in moved.values() if c], dtype="string").value_counts()
-        found = RunChanges(
-            previous.session,
-            tuple(ChangeCount(c, int(counted.get(c, 0))) for c in CHANGES),
-            moved,
-        )
+        frozen = load_change_summary(ctx, run) if run.frozen is not None else None
+        if frozen is not None and frozen.counts:
+            counts = frozen.counts
+        else:
+            counted = pd.Series([c for c, _ in moved.values() if c], dtype="string").value_counts()
+            counts = tuple(ChangeCount(c, int(counted.get(c, 0))) for c in CHANGES)
+        found = RunChanges(previous.session, counts, moved)
     ctx.cache.put(key, found)
     return found
 

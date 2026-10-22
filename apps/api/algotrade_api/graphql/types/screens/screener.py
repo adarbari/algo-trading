@@ -110,8 +110,8 @@ class ScreenerRun:
         "is new or dropped)"
     )
     async def previous_session(self, info: Info) -> dt.date | None:
-        # Off the event loop: the previous run's rows are read and compared (about 11k).
-        found = await off_loop(results.load_run_changes, self.ctx, self.run)
+        # Off the event loop: a run before the frozen table recounts from two runs' rows.
+        found = await off_loop(results.load_change_summary, self.ctx, self.run)
         return found.previous_session
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -119,7 +119,7 @@ class ScreenerRun:
         "whole run; empty: no previous run"
     )
     async def changes(self, info: Info) -> list[ChangeCount]:
-        found = await off_loop(results.load_run_changes, self.ctx, self.run)
+        found = await off_loop(results.load_change_summary, self.ctx, self.run)
         return [ChangeCount.of(c) for c in found.counts]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
