@@ -21,7 +21,7 @@ python scripts/perf/release_writer_run.py --dest /Users/<you>/perf-clone --confi
 Steps: clone the data dir (`cp -c -R`), `algotrade-ingest serve-release --rebuild` on the clone,
 `algotrade-api` on the clone (auth off), `load.py realistic --writer-store <clone>
 --publish-every 120` with `serving.release_reads` true then false (config copies in `--dest`),
-then `load.py cold` straight after an API restart. The API is always stopped at the end;
+then `load.py cold` (one user level, at most 300 s) straight after an API restart. Every child runs with its cwd and `--out` in `--dest/results`, so nothing is written to `var/`; the main checkout is refused as a `--dest` too. The API is always stopped at the end;
 nothing is deleted, remove `--dest` yourself.
 
 ## Reading the result

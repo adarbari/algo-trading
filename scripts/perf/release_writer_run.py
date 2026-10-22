@@ -27,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -70,7 +71,12 @@ def _inside(path: Path, root: Path) -> bool:
 def check_paths(dest: Path, source: Path, clone: Path, repo: Path = REPO) -> None:
     """Refuse a ``dest`` or clone that is in (or is) the real store, ``var/`` or the repo."""
     dest, source, clone = dest.resolve(), source.resolve(), clone.resolve()
+    if not source.is_dir():
+        raise RefusalError(f"the store {source} does not exist or is not a directory")
     var_roots = {repo / "var"} | {p for p in (source, source.parent) if p.name == "var"}
+    main_checkout = source.parent.parent if source.parent.name == "var" else None
+    if main_checkout is not None and _inside(dest, main_checkout):
+        raise RefusalError(f"--dest {dest} is inside the main checkout {main_checkout}")
     if _inside(dest, repo) or _inside(dest, source) or _inside(source, dest):
         raise RefusalError(f"--dest {dest} is inside the repo or overlaps the real store {source}")
     if any(_inside(dest, v) for v in var_roots):
@@ -217,28 +223,37 @@ def plan_lines(args: argparse.Namespace, port: int, clone: Path) -> list[str]:
         f"5a. {load} --scenario realistic --writer-store {clone_url} "
         f"--publish-every {PUBLISH_EVERY_S}  (release_reads=true)",
         "5b. restart the API on config-off (release_reads=false), same load",
-        f"5c. restart the API on config-on, then at once: {load} --scenario cold",
+        f"5c. restart the API on config-on, then at once: load.py --url {url} --users "
+        f"{args.users[0]} --seconds {min(args.seconds, 300)} --scenario cold  (one level, 5 min)",
+        f"   every child runs with cwd={args.dest}/results and reports to --out there",
         f"6. write summary.json and summary.md in {args.dest}/results",
         "7. stop the API; delete nothing (remove --dest yourself)",
     ]
 
 
 @contextlib.contextmanager
-def api_process(tools: Tools, port: int, env: dict[str, str], log: Path) -> Iterator[None]:
+def api_process(
+    tools: Tools, port: int, env: dict[str, str], log: Path, cwd: Path
+) -> Iterator[None]:
     """The API on the clone, stopped on exit whatever happened."""
     with log.open("ab") as out:
         proc = tools.popen(
             [str(REPO / ".venv/bin/algotrade-api"), "--port", str(port)],
             env=env,
+            cwd=cwd,
             stdout=out,
             stderr=subprocess.STDOUT,
         )
         try:
             deadline = time.monotonic() + HEALTH_WAIT_S
-            while not tools.healthy(port):
+            while True:
                 if proc.poll() is not None or time.monotonic() > deadline:
                     raise RuntimeError(f"the API on port {port} did not become healthy ({log})")
+                if tools.healthy(port):
+                    break
                 tools.sleep(1.0)
+            if proc.poll() is not None:  # a foreign server answered, ours already exited
+                raise RuntimeError(f"our API exited; something else answers on port {port}")
             yield
         finally:
             proc.terminate()
@@ -249,20 +264,31 @@ def api_process(tools: Tools, port: int, env: dict[str, str], log: Path) -> Iter
                 proc.wait(timeout=30)
 
 
-def load_run(tools: Tools, args: argparse.Namespace, port: int, extra: list[str]) -> dict:
-    """One load.py run (its report path is the ``written`` line it prints); the report."""
+def load_run(
+    tools: Tools,
+    args: argparse.Namespace,
+    port: int,
+    extra: list[str],
+    users: list[int],
+    seconds: int,
+) -> dict:
+    """One load.py run (its report path is the ``written`` line it prints); the report.
+    Reports and the process's cwd stay in ``--dest``."""
+    results = Path(args.dest).resolve() / "results"
     cmd = [
         sys.executable,
         str(REPO / "scripts/perf/load.py"),
         "--url",
         f"http://127.0.0.1:{port}",
         "--users",
-        *map(str, args.users),
+        *map(str, users),
         "--seconds",
-        str(args.seconds),
+        str(seconds),
+        "--out",
+        str(results),
         *extra,
     ]
-    done = tools.run(cmd, capture_output=True, text=True, env=tools.env, check=False)
+    done = tools.run(cmd, capture_output=True, text=True, env=tools.env, cwd=results, check=False)
     match = re.search(r"^written (\S+)$", done.stdout or "", re.M)
     if done.returncode != 0 or not match:
         raise RuntimeError(f"load.py failed ({done.returncode}): {(done.stderr or '')[-400:]}")
@@ -291,18 +317,20 @@ def execute(args: argparse.Namespace, tools: Tools) -> int:
             "compaction is running"
         )
     dest.mkdir(parents=True)
-    (dest / "results").mkdir()
-    done = tools.run(["cp", "-c", "-R", str(source), str(clone)], check=False)
+    results = dest / "results"
+    results.mkdir()
+    done = tools.run(["cp", "-c", "-R", str(source), str(clone)], cwd=results, check=False)
     if done.returncode != 0:
         raise RuntimeError("the copy-on-write clone failed (is the store on this APFS volume?)")
     on = config_copy(REPO / "config", dest / "config-on", True)
     off = config_copy(REPO / "config", dest / "config-off", False)
-    base = {**tools.env, "ALGOTRADE_DATA_URL": clone_url, "ALGOTRADE_AUTH": "off"}
-    env_on = {**base, "ALGOTRADE_CONFIG_DIR": str(on)}
-    env_off = {**base, "ALGOTRADE_CONFIG_DIR": str(off)}
+    env_on = child_env(tools.env, clone_url, on)
+    env_off = child_env(tools.env, clone_url, off)
+    results = dest / "results"
     rebuilt = tools.run(
         [str(REPO / ".venv/bin/algotrade-ingest"), "serve-release", "--rebuild"],
         env=env_on,
+        cwd=results,
         check=False,
     )
     if rebuilt.returncode != 0:
@@ -323,11 +351,13 @@ def execute(args: argparse.Namespace, tools: Tools) -> int:
             ("realistic+writer release_reads=false", env_off),
         ):
             tools.env = env  # load.py's writer opens the clone through the same env
-            with api_process(tools, port, env, log):
-                reports[label] = load_run(tools, args, port, writer)
+            with api_process(tools, port, env, log, results):
+                reports[label] = load_run(tools, args, port, writer, args.users, args.seconds)
         tools.env = env_on
-        with api_process(tools, port, env_on, log):  # the restart is the cold start
-            reports["cold after restart"] = load_run(tools, args, port, ["--scenario", "cold"])
+        with api_process(tools, port, env_on, log, results):  # the restart is the cold start
+            reports["cold after restart"] = load_run(
+                tools, args, port, ["--scenario", "cold"], args.users[:1], min(args.seconds, 300)
+            )
     finally:
         (dest / "results" / "reports.json").write_text(json.dumps(reports, indent=2))
     verdicts = judge(reports)
@@ -343,6 +373,20 @@ def execute(args: argparse.Namespace, tools: Tools) -> int:
     (dest / "results" / "summary.md").write_text(render_markdown(summary))
     tools.log(render_markdown(summary))
     return 0 if summary["pass"] else 1
+
+
+def child_env(inherited: dict[str, str], clone_url: str, config: Path) -> dict[str, str]:
+    """The environment of every child: inherited minus every ALGOTRADE_* (a real-store URL, a
+    cache dir) except the port base, then the clone, its config and auth off."""
+    keep = {k: v for k, v in inherited.items() if not k.startswith("ALGOTRADE_")}
+    if "ALGOTRADE_PORT_BASE" in inherited:
+        keep["ALGOTRADE_PORT_BASE"] = inherited["ALGOTRADE_PORT_BASE"]
+    return {
+        **keep,
+        "ALGOTRADE_DATA_URL": clone_url,
+        "ALGOTRADE_CONFIG_DIR": str(config),
+        "ALGOTRADE_AUTH": "off",
+    }
 
 
 def parser() -> argparse.ArgumentParser:
@@ -361,17 +405,28 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--dry-run", action="store_true", help="print the plan, change nothing")
     p.add_argument("--min-free-gb", type=float, default=MIN_FREE_GB)
     p.add_argument("--users", type=int, nargs="+", default=[100, 200])
-    p.add_argument("--seconds", type=int, default=300, help="per level (covers 2+ publishes)")
+    p.add_argument(
+        "--seconds", type=int, default=300, help="per level (2+ publishes); cold: min(this, 300)"
+    )
     return p
+
+
+def _terminate(signum: int, _frame: object) -> None:
+    raise SystemExit(128 + signum)  # unwinds through the finally that stops the API
 
 
 def main(argv: list[str] | None = None, tools: Tools | None = None) -> int:
     args = parser().parse_args(argv)
+    sigs = (signal.SIGTERM, signal.SIGHUP)
+    old = {s: signal.signal(s, _terminate) for s in sigs}
     try:
         return execute(args, tools or Tools())
     except RefusalError as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
+    finally:
+        for s, handler in old.items():
+            signal.signal(s, handler)
 
 
 if __name__ == "__main__":
