@@ -254,10 +254,21 @@ def test_a_framed_session_reads_one_screen_runs_partition_and_no_record(
         reader, "read_latest_runs",
         lambda t, d, **kw: (reads.append((t, d)), real(t, d, **kw))[1],
     )  # fmt: skip
-    for name in ("runs_of", "runs"):
-        monkeypatch.setattr(reader, name, lambda *a, **k: pytest.fail("a run record was read"))
-    found = load_pick_histories(ctx, [DELTA], 4)[DELTA]
+    scanned: list[date] = []
+    real_runs = reader.runs
+    monkeypatch.setattr(
+        reader, "runs", lambda j, d=None, *a, **k: (scanned.append(d), real_runs(j, d, *a, **k))[1]
+    )
+    fetched: list[object] = []
+    real_of = reader.runs_of
+    monkeypatch.setattr(reader, "runs_of", lambda *a, **k: (fetched.append(a), real_of(*a, **k))[1])
+    never = ("me", "never")  # no row in any framed session: one cached pass, never a scan each
+    both = load_pick_histories(ctx, [DELTA, never], 4)
+    found = both[DELTA]
     assert [p.picked for p in found] == [2, 2, 2, 2]
+    assert all(p.not_run is not None for p in both[never])
+    assert len(fetched) == 1
+    assert set(scanned) <= {D1}  # the request session's own lookup, never one per earlier day
     frozen_reads = [r for r in reads if r[0].endswith("screen_runs") and r[1] != D1]
     assert sorted(frozen_reads) == sorted({(t, d) for t, d in frozen_reads})  # once per session
     assert {d for _, d in frozen_reads} == {s0, s1, s2}

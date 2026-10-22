@@ -94,15 +94,14 @@ def _counted(day: date, decisions: Mapping[str, int]) -> PickCount:
 
 
 def _frozen_counts(
-    ctx: ReadContext, keys: frozenset[RunKey], days: Sequence[date]
+    ctx: ReadContext, days: Sequence[date]
 ) -> dict[date, dict[RunKey, tuple[int, int]] | None]:
-    """For each of ``days`` with a ``results/screen_runs`` partition, the asked keys' frozen
+    """For each of ``days`` with a ``results/screen_runs`` partition, every owner's frozen
     ``(picked, paused)`` of their newest run (read once per session, one row per run, never a run
     record); ``None``: the session has no such partition (written before the table). Only the
-    asked keys are kept, so one viewer's call never holds another's rows; one cache entry per
-    publish (ADR 0022: key read first)."""
-    key = ("pick_history_frozen", days[0], days[-1], tuple(sorted(keys)),
-           ctx.reader.own_run, ctx.reader.version())  # fmt: skip
+    counts of every owner are held (a few hundred ints, as ``run_summaries`` holds every owner's
+    summary) and the caller reads its own keys; one cache entry per publish (ADR 0022)."""
+    key = ("pick_history_frozen", days[0], days[-1], ctx.reader.own_run, ctx.reader.version())
 
     def build() -> dict[date, dict[RunKey, tuple[int, int]] | None]:
         out: dict[date, dict[RunKey, tuple[int, int]] | None] = {}
@@ -119,8 +118,7 @@ def _frozen_counts(
             for user, config, picked, paused in zip(
                 rows["user_id"], rows["config_id"], rows["picked"], rows["paused"], strict=True
             ):
-                if (str(user), str(config)) in keys:
-                    mine[(str(user), str(config))] = (int(picked), int(paused))
+                mine[(str(user), str(config))] = (int(picked), int(paused))
             out[day] = mine
         return out
 
@@ -139,17 +137,15 @@ def load_pick_histories(
     today = load_latest_runs(ctx, keys) if days[-1] == ctx.session.date else {}
     jobs = {key: run_job_name(key[1], key[0]) for key in keys}
     earlier = [d for d in days if not (today and d == ctx.session.date)]
-    frozen = _frozen_counts(ctx, frozenset(jobs), earlier) if earlier else {}
-    old = [d for d in earlier if frozen.get(d) is None]
-    records = _records(ctx, frozenset(jobs.values()), min(old), max(old)) if old else []
+    frozen = _frozen_counts(ctx, earlier) if earlier else {}
+    # a session with no partition, or a config with no row in one: its records, in ONE cached pass
+    need = {
+        d for d in earlier for key in keys if (found := frozen.get(d)) is None or key not in found
+    }
+    records = _records(ctx, frozenset(jobs.values()), min(need), max(need)) if need else []
     latest: dict[tuple[str, date], RunRecord] = {}
     for record in records:  # by start time: the session's latest record is the last
         latest[(record.job, record.session_date)] = record
-    for day in earlier:  # a framed session's config with no row: its records, if any
-        for key, job in jobs.items():
-            if frozen[day] is not None and key not in frozen[day]:  # type: ignore[operator]
-                for record in sorted(ctx.reader.runs(job, day), key=lambda r: r.started_at):
-                    latest[(job, day)] = record
     return {
         key: tuple(
             _entry(ctx, key, job, day, today.get(key), latest, frozen.get(day)) for day in days
