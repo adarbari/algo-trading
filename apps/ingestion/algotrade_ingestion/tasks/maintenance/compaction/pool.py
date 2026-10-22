@@ -51,7 +51,7 @@ from typing import Any
 from algotrade.services.jobs.exclusive import INGEST_LOCK
 from algotrade.services.jobs.priority import lower_priority
 from algotrade.storage.backends.arrow_memory import limit_threads
-from algotrade.storage.backends.run_compaction import OVER_BUDGET, CompactionVerificationError
+from algotrade.storage.backends.runs.run_compaction import OVER_BUDGET, CompactionVerificationError
 from algotrade.storage.factory import open_backend
 from algotrade.storage.locks import held
 from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError

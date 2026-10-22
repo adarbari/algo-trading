@@ -205,7 +205,7 @@ Backtests pass their launch time and record it with the run ids read.
 A partition (`table`, `session_date`) can hold several runs (a backfill, then nightly runs
 into the same session, a `migrate_ids` rewrite). Each table declares in its `TableSpec`
 (`runs`, `storage/tables/schemas.py`) how they combine, and the backends apply it through
-`storage/backends/run_selection.py` (the one owner; ADR 0007 "How runs combine"), so
+`storage/backends/runs/run_selection.py` (the one owner; ADR 0007 "How runs combine"), so
 `table` and `table_range` return the combined view on every backend:
 
 | Mode | Tables | A read at `as_of` sees |
@@ -282,8 +282,9 @@ storage/
     local.py           now: Parquet on the local filesystem (DuckDB-readable)
     memory.py          in-memory backend for tests
     arrow.py           casts to declared types, schema_version, row groups
-    run_selection.py   which runs a read sees (snapshot / merge, restating runs), merging
+    runs/run_selection.py   which runs a read sees (snapshot / merge, restating runs), merging
                        rows per table key, instrument selection: shared by the backends
+                       (runs/ also holds local_index, run_compaction, run_listing)
     (s3_parquet.py)    later: same files in S3-compatible object storage
     (postgres.py, clickhouse.py, ...)  only if ever needed
   configs/             config documents only (never imports tables/ or backends/)

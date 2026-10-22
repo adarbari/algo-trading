@@ -54,7 +54,7 @@ from algotrade.config.site.settings import load_nightly
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.jobs.exclusive import INGEST_TREE_LOCK, RunLockedError, exclusive_run
 from algotrade.storage.backends.local import LocalBackend
-from algotrade.storage.backends.local_index import SWAP_GRACE_S
+from algotrade.storage.backends.runs.local_index import SWAP_GRACE_S
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.compaction.pool import Plan, Pool, spawn_executor

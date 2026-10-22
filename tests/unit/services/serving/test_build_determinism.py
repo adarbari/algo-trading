@@ -19,7 +19,7 @@ from algotrade.services.serving.build import (
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.backends.release.interfaces import ReleaseInvalidError
 from algotrade.storage.backends.release.memory import MemoryReleaseStore
-from algotrade.storage.backends.run_selection import StaleSnapshotError
+from algotrade.storage.backends.runs.run_selection import StaleSnapshotError
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_rows

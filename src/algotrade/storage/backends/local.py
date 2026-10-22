@@ -55,7 +55,8 @@ from algotrade.storage.backends.arrow import (
     to_frame,
 )
 from algotrade.storage.backends.history import HISTORY, HistoryCopy
-from algotrade.storage.backends.local_index import (
+from algotrade.storage.backends.partial_reads import read_run_file
+from algotrade.storage.backends.runs.local_index import (
     INDEX,
     SWAP_GRACE_S,
     Commits,
@@ -70,8 +71,7 @@ from algotrade.storage.backends.local_index import (
     stored_tables,
     write_index,
 )
-from algotrade.storage.backends.partial_reads import read_run_file
-from algotrade.storage.backends.run_compaction import (
+from algotrade.storage.backends.runs.run_compaction import (
     OVER_BUDGET,
     Budget,
     CompactionOverBudgetError,
@@ -79,8 +79,8 @@ from algotrade.storage.backends.run_compaction import (
     plan_compaction,
     verify_plan,
 )
-from algotrade.storage.backends.run_listing import RunListing
-from algotrade.storage.backends.run_selection import (
+from algotrade.storage.backends.runs.run_listing import RunListing
+from algotrade.storage.backends.runs.run_selection import (
     RunEntry,
     StaleSnapshotError,
     chain,
