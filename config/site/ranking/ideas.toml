@@ -1,0 +1,10 @@
+# The Ideas ranking rule (owner decision 2026-10-22, docs/decisions/log.md "Ideas list").
+# Each screener's run for the session contributes its first picks: a site preset its first
+# `site_top`, the viewer's own screeners their first `user_top`. A pick's score is
+# weight / position (weight 1 for a site preset, `user_weight` for the viewer's own); an idea
+# is its best pick's score (max, never a sum). Read by services/ideas/rule.py; its hash
+# (config/ranking/ideas.py) stamps a cursor and, later, a stored list.
+
+site_top = 5
+user_top = 20
+user_weight = 3

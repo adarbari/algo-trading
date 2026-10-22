@@ -76,6 +76,11 @@ purpose = "schedule vocabularies of an edge document, split from config/edges/do
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
+path = "src/algotrade/config/ranking"
+purpose = "L3 ranking settings: the Ideas ranking rule's parameters (config/site/ranking/ideas.toml, owner decision 2026-10-22) typed and validated, with the hash that identifies the rule (ideas.py)"
+contracts = ["Configs are pure: no storage I/O"]
+
+[[dir]]
 path = "src/algotrade/config/site"
 purpose = "L3 site settings: config/site/*.toml into frozen, validated dataclasses (one loader)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
@@ -458,6 +463,11 @@ purpose = "the payload of a formula_accepted event (ADR 0066 note 2026-10-11): t
 contracts = [
     "Drafting feedback writes only feedback/* tables: no market-data writer, no jobs (ADR 0066)",
 ]
+
+[[dir]]
+path = "src/algotrade/services/ideas"
+purpose = "use case: the Ideas ranking rule (owner decision 2026-10-22): the pure function that turns the viewer's screener pool into their ideas (rule.py); reads nothing, the loader in services/read/screens builds the pool"
+contracts = ["Ideas rule is pure: config and core only (no read, storage, data or other use case)"]
 
 [[dir]]
 path = "src/algotrade/services/jobs"
