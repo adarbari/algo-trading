@@ -17,7 +17,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.jobs.exclusive import DEPLOY_LOCK, INGEST_LOCK, INGEST_TREE_LOCK
 from algotrade.storage.backends import local
 from algotrade.storage.backends.local import LocalBackend
-from algotrade.storage.backends.run_compaction import Budget, CompactionVerificationError
+from algotrade.storage.backends.runs.run_compaction import Budget, CompactionVerificationError
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunRecord, RunStatus

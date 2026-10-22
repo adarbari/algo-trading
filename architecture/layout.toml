@@ -624,6 +624,11 @@ purpose = "the serving release store (ADR 0077): manifest, shared rules, local a
 contracts = ["Parquet / Arrow I/O lives only in storage backends"]
 
 [[dir]]
+path = "src/algotrade/storage/backends/runs"
+purpose = "run records of the table backends: which runs a read sees (run_selection), the partition index files (local_index), compaction of a partition's runs (run_compaction), the cached directory listing (run_listing)"
+contracts = ["Parquet / Arrow I/O lives only in storage backends"]
+
+[[dir]]
 path = "src/algotrade/storage/configs"
 purpose = "config documents only: the ConfigStore protocol and its file / memory stores; the ConfigWriter (writer.py: user drafts, immutable versions, schedules, user features)"
 contracts = [

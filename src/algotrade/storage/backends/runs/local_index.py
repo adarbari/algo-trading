@@ -45,7 +45,7 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.storage.backends.run_selection import RunEntry, chain, chain_needed, committed
+from algotrade.storage.backends.runs.run_selection import RunEntry, chain, chain_needed, committed
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.tables.interfaces import PartitionBusyError
 

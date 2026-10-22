@@ -22,9 +22,9 @@ from algotrade.storage.backends.arrow import (
     to_arrow,
     to_frame,
 )
-from algotrade.storage.backends.local_index import safe
 from algotrade.storage.backends.partial_reads import filter_frame
-from algotrade.storage.backends.run_compaction import (
+from algotrade.storage.backends.runs.local_index import safe
+from algotrade.storage.backends.runs.run_compaction import (
     OVER_BUDGET,
     Budget,
     CompactionOverBudgetError,
@@ -32,7 +32,7 @@ from algotrade.storage.backends.run_compaction import (
     plan_compaction,
     verify_plan,
 )
-from algotrade.storage.backends.run_selection import (
+from algotrade.storage.backends.runs.run_selection import (
     RunEntry,
     chain,
     chain_needed,
