@@ -16,8 +16,10 @@ publish; deleting the folder loses nothing)::
                                 the partition path's row order exactly)
 
 **Staleness (exact, per partition).** A partition's index (``_runs.json``) is replaced by a
-rename on every commit, restate or purge, so its ``(inode, mtime, size)`` names the version of
-everything that partition resolves to. A year's copy serves a read only when every calendar day
+rename on every commit, restate or purge, and its content (every entry carries its commit
+``seq``) names the version of everything that partition resolves to; the signature is the
+size and digest of those bytes, never an inode or mtime, so a cloned or copied store is not
+stale. A year's copy serves a read only when every calendar day
 of the requested range inside that year has the signature the build recorded (``None`` for a
 day with no partition): a changed, new or purged partition, or a restored store, fails the
 check and the read falls back to the partitions. The check is one ``stat`` per requested day.
@@ -31,6 +33,7 @@ treated as stale. The copy serves reads with ``as_of`` None and no ``own_run`` (
 to exactly what it holds); anything else reads partitions.
 """
 
+import hashlib
 import json
 import logging
 import secrets
@@ -107,12 +110,14 @@ class HistoryCopy:
         return self.root / table / f"date={name}"
 
     def _signature(self, table: str, day: date | str) -> str | None:
-        """The version of a partition's index: changes on every commit, restate or purge."""
+        """The version of a partition's index: its content (size and digest), which names every
+        run entry with its commit ``seq``, so it changes on every commit, restate or purge and
+        survives a file copy or an APFS clone (inode and mtime do not)."""
         try:
-            st = (self._partition(table, day) / INDEX).stat()
+            data = (self._partition(table, day) / INDEX).read_bytes()
         except FileNotFoundError:
             return None
-        return f"{st.st_ino}:{st.st_mtime_ns}:{st.st_size}"
+        return f"{len(data)}:{hashlib.sha1(data, usedforsecurity=False).hexdigest()}"
 
     # ------------------------------------------------------------------------ reading
 

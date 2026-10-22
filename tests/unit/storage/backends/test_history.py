@@ -6,6 +6,7 @@ The reference is a read at an ``as_of`` after every run, which always takes the 
 and resolves to what ``as_of`` None does. The ``perf`` test is the budget of an Explore chart's
 read (one instrument, one year) from the copy (``make perf``)."""
 
+import shutil
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -191,6 +192,36 @@ def test_a_restated_partition_makes_its_year_fall_back(tmp_path: Path) -> None:
         got = backend.tables.read_range(TABLE, *args, instruments=["EQ:A"])
     assert taken == [2026]
     _same(got, _reference(backend, TABLE, *args, instruments=["EQ:A"]))
+
+
+def test_a_copied_store_with_new_inodes_and_mtimes_keeps_its_copy_fresh(tmp_path: Path) -> None:
+    # an APFS clone or any file copy changes every inode (and, without -p, every mtime): the
+    # signature is the index's content, so the copy still serves and is not "stale"
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    shutil.copytree(tmp_path / "data", tmp_path / "clone", copy_function=shutil.copyfile)
+    old = tmp_path / "data" / "tables" / TABLE / "date=2026-01-05" / "_runs.json"
+    new = tmp_path / "clone" / "tables" / TABLE / "date=2026-01-05" / "_runs.json"
+    assert old.stat().st_ino != new.stat().st_ino
+    assert old.stat().st_mtime_ns != new.stat().st_mtime_ns
+    cloned = LocalBackend(tmp_path / "clone")
+    assert cloned.tables.history_current(TABLE, date(2026, 1, 5))
+    args = (date(2025, 12, 1), date(2026, 3, 1))
+    with _copy_reads(cloned) as taken:
+        got = cloned.tables.read_range(TABLE, *args, instruments=["EQ:A"])
+    assert taken == [2025, 2026]
+    _same(got, _reference(cloned, TABLE, *args, instruments=["EQ:A"]))
+
+
+def test_a_partition_rewritten_in_a_cloned_store_is_still_detected(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    shutil.copytree(tmp_path / "data", tmp_path / "clone", copy_function=shutil.copyfile)
+    cloned = LocalBackend(tmp_path / "clone")
+    day = date(2026, 1, 5)
+    cloned.tables.write(TABLE, day, "r8", stamped(_rows(1, scale=7.0), day, "r8", LATER), True)
+    assert not cloned.tables.history_current(TABLE, day)
+    assert cloned.tables.history_current(TABLE, date(2025, 12, 22))
 
 
 def test_a_pending_write_changes_nothing_until_it_commits(tmp_path: Path) -> None:
