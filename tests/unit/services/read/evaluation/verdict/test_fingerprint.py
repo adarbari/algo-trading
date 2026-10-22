@@ -11,6 +11,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 
 import algotrade.services.read.evaluation.verdict.fingerprint as fp
@@ -66,6 +67,20 @@ NOT_JUDGED = {
     "algotrade.config.edges.portfolio:PORTFOLIO_KIND": "feeds the call's portfolio flag",
     "algotrade.config.edges.portfolio:benchmark_words": "feeds the call's benchmark words",
     "algotrade.config.site.settings:load_verdict": "loads the settings, hashed whole",
+    "algotrade.config.edges.portfolio:OOS_CLASSES": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:COST_LEVELS": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:DECOYS_STANDARD": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:EDGE_COSTS_KEYS": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:HAIRCUT_KEYS": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:KEYS": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:_cost_levels": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:_decoys": "settings parse: in settings_hash",
+    "algotrade.config.site.fields:Table": "settings parse: in settings_hash",
+    "algotrade.core.views.feature_view:FeatureValue": "a type",
+    "algotrade.services.read.context:run_partition": "the storage read of the run's partition",
+    "algotrade.storage.runs:RunRecord": "a type",
+    "algotrade.storage.tables.interfaces:RowFilter": "a type: the storage read's filter",
+    "algotrade.storage.tables.schemas:result_table": "the table's schema lookup",
     "algotrade.services.read.context:Stores": "a type",
     "algotrade.services.read.context:once_per_request": "the memo of the run's inputs",
     "algotrade.services.read.evaluation.decay:EdgeDecay": "full verdict only (decay)",
@@ -88,8 +103,6 @@ NOT_JUDGED = {
     "algotrade.services.read.evaluation.runs:EdgeRun": "a type: its fields enter the call",
     "algotrade.services.read.evaluation.runs:load_canonical_run": "the run: named by id",
     "algotrade.services.read.evaluation.runs:load_measured_sessions": "full verdict only",
-    "algotrade.services.read.evaluation.runs:load_run_draws": "the run's draws: named by id",
-    "algotrade.services.read.evaluation.runs:load_run_rows": "the run's rows: named by id",
     "algotrade.services.read.evaluation.runs:load_site_trials": "full verdict only",
 }  # fmt: skip
 
@@ -151,6 +164,73 @@ def test_every_name_the_verdict_imports_is_digested_or_declared_not_judged() -> 
     assert all(NOT_JUDGED.values())
 
 
+def _module_names(tree: ast.Module, module: str) -> tuple[dict[str, str], dict[str, str]]:
+    """``(defined, imported)`` at module level: name -> ``module:name`` for its own top-level
+    definitions, and for what it imports from ``algotrade`` (a module alias maps to the module)."""
+    defined: dict[str, str] = {}
+    imported: dict[str, str] = {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            defined[node.name] = f"{module}:{node.name}"
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                if isinstance(t, ast.Name):
+                    defined[t.id] = f"{module}:{t.id}"
+        elif isinstance(node, ast.ImportFrom) and (node.module or "").startswith("algotrade"):
+            for a in node.names:
+                imported[a.asname or a.name] = f"{node.module}:{a.name}"
+    return defined, imported
+
+
+def _references(entry: str) -> set[str]:
+    """Every ``module:name`` (own module or ``algotrade`` import, one hop) that the definition
+    ``entry`` names: the edges of the call graph the digest must cover."""
+    module, name = entry.split(":")
+    tree = ast.parse(inspect.getsource(import_module(module)))
+    defined, imported = _module_names(tree, module)
+    node = next(
+        n for n in tree.body
+        if getattr(n, "name", None) == name
+        or any(isinstance(t, ast.Name) and t.id == name
+               for t in (n.targets if isinstance(n, ast.Assign) else [getattr(n, "target", None)]))
+    )  # fmt: skip
+    found: set[str] = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
+            target = imported.get(n.value.id)
+            if target and inspect.ismodule(_resolve(target)):
+                found.add(f"{target.replace(':', '.')}:{n.attr}")
+                continue
+        if isinstance(n, ast.Name):
+            ref = defined.get(n.id) or imported.get(n.id)
+            if ref and ref != entry and not inspect.ismodule(_resolve(ref)):
+                found.add(ref)
+    return found
+
+
+def _resolve(ref: str) -> Any:
+    module, name = ref.split(":")
+    return getattr(import_module(module), name, None)
+
+
+def _uncovered(judged: set[str]) -> set[str]:
+    """Names the judged code references that are neither judged nor declared not judged."""
+    return {r for e in judged for r in _references(e)} - judged - set(NOT_JUDGED)
+
+
+def test_the_judged_code_is_closed_under_the_names_it_calls() -> None:
+    """Transitive: a helper reached at any depth from the judge's outside code is digested or
+    declared not judged (a change to ``_finite`` must change the digest)."""
+    assert not _uncovered(set(JUDGED_CODE)), sorted(_uncovered(set(JUDGED_CODE)))
+
+
+def test_removing_a_depth_two_helper_from_judged_code_fails_the_closure() -> None:
+    dropped = "algotrade.quant.edges.statistics:_finite"
+    assert dropped in JUDGED_CODE  # reached only through percentile_of
+    assert dropped in _uncovered(set(JUDGED_CODE) - {dropped})
+
+
 def test_every_judged_code_entry_exists() -> None:
     assert judge_digest()  # a name that is not a top-level definition raises LookupError
 
@@ -194,6 +274,10 @@ def test_the_fingerprint_follows_the_judge_version(monkeypatch: pytest.MonkeyPat
     before = fingerprint(call, run.run_id, VerdictSettings())
     monkeypatch.setattr(fp, "JUDGE_VERSION", JUDGE_VERSION + 1)
     assert fingerprint(call, run.run_id, VerdictSettings()) != before
+
+
+def test_floats_hash_by_the_python_repr_not_numpy_s() -> None:
+    assert canonical_json({"x": np.float64(0.1)}) == canonical_json({"x": 0.1})
 
 
 def test_the_settings_hash_covers_the_thresholds() -> None:

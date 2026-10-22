@@ -1,9 +1,10 @@
-"""The fingerprint of a verdict headline (ADR 0053 amendment 2026-10-22): a digest of everything
-the judge reads, so a stored headline is used only when none of it changed. It covers the run
-judged, the whole ``JudgeCall``, the verdict settings, the source of the judge (the verdict
-package and ``JUDGED_CODE``, the code outside it the headline path runs) and ``JUDGE_VERSION``,
-the knob for a semantic change the source digest cannot see. Hashing is sha256 over sorted
-canonical JSON, never ``hash()`` (randomised per process)."""
+"""The fingerprint of a verdict headline (decision log 2026-10-22, "A stored edge verdict
+headline"): a digest of everything the judge reads, so a stored headline is used only when
+none of it changed. It covers the run judged, the whole ``JudgeCall``, the verdict settings,
+the source of the judge (the verdict package and ``JUDGED_CODE``, the code outside it the
+headline path runs, closed under the names it calls) and ``JUDGE_VERSION``, the knob for a
+semantic change the source digest cannot see. Hashing is sha256 over sorted canonical JSON,
+never ``hash()`` (randomised per process)."""
 
 import ast
 import dataclasses
@@ -28,11 +29,13 @@ JUDGE_VERSION = 1  # bump on a semantic change of the judge outside JUDGED_CODE 
 JUDGED_CODE: tuple[str, ...] = (
     "algotrade.config.edges.named:OUT_OF_WINDOW",
     "algotrade.config.edges.verdict:VerdictSettings",
+    "algotrade.quant.edges.statistics:_finite",
     "algotrade.quant.edges.statistics:percentile_of",
     "algotrade.services.read.evaluation.robustness:beat_share",
     "algotrade.services.read.evaluation.robustness:draw_lifts",
     "algotrade.services.read.evaluation.runs:BASELINE",
     "algotrade.services.read.evaluation.runs:DECILES",
+    "algotrade.services.read.evaluation.runs:EDGE_EVAL",
     "algotrade.services.read.evaluation.runs:Draw",
     "algotrade.services.read.evaluation.runs:EdgeRow",
     "algotrade.services.read.evaluation.runs:IN_SAMPLE",
@@ -47,7 +50,16 @@ JUDGED_CODE: tuple[str, ...] = (
     "algotrade.services.read.evaluation.runs:_int",
     "algotrade.services.read.evaluation.runs:_row",
     "algotrade.services.read.evaluation.runs:_rows_of",
+    "algotrade.services.read.evaluation.runs:_in_sample_only",
+    "algotrade.services.read.evaluation.runs:_stored",
     "algotrade.services.read.evaluation.runs:_text",
+    "algotrade.services.read.evaluation.runs:_without_oos_counts",
+    "algotrade.services.read.evaluation.runs:COST",
+    "algotrade.services.read.evaluation.runs:SIDE_PARTS",
+    "algotrade.services.read.evaluation.runs:draws_of_record",
+    "algotrade.services.read.evaluation.runs:load_run_draws",
+    "algotrade.services.read.evaluation.runs:load_run_rows",
+    "algotrade.services.read.evaluation.runs:rows_of_record",
     "algotrade.services.read.evaluation.runs:lift_points",
     "algotrade.services.read.evaluation.runs:rows_of_frame",
     "algotrade.services.read.values:to_scalar",
@@ -112,8 +124,8 @@ def _jsonable(value: Any) -> Any:
         return {f.name: _jsonable(getattr(value, f.name)) for f in dataclasses.fields(value)}
     if isinstance(value, (date, datetime)):
         return value.isoformat()
-    if isinstance(value, float):
-        return repr(value)
+    if isinstance(value, float):  # also numpy's float64, whose own repr is ``np.float64(x)``
+        return float.__repr__(float(value))
     if isinstance(value, dict):
         return {str(k): _jsonable(v) for k, v in value.items()}
     if isinstance(value, (tuple, list, set, frozenset)):
