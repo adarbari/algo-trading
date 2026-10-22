@@ -438,3 +438,35 @@ def test_the_run_parse_cache_is_bounded_in_records(
         runs.save(RunRecord(f"x-2026-10-0{n}-20261003T010203Z", "x", date(2026, 10, n), at))
     assert len(runs.find("x")) == 7
     assert len(runs._parsed) == 3
+
+
+def test_a_scan_of_job_records_does_not_evict_the_nightly_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The store's mix, scaled down (cache 1 MB): mid-size ``job-edge-eval`` records that
+    together exceed the cache, one above the per-record limit, and the nightly records. One
+    ``find("job:edge-eval")`` (every edge-eval submit) must leave the nightly ones cached."""
+    monkeypatch.setattr(local, "MAX_PARSED_BYTES", 1024 * 1024)
+    monkeypatch.setattr(local, "MAX_PARSED_RECORD_BYTES", 400 * 1024)
+    at = datetime(2026, 10, 1, tzinfo=UTC)
+    runs = local.LocalRuns(tmp_path)
+    for n in range(1, 10):
+        day = date(2026, 10, n)
+        pad = {"pad": "x" * 20_000}
+        runs.save(RunRecord(f"nightly-{day}-20261003T010203Z", "nightly", day, at, stats=pad))
+    sizes = [500 * 1024] * 1 + [100 * 1024] * 16  # 1 big, 16 mid: 2.1 MB in all
+    for n, size in enumerate(sizes):
+        runs.save(
+            RunRecord(
+                f"job-edge-eval-{n:016x}",
+                "job:edge-eval",
+                date(2026, 10, 1),
+                at,
+                stats={"rows": "x" * size},
+            )
+        )
+    assert len(runs.find("nightly")) == 9
+    hot = set(runs._parsed)
+    assert len(hot) == 9
+    assert len(runs.find("job:edge-eval")) == 17
+    assert set(runs._parsed) == hot

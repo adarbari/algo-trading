@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -306,11 +307,28 @@ def test_find_decodes_only_the_files_that_can_match(backend: Backend, decodes: l
 
 
 def test_find_equals_an_unfiltered_scan(backend: Backend) -> None:
-    everything = [r for run_id in populate(backend) if (r := backend.runs.load(run_id))]
-    for job in ("nightly", "screen", "job:screen", "job:edge-eval", "absent"):
+    ids = populate(backend)
+    # names a filter could get wrong: odd forms, a job id that looks like another job's name,
+    # edge-evaluation runs (``new_run_id`` of a job with hyphens) and ``screen-<id>`` runs
+    day = date(2026, 10, 2)
+    extra = [
+        RunRecord("odd-name", "nightly", day, FIND_AT),
+        RunRecord("job-nightly", "job:nightly", day, FIND_AT),
+        RunRecord("job-screen-nothex", "job:screen", day, FIND_AT),
+        RunRecord(new_run_id("edge-eval", day, FIND_AT), "edge-eval", day, FIND_AT),
+        RunRecord(new_run_id("evaluation-edge-x", day, FIND_AT), "evaluation-edge-x", day, FIND_AT),
+        RunRecord(new_run_id("screen-abc123", day, FIND_AT), "screen-abc123", day, FIND_AT),
+        RunRecord(new_run_id("screen", day, FIND_AT), "screen", day, FIND_AT),
+    ]
+    for n, record in enumerate(extra):
+        timed = replace(record, started_at=FIND_AT + timedelta(hours=n + 1))
+        backend.runs.save(timed)
+        ids.append(timed.run_id)
+    everything = [r for run_id in ids if (r := backend.runs.load(run_id))]
+    jobs = {r.job for r in everything} | {"absent", "job:edge-eval"}
+    for job in sorted(jobs):
         reference = sorted((r for r in everything if r.job == job), key=lambda r: r.started_at)
         assert backend.runs.find(job) == reference
-        day = date(2026, 10, 2)
         assert backend.runs.find(job, day) == [r for r in reference if r.session_date == day]
 
 
