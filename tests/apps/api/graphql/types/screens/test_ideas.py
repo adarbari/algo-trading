@@ -14,9 +14,9 @@ from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import Graph
 from tests.helpers.api_store import as_user, store_over
 
-IDEAS = """query Ideas($limit: Int!, $names: [FeatureName!]!, $date: Date) {
-  ideas(limit: $limit, date: $date) {
-    session priority total pausedTotal
+IDEAS = """query Ideas($first: Int!, $after: String, $names: [FeatureName!]!, $date: Date) {
+  ideas(first: $first, after: $after, date: $date) {
+    session priority total hasMore nextCursor pausedTotal
     paused { instrumentId instrument { symbol }
              result { configId decision reasons regime sizeMultiplier } }
     screeners {
@@ -41,7 +41,7 @@ NAMES = ["rollup.earnings@v1.next_earnings_date", "rollup.earnings@v1.last_earni
 
 
 def test_ideas_rank_the_runs_of_the_session_with_every_pick(graph: Graph) -> None:
-    body = graph(IDEAS, {"limit": 10, "names": NAMES})
+    body = graph(IDEAS, {"first": 10, "names": NAMES})
     assert "errors" not in body, body
     ideas = body["data"]["ideas"]
     assert (ideas["session"], ideas["priority"], ideas["total"]) == ("2022-11-23", [], 2)
@@ -85,15 +85,33 @@ def test_ideas_rank_the_runs_of_the_session_with_every_pick(graph: Graph) -> Non
 
 
 def test_an_earlier_session_has_its_own_runs_and_limit_caps(graph: Graph) -> None:
-    before = graph(IDEAS, {"limit": 10, "names": [], "date": "2022-11-22"})["data"]["ideas"]
+    before = graph(IDEAS, {"first": 10, "names": [], "date": "2022-11-22"})["data"]["ideas"]
     assert before["session"] == "2022-11-22"
     assert [i["instrument"]["symbol"] for i in before["items"]] == ["BBB", "CCC"]
-    nothing = graph(IDEAS, {"limit": 10, "names": [], "date": "2021-01-04"})["data"]["ideas"]
+    nothing = graph(IDEAS, {"first": 10, "names": [], "date": "2021-01-04"})["data"]["ideas"]
     assert (nothing["items"], nothing["total"]) == ([], 0)
     assert nothing["screeners"][0]["notRun"]["code"] == "NOT_RUN"
-    over = graph(IDEAS, {"limit": 5000, "names": []})
+    over = graph(IDEAS, {"first": 5000, "names": []})
     assert over["data"]["ideas"] is None
     assert over["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
+
+
+def test_ideas_come_in_pages_by_an_opaque_cursor(graph: Graph) -> None:
+    one = graph(IDEAS, {"first": 1, "names": []})["data"]["ideas"]
+    assert [i["instrument"]["symbol"] for i in one["items"]] == ["BBB"]
+    assert (one["total"], one["hasMore"], one["pausedTotal"], len(one["paused"])) == (2, True, 1, 1)
+    assert isinstance(one["nextCursor"], str)
+    two = graph(IDEAS, {"first": 1, "after": one["nextCursor"], "names": []})["data"]["ideas"]
+    assert [(i["rank"], i["instrument"]["symbol"]) for i in two["items"]] == [(2, "AAA")]
+    assert (two["hasMore"], two["nextCursor"], two["total"]) == (False, None, 2)
+    assert (two["pausedTotal"], two["paused"]) == (1, [])  # the paused section is page one's
+    bad = graph(IDEAS, {"first": 1, "after": "garbage", "names": []})
+    assert bad["data"]["ideas"] is None
+    assert bad["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
+    # the default page is 50 and the cap 100
+    assert graph(IDEAS, {"first": 101, "names": []})["errors"][0]["extensions"]["code"] == (
+        "BAD_REQUEST"
+    )
 
 
 def test_screeners_and_a_view(graph: Graph) -> None:
@@ -119,6 +137,6 @@ def test_an_empty_store_has_no_ideas_not_an_error(tmp_path: Path) -> None:
     client = TestClient(
         create_app(ApiSettings("memory://", "config"), store, authenticator=as_user())
     )
-    query = '{ ideas(limit: 5) { total } screeners { id } view(scope: "x") { scope } }'
+    query = '{ ideas(first: 5) { total } screeners { id } view(scope: "x") { scope } }'
     body = client.post("/graphql", json={"query": query}).json()
     assert body == {"data": {"ideas": None, "screeners": [], "view": None}}

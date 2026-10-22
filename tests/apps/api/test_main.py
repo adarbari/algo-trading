@@ -330,8 +330,8 @@ OVERVIEW_NAMES = [
     "rollup.earnings@v1.last_earnings_date", "rollup.earnings@v1.days_to_earnings",
     "rollup.earnings@v1.earnings_time",
 ]  # fmt: skip
-IDEAS_PAGE = """query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
-  ideas(limit: $limit) {
+IDEAS_PAGE = """query IdeasPage($first: Int!, $names: [FeatureName!]!) {
+  ideas(first: $first) {
     session priority total
     screeners {
       screener { id name owner version } run { runId configVersion } notRun { code kind }
@@ -472,7 +472,7 @@ OPERATIONS = {
         {"key": "AAA", "expiry": "2022-12-23", "date": "2022-11-23"},
     ),
     "EtfHoldings": (DETAIL["EtfHoldings"], {"key": "BULL", "top": 10}),
-    "IdeasPage": (IDEAS_PAGE, {"limit": 200, "names": IDEA_NAMES}),
+    "IdeasPage": (IDEAS_PAGE, {"first": 50, "names": IDEA_NAMES}),
     "FeatureCatalogue": (CATALOGUE, {}),
     "FeatureDistribution": (DISTRIBUTION, {"name": "rollup.price_stats@v2.hv20"}),
     "Backtests": (BACKTESTS, {}),

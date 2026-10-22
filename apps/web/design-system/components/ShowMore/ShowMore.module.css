@@ -1,0 +1,8 @@
+/* ShowMore: it sits under a list with the list's own gutter; the progress line may shrink and wrap beside the button on a narrow container. */
+.root {
+  padding: var(--space-3);
+}
+
+.line {
+  min-width: 0;
+}

@@ -95,7 +95,7 @@ def _static(**variables: object) -> Callable[[date], dict]:
 
 
 PAGES: dict[str, list[Op]] = {
-    "ideas": [Op("IdeasPage", _static(limit=200, names=IDEA_NAMES))],
+    "ideas": [Op("IdeasPage", _static(first=50, after=None, names=IDEA_NAMES))],
     "regime": [
         Op("Regime", _static()),
         Op("RegimeEpisodes", _static()),
