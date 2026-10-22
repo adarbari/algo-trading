@@ -1,12 +1,12 @@
 """Guide prose split for linking (ADR 0051; ADR 0038: the browser does not parse text): a
 text becomes ``LinkedProse``, its segments in order, each plain text or one catalogue name
 (``field``) the text mentions. A name matches exactly as written (``feature.atr_pct``,
-``rollup.momentum@v1.rel_volume``) and only when the caller's catalogue holds it; a trailing
-dot is the sentence's. A page that has sources (``sources=<count>``) also gets its source
-markers ``[^n]`` (``config/site/guide/sources.py``) as their own segments, ``n`` naming one of
-its ``count`` sources; without a count a marker is plain text (the pages not yet written with
-sources). Joining the segments' text gives the text back unchanged. The one splitter of the
-Guide: the field page's related fields come from it too."""
+``rollup.momentum@v1.rel_volume``) and only when the catalogue it is given holds it (site
+prose: the site's); a trailing dot is the sentence's. A page that has sources
+(``sources=<count>``) also gets its source markers ``[^n]`` (``config/site/guide/sources.py``) as
+their own segments, ``n`` naming one of its ``count`` sources; without a count a marker is plain
+text (the pages not yet written with sources). Joining the segments' text gives the text back
+unchanged. The one splitter of the Guide: the field page's related fields come from it too."""
 
 import re
 from collections.abc import Container, Iterable
