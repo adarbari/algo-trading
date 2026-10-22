@@ -60,6 +60,8 @@ const response: IdeasResponse = {
     session: '2026-10-02',
     priority: ['vrp', 'liq'],
     total: 3,
+    hasMore: false,
+    nextCursor: null,
     pausedTotal: 1,
     paused: [
       {

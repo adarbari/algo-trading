@@ -226,7 +226,7 @@ def test_it_warms_what_the_ideas_page_reads(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(warm, "load_edge_desk", lambda c: ran.append("edge desk"))
     monkeypatch.setattr(warm, "load_episodes", lambda configs: type("E", (), {"episodes": []}))
     warm.warm(type("C", (), {"configs": None})())  # type: ignore[arg-type]
-    assert ran == ["screeners", "ideas 200", "edge desk"]
+    assert ran == ["screeners", "ideas 50", "edge desk"]
 
 
 def test_warm_home_reads_only_the_home_steps(monkeypatch: pytest.MonkeyPatch) -> None:

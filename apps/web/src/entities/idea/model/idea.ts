@@ -106,6 +106,8 @@ export interface IdeasData {
   session: string | null;
   total: number;
   ideas: Idea[];
+  /** Whether the server has more ideas after the ones loaded (the next page's cursor exists). */
+  hasMore: boolean;
   /** How many picks the gate paused over every run, and the first of them (never hidden). */
   pausedTotal: number;
   paused: PausedIdea[];
@@ -227,6 +229,7 @@ export const NO_IDEAS: IdeasData = {
   session: null,
   total: 0,
   ideas: [],
+  hasMore: false,
   pausedTotal: 0,
   paused: [],
   screeners: [],
@@ -254,6 +257,7 @@ export function toIdeasData(response: IdeasResponse): IdeasData {
     ideas: found.items
       .map((item) => toIdea(item, names))
       .filter((idea): idea is Idea => idea !== null),
+    hasMore: found.hasMore,
     pausedTotal: found.pausedTotal,
     paused: found.paused.map((entry) => toPaused(entry, names)),
     screeners: found.screeners.map(toScreener),

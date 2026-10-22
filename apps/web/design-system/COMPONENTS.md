@@ -1369,6 +1369,20 @@ Source: `design-system/components/ShareBar`
 | `size` | `'sm' \| 'md'` | no | Bar thickness: `sm` 6 px (lists, default) or `md` 10 px (a headline bar). |
 | `loading` | `boolean` | no | Placeholder track while the value loads. |
 
+### ShowMore
+
+ShowMore: the control under a list that loads in pages. It says how far the list has come ("Showing 50 of 312", a polite live region) and offers the next page; while it loads the button is busy, when it failed the line says so and the button retries, and when everything is shown it is a line only. The caller owns the data: this renders what it is told and calls `onMore`. Wraps under its own line on a narrow container; touch sizing from Button.
+
+Source: `design-system/components/ShowMore`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `shown` | `number` | yes | How many rows the list shows now. |
+| `total` | `number` | yes | How many rows exist in all (the server's count). |
+| `pageSize` | `number` | no | How many rows the next page adds at most (default 50: the button reads "Show 50 more"). |
+| `status` | `'idle' \| 'loading' \| 'error'` | no | `idle` (default), `loading` (the next page is on its way) or `error` (it failed). |
+| `onMore` | `() => void` | yes | Ask for the next page (also the retry after an error). |
+
 ### Skeleton
 
 Skeleton: placeholder shapes in the track colour while content loads, laid out like the content to come so the page does not jump: `text` (lines, the last one shorter), `rect` (a chart or an image area) or `table` (rows of cells at the density's row height). A slow pulse, none under reduced motion. Announced once as busy with `label` ("Loading ideas…"); the shapes themselves are hidden from screen readers.

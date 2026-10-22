@@ -360,6 +360,21 @@ def test_the_app_keys_on_the_stores_own_runs_generation(harness: Harness) -> Non
     assert harness.wired == harness.store.reader.runs_generation
 
 
+def test_each_ideas_page_has_its_own_key_by_its_cursor() -> None:
+    """``after`` is a variable, so page two never answers with page one's bytes (owner decision
+    2026-10-22, "Ideas page size"); the first page asked with and without a null cursor differ
+    only as the client sent them."""
+    who = UserRecord("ana", Role.TRADER)
+    doc = "query IdeasPage($first: Int!, $after: String) { ideas(first: $first, after: $after) { total } }"  # noqa: E501
+    one = response_key(1, who, doc, {"first": 50, "after": None}, "IdeasPage", (1, 1))
+    two = response_key(1, who, doc, {"first": 50, "after": "YzI6NTA"}, "IdeasPage", (1, 1))
+    three = response_key(1, who, doc, {"first": 50, "after": "Yzk6MTAw"}, "IdeasPage", (1, 1))
+    assert len({one, two, three}) == 3
+    assert (
+        "IdeasPage" in RUN_OPERATIONS
+    )  # keyed on the runs generation too, so a new run moves them
+
+
 def test_the_key_holds_the_variables_and_the_document() -> None:
     who = UserRecord("ana", Role.ADMIN)
     base = response_key(1, who, "{ a }", {"x": 1, "y": 2}, None)

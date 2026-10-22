@@ -2001,7 +2001,7 @@ type IdeaScreener {
 }
 
 """
-The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` the first `limit` of `total` picked tickers, `paused` the first `limit` of `pausedTotal` picks the regime gate held back (never counted in `total`)
+The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` one page of the `total` picked tickers (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
 """
 type Ideas {
   session: Date!
@@ -2011,6 +2011,10 @@ type Ideas {
   items: [Idea!]!
   pausedTotal: Int!
   paused: [PausedIdea!]!
+  nextCursor: String
+
+  """Whether another page follows this one"""
+  hasMore: Boolean!
 }
 
 """What an indicator did before one episode, in one line"""
@@ -2539,10 +2543,11 @@ type Query {
   ): EventCalendar
 
   """
-  The tickers the user's screeners picked in the session, ranked by their screener priority then score (the first `limit`); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
+  The tickers the user's screeners picked in the session, ranked by their screener priority then score (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
   """
   ideas(
-    limit: Int! = 50
+    first: Int! = 50
+    after: String = null
 
     """
     the session to read (default: the latest with bars); every value below is for exactly this date
