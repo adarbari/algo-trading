@@ -78,12 +78,13 @@ export function observeVersions(key: QueryKey | null | undefined, headers: Heade
   // an answer whose query is gone (its user signed out while it was in flight) says nothing
   if (key && !active.client?.getQueryCache().find({ queryKey: key, exact: true })) return;
   const generation = headers.get('x-config-generation');
-  if (generation !== null) {
+  // asked outside a query, its user may have gone: no baseline from it
+  if (generation !== null && key) {
     const n = Number(generation);
-    if (key) seen.userKeyed.add(String(key[1]));
+    seen.userKeyed.add(String(key[1]));
     if (seen.generation !== undefined && n > seen.generation) {
       invalidateOthers(key, seen.userKeyed);
-    } else if (key && seen.generation !== undefined && n < seen.generation) {
+    } else if (seen.generation !== undefined && n < seen.generation) {
       refetchOnLanding(key); // sent before a write
     }
     seen.generation = Math.max(n, seen.generation ?? n);

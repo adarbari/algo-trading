@@ -85,6 +85,26 @@ describe('the signed-in user, seeded', () => {
   });
 });
 
+describe('an answer asked outside a query', () => {
+  it('sets no generation baseline, even after the user it was asked for has gone', async () => {
+    const stale = seeded(['Ideas', 'Views']);
+    observeVersions(null, headers(20)); // landed after forgetVersions: the previous user's
+    observe('Ideas', headers(2)); // the next user's first answer is the baseline
+    observe('Views', headers(2));
+    observe('Ideas', headers(2));
+    active.client?.setQueryData(key('Ideas'), 3); // its data lands: a late answer would be stale now
+    await Promise.resolve();
+    expect(stale()).toEqual([]); // not refetched as late against 20
+  });
+
+  it('still reads the release', () => {
+    const stale = seeded(['Ideas', 'Views']);
+    observe('Ideas', headers(undefined, 'r1'));
+    observeVersions(null, headers(undefined, 'r2'));
+    expect(stale()).toEqual(['Ideas', 'Views']);
+  });
+});
+
 describe('observeVersions', () => {
   it('invalidates the user-keyed queries when the generation rises, not the one just answered', () => {
     const stale = seeded(['Ideas', 'Views', 'RegimeBands']);
