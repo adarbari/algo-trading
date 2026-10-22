@@ -20,7 +20,8 @@ export {
   useRegimeEpisodes,
   useRegimeSignals,
 } from './api/hooks';
-export { regimeFixture, unknownRegimeFixture } from './model/fixtures';
+export { REGIME_SOURCES_OPERATION, useRegimeSources } from './api/sources';
+export { regimeFixture, regimeSourcesFixture, unknownRegimeFixture } from './model/fixtures';
 export {
   BAND_LABELS,
   episodeBands,
@@ -73,6 +74,7 @@ export {
   type RegimeBand,
   type RegimeEpisode,
   type RegimeIndicator,
+  type RegimeSources,
   type RegimeLabel,
   type RegimeScore,
   type RegimeSizing,

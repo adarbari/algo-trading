@@ -148,14 +148,27 @@ def _provenance(
     return latest, first
 
 
-def load_sources(
+@dataclass(frozen=True)
+class SeriesProvenance:
+    """A series' provenance for the session: the ``IndicatorSource`` fields it fills."""
+
+    last_observation: date | None
+    vintage_date: date | None
+    vintage_kind: str | None
+    first_vintage: date | None
+
+
+NO_PROVENANCE = SeriesProvenance(None, None, None, None)
+
+
+def _found(
     ctx: ReadContext,
     names: Mapping[str, Sequence[str]],
     macro: MacroSettings,
     tables: Sequence[InputSource],
-) -> dict[str, tuple[IndicatorSource, ...]]:
-    """Per card key, the sources its features (``names``: card key -> its value and verdict
-    features) reach, in lineage order, with each series' provenance for ``ctx.session``."""
+) -> dict[str, list[IndicatorSource | tuple[str, MacroSeries]]]:
+    """Per card key, its sources in lineage order: a table's source whole, a series as
+    ``(leaf, series)`` still to be described (no stored read)."""
     by_card: dict[str, list[IndicatorSource | tuple[str, MacroSeries]]] = {}
     for key, features in names.items():
         found: list[IndicatorSource | tuple[str, MacroSeries]] = []
@@ -166,25 +179,65 @@ def load_sources(
             elif table is not None:
                 found.append(_table(table))
         by_card[key] = found
-    ids = tuple(sorted({s[1].instrument_id for f in by_card.values() for s in f
-                        if isinstance(s, tuple)}))  # fmt: skip
+    return by_card
+
+
+def _provenance_of(
+    ctx: ReadContext, found: Iterable[IndicatorSource | tuple[str, MacroSeries]]
+) -> dict[str, SeriesProvenance]:
+    """Per series key of ``found``, its provenance: the one stored read of the vintages."""
+    series = {s.key: s for f in found if isinstance(f, tuple) for s in (f[1],)}
+    ids = tuple(sorted({s.instrument_id for s in series.values()}))
     latest, first = _provenance(ctx, ids) if ids else ({}, {})
     day = ctx.session.date
+    out: dict[str, SeriesProvenance] = {}
+    for key, s in series.items():
+        p, earliest = latest.get(s.instrument_id), first.get(s.instrument_id)
+        out[key] = SeriesProvenance(
+            p.last_observation if p else None,
+            p.vintage_date if p else None,
+            p.vintage_kind if p else None,
+            earliest if earliest is not None and earliest <= day else None,
+        )
+    return out
+
+
+def load_sources(
+    ctx: ReadContext,
+    names: Mapping[str, Sequence[str]],
+    macro: MacroSettings,
+    tables: Sequence[InputSource],
+    *,
+    provenance: bool = True,
+) -> dict[str, tuple[IndicatorSource, ...]]:
+    """Per card key, the sources its features (``names``: card key -> its value and verdict
+    features) reach, in lineage order, with each series' provenance for ``ctx.session``
+    (``provenance=False``: without it, and without the stored read it costs;
+    ``load_provenance`` is that part)."""
+    by_card = _found(ctx, names, macro, tables)
+    found_provenance = (
+        _provenance_of(ctx, (s for f in by_card.values() for s in f)) if provenance else {}
+    )
 
     def described(found: IndicatorSource | tuple[str, MacroSeries]) -> IndicatorSource:
         if isinstance(found, IndicatorSource):
             return found
         leaf, s = found
-        p, earliest = latest.get(s.instrument_id), first.get(s.instrument_id)
-        return replace(
-            _described(leaf, s),
-            last_observation=p.last_observation if p else None,
-            vintage_date=p.vintage_date if p else None,
-            vintage_kind=p.vintage_kind if p else None,
-            first_vintage=earliest if earliest is not None and earliest <= day else None,
-        )
+        p = found_provenance.get(s.key)
+        return replace(_described(leaf, s), **vars(p or NO_PROVENANCE))
 
     return {key: tuple(described(s) for s in found) for key, found in by_card.items()}
+
+
+def load_provenance(
+    ctx: ReadContext,
+    names: Mapping[str, Sequence[str]],
+    macro: MacroSettings,
+    tables: Sequence[InputSource],
+) -> dict[str, SeriesProvenance]:
+    """The heavy part of ``load_sources``: per series key (of every card), its provenance."""
+    by_card = _found(ctx, names, macro, tables)
+    return _provenance_of(ctx, (s for f in by_card.values() for s in f))
 
 
 def activate(

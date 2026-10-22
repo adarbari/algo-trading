@@ -5,6 +5,9 @@ name outside the catalogue is an UNKNOWN_FEATURE error."""
 
 from typing import Any
 
+import pytest
+
+from algotrade.services.read.regime import indicators
 from tests.apps.api.graphql.conftest import Graph
 from tests.helpers.api_store import END, PREVIOUS
 
@@ -183,3 +186,28 @@ def test_a_history_of_a_computed_or_unknown_name_is_refused(graph: Graph) -> Non
     assert body["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
     body = graph(HISTORY, {**variables, "names": [], "points": 1})
     assert body["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
+
+
+SHELL = """query S { regime { session label headline
+  indicators { key sources { label cadence active } } } }"""
+PROVENANCE = """query P { regime { indicators { key sources { series lastObservation vintageDate
+  vintageKind firstVintage } } } }"""
+
+
+def test_the_shell_regime_never_reads_the_vintages_and_the_sources_query_reads_them_once(
+    graph: Graph, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The shell's `Regime` (no provenance field) never builds the provenance (the 2.9 M-row vintage
+    read); a query that selects one of its fields builds it once for every indicator."""
+    reads: list[int] = []
+    real = indicators.load_indicator_provenance
+
+    def counting(ctx):  # type: ignore[no-untyped-def]
+        reads.append(1)
+        return real(ctx)
+
+    monkeypatch.setattr(indicators, "load_indicator_provenance", counting)
+    shell = _data(graph(SHELL))["regime"]
+    assert reads == [] and shell["indicators"]
+    found = _data(graph(PROVENANCE))["regime"]["indicators"]
+    assert len(reads) == 1 and any(s["series"] for i in found for s in i["sources"])

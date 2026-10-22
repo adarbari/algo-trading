@@ -207,3 +207,25 @@ def test_only_the_sessions_source_of_a_switched_card_is_active() -> None:
     assert by_bars == {"bars/1d": True, "instruments/symbol_ids": True, "series:SPX": False}
     assert not any(s.active for s in activate(found, switch, None))  # not stored: none fed it
     assert activate(found, None, None) == found and all(s.active for s in found)
+
+
+def test_the_sources_without_provenance_plus_the_provenance_part_equal_the_composed_ones(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The API serves the provenance lazily: `load_sources(provenance=False)` reads no vintage
+    and `load_provenance` fills exactly the four fields `load_sources()` composes."""
+    ctx = replace(context(store_with(_macro)), features=SITE)
+    lineage = {c.key: (c.feature, c.feature + "_on") for c in CARDS.cards}
+    composed = load_sources(ctx, lineage, MACRO, CARDS.sources)
+    reads: list[object] = []
+    monkeypatch.setattr(f"{sources.__name__}.stored_vintages", lambda *a: reads.append(a))
+    window = load_sources(ctx, lineage, MACRO, CARDS.sources, provenance=False)
+    assert reads == []  # the cached vintages of the composed run are not even consulted
+    assert all(s.last_observation is None for found in window.values() for s in found)
+    lazy = sources.load_provenance(ctx, lineage, MACRO, CARDS.sources)
+    filled = {
+        key: tuple(replace(s, **vars(lazy[s.series])) if s.series in lazy else s for s in found)
+        for key, found in window.items()
+    }
+    assert filled == composed
+    assert lazy["UNRATE"].first_vintage == date(1964, 6, 1)

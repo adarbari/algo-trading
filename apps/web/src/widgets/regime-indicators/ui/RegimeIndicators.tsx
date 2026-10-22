@@ -5,17 +5,25 @@
  */
 import { Panel, Skeleton, Stack } from '@algotrade/ui';
 
-import { indicatorsOfPace, useRegime, type Regime } from '@/entities/regime';
+import {
+  indicatorsOfPace,
+  useRegime,
+  useRegimeSources,
+  type Regime,
+  type RegimeSources,
+} from '@/entities/regime';
 
 import { IndicatorCard } from './IndicatorCard';
 
 function PaceList({
   regime,
+  sources,
   pace,
   title,
   description,
 }: {
   regime: Regime;
+  sources: RegimeSources | undefined;
   pace: 'slow' | 'fast';
   title: string;
   description: string;
@@ -34,6 +42,7 @@ function PaceList({
           <Stack as="li" key={indicator.key}>
             <IndicatorCard
               indicator={indicator}
+              indicatorSources={sources?.get(indicator.key) ?? []}
               session={regime.session}
               explainable={regime.label !== 'UNKNOWN'}
             />
@@ -46,6 +55,8 @@ function PaceList({
 
 export function RegimeIndicators() {
   const regime = useRegime();
+  // The provenance read is apart from the shell's `Regime`: only this page asks for it.
+  const sources = useRegimeSources().data;
   if (regime.isPending || regime.isError || regime.data === null) {
     const state = regime.isError ? 'error' : regime.isPending ? 'ready' : 'empty';
     return (
@@ -64,12 +75,14 @@ export function RegimeIndicators() {
     <Stack gap={3}>
       <PaceList
         regime={regime.data}
+        sources={sources}
         pace="slow"
         title="Slow-moving warning signs"
         description="Credit, jobs and the yield curve: they change over weeks"
       />
       <PaceList
         regime={regime.data}
+        sources={sources}
         pace="fast"
         title="Fast-moving market signs"
         description="Trend, volatility and breadth: they change daily"

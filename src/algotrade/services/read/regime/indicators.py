@@ -21,7 +21,13 @@ from algotrade.features.rollups.market import indicators as rules
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.regime.fields import CHANGED, ON, Reading, read_fields
-from algotrade.services.read.regime.sources import IndicatorSource, activate, load_sources
+from algotrade.services.read.regime.sources import (
+    IndicatorSource,
+    SeriesProvenance,
+    activate,
+    load_provenance,
+    load_sources,
+)
 from algotrade.services.read.values import Unknown
 
 
@@ -169,16 +175,19 @@ def _indicator(
     )
 
 
-def load_indicators(ctx: ReadContext) -> tuple[RegimeIndicator, ...]:
+def load_indicators(ctx: ReadContext, *, provenance: bool = True) -> tuple[RegimeIndicator, ...]:
     """Every card, in file order, with its value, verdict and change for ``ctx.session``, its
-    threshold and direction, and its sources with their provenance."""
+    threshold and direction, and its sources with their provenance (``provenance=False``:
+    the sources without it; ``load_indicator_provenance`` is that part)."""
     doc = load_cards(ctx.configs)
     cards = doc.cards
     names = [n for c in cards for n in (c.feature, c.feature + ON, c.feature + CHANGED)]
     switches = [c.source_by.feature for c in cards if c.source_by is not None]
     read = read_fields(ctx, [*names, *switches])
     lineage = {c.key: (c.feature, c.feature + ON) for c in cards}
-    sources = load_sources(ctx, lineage, load_macro(ctx.configs), doc.sources)
+    sources = load_sources(
+        ctx, lineage, load_macro(ctx.configs), doc.sources, provenance=provenance
+    )
     found = _rules(ctx)
     return tuple(
         _indicator(card, read, found.get(card.key), _active(card, read, sources[card.key]))
@@ -192,3 +201,11 @@ def _active(
     """``found`` with the session's source marked (``source_by``: read for the session)."""
     switch = card.source_by
     return activate(found, switch, read[switch.feature].value if switch else None)
+
+
+def load_indicator_provenance(ctx: ReadContext) -> dict[str, SeriesProvenance]:
+    """The provenance of every series the cards reach for ``ctx.session``, by series key: the
+    stored-vintage read that ``load_indicators(provenance=False)`` leaves out."""
+    doc = load_cards(ctx.configs)
+    lineage = {c.key: (c.feature, c.feature + ON) for c in doc.cards}
+    return load_provenance(ctx, lineage, load_macro(ctx.configs), doc.sources)

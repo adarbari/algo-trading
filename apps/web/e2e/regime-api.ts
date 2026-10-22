@@ -27,6 +27,17 @@ const REGIME = fixture('regime');
 const BANDS = fixture('regime-bands');
 const EPISODES = fixture('regime-episodes');
 
+/** The `RegimeSources` answer: each indicator's sources, from the recorded regime. */
+const SOURCES = {
+  data: {
+    regime: {
+      indicators: (
+        REGIME as { data: { regime: { indicators: { key: string; sources: unknown }[] } } }
+      ).data.regime.indicators.map(({ key, sources }) => ({ key, sources })),
+    },
+  },
+};
+
 interface Timing {
   indicator: string;
   kind: 'FAST' | 'SLOW' | 'GATE';
@@ -170,6 +181,7 @@ export async function mockRegimeApi(page: Page): Promise<void> {
       await route.fulfill({ json: signalsAnswer() });
     else if (/query\s+RegimeBands\b/.test(query)) await route.fulfill({ json: BANDS });
     else if (/query\s+RegimeEpisodes\b/.test(query)) await route.fulfill({ json: EPISODES });
+    else if (/query\s+RegimeSources\b/.test(query)) await route.fulfill({ json: SOURCES });
     else if (/query\s+Regime\b/.test(query)) await route.fulfill({ json: REGIME });
     else await route.fallback();
   });
@@ -197,7 +209,8 @@ export async function mockRegimeComputed(page: Page): Promise<void> {
   };
   await page.route('**/api/graphql', async (route: Route) => {
     const query = (route.request().postDataJSON() as { query?: string } | null)?.query ?? '';
-    if (/query\s+Regime\b/.test(query)) await route.fulfill({ json: computed });
+    if (/query\s+RegimeSources\b/.test(query)) await route.fulfill({ json: SOURCES });
+    else if (/query\s+Regime\b/.test(query)) await route.fulfill({ json: computed });
     else await route.fallback();
   });
 }

@@ -29,6 +29,7 @@ import {
   onWhenLine,
   provenanceLine,
   sourceItems,
+  type IndicatorSource,
   type RegimeIndicator,
 } from '@/entities/regime';
 import { GuideHelp } from '@/features/guide-help';
@@ -40,10 +41,13 @@ const isNumber = (value: unknown): value is number => typeof value === 'number';
 
 export function IndicatorCard({
   indicator,
+  indicatorSources,
   session,
   explainable,
 }: {
   indicator: RegimeIndicator;
+  /** Its sources with their provenance (empty until `RegimeSources` arrives). */
+  indicatorSources: readonly IndicatorSource[];
   /** The regime's session: the end of the history window and of the presets. */
   session: string;
   explainable: boolean;
@@ -53,8 +57,8 @@ export function IndicatorCard({
   const format = indicatorFormat(indicator);
   const change = indicatorChange(indicator);
   const reason = indicator.unknown ? unknownText(indicator.unknown) : undefined;
-  const sources = sourceItems(indicator);
-  const provenance = indicator.sources.flatMap((source) => provenanceLine(source) ?? []);
+  const sources = sourceItems(indicatorSources);
+  const provenance = indicatorSources.flatMap((source) => provenanceLine(source) ?? []);
   const thresholds = meterThresholds(indicator);
   const onWhen = onWhenLine(indicator, format);
   return (

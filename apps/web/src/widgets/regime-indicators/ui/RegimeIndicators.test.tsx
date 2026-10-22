@@ -2,15 +2,22 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { regimeFixture, unknownRegimeFixture, type Regime } from '@/entities/regime';
+import {
+  regimeFixture,
+  regimeSourcesFixture,
+  unknownRegimeFixture,
+  type Regime,
+  type RegimeSources,
+} from '@/entities/regime';
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { RegimeIndicators } from './RegimeIndicators';
 
-const hooks = vi.hoisted(() => ({ useRegime: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useRegime: vi.fn(), useRegimeSources: vi.fn() }));
 vi.mock('@/entities/regime', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRegime: hooks.useRegime,
+  useRegimeSources: hooks.useRegimeSources,
 }));
 
 vi.mock('@/features/indicator-history', async () => {
@@ -47,6 +54,8 @@ vi.mock('@/features/regime-explain', async () => {
 
 beforeEach(() => {
   hooks.useRegime.mockReset();
+  hooks.useRegimeSources.mockReset();
+  hooks.useRegimeSources.mockReturnValue(fakeQuery<RegimeSources>(regimeSourcesFixture()));
 });
 
 /** Open every card's row (the rows are compact; the detail shows once opened). */
@@ -179,5 +188,19 @@ describe('RegimeIndicators', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(unknownRegimeFixture()));
     render(<RegimeIndicators />);
     expect(screen.queryByRole('button', { name: /^Explain /, hidden: true })).toBeNull();
+  });
+});
+
+describe('RegimeIndicators sources', () => {
+  it('asks for the sources apart from the regime, and shows the cards without them meanwhile', async () => {
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
+    hooks.useRegimeSources.mockReturnValue({
+      ...fakeQuery<RegimeSources>(new Map()),
+      data: undefined,
+    });
+    render(<RegimeIndicators />);
+    expect(hooks.useRegimeSources).toHaveBeenCalled();
+    await openRows(regimeFixture());
+    expect(screen.queryByRole('link', { name: /FRED NFCI/ })).toBeNull();
   });
 });
