@@ -2,9 +2,14 @@
 `scripts/perf/api_latency.py`: pure logic only (a fake pstats table, no server, no store)."""
 
 import asyncio
+import cProfile
 import importlib.util
+import os
+import pstats
+import signal
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -306,3 +311,226 @@ def test_the_read_pool_calls_run_inline_on_the_calling_thread() -> None:
         return a, b
 
     assert asyncio.run(go()) == (threading.get_ident(), threading.get_ident())
+
+
+# ---- --profile-limit: snapshots, stability, partial section, cut ----------------------------
+
+
+def _snap(t: float, other: float, fs: float, stat: int = 0, opened: int = 0) -> dict:
+    return {
+        "t": t,
+        "buckets": {"other": other, "filesystem walks": fs},
+        "counts": {"stat calls": stat, "files opened": opened},
+    }
+
+
+def test_snapshot_of_a_fake_profile_has_buckets_and_counters() -> None:
+    snap = pp.snapshot_of(_fake(), 12.0)
+    assert snap["t"] == 12.0 and snap["counts"]["stat calls"] == 4
+    assert sum(snap["buckets"].values()) == pytest.approx(14.5)
+
+
+def test_stability_needs_three_snapshots_and_moves_under_five_points() -> None:
+    steady = [_snap(60, 50, 50), _snap(120, 52, 48), _snap(180, 53, 47), _snap(240, 54, 46)]
+    assert pp.stability(steady) == "STABILITY: shares stable"
+    moving = [_snap(60, 90, 10), _snap(120, 70, 30), _snap(180, 50, 50)]
+    assert "still moving" in pp.stability(moving)
+    assert "too few" in pp.stability(steady[:2])
+    # only the last three count: an early swing does not matter
+    assert pp.stability([_snap(1, 99, 1), *steady]) == "STABILITY: shares stable"
+
+
+def test_trend_table_has_shares_counters_and_rates() -> None:
+    lines = pp.trend_table([_snap(10, 50, 50, stat=1000, opened=20)])
+    row = lines[-1]
+    assert "| 10 |" in row and "50%" in row and "1,000" in row and "100" in row  # 100 stat/s
+
+
+def test_partial_section_is_labelled_and_carries_trend_stability_and_the_note() -> None:
+    snaps = [_snap(60, 50, 50, 10, 1), _snap(120, 51, 49, 20, 2), _snap(180, 52, 48, 30, 3)]
+    row = {**_ROW, "partial": {"reason": "limit", "elapsed": 180.0, "snapshots": snaps}}
+    md = pp.render_page("/p", [row])
+    assert "PARTIAL: profiled for 180 s, the call had not finished" in md
+    assert "STABILITY: shares stable" in md and "| elapsed s |" in md
+    assert "absolute seconds are lower bounds" in md
+
+
+def test_run_profiled_cuts_at_the_limit_and_keeps_snapshots_and_the_profile() -> None:
+    def spin() -> None:
+        end = time.perf_counter() + 5
+        while time.perf_counter() < end:
+            sum(range(1000))
+
+    res = pp.run_profiled(spin, limit_s=0.35, snapshot_s=0.1)
+    assert res.cut == "limit" and 0.3 < res.elapsed < 2
+    assert len(res.snapshots) >= 3 and res.stats  # ticks, plus the final snapshot
+    assert [s["t"] for s in res.snapshots] == sorted(s["t"] for s in res.snapshots)
+
+
+def test_run_profiled_returns_the_value_when_the_call_finishes() -> None:
+    res = pp.run_profiled(lambda: 7, limit_s=5, snapshot_s=1)
+    assert res.value == 7 and res.cut is None
+
+
+def test_a_sigterm_during_the_call_is_a_cut_not_a_crash() -> None:
+    old = signal.signal(signal.SIGTERM, pp._on_signal)
+    try:
+        res = pp.run_profiled(lambda: os.kill(os.getpid(), signal.SIGTERM) or 1, limit_s=None)
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    assert res.cut == "SIGTERM"
+
+
+def test_partial_row_writes_the_section_even_when_cut(tmp_path: Path) -> None:
+    res = pp.Profiled(stats=_fake(), snapshots=[_snap(1, 1, 1)], cut="SIGTERM", elapsed=3.0)
+    row = pp.partial_row("Op", res)
+    out = tmp_path / "p.md"
+    pp._flush(out, "/p", [row])
+    text = out.read_text()
+    assert "PARTIAL: profiled for 3 s" in text and "SIGTERM" in text
+
+
+def test_limit_and_snapshot_must_be_positive_and_guards_are_unchanged() -> None:
+    bad = lat.parse_args(["--profile", "--page", "/a", "--profile-limit", "0"])
+    assert lat.profile_selection_error(bad)
+    assert lat.profile_selection_error(
+        lat.parse_args(["--profile", "--page", "/a", "--profile-snapshot", "-1"])
+    )
+    ok = lat.parse_args(["--profile", "--page", "/a", "--profile-limit", "600"])
+    assert not lat.profile_selection_error(ok) and ok.profile_limit == 600
+    assert lat.parse_args(["--profile", "--page", "/a"]).profile_limit is None
+    real = lat.REPO / "var" / "data"
+    assert (
+        lat.main(
+            ["--profile", "--page", "/x", "--profile-limit", "5", "--data-url", f"file://{real}"]
+        )
+        == 2
+    )
+    with pytest.raises(pp.SwapLowError):
+        pp.swap_guard(500, reader=lambda: 1.0)
+
+
+def test_a_cut_unwinds_a_blocking_call_inside_an_asyncio_task() -> None:
+    """The ASGI call is a task that blocks the loop thread (inline resolvers): the Cut raised in
+    the handler must come out of run_until_complete, and the drain must leave no task pending."""
+    loop = asyncio.new_event_loop()
+
+    async def blocked() -> None:
+        end = time.perf_counter() + 5
+        while time.perf_counter() < end:
+            sum(range(1000))
+
+    res = pp.run_profiled(
+        lambda: loop.run_until_complete(blocked()),
+        limit_s=0.2,
+        snapshot_s=0.1,
+        on_cut=lambda: pp._drain(loop),
+    )
+    assert res.cut == "limit" and res.elapsed < 2
+    assert not [t for t in asyncio.all_tasks(loop) if not t.done()]
+    loop.close()
+
+
+# ---- review fixes: snapshots keep the stack, atomic flush, Cut inside an exception group ------
+
+
+def _leaf() -> int:
+    return sum(range(2000))
+
+
+def _mid() -> None:
+    end = time.perf_counter() + 0.4
+    while time.perf_counter() < end:
+        _leaf()
+
+
+def _outer() -> None:
+    _mid()
+
+
+def _entry(stats: dict, name: str) -> tuple:
+    return next(v for k, v in stats.items() if k[2] == name and "test_page_profile" in k[0])
+
+
+def test_a_mid_run_snapshot_leaves_callers_and_cumulative_time_intact() -> None:
+    res = pp.run_profiled(_outer, limit_s=None, snapshot_s=0.05)
+    assert len(res.snapshots) >= 3  # ticks happened while _mid was on the stack
+    leaf, mid, outer = (_entry(res.stats, n) for n in ("_leaf", "_mid", "_outer"))
+    assert any(k[2] == "_mid" for k in leaf[4])  # the leaf calls after a snapshot keep a caller
+    assert any(k[2] == "_outer" for k in mid[4])
+    assert outer[3] > 0.9 * res.elapsed and mid[3] > 0.9 * res.elapsed  # outer frames kept gaining
+    # and the leaf time reaches the outer frames' bucket path: the table is a connected graph
+    assert sum(r[1] for r in leaf[4].values()) == leaf[1]
+
+
+def test_stats_now_matches_pstats_after_the_profile_stops() -> None:
+    prof = cProfile.Profile()
+    prof.enable()
+    _outer_short()
+    prof.disable()
+    mine, theirs = pp.stats_now(prof), pstats.Stats(prof).stats
+    assert mine.keys() == theirs.keys()
+    for key in mine:
+        assert mine[key][:2] == theirs[key][:2] and set(mine[key][4]) == set(theirs[key][4])
+
+
+def _outer_short() -> None:
+    for _ in range(50):
+        _leaf()
+
+
+def test_flush_is_atomic_and_a_signal_during_it_never_truncates_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "page-profiles.md"
+    pp._flush(out, "/a", [{**_ROW}])
+    before = out.read_text()
+    real_render = pp.render_page
+
+    def render_then_signal(route: str, rows: list) -> str:
+        os.kill(os.getpid(), signal.SIGTERM)  # arrives mid-flush: must be held back
+        return real_render(route, rows)
+
+    monkeypatch.setattr(pp, "render_page", render_then_signal)
+    old = signal.signal(signal.SIGTERM, pp._on_signal)
+    try:
+        with pytest.raises(pp.Cut):  # delivered once the flush is done
+            pp._flush(out, "/b", [{**_ROW}])
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    text = out.read_text()
+    assert "## `/a`" in text and "## `/b`" in text and text.startswith(before.split("##")[0])
+    assert [p.name for p in tmp_path.iterdir()] == ["page-profiles.md"]  # no temp file left
+
+
+def test_a_failed_write_keeps_the_old_file_and_removes_the_temp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "p.md"
+    pp._flush(out, "/a", [{**_ROW}])
+    before = out.read_text()
+
+    def boom(*_: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "replace", boom)
+    with pytest.raises(OSError):
+        pp._flush(out, "/b", [{**_ROW}])
+    assert out.read_text() == before and [p.name for p in tmp_path.iterdir()] == ["p.md"]
+
+
+def test_a_cut_wrapped_in_exception_groups_is_still_a_cut() -> None:
+    def nested() -> None:
+        raise BaseExceptionGroup(
+            "tg", [ValueError("x"), BaseExceptionGroup("in", [pp.Cut("limit")])]
+        )
+
+    res = pp.run_profiled(nested, limit_s=None)
+    assert res.cut == "limit"
+    assert pp.find_cut(ValueError("plain")) is None
+
+    def other() -> None:
+        raise BaseExceptionGroup("tg", [ValueError("x")])
+
+    with pytest.raises(BaseExceptionGroup):
+        pp.run_profiled(other, limit_s=None)
