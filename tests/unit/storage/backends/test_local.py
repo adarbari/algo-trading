@@ -358,3 +358,44 @@ def test_has_partition_is_one_stat_not_a_walk_of_the_table(
     found = [backend.tables.has_partition(t, START) for t in tables]
     assert found == [True] * 4
     assert stats["n"] <= 4 * 3  # a few per table (path checks), never 30 per table
+
+
+def test_another_process_sees_every_change_on_its_next_call(tmp_path: Path) -> None:
+    """The API (reader) and ingestion (writer) are two ``LocalBackend``s on one root: the kept
+    listing is keyed on what is on disk (sequence, epoch), never on the process."""
+    root = tmp_path / "data"
+    reader, writer = LocalBackend(root), LocalBackend(root)
+    d2, d3 = START + timedelta(days=1), START + timedelta(days=2)
+
+    def seen() -> list[date]:
+        found = reader.tables.dates(TABLE)
+        assert [reader.tables.has_partition(TABLE, d) for d in (START, d2, d3)] == [
+            d in found for d in (START, d2, d3)
+        ]
+        return found
+
+    assert seen() == []
+    writer.tables.write(TABLE, START, "r", stamped(_one(), START, "r"), pending=True)
+    writer.tables.commit_run("r", T0 + timedelta(hours=1))
+    assert seen() == [START]  # a commit
+    writer.tables.write(TABLE, d2, "direct", stamped(_one(), d2, "direct"))
+    assert seen() == [START, d2]  # a direct write
+    writer.tables.write(TABLE, d3, "r2", stamped(_one(), d3, "r2"), pending=True)
+    writer.tables.commit_run("r2", T0 + timedelta(hours=2))
+    assert seen() == [START, d2, d3]
+    other = "rollups/market/other@v1"
+    writer.tables.write(other, START, "r3", stamped(_one(), START, "r3"))
+    assert reader.tables.dates(other) == [START]
+    assert writer.tables.drop(other) == 1  # a drop
+    assert reader.tables.dates(other) == [] and not reader.tables.has_partition(other, START)
+    live = "live/option_quotes"
+    for day in (START, d2):
+        row = {
+            "instrument_id": f"OPT:{day}", "underlying_id": "EQ:A", "expiry": day,
+            "ts": pd.Timestamp(day, tz="UTC"), "right": "C", "strike": 100.0, "bid": 1.0,
+        }  # fmt: skip
+        writer.tables.write(live, day, "q", stamped([row], day, "q"), pending=True)
+    writer.tables.commit_run("q", T0 + timedelta(hours=3))
+    assert reader.tables.dates(live) == [START, d2]
+    assert writer.tables.purge_before(live, d2) == 1  # a purge
+    assert reader.tables.dates(live) == [d2] and not reader.tables.has_partition(live, START)

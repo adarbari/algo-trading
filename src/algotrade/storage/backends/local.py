@@ -470,7 +470,11 @@ class LocalTables:
         the sequence (the sequence is read first, so a commit landing mid-listing re-keys it), a
         direct write of a new partition, a drop and a purge bump the epoch (after the change as
         well as before it where the sequence does not move). Pending writes are not here: they
-        are merged on top by ``dates``, never kept."""
+        are merged on top by ``dates``, never kept. A crash between a change and its final
+        sequence / epoch move (a purge killed after the rmtree before the sequence write, a drop
+        or a direct write before its second bump) leaves a stale listing in another process until
+        the next commit or epoch bump; ``dates`` and ``has_partition`` can disagree in that
+        window, and it heals itself."""
         key = (self.commits.published(), self.commits.epoch())
         with self._dates_lock:
             held_ = self._live_dates.get(table)
