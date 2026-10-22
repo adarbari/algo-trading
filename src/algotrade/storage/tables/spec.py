@@ -55,6 +55,7 @@ class TableSpec:
     key: tuple[str, ...] = ()
     retention_days: int | None = None
     whole_per_group: bool = False
+    cluster_by: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.runs not in RUN_MODES:
@@ -89,12 +90,13 @@ def fixed(
     key: tuple[str, ...] = (),
     retention_days: int | None = None,
     whole_per_group: bool = False,
+    cluster_by: tuple[str, ...] = (),
 ) -> TableSpec:
     spec = TableSpec(
         name, grain, required, columns=columns_of(*columns), runs=runs, key=key,
-        retention_days=retention_days, whole_per_group=whole_per_group,
+        retention_days=retention_days, whole_per_group=whole_per_group, cluster_by=cluster_by,
     )  # fmt: skip
-    undeclared = [c for c in (*COMMON, *required, *key) if spec.column(c) is None]
+    undeclared = [c for c in (*COMMON, *required, *key, *cluster_by) if spec.column(c) is None]
     if undeclared:
         raise ValueError(f"{name}: required columns without a type: {undeclared}")
     return spec

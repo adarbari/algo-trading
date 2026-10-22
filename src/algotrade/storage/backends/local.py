@@ -49,8 +49,7 @@ from algotrade.storage.backends.arrow import (
     file_groups,
     file_stats,
     keep_columns,
-    parquet_bytes,
-    row_groups_holding,
+    table_parquet_bytes,
     table_spec,
     to_arrow,
     to_frame,
@@ -71,6 +70,7 @@ from algotrade.storage.backends.local_index import (
     safe,
     write_index,
 )
+from algotrade.storage.backends.partial_reads import read_run_file
 from algotrade.storage.backends.run_compaction import (
     OVER_BUDGET,
     Budget,
@@ -98,7 +98,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, is_job_record_name, job_of_name, run_session
-from algotrade.storage.tables.interfaces import CompactionReport, PartitionStats
+from algotrade.storage.tables.interfaces import CompactionReport, PartitionStats, RowFilter
 from algotrade.storage.tables.schemas import require_retention
 
 
@@ -157,7 +157,7 @@ class LocalTables:
         pending: bool = False,
     ) -> None:
         directory = self._dir(table, session_date)
-        data = parquet_bytes(to_arrow(table, frame))
+        data = table_parquet_bytes(table, to_arrow(table, frame))
         known = None if frame.empty else pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
         if pending:
             file = self.commits.stage(table, session_date, safe(run_id), known, restates)
@@ -357,6 +357,7 @@ class LocalTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
         upto: int | None = None,
     ) -> pd.DataFrame | None:
         directory = self._dir(table, session_date)
@@ -367,8 +368,8 @@ class LocalTables:
             if entry is None:
                 return None
             try:
-                return _read_run_file(
-                    directory / run_file(run_id, entry), run_id, columns, instruments
+                return read_run_file(
+                    directory / run_file(run_id, entry), run_id, columns, instruments, where
                 )
             except FileNotFoundError as gone:  # a commit replaced the version
                 raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
@@ -675,7 +676,7 @@ class LocalTables:
             return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
         fresh = {r: f"run={r}~{secrets.token_hex(4)}.parquet" for r in plan.rewritten}
         kept = kept_entries(expected, plan, fresh)
-        encoded = {r: parquet_bytes(plan.kept[r]) for r in plan.rewritten}
+        encoded = {r: table_parquet_bytes(table, plan.kept[r]) for r in plan.rewritten}
         size_after = sum(len(encoded[r]) if r in encoded else sizes[r] for r in plan.kept)
         report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))
         if dry_run:
@@ -738,37 +739,6 @@ def _read_file(
         keep = None if columns is None else keep_columns(columns)
         present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
         data = parquet.read(columns=present)
-    if instruments is None:
-        return data
-    ids = data.column("instrument_id")
-    return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments), type=ids.type)))
-
-
-def _read_run_file(
-    path: Path,
-    run_id: str,
-    columns: Sequence[str] | None = None,
-    instruments: Sequence[str] | None = None,
-) -> pa.Table:
-    """One version file's rows stamped ``run_id``: the row groups whose ``run_id`` statistics
-    cannot hold it (nor, with ``instruments``, any of them in ``instrument_id``) are skipped
-    (not decoded), then the rest is filtered exactly. ``columns``: only those and
-    ``keep_columns`` are decoded."""
-    with pq.ParquetFile(path) as parquet:
-        keep = None if columns is None else keep_columns(columns)
-        present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
-        if "run_id" not in parquet.schema_arrow.names:
-            return parquet.read(columns=present)
-        groups = row_groups_holding(parquet, "run_id", [run_id])
-        if instruments is not None and "instrument_id" in parquet.schema_arrow.names:
-            near = set(row_groups_holding(parquet, "instrument_id", instruments))
-            groups = [g for g in groups if g in near]
-        data = (
-            parquet.read_row_groups(groups, columns=present)
-            if groups
-            else parquet.schema_arrow.empty_table().select(present or parquet.schema_arrow.names)
-        )
-    data = data.filter(pc.equal(data.column("run_id"), run_id))
     if instruments is None:
         return data
     ids = data.column("instrument_id")
