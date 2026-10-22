@@ -1,6 +1,6 @@
 /**
- * The edge model: the `EdgesPage` response (ADR 0053, ED8) as the pages show it. Each edge keeps
- * what the server sent, verdict included: the verdict, its reason, every figure and sentence are
+ * The edge model: the `EdgesPage` list rows and the `EdgeDetail` edge (ADR 0053, ED8) as the pages show
+ * them. Each edge keeps what the server sent, verdict included: the verdict, its reason, every figure and sentence are
  * the read model's, so this only names the labels and tones of the served codes and their order.
  */
 import type { StatusTone } from '@algotrade/ui';
@@ -8,7 +8,10 @@ import type { StatusTone } from '@algotrade/ui';
 import type { gqlTypes } from '@/shared/api';
 
 export type EdgesResponse = gqlTypes.EdgesPageQuery;
-export type Edge = EdgesResponse['edges'][number];
+/** One row of the list: the edge's own fields and the headline of its verdict (`summary`). */
+export type EdgeRow = EdgesResponse['edges'][number];
+/** One edge in full (the `EdgeDetail` read): the whole verdict, definition and runs. */
+export type Edge = gqlTypes.EdgeDetailQuery['edges'][number];
 /** One edge's document, as the builder reads it (no verdict, no runs). */
 export type EdgeDocument = gqlTypes.EdgeDocumentQuery['edges'][number];
 export type EdgeVerdict = Edge['verdict'];
@@ -132,7 +135,7 @@ export const EDGE_VIEWS = [
 export type EdgeView = (typeof EDGE_VIEWS)[number]['value'];
 
 /** Whether an edge belongs to a view (rejected: by the user, or the site's own verdict). */
-export function inView(edge: Edge, view: EdgeView): boolean {
+export function inView(edge: Pick<EdgeRow, 'mine' | 'state' | 'status'>, view: EdgeView): boolean {
   if (view === 'mine') return edge.mine;
   if (view === 'following') return edge.state === 'following';
   if (view === 'rejected') return edge.state === 'rejected' || edge.status === 'rejected';
@@ -140,5 +143,5 @@ export function inView(edge: Edge, view: EdgeView): boolean {
 }
 
 /** The state the list shows: the user's own, else the site's status for an edge not yet theirs. */
-export const stateOrStatus = (edge: Edge): string =>
+export const stateOrStatus = (edge: Pick<EdgeRow, 'state' | 'status'>): string =>
   edge.state === 'researching' ? statusLabel(edge.status) : stateLabel(edge.state);

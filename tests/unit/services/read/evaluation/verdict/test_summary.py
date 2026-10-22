@@ -24,6 +24,7 @@ from algotrade.services.read.evaluation.verdict import (
 from algotrade.services.read.evaluation.verdict import rule as rule_module
 from algotrade.storage.backends.memory import MemoryBackend
 from tests.unit.services.read.evaluation.conftest import DOCS, EDGE, FROZEN, stores, write_run
+from tests.unit.services.read.evaluation.conftest import row as stored_row
 from tests.unit.services.read.evaluation.test_versions import (
     ctx_for,
     mine,
@@ -147,6 +148,89 @@ def test_a_hidden_copys_summary_says_in_sample_and_never_leaks_the_withheld_figu
     ctx = ctx_for(backend, with_copy())
     found = versions.load_summary(ctx, mine(ctx))
     assert "Out-of-sample" not in found.result and "0.80" not in found.result
+
+
+# --- the loader: a strong, a middling and a failing run reach their labels through `summary` ---
+
+
+def _draws(beaten: int, edge: str, of: int = 100) -> list[dict[str, Any]]:
+    """``of`` random-pick draws of ``edge``'s run, ``beaten`` below the screener's lift (1.2)."""
+    return [
+        stored_row("random:momo", "draw", 0.5, FROZEN, role="random", slice_value=str(i),
+                   edge_id=edge, lift=1.0 if i < beaten else 1.5)
+        for i in range(of)
+    ]  # fmt: skip
+
+
+def test_the_loader_reaches_works_promising_and_not_working_through_the_summary() -> None:
+    """One site edge per level, each with its own run and draws: the headline loader judges the
+    stored rows and draws to the same label as the full loader, whatever the level."""
+    ok = {"sessions": 60, "picks": 600, "hits": 360, "lift": 1.2, "base_rate": 0.5, "trials": 3,
+          "decile_spread": 0.05, "decile_t": 2.5, "sharpe": 1.0, "deflated_sharpe": 0.9,
+          "pbo": 0.3, "picks_t": 3.0}  # fmt: skip
+
+    def insample(edge: str) -> dict[str, Any]:
+        return stored_row("momo", "in_sample", 0.6, FROZEN, edge_id=edge, **ok)
+
+    whole = {"sessions": 70, "deflated_sharpe": 0.9, "pbo": 0.3, "sharpe": 1.0}
+    docs = {
+        **DOCS,
+        **{
+            ("site", "edges", i): {**EDGE, "id": i, "name": i}
+            for i in ("strong", "middling", "bad")
+        },
+    }
+    backend = MemoryBackend()
+    write_run(  # beats its random draws and has the whole-period evidence
+        backend, "r1", FROZEN, 0.6, edge="strong", minutes=1,
+        oos={**ok, "decile_t": 3.0, "decile_spread": 0.9},
+        whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2, "sharpe": 1.0},
+        extra=[insample("strong"), *_draws(100, "strong")],
+    )  # fmt: skip
+    write_run(
+        backend,
+        "r2",
+        FROZEN,
+        0.6,
+        edge="middling",
+        minutes=2,
+        oos=ok,
+        whole=whole,
+        extra=[insample("middling")],
+    )  # no draws stored
+    write_run(  # below the base rate and beating no draw
+        backend, "r3", FROZEN, 0.4, edge="bad", minutes=3,
+        oos={**ok, "hits": 240, "lift": 0.8}, whole=whole,
+        extra=[insample("bad"), *_draws(0, "bad")],
+    )  # fmt: skip
+    ctx = stores(backend, docs=docs)
+    seen = {}
+    for e in load_edges(ctx):
+        if e.id in ("strong", "middling", "bad"):
+            full = versions.load_verdict(ctx, e)
+            _same(full, versions.load_summary(ctx, e))
+            seen[e.id] = full.verdict
+    assert seen == {"strong": WORKS, "middling": PROMISING, "bad": NOT_WORKING}
+
+
+def test_a_page_asking_summary_and_verdict_reads_each_runs_rows_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = MemoryBackend()
+    write_run(backend, "a0", FROZEN, 0.6)
+    ctx = stores(backend, docs=DOCS)
+    seen: list[str] = []
+    real = runs_module.load_run_rows
+
+    def spy(c: Any, run: Any, *a: Any) -> Any:
+        seen.append(run.run_id)
+        return real(c, run, *a)
+
+    monkeypatch.setattr(runs_module, "load_run_rows", spy)
+    edge = load_edges(ctx)[0]
+    versions.load_summary(ctx, edge)
+    versions.load_verdict(ctx, edge)
+    assert seen == ["a0"]
 
 
 # --- the cost: what the headline does not read --------------------------------------------
