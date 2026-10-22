@@ -117,3 +117,9 @@ def job_of_name(stem: str) -> str | None:
         return f"job:{match.group(1)}"
     match = _RUN_JOB.match(stem)
     return match.group(1) if match else None
+
+
+def is_job_record_name(stem: str) -> bool:
+    """True for a ``services/jobs`` record's file name (``job-<kind>-<16 hex>``): those records
+    carry the whole result of the job and are large (an ``edge-eval`` one is up to 6 MB)."""
+    return _JOB_RECORD.match(stem) is not None
