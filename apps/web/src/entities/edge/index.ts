@@ -7,7 +7,13 @@
  * (`Query.edgeResult`: the evidence curve, drawdown, rolling starts, monthly map, decay, costs,
  * capacity, regimes and horizons, one read each). Never reads an exploratory run as a track record.
  */
-export { prefetchEdges, refreshEdges, useEdgeProblems, useEdges } from './api/edges';
+export {
+  prefetchEdges,
+  refreshEdges,
+  useEdgeDocument,
+  useEdgeProblems,
+  useEdges,
+} from './api/edges';
 export { useEdgeTrades, type TradesRequest } from './api/evidence';
 export {
   useEdgeCapacity,
@@ -38,6 +44,7 @@ export {
   verdictTone,
   VERDICT_ORDER,
   type Edge,
+  type EdgeDocument,
   type EdgeProblem,
   type EdgeView,
   type EdgesResponse,

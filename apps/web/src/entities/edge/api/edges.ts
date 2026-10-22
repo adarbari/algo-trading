@@ -206,6 +206,48 @@ const EdgesPage = graphql(`
   }
 `);
 
+/**
+ * One edge's document, for the builder (`/edges/:id/edit`): what it needs to start a draft and
+ * nothing the harness judges: no verdict, no runs, so the server reads neither.
+ */
+const EdgeDocument = graphql(`
+  query EdgeDocument($ids: [String!]!) {
+    edges(ids: $ids) {
+      id
+      name
+      state
+      mine
+      extends
+      thesis
+      mechanism
+      persistence
+      horizons
+      screeners
+      baselines
+      sources {
+        title
+        url
+      }
+      definition {
+        picks
+        trade
+        compare
+        test
+      }
+    }
+  }
+`);
+
+/** One edge's document (null id: nothing is read; `data` is then the empty list's `undefined`). */
+export function useEdgeDocument(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeDocument', { ids: [id ?? ''] }),
+    queryFn: ({ queryKey }) => gql(EdgeDocument, { ids: [id ?? ''] }, queryKey),
+    enabled: id !== null,
+    select: (data) => data.edges[0] ?? null,
+  });
+}
+
 /** Every edge the user sees (empty: none declared). */
 export function useEdges() {
   return useQuery({ ...edgesQuery(), select: (data) => data.edges });
@@ -229,5 +271,6 @@ export function prefetchEdges(client: QueryClient): void {
 
 /** Read the edges (and their runs) again, after an evaluation finished. */
 export function refreshEdges(client: QueryClient): Promise<void> {
+  void client.invalidateQueries({ queryKey: queryKeys.gqlAll('EdgeDocument') });
   return client.invalidateQueries({ queryKey: queryKeys.gqlAll('EdgesPage') });
 }

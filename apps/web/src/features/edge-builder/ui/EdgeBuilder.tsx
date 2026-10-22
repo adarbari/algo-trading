@@ -19,7 +19,7 @@ import {
 } from '@algotrade/ui';
 import { useState, type ReactNode } from 'react';
 
-import { useEdges, type Edge } from '@/entities/edge';
+import { useEdgeDocument, type EdgeDocument } from '@/entities/edge';
 import { useScreeners } from '@/entities/screen';
 import { errorDetail } from '@/shared/api';
 
@@ -58,14 +58,14 @@ export interface EdgeBuilderProps {
 }
 
 export function EdgeBuilder({ id, ...rest }: EdgeBuilderProps) {
-  const edges = useEdges();
+  const document = useEdgeDocument(id);
   const settings = useEdgeSettings(id);
   if (id === null) return <Builder {...rest} edge={null} served={null} id={null} />;
-  const edge = edges.data?.find((e) => e.id === id);
-  if (edges.isError || settings.isError) {
+  const edge = document.data;
+  if (document.isError || settings.isError) {
     return <Banner tone="negative">The edge could not be loaded.</Banner>;
   }
-  if (edges.isPending || settings.isPending)
+  if (document.isPending || settings.isPending)
     return <Skeleton lines={8} label="Loading the edge…" />;
   if (!edge || !settings.data?.settings || !edge.mine) {
     return <Banner tone="warning">You have no edge of this name to change.</Banner>;
@@ -73,7 +73,7 @@ export function EdgeBuilder({ id, ...rest }: EdgeBuilderProps) {
   return <Builder {...rest} edge={edge} served={settings.data} id={id} />;
 }
 
-const modeOf = (edge: Edge | null): Mode =>
+const modeOf = (edge: EdgeDocument | null): Mode =>
   edge === null || edge.extends === null ? 'new' : edge.state === 'trial' ? 'version' : 'clone';
 
 const HEADINGS: Record<Mode, string> = {
@@ -84,7 +84,7 @@ const HEADINGS: Record<Mode, string> = {
 
 interface BuilderProps extends Omit<EdgeBuilderProps, 'id'> {
   id: string | null;
-  edge: Edge | null;
+  edge: EdgeDocument | null;
   served: EdgeSettings | null;
 }
 
@@ -111,7 +111,6 @@ function Builder({ id, edge, served, onSaved, onCancel, onOpenScreen }: BuilderP
   const help = useHelp();
   const blocked = incomplete(draft, mode);
   const own = served?.settings?.own ?? {};
-  const trials = Math.max(0, ...(edge?.runs.map((r) => r.trialsCounted ?? 0) ?? []));
   const change = (patch: Partial<EdgeDraft>) => {
     setDraft((d) => ({ ...d, ...patch }));
   };
@@ -201,7 +200,7 @@ function Builder({ id, edge, served, onSaved, onCancel, onOpenScreen }: BuilderP
         <TestStep
           draft={draft}
           onChange={change}
-          trials={trials}
+          trials={0}
           ready={blocked.length === 0}
           saving={save.isPending}
           onSave={submit}

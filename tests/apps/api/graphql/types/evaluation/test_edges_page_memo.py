@@ -16,6 +16,7 @@ from algotrade.config.user import UserContext
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.evaluation import edges as edges_module
 from algotrade.services.read.evaluation import runs as runs_module
+from algotrade.services.read.evaluation import verdict as verdict_module
 from algotrade.services.read.serving.current import CurrentRelease
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
@@ -89,3 +90,36 @@ def test_the_page_reads_each_thing_once_per_request(
     asyncio.run(schema.execute(PAGE, context_value=again))
     assert parses["me"] == 2  # a second request: its own memo, nothing carried over
     assert first.stores().memo is not again.stores().memo  # type: ignore[union-attr]
+
+
+def test_the_document_query_returns_the_ids_asked_and_never_judges(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``EdgeDocument`` (the builder's read): ``edges(ids:)`` serves only those documents, and
+    with no ``verdict`` or ``runs`` selected no verdict is judged and no run record is read."""
+    backend = MemoryBackend()
+    judged: list[str] = []
+    read_runs: list[str] = []
+    real_verdict, real_read = verdict_module.load_edge_verdict, runs_module._read_committed
+    monkeypatch.setattr(
+        verdict_module, "load_edge_verdict", lambda c, e: judged.append(e.id) or real_verdict(c, e)
+    )
+    monkeypatch.setattr(
+        runs_module, "_read_committed", lambda c, e, o: read_runs.append(e.id) or real_read(c, e, o)
+    )
+    query = (
+        "query EdgeDocument($ids: [String!]!) { edges(ids: $ids) "
+        "{ id name state mine extends definition { picks } } }"
+    )
+    result = asyncio.run(
+        schema.execute(
+            query, variable_values={"ids": ["e2"]}, context_value=_request(backend, False)
+        )
+    )
+    assert result.errors is None
+    assert [e["id"] for e in result.data["edges"]] == ["e2"]  # type: ignore[index]
+    assert judged == [] and read_runs == []
+    everything = asyncio.run(
+        schema.execute("{ edges { id } }", context_value=_request(backend, False))
+    )
+    assert len(everything.data["edges"]) == len(IDS) + 1  # type: ignore[index]

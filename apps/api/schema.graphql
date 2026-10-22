@@ -2713,9 +2713,9 @@ type Query {
   backtests: [Backtest!]!
 
   """
-  Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data
+  Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data. `ids`: only those edges
   """
-  edges: [Edge!]!
+  edges(ids: [String!] = null): [Edge!]!
 
   """
   The user's own edge files `edges` leaves out (or reads only in part), by id, with the reason; empty: every file of theirs loads

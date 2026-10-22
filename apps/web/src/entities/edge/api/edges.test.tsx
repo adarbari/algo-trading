@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gql } from '@/shared/api';
 
 import { EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from '../model/fixtures';
-import { useEdgeProblems, useEdges } from './edges';
+import { useEdgeDocument, useEdgeProblems, useEdges } from './edges';
 import { useEdgeLiveStates } from './paper';
 import { useTrackRecords } from './track-records';
 
@@ -35,6 +35,26 @@ describe('useEdges', () => {
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgesPage');
     expect(result.current.data?.[0]?.verdict.verdict).toBe('promising');
+  });
+});
+
+describe('useEdgeDocument', () => {
+  it('asks the EdgeDocument operation for one id: no verdict, no runs', async () => {
+    GQL.mockResolvedValue({ edges: [EDGES_FIXTURE.edges[0]] });
+    const { result } = renderHook(() => useEdgeDocument('drift'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    const document = String(GQL.mock.calls[0]?.[0]);
+    expect(document).toContain('query EdgeDocument');
+    expect(document).not.toMatch(/verdict|runs|canonicalRun/);
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ ids: ['drift'] });
+    expect(result.current.data?.id).toBe(EDGES_FIXTURE.edges[0]?.id);
+  });
+
+  it('sends nothing for a new edge', () => {
+    renderHook(() => useEdgeDocument(null), { wrapper });
+    expect(GQL).not.toHaveBeenCalled();
   });
 });
 

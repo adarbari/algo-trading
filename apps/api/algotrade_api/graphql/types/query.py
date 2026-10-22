@@ -479,11 +479,11 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every edge the user sees (ADR 0053), by id: status, thesis, the screeners "
-        "that implement it and its evaluation runs; not session data"
+        "that implement it and its evaluation runs; not session data. `ids`: only those edges"
     )
-    def edges(self, info: Ctx) -> list[Edge]:
+    def edges(self, info: Ctx, ids: list[str] | None = None) -> list[Edge]:
         ctx = info.context.stores()
-        found = edge_reads.load_edges(ctx) if ctx is not None else ()
+        found = edge_reads.load_edges(ctx, ids) if ctx is not None else ()
         return [Edge.of(e, ctx) for e in found] if ctx is not None else []
 
     @strawberry.field(  # type: ignore[untyped-decorator]
