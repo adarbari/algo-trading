@@ -17,6 +17,7 @@ from algotrade.services.read.market.history import (
     load_market_history,
     warm_market_frames,
 )
+from algotrade.services.read.regime.history import load_regime_bands
 from algotrade.storage.tables.writers import StoreWriter
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 from tests.unit.services.read.regime.conftest import (
@@ -165,3 +166,24 @@ def test_warming_reads_every_market_table_ahead_so_a_chart_reads_nothing(
     assert all(start == date.min for _, start, _ in reads)  # each table's whole history
     load_market_history(ctx, [RISK, CURVE_ON], SEP28, D1)
     assert len(reads) == len(tables)
+
+
+def test_every_market_loader_of_a_request_reads_each_table_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # MarketHistory and the regime bands of one published state share
+    # one read per market table (market_frame), whatever window or field each asks for
+    ctx = regime_ctx()
+    reads: list[str] = []
+    real = ctx.reader.table_range
+
+    def spy(table: str, *args: Any, **kwargs: Any) -> Any:
+        reads.append(table)
+        return real(table, *args, **kwargs)
+
+    monkeypatch.setattr(ctx.reader, "table_range", spy)
+    load_market_history(ctx, [RISK, LABEL], SEP28, D1)
+    load_market_history(ctx, [CURVE_ON], SEP29, D1)
+    load_market_history(ctx, [LABEL], SEP28, SEP29)
+    load_regime_bands(ctx, SEP28, D1)
+    assert sorted(reads) == sorted(set(reads)) and reads

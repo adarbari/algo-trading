@@ -46,7 +46,7 @@ def test_a_malformed_backfill_entry_is_refused(entry: str) -> None:
 
 
 def test_compaction_lists_only_merge_tables_without_a_history_copy() -> None:
-    # ADR 0078: the history copy signs the index (inode, mtime, size), so a swap would void it;
+    # ADR 0078: the history copy signs the index (size and content digest), so a swap would void it;
     # a snapshot table keeps one run, so there is nothing to merge
     nightly = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False))
     copied = nightly.history_copy
