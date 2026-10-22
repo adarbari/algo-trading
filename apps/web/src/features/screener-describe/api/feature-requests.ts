@@ -32,7 +32,7 @@ export type MyFeatureRequest = gqlTypes.MyFeatureRequestsQuery['myFeatureRequest
 export function useMyFeatureRequests(enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.gql('MyFeatureRequests', {}),
-    queryFn: () => gql(MyFeatureRequests, {}),
+    queryFn: ({ queryKey }) => gql(MyFeatureRequests, {}, queryKey),
     select: (data) => data.myFeatureRequests,
     enabled,
     staleTime: 0, // the draft that just ran may have recorded a new ask

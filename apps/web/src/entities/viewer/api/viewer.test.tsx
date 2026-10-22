@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ApiError, gql } from '@/shared/api';
+import { ApiError, active, gql } from '@/shared/api';
 
 import { ensureViewer, forgetUser, useViewer } from './viewer';
 
@@ -61,9 +61,12 @@ describe('the viewer', () => {
     const draft = client.getMutationCache().build(client, { mutationFn: () => Promise.resolve(1) });
     await draft.execute({ draft: 'a screener' });
     expect(client.getMutationCache().getAll()).toHaveLength(1);
+    const forget = vi.fn();
+    active.forget = forget;
     act(() => {
       forgetUser(client);
     });
+    expect(forget).toHaveBeenCalled(); // the next user's counter starts elsewhere
     expect(client.getQueryData(['gql', 'Secret'])).toBeUndefined();
     expect(client.getMutationCache().getAll()).toHaveLength(0);
     await waitFor(() => {

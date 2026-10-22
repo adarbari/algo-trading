@@ -99,7 +99,7 @@ const QualityChecks = graphql(`
 function nightlyRunsQuery(limit = NIGHTLY_LIMIT) {
   return queryOptions({
     queryKey: queryKeys.gql('NightlyRuns', { limit }),
-    queryFn: () => gql(NightlyRuns, { limit }),
+    queryFn: ({ queryKey }) => gql(NightlyRuns, { limit }, queryKey),
   });
 }
 
@@ -121,7 +121,7 @@ export function useNightlyRuns(limit = NIGHTLY_LIMIT, enabled = true) {
 export function useRun(runId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.gql('RunRecord', { runId: runId ?? '' }),
-    queryFn: () => gql(RunRecord, { runId: runId ?? '' }),
+    queryFn: ({ queryKey }) => gql(RunRecord, { runId: runId ?? '' }, queryKey),
     select: (data) => (data.run ? toRunDetail(data.run) : null),
     enabled: Boolean(runId),
   });
@@ -131,8 +131,8 @@ export function useRun(runId: string | null | undefined) {
 export function runItemsQuery(runId: string) {
   return queryOptions({
     queryKey: queryKeys.gql('RunItems', { runId }),
-    queryFn: async () => {
-      const { runItems } = await gql(RunItems, { runId });
+    queryFn: async ({ queryKey }) => {
+      const { runItems } = await gql(RunItems, { runId }, queryKey);
       if (!runItems) throw new Error(`no run ${runId}`);
       return runItems;
     },
@@ -146,7 +146,7 @@ export function useRunItems(runId: string | null | undefined, enabled = true) {
 function qualityChecksQuery() {
   return queryOptions({
     queryKey: queryKeys.gql('QualityChecks', {}),
-    queryFn: () => gql(QualityChecks, {}),
+    queryFn: ({ queryKey }) => gql(QualityChecks, {}, queryKey),
   });
 }
 

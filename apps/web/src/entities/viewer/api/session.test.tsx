@@ -7,6 +7,7 @@ import {
   ApiError,
   AuthFailure,
   currentSession,
+  active,
   gql,
   signInWithPassword,
   signOutSession,
@@ -74,6 +75,17 @@ describe('useSignIn', () => {
     expect(viewer).toEqual(TRADER);
     expect(client.getQueryData(viewerKey)).toEqual(TRADER);
     expect(result.current.error).toBeUndefined();
+  });
+
+  it("forgets the last user's page-cache versions", async () => {
+    GQL.mockResolvedValue({ viewer: TRADER });
+    const forget = vi.fn();
+    active.forget = forget;
+    const { result } = renderHook(() => useSignIn(), { wrapper });
+    await act(async () => {
+      await result.current.signIn('a@b.co', 'pw');
+    });
+    expect(forget).toHaveBeenCalled();
   });
 
   it('says wrong credentials in plain words and stays signed out', async () => {

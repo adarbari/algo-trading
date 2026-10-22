@@ -109,7 +109,7 @@ export function useScreeners() {
 const screenerConfigsQuery = () =>
   queryOptions({
     queryKey: queryKeys.gql('ScreenerConfigs', {}),
-    queryFn: () => gql(ScreenerConfigs, {}),
+    queryFn: ({ queryKey }) => gql(ScreenerConfigs, {}, queryKey),
   });
 
 /** Start reading the screener list before the page opens (a link was hovered): a no-op while fresh. */
@@ -120,7 +120,7 @@ export function prefetchScreeners(client: QueryClient): void {
 const myScreensQuery = () =>
   queryOptions({
     queryKey: queryKeys.gql('MyScreens', {}),
-    queryFn: () => gql(MyScreens, {}),
+    queryFn: ({ queryKey }) => gql(MyScreens, {}, queryKey),
   });
 
 /** The user's own screens: finalized ones and draft-only ones (status DRAFT). */
@@ -141,7 +141,7 @@ export function useScreener(id: string | null) {
   const variables = { id: id ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('ScreenDetail', variables),
-    queryFn: () => gql(ScreenDetail, variables),
+    queryFn: ({ queryKey }) => gql(ScreenDetail, variables, queryKey),
     // The JSON documents are the screen's TOML tables (objects) as stored.
     select: (data) => data.screenDetail as ScreenerDetail | null,
     enabled: Boolean(id),
@@ -154,7 +154,7 @@ export function useScreenerVersions(id: string | null, enabled = true) {
   const variables = { id: id ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('ScreenVersions', variables),
-    queryFn: () => gql(ScreenVersions, variables),
+    queryFn: ({ queryKey }) => gql(ScreenVersions, variables, queryKey),
     select: (data) =>
       data.screenVersions.map((v) => ({
         version: v.version,

@@ -26,7 +26,7 @@ describe('gql', () => {
   it('posts the operation and its variables, and resolves to its data', async () => {
     const fetch = answer({ data: { session: { date: '2026-10-02' } } });
     vi.stubGlobal('fetch', fetch);
-    await expect(gql(document, { day: '2026-10-02' })).resolves.toEqual({
+    await expect(gql(document, { day: '2026-10-02' }, null)).resolves.toEqual({
       session: { date: '2026-10-02' },
     });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
@@ -58,9 +58,9 @@ describe('gql', () => {
 
   it('rejects an HTTP failure and an answer without data', async () => {
     vi.stubGlobal('fetch', answer({}, 502));
-    await expect(gql(document, { day: 'x' })).rejects.toBeInstanceOf(ApiError);
+    await expect(gql(document, { day: 'x' }, null)).rejects.toBeInstanceOf(ApiError);
     vi.stubGlobal('fetch', answer({ data: null }));
-    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ codes: ['INTERNAL'] });
+    await expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({ codes: ['INTERNAL'] });
   });
 
   it('sends the access token as a bearer, and none when signed out', async () => {
@@ -77,7 +77,7 @@ describe('gql', () => {
 
   it('ends the session on a 401 and rejects with an ApiError', async () => {
     vi.stubGlobal('fetch', answer({}, 401));
-    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 401 });
+    await expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({ status: 401 });
     expect(handleUnauthorized).toHaveBeenCalledTimes(1);
   });
 
@@ -98,7 +98,9 @@ describe('gql', () => {
     vi.useFakeTimers();
     const fetch = vi.fn(() => Promise.resolve(new Response('{}', { status: 503 })));
     vi.stubGlobal('fetch', fetch);
-    const settled = expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 503 });
+    const settled = expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({
+      status: 503,
+    });
     await vi.advanceTimersByTimeAsync(60_000);
     await settled;
     expect(fetch).toHaveBeenCalledTimes(6);
@@ -114,7 +116,7 @@ describe('gql', () => {
 
   it('keeps the session on a 403 (a user the registry does not know)', async () => {
     vi.stubGlobal('fetch', answer({}, 403));
-    await expect(gql(document, { day: 'x' })).rejects.toMatchObject({ status: 403 });
+    await expect(gql(document, { day: 'x' }, null)).rejects.toMatchObject({ status: 403 });
     expect(handleUnauthorized).not.toHaveBeenCalled();
   });
 });

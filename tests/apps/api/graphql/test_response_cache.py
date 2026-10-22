@@ -27,6 +27,7 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade_api import main
 from algotrade_api.deps import ApiSettings, ReadStore
+from algotrade_api.graphql.context import ReleaseReads
 from algotrade_api.graphql.offload import MAX_WAITING, READ_THREADS, Admission
 from algotrade_api.graphql.response_cache import (
     CLOSED_SESSION_OPERATIONS,
@@ -60,6 +61,7 @@ class Harness:
     def __init__(self, store: ReadStore, monkeypatch: pytest.MonkeyPatch) -> None:
         self.store = store
         self.seq = 1
+        self.releases: Any = None  # ReleaseReads the router follows (ADR 0077)
         self.generation: int | None = 0  # the caller's config generation (None: a write in flight)
         self.runs = (7, 100)  # the runs generation
         self.closed = date(2026, 10, 8)  # the last closed session
@@ -105,6 +107,7 @@ class Harness:
                 lambda: self.served,
                 log,
                 lambda user, everyone: self.generation,
+                self.releases,
             )
             return self.router
 
@@ -618,3 +621,75 @@ def test_a_run_compaction_leaves_the_cache_key_unchanged(tmp_path: Path) -> None
     before = key()
     assert backend.tables.compact_runs("events/dividend", day).runs_dropped == 2
     assert key() == before
+
+
+# ADR 0077 decision 18: the version an answer was built from, as response headers the web
+# client reads (a miss and a hit alike; absent for a shared operation, a write in flight, or
+# with no release)
+GENERATION, RELEASE = "x-config-generation", "x-release-id"
+
+
+def _releases(release_id: str = "r1") -> ReleaseReads:
+    def pinned(*_: Any) -> Any:
+        raise AssertionError("an unlisted operation reads live")
+
+    return ReleaseReads(current=lambda: SimpleNamespace(release_id=release_id), pinned=pinned)
+
+
+def test_a_hit_and_a_miss_carry_the_same_generation(harness: Harness) -> None:
+    harness.generation = 4
+    client = harness.client()
+    miss = _post(client, SESSION)
+    opened = harness.opened
+    hit = _post(client, SESSION)
+    assert harness.opened == opened  # served from the cache
+    assert miss.headers[GENERATION] == hit.headers[GENERATION] == "4"
+
+
+def test_a_write_moves_the_generation(harness: Harness) -> None:
+    client = harness.client()
+    before = _post(client, SESSION).headers[GENERATION]
+    harness.generation = 2
+    assert _post(client, SESSION).headers[GENERATION] == "2" != before
+
+
+def test_no_generation_while_a_write_is_in_flight(harness: Harness) -> None:
+    harness.generation = None
+    assert GENERATION not in _post(harness.client(), SESSION).headers
+
+
+def test_a_shared_operation_carries_no_generation(harness: Harness) -> None:
+    assert GENERATION not in _post(harness.client(), SHARED).headers
+
+
+def test_the_release_id_is_on_a_miss_and_a_hit(harness: Harness) -> None:
+    harness.releases = _releases("r7")
+    client = harness.client()
+    miss, hit = _post(client, SESSION), _post(client, SESSION)
+    assert miss.headers[RELEASE] == hit.headers[RELEASE] == "r7"
+
+
+def test_no_release_id_without_a_serving_release(harness: Harness) -> None:
+    assert RELEASE not in _post(harness.client(), SESSION).headers
+
+
+def test_cors_exposes_both_headers(harness: Harness) -> None:
+    reply = harness.client().options(
+        "/graphql",
+        headers={"origin": "http://localhost:5173", "access-control-request-method": "POST"},
+    )
+    assert reply.status_code == 200
+    response = harness.client().post(
+        "/graphql", json={"query": SESSION}, headers={"origin": "http://localhost:5173"}
+    )
+    exposed = response.headers["access-control-expose-headers"].lower()
+    assert GENERATION in exposed and RELEASE in exposed
+
+
+def test_a_stale_serve_carries_the_generation_and_the_release(harness: Harness) -> None:
+    harness.generation, harness.releases = 4, _releases("r7")
+    with harness.client() as client:
+        _post(client, SESSION)
+        harness.now[0] += TTL_S + 1
+        stale = _post(client, SESSION)  # served from the stale entry while it recomputes
+        assert stale.headers[GENERATION] == "4" and stale.headers[RELEASE] == "r7"

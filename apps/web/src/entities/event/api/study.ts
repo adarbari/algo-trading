@@ -95,7 +95,7 @@ export function useInstrumentEventStudy(key: string | null) {
   const variables = { key: key ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('InstrumentEventStudy', variables),
-    queryFn: () => gql(InstrumentEventStudy, variables),
+    queryFn: ({ queryKey }) => gql(InstrumentEventStudy, variables, queryKey),
     select: (data: EventStudyResponse) => data.instrument?.eventStudy ?? null,
     enabled: Boolean(key),
   });

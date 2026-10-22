@@ -53,7 +53,7 @@ export type ScreenerRunSummary = gqlTypes.ScreenerRunsQuery['screeners'][number]
 const runsQuery = () =>
   queryOptions({
     queryKey: queryKeys.gql('ScreenerRuns', {}),
-    queryFn: () => gql(ScreenerRuns, {}),
+    queryFn: ({ queryKey }) => gql(ScreenerRuns, {}, queryKey),
   });
 
 /** Start reading the run summaries before the page mounts (a route loader). */

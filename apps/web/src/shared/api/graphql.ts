@@ -13,8 +13,11 @@
  * refused clients do not return in lockstep, and asks again, up to `BUSY_RETRIES` times, before
  * it rejects (here, not in the query client: the entry chunk has no bytes to spare).
  */
+import type { QueryKey } from '@tanstack/react-query';
+
 import { apiBaseUrl } from '@/shared/config';
 
+import { active } from './active-client';
 import { accessToken, handleUnauthorized } from './auth';
 import { ApiError } from './client';
 import type { TypedDocumentString } from './generated/graphql/graphql';
@@ -48,10 +51,13 @@ export function busyDelayMs(retryAfter: string | null, attempt: number): number 
   return (Number(retryAfter) || 1) * 1000 * (1 + attempt / 2) * (0.5 + Math.random());
 }
 
-/** Runs `document` with `variables`; rejects on an HTTP failure or any GraphQL error. */
+/** Runs `document` with `variables`; rejects on an HTTP failure or any GraphQL error. `key` is
+ * the query key of the hook that asked (its `queryFn` context's `queryKey`; `null` outside a
+ * query; left out by a hook of a shared read, which carries no generation and loses nothing): the answer's version headers are read against it (ADR 0077 decision 18). */
 export async function gql<TResult, TVariables>(
   document: TypedDocumentString<TResult, TVariables>,
   variables: TVariables,
+  key?: QueryKey | null,
 ): Promise<TResult> {
   const token = await accessToken();
   const init = {
@@ -71,6 +77,7 @@ export async function gql<TResult, TVariables>(
   }
   if (response.status === 401) await handleUnauthorized();
   if (!response.ok) throw new ApiError(response.status, response.statusText);
+  active.observe?.(key, response.headers);
   const body = (await response.json()) as Body<TResult>;
   if (body.errors?.length) throw new GraphQLRequestError(body.errors);
   if (body.data == null) throw new GraphQLRequestError([{ message: 'no data in the response' }]);

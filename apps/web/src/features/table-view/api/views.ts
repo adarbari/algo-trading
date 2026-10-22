@@ -36,7 +36,7 @@ const keyOf = (scope: string, name: string | null) =>
 export function useSavedView(scope: string, name: string | null) {
   return useQuery({
     queryKey: keyOf(scope, name),
-    queryFn: () => gql(TableView, { scope, name }),
+    queryFn: ({ queryKey }) => gql(TableView, { scope, name }, queryKey),
     select: (data) => data.view,
   });
 }

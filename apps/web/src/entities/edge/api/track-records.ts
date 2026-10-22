@@ -55,7 +55,7 @@ const ScreenerTrackRecords = graphql(`
 const trackRecordsQuery = () =>
   queryOptions({
     queryKey: queryKeys.gql('ScreenerTrackRecords', {}),
-    queryFn: () => gql(ScreenerTrackRecords, {}),
+    queryFn: ({ queryKey }) => gql(ScreenerTrackRecords, {}, queryKey),
   });
 
 /** Start reading every screener's track records before the page mounts (a route loader). */

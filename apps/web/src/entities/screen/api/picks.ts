@@ -50,7 +50,7 @@ export function useScreenerPicks(id: string, enabled = true) {
   const variables = { id, size: PICKS_LIMIT };
   return useQuery({
     queryKey: queryKeys.gql(SCREENER_PICKS_OPERATION, variables),
-    queryFn: () => gql(ScreenerPicks, variables),
+    queryFn: ({ queryKey }) => gql(ScreenerPicks, variables, queryKey),
     enabled,
   });
 }

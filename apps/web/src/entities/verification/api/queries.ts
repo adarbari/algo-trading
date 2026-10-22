@@ -43,7 +43,7 @@ const Verification = graphql(`
 function verificationQuery() {
   return queryOptions({
     queryKey: queryKeys.gql('Verification', {}),
-    queryFn: () => gql(Verification, {}),
+    queryFn: ({ queryKey }) => gql(Verification, {}, queryKey),
   });
 }
 

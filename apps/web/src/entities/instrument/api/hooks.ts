@@ -10,6 +10,7 @@ import {
   useQuery,
   useQueryClient,
   type QueryClient,
+  type QueryKey,
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -43,7 +44,7 @@ export function useInstrumentEvents(key: string | null) {
   const variables = { key: key ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('InstrumentEvents', variables),
-    queryFn: () => gql(InstrumentEvents, variables),
+    queryFn: ({ queryKey }) => gql(InstrumentEvents, variables, queryKey),
     select: (data: gqlTypes.InstrumentEventsQuery) => data.instrument?.events ?? [],
     enabled: Boolean(key),
   });
@@ -71,7 +72,7 @@ export function useInstrumentPrices(key: string | null, start: string) {
   const variables = { key: key ?? '', start };
   return useQuery({
     queryKey: queryKeys.gql('InstrumentPrices', variables),
-    queryFn: () => gql(InstrumentPrices, variables),
+    queryFn: ({ queryKey }) => gql(InstrumentPrices, variables, queryKey),
     select: (data: gqlTypes.InstrumentPricesQuery) => data.instrument?.prices.bars ?? [],
     enabled: Boolean(key),
     // Another range of the same instrument keeps the chart on screen while it loads.
@@ -402,7 +403,7 @@ function valuesVariables(key: string, date: string | null, names: readonly strin
 function valuesQuery(variables: ReturnType<typeof valuesVariables>) {
   return queryOptions({
     queryKey: queryKeys.gql('InstrumentFeatureValues', variables),
-    queryFn: () => gql(InstrumentFeatureValues, variables),
+    queryFn: ({ queryKey }) => gql(InstrumentFeatureValues, variables, queryKey),
   });
 }
 
@@ -446,7 +447,8 @@ export function useFeatureValues(key: string | null, names: readonly string[]): 
         const variables = valuesVariables(key ?? '', session, group);
         return {
           queryKey: queryKeys.gql('InstrumentFeatureValues', variables),
-          queryFn: () => gql(InstrumentFeatureValues, variables),
+          queryFn: ({ queryKey }: { queryKey: QueryKey }) =>
+            gql(InstrumentFeatureValues, variables, queryKey),
           enabled: Boolean(key) && session !== null,
         };
       }),
@@ -483,7 +485,7 @@ const InstrumentHistory = graphql(`
 function historyQuery(variables: { key: string; names: string[]; start: string; date: string }) {
   return queryOptions({
     queryKey: queryKeys.gql('InstrumentHistory', variables),
-    queryFn: () => gql(InstrumentHistory, variables),
+    queryFn: ({ queryKey }) => gql(InstrumentHistory, variables, queryKey),
   });
 }
 

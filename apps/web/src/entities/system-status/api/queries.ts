@@ -62,7 +62,7 @@ export interface StatusStripState {
 function statusStripQuery(admin: boolean) {
   return queryOptions({
     queryKey: queryKeys.gql('StatusStrip', { admin }),
-    queryFn: () => gql(StatusStrip, { admin }),
+    queryFn: ({ queryKey }) => gql(StatusStrip, { admin }, queryKey),
   });
 }
 

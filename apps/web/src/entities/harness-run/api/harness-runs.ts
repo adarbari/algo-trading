@@ -70,7 +70,7 @@ const HarnessRunQuery = graphql(`
 function harnessRunsQuery(limit = RUN_LIMIT) {
   return queryOptions({
     queryKey: queryKeys.gql('HarnessRuns', { limit }),
-    queryFn: () => gql(HarnessRunsQuery, { limit }),
+    queryFn: ({ queryKey }) => gql(HarnessRunsQuery, { limit }, queryKey),
   });
 }
 
@@ -91,7 +91,7 @@ export function useHarnessRuns(limit = RUN_LIMIT) {
 export function useHarnessRunRows(runId: string | null) {
   return useQuery({
     queryKey: queryKeys.gql('HarnessRun', { runId }),
-    queryFn: () => gql(HarnessRunQuery, { runId: runId ?? '' }),
+    queryFn: ({ queryKey }) => gql(HarnessRunQuery, { runId: runId ?? '' }, queryKey),
     select: (data) => data.harnessRun,
     enabled: runId !== null,
   });
