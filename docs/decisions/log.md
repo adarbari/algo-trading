@@ -446,3 +446,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the architect's bar gap analysis (docs of 2026-10-22) shows no page reaches 1 s with code fixes alone; 11 operations need a shaped table or the run ledger; each new table is a new derived artifact with a freshness rule, so the owner wants to review each.
+
+## 2026-10-22 | Run records (data architecture v2, decision 3) | Slimming the edge-eval job records is on hold
+- Question: after the architect's check showed slimming does not reduce runtime (edge pages read small `edge-eval:<edge>:<user>` records; the 6 MB `job:edge-eval` records are read only by three evaluation-start guards), implement it now?
+- Options: now / after the speed phases / hold.
+- Decision: hold; do not implement. It stays a disk-hygiene candidate (139 MB of duplicated rows, growing about 6 MB per evaluation run); revisit when disk or the evaluation-start guards' cost becomes a problem. Archiving old run records also stays deferred (revisit at about 100,000 run files). This amends the 2026-10-22 entry "slim now, archive later".
+- decided by: owner
+- status: final
+- Reasoning: it does not help the cold-load bar, so it does not belong in the speed phases.
