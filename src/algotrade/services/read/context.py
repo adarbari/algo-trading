@@ -50,6 +50,7 @@ from algotrade.storage.backends.arrow_memory import limit_threads, release_unuse
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.interfaces import PartitionStats
 
 __all__ = [
     "ConfigStore",
@@ -68,6 +69,7 @@ __all__ = [
     "open_stores",
     "partition",
     "partition_on",
+    "partition_stats_on",
     "previous_session",
     "run_partition",
     "run_rows_of",
@@ -570,6 +572,14 @@ def partition_on(ctx: Stores, table: str, day: date) -> pd.DataFrame | None:
     """``table``'s partition for exactly ``day``, whatever its grain (``None``: none stored):
     an ops loader counting what is stored on each session of a window it names."""
     return ctx.reader.table(table, day)
+
+
+def partition_stats_on(
+    ctx: Stores, table: str, day: date, column: str | None = None
+) -> PartitionStats | None:
+    """What ``partition_on`` would hold, counted from the store's metadata, not decoded: rows,
+    run ids and (``column``) one column's values; ``None``: no partition stored."""
+    return ctx.reader.partition_stats(table, day, column)
 
 
 def snapshot_on(ctx: Stores, table: str, day: date) -> Snapshot | None:

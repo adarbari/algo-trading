@@ -9,7 +9,8 @@ written before the schemas were typed (``string`` vs ``large_string``, all-null 
 """
 
 import io
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Sequence
+from pathlib import Path
 
 import pandas as pd
 import pyarrow as pa
@@ -17,6 +18,7 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from algotrade.core.model.errors import DataValidationError
+from algotrade.storage.tables.interfaces import PartitionStats
 from algotrade.storage.tables.schemas import KNOWN_FROM, spec_for
 from algotrade.storage.tables.spec import COMMON, SCHEMA_VERSION, TableSpec
 
@@ -138,3 +140,54 @@ def row_groups_holding(parquet: pq.ParquetFile, column: str, values: Collection[
         ):
             chosen.append(group)
     return chosen
+
+
+def footer_groups(meta: pq.FileMetaData, group: Sequence[str]) -> set[tuple[object, ...]] | None:
+    """The groups (values of the ``group`` columns) a file holds, from its footer alone: every
+    row group's statistics must name one value per column (min == max) and no null. ``None``: a
+    column missing, a row group without statistics, or one holding two values or a null."""
+    at = {meta.schema.column(i).path: i for i in range(meta.num_columns)}
+    if any(name not in at for name in group):
+        return None
+    found: set[tuple[object, ...]] = set()
+    for number in range(meta.num_row_groups):
+        values = []
+        for name in group:
+            stats = meta.row_group(number).column(at[name]).statistics
+            if stats is None or not stats.has_min_max or stats.min != stats.max:
+                return None
+            if stats.null_count:
+                return None
+            values.append(stats.min)
+        found.add(tuple(values))
+    return found
+
+
+def file_groups(path: Path, group: Sequence[str]) -> set[tuple[object, ...]] | None:
+    """``footer_groups`` of the file at ``path``."""
+    with pq.ParquetFile(path) as parquet:
+        return footer_groups(parquet.metadata, group)
+
+
+def file_stats(path: Path, column: str | None) -> PartitionStats:
+    """What one version file holds, without decoding it: its rows (the footer's ``num_rows``),
+    the sorted ``run_id`` values (the footer's statistics; the one column decoded when they
+    cannot name them) and, when ``column`` is in the file, that column's values as text (only
+    it decoded)."""
+    with pq.ParquetFile(path) as parquet:
+        rows = parquet.metadata.num_rows
+        names = parquet.schema_arrow.names
+        if rows == 0:
+            return PartitionStats(0)
+        named = footer_groups(parquet.metadata, ["run_id"]) if "run_id" in names else set()
+        wanted = [c for c in ("run_id", column) if c in names and (c == column or named is None)]
+        data = parquet.read(columns=wanted) if wanted else None
+    if named is None:
+        assert data is not None
+        runs = tuple(sorted(map(str, data.column("run_id").to_pandas().unique())))
+    else:
+        runs = tuple(sorted(str(v) for (v,) in named))
+    values: tuple[str, ...] = ()
+    if column is not None and data is not None and column in data.column_names:
+        values = tuple(map(str, data.column(column).to_pandas()))
+    return PartitionStats(rows, runs, values)
