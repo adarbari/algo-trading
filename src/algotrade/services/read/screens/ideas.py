@@ -200,8 +200,9 @@ def _rows(frame: pd.DataFrame) -> tuple[PoolRow, ...]:
 
 
 def _fingerprint(session: date, pool: Sequence[PoolRun], rule: IdeasRule) -> str:
-    """What a cursor is only good for: the session, the runs read and the rule's parameters."""
-    runs = sorted(r.run_id for r in pool if r.run_id is not None)
+    """What a cursor is only good for: the session, the runs with their status (a withheld run
+    is another pool) and the rule's parameters."""
+    runs = sorted(f"{r.run_id}:{r.status}" for r in pool if r.run_id is not None)
     text = "|".join([session.isoformat(), *runs, "/", rule.hash])
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 

@@ -201,13 +201,12 @@ const pickedByColumn: DataTableColumn<Idea> = {
   headerAction: termHelp('picked_by'),
   cell: ({ row }) => (
     <Stack direction="row" gap={1} wrap>
-      {row.pickedBy.map((pick, index, all) => (
+      {row.pickedBy.map((pick) => (
         <Text key={pick.screenerId} size="xs">
           <TextLink href={screenerResultsPath(pick.screenerId)} size="inherit">
             {pick.screenerName}
           </TextLink>
-          <Text tone="muted">{` #${String(pick.position)}`}</Text>
-          {index < all.length - 1 && <Text tone="muted"> ·</Text>}
+          {pick.position > 1 && <Text tone="muted">{` #${String(pick.position)}`}</Text>}
         </Text>
       ))}
     </Stack>
@@ -222,7 +221,6 @@ const scoreColumn: DataTableColumn<Idea> = {
   format: { kind: 'number', digits: 2 },
   width: 'xs',
   essential: true,
-  headerAction: termHelp('ideas_ranking'),
 };
 
 const decisionColumn: DataTableColumn<Idea> = {

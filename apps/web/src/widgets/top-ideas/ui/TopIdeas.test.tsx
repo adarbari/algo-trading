@@ -232,7 +232,7 @@ describe('TopIdeas', () => {
   it('lists the screeners that picked an idea with their place, the best first', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
-    expect(aapl).toHaveTextContent(/VRP scanner #1.*Liquidity #2/);
+    expect(aapl).toHaveTextContent(/VRP scanner.*Liquidity #2/);
   });
 
   it('names a withheld screener beside the table, with its help', () => {
@@ -498,10 +498,10 @@ describe('TopIdeas field headers', () => {
           name: /^What is .*\?$/,
         },
       );
-    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(5);
+    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(4);
     expect(help(/Expiry DTE/)).toBeVisible();
     expect(help(/IV30/)).toBeVisible();
-    expect(help(/Score/)).toBeVisible(); // How Ideas are ranked
+    expect(help(/Score/)).toBeNull();
     expect(help(/Picked by/)).toBeVisible();
     expect(help(/Decision/)).toBeNull();
   });

@@ -277,3 +277,14 @@ def test_a_negative_or_empty_page_is_empty_with_no_cursor_past_the_end() -> None
     assert load_ideas(ctx, 0).items == ()
     last = load_ideas(ctx, 100)
     assert last.next_cursor is None and len(last.items) == 7
+
+
+def test_a_cursor_from_a_viewer_with_other_licences_is_refused_not_shifted(
+    reader: StoreReader,
+) -> None:
+    # ``me`` holds the personal licence, ``trader`` does not: same runs, other pool
+    wide = {**WIDE, ("site", "ranking", "ideas"): {"site_top": 1, "user_top": 1}}
+    cursor = load_ideas(context(reader, wide), 1).next_cursor
+    assert cursor is not None
+    with pytest.raises(ConfigurationError, match="changed since"):
+        load_ideas(context(reader, wide, user="trader"), 1, cursor)
