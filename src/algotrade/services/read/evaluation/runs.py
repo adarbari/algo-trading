@@ -143,6 +143,7 @@ class EdgeRow:
     reference_rate: float | None = None
     touch_rate: float | None = None
     side: str = "long"  # the outcome's side (ADR 0053 amendment); a run before sides is long
+    licence: str | None = None  # the trial's licence (ADR 0028); None: a run from before it
 
 
 @dataclass(frozen=True)
@@ -213,10 +214,23 @@ def _day(value: Any) -> date | None:
 def _run(
     ctx: Stores, record: RunRecord, edge: Edge, owner: str, legacy_owner: str | None = None
 ) -> EdgeRun:
+    session = ctx.session.date if isinstance(ctx, ReadContext) else None
+    return run_of_record(record, edge, owner, legacy_owner, session)
+
+
+def run_of_record(
+    record: RunRecord,
+    edge: Edge,
+    owner: str,
+    legacy_owner: str | None = None,
+    session: date | None = None,
+) -> EdgeRun:
+    """The ``EdgeRun`` of a run record, with no store read: what the reader builds for a
+    committed run and a writer builds for the run it is publishing (the one decoding of a run
+    record). ``session``: the request's session, for ``after_session`` (None: always False)."""
     stats = record.stats
     frozen_from = edge.frozen_from
     committed = record.finished_at or record.started_at
-    session = ctx.session.date if isinstance(ctx, ReadContext) else None
     split = _day(stats.get("split_from"))
     start = (stats.get("range") or [None])[0]
     exploratory = _exploratory(stats, frozen_from)
@@ -424,6 +438,7 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         reference_rate=_float(row.get("reference_rate")),
         touch_rate=_float(row.get("touch_rate")),
         side=str(to_scalar(row.get("side")) or "long"),
+        licence=_text(row.get("licence")),
     )
 
 
@@ -482,7 +497,19 @@ def _stored(
     frame = run_partition(ctx, result_table(EDGE_EVAL), record, where=cut)
     if frame is None:
         return ()
+    return _rows_of(frame)
+
+
+def _rows_of(frame: pd.DataFrame) -> tuple[EdgeRow, ...]:
     return tuple(_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records"))
+
+
+def rows_of_frame(frame: pd.DataFrame) -> tuple[tuple[EdgeRow, ...], tuple[Draw, ...]]:
+    """``(rows, draws)`` of an ``edge_eval`` frame as the reader parses a stored run's: the
+    screener and baseline rows, and the random-pick draws apart (the one parse: a writer judging
+    the frame it is publishing reads it exactly as the reader reads it back)."""
+    drawn = frame["role"] == RANDOM
+    return _rows_of(frame[~drawn]), _draws_of(frame[drawn])
 
 
 def rows_of_record(
@@ -503,7 +530,12 @@ def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[Draw, ...]:
     found = run_partition(
         ctx, result_table(EDGE_EVAL), record, where=[RowFilter("role", frozenset({RANDOM}))]
     )
-    if found is None or found.empty:
+    return () if found is None else _draws_of(found)
+
+
+def _draws_of(found: pd.DataFrame) -> tuple[Draw, ...]:
+    """The draws of the random-pick rows ``found``, straight from the columns."""
+    if found.empty:
         return ()
     variant = (
         found["edge_variant"].astype(object).where(found["edge_variant"].notna(), MAIN)

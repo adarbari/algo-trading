@@ -11,7 +11,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.core.time.calendar import is_session
 from algotrade.quant.edges.statistics import window_weights
-from algotrade.services.read.context import ResultCache, open_stores
+from algotrade.services.read.context import ResultCache, open_stores, run_partition
 from algotrade.services.read.evaluation import edges as edges_module
 from algotrade.services.read.evaluation import runs as runs_module
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
@@ -27,7 +27,9 @@ from algotrade.services.read.evaluation.runs import (
     load_run_series,
     load_site_trials,
     measured_sessions,
+    rows_of_frame,
     rows_of_record,
+    run_of_record,
 )
 from algotrade.services.read.evaluation.verdict import load_edge_verdict
 from algotrade.services.read.values import UnknownCode
@@ -35,6 +37,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.schemas import result_table
 from tests.unit.services.read.evaluation.conftest import (
     DOCS,
     EDGE,
@@ -680,3 +683,38 @@ def test_the_memoised_page_equals_one_read_without_sharing(backend: MemoryBacken
         ]
 
     assert page(lambda: shared) == page(lambda: stores(backend, docs=_docs()))
+
+
+def test_rows_of_frame_parses_a_frame_as_the_reader_reads_it_back(backend: MemoryBackend) -> None:
+    """The writer judges the frame it is publishing: the same rows and draws the reader decodes
+    from the committed partition (licence included)."""
+    ctx, record = _mixed_run(backend)
+    frame = run_partition(ctx, result_table("edge_eval"), record)
+    assert frame is not None
+    rows, drawn = rows_of_frame(frame)
+    assert rows == rows_of_record(ctx, record)
+    assert drawn == draws_of_record(ctx, record) and len(drawn) == 5
+
+
+def test_a_rows_licence_is_read_and_a_null_is_none(backend: MemoryBackend) -> None:
+    write_run(
+        backend, "canon", FROZEN, 0.66, extra=[row("momo", "year", 0.5, FROZEN, licence="personal")]
+    )
+    ctx = stores(backend)
+    record = ctx.reader.run("canon")
+    assert record is not None
+    licences = {(r.slice_kind, r.licence) for r in rows_of_record(ctx, record)}
+    assert ("year", "personal") in licences and ("all", None) in licences
+
+
+def test_run_of_record_is_the_run_the_reader_builds_without_a_store_read(
+    backend: MemoryBackend,
+) -> None:
+    write_run(backend, "canon", FROZEN, 0.66, trigger="nightly")
+    ctx = stores(backend)
+    edge = load_edge(ctx, "drift")
+    record = ctx.reader.run("canon")
+    assert edge is not None and record is not None
+    built = run_of_record(record, edge, "site")
+    assert built == load_canonical_run(ctx, edge).run
+    assert built.trigger == "nightly" and built.after_session is False
