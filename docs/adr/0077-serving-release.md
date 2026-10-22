@@ -3,7 +3,8 @@
 **Status:** proposed (2026-10-19; owner approved the direction the same day; amended
 2026-10-21 with the owner-approved decisions 14-22 below, which win over 8, 10 and 13 where
 they differ; amended 2026-10-22 (c): decisions 1 and 23 no longer create purpose-shaped
-tables, the release pins business objects; design: the
+tables, the release pins business objects; amended 2026-10-22 (d): Ideas, only, gets a
+derived per-viewer SQLite index (decision 28); design: the
 architect's memo, which corrected four points of the first sketch, marked below). Amends
 [0022](0022-atomic-run-publication.md) (a pinned read of the history copy, a build-wide pin and retained versions), [0060](0060-history-copy.md) (how the copy serves a pinned read), [0044](0044-hosting-from-the-owners-mac.md) (a second port, blue/green),
 [0062](0062-reads-serve-the-last-complete-session.md) (the default session is the current
@@ -317,3 +318,17 @@ Owner decision 2026-10-22 ("The domain tables look good. Let us go with them", l
     runs generation; the two results tables make them fast enough live. ADR 0005 and the
     writers line in `CLAUDE.md` do not change (the on-request run already writes `results/`,
     ADR 0033).
+
+## Amendment 2026-10-22 (d): Ideas gets a derived per-viewer index (owner exception)
+Owner decision 2026-10-22 (logged in `docs/decisions/log.md`, "Ideas ranking rule, store and
+licence (confirmed)").
+
+28. **Decision 25's rejection of a one-page table does not apply to Ideas.** The Ideas list
+    is a per-viewer ranking (weight / position, site top 5 at weight 1, the viewer's own
+    screeners top 20 at weight 3; an idea is its ticker's best pick score), stored as pointers
+    and ranks in one SQLite index (ADR 0006 amendment 2026-10-22), written by the nightly
+    `ideas` step and by the API after an on-request run (ADR 0005 amendment), stamped with
+    `source_seq`, `screeners_hash` and `rule_hash`, with a live fallback. It is built only
+    after the rule and smaller-response loader PRs and their re-measure. Every other page
+    stays under decision 25. Decision 16 stays: IdeasPage is a run operation, never
+    release-shared, and the index is not in the release manifest.

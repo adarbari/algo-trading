@@ -1,7 +1,7 @@
 # ADR 0005: Ingestion is the only writer of market and feature data
 
 **Status:** accepted (2026-10-02); amended 2026-10-03 by ADR 0027 (vendor SDKs, credentials
-handling and source adapters now live in the shared package `libs/sources`, `algotrade_sources`); amended by ADR 0028 (the API's one write: its live-quote log, `live/option_quotes`); amended by [0058](0058-llm-usage-log-prices-and-budget.md) (the API's text-model usage log, `usage/llm_calls`); amended by [0066](0066-drafting-feedback-events.md) (the API's Describe-it feedback events, `feedback/drafting_events`); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (job-written `results/edge_series` and `results/edge_trades`)
+handling and source adapters now live in the shared package `libs/sources`, `algotrade_sources`); amended by ADR 0028 (the API's one write: its live-quote log, `live/option_quotes`); amended by [0058](0058-llm-usage-log-prices-and-budget.md) (the API's text-model usage log, `usage/llm_calls`); amended by [0066](0066-drafting-feedback-events.md) (the API's Describe-it feedback events, `feedback/drafting_events`); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (job-written `results/edge_series` and `results/edge_trades`); amended 2026-10-22 (the API's rebuild of the viewer's Ideas rows, `indexes/ideas.sqlite`)
 
 ## Context
 If several apps write data, nobody owns its quality and backtests stop being reproducible.
@@ -25,3 +25,12 @@ If several apps write data, nobody owns its quality and backtests stop being rep
 
 ## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
 See [0077](0077-serving-release.md): ingestion writes serving releases (`serve-release` job); a persisted response cache is an API write, through `storage/backends`.
+
+## Amendment 2026-10-22: the derived Ideas index
+Owner decision 2026-10-22 (`docs/decisions/log.md`, "Ideas ranking rule, store and licence
+(confirmed)"). Write class **derived Ideas index** (ADR 0006 amendment): ingestion writes the
+nightly lists (the `ideas` step, not critical); the API additionally rebuilds the affected
+viewers' Ideas rows in the on-request screener run job, after the Parquet publish is durable
+and before the run record is saved. The index is derived and rebuildable, holds pointers and
+ranks only, and a failed rebuild leaves a stale stamp that the page answers with a live
+computation. It writes no market or feature data.
