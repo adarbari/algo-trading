@@ -221,6 +221,22 @@ def render_history(history: list[dict]) -> str:
 # ---- measurement ----------------------------------------------------------------------------
 
 
+def guard_waiting() -> None:
+    """The swap guard, but on this shared machine wait (up to 3 min) for free swap, not abort."""
+    end = time.time() + 180
+    while True:
+        try:
+            return _GUARD()
+        except al.pp.SwapLowError:
+            if time.time() > end:
+                raise
+            time.sleep(5)
+
+
+_GUARD = al.guard
+al.guard = guard_waiting
+
+
 def load1() -> float:
     """The 1-minute load average."""
     return float(
