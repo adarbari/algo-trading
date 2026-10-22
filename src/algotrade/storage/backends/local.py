@@ -134,7 +134,9 @@ class LocalTables:
     def __init__(self, root: Path) -> None:
         self.root = root / "tables"
         self.commits = Commits(self.root)
-        self.history = HistoryCopy(self.root, self.commits.published, self.commits.no_commits)
+        self.history = HistoryCopy(
+            self.root, self.commits.published, self.commits.no_commits, self.commits.epoch
+        )
         self.swap_grace_s = SWAP_GRACE_S  # tests shorten it
         self._dates_memo: OrderedDict[tuple[str, int, int], frozenset[date]] = OrderedDict()
         self._dates_lock = threading.Lock()
