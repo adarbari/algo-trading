@@ -173,6 +173,11 @@ class Held[T]:
                 if self._flights.get(key) is flight:  # not a newer caller's
                     del self._flights[key]
 
+    def holds(self, key: Hashable) -> bool:
+        """Whether ``key`` is already read."""
+        with self._lock:
+            return key in self._items
+
     def weight_bytes(self) -> int:
         with self._lock:
             return self._bytes
