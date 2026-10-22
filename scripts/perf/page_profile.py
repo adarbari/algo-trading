@@ -15,6 +15,7 @@ absolute split). Nothing here touches a store: `run_profile` is only called with
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import cProfile
 import itertools
 import os
@@ -456,6 +457,13 @@ def find_cut(err: BaseException) -> Cut | None:
     return None
 
 
+def survivable(err: BaseException) -> bool:
+    """Whether a failure while cleaning up after a cut may be logged and dropped: anything but a
+    Cut for SIGTERM / SIGHUP / Ctrl-C: that stop must go on."""
+    found = find_cut(err)
+    return found is None or found.reason == "limit"
+
+
 def snapshot_of(stats: dict[Key, tuple], elapsed: float) -> dict:
     """The bucket seconds and call counters of a profile so far."""
     return {"t": elapsed, "buckets": attribute(stats), "counts": call_counts(stats)}
@@ -510,11 +518,16 @@ def run_profiled(
     snaps: list[dict] = []
     t0 = clock()
     emitted: list[Profiled] = []
+    started: list[bool] = []
 
     def emit(reason: str) -> None:
-        """The partial result, once: final snapshot included, handed to ``on_partial``."""
-        if not emitted:
-            emitted.append(_partial(prof, snaps, clock() - t0, reason, on_partial))
+        """The partial result, once (the guard is set before anything is computed, and a second
+        SIGTERM / SIGHUP / Ctrl-C waits until it is done): final snapshot included, handed to
+        ``on_partial``."""
+        with _deferred():
+            if not started:
+                started.append(True)
+                emitted.append(_partial(prof, snaps, clock() - t0, reason, on_partial))
 
     def tick(_signum: int, _frame: object) -> None:
         elapsed = clock() - t0
@@ -545,17 +558,21 @@ def run_profiled(
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, old)
         CURRENT.clear()
-    if emitted:
-        result = emitted[0]
-        try:
-            on_cut()
-        except BaseException as err:
-            print(f"cleaning up after the cut failed: {err!r}", file=sys.stderr)
+    if not emitted:
+        result.elapsed, result.stats, result.snapshots = clock() - t0, stats_now(prof), snaps
         return result
-    result.elapsed = clock() - t0
-    result.stats = stats_now(prof)
-    result.snapshots = snaps
-    return result
+    _clean_up(on_cut)
+    return emitted[0]
+
+
+def _clean_up(on_cut: Callable[[], None]) -> None:
+    """``on_cut()`` after a cut: its failure is logged, except a stop signal's Cut."""
+    try:
+        on_cut()
+    except BaseException as err:
+        if not survivable(err):
+            raise
+        print(f"cleaning up after the cut failed: {err!r}", file=sys.stderr)
 
 
 def partial_row(name: str, res: Profiled) -> dict:
@@ -573,9 +590,6 @@ def partial_row(name: str, res: Profiled) -> dict:
         "top": top_functions(res.stats),
         "partial": {"reason": res.cut, "elapsed": res.elapsed, "snapshots": res.snapshots},
     }
-
-
-CUT_SIGNALS = {signal.SIGTERM, signal.SIGHUP, signal.SIGINT}
 
 
 def finished_row(
@@ -602,30 +616,52 @@ def finished_row(
     }
 
 
+DEFER: list[list[str]] = []  # stop signals held back by _deferred(), innermost last
+
+
+@contextlib.contextmanager
+def _deferred():  # type: ignore[no-untyped-def]
+    """A critical section the stop signals (SIGTERM / SIGHUP / Ctrl-C) must not interrupt: the
+    handler records the signal instead of raising, and the outermost exit raises its Cut. (Not
+    ``pthread_sigmask``: a signal sent to the process may be taken by another thread, and the
+    Python handler then still runs in the main thread.)"""
+    held: list[str] = []
+    DEFER.append(held)
+    try:
+        yield
+    finally:
+        DEFER.pop()
+        if held and DEFER:
+            DEFER[-1].extend(held)
+        elif held:
+            raise Cut(held[0])
+
+
 def _flush(out: Path, route: str, done: list[dict]) -> None:
     """Rewrite the page's section atomically (a temp file in the same directory, then
-    ``os.replace``) with the cut signals blocked, so a signal never leaves a truncated file; one
+    ``replace``) with the stop signals deferred, so a signal never leaves a truncated file; one
     that arrives meanwhile is delivered after the write."""
-    old = signal.pthread_sigmask(signal.SIG_BLOCK, CUT_SIGNALS)
-    try:
+    with _deferred():
         current = out.read_text() if out.exists() else ""
         out.parent.mkdir(parents=True, exist_ok=True)
         text = upsert_section(current, route, render_page(route, done))
         fd, tmp = tempfile.mkstemp(dir=out.parent, prefix=f".{out.name}.")
         try:
+            os.fchmod(fd, 0o644)  # mkstemp makes it 0600; the page file is a readable doc
             with os.fdopen(fd, "w") as handle:
                 handle.write(text)
             Path(tmp).replace(out)
         except BaseException:
             Path(tmp).unlink(missing_ok=True)
             raise
-    finally:
-        signal.pthread_sigmask(signal.SIG_SETMASK, old)
 
 
 def _on_signal(signum: int, _frame: object) -> None:
     """SIGTERM / SIGHUP / SIGINT: write the running operation's partial result, then unwind."""
     reason = signal.Signals(signum).name
+    if DEFER:  # inside a write that must finish: delivered when it is done
+        DEFER[-1].append(reason)
+        return
     emit = CURRENT.get("emit")
     if emit is not None:
         emit(reason)
@@ -722,17 +758,44 @@ def _profile_all(
     return code
 
 
-def _drain(loop: asyncio.AbstractEventLoop) -> None:
-    """Cancel what a cut call left pending and let it unwind (best effort: a task that re-raises
-    the ``Cut`` while unwinding, or any failure here, is logged, never fatal)."""
+DRAIN_S = 10.0
+
+
+def _drain_timeout(_signum: int, _frame: object) -> None:
+    raise Cut("drain timeout")
+
+
+def _drain(loop: asyncio.AbstractEventLoop, timeout_s: float = DRAIN_S) -> None:
+    """Cancel what a cut call left pending and let it unwind, for at most ``timeout_s`` (an alarm
+    interrupts a sibling task stuck in long CPU work). A ``Cut`` a task re-raises while unwinding
+    is the cut already handled: the wait goes on. Failures are logged, never fatal, except a
+    stop signal's Cut."""
+    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+    for t in pending:
+        t.cancel()
+    old = signal.signal(signal.SIGALRM, _drain_timeout)
+    signal.setitimer(signal.ITIMER_REAL, timeout_s)
     try:
-        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-        for t in pending:
-            t.cancel()
-        if pending:
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-    except BaseException as err:
-        print(f"draining the cut call failed: {err!r}", file=sys.stderr)
+        while pending:
+            loop.call_later(0.05, loop.stop)  # a poll, not a coroutine: a Cut can never orphan one
+            try:
+                loop.run_forever()
+            except BaseException as err:
+                found = find_cut(err)
+                if found is not None and found.reason == "drain timeout":
+                    print(
+                        f"draining the cut call timed out after {timeout_s:.0f} s", file=sys.stderr
+                    )
+                    break
+                if not survivable(err):
+                    raise
+                if found is None:
+                    print(f"draining the cut call failed: {err!r}", file=sys.stderr)
+                    break
+            pending = [t for t in pending if not t.done()]
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old)
 
 
 def _close(loop: asyncio.AbstractEventLoop, client: Any, lifespan: Any) -> None:
@@ -741,6 +804,8 @@ def _close(loop: asyncio.AbstractEventLoop, client: Any, lifespan: Any) -> None:
         loop.run_until_complete(client.aclose())
         loop.run_until_complete(lifespan.__aexit__(None, None, None))
     except BaseException as err:
+        if not survivable(err):
+            raise
         print(f"closing the app failed: {err!r}", file=sys.stderr)
     finally:
         loop.close()
