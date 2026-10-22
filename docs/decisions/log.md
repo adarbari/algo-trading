@@ -438,3 +438,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the profiles of 20 pages (1,310 s of work) show 39% in run-record decoding (every lookup decodes the 572 `job-<kind>-<hash>` files), 25% in the status strip's unused completeness grid and 16-20% in market-history reads; these are code fixes that need no migration; the owner wants cold loads under 1 s and wants to approve any exception.
+
+## 2026-10-22 | Run records (data architecture v2, decision 3) | Slim the edge-eval job records now; archive old run records later
+- Question: stop copying `stats.result.rows` (about 4.3 MB of a 5.96 MB record; the 169 `job-edge-eval` records are 139 MB together) into the `job-edge-eval` run records, and archive `outcomes` / `residual-returns` run records older than 90 days into packed files?
+- Options: both now / slim now and archive later / neither.
+- Decision: slim now (keep a pointer to the rows already stored in `results/edge_eval`; never delete), archive later (revisit when a measurement shows the run files' count or a long-window lookup costing time).
+- decided by: owner
+- status: final
+- Reasoning: slimming cuts what every edge-eval lookup decodes (about 2.7 ms per MB) and lets the records fit the parse cache; archiving has no speed benefit while the job-name filter skips those files and adds reader paths, atomic packing and tooling; lineage is kept either way (ADR 0007).
