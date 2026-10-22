@@ -1,0 +1,38 @@
+# The page-latency bar (owner decisions 2026-10-22, docs/decisions/log.md): read by
+# scripts/perf/fast_bench.py (`make api-latency-fast`) and checked by tests/scripts/perf.
+# A VIEW is judged on its CRITICAL PATH (its slowest request, empty-cache first request).
+# The SHELL requests every screen asks for are judged together, as a separate limit.
+
+critical_path_limit_s = 1.0
+shell_total_limit_s = 1.0
+
+# the shell operations (a GuideEntries variant counts once, its slowest)
+shell_operations = ["Viewer", "SessionDate", "Regime", "StatusStrip", "EdgeDesk", "GuideEntries"]
+
+# Accepted exceptions: a view whose critical-path operation is named here may exceed the limit
+# until its named fix, then the owner withdraws the exception. Every entry needs a reason + date.
+[[exception]]
+operation = "ScreenerResults"
+reason = "accepted over-1-s until its named fix (data architecture v2: results/screen_runs and screen_picks); re-measured after it"
+date = "2026-10-22"
+
+[[exception]]
+operation = "RegimeSignals"
+reason = "accepted over-1-s until the memo and dates index (trigger T2); the owner withdraws it when cold time is under 1 s"
+date = "2026-10-22"
+
+[[exception]]
+operation = "MarketHistory"
+reason = "accepted over-1-s until the memo and dates index (trigger T2); the owner withdraws it when cold time is under 1 s"
+date = "2026-10-22"
+
+[[exception]]
+operation = "HarnessRuns"
+reason = "admin page: accepted over-1-s until its named fix; re-measured after it"
+date = "2026-10-22"
+
+[[exception]]
+operation = "InstrumentFacts"
+reason = "accepted over-1-s until its named fix; re-measured after it"
+date = "2026-10-22"
+# InstrumentEvents: the 2 s exception is withdrawn after the option F re-measure (no entry).

@@ -1,0 +1,441 @@
+"""`make api-latency-fast`: the page-latency bar over every web view: a gate and a history.
+
+The bar (benchmarks/perf_bar.toml, owner decisions 2026-10-22): a VIEW is judged on its CRITICAL
+PATH (its slowest request, the empty-cache first request) under 1 s, and the SHELL requests every
+screen asks for (Viewer, SessionDate, Regime, StatusStrip, EdgeDesk, GuideEntries) together under
+1 s. A view whose critical-path operation is a named exception (with reason and date) may exceed it.
+Exits 1 when a non-exempt view or the shell is over; 2 when refused.
+
+Method: ONE API process on a CLONE of the store (`--data-url` is required; the real store is
+refused as in api_latency.py), start-up warmer off, `release_reads=false`, and a patched endpoint
+that empties the ResponseCache and every loader ResultCache before EVERY timing. Each distinct
+(operation, document, variables) is timed 5 times and averaged (3 for operations whose first
+timing is over 10 s) while the 1-minute load is gated at `--load-max`; a view's critical path is
+its slowest operation's average, its sum the total of its operations' averages. The views come from
+`benchmarks/api_latency_views.json` with its crawled `captured` documents (`make
+api-latency-views-capture` on the clone; `--views-file` points at another copy).
+
+`--ratio-mode` (a busy machine): every time is divided by the shell's slowdown against the last
+recorded run (the shell operations are untouched by the work being judged), never below 1.
+`--record` appends the run to benchmarks/critical_path_history.jsonl (the only writer);
+`--history` prints the trend and measures nothing. Docs: docs/perf/page-latency-bar.md.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+import tomllib
+from datetime import UTC, datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import api_latency as al
+import views as vw
+
+REPO = Path(__file__).resolve().parents[2]
+BAR_FILE = REPO / "benchmarks" / "perf_bar.toml"
+HISTORY_FILE = REPO / "benchmarks" / "critical_path_history.jsonl"
+SLOW_FIRST_MS = 10_000.0  # an operation over this on its first timing is repeated only 3 times
+SLOW_REPS = 3
+HISTORY_KEYS = ("date", "sha", "load_before", "load_after", "machine", "views", "totals")
+VIEW_KEYS = ("crit_s", "sum_s", "slowest_op")
+TOTAL_KEYS = ("views_over_1s", "seconds_above_bar", "shell_total_s")
+
+# argv: port. The empty-cache process: warmer off, and GET /__bench_clear empties every cache.
+CLEAR_PATCH = """
+import sys, gc, json
+import algotrade_api.graphql.response_cache as rc
+import algotrade_api.graphql.warm as w
+import algotrade.services.read.context as cx
+async def _idle(self, *args):
+    return None
+w.CacheWarmer.run = _idle
+w.CacheWarmer.replay_operations = _idle
+w.CacheWarmer.warm_home = lambda self, *args: None
+def clear_all():
+    n = 0
+    for o in gc.get_objects():
+        if isinstance(o, cx.ResultCache):
+            with o._lock:
+                o._items.clear(); o._weights.clear(); o._held = 0
+            n += 1
+        elif isinstance(o, rc.ResponseCache):
+            with o._lock:
+                o._items.clear(); o._held = 0
+            n += 1
+    return n
+class Clear:
+    def __init__(self, app): self.app = app
+    async def __call__(self, scope, receive, send):
+        if scope['type'] == 'http' and scope['path'] == '/__bench_clear':
+            body = json.dumps({'cleared': clear_all()}).encode()
+            await send({'type': 'http.response.start', 'status': 200,
+                        'headers': [(b'content-type', b'application/json')]})
+            await send({'type': 'http.response.body', 'body': body}); return
+        await self.app(scope, receive, send)
+import uvicorn
+from algotrade_api.app import app
+uvicorn.run(Clear(app), host='127.0.0.1', port=int(sys.argv[1]), log_level='warning')
+"""
+
+
+# ---- the rule (pure) ------------------------------------------------------------------------
+
+
+def load_bar(path: Path = BAR_FILE) -> dict:
+    """The parsed rule file."""
+    return tomllib.loads(path.read_text())
+
+
+def exceptions_by_op(bar: dict) -> dict[str, dict]:
+    """The accepted exceptions by operation name."""
+    return {e["operation"]: e for e in bar.get("exception", [])}
+
+
+def shell_total(op_avg_s: dict[str, list[float]], shell_ops: list[str]) -> float:
+    """The shell's combined time: each shell operation counted once at its slowest variant."""
+    return round(sum(max(op_avg_s.get(n, [0.0])) for n in shell_ops), 2)
+
+
+def evaluate(views: dict[str, dict], shell_s: float, bar: dict, scale: float = 1.0) -> dict:
+    """Judge each view's critical path and the shell, after dividing times by ``scale``.
+
+    Returns {"rows": [{view, crit_s, slowest_op, verdict}], "failures": [str], "totals": {...}};
+    verdict is ok / EXCEPTION (named, over) / OVER."""
+    limit, excepted = bar["critical_path_limit_s"], exceptions_by_op(bar)
+    rows, failures, over = [], [], []
+    for vid, v in sorted(views.items(), key=lambda kv: -kv[1]["crit_s"]):
+        crit = round(v["crit_s"] / scale, 2)
+        if crit <= limit:
+            verdict = "ok"
+        elif v["slowest_op"] in excepted:
+            verdict = "EXCEPTION"
+        else:
+            verdict = "OVER"
+            failures.append(f"{vid}: critical path {crit:.2f} s ({v['slowest_op']}) over {limit} s")
+        if crit > limit:
+            over.append(crit)
+        rows.append(
+            {"view": vid, "crit_s": crit, "slowest_op": v["slowest_op"], "verdict": verdict}
+        )
+    shell = round(shell_s / scale, 2)
+    if shell > bar["shell_total_limit_s"]:
+        failures.append(f"shell: {shell:.2f} s combined over {bar['shell_total_limit_s']} s")
+    totals = {
+        "views_over_1s": len(over),
+        "seconds_above_bar": round(sum(x - limit for x in over), 2),
+        "shell_total_s": shell,
+    }
+    return {"rows": rows, "failures": failures, "totals": totals}
+
+
+def render_table(result: dict, bar: dict) -> str:
+    """The per-view table, slowest first, then the totals line."""
+    lines = ["| view | critical path s | slowest op | verdict |", "|---|---:|---|---|"]
+    for r in result["rows"]:
+        lines.append(f"| `{r['view']}` | {r['crit_s']:.2f} | {r['slowest_op']} | {r['verdict']} |")
+    t = result["totals"]
+    lines.append(
+        f"\n{t['views_over_1s']} views over {bar['critical_path_limit_s']} s on the critical path "
+        f"({t['seconds_above_bar']} s above the bar); shell {t['shell_total_s']} s of "
+        f"{bar['shell_total_limit_s']} s"
+    )
+    return "\n".join(lines)
+
+
+def scale_from_history(shell_s: float, history: list[dict]) -> float:
+    """The machine's slowdown: the shell now over the shell of the last recorded run, at least 1."""
+    if not history:
+        return 1.0
+    last = history[-1]["totals"]["shell_total_s"]
+    return max(1.0, shell_s / last) if last > 0 else 1.0
+
+
+# ---- the history ----------------------------------------------------------------------------
+
+
+def read_history(path: Path = HISTORY_FILE) -> list[dict]:
+    """Every recorded run, oldest first."""
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def history_record(
+    views: dict[str, dict],
+    totals: dict,
+    sha: str,
+    load_before: float,
+    load_after: float,
+    machine: str,
+) -> dict:
+    """One history line for a run (critical path, sum and slowest op per view, plus totals)."""
+    return {
+        "date": datetime.now(UTC).strftime("%Y-%m-%d"),
+        "sha": sha,
+        "load_before": load_before,
+        "load_after": load_after,
+        "machine": machine,
+        "mode": "empty-cache first request, 5 reps averaged",
+        "views": {
+            k: {"crit_s": v["crit_s"], "sum_s": v["sum_s"], "slowest_op": v["slowest_op"]}
+            for k, v in views.items()
+        },
+        "totals": {**totals, "views_measured": len(views)},
+    }
+
+
+def append_history(record: dict, path: Path = HISTORY_FILE) -> None:
+    """Append one line; the only writer of the history file."""
+    with path.open("a") as f:
+        f.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+
+def render_history(history: list[dict]) -> str:
+    """A summary line per run, then the trend of every view that ever was over the bar."""
+    out = ["run summaries:"]
+    for h in history:
+        t = h["totals"]
+        out.append(
+            f"  {h['date']} {h['sha']}: {t['views_over_1s']} views over 1 s, "
+            f"{t['seconds_above_bar']} s above the bar, shell {t['shell_total_s']} s "
+            f"(load {h['load_before']} -> {h['load_after']}; {h['machine']})"
+        )
+    names = sorted({k for h in history for k, v in h["views"].items() if v["crit_s"] > 1})
+    out.append("critical path s per view (views that were over 1 s at some run):")
+    for name in names:
+        trend = " -> ".join(
+            f"{h['views'][name]['crit_s']:.2f}" if name in h["views"] else "n/a" for h in history
+        )
+        out.append(f"  {name}: {trend}")
+    return "\n".join(out)
+
+
+# ---- measurement ----------------------------------------------------------------------------
+
+
+def load1() -> float:
+    """The 1-minute load average."""
+    return float(
+        subprocess.check_output("uptime", text=True)
+        .split("load averages:")[1]
+        .split()[0]
+        .rstrip(",")
+    )
+
+
+def wait_quiet(limit: float, load_max: float) -> float:
+    """Wait up to ``limit`` s until the load is at most ``load_max``; the load read."""
+    end, load = time.time() + limit, load1()
+    while load > load_max and time.time() < end:
+        time.sleep(3)
+        load = load1()
+    return load
+
+
+def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, str]]:
+    """(distinct ops by signature, signatures per view, views not measured with the reason)."""
+    pages = json.loads(al.PAGES_FILE.read_text())["pages"]
+    known, _ = al.inventory(pages)
+    ids = [k for k, v in doc["views"].items() if v.get("source") == "static"]
+    global_ops: dict[str, dict] = {}
+    for v in doc["views"].values():
+        for r in vw.captured_requests(v):
+            global_ops.setdefault(r["op"], {"query": r["query"], "variables": r["variables"]})
+    distinct: dict[str, dict] = {}
+    view_ops: dict[str, list[str]] = {}
+    skipped: dict[str, str] = {}
+    for vid in ids:
+        try:
+            ops, by = vw.view_operations(doc, [vid], known)
+            have = {k.split(" [")[0] for k in by[vid]}
+            for name in doc["views"][vid].get("ops", []):
+                if name in have or name in doc["views"][vid].get("uncertain", []):
+                    continue
+                d = global_ops.get(name) or known.get(name)
+                if d is None:
+                    continue
+                ops[vw.op_key(name, vid)] = d
+                by[vid].append(vw.op_key(name, vid))
+                have.add(name)
+        except Exception as e:
+            skipped[vid] = str(e)[:100]
+            continue
+        sigs = []
+        for key in by[vid]:
+            name = key.split(" [")[0]
+            if (
+                vid.startswith("/explore")
+                and "sel=" not in vid
+                and name == "InstrumentScreenerHits"
+            ):
+                continue  # the static list over-approximates the unselected Explore
+            o = ops[key]
+            body = o["query"] + json.dumps(o["variables"], sort_keys=True)
+            sig = name + "#" + hashlib.sha1(body.encode()).hexdigest()[:8]
+            distinct.setdefault(
+                sig, {"name": name, "query": o["query"], "variables": o["variables"]}
+            )
+            sigs.append(sig)
+        view_ops[vid] = sigs
+    return distinct, view_ops, skipped
+
+
+def time_ops(
+    distinct: dict[str, dict], data_url: str, reps: int, load_max: float
+) -> dict[str, dict]:
+    """Time every distinct op ``reps`` times, caches emptied before each timing."""
+    al.LAUNCH = CLEAR_PATCH
+    al.MODES["empty"] = "9"
+    cfg = al.uncached_config(al.REPO / "config", Path(tempfile.mkdtemp()) / "config")
+    samples = {s: [] for s in distinct}
+    loads = {s: [] for s in distinct}
+    last: dict[str, dict] = {}
+    api = al.Api("empty", data_url=data_url, config_dir=cfg)
+    try:
+        for p in range(reps):
+            print(f"pass {p + 1}/{reps} (load {wait_quiet(180, load_max)})", flush=True)
+            for sig, d in distinct.items():
+                if p >= SLOW_REPS and samples[sig] and samples[sig][0] > SLOW_FIRST_MS:
+                    continue
+                al.guard()
+                loads[sig].append(wait_quiet(8, load_max))
+                api.client.get(f"{api.url}/__bench_clear")
+                ms, status, size, _ = api.call({"query": d["query"], "variables": d["variables"]})
+                samples[sig].append(round(ms, 1))
+                last[sig] = {"status": status, "bytes": size, "err": api.last_error}
+    finally:
+        api.close()
+    return {
+        s: {
+            "name": distinct[s]["name"],
+            "avg": round(statistics.mean(x), 1),
+            "n": len(x),
+            "noisy": any(ld > load_max for ld in loads[s]),
+            "failed": last[s]["status"] != 200 or bool(last[s]["err"]),
+        }
+        for s, x in samples.items()
+    }
+
+
+def per_view(ops: dict[str, dict], view_ops: dict[str, list[str]]) -> dict[str, dict]:
+    """Critical path (slowest op's average), sum and slowest op per view, in seconds."""
+    out = {}
+    for vid, sigs in view_ops.items():
+        if not sigs:
+            continue
+        top = max(sigs, key=lambda s: ops[s]["avg"])
+        out[vid] = {
+            "crit_s": round(ops[top]["avg"] / 1000, 2),
+            "sum_s": round(sum(ops[s]["avg"] for s in sigs) / 1000, 2),
+            "slowest_op": ops[top]["name"],
+            "failed": [ops[s]["name"] for s in sigs if ops[s]["failed"]],
+        }
+    return out
+
+
+def git_sha() -> str:
+    """The short sha of the code measured."""
+    done = subprocess.run(
+        ["git", "-C", str(REPO), "rev-parse", "--short=9", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.stdout.strip() or "unknown"
+
+
+# ---- entry point ----------------------------------------------------------------------------
+
+
+def parse_args(argv: list[str] | None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    p.add_argument("--data-url", help="the CLONE of the store to serve (required to measure)")
+    p.add_argument(
+        "--history", action="store_true", help="print the recorded trend; measure nothing"
+    )
+    p.add_argument("--record", action="store_true", help="append this run to the history file")
+    p.add_argument(
+        "--ratio-mode", action="store_true", help="busy machine: divide by the shell's slowdown"
+    )
+    p.add_argument("--reps", type=int, default=5)
+    p.add_argument("--load-max", type=float, default=4.0)
+    p.add_argument("--views-file", default=str(vw.VIEWS_FILE))
+    p.add_argument("--machine", default="", help="a note on the machine, stored with --record")
+    p.add_argument("--out", help="a directory for ops.json and views.json")
+    p.add_argument("--min-free-swap-mb", type=int, default=al.pp.MIN_FREE_SWAP_MB)
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    bar = load_bar()
+    if args.history:
+        print(render_history(read_history()))
+        return 0
+    try:
+        data_url = al.check_target(
+            args.data_url,
+            al.real_stores(dict(al.os.environ), REPO, al.main_checkout_of(REPO)),
+            False,
+            need_url=True,
+        )
+    except al.RefusalError as err:
+        print(f"refused: {err}", file=sys.stderr)
+        return 2
+    al.SWAP_FLOOR_MB[0] = args.min_free_swap_mb
+    al.GUARD_PATH[0] = al.store_path(data_url)
+    distinct, view_ops, skipped = op_set(vw.load_views(Path(args.views_file)))
+    print(
+        f"{len(view_ops)} views, {len(skipped)} not measured, {len(distinct)} distinct ops",
+        flush=True,
+    )
+    load_before = load1()
+    ops = time_ops(distinct, data_url, args.reps, args.load_max)
+    load_after = load1()
+    views = per_view(ops, view_ops)
+    by_name: dict[str, list[float]] = {}
+    for o in ops.values():
+        by_name.setdefault(o["name"], []).append(o["avg"] / 1000)
+    shell_s = shell_total(by_name, bar["shell_operations"])
+    history = read_history()
+    scale = scale_from_history(shell_s, history) if args.ratio_mode else 1.0
+    result = evaluate(views, shell_s, bar, scale)
+    if args.ratio_mode:
+        print(f"ratio mode: times divided by {scale:.2f} (shell {shell_s} s now vs the last run)")
+    print(render_table(result, bar))
+    failed = sorted({n for v in views.values() for n in v["failed"]})
+    if failed:
+        result["failures"].append(
+            f"operations that failed (a fast failure is no pass): {', '.join(failed)}"
+        )
+    for vid, why in skipped.items():
+        print(f"not measured: {vid}: {why}")
+    if args.out:
+        out = Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "ops.json").write_text(json.dumps(ops, indent=1))
+        (out / "views.json").write_text(
+            json.dumps({"views": views, "not_measured": skipped}, indent=1)
+        )
+    if args.record:
+        note = args.machine + ("; ratio mode" if args.ratio_mode else "")
+        rec = history_record(
+            views, result["totals"], git_sha(), load_before, load_after, note.strip("; ")
+        )
+        append_history(rec)
+        print(f"recorded in {HISTORY_FILE.relative_to(REPO)}")
+    for line in result["failures"]:
+        print(f"FAIL {line}", file=sys.stderr)
+    return 1 if result["failures"] else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
