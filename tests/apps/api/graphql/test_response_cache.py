@@ -224,7 +224,7 @@ def test_an_errored_answer_is_not_kept(harness: Harness) -> None:
 
 
 WEB_SRC = Path(__file__).parents[4] / "apps/web/src"
-HAND_WRITTEN = re.compile(r"[`'](?:query|mutation)\s+(\w+)")
+HAND_WRITTEN = re.compile(r"""[`'"]\s*(?:query|mutation)\s+(\w+)""")
 
 
 def web_operations() -> set[str]:
@@ -235,7 +235,7 @@ def web_operations() -> set[str]:
         head = re.search(r"\b(?:query|mutation)\s+(\w+)", json.loads(m.group(1)))
         if head:
             names.add(head.group(1))
-    for path in WEB_SRC.rglob("*.ts"):
+    for path in WEB_SRC.rglob("*.ts*"):
         if "generated" in path.parts or re.search(r"\.(test|stories)\.", path.name):
             continue
         names.update(HAND_WRITTEN.findall(path.read_text()))
@@ -448,7 +448,7 @@ def test_a_stale_entry_is_served_at_once_and_recomputed_behind_the_answer(
 
 def _key(harness: Harness) -> str:
     return response_key(
-        harness.seq, UserRecord("ana", Role.ADMIN), SESSION, None, "Day",
+        harness.seq, UserRecord("ana", Role.ADMIN), SESSION, None, "Regime",
         served=harness.served,
     )  # fmt: skip
 
@@ -612,7 +612,7 @@ def test_a_run_compaction_leaves_the_cache_key_unchanged(tmp_path: Path) -> None
 
     def key() -> str:
         return response_key(
-            reader.visible_seq(), who, SESSION, None, "Day", reader.runs_generation()
+            reader.visible_seq(), who, SESSION, None, "Regime", reader.runs_generation()
         )
 
     before = key()
