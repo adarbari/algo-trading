@@ -516,3 +516,56 @@ def test_a_previous_run_before_the_table_is_read_from_the_frozen_run_id() -> Non
     assert before.frozen is None
     changes = results.load_run_changes(ctx, run)
     assert changes.by_instrument["EQ:AAA"] == ("new", "REJECT")
+
+
+# ------------------------------------------------- the previous run of every screener, one read
+
+
+def _previous_of_each(ctx_for: Any) -> dict[tuple[str, str], tuple[str, date, bool] | None]:
+    out: dict[tuple[str, str], tuple[str, date, bool] | None] = {}
+    for owner, config in KEYS:
+        run = latest_run(ctx_for(), owner, config).run
+        if run is None:
+            continue
+        before = load_previous_run(ctx_for(), run)
+        out[(owner, config)] = (
+            None if before is None else (before.run_id, before.session, before.frozen is None)
+        )
+    return out
+
+
+@pytest.mark.parametrize("days", [(D0, D1), (D1,), ()], ids=["framed", "mixed", "unframed"])
+def test_the_previous_run_is_the_same_cached_or_not(days: tuple[date, ...]) -> None:
+    """First run (no previous), previous in an earlier session, a superseded run and the unframed
+    fallback: one shared context (cached file reads) gives what a fresh one per call gives."""
+    backend = screens_store()
+    freeze(backend, days=days)
+    reader = StoreReader(backend)
+    shared = context(reader)
+    cached = _previous_of_each(lambda: shared)
+    fresh = _previous_of_each(lambda: context(StoreReader(backend)))
+    assert cached == fresh
+    assert cached[("site", "alpha")] is not None and cached[("me", "beta")] is None
+
+
+def test_the_screen_runs_file_is_read_once_per_run_whatever_the_screeners(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = screens_store()
+    freeze(backend)
+    reads: list[str] = []
+    real = runs.run_rows_of
+
+    def counting(c: ReadContext, table: str, run_id: str, *args: Any, **kwargs: Any) -> Any:
+        if table == runs.SCREEN_RUNS:
+            reads.append(run_id)
+        return real(c, table, run_id, *args, **kwargs)
+
+    monkeypatch.setattr(runs, "run_rows_of", counting)
+    shared = context(StoreReader(backend))
+    for _ in range(3):  # the same request again, and every screener of it
+        for owner, config in KEYS:
+            run = latest_run(shared, owner, config).run
+            if run is not None:
+                load_previous_run(shared, run)
+    assert reads and len(reads) == len(set(reads)), reads  # each previous run's file once
