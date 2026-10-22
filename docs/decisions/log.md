@@ -454,3 +454,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: it does not help the cold-load bar, so it does not belong in the speed phases.
+
+## 2026-10-22 | Ideas page size (data architecture v2, decision 6) | First 50 picks, a "more" control loads the next 50, and so on
+- Question: the Ideas page returns every pick in one response; how many does a first load carry?
+- Options: top 50 plus a "more" control loading the next 50; keep the full list and virtualise it on screen.
+- Decision: the first load carries the top 50 picks; a "more" control loads the next 50, repeatedly. The first load stays within a 300 KB budget.
+- decided by: owner
+- status: final
+- Reasoning: the response size and the server read stay small on phones and desktops; virtualising only hides rows already sent.
