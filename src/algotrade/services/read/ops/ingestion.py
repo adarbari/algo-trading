@@ -172,19 +172,43 @@ def _cell(counts: _Counts, d: Dataset, day: date) -> Cell:
     return builders[d.kind]()
 
 
+@dataclass(frozen=True)
+class CompletenessWindow:
+    """The grid's frame without its cells: the window's ``sessions`` (oldest first), the
+    ``datasets`` and ``last_closed``. Cheap (no partition read): the status strip needs only it."""
+
+    sessions: tuple[date, ...]
+    datasets: tuple[str, ...]
+    last_closed: date
+
+
+def load_completeness_window(
+    ctx: ReadContext, sessions: int = 10, now: datetime | None = None
+) -> CompletenessWindow:
+    """The window of the last ``sessions`` exchange sessions ending at ``ctx.session.date`` and
+    the last session the exchange closed by ``now``; reads no partition."""
+    days = sessions_ending(ctx.session.date, min(max(sessions, 1), MAX_SESSIONS))
+    closed = last_closed_session(now or datetime.now(UTC))
+    return CompletenessWindow(tuple(days), tuple(d.name for d in DATASETS), closed)
+
+
+def load_cells(ctx: ReadContext, days: Sequence[date]) -> tuple[Cell, ...]:
+    """Every dataset x ``days``: the partition walk, built only for a caller that asks for the
+    cells (a query that selects them), never for the strip's window."""
+    # the cells are what is stored, the same for every caller until the next publish (in the
+    # key, read before the partitions, ADR 0022): 430 partitions read (1.6 s) when cold
+    key = ("completeness", tuple(days), ctx.reader.version())
+    cells: tuple[Cell, ...] = ctx.cache.get_or_compute(key, lambda: _cells(ctx, days))
+    return cells
+
+
 def load_completeness(
     ctx: ReadContext, sessions: int = 10, now: datetime | None = None
 ) -> Completeness:
     """Every dataset x the last ``sessions`` exchange sessions ending at ``ctx.session.date``,
     and the last session the exchange closed by ``now`` (default: the current time)."""
-    days = sessions_ending(ctx.session.date, min(max(sessions, 1), MAX_SESSIONS))
-    # the cells are what is stored, the same for every caller until the next publish (in the
-    # key, read before the partitions, ADR 0022): the status strip of every page asks for one
-    # session, 430 partitions read (1.6 s a page)
-    key = ("completeness", tuple(days), ctx.reader.version())
-    cells: tuple[Cell, ...] = ctx.cache.get_or_compute(key, lambda: _cells(ctx, days))
-    closed = last_closed_session(now or datetime.now(UTC))
-    return Completeness(tuple(days), tuple(d.name for d in DATASETS), cells, closed)
+    w = load_completeness_window(ctx, sessions, now)
+    return Completeness(w.sessions, w.datasets, load_cells(ctx, w.sessions), w.last_closed)
 
 
 def _cells(ctx: ReadContext, days: Sequence[date]) -> tuple[Cell, ...]:
