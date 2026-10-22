@@ -11,9 +11,7 @@ from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.runs import (
-    NOT_PICKED,
     DecisionCount,
-    is_picked,
     last_run_rows,
     latest_run,
     load_latest_runs,
@@ -22,6 +20,7 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.values import UnknownCode
+from algotrade.services.screening.rule_results import NOT_PICKED, is_picked
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore

@@ -186,3 +186,60 @@ RULE_SCREEN_VALUES = fixed(
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
     whole_per_group=True,
 )
+
+# A screener run as a business object (ADR 0077 amendment (c); owner decision 2026-10-22): one row
+# per run of one config for a session, written in the run's own publish beside
+# ``results/rule_screen`` (ADR 0022), so the two cannot drift. The decision counts are the run's
+# summary (parallel arrays sorted by decision); ``new_picks`` / ``dropped`` are FROZEN at write,
+# counted against ``previous_run_id`` (the config's latest run in the previous stored session of
+# ``results/rule_screen``, whatever its version: both versions are kept). Null previous / counts:
+# no earlier run to compare with, never 0. Runs merge and the key holds ``run_id``, so every run
+# is kept; a reader takes the newest ``knowledge_ts`` per (user, config).
+SCREEN_RUNS = fixed(
+    "results/screen_runs",
+    "results",
+    ("user_id", "config_id", "config_hash", "rows", "passed", "picked", "paused"),
+    "user_id string!",
+    "config_id string!",
+    "config_hash string!",
+    "config_version int64",
+    "rows int64!",
+    "passed int64!",
+    "picked int64!",
+    "paused int64!",
+    "decision_names string[]",
+    "decision_counts int64[]",
+    "regime string",
+    "size_multiplier float64",
+    "previous_run_id string",
+    "previous_session date",
+    "previous_version int64",
+    "new_picks int64",
+    "dropped int64",
+    "started_at timestamp_utc",
+    "finished_at timestamp_utc",
+    runs="merge",
+    key=("user_id", "config_id", "run_id"),
+)
+
+# A screener run's picks as a business object (ScreenPick, same decision): the rows of
+# ``results/rule_screen`` whose decision is a pick or a regime-gate ``PAUSED`` (the same columns,
+# equal), one file per run, sorted by ``instrument_id``. No field value: those stay in
+# ``results/rule_screen_values`` under their licence, so this table adds no licence surface.
+SCREEN_PICKS = fixed(
+    "results/screen_picks",
+    "results",
+    ("instrument_id", "user_id", "config_id", "decision", "rank"),
+    "instrument_id string!",
+    "user_id string!",
+    "config_id string!",
+    "config_version int64",
+    "decision string!",
+    "score float64",
+    "rank int64!",
+    "regime string",
+    "size_multiplier float64",
+    runs="merge",
+    key=("user_id", "config_id", "instrument_id"),
+    whole_per_group=True,
+)

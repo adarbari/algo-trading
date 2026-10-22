@@ -258,6 +258,42 @@ def test_result_runs_publish_together_or_not_at_all(backend: Backend) -> None:
     assert values(backend, "results/trades") == [2.0]
 
 
+def _screen_run_frames(run: str, day: date = D1) -> dict[str, pd.DataFrame]:
+    key = {"user_id": "site", "config_id": "s"}
+    rows = [
+        {**key, "instrument_id": "EQ:A", "config_hash": "h", "decision": "QUALIFIED", "rank": 1}
+    ]
+    run_row = {**key, "config_hash": "h", "rows": 1, "passed": 1, "picked": 1, "paused": 0}
+    return {
+        "rule_screen": stamped(rows, day, run),
+        "screen_picks": stamped(
+            [{k: v for k, v in rows[0].items() if k != "config_hash"}], day, run
+        ),
+        "screen_runs": stamped([run_row], day, run),
+    }
+
+
+def test_a_screen_run_and_its_picks_publish_with_the_rule_screen_or_not_at_all(
+    backend: Backend,
+) -> None:
+    """ADR 0077 amendment (c): ScreenRun and ScreenPick ride the rule screen's one publish."""
+    writer = ResultWriter(backend)
+    tables = ("rule_screen", "screen_picks", "screen_runs")
+    with pytest.raises(RuntimeError), writer.publishing("s1", COMMIT):
+        for name, frame in _screen_run_frames("s1").items():
+            writer.write_result(name, D1, "s1", frame, pending=True)
+        raise RuntimeError("a later table failed")
+    assert [backend.tables.read(f"results/{n}", D1) for n in tables] == [None] * 3
+    assert backend.tables.pending_runs() == []
+    with writer.publishing("s2", COMMIT):
+        for name, frame in _screen_run_frames("s2").items():
+            writer.write_result(name, D1, "s2", frame, pending=True)
+        assert backend.tables.read("results/screen_runs", D1) is None
+    for name in tables:
+        committed = backend.tables.read(f"results/{name}", D1)
+        assert committed is not None and set(committed["run_id"]) == {"s2"}
+
+
 # A read pins one commit sequence. Each partition keeps one older version of a run, so when
 # the same run commits twice before the read reaches a partition, the pinned version is gone:
 # the read must start again, whole, rather than skip the partition or mix commits.

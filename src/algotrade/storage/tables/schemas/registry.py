@@ -67,6 +67,8 @@ from algotrade.storage.tables.schemas.results import (
     FEEDBACK_FEATURE_REQUESTS,
     RULE_SCREEN,
     RULE_SCREEN_VALUES,
+    SCREEN_PICKS,
+    SCREEN_RUNS,
     USAGE_LLM_CALLS,
 )
 from algotrade.storage.tables.spec import (
@@ -99,6 +101,8 @@ KNOWN: dict[str, TableSpec] = {
         FUTURES_CURVE,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
+        SCREEN_RUNS,
+        SCREEN_PICKS,
         EDGE_EVAL,
         EDGE_SERIES,
         WINNERS_STUDY,

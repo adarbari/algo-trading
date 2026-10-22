@@ -35,6 +35,7 @@ from algotrade.services.read.context import (
     weigh,
 )
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
+from algotrade.services.screening.rule_results import NOT_PICKED, PAUSED, is_picked
 from algotrade.storage.tables.schemas import result_table
 
 RULE_SCREEN = result_table("rule_screen")
@@ -48,16 +49,8 @@ DETAIL_COLUMNS = (
     "user_id", "config_id", "decision", "score", "rank", "tie_break", "flags", "reasons",
     "regime", "size_multiplier",
 )  # fmt: skip
-PAUSED = "PAUSED"  # the regime gate held the pick back (ADR 0049)
-EXCLUDED = "EXCLUDED"  # a stale chain the chains gate tolerated (ADR 0054): never a pick
-NOT_PICKED = frozenset({"REJECT", "SKIPPED", "UNKNOWN", PAUSED, EXCLUDED})
 
 RunKey = tuple[str, str]  # (owner, config id)
-
-
-def is_picked(decision: str) -> bool:
-    """Whether a row with ``decision`` is one of the screener's picks."""
-    return decision not in NOT_PICKED
 
 
 def picked_mask(decisions: pd.Series) -> pd.Series:

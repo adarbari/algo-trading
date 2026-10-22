@@ -35,8 +35,9 @@ from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import config_features
 from algotrade.services.licences import recorded_licences
+from algotrade.services.screening.previous import previous_lineage
 from algotrade.services.screening.regime import market_names, regime_gate, session_market
-from algotrade.services.screening.rule_results import Stamp, rule_frames
+from algotrade.services.screening.rule_results import Lineage, Stamp, rule_frames
 from algotrade.services.selection import fields_view, select
 from algotrade.services.views import feature_view
 from algotrade.storage.runs import start_run
@@ -155,6 +156,7 @@ def _write(
     run: ScreenRun,
     rules: RuleScreenResult | None,
     stamp: Stamp,
+    lineage: Lineage | None = None,
 ) -> None:
     if not run.rows:
         return
@@ -171,8 +173,8 @@ def _write(
                 config.config.impl, stamp.session_date, stamp.run_id, frame, pending=True
             )
         return
-    with writer.publishing(stamp.run_id, stamp.knowledge_ts):  # both tables or neither
-        for name, frame in rule_frames(rules, stamp).items():
+    with writer.publishing(stamp.run_id, stamp.knowledge_ts):  # every table or none
+        for name, frame in rule_frames(rules, stamp, lineage).items():
             writer.write_result(name, stamp.session_date, stamp.run_id, frame, pending=True)
 
 
@@ -309,7 +311,14 @@ def run_screener(
     stamp = Stamp(session_date, run_id, now, user, config.config.id, config.hash, version)
     if gate is not None:
         stamp = replace(stamp, regime=gate.regime, size_multiplier=gate.size_multiplier)
-    _write(writer, config, run, rules, stamp)
+    lineage = None
+    if rules is not None:  # the run's object row records what it was compared with (frozen)
+        lineage = replace(
+            previous_lineage(reader, run_job_name(config.config.id, user), session_date),
+            started_at=now,
+            finished_at=max(now, datetime.now(UTC)),
+        )
+    _write(writer, config, run, rules, stamp, lineage)
     complete = run.coverage is RunCoverage.COMPLETE
     writer.save_run(record.finish(now, complete=complete, stats=audit))
     return ScreenOutcome(run_id, session_date, run, universe, audit, rules)

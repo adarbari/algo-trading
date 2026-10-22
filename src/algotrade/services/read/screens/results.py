@@ -43,13 +43,13 @@ from algotrade.services.read.instruments.identity import Instrument, load_instru
 from algotrade.services.read.instruments.table import DEFAULT_SIZE, catalogue_values
 from algotrade.services.read.screens.runs import (
     ScreenerRun,
-    is_picked,
     load_previous_run,
     run_row_details,
     run_rows,
 )
 from algotrade.services.read.screens.screeners import ScreenGroup
 from algotrade.services.read.values import UnknownCode, to_scalar
+from algotrade.services.screening.rule_results import is_picked
 from algotrade.storage.tables.schemas import (
     is_criterion_row,
     is_display_column,
