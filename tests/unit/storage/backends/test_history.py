@@ -428,3 +428,32 @@ def test_a_one_instrument_year_read_from_the_copy_is_within_budget(tmp_path: Pat
     assert from_copy < 0.05, (
         f"{from_copy * 1000:.0f} ms from the copy, {from_partitions:.2f} s from partitions"
     )
+
+
+def test_a_same_run_rewrite_with_the_same_knowledge_ts_is_detected(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    day = date(2026, 1, 5)  # r1 only: rewrite it with other rows, same run, same knowledge_ts
+    frame = stamped(_rows(1, scale=55.0), day, "r1")
+    backend.tables.write(TABLE, day, "r1", frame)
+    assert not backend.tables.history_current(TABLE, day)
+    args = (date(2025, 12, 1), date(2026, 3, 1))
+    got = backend.tables.read_range(TABLE, *args, instruments=["EQ:A"])
+    _same(got, _reference(backend, TABLE, *args, instruments=["EQ:A"]))
+
+
+def test_the_index_digest_is_read_once_per_version_of_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    copy = LocalBackend(tmp_path / "data").tables.history  # a cold process
+    reads: list[Path] = []
+    real = Path.read_bytes
+    monkeypatch.setattr(Path, "read_bytes", lambda p: (reads.append(p), real(p))[1])
+    day = date(2026, 1, 5)
+    copy.current(TABLE, day)
+    first = len(reads)
+    copy.current(TABLE, day)
+    copy.current(TABLE, day)
+    assert first == 1 and len(reads) == 1

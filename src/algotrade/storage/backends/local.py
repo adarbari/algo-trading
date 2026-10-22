@@ -162,12 +162,17 @@ class LocalTables:
             return
         self.commits.bump_epoch()  # no sequence: every pin sees it, so no release is trusted
         born = not (directory / INDEX).exists()
+        # a rewrite of a run already indexed goes to a new file name, recorded in the entry: the
+        # index then differs byte for byte (the history copy signs its content), and a reader of
+        # the old entry never meets half-replaced rows
+        again = known is not None and run_id in read_index(directory)
+        ref = f"run={safe(run_id)}~{secrets.token_hex(6)}.parquet" if again else None
         if known is not None:
-            atomic_write(directory / default_file(safe(run_id)), data)
+            atomic_write(directory / (ref or default_file(safe(run_id))), data)
         with held(index_lock(directory)):
             index = read_index(directory)
             if known is not None:
-                index[run_id] = RunEntry(pd.Timestamp(known), restates)
+                index[run_id] = RunEntry(pd.Timestamp(known), restates, ref=ref)
             write_index(directory, index)
         if born:  # a listing taken since the bump above lacks it and moves no sequence: re-key
             self.commits.bump_epoch()

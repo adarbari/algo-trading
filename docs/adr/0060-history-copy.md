@@ -40,9 +40,9 @@ column pruning, `ParquetFile` + filter) cannot remove the per-file cost.
   `(size, content digest)` (not inode or mtime: amended 2026-10-22, a clone or copy changes those and made every copy stale) identifies the version of everything the partition resolves to. The
   manifest holds each source partition's signature (none for a day without one); a copy serves
   the requested days of a year only if each has the recorded signature: a changed, restated,
-  purged or new partition, or a restored store, fails it and the year reads partitions. A
+  purged or new partition, or a store restored from another one with different indexes, fails it and the year reads partitions. A
   pending write changes no index, so it does not invalidate (it is invisible to the read too).
-  The check is one small read per requested day. The build captures the signatures before and after
+  The check is one `stat` per requested day once a file's digest is held in process (the first check of a file, or of a cloned one, reads it). A non-pending rewrite of a run goes to a new file name so its index entry changes. The build captures the signatures before and after
   reading the partitions and refuses (re-reads at a fresh sequence, `pinned_read`) when a commit
   was applied to an index but not yet published, or a partition changed meanwhile; so a matching
   signature can only mean the index was untouched since a state the build read in full. A copy
