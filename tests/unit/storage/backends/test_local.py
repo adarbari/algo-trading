@@ -10,6 +10,7 @@ columns) and of the table listing (50,000 partitions), serial, cold, on an idle 
 (``make perf``): the first ceiling is the time measured when it landed (target under 5 s,
 docs/roadmap.md); the listing's is 0.2 s."""
 
+import os
 import shutil
 import time
 from datetime import date, timedelta
@@ -291,3 +292,69 @@ def test_partition_seq_equals_the_sorted_glob_it_replaced(tmp_path: Path) -> Non
             old[when] = local.max_seq(local.read_index(day), published)
     found = backend.tables.partition_seq(TABLE, start, end)
     assert found == old and list(found) == sorted(found) and len(found) == 16
+
+
+def _one() -> list[dict[str, Any]]:
+    return [{"instrument_id": "EQ:X", "a": 1.0, "b": 1, "c": "x"}]
+
+
+def test_listing_the_live_dates_is_kept_until_the_store_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One filesystem listing per (table, published sequence, epoch): a second ``dates`` and
+    any number of ``has_partition`` probes do no directory scan, and a commit re-lists."""
+    backend = LocalBackend(tmp_path / "data")
+    for day in _days(5):
+        backend.tables.write(TABLE, day, "r", stamped(_one(), day, "r"), pending=True)
+    backend.tables.commit_run("r", T0 + timedelta(hours=1))
+    scans = {"n": 0}
+    real = backend.tables._list_dates
+
+    def counting_list(table: str) -> Any:
+        scans["n"] += 1
+        return real(table)
+
+    monkeypatch.setattr(backend.tables, "_list_dates", counting_list)
+    first = backend.tables.dates(TABLE)
+    assert backend.tables.dates(TABLE) == first and scans["n"] == 1
+    assert all(backend.tables.has_partition(TABLE, d) for d in first) and scans["n"] == 1
+    late = START + timedelta(days=9)
+    backend.tables.write(TABLE, late, "r2", stamped(_one(), late, "r2"), pending=True)
+    backend.tables.commit_run("r2", T0 + timedelta(hours=2))
+    assert backend.tables.dates(TABLE) == [*first, late] and scans["n"] == 2
+
+
+def test_a_pending_partition_is_merged_over_the_kept_listing(tmp_path: Path) -> None:
+    backend = LocalBackend(tmp_path / "data")
+    backend.tables.write(TABLE, START, "r", stamped(_one(), START, "r"), pending=True)
+    backend.tables.commit_run("r", T0 + timedelta(hours=1))
+    assert backend.tables.dates(TABLE) == [START]  # kept now
+    day = START + timedelta(days=1)
+    backend.tables.write(TABLE, day, "open", stamped(_one(), day, "open"), pending=True)
+    assert backend.tables.dates(TABLE, "open") == [START, day]
+    assert backend.tables.dates(TABLE) == [START]  # another reader: not there
+    backend.tables.abort_run("open")
+    assert backend.tables.dates(TABLE, "open") == [START]
+
+
+def test_has_partition_is_one_stat_not_a_walk_of_the_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cost of asking whether one day exists is independent of the partitions the table
+    holds (the uncached SessionDate did 340,846 stats: one per partition per table)."""
+    backend = LocalBackend(tmp_path / "data")
+    tables = [f"rollups/market/t{i}@v1" for i in range(4)]
+    for table in tables:
+        for day in _days(30):
+            backend.tables.write(table, day, "d", stamped(_one(), day, "d"))
+    stats = {"n": 0}
+    real = os.stat
+
+    def counting(path: Any, *args: Any, **kwargs: Any) -> Any:
+        stats["n"] += 1
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "stat", counting)
+    found = [backend.tables.has_partition(t, START) for t in tables]
+    assert found == [True] * 4
+    assert stats["n"] <= 4 * 3  # a few per table (path checks), never 30 per table

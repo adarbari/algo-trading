@@ -462,7 +462,7 @@ def partition(
     if columns is None and instruments is None:
         whole = ctx.reader.table(table, day)
         return absent if whole is None else whole
-    if day not in ctx.reader.dates(table):
+    if not ctx.reader.has_partition(table, day):
         return absent
     found = ctx.reader.table_range(table, day, day, None, instruments, columns)
     if found is None:  # the partition is stored; none of its rows is asked for

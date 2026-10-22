@@ -96,7 +96,7 @@ def _serving_now(reader: StoreReader, releases: ReleaseStore) -> str | None:
         for held, stamp in item.partitions.items():
             if reader.partition_seq(item.table, held, held).get(held) != stamp:
                 return None
-    if any(day in reader.dates(table) for table in EXPECTED_TABLES if table not in recorded):
+    if any(reader.has_partition(table, day) for table in EXPECTED_TABLES if table not in recorded):
         return None  # a table arrived for the session after the build (an optional source)
     return current.manifest.release_id
 

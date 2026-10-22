@@ -336,7 +336,7 @@ def resolve_session(
     else:
         raise NotFoundError("nothing stored: no bars/1d and no instruments/reference partition")
     reference = snapshot(reader, REFERENCE_TABLE, day)
-    present = tuple(t for t in expected if day in reader.dates(t))
+    present = tuple(t for t in expected if reader.has_partition(t, day))
     missing = tuple(t for t in expected if t not in present)
     return Session(
         date=day,

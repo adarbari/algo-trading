@@ -139,6 +139,26 @@ def test_present_and_missing_are_for_exactly_the_session() -> None:
     assert (earlier.present, earlier.missing) == (("bars/1d", EARNINGS), (STATUS,))
 
 
+def test_present_is_probed_per_table_never_listed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``present`` asks one question per expected table (``has_partition``); it never lists a
+    table's partitions to find one day (24 s of stats per uncached request on the real store)."""
+    writer, reader = store()
+    for day in (D1, D2):
+        write_bar(writer, day)
+    write_earnings(writer, D2)
+    listed: list[str] = []
+    real = reader._backend.tables.dates
+
+    def spy(table: str, *args: object, **kwargs: object) -> list[date]:
+        listed.append(table)
+        return real(table, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(reader._backend.tables, "dates", spy)
+    session = resolve_session(reader, D2, EXPECTED)
+    assert session.present == ("bars/1d", EARNINGS) and session.missing == (STATUS,)
+    assert EARNINGS not in listed and STATUS not in listed
+
+
 def test_expected_tables_are_the_declared_nightly_session_tables() -> None:
     assert "bars/1d" in EXPECTED_TABLES
     assert {EARNINGS, STATUS, "results/rule_screen"} <= set(EXPECTED_TABLES)
