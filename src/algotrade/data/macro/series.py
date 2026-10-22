@@ -48,6 +48,36 @@ def stored_vintages(
     return frame.sort_values(order, kind="stable").reset_index(drop=True)
 
 
+def provenance(
+    reader: StoreReader, ids: Sequence[str], session: date, first_kind: str
+) -> tuple[dict[str, tuple[date, date, str]], dict[str, date]]:
+    """Two aggregates per series of ``ids``, without materialising ``stored_vintages``: the
+    latest observation ``session`` knew (``series_as_of`` with ``lookback=0``: the newest
+    ``obs_date`` among vintages with ``vintage_date <= session``) as ``(obs_date,
+    vintage_date, vintage_kind)`` of its latest known vintage; and the earliest
+    ``vintage_date`` of kind ``first_kind`` over all time (the caller compares it with the
+    session). A series with nothing known is absent, never zero. Same rows and rule as
+    ``stored_vintages`` + ``known_window``, from the five columns they need, with no per-row
+    date conversion, sort or dedupe of the whole table (a later stored version of one key
+    shares its dates and kind, so the dedupe cannot change either aggregate)."""
+    columns = ["obs_date", "vintage_date", "vintage_kind", "knowledge_ts"]
+    frame = reader.table_range(
+        TABLE, *ALL_TIME, None, instruments=list(ids) or None, columns=columns
+    )
+    if frame is None or frame.empty:
+        return {}, {}
+    firsts = frame[frame["vintage_kind"] == first_kind].groupby("instrument_id")["vintage_date"]
+    first = {str(k): v for k, v in firsts.min().items()}
+    known = frame[frame["vintage_date"] <= session]
+    newest = known.groupby("instrument_id")["obs_date"].transform("max")
+    rows = known[known["obs_date"] == newest]  # each series' newest observation's vintages
+    rows = rows.sort_values(["vintage_date", "knowledge_ts"], kind="stable", na_position="first")
+    rows = rows.drop_duplicates("instrument_id", keep="last")  # its latest vintage
+    cols = ("instrument_id", "obs_date", "vintage_date", "vintage_kind")
+    latest = {str(i): (o, v, str(k)) for i, o, v, k in zip(*(rows[c] for c in cols), strict=True)}
+    return latest, first
+
+
 def latest_vintages(vintages: pd.DataFrame, session: date) -> pd.DataFrame:
     """The rows of ``vintages`` a ``session`` knew (``vintage_date`` on or before it), only the
     latest vintage per (``instrument_id``, ``obs_date``); sorted by id and observation."""

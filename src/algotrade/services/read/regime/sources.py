@@ -9,8 +9,8 @@ has none. A card whose source is chosen per session (``source_by``: the S&P 500 
 SPY's bars or the SPX level) lists both; ``activate`` marks the one the session's value names.
 
 Provenance per series, for ``ctx.session``: its latest observation the session knew, with that
-value's vintage date and kind (``series_as_of`` with ``lookback=0``: ``known_window`` over the
-series' stored vintages), and ``first_vintage``, the series' earliest ALFRED vintage the
+value's vintage date and kind (``series_as_of`` with ``lookback=0``, reduced by
+``data.macro.series.provenance``), and ``first_vintage``, the series' earliest ALFRED vintage the
 session knew: before it the stored history is the figures as first vintaged, not as they were
 known then ("before <date> these are today's revised figures"). ``None`` for a lagged
 (unrevised) series. One read of the vintages per publish (``visible_seq``) and session."""
@@ -19,11 +19,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 
-import pandas as pd
-
 from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.regime.cards import InputSource, SourceSwitch
-from algotrade.data.macro.series import known_window, stored_vintages
+from algotrade.data.macro.series import provenance
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import SERIES_REF, is_feature_ref, is_series_ref
 from algotrade.services.read.context import ReadContext
@@ -117,11 +115,6 @@ class Provenance:
     vintage_kind: str
 
 
-def _first_vintages(frame: pd.DataFrame) -> dict[str, date]:
-    alfred = frame[frame["vintage_kind"] == ALFRED]
-    return {str(k): v for k, v in alfred.groupby("instrument_id")["vintage_date"].min().items()}
-
-
 def _provenance(
     ctx: ReadContext, ids: tuple[str, ...]
 ) -> tuple[Mapping[str, Provenance], Mapping[str, date]]:
@@ -132,17 +125,8 @@ def _provenance(
     first_key = ("regime-source-first-vintage", ids, seq)
     latest, first = ctx.cache.get(latest_key), ctx.cache.get(first_key)
     if latest is None or first is None:
-        frame = stored_vintages(ctx.reader, ids)
-        known = known_window(frame, day, 0)  # series_as_of(lookback=0) over this one read
-        newest = known.sort_values("obs_date", kind="stable").drop_duplicates(
-            "instrument_id", keep="last"
-        )
-        columns = ("instrument_id", "obs_date", "vintage_date", "vintage_kind")
-        latest = {
-            str(iid): Provenance(obs, vintage, str(kind))
-            for iid, obs, vintage, kind in zip(*(newest[c] for c in columns), strict=True)
-        }
-        first = _first_vintages(frame)
+        found, first = provenance(ctx.reader, ids, day, ALFRED)
+        latest = {iid: Provenance(*values) for iid, values in found.items()}
         ctx.cache.put(latest_key, latest)
         ctx.cache.put(first_key, first)
     return latest, first

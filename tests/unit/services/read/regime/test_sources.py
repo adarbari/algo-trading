@@ -11,7 +11,7 @@ import pytest
 
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.settings import load_macro
-from algotrade.data.macro.series import stored_vintages
+from algotrade.data.macro.series import known_window, provenance, stored_vintages
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input
 from algotrade.features.framework.feature import Feature
@@ -135,6 +135,47 @@ def _cards(ctx: ReadContext) -> dict[str, tuple[sources.IndicatorSource, ...]]:
     return load_sources(ctx, lineage, MACRO, CARDS.sources)
 
 
+def _equiv_rows(writer: StoreWriter) -> None:
+    rows = [
+        _row("MACRO:UNRATE", date(1960, 1, 1), date(1964, 6, 1), "alfred"),  # first vintage
+        _row("MACRO:UNRATE", date(2026, 8, 1), date(2026, 9, 5), "alfred"),
+        _row("MACRO:UNRATE", date(2026, 8, 1), date(2026, 9, 20), "alfred"),  # revision known
+        _row("MACRO:UNRATE", date(2026, 8, 1), date(2026, 10, 3), "alfred"),  # revision after S
+        _row("MACRO:UNRATE", date(2026, 9, 1), date(2026, 10, 3), "alfred"),  # obs after S
+        _row("MACRO:BAMLH0A0HYM2", date(2026, 9, 30), date(2026, 10, 1), "lagged"),  # personal
+        _row("MACRO:SAHMREALTIME", date(2026, 8, 1), date(2026, 10, 3), "alfred"),  # none by S
+    ]
+    writer.write_table("macro/series", D1, "macro-1", stamped(rows, D1, "macro-1"))
+    later = [_row("MACRO:UNRATE", date(2026, 8, 1), date(2026, 9, 20), "alfred")]
+    writer.write_table("macro/series", D1, "macro-2", stamped(later, D1, "macro-2"))  # re-stored
+
+
+def _old_provenance(reader: object, ids: list[str], day: date) -> tuple[dict, dict]:  # type: ignore[type-arg]
+    """The pre-projection computation, kept as the reference the new one must equal."""
+    frame = stored_vintages(reader, ids)  # type: ignore[arg-type]
+    known = known_window(frame, day, 0)
+    newest = known.sort_values("obs_date", kind="stable").drop_duplicates(
+        "instrument_id", keep="last"
+    )
+    cols = ("instrument_id", "obs_date", "vintage_date", "vintage_kind")
+    latest = {str(i): (o, v, str(k)) for i, o, v, k in zip(*(newest[c] for c in cols), strict=True)}
+    alfred = frame[frame["vintage_kind"] == "alfred"]
+    first = {str(k): v for k, v in alfred.groupby("instrument_id")["vintage_date"].min().items()}
+    return latest, first
+
+
+def test_the_projected_provenance_equals_the_full_read_incl_a_later_revision() -> None:
+    ctx = context(store_with(_equiv_rows), D1)
+    ids = ["MACRO:UNRATE", "MACRO:BAMLH0A0HYM2", "MACRO:SAHMREALTIME", "MACRO:NOPE"]
+    for day in (date(2026, 10, 1), date(2026, 10, 3), date(1964, 6, 1), date(1950, 1, 1)):
+        assert provenance(ctx.reader, ids, day, "alfred") == _old_provenance(ctx.reader, ids, day)
+    latest, first = provenance(ctx.reader, ids, date(2026, 10, 1), "alfred")
+    # the revision of 2026-10-03 is not seen at 2026-10-01; no observation by S: absent, not zero
+    assert latest["MACRO:UNRATE"] == (date(2026, 8, 1), date(2026, 9, 20), "alfred")
+    assert "MACRO:SAHMREALTIME" not in latest and first["MACRO:UNRATE"] == date(1964, 6, 1)
+    assert latest["MACRO:BAMLH0A0HYM2"][2] == "lagged" and "MACRO:BAMLH0A0HYM2" not in first
+
+
 def test_each_series_carries_its_provenance_as_the_session_knew_it() -> None:
     found = _cards(replace(context(store_with(_macro)), features=SITE))
     [unrate] = found["unrate_trend"]
@@ -171,13 +212,13 @@ def test_a_vintage_after_the_session_is_not_known_then() -> None:
 
 def test_the_vintages_are_read_once_per_publish(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, ...]] = []
-    real = stored_vintages
+    real = provenance
 
-    def counting(reader: object, ids: tuple[str, ...]) -> object:
+    def counting(reader: object, ids: tuple[str, ...], *rest: object) -> object:
         calls.append(ids)
-        return real(reader, ids)  # type: ignore[arg-type]
+        return real(reader, ids, *rest)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(f"{sources.__name__}.stored_vintages", counting)
+    monkeypatch.setattr(f"{sources.__name__}.provenance", counting)
     ctx = replace(context(store_with(_macro)), features=SITE)
     first, again = _cards(ctx), _cards(ctx)
     assert first == again and len(calls) == 1
