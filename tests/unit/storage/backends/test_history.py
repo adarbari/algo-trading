@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import pytest
 from pandas.testing import assert_frame_equal
 
-from algotrade.storage.backends import history
+from algotrade.storage.backends import history, local
 from algotrade.storage.backends.history import HISTORY, MANIFEST
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -561,3 +561,22 @@ def test_the_kept_verdicts_are_bounded(tmp_path: Path, monkeypatch: pytest.Monke
     for k in range(10):
         copy.usable(TABLE, date(2025, 12, 1 + k), date(2025, 12, 28), True, seq)
     assert len(copy._verdicts) <= 3
+
+
+def test_a_verdict_taken_mid_direct_write_is_not_kept_after_the_write_lands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    real = local.write_index
+    seen: list[list[int]] = []
+
+    def racing(directory: Path, index: Any) -> None:  # a reader between the bump and the rewrite
+        seen.append(_usable(backend))
+        real(directory, index)
+
+    monkeypatch.setattr(local, "write_index", racing)
+    day = date(2026, 1, 5)
+    backend.tables.write(TABLE, day, "r1", stamped(_rows(1, scale=55.0), day, "r1"))
+    assert seen == [[2025, 2026]]  # the reader saw the old index
+    assert _usable(backend) == [2025]  # ...and its verdict did not stick
