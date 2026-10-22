@@ -40,7 +40,7 @@ from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_
 from algotrade_api.graphql.offload import off_loop
 
 FeatureKey = tuple[str, tuple[str, ...]]  # (instrument_id, catalogue names in the order asked)
-EventKey = tuple[str, date | None, date | None]  # (instrument_id, start, end)
+EventKey = tuple[str, date | None, date | None, tuple[str, ...] | None]  # id, start, end, kinds
 EventStudyKey = tuple[str, int, int]  # (instrument_id, days, months)
 QuoteKey = tuple[str, date]  # (underlying_id, expiry)
 HoldingsKey = tuple[str, int]  # (fund_id, top)

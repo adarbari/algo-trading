@@ -108,6 +108,8 @@ describe('PriceChartPanel', () => {
       <PriceChartPanel symbol="AAPL" range="1Y" onRangeChange={onRangeChange} />,
     );
     expect(hooks.useInstrumentPrices).toHaveBeenCalledWith('AAPL', '2025-10-03');
+    // the chart asks for no event older than its first day
+    expect(hooks.useInstrumentEvents).toHaveBeenCalledWith('AAPL', '2025-10-03');
     const chart = hooks.chart.mock.lastCall?.[0] as ChartProps;
     expect(chart.series[0]?.points).toEqual([
       { time: '2026-08-07', value: 220 },

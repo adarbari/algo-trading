@@ -25,10 +25,10 @@ import { chunks, type FeatureHistory, type FeatureValues } from '../model/values
 export const NAMES_PER_REQUEST = 60;
 
 const InstrumentEvents = graphql(`
-  query InstrumentEvents($key: String!) {
+  query InstrumentEvents($key: String!, $start: Date) {
     instrument(key: $key) {
       instrumentId
-      events {
+      events(start: $start) {
         table
         kind
         date
@@ -39,9 +39,13 @@ const InstrumentEvents = graphql(`
   }
 `);
 
-/** Every stored event (all time): dividends, splits, earnings, ticker and index changes. */
-export function useInstrumentEvents(key: string | null) {
-  const variables = { key: key ?? '' };
+/**
+ * The stored calendar events (the API's default kinds: dividends, splits, earnings, ticker and
+ * index changes) from `start` (ISO day; omitted: all time), so the chart asks no older than
+ * its first day.
+ */
+export function useInstrumentEvents(key: string | null, start?: string) {
+  const variables = start ? { key: key ?? '', start } : { key: key ?? '' };
   return useQuery({
     queryKey: queryKeys.gql('InstrumentEvents', variables),
     queryFn: ({ queryKey }) => gql(InstrumentEvents, variables, queryKey),

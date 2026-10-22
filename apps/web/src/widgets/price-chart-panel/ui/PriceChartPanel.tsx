@@ -26,7 +26,7 @@ export interface PriceChartPanelProps {
 export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPanelProps) {
   const from = rangeFrom(range);
   const bars = useInstrumentPrices(symbol, from);
-  const events = useInstrumentEvents(symbol);
+  const events = useInstrumentEvents(symbol, from);
   const study = useInstrumentEventStudy(symbol);
   const items = useMemo(() => bars.data ?? [], [bars.data]);
   // Storm and Severe-storm sessions shade the window, up to the last stored bar.

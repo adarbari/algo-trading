@@ -11,13 +11,18 @@ import pandas as pd
 import pytest
 
 from algotrade.data.events import ALL_TIME, read_events
-from algotrade.services.read.events.stored import event_tables, load_events, warm_event_copies
+from algotrade.services.read.events.stored import (
+    TIMELINE_KINDS,
+    event_tables,
+    load_events,
+    warm_event_copies,
+)
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryTables
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.rollup_store import write_dividends, write_split
+from tests.helpers.rollup_store import write_dividends, write_rows, write_split
 from tests.helpers.stored_frames import T0, stamped
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 
@@ -199,3 +204,65 @@ def test_warming_the_event_copies_leaves_the_first_events_read_no_index_digest_t
     digests.clear()
     frame = read_events(ctx.reader, table, *ALL_TIME, ["EQ:A"]).frame
     assert len(frame) == 30 and digests == []
+
+
+def _every_kind(writer: StoreWriter) -> None:
+    _events(writer)
+    write_rows(
+        writer,
+        "events/short_interest",
+        D0,
+        [
+            {
+                "instrument_id": "EQ:AAA",
+                "ts": pd.Timestamp(D0, tz="UTC"),
+                "known_from": D0,
+                "published": D0,
+                "short_position": 10,
+            }
+        ],
+    )
+    write_rows(
+        writer,
+        "events/short_volume",
+        D0,
+        [
+            {
+                "instrument_id": "EQ:AAA",
+                "ts": pd.Timestamp(D0, tz="UTC"),
+                "known_from": D0,
+                "short_volume": 5,
+                "total_volume": 50,
+            }
+        ],
+    )
+
+
+def test_the_timeline_kinds_return_exactly_the_calendar_rows_of_every_kind_read() -> None:
+    ctx = context(store_with(_every_kind))
+    everything = load_events(ctx, ["EQ:AAA"], None, None)["EQ:AAA"]
+    assert {e.kind for e in everything} == {"split", "dividend", "short_interest", "short_volume"}
+    page = load_events(ctx, ["EQ:AAA"], None, None, TIMELINE_KINDS)["EQ:AAA"]
+    # same rows, same order, same known_from rule as the full read restricted to the kinds
+    assert page == tuple(e for e in everything if e.kind in TIMELINE_KINDS)
+    assert [e.kind for e in page] == ["split", "dividend"]
+
+
+def test_another_kind_is_still_readable_when_asked() -> None:
+    ctx = context(store_with(_every_kind))
+    found = load_events(ctx, ["EQ:AAA"], None, None, ("short_interest",))["EQ:AAA"]
+    assert [(e.kind, e.values["short_position"]) for e in found] == [("short_interest", 10)]
+
+
+def test_the_default_timeline_read_opens_no_table_of_another_kind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Insider, short, filing and NAV partitions and copies are not opened for the page."""
+    ctx = context(store_with(_every_kind))
+    reads = _spy_reads(monkeypatch)
+    load_events(ctx, ["EQ:AAA"], None, None, TIMELINE_KINDS)
+    assert set(reads) == {"events/split", "events/dividend"}
+    assert event_tables(ctx, TIMELINE_KINDS) == ("events/dividend", "events/split")
+    reads.clear()
+    load_events(ctx, ["EQ:AAA"], None, None, ("short_interest",))  # its own held entry
+    assert set(reads) == {"events/short_interest"}
