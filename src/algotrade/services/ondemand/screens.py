@@ -25,7 +25,7 @@ from datetime import date, timedelta
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
-from algotrade.services.configs import config_ids, resolve_config
+from algotrade.services.configs import config_ids, latest_screen_version, resolve_config
 from algotrade.services.jobs.api import open_runner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
@@ -110,7 +110,14 @@ class OnDemandScreens:
         stored = self._stored(config_id, owner, config.hash, session)
         if stored is not None and stored.status == JobStatus.COMPLETE:
             return RunRequest(READY, config_id, session, None, stored.run_id, None)
-        params = {"config": config_id, "session": session.isoformat(), "export_dir": None}
+        params: dict[str, object] = {
+            "config": config_id,
+            "session": session.isoformat(),
+            "export_dir": None,
+        }
+        version = latest_screen_version(self._configs, owner.user_id, config_id)
+        if version is not None:  # the job runs this version even if a newer one lands first
+            params["version"] = version
         # a PARTIAL run is the same job identity: force it to run again (in flight stays one job)
         job_id = self._jobs.submit(KIND, params, owner, force=stored is not None)
         return self._view(config_id, session, self._jobs.status(job_id))
