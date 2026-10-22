@@ -270,3 +270,28 @@ def test_a_request_reads_each_table_once_for_every_episode(
         done = list(pool.map(lambda k: load_episode_signals(ctx, k), ("ep", "overlap", "far")))
     assert all(d is not None for d in done)
     assert sorted(reads) == ["rollups/market/regime@v3", "rollups/market/regime_indicators@v1"]
+
+
+def test_two_tables_of_a_request_are_read_concurrently(monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading  # noqa: PLC0415
+    from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
+
+    from algotrade.core.model.instruments import market_id  # noqa: PLC0415
+    from algotrade.services.read.instruments.series import span_frame  # noqa: PLC0415
+
+    ctx = _three_episodes(ROWS)
+    both = threading.Barrier(2, timeout=5)  # passes only if two tables are inside a read together
+    original = ctx.reader.table_range
+    reads: list[str] = []
+
+    def spy(table: str, *args: Any, **kwargs: Any) -> Any:
+        reads.append(table)
+        both.wait()
+        return original(table, *args, **kwargs)
+
+    monkeypatch.setattr(ctx.reader, "table_range", spy)
+    ids, span = [market_id("US")], (SEP17, SEP29)
+    tables = ["rollups/market/regime@v3", "rollups/market/regime_indicators@v1"]
+    with ThreadPoolExecutor(4) as pool:
+        list(pool.map(lambda t: span_frame(ctx, t, ["label"], ids, span), [*tables, *tables]))
+    assert sorted(reads) == sorted(tables)  # concurrent across tables, once per table

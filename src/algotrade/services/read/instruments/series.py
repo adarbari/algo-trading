@@ -156,7 +156,7 @@ def span_frame(
     bound), so a slice of this frame is the slice of ``market_frame``'s."""
     low, high = span[0], min(span[1], ctx.session.date)
     key = ("series-span", table, tuple(sorted(columns)), tuple(ids), low, high, ctx.session.date)
-    with ctx.memo.setdefault(("series-span-lock",), threading.Lock()):
+    with ctx.memo.setdefault(("series-span-lock", key), threading.Lock()):
         if key not in ctx.memo:
             ctx.memo[key] = (rollup_rows(ctx.reader, table, low, high, None, list(ids), columns),)
         return ctx.memo[key][0]  # type: ignore[no-any-return]
