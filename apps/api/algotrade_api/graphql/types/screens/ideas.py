@@ -97,7 +97,9 @@ class Ideas:
     paused: list[PausedIdea]
     next_cursor: str | None
 
-    @strawberry.field(description="Whether another page follows this one")  # type: ignore[untyped-decorator]
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Whether another page follows this one"
+    )
     def has_more(self) -> bool:
         return self.next_cursor is not None
 

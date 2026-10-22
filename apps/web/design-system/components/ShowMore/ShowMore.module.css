@@ -1,0 +1,4 @@
+/* ShowMore: the progress line may shrink and wrap beside the button on a narrow container. */
+.line {
+  min-width: 0;
+}

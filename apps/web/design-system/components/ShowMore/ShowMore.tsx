@@ -8,6 +8,7 @@
 import { Button } from '../Button';
 import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
+import styles from './ShowMore.module.css';
 
 export interface ShowMoreProps {
   /** How many rows the list shows now. */
@@ -33,7 +34,7 @@ export function ShowMore({ shown, total, pageSize = 50, status = 'idle', onMore 
         : `Showing ${shown} of ${total}`;
   return (
     <Stack direction="row" gap={3} align="center" wrap>
-      <span role="status" aria-live="polite">
+      <span className={styles.line} role="status" aria-live="polite">
         <Text size="sm" tone={status === 'error' ? 'negative' : 'muted'}>
           {line}
         </Text>
