@@ -226,13 +226,15 @@ def headline(label: RegimeLabel, indicators: tuple[RegimeIndicator, ...]) -> str
     return " ".join(parts)
 
 
-def load_regime(ctx: ReadContext) -> MarketRegime:
-    """The regime for ``ctx.session``; never ``None`` (nothing stored is an UNKNOWN regime)."""
+def load_regime(ctx: ReadContext, *, provenance: bool = True) -> MarketRegime:
+    """The regime for ``ctx.session``; never ``None`` (nothing stored is an UNKNOWN regime).
+    ``provenance=False``: the indicators' sources without their provenance (the API serves
+    that lazily: ``load_indicator_provenance``)."""
     read = read_fields(
         ctx, [LABEL, MACRO_RISK, MARKET_STRESS, FRAGILITY, MACRO_EARLY, MACRO_CONFIRMING]
     )
     label, reason = _label(read[LABEL])
-    indicators = load_indicators(ctx)
+    indicators = load_indicators(ctx, provenance=provenance)
     return MarketRegime(
         session=ctx.session.date,
         label=label,

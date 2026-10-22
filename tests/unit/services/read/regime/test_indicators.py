@@ -10,7 +10,11 @@ from algotrade.core.model.instruments import market_id
 from algotrade.features.rollups.market import indicators as rules
 from algotrade.features.rollups.market import trend
 from algotrade.services.features import catalogue
-from algotrade.services.read.regime.indicators import RiskDirection, load_indicators
+from algotrade.services.read.regime.indicators import (
+    RiskDirection,
+    load_indicator_provenance,
+    load_indicators,
+)
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.conftest import REPO_ROOT
@@ -45,3 +49,12 @@ def test_the_sessions_stored_source_marks_the_active_one() -> None:
     }  # fmt: skip
     vix = next(i for i in load_indicators(ctx) if i.key == "vix_term")
     assert all(s.active for s in vix.sources)  # no switch: always the source
+
+
+def test_the_indicators_compose_their_window_and_provenance_parts() -> None:
+    ctx = replace(context(store_with()), configs=CONFIG, features=catalogue(CONFIG))
+    whole = load_indicators(ctx)
+    window = load_indicators(ctx, provenance=False)
+    assert [replace(i, sources=()) for i in whole] == [replace(i, sources=()) for i in window]
+    provenance = load_indicator_provenance(ctx)
+    assert set(provenance) >= {s.series for i in whole for s in i.sources if s.series}

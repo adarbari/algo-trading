@@ -48,11 +48,11 @@ export function onWhenLine(indicator: RegimeIndicator, format: ValueFormat): str
  * "not used today". A source with no page of its own has no link, so the line names it in
  * `unlinked` instead.
  */
-export function sourceItems(indicator: RegimeIndicator): {
+export function sourceItems(sources: readonly IndicatorSource[]): {
   linked: SourceLineItem[];
   unlinked: string[];
 } {
-  const ordered = [...indicator.sources].sort((a, b) => Number(b.active) - Number(a.active));
+  const ordered = [...sources].sort((a, b) => Number(b.active) - Number(a.active));
   const linked: SourceLineItem[] = [];
   const unlinked: string[] = [];
   for (const source of ordered) {

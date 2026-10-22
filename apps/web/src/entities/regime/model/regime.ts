@@ -88,8 +88,13 @@ export interface RegimeIndicator {
   direction: gqlTypes.RiskDirection | null;
   /** How the value is calculated, as linked parts. */
   how: readonly TextPart[];
-  sources: readonly IndicatorSource[];
 }
+
+/**
+ * Each indicator's sources by card key (`RegimeSources`): read apart from the `Regime` the shell
+ * shows, because their provenance costs a read of the stored vintages.
+ */
+export type RegimeSources = ReadonlyMap<string, readonly IndicatorSource[]>;
 
 /**
  * One reference market drawdown (`Query.regime.episodes`), known as of the session. `recovered`

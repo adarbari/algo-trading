@@ -504,7 +504,7 @@ export type SessionDateQuery = { session: { date: string } | null };
 export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, scores: { macroRisk: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, marketStress: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, fragility: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } }, sizing: { label: RegimeLabel, multiplier: number | null, enabled: boolean, unknownMultiplier: number, multipliers: Array<{ label: RegimeLabel, multiplier: number }>, screeners: Array<{ screenerId: string, name: string, enabled: boolean, pauseIn: Array<RegimeLabel> }> }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, feature: string, verdictFeature: string, threshold: number | null, direction: RiskDirection | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, range: { min: number, max: number }, how: Array<{ text: string, url: string | null }>, sources: Array<{ label: string, series: string | null, cadence: string, releaseLagDays: number | null, url: string | null, licence: string, terms: string | null, lastObservation: string | null, vintageDate: string | null, vintageKind: string | null, firstVintage: string | null, active: boolean }> }> } | null };
+export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, scores: { macroRisk: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, marketStress: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, fragility: { value: number | null, feature: string, coverageFeature: string | null, threshold: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } }, sizing: { label: RegimeLabel, multiplier: number | null, enabled: boolean, unknownMultiplier: number, multipliers: Array<{ label: RegimeLabel, multiplier: number }>, screeners: Array<{ screenerId: string, name: string, enabled: boolean, pauseIn: Array<RegimeLabel> }> }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, feature: string, verdictFeature: string, threshold: number | null, direction: RiskDirection | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, range: { min: number, max: number }, how: Array<{ text: string, url: string | null }> }> } | null };
 
 export type RegimeBandsQueryVariables = Exact<{
   start: string;
@@ -533,6 +533,11 @@ export type MarketHistoryQueryVariables = Exact<{
 
 
 export type MarketHistoryQuery = { market: { history: Array<{ name: string, bucketSessions: number, points: Array<{ session: string, value: number | null }>, segments: Array<{ start: string, end: string, value: string }> }> } | null };
+
+export type RegimeSourcesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type RegimeSourcesQuery = { regime: { indicators: Array<{ key: string, sources: Array<{ label: string, series: string | null, cadence: string, releaseLagDays: number | null, url: string | null, licence: string, terms: string | null, lastObservation: string | null, vintageDate: string | null, vintageKind: string | null, firstVintage: string | null, active: boolean }> }> } | null };
 
 export type FigiReviewQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -3532,20 +3537,6 @@ export const RegimeDocument = new TypedDocumentString(`
         text
         url
       }
-      sources {
-        label
-        series
-        cadence
-        releaseLagDays
-        url
-        licence
-        terms
-        lastObservation
-        vintageDate
-        vintageKind
-        firstVintage
-        active
-      }
     }
   }
 }
@@ -3669,6 +3660,29 @@ export const MarketHistoryDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<MarketHistoryQuery, MarketHistoryQueryVariables>;
+export const RegimeSourcesDocument = new TypedDocumentString(`
+    query RegimeSources {
+  regime {
+    indicators {
+      key
+      sources {
+        label
+        series
+        cadence
+        releaseLagDays
+        url
+        licence
+        terms
+        lastObservation
+        vintageDate
+        vintageKind
+        firstVintage
+        active
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<RegimeSourcesQuery, RegimeSourcesQueryVariables>;
 export const FigiReviewDocument = new TypedDocumentString(`
     query FigiReview {
   figiReview {

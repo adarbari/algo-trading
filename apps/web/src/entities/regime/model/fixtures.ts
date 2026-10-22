@@ -2,7 +2,7 @@
  * Test builders for the regime entity (exported for widget and page tests): a `Regime` with three indicator cards (two slow, one
  * fast; one changed; two cite the same link) and the same regime as an UNKNOWN session.
  */
-import type { Regime } from './regime';
+import type { Regime, RegimeSources } from './regime';
 
 const NO_UNKNOWN = null;
 const SYSTEM_UNKNOWN = {
@@ -97,22 +97,6 @@ export function regimeFixture(overrides: Partial<Regime> = {}): Regime {
           { text: '10-year Treasury yield', url: 'https://fred.stlouisfed.org/series/DGS10' },
           { text: ' minus the 3-month yield, in points.', url: null },
         ],
-        sources: [
-          {
-            label: 'FRED T10Y3M',
-            series: 'T10Y3M',
-            cadence: 'daily',
-            releaseLagDays: 1,
-            url: 'https://fred.stlouisfed.org/series/T10Y3M',
-            licence: 'public',
-            terms: null,
-            lastObservation: '2026-10-01',
-            vintageDate: '2026-10-02',
-            vintageKind: 'lagged',
-            firstVintage: null,
-            active: true,
-          },
-        ],
       },
       {
         key: 'nfci',
@@ -141,36 +125,6 @@ export function regimeFixture(overrides: Partial<Regime> = {}): Regime {
           { text: 'financial conditions', url: 'https://www.chicagofed.org/nfci' },
           { text: ', above zero when money is tighter than average.', url: null },
         ],
-        sources: [
-          {
-            label: 'FRED NFCI',
-            series: 'NFCI',
-            cadence: 'weekly',
-            releaseLagDays: 5,
-            url: 'https://fred.stlouisfed.org/series/NFCI',
-            licence: 'public',
-            terms: null,
-            lastObservation: '2026-09-25',
-            vintageDate: '2026-10-01',
-            vintageKind: 'alfred',
-            firstVintage: '1996-05-01',
-            active: true,
-          },
-          {
-            label: 'FRED ANFCI',
-            series: 'ANFCI',
-            cadence: 'weekly',
-            releaseLagDays: 5,
-            url: 'https://fred.stlouisfed.org/series/ANFCI',
-            licence: 'public',
-            terms: null,
-            lastObservation: null,
-            vintageDate: null,
-            vintageKind: null,
-            firstVintage: null,
-            active: false,
-          },
-        ],
       },
       {
         key: 'vix_term',
@@ -195,7 +149,6 @@ export function regimeFixture(overrides: Partial<Regime> = {}): Regime {
         threshold: 1,
         direction: 'HIGHER_IS_RISK',
         how: [{ text: 'The VIX divided by the 3-month VIX.', url: null }],
-        sources: [],
       },
     ],
     ...overrides,
@@ -235,4 +188,63 @@ export function unknownRegimeFixture(): Regime {
       changed: null,
     })),
   });
+}
+
+/** The sources of the fixture's cards, by card key (`useRegimeSources`). */
+export function regimeSourcesFixture(): RegimeSources {
+  return new Map([
+    [
+      'curve_10y3m',
+      [
+        {
+          label: 'FRED T10Y3M',
+          series: 'T10Y3M',
+          cadence: 'daily',
+          releaseLagDays: 1,
+          url: 'https://fred.stlouisfed.org/series/T10Y3M',
+          licence: 'public',
+          terms: null,
+          lastObservation: '2026-10-01',
+          vintageDate: '2026-10-02',
+          vintageKind: 'lagged',
+          firstVintage: null,
+          active: true,
+        },
+      ],
+    ],
+    [
+      'nfci',
+      [
+        {
+          label: 'FRED NFCI',
+          series: 'NFCI',
+          cadence: 'weekly',
+          releaseLagDays: 5,
+          url: 'https://fred.stlouisfed.org/series/NFCI',
+          licence: 'public',
+          terms: null,
+          lastObservation: '2026-09-25',
+          vintageDate: '2026-10-01',
+          vintageKind: 'alfred',
+          firstVintage: '1996-05-01',
+          active: true,
+        },
+        {
+          label: 'FRED ANFCI',
+          series: 'ANFCI',
+          cadence: 'weekly',
+          releaseLagDays: 5,
+          url: 'https://fred.stlouisfed.org/series/ANFCI',
+          licence: 'public',
+          terms: null,
+          lastObservation: null,
+          vintageDate: null,
+          vintageKind: null,
+          firstVintage: null,
+          active: false,
+        },
+      ],
+    ],
+    ['vix_term', []],
+  ]);
 }

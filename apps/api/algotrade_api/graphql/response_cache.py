@@ -248,6 +248,7 @@ RELEASE_FIELDS: dict[str, frozenset[str]] = {
 USER_OPERATIONS: frozenset[str] = frozenset(
     {
         "Regime",
+        "RegimeSources",  # the same read as Regime, its provenance part
         "PublishedEdge",
         "EdgeBuilder",  # the viewer's own edge document and the site files: config_generation
         "FeatureTable",

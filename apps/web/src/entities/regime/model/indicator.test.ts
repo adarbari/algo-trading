@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { regimeFixture } from './fixtures';
+import { regimeFixture, regimeSourcesFixture } from './fixtures';
 import {
   indicatorFormat,
   meterDirection,
@@ -11,6 +11,7 @@ import {
 } from './indicator';
 import type { IndicatorSource, RegimeIndicator } from './regime';
 
+const nfciSources = regimeSourcesFixture().get('nfci') as readonly IndicatorSource[];
 const [curve, nfci, vix] = regimeFixture().indicators as [
   RegimeIndicator,
   RegimeIndicator,
@@ -51,8 +52,8 @@ describe('indicatorFormat', () => {
 
 describe('sourceItems', () => {
   it('lists the source in use first and marks the others as not used today', () => {
-    const [active, other] = nfci.sources as [IndicatorSource, IndicatorSource];
-    const { linked, unlinked } = sourceItems({ ...nfci, sources: [other, active] });
+    const [active, other] = nfciSources as [IndicatorSource, IndicatorSource];
+    const { linked, unlinked } = sourceItems([other, active]);
     expect(linked).toEqual([
       { label: 'FRED NFCI', cadence: 'weekly', url: 'https://fred.stlouisfed.org/series/NFCI' },
       {
@@ -65,8 +66,8 @@ describe('sourceItems', () => {
   });
 
   it('names a source with no page of its own in text', () => {
-    const source = { ...(nfci.sources[0] as IndicatorSource), url: null, label: 'SPY bars' };
-    expect(sourceItems({ ...nfci, sources: [source] })).toEqual({
+    const source = { ...(nfciSources[0] as IndicatorSource), url: null, label: 'SPY bars' };
+    expect(sourceItems([source])).toEqual({
       linked: [],
       unlinked: ['SPY bars · weekly'],
     });
@@ -74,7 +75,7 @@ describe('sourceItems', () => {
 });
 
 describe('provenanceLine', () => {
-  const [active, other] = nfci.sources as [IndicatorSource, IndicatorSource];
+  const [active, other] = nfciSources as [IndicatorSource, IndicatorSource];
 
   it('gives the last observation, its release and, for a revised series, the first vintage', () => {
     expect(provenanceLine(active)).toMatch(

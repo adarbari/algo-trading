@@ -10,6 +10,7 @@ review lists over its reference snapshot) take ``date`` like any other. Every Ad
 is ``AdminOnly`` (ADR 0040: a trader gets ``FORBIDDEN``)."""
 
 import datetime as dt
+from functools import partial
 from typing import Annotated
 
 import strawberry
@@ -250,7 +251,11 @@ class Query:
     async def regime(self, info: Ctx, date: Day = None) -> MarketRegime | None:
         ctx = await info.context.aread(date)
         # Off the event loop: the market rows and the cards file.
-        found = await off_loop(regime.load_regime, ctx) if ctx is not None else None
+        found = (
+            await off_loop(partial(regime.load_regime, provenance=False), ctx)
+            if ctx is not None
+            else None
+        )
         return MarketRegime.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]

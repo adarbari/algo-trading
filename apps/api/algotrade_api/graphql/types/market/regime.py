@@ -14,7 +14,7 @@ from algotrade.services.read.regime import history, regime, timeline
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.market.episode_signals import EpisodeSignals
-from algotrade_api.graphql.types.market.indicator import RegimeIndicator
+from algotrade_api.graphql.types.market.indicator import LazyProvenance, RegimeIndicator
 
 strawberry.enum(regime.RegimeLabel, description="The regime; UNKNOWN when it is not stored")
 
@@ -237,13 +237,14 @@ class MarketRegime:
 
     @classmethod
     def of(cls, d: regime.MarketRegime, ctx: ReadContext) -> Self:
+        lazy = LazyProvenance(ctx)
         return cls(
             session=d.session,
             label=d.label,
             plain_label=d.plain_label,
             headline=d.headline,
             scores=RegimeScores.of(d.scores),
-            indicators=[RegimeIndicator.of(i) for i in d.indicators],
+            indicators=[RegimeIndicator.of(i, lazy) for i in d.indicators],
             sizing=RegimeSizing.of(d.sizing),
             unknown_reason=Unknown.of(d.unknown_reason) if d.unknown_reason else None,
             ctx=ctx,

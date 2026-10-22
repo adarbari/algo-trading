@@ -171,20 +171,6 @@ const RegimeQuery = graphql(`
           text
           url
         }
-        sources {
-          label
-          series
-          cadence
-          releaseLagDays
-          url
-          licence
-          terms
-          lastObservation
-          vintageDate
-          vintageKind
-          firstVintage
-          active
-        }
       }
     }
   }

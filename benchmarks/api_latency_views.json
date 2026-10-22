@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-22 05:45 UTC",
+ "generated": "2026-10-22 13:05 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -1660,7 +1660,8 @@
     "GuideHelpField",
     "MarketHistory",
     "RegimeEpisodes",
-    "RegimeSignals"
+    "RegimeSignals",
+    "RegimeSources"
    ],
    "uncertain": [
     "GuideHelpField",

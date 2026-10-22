@@ -2036,7 +2036,7 @@ type IndicatorRange {
 }
 
 """
-One source of an indicator's value, from the catalogue's lineage: a macro series (`series`: its key; `releaseLagDays`, `terms` and the provenance only for one) or a stored table. `lastObservation`: the latest observation the session knew, public on `vintageDate` (`vintageKind`: alfred or lagged); `firstVintage`: the series' earliest ALFRED vintage the session knew, before which the history is today's revised figures (null: an unrevised series, or nothing stored). `active`: it fed the value for the session (false: the source a per-session switch did not choose, e.g. SPY's bars when the S&P 500 trend came from the index level)
+One source of an indicator's value, from the catalogue's lineage: a macro series (`series`: its key; `releaseLagDays`, `terms` and the provenance only for one) or a stored table. `lastObservation`: the latest observation the session knew, public on `vintageDate` (`vintageKind`: alfred or lagged); `firstVintage`: the series' earliest ALFRED vintage the session knew, before which the history is today's revised figures (null: an unrevised series, or nothing stored). `active`: it fed the value for the session (false: the source a per-session switch did not choose, e.g. SPY's bars when the S&P 500 trend came from the index level). The four provenance fields are read from the stored vintages only when a query selects them
 """
 type IndicatorSource {
   label: String!
@@ -2046,11 +2046,19 @@ type IndicatorSource {
   url: String
   licence: String!
   terms: String
-  lastObservation: Date
-  vintageDate: Date
-  vintageKind: String
-  firstVintage: Date
   active: Boolean!
+
+  """The latest observation the session knew"""
+  lastObservation: Date
+
+  """When that observation became public"""
+  vintageDate: Date
+
+  """`alfred` or `lagged`"""
+  vintageKind: String
+
+  """The series' earliest ALFRED vintage the session knew"""
+  firstVintage: Date
 }
 
 """An indicator's own verdict: ON, OFF or UNKNOWN"""

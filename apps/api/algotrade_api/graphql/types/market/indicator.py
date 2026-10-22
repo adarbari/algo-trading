@@ -2,14 +2,17 @@
 the threshold and direction of its rule, its linked how-line and the sources its value is
 derived from (with their provenance). Split from ``regime.py`` (``MarketRegime``)."""
 
+import asyncio
 import datetime as dt
 from typing import Self
 
 import strawberry
 from strawberry.scalars import JSON
 
+from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.regime import indicators, sources
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
 strawberry.enum(
@@ -52,6 +55,24 @@ class TextPart:
         return cls(text=d.text, url=d.url)
 
 
+class LazyProvenance:
+    """The provenance of every source of one request, read on first use and shared: the
+    provenance fields of all the indicators' sources resolve at once, and only the first of
+    them does the stored-vintage read."""
+
+    def __init__(self, ctx: ReadContext) -> None:
+        self._ctx = ctx
+        self._lock = asyncio.Lock()
+        self._found: dict[str, sources.SeriesProvenance] | None = None
+
+    async def of(self, series: str | None) -> sources.SeriesProvenance:
+        """The series' provenance (none stored, or a table: all fields null)."""
+        async with self._lock:
+            if self._found is None:
+                self._found = await off_loop(indicators.load_indicator_provenance, self._ctx)
+        return self._found.get(series or "", sources.NO_PROVENANCE)
+
+
 @strawberry.type(
     description="One source of an indicator's value, from the catalogue's lineage: a macro "
     "series (`series`: its key; `releaseLagDays`, `terms` and the provenance only for one) or "
@@ -60,7 +81,8 @@ class TextPart:
     "ALFRED vintage the session knew, before which the history is today's revised figures "
     "(null: an unrevised series, or nothing stored). `active`: it fed the value for the "
     "session (false: the source a per-session switch did not choose, e.g. SPY's bars when "
-    "the S&P 500 trend came from the index level)"
+    "the S&P 500 trend came from the index level). The four provenance fields are read "
+    "from the stored vintages only when a query selects them"
 )
 class IndicatorSource:
     label: str
@@ -70,14 +92,11 @@ class IndicatorSource:
     url: str | None
     licence: str
     terms: str | None
-    last_observation: dt.date | None
-    vintage_date: dt.date | None
-    vintage_kind: str | None
-    first_vintage: dt.date | None
     active: bool
+    lazy: strawberry.Private[LazyProvenance]
 
     @classmethod
-    def of(cls, d: sources.IndicatorSource) -> Self:
+    def of(cls, d: sources.IndicatorSource, lazy: LazyProvenance) -> Self:
         return cls(
             label=d.label,
             series=d.series,
@@ -86,12 +105,38 @@ class IndicatorSource:
             url=d.url,
             licence=d.licence,
             terms=d.terms,
-            last_observation=d.last_observation,
-            vintage_date=d.vintage_date,
-            vintage_kind=d.vintage_kind,
-            first_vintage=d.first_vintage,
             active=d.active,
+            lazy=lazy,
         )
+
+    async def _provenance(self) -> sources.SeriesProvenance:
+        """The series' provenance, read (once per request) only when the query selects one of
+        the four provenance fields."""
+        return await self.lazy.of(self.series)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The latest observation the session knew"
+    )
+    async def last_observation(self) -> dt.date | None:
+        return (await self._provenance()).last_observation
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="When that observation became public"
+    )
+    async def vintage_date(self) -> dt.date | None:
+        return (await self._provenance()).vintage_date
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="`alfred` or `lagged`"
+    )
+    async def vintage_kind(self) -> str | None:
+        return (await self._provenance()).vintage_kind
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The series' earliest ALFRED vintage the session knew"
+    )
+    async def first_vintage(self) -> dt.date | None:
+        return (await self._provenance()).first_vintage
 
 
 @strawberry.type(description="What an indicator did before one episode, in one line")
@@ -141,7 +186,7 @@ class RegimeIndicator:
     verdict_feature: str
 
     @classmethod
-    def of(cls, d: indicators.RegimeIndicator) -> Self:
+    def of(cls, d: indicators.RegimeIndicator, lazy: LazyProvenance) -> Self:
         return cls(
             key=d.key,
             pace=d.pace,
@@ -164,6 +209,6 @@ class RegimeIndicator:
             threshold=d.threshold,
             direction=d.direction,
             how=[TextPart.of(p) for p in d.how],
-            sources=[IndicatorSource.of(s) for s in d.sources],
+            sources=[IndicatorSource.of(s, lazy) for s in d.sources],
             verdict_feature=d.verdict_feature,
         )
