@@ -411,15 +411,30 @@ def test_a_run_records_every_fields_licence_for_the_read_to_gate_by() -> None:
 
 
 def test_every_field_a_run_stores_a_value_for_is_in_its_recorded_field_licences() -> None:
-    """The invariant behind ``run_withheld`` not reading a recorded run's values file: criteria,
-    flags, display columns and the tie-break read distinct fields, and every ``field`` the run
-    writes to ``rule_screen_values`` is a key of ``audit["field_licences"]``."""
+    """The invariant behind ``run_withheld`` not reading a recorded run's values file: a spec
+    with criteria, a group, a flag, display columns and a tie-break (distinct fields), and every
+    catalogue ``field`` the run writes to ``rule_screen_values`` is a key of
+    ``audit["field_licences"]``. A group row's ``field`` is its kind (``any``), not a field."""
     reader, writer = seeded()
-    config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
+    screen = {
+        **SCREEN,
+        "criteria": {
+            **SCREEN["criteria"],
+            "tier": {"field": f"{LIQ}.put_tier", "op": "in", "value": ["A", "B"]},
+        },
+        "groups": {"either": {"any": ["oi", "tier"]}},
+        "flags": {
+            "cheap": {"all": [{"field": f"{LIQ}.underlying_price", "op": "lt", "value": 70}]}
+        },
+        "columns": {"tier_col": f"{LIQ}.put_tier", "oi_col": f"{LIQ}.chain_oi"},
+        "rank": {"tie_break": f"{LIQ}.underlying_price"},
+    }
+    config = resolve_config(configs(**screen), "big_liquid", UserContext(SITE_USER))
     outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     recorded = set(outcome.audit["field_licences"])
     values = reader.table("results/rule_screen_values", DAY)
     assert values is not None and not values.empty
-    stored = set(values["field"].dropna())
+    assert {"group", "column"} <= set(values["mode"])  # every kind of row was stored
+    stored = set(values[values["mode"] != "group"]["field"].dropna())
     assert {f"{LIQ}.underlying_price", f"{LIQ}.chain_oi", f"{LIQ}.put_tier"} <= stored
     assert stored <= recorded
