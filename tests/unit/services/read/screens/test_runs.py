@@ -8,9 +8,11 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.read.context import ReadContext, open_context
+from algotrade.services.read.context import ReadContext, at_session, open_context
 from algotrade.services.read.screens import results, runs
+from algotrade.services.read.screens.results import ResultQuery
 from algotrade.services.read.screens.runs import (
+    RULE_SCREEN,
     DecisionCount,
     last_run_rows,
     latest_run,
@@ -20,7 +22,7 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.values import UnknownCode
-from algotrade.services.screening.rule_results import NOT_PICKED, is_picked
+from algotrade.services.screening.rule_results import NOT_PICKED, change_counts, is_picked
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -33,6 +35,7 @@ from tests.unit.services.read.screens.conftest import (
     D1,
     T,
     context,
+    screens_store,
     write_gated,
     write_run,
 )
@@ -300,3 +303,176 @@ def test_the_run_summaries_are_what_the_whole_rows_gave(either: Backend, view: s
             run.paused,
             run.regime,
         ) == want
+
+
+# ---------------------------------------------------------------- frozen runs
+# A run's read object from its frozen ``results/screen_runs`` row equals the one recounted from
+# ``results/rule_screen`` (owner decision 2026-10-22, "Screener changes"); a session without the
+# table is the old path, never ``NOT_RUN``; the frozen path reads no row of any run.
+
+KEYS = [("site", "alpha"), ("me", "beta"), ("site", "beta"), ("me", "gamma")]
+SCREEN_RUNS = "screen_runs"
+
+
+def _decisions(ctx: ReadContext, run_id: str, owner: str, config: str) -> dict[str, str]:
+    stored = ctx.reader.read_run("results/rule_screen", ctx.session.date, run_id)
+    assert stored is not None
+    mine = stored[(stored["user_id"] == owner) & (stored["config_id"] == config)]
+    return {str(i): str(d) for i, d in zip(mine["instrument_id"], mine["decision"], strict=True)}
+
+
+def freeze(backend: MemoryBackend, days: tuple[date, ...] = (D0, D1)) -> None:
+    """Write the ``screen_runs`` row of every run of the store, as the writer would have: from
+    the rows, the previous run being the config's newest in the previous stored session."""
+    reader = StoreReader(backend)
+    writer = StoreWriter(backend)
+    for day in days:
+        now = at_session(context(reader, user="admin"), day)
+        keys = [("site", "alpha"), ("site", "beta"), ("me", "beta"), ("me", "gamma")]
+        for owner, config in keys:
+            found = latest_run(now, owner, config).run
+            if found is None:
+                continue
+            decisions = _decisions(now, found.run_id, owner, config)
+            before = load_previous_run(now, found)
+            then = (
+                None
+                if before is None
+                else _decisions(at_session(now, before.session), before.run_id, owner, config)
+            )
+            new, dropped = (None, None) if then is None else change_counts(decisions, then)
+            counts = {d.decision: d.count for d in found.decisions}
+            row = {
+                "user_id": owner, "config_id": config, "config_hash": "h",
+                "config_version": found.config_version, "rows": len(decisions),
+                "passed": found.picked, "picked": found.picked, "paused": found.paused,
+                "decision_names": sorted(counts),
+                "decision_counts": [counts[d] for d in sorted(counts)],
+                "regime": found.regime, "size_multiplier": 1.0,
+                "previous_run_id": None if before is None else before.run_id,
+                "previous_session": None if before is None else before.session,
+                "previous_version": None if before is None else before.config_version,
+                "new_picks": new, "dropped": dropped,
+            }  # fmt: skip
+            frame = pd.DataFrame([row])
+            for name in ("config_version", "previous_version", "new_picks", "dropped"):
+                frame[name] = frame[name].astype("Int64")
+            writer.write_result(
+                SCREEN_RUNS, day, found.run_id, _stamp(frame, day, found.run_id, found.knowledge_ts)
+            )
+
+
+def _stamp(frame: pd.DataFrame, day: date, run_id: str, knowledge: Any) -> pd.DataFrame:
+    frame["session_date"] = day
+    frame["knowledge_ts"] = pd.Timestamp(knowledge)
+    frame["source"] = "test"
+    frame["run_id"] = run_id
+    return frame
+
+
+@pytest.fixture
+def stores() -> tuple[StoreReader, StoreReader]:
+    """The same screens twice: ``old`` has ``rule_screen`` only, ``new`` its frozen rows too
+    (a gated, PAUSED run of ``alpha`` included)."""
+    old, new = screens_store(), screens_store()
+    for backend in (old, new):
+        write_gated(backend)
+    freeze(new)
+    return StoreReader(old), StoreReader(new)
+
+
+def _bare(run: Any) -> Any:
+    return None if run is None else replace(run, frozen=None)
+
+
+@pytest.mark.parametrize("user", ["me", "admin", "trader"])
+def test_the_frozen_run_is_the_recounted_run(
+    stores: tuple[StoreReader, StoreReader], user: str
+) -> None:
+    old, new = (context(r, user=user) for r in stores)
+    before, after = load_latest_runs(old, KEYS), load_latest_runs(new, KEYS)
+    assert after[("site", "alpha")].run is not None and after[("site", "alpha")].run.frozen
+    for key in KEYS:
+        assert _bare(after[key].run) == before[key].run  # picked, paused, decisions, version
+        assert after[key].not_run == before[key].not_run  # the NOT_RUN cause, role-scoped
+    alpha = after[("site", "alpha")].run
+    assert alpha is not None and (alpha.picked, alpha.paused) == (1, 2)  # a PAUSED pick
+    gamma = after[("me", "gamma")].not_run
+    assert gamma is not None and gamma.code is UnknownCode.NOT_RUN
+
+
+def test_the_frozen_changes_equal_the_recounted_changes(
+    stores: tuple[StoreReader, StoreReader],
+) -> None:
+    old, new = (context(r) for r in stores)
+    for key in [("site", "alpha"), ("me", "beta")]:  # a previous run, and a first run
+        was, now = latest_run(old, *key).run, latest_run(new, *key).run
+        assert was is not None and now is not None
+        recount, frozen = results.load_run_changes(old, was), results.load_run_changes(new, now)
+        assert frozen == recount
+        summary = results.load_change_summary(new, now)
+        assert (summary.previous_session, summary.counts) == (
+            recount.previous_session,
+            recount.counts,
+        )
+    first = latest_run(new, "me", "beta").run
+    assert first is not None and first.frozen is not None
+    assert first.frozen.new_picks is None  # no previous run: null, never 0
+    assert results.load_change_summary(new, first).counts == ()
+
+
+def test_a_result_page_and_a_personal_field_are_the_same_either_way(
+    stores: tuple[StoreReader, StoreReader],
+) -> None:
+    for user in ("me", "trader"):  # `me` holds the personal licence, `trader` does not
+        pages = []
+        for reader in stores:
+            ctx = context(reader, user=user)
+            run = latest_run(ctx, "site", "alpha").run
+            assert run is not None
+            pages.append(results.load_result_page(ctx, run, ResultQuery(change="dropped")))
+        assert pages[0] == pages[1]
+        assert pages[0].results  # the PAUSED BBB dropped against the previous run
+
+
+def test_definition_changed_is_the_previous_version_differing(
+    stores: tuple[StoreReader, StoreReader],
+) -> None:
+    run = latest_run(context(stores[1]), "site", "alpha").run
+    assert run is not None and run.frozen is not None
+    assert run.definition_changed is False
+    assert replace(run, config_version=2).definition_changed is True
+    assert replace(run, frozen=None).definition_changed is None
+
+
+def test_a_session_without_screen_runs_is_the_old_path_never_not_run(
+    stores: tuple[StoreReader, StoreReader],
+) -> None:
+    ctx = context(stores[0])
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None and run.frozen is None and run.picked == 1
+    assert load_latest_runs(ctx, [("site", "alpha")])[("site", "alpha")].not_run is None
+    assert results.load_change_summary(ctx, run) == results.load_run_changes(ctx, run)
+
+
+def test_the_frozen_path_reads_no_row_of_any_run(
+    stores: tuple[StoreReader, StoreReader], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reader = stores[1]
+    read: list[str] = []
+    for name in ("read_run", "read_latest_runs", "table", "table_range"):
+        real = getattr(reader, name)
+
+        def counting(table: str, *args: Any, _real: Any = real, **kwargs: Any) -> Any:
+            read.append(table)
+            return _real(table, *args, **kwargs)
+
+        monkeypatch.setattr(reader, name, counting)
+    ctx = context(reader)
+    found = load_latest_runs(ctx, KEYS)
+    for key in KEYS:
+        run = found[key].run
+        if run is not None:
+            results.load_change_summary(ctx, run)
+    assert read and set(read) == {f"results/{SCREEN_RUNS}"}
+    assert RULE_SCREEN not in read
