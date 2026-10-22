@@ -26,6 +26,7 @@ state before any user asks; the long market frames come after, not before."""
 import asyncio
 import json
 import logging
+import threading
 import time
 from collections.abc import Awaitable, Callable, Hashable
 from functools import partial
@@ -75,10 +76,11 @@ class Pacer:
     def __init__(self, busy: Callable[[], bool], budget_s: float = PAUSE_BUDGET_S) -> None:
         self._busy = busy
         self._left = budget_s
+        self._tick = threading.Event()  # never set: a wait that is a sleep
 
     def __call__(self) -> None:
         while self._left > 0 and self._busy():
-            time.sleep(PAUSE_POLL_S)
+            self._tick.wait(PAUSE_POLL_S)
             self._left -= PAUSE_POLL_S
 
 
