@@ -53,7 +53,7 @@ VARIABLES: dict[str, dict[str, Any]] = {
 OPERATIONS: dict[str, tuple[str, dict[str, Any]]] = {
     name: (web_documents()[name], variables) for name, variables in VARIABLES.items()
 }
-NOT_LISTED = "query Day { session { date } }"  # a USER_OPERATIONS name: keyed on the sequence
+NOT_LISTED = "query Regime { session { date } }"  # a USER_OPERATIONS name: keyed on the sequence
 
 
 class Counts:
