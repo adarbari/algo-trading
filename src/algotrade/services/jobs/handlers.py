@@ -57,6 +57,7 @@ from algotrade.services.evaluation.training.frame import training_frame
 from algotrade.services.evaluation.training.render import render_scorer
 from algotrade.services.jobs.runner import JobContext, JobKind
 from algotrade.services.licences import HARNESS_ALL, held_by
+from algotrade.services.read.context import open_stores
 from algotrade.services.screening.exports import run_exports
 from algotrade.services.screening.run import run_screener
 
@@ -203,6 +204,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         owner=edge.owner,
         trigger=params.get("trigger") or "cli",
         job_id=ctx.job_id,
+        stores=open_stores(ctx.resources["reader"], configs, ctx.user),  # the verdict headline
     )
     if differing:
         raise AlgoTradeError(_audit_failure(edge.id, differing))

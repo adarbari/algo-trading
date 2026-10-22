@@ -2,7 +2,7 @@
 
 **Status:** accepted, amended by [0065](0065-verdict-basis-fixed-before-the-frozen-period.md) (the verdict's basis) (2026-10-07; owner decisions 2026-10-06 and 2026-10-07; the plan and items
 are [edges-plan.md](../edges-plan.md), the long form is the owner's PRD "Winners-Derived Screener:
-Product Requirements"; the open decisions below are the owner's before the item that needs each); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (the optional `[published]` table of an edge document).
+Product Requirements"; the open decisions below are the owner's before the item that needs each); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (the optional `[published]` table of an edge document); amended 2026-10-22 (the stored verdict headline, `results/edge_verdict`).
 Extends [0005](0005-ingestion-is-the-only-writer.md) (ingestion writes the outcomes),
 [0007](0007-point-in-time-data.md) (an outcome is knowable only when its window closes),
 [0015](0015-configs-selections-users.md) (the edge document is a layered settings file),
@@ -992,3 +992,9 @@ adds one feature group, `share_classes@v1`, that names each name's sibling.
    share class) need a different `pair_field` producer and no harness change; none is built.
    A hedge ratio other than one-to-one (the legs are equal-dollar by construction of the
    spread of returns) and a borrow rate per name are not modelled.
+
+## Amendment 2026-10-22: the stored verdict headline
+Owner approval 2026-10-22. `results/edge_verdict`: the headline (no haircut) of a site edge's
+canonical run, per (edge, judged run, fingerprint of judge call, settings, source, `JUDGE_VERSION`),
+written in the edge-eval publish and by `edge-verdicts`, framed only in `detail/verdict.py` (ML
+never writes it), read only on a match, else judged live; by run (`docs/data/storage.md`).

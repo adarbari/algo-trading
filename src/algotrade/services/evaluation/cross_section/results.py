@@ -7,9 +7,13 @@ exploratory, how much was excluded, and who ran it: ``owner``, ``trigger`` (nigh
 and the ``job_id`` of the job that wrote it (ADR 0059 amendment 2026-10-10); its ``mode``
 (``full`` | ``incremental``) and how many legs it reused, computed and recomputed, by reason
 (ADR 0063); and how many trade-ledger rows it wrote (``ledger_rows``, ADR 0064: a run whose
-ledger has gone under a nonzero count was pruned, one with no count is older than the ledger)."""
+ledger has gone under a nonzero count was pruned, one with no count is older than the ledger).
+A site edge's canonical run also publishes its verdict headline (``results/edge_verdict``, ADR
+0053 amendment 2026-10-22), framed from the run's own rows: a framing error costs that row (the
+reader judges live, ``verdict_row`` false on the record), never the evaluation."""
 
-from dataclasses import asdict
+import logging
+from dataclasses import asdict, replace
 from datetime import datetime
 from typing import Any
 
@@ -17,7 +21,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN, job_name
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.evaluation.cross_section.detail import series, trades
+from algotrade.services.evaluation.cross_section.detail import series, trades, verdict
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     VariantResult,
@@ -30,9 +34,12 @@ from algotrade.services.evaluation.cross_section.measures import (
 )
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
+from algotrade.services.read.context import Stores
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
+from algotrade.storage.tables.schemas import result_table, validate_frame
 
+log = logging.getLogger(__name__)
 RESULT = "edge_eval"
 SOURCE = "edge-eval"
 TRIGGERS = ("nightly", "ui", "cli")  # what can start a run; stored in its stats, shown as-is
@@ -310,6 +317,28 @@ def historical_identity(evaluation: EdgeEvaluation) -> dict[str, Any] | None:
     return None if evaluation.historical is None else evaluation.historical.as_dict()
 
 
+def _verdict_headline(
+    stores: Stores | None,
+    evaluation: EdgeEvaluation,
+    record: RunRecord,
+    frame: pd.DataFrame,
+    now: datetime,
+) -> tuple[pd.DataFrame | None, bool]:
+    """``(row, ok)``: the verdict row of the run, or None for a run that gets none (no ``stores``,
+    or not the canonical kind; ``ok``) or whose framing failed (not ``ok``: logged, never raised:
+    the row is a fingerprint-checked cache, and a lost evaluation costs more than a missing row)."""
+    if stores is None:
+        return None, True
+    try:
+        row = verdict.edge_verdict_frame(stores, evaluation.edge_id, record, frame, now)
+        if row is not None:
+            validate_frame(result_table(verdict.RESULT), row)  # a bad row costs the row only
+        return row, True
+    except Exception:
+        log.exception("verdict of %s not framed; the reader judges live", evaluation.edge_id)
+        return None, False
+
+
 def write_edge_eval(
     writer: ResultWriter,
     evaluation: EdgeEvaluation,
@@ -318,13 +347,15 @@ def write_edge_eval(
     owner: str | None = None,
     trigger: str = "cli",
     job_id: str | None = None,
+    stores: Stores | None = None,
 ) -> RunRecord:
     """Save ``evaluation``: its rows, its per-session series (``results/edge_series``), its trade
     ledger (``results/edge_trades``, ADR 0064) and its legs (``results/edge_legs``, ADR 0063), all
     visible or none, and its run record, whose stats hold the trial log and who ran it
     (``owner``: the edge's, default the rows' user; ``trigger``: ``nightly`` | ``ui`` | ``cli``;
-    ``job_id``: the job that wrote it, none for a direct call).
-    Returns the finished record."""
+    ``job_id``: the job that wrote it, none for a direct call). ``stores``: the site's store and
+    documents, to frame the run's verdict headline in the same publish (none: no verdict row,
+    the reader judges live). Returns the finished record."""
     if trigger not in TRIGGERS:
         raise ConfigurationError(f"unknown run trigger {trigger!r}; known: {list(TRIGGERS)}")
     record = start_run(job_name(evaluation.edge_id, evaluation.user_id), evaluation.end, now)
@@ -353,6 +384,10 @@ def write_edge_eval(
         "legs_invalidated": dict(evaluation.legs_invalidated),  # stored legs recomputed, by reason
         "ledger_rows": len(ledger),  # results/edge_trades rows written (ADR 0064)
     }
+    finished = replace(record, finished_at=now, stats=stats)  # what the run will have saved
+    headline, headline_ok = _verdict_headline(stores, evaluation, finished, frame, now)
+    if stores is not None:
+        stats["verdict_row"] = headline is not None and headline_ok
     # The record goes in before the commit: a crash between the two leaves a trial counted
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
     with writer.publishing(record.run_id, now):
@@ -364,5 +399,9 @@ def write_edge_eval(
             write_legs(writer, record.run_id, legs_frame(evaluation.leg_rows, record.run_id, now))
         if not ledger.empty:
             writer.write_result(trades.RESULT, evaluation.end, record.run_id, ledger, pending=True)
+        if headline is not None:
+            writer.write_result(
+                verdict.RESULT, evaluation.end, record.run_id, headline, pending=True
+            )
         writer.save_run(record.finish(now, complete=True, stats=stats))
     return record
