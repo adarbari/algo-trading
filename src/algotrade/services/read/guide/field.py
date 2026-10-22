@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 from algotrade.config.site.field_guide import Situation
 from algotrade.config.site.settings import load_field_guide
-from algotrade.services.configs import catalog_of
+from algotrade.services.configs import catalog_of, field_catalog
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.prose import LinkedProse, link_prose, mentions
 from algotrade.services.read.guide.screeners.site_screeners import (
@@ -88,8 +88,11 @@ def load_guide_field(ctx: Stores, name: str) -> GuideField:
     caller's catalogue."""
     guide = load_field_guide(ctx.configs)
     info = feature_infos(ctx.features, [name], guide=guide)[name]
-    fields = catalog_of(ctx.features).fields
-    situations = tuple(GuideSituation.of(s, fields) for s in guide.situations if name in s.affects)
+    fields = catalog_of(ctx.features).fields  # the entry is the caller's field: their catalogue
+    site_fields = field_catalog(ctx.configs).fields  # site prose links the site's only
+    situations = tuple(
+        GuideSituation.of(s, site_fields) for s in guide.situations if name in s.affects
+    )
     found = (_use(p, name) for p in site_screeners(ctx))
     entry = info.guide
     return GuideField(

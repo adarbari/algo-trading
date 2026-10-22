@@ -27,7 +27,7 @@ from algotrade.config.site.guide.screeners import ScreenerProse, load_guide_scre
 from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.config.site.settings import load_field_guide
 from algotrade.core.model.screen_spec import Criterion, Mode
-from algotrade.services.configs import catalog_of
+from algotrade.services.configs import field_catalog
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.edges.edge import GuideEdgeRow, edge_row
 from algotrade.services.read.guide.edges.site_edges import edges_of_screener
@@ -136,7 +136,7 @@ def load_guide_screener(ctx: Stores, screener_id: str) -> GuideScreenerDetail | 
 
 
 def _prose(ctx: Stores, prose: ScreenerProse) -> GuideScreenerProse:
-    fields = catalog_of(ctx.features).fields
+    fields = field_catalog(ctx.configs).fields
     count = len(prose.sources)
     return GuideScreenerProse(
         summary=link_prose(prose.summary, fields, count),
