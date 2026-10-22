@@ -17,7 +17,7 @@ from algotrade.services.read.ops.ingestion import (
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade_api.deps import ReadStore
-from tests.unit.storage.tables.test_readers import publish
+from tests.helpers.stored_frames import publish
 
 NOW = datetime(2026, 10, 5, 12, tzinfo=UTC)
 
@@ -209,10 +209,9 @@ def test_the_pinned_window_equals_the_pinned_listing() -> None:
     assert counts.around(DENSE, GRID[4]) == (False, GRID[3])
 
 
-def test_a_snapshot_probes_back_for_the_latest_and_agrees_with_the_rule() -> None:
+def test_a_snapshot_from_the_window_agrees_with_the_rule() -> None:
     _reader, ctx = _fixture()
+    counts = ingestion._Counts(ctx, GRID)
     for day in (*GRID, date(2026, 10, 20)):
         for table in (DENSE, SPARSE, EMPTY):
-            assert snapshot_on(ctx, table, day, ingestion.LOOKBACK_DAYS) == snapshot_on(
-                ctx, table, day
-            )
+            assert counts.snapshot(table, day) == snapshot_on(ctx, table, day)

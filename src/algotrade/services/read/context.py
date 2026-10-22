@@ -19,7 +19,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field, fields, is_dataclass, replace
-from datetime import date, timedelta
+from datetime import date
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -551,13 +551,7 @@ def partition_on(ctx: Stores, table: str, day: date) -> pd.DataFrame | None:
     return ctx.reader.table(table, day)
 
 
-def snapshot_on(ctx: Stores, table: str, day: date, lookback: int | None = None) -> Snapshot | None:
+def snapshot_on(ctx: Stores, table: str, day: date) -> Snapshot | None:
     """The snapshot of ``table`` a read for ``day`` sees (ADR 0007's one rule,
-    ``data.reference.snapshot``); ``None``: the table has no partition at all. ``lookback``:
-    first probe the ``lookback`` days up to ``day`` and take the latest partition found (the
-    same answer, without listing the table); none there: the rule as it stands."""
-    if lookback is not None:
-        found = ctx.reader.dates_in(table, day - timedelta(days=lookback), day)
-        if found:
-            return Snapshot(table, found[-1], day)
+    ``data.reference.snapshot``); ``None``: the table has no partition at all."""
     return snapshot(ctx.reader, table, day)

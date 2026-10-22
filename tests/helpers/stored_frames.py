@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 import pandas as pd
 
 from algotrade.data import StoreReader
+from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 
@@ -214,3 +215,11 @@ def quarter_facts(
             )
         )
     return out
+
+
+def publish(backend: MemoryBackend | LocalBackend, run: str, table: str, *days: date) -> None:
+    writer = StoreWriter(backend)
+    for day in days:
+        frame = stamped([{"instrument_id": "EQ:A", "value": 1.0}], day, run)
+        writer.write_table(table, day, run, frame, pending=True)
+    backend.tables.commit_run(run, T0 + timedelta(minutes=5))

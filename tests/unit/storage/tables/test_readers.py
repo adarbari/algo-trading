@@ -17,18 +17,10 @@ from algotrade.storage.tables.readers import (
     dates_digest,
 )
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.stored_frames import T0, stamped
+from tests.helpers.stored_frames import T0, publish, stamped
 
 D1, D2, D3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)
 A, B = "rollups/instrument/a@v1", "rollups/instrument/b@v1"
-
-
-def publish(backend: MemoryBackend | LocalBackend, run: str, table: str, *days: date) -> None:
-    writer = StoreWriter(backend)
-    for day in days:
-        frame = stamped([{"instrument_id": "EQ:A", "value": 1.0}], day, run)
-        writer.write_table(table, day, run, frame, pending=True)
-    backend.tables.commit_run(run, T0 + timedelta(minutes=5))
 
 
 def test_reads_are_logged_per_attributed_day_found_or_not() -> None:

@@ -29,7 +29,7 @@ import pandas as pd
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import last_closed_session, sessions_ending
 from algotrade.data.chains import CHAIN_STATUS, OPTION_QUOTES
-from algotrade.data.reference import UNIVERSE_TABLE, load_universe
+from algotrade.data.reference import UNIVERSE_TABLE, Snapshot, load_universe
 from algotrade.features.registry import GROUPS
 from algotrade.services.read.context import (
     ReadContext,
@@ -125,6 +125,15 @@ class _Counts:
             self._stored[table] = stored_dates(self.ctx, table)
         return self._stored[table]
 
+    def snapshot(self, table: str, day: date) -> Snapshot | None:
+        """``snapshot_on``'s answer: the latest partition on or before ``day`` from the window
+        when it holds one, else the rule over the whole table."""
+        if self.days and min(self.days) <= day <= max(self.days):
+            found = [s for s in self.window(table) if s <= day]
+            if found:
+                return Snapshot(table, found[-1], day)
+        return snapshot_on(self.ctx, table, day)
+
     def around(self, table: str, day: date) -> tuple[bool, date | None]:
         """-> (``day`` is stored, the last stored day before ``day``), as the listing says."""
         if not self.days or not min(self.days) <= day <= max(self.days):
@@ -180,7 +189,7 @@ def _chains_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
 
 
 def _snapshot_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
-    snap = snapshot_on(counts.ctx, d.name, day, LOOKBACK_DAYS)
+    snap = counts.snapshot(d.name, day)
     if snap is None or snap.pre_snapshot:
         return Cell(d.name, day, "MISSING", 0, None, "no snapshot on or before")
     present, runs, _ = counts.of(d.name, snap.snapshot_date)
