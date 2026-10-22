@@ -240,7 +240,29 @@ def _lost(stats: Mapping[str, Any]) -> tuple[str, ...]:
 
 def _committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
     """The committed runs of ``owner``, newest first; the site's include the records of
-    ``LEGACY_SITE_OWNERS`` (built as the site's, the old owner disclosed)."""
+    ``LEGACY_SITE_OWNERS`` (built as the site's, the old owner disclosed).
+
+    Kept in ``ctx.cache`` per run-record generation (read before the records, so a saved record
+    is never answered from an older entry) with every input ``_run`` reads of the edge and the
+    session; a reader whose records are a snapshot is not cached. A page asks this per edge per
+    field (4,210 reads of a page of 81 edges), each decoding every record."""
+    if ctx.reader.runs_frozen():
+        return _read_committed(ctx, edge, owner)
+    session = ctx.session.date if isinstance(ctx, ReadContext) else None
+    key = (
+        "edge-committed",
+        edge.id,
+        owner,
+        edge.mine,
+        edge.frozen_from,
+        edge.oos_hidden,
+        session,
+        ctx.reader.runs_generation(),
+    )
+    return list(ctx.cache.get_or_compute(key, lambda: tuple(_read_committed(ctx, edge, owner))))
+
+
+def _read_committed(ctx: Stores, edge: Edge, owner: str) -> list[EdgeRun]:
     sources: list[tuple[str, str | None]] = [(owner, None)]
     if owner == SITE_USER and not edge.mine:  # a user's own edge has no legacy runs
         sources += [(legacy, legacy) for legacy in LEGACY_SITE_OWNERS]
@@ -293,6 +315,18 @@ def load_site_trials(ctx: Stores) -> int:
     user's own edges are not the site's). An edge with no canonical run, or one from before the
     count, adds none. Kept until the next publish or run, and keyed on the site edges' ids,
     frozen periods and statuses, so an edited document recounts."""
+    if not isinstance(ctx, ReadContext):
+        return _site_trials(ctx)
+    # one request asks per edge per field: the count (and the config reads of its key) once
+    memo_key = ("site-trials", ctx.reader.version(), ctx.reader.runs_generation())
+    if memo_key not in ctx.memo:
+        ctx.memo[memo_key] = _site_trials(ctx)
+    return int(ctx.memo[memo_key])
+
+
+def _site_trials(ctx: Stores) -> int:
+    """``load_site_trials`` without the request memo: kept in ``ctx.cache`` until the next publish
+    or run."""
     site = {e.id: (e.status, e.frozen_from) for e in load_site_edges(ctx.configs)}
     key = (
         "site-trials",
