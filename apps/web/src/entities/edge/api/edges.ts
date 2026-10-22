@@ -315,7 +315,9 @@ export function prefetchEdges(client: QueryClient): void {
 
 /** Read the edges (and their runs) again, after an evaluation finished. */
 export function refreshEdges(client: QueryClient): Promise<void> {
-  void client.invalidateQueries({ queryKey: queryKeys.gqlAll('EdgeDocument') });
-  void client.invalidateQueries({ queryKey: queryKeys.gqlAll('EdgeDetail') });
-  return client.invalidateQueries({ queryKey: queryKeys.gqlAll('EdgesPage') });
+  return Promise.all(
+    ['EdgeDocument', 'EdgeDetail', 'EdgesPage'].map((name) =>
+      client.invalidateQueries({ queryKey: queryKeys.gqlAll(name) }),
+    ),
+  ).then(() => undefined);
 }

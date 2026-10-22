@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gql } from '@/shared/api';
 
 import { EDGE_ROWS_FIXTURE, EDGES_FIXTURE, TRACK_RECORDS_FIXTURE } from '../model/fixtures';
-import { useEdge, useEdgeDocument, useEdgeProblems, useEdges } from './edges';
+import { refreshEdges, useEdge, useEdgeDocument, useEdgeProblems, useEdges } from './edges';
 import { useEdgeLiveStates } from './paper';
 import { useTrackRecords } from './track-records';
 
@@ -86,6 +86,16 @@ describe('useEdgeDocument', () => {
   it('sends nothing for a new edge', () => {
     renderHook(() => useEdgeDocument(null), { wrapper });
     expect(GQL).not.toHaveBeenCalled();
+  });
+});
+
+describe('refreshEdges', () => {
+  it('waits for the list, the one-edge and the document reads to refetch', async () => {
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    await refreshEdges(client);
+    const names = spy.mock.calls.map((c) => (c[0]?.queryKey as unknown[] | undefined)?.[1]);
+    expect(names.sort()).toEqual(['EdgeDetail', 'EdgeDocument', 'EdgesPage']);
   });
 });
 
