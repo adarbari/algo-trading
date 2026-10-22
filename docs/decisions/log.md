@@ -460,5 +460,6 @@ follow-up PR).
 - Options: A drop the text and keep the dated row as it is / B drop the text and link each filing row to the filing / C keep the text.
 - Decision: B. The events list (`InstrumentEvents`) no longer reads or sends the text bodies of `events/filing_text` (the web timeline never showed them: only earnings, dividend, split and reference change get a detail line, every other kind is a dated row with its table name); each filing row links to the filing itself. The per-table column list of phase 4 keeps what the chart needs (the 8-K acceptance time that confirms an earnings date) and adds what the link needs (filing form, cik and accession, known_from).
 - decided by: owner
-- status: final (direction); the link target (the SEC EDGAR filing page built from cik and accession, one link per filing not per item) is confirmed in the phase 4 design
+- status: final
+- Note: direction is final; the link target (the SEC EDGAR filing page built from cik and accession, one link per filing not per item) is confirmed in the phase 4 design.
 - Reasoning: the text bodies are 4.5 GB of the 56 s uncached read of one name's events and nothing on the page displays them; a link keeps the page useful and the read narrow.
