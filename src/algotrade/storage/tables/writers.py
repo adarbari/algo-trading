@@ -96,6 +96,15 @@ class StoreWriter(ResultWriter):
         (``TableStore.run_layouts``): what ``screen-values-recluster`` finds its work by."""
         return self._backend.tables.run_layouts(table, session_date)
 
+    def run_visible_from(self, table: str, session_date: date) -> dict[str, datetime]:
+        """When each run of one partition became visible (``TableStore.run_visible_from``)."""
+        return self._backend.tables.run_visible_from(table, session_date)
+
+    def trim_superseded(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        """Forget the older versions of ``runs`` once their grace has passed and no pin needs them
+        (``TableStore.trim_superseded``); the files then go with ``sweep_orphans``."""
+        return self._backend.tables.trim_superseded(table, session_date, runs)
+
     def sweep_orphans(self, table: str, session_date: date) -> int:
         """Delete the files of one partition no run names (``TableStore.sweep_orphans``): what a
         compaction swap superseded, once its grace has passed."""

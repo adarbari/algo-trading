@@ -7,17 +7,26 @@ makes the old ones fast.
 
 One run is one atomic publish through the live path's ``ResultWriter.publishing`` (ADR 0022):
 the run's rows are read back as they are, written again under the same run id and the same
-``knowledge_ts`` (point in time: the rows were knowable when the run ended, never "now"; the
-commit is stamped with it, as ``screen-runs-backfill`` does), and both tables of a run commit
-together or neither does. Every row keeps its licence columns and its value; only the order and
-the row groups change, which the task checks by reading the run back.
+``knowledge_ts`` (point in time: the rows were knowable when the run ended, never "now"), and both
+tables of a run commit together or neither does. The commit is stamped with the run's own
+``visible_from`` (``TableStore.run_visible_from``), so it is visible from exactly when it was.
+Every row keeps its licence columns and its value; only the order and the row groups change, which
+the task checks **before** the commit: inside the publish the run's pending files are read back
+(``own_run``) and compared with the rows read; a difference aborts the publish and fails the run
+item, so a rewrite that changed a value never becomes visible.
 
 - Idempotent and resumable by the store itself: a run whose file's footer already shows the
   declared layout (``ResultWriter.run_layouts``) is skipped, so a run cut short, or one limited
   by ``--limit``, is finished by running it again; a second run with nothing left writes nothing.
 - Runs under the ingest run lock and the lowered priority every ingest command takes
   (``cli/main.py``), so it never overlaps the nightly; progress is saved to the run record after
-  each session. The superseded file of a run stays until the partition's orphans are swept.
+  each session.
+- The commit keeps the old file as the run's ``prev`` (a read in flight finishes on it). Once the
+  new file is ``SWAP_GRACE_S`` old the task forgets it (``TableStore.trim_superseded``: never while
+  a pin, ADR 0077, may read it) and sweeps the partition, so one file per run is left. A pass over
+  every session of the window does this at the end of the run (and each session's own leftovers of
+  an earlier run at its start); a run whose grace has not passed by then is trimmed by the next
+  run, which writes nothing else.
 - Owner-run, never in the nightly: ``algotrade-ingest run screen-values-recluster --from D1 --to
   D2 [--limit N]``.
 """
@@ -27,13 +36,14 @@ from datetime import date
 
 import pandas as pd
 
+from algotrade.data import StoreReader
 from algotrade.services.screening.rule_results import RULE_SCREEN, RULE_SCREEN_VALUES
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.interfaces import PartitionBusyError
 from algotrade.storage.tables.schemas import result_table
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 
 TASK = "screen_values_recluster"
-SHOWN = 20  # runs whose rows changed on the way, listed in the run's stats
 TABLES = (result_table(RULE_SCREEN), result_table(RULE_SCREEN_VALUES))
 
 
@@ -47,13 +57,16 @@ def _same_rows(before: pd.DataFrame, after: pd.DataFrame) -> bool:
     return bool(one.equals(two))
 
 
+class RewriteChangedRowsError(RuntimeError):
+    """The pending files of a run read back with other rows than the run held."""
+
+
 class _Pass:
     """One recluster run's state: what each run did, and what to report."""
 
     def __init__(self, run: IngestRun, limit: int | None) -> None:
         self.run, self.limit = run, limit
         self.counts: Counter[str] = Counter()
-        self.changed: list[str] = []
 
     def todo(self, day: date) -> dict[str, list[str]]:
         """The runs of ``day`` whose file is not laid out as declared, with their tables."""
@@ -77,18 +90,32 @@ class _Pass:
             held = {t: f for t, f in frames.items() if f is not None and not f.empty}
             if not held:  # superseded since the listing
                 return self._note(key, "NO_ROWS", "no_rows")
-            at = max(pd.Timestamp(f["knowledge_ts"].max()) for f in held.values())
-            with writer.publishing(run_id, at.to_pydatetime()):  # every table or none
+            seen = [writer.run_visible_from(t, day).get(run_id) for t in held]
+            at = max(v for v in seen if v is not None)  # the run's own, never "now"
+            own = StoreReader(writer.backend, own_run=run_id)
+            with writer.publishing(run_id, at):  # every table or none
                 for table, frame in held.items():
                     name = table.removeprefix("results/")
                     writer.write_result(name, day, run_id, frame, pending=True)
-            back = {t: reader.read_run(t, day, run_id) for t in held}
+                for table, frame in held.items():  # before the commit: a mismatch aborts it
+                    back = own.read_run(table, day, run_id)
+                    if back is None or not _same_rows(frame, back):
+                        raise RewriteChangedRowsError(f"{table}: rows differ after the rewrite")
         except Exception as exc:  # one run's failure never stops the others
             return run.fail(key, f"{type(exc).__name__}: {exc}", kind="FAILED")
-        if any(b is None or not _same_rows(held[t], b) for t, b in back.items()):
-            self.changed.append(key)
-            return self._note(key, "MISMATCH: rows differ after the rewrite", "mismatch")
         return self._note(key, "OK", "reclustered")
+
+    def tidy(self, day: date) -> None:
+        """Forget the old file each run of ``day`` keeps beside its clustered one (once its grace
+        has passed and no pin needs it) and sweep it: one file per run is left."""
+        writer = self.run.writer
+        for table in TABLES:
+            try:
+                runs = list(writer.run_layouts(table, day))
+                self.counts["trimmed"] += writer.trim_superseded(table, day, runs)
+                self.counts["swept_files"] += writer.sweep_orphans(table, day)
+            except PartitionBusyError:  # a pending run wrote there: the next run tidies
+                self.counts["tidy_deferred"] += 1
 
     def _note(self, key: str, status: str, count: str) -> None:
         self.run.record_item(key, status)
@@ -103,10 +130,7 @@ class _Pass:
             last=days[-1].isoformat() if days else None,
             sessions=len(days),
             limit=self.limit,
-            changed=self.changed[:SHOWN],
         )
-        if self.changed:
-            run.partial(f"{len(self.changed)} runs read back with different rows: check them")
         if counts["not_reached"]:
             run.partial(f"{counts['not_reached']} runs left by --limit: run it again to continue")
 
@@ -122,6 +146,7 @@ def recluster_screen_values(
     with IngestRun(ctx, TASK, days[-1] if days else (end or ctx.clock().date())) as run:
         work = _Pass(run, limit)
         for index, day in enumerate(days):
+            work.tidy(day)  # what an earlier run left
             for run_id, tables in work.todo(day).items():
                 work.rewrite(day, run_id, tables)
             run.stats["progress"] = {
@@ -131,5 +156,7 @@ def recluster_screen_values(
             }
             run.stats.update(work.counts)
             run.checkpoint()
+        for day in days:
+            work.tidy(day)  # this run's own, where the grace has passed
         work.finish(days, start, end)
     return run.record

@@ -3,6 +3,7 @@ under the same run ids and ``knowledge_ts``, the rows unchanged; a second run wr
 ``--limit`` run is finished by running it again, and a failure mid-run leaves every file of the
 run as it was (ADR 0022)."""
 
+import os
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,16 @@ class Store:
                 )
             for name in TABLES:
                 make_unclustered(self.root / "tables" / "results" / name / f"date={day}")
+
+    def files(self) -> int:
+        return len(list((self.root / "tables").rglob("run=*.parquet")))
+
+    def visible(self) -> dict[tuple[str, date], dict[str, datetime]]:
+        return {
+            (name, day): self.writer.run_visible_from(f"results/{name}", day)
+            for name in TABLES
+            for day in DAYS
+        }
 
     def layouts(self) -> dict[tuple[str, date, str], bool]:
         return {
@@ -152,3 +163,71 @@ def test_a_failed_publish_leaves_the_run_exactly_as_it_was(
     for name in TABLES:
         pd.testing.assert_frame_equal(after[(name, DAYS[0], "a1")], before[(name, DAYS[0], "a1")])
     assert store.recluster().stats["reclustered"] == 1  # the next run retries it
+
+
+def test_a_value_changed_on_the_way_is_never_published(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The mismatch is found before the commit: the publish aborts, the run is as it was."""
+    store = Store(tmp_path)
+    before, seen = store.frames(), store.visible()
+    real = store.writer.write_result
+
+    def altering(name: str, day: date, run: str, frame: pd.DataFrame, **kwargs: Any) -> None:
+        if name == "rule_screen_values" and run == "a1":
+            frame = frame.copy()
+            frame["value_num"] = frame["value_num"] + 1.0  # a value changed on the way
+        real(name, day, run, frame, **kwargs)
+
+    monkeypatch.setattr(store.writer, "write_result", altering)
+    record = store.recluster()
+    assert record.status is not RunStatus.COMPLETE and record.stats["reclustered"] == 2
+    assert not store.layouts()[("rule_screen_values", DAYS[0], "a1")]  # not rewritten
+    assert not store.layouts()[("rule_screen", DAYS[0], "a1")]  # nor its sibling table
+    after = store.frames()
+    for key, frame in before.items():
+        if key[2] == "a1":
+            pd.testing.assert_frame_equal(after[key], frame)  # exactly the old rows
+    assert store.visible() == seen and store.writer.backend.tables.pending_runs() == []
+
+
+def test_the_commit_keeps_the_run_visible_from_when_it_was(tmp_path: Path) -> None:
+    store = Store(tmp_path)
+    seen = store.visible()
+    assert store.recluster().status is RunStatus.COMPLETE
+    assert store.visible() == seen  # neither earlier nor later, whatever the rows' stamps
+
+
+def old_files(store: Store) -> None:
+    """Make every file old enough for the grace and the sweep (a minute and more later)."""
+    for path in (store.root / "tables").rglob("run=*.parquet"):
+        os.utime(path, (0, 0))
+
+
+def test_the_old_file_of_a_reclustered_run_is_trimmed_and_swept_after_the_grace(
+    tmp_path: Path,
+) -> None:
+    store = Store(tmp_path)
+    assert store.recluster().stats.get("trimmed", 0) == 0  # too young: its readers may be on it
+    assert store.files() == 2 * 6  # three runs x two tables, the old and the new file each
+    old_files(store)
+    again = store.recluster()
+    assert again.stats.get("reclustered", 0) == 0 and again.stats["trimmed"] == 6
+    assert store.files() == 6  # exactly one file per run and table
+    assert store.recluster().stats.get("trimmed", 0) == 0  # idempotent
+    assert all(store.layouts().values())
+    for frame in store.frames().values():
+        assert len(frame) > 0
+
+
+def test_a_version_a_pin_may_read_is_kept_until_the_pin_goes(tmp_path: Path) -> None:
+    store = Store(tmp_path)
+    tables = store.writer.backend.tables
+    tables.pin("release", tables.visible_seq())  # a serving release (ADR 0077) before the rewrite
+    store.recluster()
+    old_files(store)
+    store.recluster()
+    assert store.files() == 2 * 6  # the version the release reads stays
+    tables.unpin("release")
+    store.recluster()
+    assert store.files() == 6

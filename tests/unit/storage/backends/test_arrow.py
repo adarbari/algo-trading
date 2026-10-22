@@ -96,6 +96,19 @@ def test_an_instrument_read_opens_only_the_row_groups_that_can_hold_it(
     assert set(high["instrument_id"]) == {last} and len(high) == 3
 
 
+def test_an_instrument_straddling_two_row_groups_is_read_whole_from_both(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = LocalBackend(tmp_path / "data")
+    backend.tables.write(VALUES, DAY, "r1", values_frame())
+    straddler = f"EQ:{CLUSTER_ROWS // 3:05d}"  # its rows are 8,190 .. 8,192: the group edge
+    opened = read_counting(monkeypatch)
+    got = backend.tables.read_run(VALUES, DAY, "r1", instruments=[straddler])
+    assert opened == [[0, 1]]  # both groups' statistics can hold it
+    assert got is not None and set(got["instrument_id"]) == {straddler}
+    assert sorted(got["criterion_id"]) == ["c0", "c1", "c2"]  # none lost at the edge
+
+
 def sorted_rows(frame: pd.DataFrame | None) -> pd.DataFrame:
     assert frame is not None
     keys = ["instrument_id", "criterion_id"]
@@ -106,7 +119,13 @@ def test_sorted_and_old_files_read_the_same_rows_for_every_read(tmp_path: Path) 
     """Equivalence: a clustered store and the same store written before give identical rows for a
     whole read, an instrument read and a run read; a mixed store (one run each) reads whole."""
     new, old, mixed = (LocalBackend(tmp_path / n / "data") for n in ("new", "old", "mixed"))
-    wanted = ["EQ:00001", "EQ:02000", f"EQ:{INSTRUMENTS - 1:05d}", "EQ:99999"]
+    wanted = [
+        "EQ:00001",
+        "EQ:02000",
+        f"EQ:{CLUSTER_ROWS // 3:05d}",
+        f"EQ:{INSTRUMENTS - 1:05d}",
+        "EQ:99999",
+    ]
     for backend in (new, old, mixed):
         backend.tables.write(VALUES, DAY, "r1", values_frame("r1"))
         backend.tables.write(VALUES, DAY, "r2", values_frame("r2"))

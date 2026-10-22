@@ -311,6 +311,22 @@ class TableStore(Protocol):
         answer ``True``: there is nothing to cluster."""
         ...
 
+    def run_visible_from(self, table: str, session_date: date) -> dict[str, datetime]:
+        """Per run of one partition's index, when a read pinned at ``as_of`` starts to see it (its
+        commit time, never before its rows' ``knowledge_ts``): what a rewrite that keeps the rows
+        (``screen-values-recluster``) commits at again, so the run is visible exactly as before."""
+        ...
+
+    def trim_superseded(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        """Forget the older version each of ``runs`` keeps (``prev``: what a commit of the same run
+        id left, e.g. a recluster's old file) once the run's newest file is ``SWAP_GRACE_S`` old (a
+        read that resolved the older one has finished), unless a pin (ADR 0077 release) may read it
+        (``chain_needed``: kept). The older file is then named by no index and goes with
+        ``sweep_orphans``. An index swap, not a commit: no sequence moves, no row changes; a read
+        still on the forgotten version retries. Idempotent. ``PartitionBusyError`` when a pending
+        run wrote to the partition. -> versions forgotten."""
+        ...
+
     def sweep_orphans(self, table: str, session_date: date) -> int:
         """Delete the data files of one partition that no run of its index names (what a crash
         between rewriting the index and deleting a file leaves); a pending run's files are never

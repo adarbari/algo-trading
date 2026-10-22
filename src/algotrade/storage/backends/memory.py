@@ -47,6 +47,7 @@ from algotrade.storage.backends.run_selection import (
     select_instruments,
     select_runs,
     seq_at,
+    trimmed,
     visible_entries,
 )
 from algotrade.storage.locks import ThreadLock
@@ -382,6 +383,29 @@ class MemoryTables:
 
     def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
         return dict.fromkeys(self.partition_runs(table, session_date), True)  # no files
+
+    def run_visible_from(self, table: str, session_date: date) -> dict[str, datetime]:
+        with self._index_lock:
+            entries = self._partitions.get((table, session_date), {})
+            return {r: e.visible_from.to_pydatetime() for r, e in entries.items()}
+
+    def trim_superseded(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        key = (table, session_date)
+        with self._index_lock:
+            if any(key in writes for writes in self._pending.values()):
+                raise PartitionBusyError(f"{table} {session_date}")
+            entries, done = self._partitions.get(key, {}), 0
+            for run in dict.fromkeys(runs):  # no files, so no grace: a read on an old one retries
+                old = entries.get(run)
+                new = None if old is None else trimmed(old, self._pins.values())
+                if old is not None and new is not None:
+                    for version in list(chain(old))[1:]:
+                        if version.ref == old.ref:
+                            continue
+                        self._frames.pop((key, run, version.ref), None)
+                    entries[run] = new
+                    done += 1
+            return done
 
     def sweep_orphans(self, table: str, session_date: date) -> int:
         with self._index_lock:

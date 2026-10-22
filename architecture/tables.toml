@@ -587,13 +587,13 @@ note = "none produced yet (phase 6); rollups are computed only by the rollups ta
 name = "results/rule_screen"
 owner = "src/algotrade/storage/tables/result_writer.py"
 also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/screens/screen_values_recluster.py"]
-note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_results.py, written by services/screening/run.py; files sorted by instrument_id in 8,192-row row groups (TableSpec.cluster_by, storage.md), older ones until screen-values-recluster"
+note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_results.py, written by services/screening/run.py; files sorted by instrument_id in 8,192-row row groups (TableSpec.cluster_by, storage.md), older ones until screen-values-recluster (which then trims and sweeps the old file once its grace has passed)"
 
 [[table]]
 name = "results/rule_screen_values"
 owner = "src/algotrade/storage/tables/result_writer.py"
 also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/screens/screen_values_recluster.py"]
-note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row); files sorted by instrument_id in 8,192-row row groups (TableSpec.cluster_by, storage.md), older ones until screen-values-recluster; licence columns unchanged"
+note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row); files sorted by instrument_id in 8,192-row row groups (TableSpec.cluster_by, storage.md), older ones until screen-values-recluster (which then trims and sweeps the old file once its grace has passed); licence columns unchanged"
 
 [[table]]
 name = "results/screen_runs"

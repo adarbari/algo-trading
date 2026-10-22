@@ -46,7 +46,13 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.storage.backends.run_selection import RunEntry, chain, chain_needed, committed
+from algotrade.storage.backends.run_selection import (
+    RunEntry,
+    chain,
+    chain_needed,
+    committed,
+    trimmed,
+)
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.tables.interfaces import PartitionBusyError
 
@@ -534,6 +540,42 @@ class Commits:
                         os.utime(directory / name, (stamp, stamp))
                 write_index(directory, replacement)
             return True
+
+    def trim_runs(
+        self,
+        directory: Path,
+        runs: Iterable[str],
+        grace_s: float = SWAP_GRACE_S,
+        clock: Callable[[], float] = time.time,
+    ) -> int:
+        """Forget the older version a run of one partition keeps (``TableStore.trim_superseded``),
+        once its newest file is ``grace_s`` old (a read that resolved the older one has finished)
+        and no pin may read it; the older file is then unnamed and ``sweep`` deletes it. An index
+        swap like ``swap_runs``, not a commit: the sequence never moves. ``PartitionBusyError``
+        when a pending run wrote to the partition. -> versions forgotten."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            if directory in busy:
+                raise PartitionBusyError(str(directory))
+            with held(index_lock(directory)):
+                entries = read_index(directory)
+                pins = self._read_pins().values()
+                cutoff = clock() - grace_s
+                done = 0
+                for run in dict.fromkeys(runs):
+                    entry = entries.get(run)
+                    new = None if entry is None else trimmed(entry, pins)
+                    if new is not None and _older(directory / run_file(run, new), cutoff):
+                        entries[run] = new
+                        done += 1
+                if done:
+                    write_index(directory, entries)
+            return done
 
     def _forget(self, run_id: str) -> None:
         with self._guard:

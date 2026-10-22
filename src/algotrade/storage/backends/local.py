@@ -608,6 +608,15 @@ class LocalTables:
             for r, e in read_index(directory).items()
         }
 
+    def run_visible_from(self, table: str, session_date: date) -> dict[str, datetime]:
+        return {
+            r: e.visible_from.to_pydatetime()
+            for r, e in read_index(self._dir(table, session_date)).items()
+        }
+
+    def trim_superseded(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        return self.commits.trim_runs(self._dir(table, session_date), runs, self.swap_grace_s)
+
     def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
         return self.commits.remove_runs(self._dir(table, session_date), runs)
 
