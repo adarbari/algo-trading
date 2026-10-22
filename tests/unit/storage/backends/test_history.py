@@ -6,6 +6,7 @@ The reference is a read at an ``as_of`` after every run, which always takes the 
 and resolves to what ``as_of`` None does. The ``perf`` test is the budget of an Explore chart's
 read (one instrument, one year) from the copy (``make perf``)."""
 
+import shutil
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -191,6 +192,36 @@ def test_a_restated_partition_makes_its_year_fall_back(tmp_path: Path) -> None:
         got = backend.tables.read_range(TABLE, *args, instruments=["EQ:A"])
     assert taken == [2026]
     _same(got, _reference(backend, TABLE, *args, instruments=["EQ:A"]))
+
+
+def test_a_copied_store_with_new_inodes_and_mtimes_keeps_its_copy_fresh(tmp_path: Path) -> None:
+    # an APFS clone or any file copy changes every inode (and, without -p, every mtime): the
+    # signature is the index's content, so the copy still serves and is not "stale"
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    shutil.copytree(tmp_path / "data", tmp_path / "clone", copy_function=shutil.copyfile)
+    old = tmp_path / "data" / "tables" / TABLE / "date=2026-01-05" / "_runs.json"
+    new = tmp_path / "clone" / "tables" / TABLE / "date=2026-01-05" / "_runs.json"
+    assert old.stat().st_ino != new.stat().st_ino
+    assert old.stat().st_mtime_ns != new.stat().st_mtime_ns
+    cloned = LocalBackend(tmp_path / "clone")
+    assert cloned.tables.history_current(TABLE, date(2026, 1, 5))
+    args = (date(2025, 12, 1), date(2026, 3, 1))
+    with _copy_reads(cloned) as taken:
+        got = cloned.tables.read_range(TABLE, *args, instruments=["EQ:A"])
+    assert taken == [2025, 2026]
+    _same(got, _reference(cloned, TABLE, *args, instruments=["EQ:A"]))
+
+
+def test_a_partition_rewritten_in_a_cloned_store_is_still_detected(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    shutil.copytree(tmp_path / "data", tmp_path / "clone", copy_function=shutil.copyfile)
+    cloned = LocalBackend(tmp_path / "clone")
+    day = date(2026, 1, 5)
+    cloned.tables.write(TABLE, day, "r8", stamped(_rows(1, scale=7.0), day, "r8", LATER), True)
+    assert not cloned.tables.history_current(TABLE, day)
+    assert cloned.tables.history_current(TABLE, date(2025, 12, 22))
 
 
 def test_a_pending_write_changes_nothing_until_it_commits(tmp_path: Path) -> None:
@@ -397,3 +428,32 @@ def test_a_one_instrument_year_read_from_the_copy_is_within_budget(tmp_path: Pat
     assert from_copy < 0.05, (
         f"{from_copy * 1000:.0f} ms from the copy, {from_partitions:.2f} s from partitions"
     )
+
+
+def test_a_same_run_rewrite_with_the_same_knowledge_ts_is_detected(tmp_path: Path) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    day = date(2026, 1, 5)  # r1 only: rewrite it with other rows, same run, same knowledge_ts
+    frame = stamped(_rows(1, scale=55.0), day, "r1")
+    backend.tables.write(TABLE, day, "r1", frame)
+    assert not backend.tables.history_current(TABLE, day)
+    args = (date(2025, 12, 1), date(2026, 3, 1))
+    got = backend.tables.read_range(TABLE, *args, instruments=["EQ:A"])
+    _same(got, _reference(backend, TABLE, *args, instruments=["EQ:A"]))
+
+
+def test_the_index_digest_is_read_once_per_version_of_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    copy = LocalBackend(tmp_path / "data").tables.history  # a cold process
+    reads: list[Path] = []
+    real = Path.read_bytes
+    monkeypatch.setattr(Path, "read_bytes", lambda p: (reads.append(p), real(p))[1])
+    day = date(2026, 1, 5)
+    copy.current(TABLE, day)
+    first = len(reads)
+    copy.current(TABLE, day)
+    copy.current(TABLE, day)
+    assert first == 1 and len(reads) == 1

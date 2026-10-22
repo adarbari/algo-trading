@@ -16,13 +16,14 @@ from typing import Any
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.winners import load_winners
 from algotrade.config.site.settings import load_sources, load_users
+from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.features.site import site_features
 from algotrade.services.backtests.run import run_configured_backtest
-from algotrade.services.configs import resolve_config
+from algotrade.services.configs import resolve_config, resolve_screen_version
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     edge_universe,
@@ -97,9 +98,18 @@ def backtest_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any
     }
 
 
+def _screen_config(params: Mapping[str, Any], ctx: JobContext) -> ResolvedConfig:
+    """The screener a screen job runs: the version it was asked for (``version`` param, pinned
+    at enqueue), else the latest (the nightly's)."""
+    version = params.get("version")
+    if version is None:
+        return resolve_config(ctx.resources["configs"], params["config"], ctx.user)
+    return resolve_screen_version(ctx.resources["configs"], params["config"], ctx.user, version)
+
+
 def screen_identity(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     return {
-        "config_hash": _config_hash(params, ctx),
+        "config_hash": _screen_config(params, ctx).hash,
         "session": params["session"],
         "export_dir": params.get("export_dir"),
     }
@@ -115,8 +125,9 @@ def _screen_licences(ctx: JobContext) -> frozenset[str]:
 
 
 def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
-    """params: ``config`` (id), ``session`` (ISO date), optional ``export_dir``."""
-    config = resolve_config(ctx.resources["configs"], params["config"], ctx.user)
+    """params: ``config`` (id), ``session`` (ISO date), optional ``export_dir`` and ``version``
+    (the exact finalised version to run; it failing to exist fails the job)."""
+    config = _screen_config(params, ctx)
     outcome = run_screener(
         ctx.resources["reader"],
         ctx.resources["writer"],

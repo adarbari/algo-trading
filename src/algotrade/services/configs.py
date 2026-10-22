@@ -54,6 +54,25 @@ def resolve_config(
     return resolved.with_features(user_features_read(fs, resolved.selection, spec_fields))
 
 
+def latest_screen_version(store: ConfigStore, scope: str, name: str) -> int | None:
+    """The newest finalised version of ``scope``'s rule screen ``name`` (None: not versioned)."""
+    versions = store.versions(scope, name)
+    return versions[-1] if versions else None
+
+
+def resolve_screen_version(
+    store: ConfigStore, config_id: str, user: UserContext, version: int
+) -> ResolvedConfig:
+    """Exactly finalised ``version`` of ``user``'s rule screen ``config_id`` (versions are
+    immutable), resolved as the latest would be, so its hash is the one a request recorded.
+    A version that no longer exists is a ``ConfigurationError``, never the latest instead."""
+    document = store.version(user.user_id, config_id, version)
+    if document is None:
+        raise ConfigurationError(f"{config_id} v{version} no longer exists; run it again")
+    overlay = OverlayConfigStore(store, {(user.user_id, SCREENERS, config_id): document})
+    return resolve_config(overlay, config_id, user)
+
+
 def resolve_rule_draft(
     store: ConfigStore,
     name: str,

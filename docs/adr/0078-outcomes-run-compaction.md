@@ -43,7 +43,7 @@ ADR 0063 reuses a leg only when `partition_seq` and the recorded `knowledge_ts` 
 5. **The job** `algotrade-ingest run compact-runs --table T [--from D --to D] [--limit N] [--dry-run]`
    (`tasks/maintenance/compaction/`, beside `history_copy`; writes no run). Tables are listed in
    `config/site/nightly.toml [compaction] tables` (merge mode, no history copy: a fitness test; the
-   history copy signs the index by inode, mtime and size). One partition at a time, background QoS
+   history copy signs the index by its size and content digest). One partition at a time, background QoS
    (#734), `limit_threads`, one partition of scratch, refusing below `[resources] min_free_gb`;
    it stops between partitions when the `ingest` lock is held and resumes the next run. Before each
    swap it checks, at every `visible_from`, every `visible_from - 1 us` and `None`: same keys and row
