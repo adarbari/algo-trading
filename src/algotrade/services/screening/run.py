@@ -15,7 +15,7 @@ chains acceptance check tolerated (``data.chains.tolerated_stale``) are EXCLUDED
 (a not-processed row of one becomes ``Decision.EXCLUDED`` with the reason; out of the coverage
 denominator) instead of lowering coverage; the audit says how many and why."""
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 
@@ -261,8 +261,11 @@ def run_screener(
     *,
     sources: SourcesSettings | None = None,
     held: Collection[str],
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> ScreenOutcome:
-    """Select -> screen -> audit -> save, for one resolved screener config and user.
+    """Select -> screen -> audit -> save, for one resolved screener config and user. ``now`` is
+    when the run started (and its knowledge time); the record is finished at ``clock()`` after
+    the save, so ``finished_at - started_at`` is the run's real duration.
     ``held``: the user's data licences: the run is evaluated without the fields under any other,
     so no value of one is stored in the run's results (``services.licences``)."""
     now = now or datetime.now(UTC)
@@ -311,5 +314,5 @@ def run_screener(
         stamp = replace(stamp, regime=gate.regime, size_multiplier=gate.size_multiplier)
     _write(writer, config, run, rules, stamp)
     complete = run.coverage is RunCoverage.COMPLETE
-    writer.save_run(record.finish(now, complete=complete, stats=audit))
+    writer.save_run(record.finish(max(now, clock()), complete=complete, stats=audit))
     return ScreenOutcome(run_id, session_date, run, universe, audit, rules)

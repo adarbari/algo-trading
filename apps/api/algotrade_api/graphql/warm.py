@@ -2,7 +2,7 @@
 start and after every publish (polled every ``WARM_EVERY_S``), reads into the shared result
 cache what every caller shares: the market tables' whole history (``warm_market_frames``), so
 the regime page's charts slice a cached frame instead of reading 14 000 partitions on a
-request (20 s a table cold), and the status strip's one-session completeness grid and the
+request (20 s a table cold), and the
 session's regime that every page shows (3 to 5 s on the first page after a publish), the Ideas
 table and the edge desk (the home page), the Admin Ingestion page's 10-session grid, the
 session's run summaries (the stored screen rows, counted once) that every screener page and the
@@ -90,7 +90,6 @@ def home_steps(ctx: ReadContext) -> list[Step]:
             "run summaries",
             lambda: run_summaries(ctx),
         ),  # every screener page's and the preview's runs
-        ("completeness", lambda: load_completeness(ctx, 1)),  # the status strip's grid
         ("regime", lambda: load_regime(ctx)),
         ("ideas", lambda: load_ideas(ctx, IDEAS_LIMIT)),  # the Ideas page, home of every login
         ("edge desk", lambda: load_edge_desk(ctx)),

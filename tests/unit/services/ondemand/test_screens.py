@@ -1,12 +1,17 @@
 """A screener run on request: the latest session unless it has run, stored like the nightly's,
 without waiting for ingestion, for the right owner (ADR 0033)."""
 
+import threading
 import time
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 
 from algotrade.config.user import SITE_USER, UserContext
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.configs import resolve_screen_version
+from algotrade.services.jobs import handlers
 from algotrade.services.ondemand.screens import READY, OnDemandScreens, RunRequest
 from algotrade.services.ondemand.status import JobView, read_job
 from algotrade.services.read.context import NotFoundError
@@ -156,3 +161,50 @@ def test_a_partial_run_is_run_again_on_request(
     again = runner.request("big_liquid", SITE, SNAPSHOT)
     assert again.state != READY and again.job_id
     assert wait(runner, again).state == "partial"  # ran again: still no features that day
+
+
+def _versioned(version: int, price: int) -> dict[str, object]:
+    criteria = {"price": {**SCREEN["criteria"]["price"], "value": price}}  # type: ignore[index]
+    return {**SCREEN, "id": "mine", "version": version, "criteria": criteria}
+
+
+def test_a_job_enqueued_for_v2_still_runs_v2_after_v3_is_finalised(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The job queued behind a busy worker runs the version it was asked for, not the latest
+    when it starts."""
+    configs = site_configs(
+        {
+            ("alice", "screeners", "mine@1"): _versioned(1, 10),
+            ("alice", "screeners", "mine@2"): _versioned(2, 50),
+        }
+    )
+    ondemand = OnDemandScreens(seeded_backend(), configs)
+    busy, release = threading.Event(), threading.Event()
+    real = handlers.run_screener
+
+    def blocking(*args: Any, **kwargs: Any) -> Any:
+        busy.set()  # the first job holds the one worker until v3 exists
+        release.wait(10)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(handlers, "run_screener", blocking)
+    try:
+        first = ondemand.request("big_liquid", SITE, DAY)
+        assert busy.wait(10)
+        queued = ondemand.request("mine", UserContext("alice"), DAY)
+        configs._docs[("alice", "screeners", "mine@3")] = _versioned(3, 500)  # finalised later
+        release.set()
+        wait(ondemand, first)
+        assert wait(ondemand, queued).state in ("complete", "partial")
+        (record,) = ondemand._runs.runs_for("screen-mine-alice")
+        assert record.stats["config_version"] == 2
+    finally:
+        release.set()
+        ondemand.close()
+
+
+def test_a_version_that_no_longer_exists_is_an_error_not_the_latest() -> None:
+    configs = site_configs({("alice", "screeners", "mine@1"): _versioned(1, 10)})
+    with pytest.raises(ConfigurationError, match="v9 no longer exists"):
+        resolve_screen_version(configs, "mine", UserContext("alice"), 9)
