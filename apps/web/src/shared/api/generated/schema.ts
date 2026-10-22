@@ -211,23 +211,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/preferences/ideas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Save Ideas Priority */
-        put: operations["save_ideas_priority_preferences_ideas_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/preferences/views/{scope}/view": {
         parameters: {
             query?: never;
@@ -944,19 +927,6 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
-        };
-        /** IdeasPriority */
-        IdeasPriority: {
-            /** Priority */
-            priority: string[];
-        };
-        /** IdeasPriorityBody */
-        IdeasPriorityBody: {
-            /**
-             * Priority
-             * @description screener ids, highest priority first
-             */
-            priority: string[];
         };
         /** JobStatus */
         JobStatus: {
@@ -2248,42 +2218,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobStatus"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    save_ideas_priority_preferences_ideas_put: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description whose configs (default: the caller's; another user's: admins only) */
-                "X-Act-For"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IdeasPriorityBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdeasPriority"];
                 };
             };
             /** @description Validation Error */

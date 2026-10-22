@@ -1,7 +1,8 @@
 """The Ideas page's first load stays within its transfer budget (owner decision 2026-10-22,
-docs/decisions/log.md "Ideas page size": 50 picks, 300 KB): the web app's own ``IdeasPage``
-document and fact names over a store of 400 picks each with stored values, asked for the first
-page; the next page's cursor then continues it (the browser's whole sequence)."""
+docs/decisions/log.md "Ideas page size": 50 ideas, 300 KB): the web app's own ``IdeasPage``
+document and fact names over a store of 400 picks each with stored values (the Ideas rule's caps
+lifted so 400 are ideas), asked for the first page; the next page's cursor then continues it (the
+browser's whole sequence)."""
 
 import gzip
 import json
@@ -36,9 +37,10 @@ def _names() -> list[str]:
 def _client() -> TestClient:
     backend = screens_store()
     write_big_run(backend, PICKS, frozen=True, criteria=8)
-    store = store_over(backend, MemoryConfigStore(CONFIGS), UserContext("me"))
+    wide = {("site", "ranking", "ideas"): {"site_top": 500, "user_top": 500}}
+    store = store_over(backend, MemoryConfigStore({**CONFIGS, **wide}), UserContext("me"))
     return TestClient(
-        create_app(ApiSettings("memory://", "config"), store, authenticator=as_user())
+        create_app(ApiSettings("memory://", "config"), store, authenticator=as_user("me"))
     )
 
 
@@ -52,7 +54,7 @@ def _post(client: TestClient, after: str | None, first: int = 50) -> tuple[dict,
     return parsed["data"]["ideas"], len(raw), len(gzip.compress(raw))
 
 
-def test_the_first_load_of_fifty_picks_is_within_the_transfer_budget() -> None:
+def test_the_first_load_of_fifty_ideas_is_within_the_transfer_budget() -> None:
     client = _client()
     page, raw, zipped = _post(client, None)
     assert len(page["items"]) == 50 and page["total"] >= PICKS and page["hasMore"]
