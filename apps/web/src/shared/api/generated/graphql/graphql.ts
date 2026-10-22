@@ -448,7 +448,6 @@ export type InstrumentFactsQuery = { session: { date: string, isLatest: boolean,
 
 export type InstrumentEventsQueryVariables = Exact<{
   key: string;
-  start?: string | null | undefined;
 }>;
 
 
@@ -2886,10 +2885,10 @@ export const InstrumentFactsDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<InstrumentFactsQuery, InstrumentFactsQueryVariables>;
 export const InstrumentEventsDocument = new TypedDocumentString(`
-    query InstrumentEvents($key: String!, $start: Date) {
+    query InstrumentEvents($key: String!) {
   instrument(key: $key) {
     instrumentId
-    events(start: $start) {
+    events {
       table
       kind
       date

@@ -366,7 +366,7 @@
     "variables": {
      "key": "AAPL"
     },
-    "query": "\n  query InstrumentEvents($key: String!, $start: Date) {\n    instrument(key: $key) {\n      instrumentId\n      events(start: $start) {\n        table\n        kind\n        date\n        ts\n        values\n      }\n    }\n  }\n"
+    "query": "\n  query InstrumentEvents($key: String!) {\n    instrument(key: $key) {\n      instrumentId\n      events {\n        table\n        kind\n        date\n        ts\n        values\n      }\n    }\n  }\n"
    },
    {
     "kind": "graphql",

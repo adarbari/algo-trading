@@ -36,7 +36,13 @@ from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from algotrade_ingestion.workflows.nightly.steps import StepResult, StepStatus
 from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.ingest_fakes import task_ctx
-from tests.helpers.rollup_store import chain_rows, write_chains, write_dividends, write_split
+from tests.helpers.rollup_store import (
+    chain_rows,
+    write_chains,
+    write_dividends,
+    write_rows,
+    write_split,
+)
 from tests.helpers.stored_frames import holdings_rows, stamped, universe_rows
 
 END = date(2022, 11, 23)  # the last golden session
@@ -138,6 +144,20 @@ def _rollups(writer: StoreWriter) -> None:
 def _market(writer: StoreWriter) -> None:
     write_split(writer, "EQ:AAA", SPLIT_DAY, 2.0, SPLIT_DAY)
     write_dividends(writer, [("EQ:AAA", date(2022, 9, 1), 0.5, "CD")], END)
+    write_rows(  # a kind the events page does not show (``stored.NOT_TIMELINE``)
+        writer,
+        "events/short_volume",
+        END,
+        [
+            {
+                "instrument_id": "EQ:AAA",
+                "ts": pd.Timestamp(END, tz="UTC"),
+                "known_from": END,
+                "short_volume": 5,
+                "total_volume": 50,
+            }
+        ],
+    )
     expiries = {END + timedelta(days=30): 0.25, END + timedelta(days=60): 0.27}
     options = chain_rows("EQ:AAA", END, 100.0, expiries, 0.03)
     write_chains(writer, END, options, {"EQ:AAA": 100.0})

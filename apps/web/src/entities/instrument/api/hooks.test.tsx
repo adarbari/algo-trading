@@ -52,15 +52,6 @@ describe('instrument hooks', () => {
     expect(prices.result.current.data).toEqual([{ session: 'd' }]);
   });
 
-  it('asks the events from the window start the chart passes', async () => {
-    GQL.mockResolvedValue({ instrument: { instrumentId: 'EQ:A', events: [] } });
-    const events = renderHook(() => useInstrumentEvents('AAPL', '2025-10-03'), { wrapper });
-    await waitFor(() => {
-      expect(events.result.current.isSuccess).toBe(true);
-    });
-    expect(calls()).toEqual([['InstrumentEvents', { key: 'AAPL', start: '2025-10-03' }]]);
-  });
-
   /** An answer for the aliased slots `n0..` of a values request, as `f0..`. */
   const answerValues = (variables: unknown) => {
     const v = variables as Record<string, unknown>;

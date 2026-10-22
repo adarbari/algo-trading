@@ -12,7 +12,6 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS, DEFAULT_MONTHS
-from algotrade.services.read.events.stored import TIMELINE_KINDS
 from algotrade.services.read.instruments import identity
 from algotrade.services.read.instruments.prices import Adjustment
 from algotrade_api.graphql.limits import MAX_DAYS, MAX_MONTHS, MAX_NAMES, MAX_PAGE, MaxItems
@@ -71,7 +70,8 @@ class Instrument:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Stored events of `kinds` (default: the calendar kinds the page shows: "
         "earnings, dividends, splits, reference and index changes; a kind is a stored "
-        "`events/<kind>` table, e.g. insider_transaction) with "
+        "`events/<kind>` table, e.g. insider_transaction; "
+        "an unknown kind is a BAD_REQUEST error) with "
         "their event date in `start..end` (null: unbounded), oldest first, among the rows "
         "known on or before the session (`known_from`, else the session that stored the row; "
         "ADR 0050); splits, dividends, reference and index changes unbounded (facts of record "
@@ -85,7 +85,7 @@ class Instrument:
         end: dt.date | None = None,
         kinds: list[str] | None = None,
     ) -> list[Event]:
-        asked = TIMELINE_KINDS if kinds is None else tuple(sorted(set(kinds)))
+        asked = None if kinds is None else tuple(kinds)
         found = await self.ctx.loaders.events.load((self.instrument_id, start, end, asked))
         return [Event.of(e) for e in found]
 

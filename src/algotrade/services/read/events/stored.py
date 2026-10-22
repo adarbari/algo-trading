@@ -22,6 +22,7 @@ from functools import partial
 import pandas as pd
 
 from algotrade.config.site.settings import load_nightly
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.events import ALL_TIME, NO_INSTRUMENT_ROWS, knowledge_bound, read_events
 from algotrade.services.read.context import Held, ReadContext
@@ -134,6 +135,24 @@ def load_events(
     if grew:
         ctx.cache.put(key, held)  # its weight changed
     return out
+
+
+def load_timeline_events(
+    ctx: ReadContext,
+    instrument_ids: Sequence[str],
+    start: date | None,
+    end: date | None,
+    kinds: tuple[str, ...] | None = None,
+) -> dict[str, tuple[Event, ...]]:
+    """``load_events`` for a page: ``kinds`` None is ``TIMELINE_KINDS`` (the calendar kinds);
+    a kind that is neither on the timeline nor in ``NOT_TIMELINE`` is a ``ConfigurationError``
+    (a typo is loud; a declared kind with no stored table is simply empty)."""
+    unknown = sorted(set(kinds or ()) - set(TIMELINE_KINDS) - set(NOT_TIMELINE))
+    if unknown:
+        known = sorted({*TIMELINE_KINDS, *NOT_TIMELINE})
+        raise ConfigurationError(f"unknown event kind(s) {unknown}; the kinds are {known}")
+    asked = TIMELINE_KINDS if kinds is None else tuple(sorted(set(kinds)))
+    return load_events(ctx, instrument_ids, start, end, asked)
 
 
 def _read_events(

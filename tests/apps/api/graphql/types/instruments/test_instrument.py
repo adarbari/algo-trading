@@ -52,8 +52,10 @@ def test_events_default_to_the_calendar_kinds_and_a_caller_can_narrow_or_widen(
     assert [e["kind"] for e in default] == ["split", "dividend"]
     split = graph(KINDS, {"key": "AAA", "kinds": ["split"]})["data"]["instrument"]["events"]
     assert [e["kind"] for e in split] == ["split"]
-    other = graph(KINDS, {"key": "AAA", "kinds": ["short_volume"]})
-    assert "errors" not in other and other["data"]["instrument"]["events"] == []
+    other = graph(KINDS, {"key": "AAA", "kinds": ["short_volume"]})["data"]["instrument"]["events"]
+    assert [e["kind"] for e in other] == ["short_volume"]  # stored, but not on the page by default
+    nope = graph(KINDS, {"key": "AAA", "kinds": ["insider_trades"]})
+    assert nope["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
 
 
 def test_events_by_event_date_across_tables(graph: Graph) -> None:
