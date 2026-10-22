@@ -3,8 +3,9 @@ Waiting on data, judged on its official result (the canonical run) by one determ
 
 Split by kind: ``model`` (the status words and the records), ``criteria`` (each test of Promising
 and Works), ``level`` (a candidate's level and columns), ``basis`` (the basis choice, ADR 0065:
-fixed on the in-sample figures alone, before the frozen period is read) and ``rule`` (``judge``
-and ``load_edge_verdict``). The thresholds are site data (``config/site/verdict.toml``);
+fixed on the in-sample figures alone, before the frozen period is read), ``rule`` (``judge``,
+``judge_call`` and ``load_edge_verdict``) and ``fingerprint`` (the digest of everything the judge
+reads, for a stored headline). The thresholds are site data (``config/site/verdict.toml``);
 the statistics are the stored rows' (``quant/edges/statistics.py``), never recomputed; the
 sentences are the server's, the browser words nothing. Importers use this package's names."""
 
@@ -31,6 +32,9 @@ from algotrade.services.read.evaluation.verdict.criteria import (
 )
 from algotrade.services.read.evaluation.verdict.criteria import (
     PORTFOLIO_BASE as PORTFOLIO_BASE,
+)
+from algotrade.services.read.evaluation.verdict.fingerprint import (
+    JUDGE_VERSION as JUDGE_VERSION,
 )
 from algotrade.services.read.evaluation.verdict.model import (
     ALL as ALL,
@@ -114,6 +118,9 @@ from algotrade.services.read.evaluation.verdict.rule import (
     EdgeFacts as EdgeFacts,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
+    JudgeCall as JudgeCall,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
     counts_wins as counts_wins,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
@@ -124,6 +131,9 @@ from algotrade.services.read.evaluation.verdict.rule import (
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     judge as judge,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    judge_call as judge_call,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     load_edge_summary as load_edge_summary,

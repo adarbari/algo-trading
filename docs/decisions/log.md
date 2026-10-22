@@ -555,3 +555,12 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: release dates and vintage kinds are not the licensed content, and hiding them would make the regime cards say less about how fresh their inputs are, with no licence benefit.
+
+## 2026-10-22 | A stored edge verdict headline for the edges list (data architecture v2) | results/edge_verdict, fingerprint-checked, live fallback
+- Question: the edges list judges every site edge's verdict per request (about 1.4 to 1.7 s of the 4 list views); should the headline be stored?
+- Options: (A) keep judging live and speed up the judge; (B) a table `results/edge_verdict` holding the headline only, written in the edge-eval publish and by a re-judge task, read only when its fingerprint matches, else judged live; (C) store the full verdict.
+- Decision: (B). The table keys on edge, user, judged run and fingerprint (judge call, settings hash, judge source digest, `JUDGE_VERSION`); the haircut is excluded; own edges and copies are always judged live; a missing or mismatched row falls back to live, never to Waiting on data.
+- decided by: owner
+- status: final
+- Note: approved in chat 2026-10-22 (results/edge_verdict approved by the owner 2026-10-22 in chat); build plan in four PRs, PR 1 is the shared judge call and fingerprint with no behaviour change.
+- Reasoning: stale is never an option, slow is: a fingerprint over everything the judge reads makes a stale verdict impossible by construction, and the headline reads less than the full verdict, so the table stays a flat row.

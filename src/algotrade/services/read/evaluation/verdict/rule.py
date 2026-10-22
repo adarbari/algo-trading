@@ -2,8 +2,9 @@
 ``judge`` and the loader of an edge's verdict from its canonical run."""
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from datetime import date, timedelta
+from typing import Any
 
 from algotrade.config.edges.document import MODEL_KIND, PAIR_KIND
 from algotrade.config.edges.named import OUT_OF_WINDOW
@@ -395,6 +396,59 @@ def _inputs(ctx: Stores, run: runs.EdgeRun) -> tuple[tuple[EdgeRow, ...], Draws]
     )
 
 
+@dataclass(frozen=True)
+class JudgeCall:
+    """Every input of ``judge`` that is not the run's own rows, its draws or the settings: what
+    the reader, the stored-verdict writers and the fingerprint all build from the edge and its
+    run through ``judge_call``, so a new judge input cannot reach one and miss the others.
+    ``facts`` carries the two callables only for the full verdict (never in a fingerprint)."""
+
+    edge_id: str
+    split: date | None
+    lost_inputs: tuple[str, ...]
+    decoys: bool
+    declared: Declared
+    facts: EdgeFacts
+    range_to: date | None
+
+    def kwargs(self) -> dict[str, Any]:
+        """The call's fields as ``judge``'s keyword arguments (not ``dataclasses.asdict``: the
+        nested records stay records)."""
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
+
+def judge_call(
+    edge: Edge, run: runs.EdgeRun, headline: bool = False, ctx: Stores | None = None
+) -> JudgeCall:
+    """The ``judge`` inputs for ``edge`` judged on its canonical ``run``. ``headline``: the
+    haircut's two readers (the run's series, the site's trials) are left out; otherwise they read
+    through ``ctx`` when called (without a ``ctx`` they stay None, as a writer has none)."""
+    full = ctx is not None and not headline
+    return JudgeCall(
+        edge_id=edge.id,
+        split=run.split_from or edge.frozen_from,  # the split its year parts were cut at
+        lost_inputs=run.lost_inputs,
+        decoys=bool(edge.baselines),
+        declared=Declared(edge.promoted, edge.basis_horizon),
+        facts=EdgeFacts(
+            edge.published,
+            edge.schedule,
+            after=run.range_to,
+            measured=(lambda: runs.load_measured_sessions(ctx, run)) if full and ctx else None,
+            wins=counts_wins(edge),
+            chain=is_chain(edge),
+            portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
+            benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
+            neutral=is_factor_neutral(edge),
+            base=edge.base,
+            site_trials=(lambda: runs.load_site_trials(ctx))
+            if full and ctx and not edge.mine
+            else None,
+        ),
+        range_to=run.range_to,
+    )
+
+
 def load_edge_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> EdgeVerdict:
     """The verdict of ``edge`` from its canonical run's stored rows. Like ``canonicalRun`` it
     ignores ``after_session`` (ADR 0036: runs are read by run, not by session). ``headline``:
@@ -405,31 +459,8 @@ def load_edge_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> EdgeVe
     if run is None:
         return judge(edge.id, None, edge.frozen_from, settings)
     rows, draws = _inputs(ctx, run)  # memoised: a page asking `summary` and `verdict` reads once
-    return judge(
-        edge.id,
-        rows,
-        run.split_from or edge.frozen_from,  # the split its year parts were cut at
-        settings,
-        run.lost_inputs,
-        draws=draws,
-        decoys=bool(edge.baselines),
-        declared=Declared(edge.promoted, edge.basis_horizon),
-        facts=EdgeFacts(
-            edge.published,
-            edge.schedule,
-            after=run.range_to,
-            measured=None if headline else lambda: runs.load_measured_sessions(ctx, run),
-            wins=counts_wins(edge),
-            chain=is_chain(edge),
-            portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
-            benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
-            neutral=is_factor_neutral(edge),
-            base=edge.base,
-            site_trials=None if edge.mine or headline else lambda: runs.load_site_trials(ctx),
-        ),
-        range_to=run.range_to,
-        headline=headline,
-    )
+    call = judge_call(edge, run, headline, ctx)
+    return judge(rows=rows, draws=draws, t=settings, headline=headline, **call.kwargs())
 
 
 def load_edge_summary(ctx: Stores, edge: Edge) -> EdgeSummary:
