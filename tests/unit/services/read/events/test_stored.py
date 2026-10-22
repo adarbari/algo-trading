@@ -201,19 +201,20 @@ def test_fund_nav_partitions_are_never_opened_for_an_equity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ctx = context(store_with(_events, _with_fund_nav))
+    load_events(ctx, ["EQ:ETFX"], None, None)  # the id scan reads the table once, per publish
     reads = _spy_reads(monkeypatch)
-    equity = load_events(ctx, ["EQ:AAA", "EQ:ETFX"], None, None)
+    equity = load_events(ctx, ["EQ:ETFX", "EQ:QQQ"], None, None)
     assert "events/fund_nav" not in reads and "events/split" in reads
-    assert all(e.table != "events/fund_nav" for e in equity["EQ:AAA"])
     # equivalence: the same events as a store that has no NAV rows at all
     plain = context(store_with(_events, _with_fund_nav_reference))
-    assert equity == load_events(plain, ["EQ:AAA", "EQ:ETFX"], None, None)
+    assert equity == load_events(plain, ["EQ:ETFX", "EQ:QQQ"], None, None)
 
 
-def test_a_fund_still_gets_its_nav_events_and_an_unknown_kind_reads_everything() -> None:
+def test_nav_rows_are_returned_whatever_the_session_snapshot_types_the_id() -> None:
+    """Decided by what was written: AAA is a COMMON_STOCK in the snapshot but has NAV rows (a
+    name backfilled before it was typed a fund), so they show; an id with none is not opened."""
     ctx = context(store_with(_events, _with_fund_nav))
-    found = load_events(ctx, ["EQ:AAA", "EQ:CEFA", "EQ:CEFN", "EQ:ZZZ"], None, None)
-    assert [e.table for e in found["EQ:CEFA"]] == ["events/fund_nav"]
-    assert [e.table for e in found["EQ:CEFN"]] == ["events/fund_nav"]  # typed a stock, named a fund
-    assert [e.table for e in found["EQ:ZZZ"]] == ["events/fund_nav"]  # not in the reference: read
-    assert [e.table for e in found["EQ:AAA"]] == ["events/split", "events/dividend"]
+    found = load_events(ctx, ["EQ:AAA", "EQ:CEFA", "EQ:CEFN", "EQ:ZZZ", "EQ:ETFX"], None, None)
+    for iid in ("EQ:AAA", "EQ:CEFA", "EQ:CEFN", "EQ:ZZZ"):
+        assert "events/fund_nav" in [e.table for e in found[iid]]
+    assert "events/fund_nav" not in [e.table for e in found["EQ:ETFX"]]

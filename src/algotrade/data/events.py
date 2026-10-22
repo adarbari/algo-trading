@@ -50,18 +50,29 @@ FACTS_OF_RECORD = frozenset(
 # 4.3 GB read for 0 rows). ``events/ipo_lockup`` is not here: its later versions carry the id.
 # Fitness test: ``tests/architecture/ingestion/test_events_no_instrument_rows.py``.
 NO_INSTRUMENT_ROWS = frozenset({"events/filing_text"})
-# Tables whose writer stores rows for ONE kind of instrument (closed-end funds, ``reference.
-# is_closed_end``): 1.3 M rows over 5,737 day partitions for 280 funds, 2.1 s of an AAPL events
-# read for 0 rows. A per-instrument read leaves them out for an instrument the session's
-# reference snapshot knows is of another kind, and reads them for one it does not know.
-# Fitness test: ``tests/architecture/ingestion/test_events_single_kind_tables.py``.
-CLOSED_END_FUND_ROWS = frozenset({"events/fund_nav"})
+# Tables that hold rows for a few instruments only (``events/fund_nav``: closed-end funds):
+# 1.3 M rows over 5,737 day partitions for 280 funds, 2.1 s of an AAPL events read for 0 rows.
+# A per-instrument read opens them only for ids that have a stored row in the table
+# (``stored_instrument_ids``), never by how a session's reference snapshot types the instrument
+# (test: ``tests/unit/services/read/events/test_stored.py``).
+FEW_INSTRUMENT_ROWS = frozenset({"events/fund_nav"})
 
 
 @dataclass(frozen=True)
 class Events:
     frame: pd.DataFrame  # one row per event key, sorted by (instrument_id, ts)
     runs: list[str]  # the stored runs the rows came from (for reproducibility)
+
+
+def stored_instrument_ids(reader: StoreReader, table: str) -> frozenset[str]:
+    """The distinct instrument ids with any stored row in ``table`` (whatever its ``known_from``:
+    a superset of what a session sees), from the id column alone. Decided by what was WRITTEN,
+    not by how a session's reference snapshot types the instrument: a backfill stores past rows
+    for a name typed a fund only later (ADR 0007)."""
+    frame = reader.table_range(table, *ALL_TIME, columns=())
+    if frame is None or frame.empty:
+        return frozenset()
+    return frozenset(frame["instrument_id"].dropna().astype(str).unique())
 
 
 def event_key(frame: pd.DataFrame) -> list[str]:

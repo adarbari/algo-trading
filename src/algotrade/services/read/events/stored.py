@@ -23,12 +23,12 @@ import pandas as pd
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.events import (
     ALL_TIME,
-    CLOSED_END_FUND_ROWS,
+    FEW_INSTRUMENT_ROWS,
     NO_INSTRUMENT_ROWS,
     knowledge_bound,
     read_events,
+    stored_instrument_ids,
 )
-from algotrade.data.reference import instruments, is_closed_end
 from algotrade.services.read.context import Held, ReadContext
 from algotrade.services.read.session import Grain, grain_of
 from algotrade.services.read.values import stored_values
@@ -59,20 +59,14 @@ def event_tables(ctx: ReadContext) -> tuple[str, ...]:
     return tuple(tables)
 
 
-def _not_funds(ctx: ReadContext, instrument_ids: Sequence[str]) -> frozenset[str]:
-    """The ids the session's reference snapshot HAS and says are not closed-end funds
-    (``reference.is_closed_end``); an id it lacks, a reference taken after the session
-    (``pre_snapshot``) or one without the columns is unknown, so never in the set."""
-    ref = ctx.session.reference_snapshot
-    if ref is None or ref > ctx.session.date or not instrument_ids:
-        return frozenset()
-    frame = instruments(ctx.reader, ctx.session.date, list(instrument_ids))
-    if frame.empty or not {"instrument_id", "security_type", "name", "symbol"} <= set(frame):
-        return frozenset()
-    flags = is_closed_end(frame)
-    return frozenset(frame.loc[~flags, "instrument_id"].astype(str)) - frozenset(
-        frame.loc[flags, "instrument_id"].astype(str)
-    )
+def _ids_in(ctx: ReadContext, table: str) -> frozenset[str]:
+    """``data.events.stored_instrument_ids`` of ``table``, read once per publish."""
+    key = ("event-table-ids", table, ctx.reader.version())  # read before computing (ADR 0022)
+    found = ctx.cache.get(key)
+    if found is None:
+        found = stored_instrument_ids(ctx.reader, table)
+        ctx.cache.put(key, found)
+    return found
 
 
 def load_events(
@@ -112,14 +106,10 @@ def _read_events(
 ) -> dict[str, tuple[Event, ...]]:
     """The uncached read of ``load_events``: one read per table for ``instrument_ids``."""
     found: dict[str, list[Event]] = {iid: [] for iid in instrument_ids}
-    skip = _not_funds(ctx, instrument_ids)
     for table in event_tables(ctx):
-        # a table of one instrument kind is never opened for instruments of another
-        wanted = (
-            [i for i in instrument_ids if i not in skip]
-            if table in CLOSED_END_FUND_ROWS
-            else list(instrument_ids)
-        )
+        # a table of one instrument kind is never opened for an id it holds no row of
+        stored = _ids_in(ctx, table) if table in FEW_INSTRUMENT_ROWS else None
+        wanted = [i for i in instrument_ids if stored is None or i in stored]
         if not wanted:
             continue
         through = knowledge_bound(table, ctx.session.date)
