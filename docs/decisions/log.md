@@ -520,3 +520,12 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: no storage change, no point-in-time change; it removes the cost instead of storing it faster. Analysis: events-design-deep-dive.md (shared notes).
+
+## 2026-10-22 | Ideas list: prestored per session in a SQLite table, top picks per screener, user screeners weighted (data architecture v2) | Direction decided; design to be reviewed before building
+- Question: the Ideas page ranks and merges every screener's picks per request (1.0 MB, about 1 s cold); what should it read?
+- Options: the server picks one best pick per ticker (Idea.best); the server merges metrics; a prestored list.
+- Decision: keep it simple: a prestored Ideas list in a SQLite table, built from all screeners: the top 5 picks of each site screener and, for the user's own screeners, 3x the importance and the top 20 picks instead of 5. The page reads the stored list (paged, first 50 plus "Show more") instead of recomputing from run rows.
+- decided by: owner
+- status: final
+- Note: direction is final. Open points the architect's design must settle before building: the exact meaning of "3x importance" in the ranking, how a ticker picked by several screeners is merged (best pick and metrics), per-user lists and privacy, the write path and atomic consistency with the Parquet publish (ADR 0022, 0033, 0077 pins), who rebuilds it after an on-request run, point in time (one session per read), and the ADR 0006 amendment for SQLite as a derived, rebuildable store beside the Parquet screen_picks.
+- Reasoning: the owner prefers a small precomputed list over per-request ranking and merging; it also removes the 1.0 MB page and the best-pick question. This supersedes the earlier open questions about Idea.best and ideas.priority.
