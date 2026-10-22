@@ -13,6 +13,7 @@ from algotrade.services.read.context import ResultCache
 from algotrade.services.read.evaluation import runs as runs_module
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
+    Draw,
     _committed,
     _row,
     draws_of_record,
@@ -407,13 +408,54 @@ def _decoded_after_filtering(ctx: Any, record: Any) -> list[Any]:
     return [runs_module._row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records")]
 
 
+def _as_draws(rows: Any) -> tuple[Draw, ...]:
+    return tuple(Draw(r.edge_variant, r.variant, r.horizon_sessions, r.lift) for r in rows)
+
+
+def test_draws_built_from_columns_equal_the_decoded_rows_with_nulls_and_a_restated_run(
+    backend: MemoryBackend,
+) -> None:
+    nan, none = float("nan"), None
+    lifts = [1.0, nan, 1.3, none, 0.7, 2.0]
+    draws = [
+        row(
+            f"random:{'momo' if i % 2 else 'other'}",
+            "draw",
+            0.4,
+            FROZEN,
+            role="random",
+            slice_value=str(i),
+            lift=x,
+            horizon_sessions=1 + i % 3,
+        )
+        for i, x in enumerate(lifts)
+    ]
+    write_run(backend, "first", FROZEN, 0.66, minutes=10, extra=draws)
+    write_run(
+        backend, "canon", FROZEN, 0.66, minutes=20, extra=[{**d, "lift": 9.0} for d in draws[:4]]
+    )  # restated
+    ctx = stores(backend)
+    for run_id in ("first", "canon"):
+        record = ctx.reader.run(run_id)
+        assert record is not None
+        old = _decoded_after_filtering(ctx, record)
+        got = draws_of_record(ctx, record)
+        assert got == _as_draws(r for r in old if r.role == "random")
+        assert all(d.lift is None or isinstance(d.lift, float) for d in got)
+        assert [d.lift for d in got if d.lift is not None] == [
+            r.lift for r in old if r.role == "random" and r.lift is not None
+        ]
+    wanted = [d.lift for d in draws_of_record(ctx, ctx.reader.run("first"))]
+    assert wanted.count(None) == 2  # NaN and None both read as no lift
+
+
 def test_filtering_the_frame_before_decoding_serves_the_same_rows_as_after(
     backend: MemoryBackend,
 ) -> None:
     ctx, record = _mixed_run(backend)
     everything = _decoded_after_filtering(ctx, record)
     assert rows_of_record(ctx, record) == tuple(r for r in everything if r.role != "random")
-    assert draws_of_record(ctx, record) == tuple(r for r in everything if r.role == "random")
+    assert draws_of_record(ctx, record) == _as_draws(r for r in everything if r.role == "random")
     assert len(draws_of_record(ctx, record)) == 5
     frozen = rows_of_record(ctx, record, ("frozen",))
     assert frozen == tuple(r for r in everything if r.role != "random" and r.slice_kind == "frozen")
@@ -440,7 +482,7 @@ def test_random_rows_are_never_converted_to_edge_rows_for_the_screener_rows(
     assert seen and len(seen) < total - 5
     seen.clear()
     draws_of_record(ctx, record)
-    assert seen == ["random"] * 5
+    assert seen == []  # draws are cut from the columns: no EdgeRow is built for one
 
 
 # the run records behind an edge page are decoded once per run-record generation
