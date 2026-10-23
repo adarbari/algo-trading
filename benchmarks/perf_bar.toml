@@ -9,30 +9,19 @@ shell_total_limit_s = 1.0
 # the shell operations (a GuideEntries variant counts once, its slowest)
 shell_operations = ["Viewer", "SessionDate", "Regime", "StatusStrip", "EdgeDesk", "GuideEntries"]
 
-# Accepted exceptions: a view whose critical-path operation is named here may exceed the limit
-# until its named fix, then the owner withdraws the exception. Every entry needs a reason + date.
-[[exception]]
-operation = "ScreenerResults"
-reason = "accepted over-1-s until its named fix (data architecture v2: results/screen_runs and screen_picks); re-measured after it"
-date = "2026-10-22"
-
-[[exception]]
-operation = "RegimeSignals"
-reason = "accepted over-1-s until the memo and dates index (trigger T2); the owner withdraws it when cold time is under 1 s"
-date = "2026-10-22"
-
-[[exception]]
-operation = "MarketHistory"
-reason = "accepted over-1-s until the memo and dates index (trigger T2); the owner withdraws it when cold time is under 1 s"
-date = "2026-10-22"
-
-[[exception]]
-operation = "HarnessRuns"
-reason = "admin page: accepted over-1-s until its named fix; re-measured after it"
-date = "2026-10-22"
-
-[[exception]]
-operation = "InstrumentFacts"
-reason = "accepted over-1-s until its named fix; re-measured after it"
-date = "2026-10-22"
-# InstrumentEvents: the 2 s exception is withdrawn after the option F re-measure (no entry).
+# Accepted exceptions: NONE. Round 8 (2026-10-22, quiet machine) had one view over the bar, /regime
+# (RegimeSignals 12.6 s, MarketHistory 7.6 s), from the clone snapshot's 257k small rollup files,
+# fixed by data steps (compaction of rollups/market), not by an exception. The entries held until
+# round 5-7 (ScreenerResults, HarnessRuns, InstrumentFacts, MarketHistory, RegimeSignals) were
+# withdrawn: every other view passed in round 8.
+#
+# A view whose critical-path operation is named here may exceed the limit until `expiry`. Every
+# entry needs the owner's approval (a docs/decisions/log.md link in `approval`), a reason, the date
+# granted and an expiry; an agent never adds or renews one (docs/perf/page-latency-bar.md):
+#
+# [[exception]]
+# operation = "OperationName"
+# reason = "the named fix, and why it is not done"
+# approval = "owner, docs/decisions/log.md 2026-MM-DD"
+# date = "2026-10-22"
+# expiry = "2026-11-22"

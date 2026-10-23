@@ -3,7 +3,8 @@
 The bar (benchmarks/perf_bar.toml, owner decisions 2026-10-22): a VIEW is judged on its CRITICAL
 PATH (its slowest request, the empty-cache first request) under 1 s, and the SHELL requests every
 screen asks for (Viewer, SessionDate, Regime, StatusStrip, EdgeDesk, GuideEntries) together under
-1 s. A view whose critical-path operation is a named exception (with reason and date) may exceed it.
+1 s. A view whose critical-path operation is a named exception (reason, approval, date and a live
+expiry) may exceed it.
 Exits 1 when a non-exempt view or the shell is over; 2 when refused.
 
 Method: ONE API process on a CLONE of the store (`--data-url` is required; the real store is
@@ -37,7 +38,7 @@ import sys
 import tempfile
 import time
 import tomllib
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -99,9 +100,14 @@ def load_bar(path: Path = BAR_FILE) -> dict:
     return tomllib.loads(path.read_text())
 
 
-def exceptions_by_op(bar: dict) -> dict[str, dict]:
-    """The accepted exceptions by operation name."""
-    return {e["operation"]: e for e in bar.get("exception", [])}
+def exceptions_by_op(bar: dict, today: date | None = None) -> dict[str, dict]:
+    """The accepted exceptions by operation name; one past its ``expiry`` no longer counts."""
+    today = today or datetime.now(UTC).date()
+    return {
+        e["operation"]: e
+        for e in bar.get("exception", [])
+        if date.fromisoformat(e["expiry"]) >= today
+    }
 
 
 def shell_total(op_avg_s: dict[str, list[float]], shell_ops: list[str]) -> float:

@@ -4,7 +4,7 @@ judges critical paths, exceptions and the shell, and the tool refuses the real s
 import importlib.util
 import json
 import sys
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -23,7 +23,10 @@ BAR = {
     "critical_path_limit_s": 1.0,
     "shell_total_limit_s": 1.0,
     "shell_operations": ["Viewer", "GuideEntries"],
-    "exception": [{"operation": "Slow", "reason": "r", "date": "2026-10-22"}],
+    "exception": [
+        {"operation": "Slow", "reason": "r", "date": "2026-10-22", "expiry": "2999-01-01"},
+        {"operation": "Old", "reason": "r", "date": "2019-10-22", "expiry": "2020-01-01"},
+    ],
 }
 
 
@@ -38,12 +41,22 @@ def test_bar_file_is_valid_and_every_exception_has_reason_and_date() -> None:
     assert {"Viewer", "SessionDate", "Regime", "StatusStrip", "EdgeDesk", "GuideEntries"} == set(
         bar["shell_operations"]
     )
-    names = [e["operation"] for e in bar["exception"]]
+    exceptions = bar.get("exception", [])
+    names = [e["operation"] for e in exceptions]
     assert len(names) == len(set(names))
     assert "InstrumentEvents" not in names  # withdrawn after the option F re-measure
-    for e in bar["exception"]:
-        assert e["operation"] and e["reason"].strip()
-        date.fromisoformat(e["date"])
+    today = datetime.now(UTC).date()
+    for e in exceptions:
+        assert e["operation"] and e["reason"].strip() and e["approval"].strip()
+        assert date.fromisoformat(e["date"]) <= date.fromisoformat(e["expiry"])
+        assert date.fromisoformat(e["expiry"]) >= today, f"{e['operation']}: expired, remove it"
+
+
+def test_an_expired_exception_no_longer_excuses_a_view() -> None:
+    assert set(fb.exceptions_by_op(BAR, date(2019, 12, 31))) == {"Slow", "Old"}
+    assert set(fb.exceptions_by_op(BAR)) == {"Slow"}
+    res = fb.evaluate({"/a": _view(1.5, "Old")}, 0.2, BAR)
+    assert res["rows"][0]["verdict"] == "OVER" and res["failures"]
 
 
 def test_history_lines_parse_and_carry_the_required_keys() -> None:
