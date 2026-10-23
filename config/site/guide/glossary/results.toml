@@ -196,7 +196,7 @@ short = "How many names the screener picked in the latest session, with how many
 body = """
 The number counts the names the screener kept after its criteria and its ranking. The green +N is the names that are new since the previous run, the red −N the names that dropped out. A muted line says how many were paused because the market regime stopped the screener that session. For example, 12 with +3 −2 means three new names, two gone and ten kept. A dash means no run is stored for the session. Don't read a long list as a better screener: a loose screen picks many names, and the track record says whether the picks did well.
 """
-next = "Open the pick count to see each pick and the criterion behind its decision."
+next = "Click the pick count, or View, to open the screener and see each pick and the criterion behind its decision."
 see_also = ["paused", "idea_decision", "screener_track_record"]
 
 [[term]]
@@ -214,19 +214,29 @@ id = "screener_column"
 term = "Screener name and last run"
 short = "The screener's name, whether it is a site preset or yours, and the session of its latest run."
 body = """
-A Preset is a screener the site ships; Mine is one you built. Draft means you have not finalized it, so it has not run. Does not resolve means its config no longer loads. The muted line is the session of the latest run, not the day it started. No run today means the screener has no run for the session the page shows, so its picks are not the latest. Paused means the market regime stopped it that session and it picked nothing on purpose.
+A Preset is a screener the site ships; Mine is one you built. Draft means you have not finalized it, so it has not run. Does not resolve means its config no longer loads. The muted line is the session of the latest run, not the day it started. No run today means the screener has no run for the session the page shows, so its picks are not the latest. Paused means the market regime stopped it that session and it picked nothing on purpose. Built in code means the screener is written in code, not as criteria: you can view it, not edit or copy it.
 """
 next = "Check the run date before you act on a screener's picks."
 see_also = ["screener_picks", "paused", "not_run"]
 
 [[term]]
+id = "screener_actions"
+term = "Screener actions"
+short = "What you can do with a screener from the list: View it, edit it, duplicate it or delete it."
+body = """
+View opens the screener page with its picks and criteria; every screener has it, a preset and a screener built in code too. On one of yours, Edit opens its criteria in the Builder and Delete removes it after asking. Duplicate makes a copy you can change; on a preset it is Duplicate to edit, because a site preset is never changed in place. A screener built in code can be viewed but not copied or edited, since its rules are not criteria. On a narrow screen the actions turn into icons with the same names.
+"""
+next = "Use View to read a screener before you copy it."
+see_also = ["screener_column", "screener_picks"]
+
+[[term]]
 id = "screener_track_record"
 term = "Evidence and edges"
-short = "How the picks of the strongest edge this screener implements did in the past: win rate against the base rate, lift, trades and holding period."
+short = "The edges this screener implements, strongest first, and how that edge's picks did in the past."
 body = """
-A screener has a record only when it implements an edge. The headline is the strongest edge it is in: an evidenced edge beats a candidate, and ties go to the one with more trades. The figures are that edge's frozen-period record: the out-of-sample test whose date was fixed before it was read, never an exploratory run. The win rate is the share of picks whose outcome came true, the base rate the same share for every eligible name, and the lift the gap in points. The trades are the independent test dates behind the numbers, and the holding period is how many sessions each outcome was given. For example, 62% against a 55% base rate on 40 trades with a 20-session hold means the picks beat the field by 7 points. Click the headline to see every edge the screener is in, each with its own record and the date its test was frozen. No record yet means the edge has no frozen run, or fewer than 20 trades since the freeze, and the line under it says which. It does not mean the screener is bad. Not part of an edge means no edge uses this screener. Don't read a record as profit: it counts outcomes, not amounts.
+A screener has evidence only when it implements an edge, and one screener can be part of several. The line leads with the headline edge. An evidenced edge beats a candidate, and a candidate beats the rest. Ties go to the edge with more trades, then to its id. Only an edge with a readable record can be the headline. Click the edge name to list every edge the screener is in, each with its own record or its reason for having none. Under the name, a record shows the win rate against the base rate, the lift in points, the trades behind it, the holding period and the date the test was frozen. The test is the out-of-sample period whose date was fixed before it was read, never an exploratory run. For example, 62% against 55% on 40 trades with a 20-session hold, frozen since 1 May, means the picks beat the field by 7 points since then. Most screeners show no record yet, and that is normal. Either the edge has no frozen run, or fewer than 20 independent trades have passed since the freeze, and the line says which. It does not mean the screener is bad. Not part of an edge means no edge uses it. Don't read a record as profit: it counts outcomes, not amounts.
 """
-next = "Click the headline, then Open edge to see the curve, the sample size and the verdict."
+next = "Click the edge name, then Open edge to see the curve, the sample size and the verdict."
 see_also = ["win_rate", "base_rate", "lift", "trades", "out_of_sample", "record_how_to_read"]
 
 [[term]]

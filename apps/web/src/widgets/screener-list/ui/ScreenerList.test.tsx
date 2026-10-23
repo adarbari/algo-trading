@@ -179,6 +179,11 @@ const setup = () => {
   return { onOpen, onEdit, onOpenEdge, ...view };
 };
 
+const rowOf = (text: string) =>
+  within(screen.getByRole('table', { name: 'Screeners' }))
+    .getAllByRole('row')
+    .find((r) => r.textContent.includes(text)) as HTMLElement;
+
 describe('ScreenerList', () => {
   it('lists mine and presets with kind pills, last run, evidence and picks', async () => {
     const { container } = setup();
@@ -233,7 +238,7 @@ describe('ScreenerList', () => {
   it('narrows by segment and by search', async () => {
     setup();
     await userEvent.click(screen.getByRole('radio', { name: 'Presets' }));
-    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
     await userEvent.click(screen.getByRole('radio', { name: 'All' }));
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'vrp');
     expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
@@ -241,41 +246,47 @@ describe('ScreenerList', () => {
     expect(screen.getByText('No screener matches')).toBeInTheDocument();
   });
 
-  it('links the picks to the screener and the pencil edits one of yours', async () => {
-    const { onOpen, onEdit } = setup();
+  it('links the picks to the screener, with a chevron, and View opens it for any screener', async () => {
+    const { onOpen } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'Open Name of my-vrp: 3 picks' }));
     expect(onOpen).toHaveBeenCalledWith('my-vrp');
-    await userEvent.click(screen.getByRole('button', { name: 'Edit Name of my-vrp' }));
-    expect(onEdit).toHaveBeenCalledWith('my-vrp');
+    // Presets, a Python preset and a screener with no run can all be viewed.
+    for (const id of ['vrp_scanner', 'short_premium', 'idea']) {
+      await userEvent.click(within(rowOf(id)).getByRole('button', { name: 'View' }));
+      expect(onOpen).toHaveBeenLastCalledWith(id);
+    }
   });
 
-  it('duplicates one of yours and opens the copy to edit', async () => {
+  it('offers Edit, Duplicate and Delete on one of yours, labelled', async () => {
     const { onEdit } = setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Duplicate Name of my-vrp' }));
+    const mine = within(rowOf('Name of my-vrp'));
+    await userEvent.click(mine.getByRole('button', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith('my-vrp');
+    await userEvent.click(mine.getByRole('button', { name: 'Duplicate' }));
     await userEvent.click(screen.getByRole('button', { name: 'finish duplicate of my-vrp' }));
     expect(onEdit).toHaveBeenCalledWith('copy-of-my-vrp');
-  });
-
-  it('asks before deleting one of yours', async () => {
-    setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete Name of my-vrp' }));
+    await userEvent.click(mine.getByRole('button', { name: 'Delete' }));
     await userEvent.click(screen.getByRole('button', { name: 'confirm delete of my-vrp' }));
     expect(screen.queryByRole('button', { name: /confirm delete/ })).toBeNull();
   });
 
-  it('copies a preset first, with the pencil, and never offers Delete on one', async () => {
+  it('offers Duplicate to edit on a preset, never Edit or Delete', async () => {
     const { onEdit } = setup();
-    expect(screen.queryByRole('button', { name: /^Delete .*vrp_scanner/ })).toBeNull();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Duplicate Name of vrp_scanner to edit' }),
-    );
+    const preset = within(rowOf('Name of vrp_scanner'));
+    expect(preset.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(preset.queryByRole('button', { name: 'Delete' })).toBeNull();
+    await userEvent.click(preset.getByRole('button', { name: 'Duplicate to edit' }));
     await userEvent.click(screen.getByRole('button', { name: 'finish copy of vrp_scanner' }));
     expect(onEdit).toHaveBeenCalledWith('copy-of-vrp_scanner');
   });
 
-  it('gives a Python preset no pencil', () => {
+  it('gives a Python preset View and its evidence, with nothing to copy or edit', () => {
     setup();
-    expect(screen.queryByRole('button', { name: /short_premium to edit/ })).toBeNull();
+    const python = within(rowOf('short_premium'));
+    expect(python.getByRole('button', { name: 'View' })).toBeInTheDocument();
+    expect(python.getByRole('button', { name: 'Win of short_premium' })).toBeInTheDocument();
+    expect(python.getByText('Built in code')).toBeInTheDocument();
+    expect(python.queryByRole('button', { name: /Duplicate|Edit|Delete/ })).toBeNull();
   });
 
   it('says when the list failed to load', () => {

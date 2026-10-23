@@ -1,23 +1,24 @@
 /**
  * The screeners as one list: your own (finalized and draft-only) and the site presets, narrowed
  * by a segment (All / Mine / Presets) and a search. A row is not expandable as a whole: it shows
- * the screener (kind, last run), its evidence (the strongest edge's record, opening in place to
- * one block per edge, one row at a time), today's picks (a link to the screener) and an edit
- * button (a preset is copied first). Python screeners are listed but built in code. Deleting asks first.
+ * the screener (kind, last run), its evidence (the strongest edge's name first, opening in place
+ * whenever it has edges to one block per edge, one row at a time), today's picks (a link to the
+ * screener) and labelled actions: View for every screener, Edit and Delete for yours, Duplicate
+ * (a preset's "Duplicate to edit"). Python screeners are listed, viewable, but built in code.
+ * Deleting asks first.
  */
 import {
   Banner,
-  Button,
   EmptyState,
+  ActionGroup,
   ExpandableTable,
-  IconButton,
+  LinkButton,
   Panel,
   SearchInput,
   SegmentedControl,
   Stack,
   StatusBadge,
   Text,
-  VisuallyHidden,
   type ExpandableTableColumn,
   type ExpandableTableRow,
 } from '@algotrade/ui';
@@ -65,7 +66,7 @@ const COLUMNS: readonly ExpandableTableColumn[] = [
     narrow: true,
   },
   { id: 'picks', label: withHelp('Picks today', 'screener_picks'), grow: 1.1, narrow: true },
-  { id: 'actions', label: <VisuallyHidden>Actions</VisuallyHidden>, grow: 0.9, narrow: true },
+  { id: 'actions', label: withHelp('Actions', 'screener_actions'), grow: 2.2, narrow: true },
 ];
 
 export function ScreenerList({ onOpen, onEdit, onOpenEdge }: ScreenerListProps) {
@@ -229,27 +230,26 @@ function toTableRow(
           ) : run ? (
             <Text size="xs" tone="muted">{`Last run ${run.session}`}</Text>
           ) : null}
+          {!row.rules && (
+            <Text size="xs" tone="muted">
+              Built in code
+            </Text>
+          )}
         </>
       ),
-      evidence: row.rules ? (
+      evidence: (
         <ScreenerEvidenceCell screenerId={row.id} open={open} onOpenChange={onOpenChange} />
-      ) : (
-        <Text size="sm" tone="muted">
-          Built in code
-        </Text>
       ),
       picks: run ? (
         <>
-          <Button
-            size="sm"
-            variant="ghost"
+          <LinkButton
             aria-label={`Open ${name}: ${String(run.picked)} picks`}
             onClick={() => {
               onOpen(row.id);
             }}
           >
             {`${String(run.picked)} ${run.picked === 1 ? 'pick' : 'picks'}`}
-          </Button>
+          </LinkButton>
           {changes && (
             <Text size="xs">
               <Text as="span" size="xs" tone="up">{`+${String(changes.added)}`}</Text>
@@ -262,36 +262,58 @@ function toTableRow(
       ) : (
         '—'
       ),
-      actions: row.rules ? (
-        <Stack direction="row" gap={1} align="center">
-          <IconButton
-            icon="pencil"
-            label={row.kind === 'mine' ? `Edit ${name}` : `Duplicate ${name} to edit`}
-            onClick={() => {
-              if (row.kind === 'mine') onEdit(row.id);
-              else onDuplicate(row);
-            }}
-          />
-          {row.kind === 'mine' && (
-            <>
-              <IconButton
-                icon="copy"
-                label={`Duplicate ${name}`}
-                onClick={() => {
-                  onDuplicate(row);
-                }}
-              />
-              <IconButton
-                icon="trash"
-                label={`Delete ${name}`}
-                onClick={() => {
-                  onDelete(row.id);
-                }}
-              />
-            </>
-          )}
-        </Stack>
-      ) : null,
+      actions: (
+        <ActionGroup
+          label={`Actions of ${name}`}
+          actions={[
+            {
+              id: 'view',
+              label: 'View',
+              icon: 'chevron-right',
+              onClick: () => {
+                onOpen(row.id);
+              },
+            },
+            ...(row.rules && row.kind === 'mine'
+              ? [
+                  {
+                    id: 'edit',
+                    label: 'Edit',
+                    icon: 'pencil' as const,
+                    onClick: () => {
+                      onEdit(row.id);
+                    },
+                  },
+                ]
+              : []),
+            ...(row.rules
+              ? [
+                  {
+                    id: 'duplicate',
+                    label: row.kind === 'mine' ? 'Duplicate' : 'Duplicate to edit',
+                    icon: 'copy' as const,
+                    onClick: () => {
+                      onDuplicate(row);
+                    },
+                  },
+                ]
+              : []),
+            ...(row.kind === 'mine'
+              ? [
+                  {
+                    id: 'delete',
+                    label: 'Delete',
+                    icon: 'trash' as const,
+                    variant: 'ghost' as const,
+                    onClick: () => {
+                      onDelete(row.id);
+                    },
+                  },
+                ]
+              : []),
+          ]}
+        />
+      ),
     },
   };
 }

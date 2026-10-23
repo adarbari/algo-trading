@@ -171,7 +171,10 @@ test('Screeners shows the track record of a screener in an edge and opens it in 
 }) => {
   const errors = collectErrors(page);
   await page.goto('/screeners');
-  const headline = page.getByRole('button', { name: /^Win \d+% vs \d+% base$/ }).first();
+  const headline = page
+    .getByRole('table', { name: 'Screeners' })
+    .getByRole('button', { name: 'Momentum 12-1' })
+    .first();
   await expect(headline).toBeVisible();
   await headline.click();
   await expect(headline).toHaveAttribute('aria-expanded', 'true');

@@ -42,6 +42,10 @@ test('the list shows your screeners and the site presets in one list', async ({ 
   await expect(rowOf('vrp_scanner')).toContainText('12 picks');
   await expect(rowOf('vrp_scanner')).toContainText('+3');
   await expect(rowOf('short_premium_liquidity')).toBeVisible();
+  // Every screener can be viewed, one built in code too.
+  await expect(
+    rowOf('short_premium_liquidity').getByRole('button', { name: 'View' }),
+  ).toBeVisible();
   // The columns are the screener, its evidence, today's picks and the edit button.
   await expect(list.getByRole('columnheader')).toHaveText([
     'Screener',
@@ -67,7 +71,7 @@ test('a row does not expand: the picks open the screener and the pencil copies a
   const preset = list.getByRole('row').filter({ hasText: 'vrp_scanner' });
   await expect(preset.getByRole('button', { expanded: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 3, name: 'Criteria' })).toHaveCount(0);
-  await preset.getByRole('button', { name: /^Duplicate .* to edit$/ }).click();
+  await preset.getByRole('button', { name: 'Duplicate to edit' }).click();
   await expect(page.getByRole('dialog', { name: 'Copy to my screeners' })).toBeVisible();
   await expectAccessible(page);
   await page.keyboard.press('Escape');
@@ -81,7 +85,7 @@ test('the pencil of one of yours opens its edit page', async ({ page }) => {
   await list
     .getByRole('row')
     .filter({ hasText: 'my-vrp' })
-    .getByRole('button', { name: /^Edit / })
+    .getByRole('button', { name: 'Edit', exact: true })
     .click();
   await expect(page).toHaveURL(/\/screeners\/my-vrp\/edit$/);
 });
@@ -99,7 +103,7 @@ for (const width of [800, 1024, 1280]) {
     const button = page
       .getByRole('row')
       .filter({ hasText: 'vrp_scanner' })
-      .getByRole('button', { name: /^Duplicate .* to edit$/ });
+      .getByRole('button', { name: 'Duplicate to edit' });
     await expect(button).toBeInViewport({ ratio: 1 });
     await button.click();
     await expect(page.getByRole('dialog', { name: 'Copy to my screeners' })).toBeVisible();
@@ -288,7 +292,7 @@ test('a preset is copied to a named screener from the list', async ({ page }) =>
   await page
     .getByRole('row')
     .filter({ hasText: 'vrp_scanner' })
-    .getByRole('button', { name: /^Duplicate .* to edit$/ })
+    .getByRole('button', { name: 'Duplicate to edit' })
     .click();
   const dialog = page.getByRole('dialog', { name: 'Copy to my screeners' });
   await expect(dialog.getByLabel('Name of your copy')).toHaveValue('my-vrp_scanner');
