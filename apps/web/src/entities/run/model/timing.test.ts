@@ -69,6 +69,7 @@ describe('stepTimings', () => {
         step('chains', 'SUCCEEDED', 60),
         reused('filings', 200),
         step('screens', 'SKIPPED', 0),
+        step('edge-signals', 'WAIVED', 0),
       ]),
     );
     expect(timings.map((t) => [t.name, t.state])).toEqual([
@@ -76,11 +77,12 @@ describe('stepTimings', () => {
       ['bars', 'waiting'],
       ['filings', 'reused'],
       ['macro', 'reused'],
+      ['edge-signals', 'waived'],
       ['rollups', 'held'],
       ['screens', 'held'],
     ]);
     expect(timings.map((t) => t.share)).toEqual(
-      [0.4, 0.6, 0, 0, 0, 0].map((n) => expect.closeTo(n) as number),
+      [0.4, 0.6, 0, 0, 0, 0, 0].map((n) => expect.closeTo(n) as number),
     );
     expect(timings.find((t) => t.name === 'filings')?.originDurationS).toBe(200);
   });

@@ -1,7 +1,7 @@
 """Run records for the Admin pages: nightly runs step by step, one run's detail with its
 failures grouped by reason, its items; ``None`` for a run that is not there."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -200,6 +200,7 @@ def test_a_run_from_before_starts_were_recorded_places_steps_one_after_another()
                 "macro": {"status": "SUCCEEDED", "duration_s": 0.0, "origin": first.run_id},
                 "bars": {"status": "WAITING", "duration_s": 30.0},
                 "rollups": {"status": "NOT_RUN", "duration_s": 0.0},
+                "screens": {"status": "WAIVED", "duration_s": 0.0},
             }
         },
     )
@@ -209,5 +210,6 @@ def test_a_run_from_before_starts_were_recorded_places_steps_one_after_another()
     steps = {s.name: s for s in latest.steps}
     assert steps["macro"].started_at == first.started_at  # the attempt that did it
     assert steps["bars"].started_at == second.started_at  # the first step this attempt ran
-    assert steps["rollups"].started_at == second.started_at + timedelta(seconds=30)
+    assert steps["rollups"].started_at is None  # held by bars: it never began
+    assert steps["screens"].started_at is None  # waived by hand: neither
     assert steps["bars"].needs is None  # the edges were not recorded

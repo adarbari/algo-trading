@@ -22,6 +22,9 @@ from algotrade.services.run_items import failed_items, status_code
 from algotrade.storage.runs import RunRecord
 
 EXAMPLES = 10
+# Statuses of a step that began (an estimate of its start is meaningful); a held, skipped or
+# waived step never started.
+RAN = frozenset({"SUCCEEDED", "COMPLETE", "FAILED", "PARTIAL", "WAITING"})
 
 
 @dataclass(frozen=True)
@@ -127,7 +130,7 @@ def _starts(run: RunRecord) -> dict[str, datetime | None]:
     for name, step in stored.items():
         if step.get("started_at"):
             out[str(name)] = datetime.fromisoformat(step["started_at"])
-        elif step.get("origin") or step.get("duration_s") is None:
+        elif step.get("origin") or str(step.get("status")) not in RAN:
             out[str(name)] = None
         else:
             out[str(name)] = cursor

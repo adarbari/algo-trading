@@ -60,6 +60,8 @@ function display(t: StepTiming): string {
       ].join(' · ');
     case 'held':
       return 'not run';
+    case 'waived':
+      return 'waived';
   }
 }
 
@@ -69,6 +71,7 @@ const TONES: Record<StepState, DataTone> = {
   waiting: 'warning',
   held: 'empty',
   failed: 'negative',
+  waived: 'info',
 };
 
 const KEY: Record<StepState, string> = {
@@ -77,6 +80,7 @@ const KEY: Record<StepState, string> = {
   waiting: 'Waiting on its source',
   reused: 'Reused from earlier',
   held: 'Held by an upstream step',
+  waived: 'Waived by the owner',
 };
 
 const emphasis = (relation: Relation | undefined) =>
@@ -142,7 +146,7 @@ function RunTiming({ run }: { run: NightlyRun }) {
           value: t.state === 'reused' ? (t.originDurationS ?? 0) : t.durationS,
           display: display(t),
           tone: TONES[t.state],
-          hollow: t.state === 'held',
+          hollow: t.state === 'held' || t.state === 'waived',
           ...emphasis(related.get(t.name)),
         }))}
         emptyMessage="This run recorded no steps."

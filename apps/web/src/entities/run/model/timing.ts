@@ -4,8 +4,8 @@
  */
 import type { NightlyRun } from './types';
 
-/** Ran now, reused from an earlier attempt, waiting on its source, held by an upstream step, failed. */
-export type StepState = 'ran' | 'reused' | 'waiting' | 'held' | 'failed';
+/** Ran now, reused from an earlier attempt, waiting on its source, held by an upstream step, failed, or waived by the owner. */
+export type StepState = 'ran' | 'reused' | 'waiting' | 'held' | 'failed' | 'waived';
 
 export interface StepTiming {
   name: string;
@@ -34,17 +34,25 @@ export const isReused = (t: Pick<StepTiming, 'origin'>): boolean => t.origin !==
 
 // A step that is done: SUCCEEDED (ADR 0039) or COMPLETE in records written before it.
 const DONE = new Set(['COMPLETE', 'SUCCEEDED']);
-const FAILED = new Set(['FAILED', 'PARTIAL', 'BLOCKED']);
+const FAILED = new Set(['FAILED', 'PARTIAL']);
 
 function stateOf(status: string, origin: string | null): StepState {
   const s = status.toUpperCase();
   if (FAILED.has(s)) return 'failed';
   if (s === 'WAITING') return 'waiting';
+  if (s === 'WAIVED') return 'waived';
   if (!DONE.has(s)) return 'held';
   return origin === null ? 'ran' : 'reused';
 }
 
-const ORDER: Record<StepState, number> = { failed: 0, ran: 1, waiting: 2, reused: 3, held: 4 };
+const ORDER: Record<StepState, number> = {
+  failed: 0,
+  ran: 1,
+  waiting: 2,
+  reused: 3,
+  waived: 4,
+  held: 5,
+};
 
 const byOrder = (a: StepTiming, b: StepTiming) =>
   ORDER[a.state] - ORDER[b.state] ||
@@ -61,7 +69,8 @@ export function stepTimings(run: NightlyRun): StepTiming[] {
   const timings = run.steps.map((s): StepTiming => {
     const origin = s.origin ?? null;
     const state = stateOf(s.status, origin);
-    const worked = state === 'reused' || state === 'held' ? 0 : (s.durationS ?? 0);
+    const worked =
+      state === 'reused' || state === 'held' || state === 'waived' ? 0 : (s.durationS ?? 0);
     return {
       name: s.name,
       status: s.status,
