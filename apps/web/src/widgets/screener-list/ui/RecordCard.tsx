@@ -7,6 +7,7 @@ import { Button, formatValue, Stack, Text } from '@algotrade/ui';
 
 import { unknownText } from '@/entities/availability';
 import { recordFigures, useTrackRecords } from '@/entities/edge';
+import { Labelled } from '@/features/guide-help';
 
 import { Facts } from './Facts';
 
@@ -50,14 +51,28 @@ export function RecordCard({ screenerId, onOpenEdge }: RecordCardProps) {
         facts={[
           {
             id: 'win',
-            label: 'Win rate',
+            label: <Labelled text="Win rate" help="win_rate" />,
             value: percent(figures.hitRate),
           },
-          { id: 'base', label: 'Base rate', value: percent(figures.baseRate) },
+          {
+            id: 'base',
+            label: <Labelled text="Base rate" help="base_rate" />,
+            value: percent(figures.baseRate),
+          },
           ...(figures.liftPts === null
             ? []
-            : [{ id: 'lift', label: 'Lift', value: lift(figures.liftPts) }]),
-          { id: 'trades', label: 'Trades', value: trades(figures.sessions) },
+            : [
+                {
+                  id: 'lift',
+                  label: <Labelled text="Lift" help="lift" />,
+                  value: lift(figures.liftPts),
+                },
+              ]),
+          {
+            id: 'trades',
+            label: <Labelled text="Trades" help="trades" />,
+            value: trades(figures.sessions),
+          },
           {
             id: 'horizon',
             label: 'Holding period',
