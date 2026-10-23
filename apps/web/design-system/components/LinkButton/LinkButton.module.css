@@ -1,0 +1,35 @@
+/* LinkButton: accent text and a chevron; underline and a nudged chevron on hover. */
+.link {
+  display: inline-flex;
+  gap: var(--space-0-5);
+  align-items: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-strong);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+}
+
+.text {
+  min-width: 0;
+}
+
+.arrow {
+  display: inline-flex;
+  flex: none;
+  transition: transform var(--duration-fast) var(--easing-standard);
+}
+
+.link:hover .text {
+  text-decoration: underline;
+}
+
+.link:hover .arrow {
+  transform: translateX(var(--space-0-5));
+}

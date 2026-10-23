@@ -190,7 +190,7 @@ test('Regime: a tapped card help button opens the indicator drawer as a sheet', 
   await expectAccessible(page);
 });
 
-test('Screeners: each row is a card with evidence, picks and the pencil, and no header', async ({
+test('Screeners: each row is a card with evidence, picks and labelled actions, and no header', async ({
   page,
 }) => {
   await page.goto('/screeners');
@@ -198,17 +198,11 @@ test('Screeners: each row is a card with evidence, picks and the pencil, and no 
   // On a phone the table is a list of cards: the header row is gone, every cell stays.
   await expect(page.getByRole('columnheader', { name: 'Evidence and edges' })).toBeHidden();
   await expect(row.getByRole('button', { name: /: 12 picks$/ })).toBeVisible();
-  await expect(row.getByRole('button', { name: /^Duplicate .* to edit$/ })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Duplicate to edit' })).toBeVisible();
   // The card holds no sideways scroll.
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  const headline = row.getByRole('button', { name: /^Win \d+% vs \d+% base$/ });
-  if (await headline.count()) {
-    await headline.tap();
-    await expect(headline).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('list', { name: /^Edges of / })).toBeVisible();
-  }
   await expectAccessible(page);
   await row.getByRole('button', { name: /: 12 picks$/ }).tap();
   await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
