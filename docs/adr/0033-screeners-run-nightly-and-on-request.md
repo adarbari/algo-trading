@@ -44,3 +44,7 @@ that was never run, or changed since it last ran, can only be run from the CLI.
 - Part 1 (the nightly) shipped first; part 2 is `services/ondemand`, `POST /screens/{id}/run`
   with its status polled at `GET /jobs/{job_id}` (amended 2026-10-08 by 0037: it was
   `GET /screens/{id}/run/{job_id}`), and "Run now" on the Results page.
+- Amended 2026-10-22: finalising a screen starts its one-off run at once (`POST
+  /screeners/{id}/finalise` submits the same on-request job and answers `run_job_id` and
+  `run_state`), so a new screen has results without waiting for the nightly. A run that cannot
+  start never fails the finalise.

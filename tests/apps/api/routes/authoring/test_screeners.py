@@ -3,6 +3,7 @@ back through GraphQL (``screenDetail``, ``screenVersions``, ``myScreens``: the A
 
 import json
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -10,8 +11,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.site.features.definitions import feature_definitions
+from algotrade.config.user import UserContext
 from algotrade.core.model.completion import Completion
 from algotrade.features.expressions.fingerprint import fingerprint
+from algotrade.services.ondemand.screens import RunRequest
+from algotrade.storage.configs.writer import FileConfigWriter
+from algotrade_api.deps import ApiSettings
+from algotrade_api.main import create_app
+from tests.helpers.api_store import as_user
 
 ALICE = {"X-Act-For": "alice"}  # an admin writing for another declared user
 
@@ -484,3 +491,49 @@ def test_a_choice_resent_at_finalise_keeps_the_formula_the_save_recorded(
     rows = [r for r in sink.rows if r["event"] == "formula_accepted"]
     assert len(rows) == 1  # a subject-only resend (keep="last" on event_id) would replace the row
     assert json.loads(rows[0]["payload"])["fingerprint"] == FINGERPRINT
+
+
+class _Runner:
+    """Stands in for ``OnDemandScreens``: records the requests, or fails them."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.asked: list[tuple[str, str]] = []
+
+    def request(self, config_id: str, user: Any, on: Any, serving: Any) -> Any:
+        if self.fail:
+            raise RuntimeError("no data")
+        self.asked.append((config_id, user.user_id))
+        return RunRequest("queued", config_id, date(2026, 10, 21), "job-1", None, None)
+
+    def close(self) -> None:
+        pass
+
+
+def _client_with(runner: _Runner, api_golden: Any, root: Path) -> TestClient:
+    writer = FileConfigWriter(root)
+    store = replace(api_golden[0], configs=writer, user=UserContext("local"))
+    app = create_app(
+        ApiSettings("memory://", str(root)),
+        store,
+        writer,
+        authenticator=as_user(),
+        ondemand=runner,  # type: ignore[arg-type]
+    )
+    return TestClient(app)
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_finalise_starts_a_one_off_run(api_golden: Any, root: Path, fail: bool) -> None:
+    """Finalising a screen runs it once now (ADR 0033); a run that cannot start never fails the
+    finalise."""
+    runner = _Runner(fail)
+    c = _client_with(runner, api_golden, root)
+    assert c.post("/screeners/my_vrp/copy", json={"preset": "vrp"}).status_code == 201
+    done = c.post("/screeners/my_vrp/finalise")
+    assert done.status_code == 200 and done.json()["version"] == 1
+    if fail:
+        assert done.json()["run_job_id"] is None and done.json()["run_state"] is None
+    else:
+        assert (done.json()["run_job_id"], done.json()["run_state"]) == ("job-1", "queued")
+        assert runner.asked == [("my_vrp", "local")]
