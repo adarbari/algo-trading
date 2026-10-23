@@ -179,3 +179,26 @@ def test_a_frozen_run_with_no_previous_run_has_no_counts(backend: MemoryBackend)
     found = load_screener_run_changes(stores(backend), "a")
     assert found is not None
     assert (found.previous_run_id, found.new_picks, found.dropped) == (None, None, None)
+
+
+def test_a_small_limit_does_not_read_the_older_windows(backend: MemoryBackend) -> None:
+    today = datetime.now(UTC).date()
+    for n, back in enumerate((1, 3, 200)):
+        day = today - timedelta(days=back)
+        at = datetime.combine(day, T.timetz())
+        record = RunRecord(f"r{n}", run_job_name("momo", "site"), day, at)
+        ResultWriter(backend).save_run(record.finish(at, stats=GOOD))
+    ctx = stores(backend)
+    asked: list[tuple[date, date]] = []
+    real = ctx.reader.runs_of
+
+    def spy(jobs: Any, first: date, last: date) -> Any:
+        asked.append((first, last))
+        return real(jobs, first, last)
+
+    ctx.reader.runs_of = spy  # type: ignore[method-assign]
+    assert [r.run_id for r in load_screener_runs(ctx, 2)] == ["r0", "r1"]
+    assert len(asked) == 1 and asked[0][1] == today  # the newest week filled the limit
+    asked.clear()
+    assert [r.run_id for r in load_screener_runs(ctx, 3)] == ["r0", "r1", "r2"]
+    assert len(asked) > 1  # a bigger limit walks back to the old run

@@ -98,7 +98,8 @@ class ScreenerRunEntry:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="What the run froze against the run before it; null: it has no "
-        "`screen_runs` row (a run before the table, or one that never wrote)"
+        "`screen_runs` row (a run before the table, or one that never wrote). For the detail "
+        "only: it reads one row per run, so asking it in a list is one read per entry"
     )
     async def changes(self, info: Info) -> ScreenerRunChanges | None:
         found = await off_loop(screener_runs.load_screener_run_changes, self.ctx, self.run_id)

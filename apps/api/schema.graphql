@@ -3432,7 +3432,7 @@ type ScreenerRunEntry {
   unavailable: [Unavailable!]!
 
   """
-  What the run froze against the run before it; null: it has no `screen_runs` row (a run before the table, or one that never wrote)
+  What the run froze against the run before it; null: it has no `screen_runs` row (a run before the table, or one that never wrote). For the detail only: it reads one row per run, so asking it in a list is one read per entry
   """
   changes: ScreenerRunChanges
 }

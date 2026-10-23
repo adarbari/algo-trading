@@ -9,13 +9,13 @@ as its record left it, never by session date. The list reads no result row; a fi
 does not hold is ``None``, never 0 (a run that never finished has no decisions). The detail's
 changes are the one ``results/screen_runs`` row of that run (``FrozenRun``), by run id."""
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
-from algotrade.services.configs import config_ids
 from algotrade.services.read.availability.cause import Unavailable
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import Stores, run_partition
@@ -30,10 +30,12 @@ from algotrade.services.read.screens.runs import (
 )
 from algotrade.services.screening.rule_results import PAUSED, is_picked
 from algotrade.services.screening.run import run_job_name
+from algotrade.storage.configs.files import SCREENERS
 from algotrade.storage.runs import RunRecord
 
 PREFIX = "screen-"
-FIRST, LAST = date.min, date.max  # a run is read as its record left it, whatever its session
+FIRST = date.min  # a run is read as its record left it, whatever its session
+WINDOW_DAYS, WINDOWS = 7, 8  # the list reads a week of sessions at a time, newest first
 
 
 @dataclass(frozen=True)
@@ -108,13 +110,16 @@ def _entry(record: RunRecord, config_id: str, owner: str) -> ScreenerRunEntry:
 
 def _jobs(ctx: Stores) -> dict[str, tuple[str, str]]:
     """``{run record job: (config id, owner)}`` of every screen the site and each declared user
-    can run: the site presets for each of them, and a user's own finalised configs."""
+    can run now: the site presets for each of them, and a user's own finalised screeners (a run of
+    a config or user no longer declared is not listed)."""
     users = dict.fromkeys([SITE_USER, *(u.user_id for u in load_users(ctx.configs).users)])
-    site = config_ids(ctx.configs, SITE_USER)
+    site = ctx.configs.names(SITE_USER, SCREENERS)
     return {
         run_job_name(config, user): (config, user)
         for user in users
-        for config in sorted({*site, *(config_ids(ctx.configs, user) if user != SITE_USER else ())})
+        for config in sorted(
+            {*site, *(ctx.configs.names(user, SCREENERS) if user != SITE_USER else ())}
+        )
     }
 
 
@@ -125,20 +130,37 @@ def load_screener_runs(
     screener: str | None = None,
     status: str | None = None,
 ) -> tuple[ScreenerRunEntry, ...]:
-    """The ``limit`` most recent screen runs of any status, newest first, one pass over the run
-    records: ``user`` (whose), ``screener`` (config id) and ``status`` (the record's) narrow it."""
+    """The ``limit`` most recent screen runs of any status, newest session first (then newest
+    start), read a window of sessions at a time, stopping once ``limit`` match: ``user`` (whose),
+    ``screener`` (config id) and ``status`` (the record's) narrow it."""
     jobs = {
         job: key
         for job, key in _jobs(ctx).items()
         if user in (None, key[1]) and screener in (None, key[0])
     }
-    found = [
-        _entry(r, *jobs[r.job])
-        for r in ctx.reader.runs_of(set(jobs), FIRST, LAST)
-        if status in (None, r.status.value)
-    ]
-    found.sort(key=lambda r: r.started_at, reverse=True)
-    return tuple(found[: max(limit, 1)])
+    want = max(limit, 1)
+    found: list[ScreenerRunEntry] = []
+    for first, last in _windows(datetime.now(UTC).date()):
+        found.extend(
+            _entry(r, *jobs[r.job])
+            for r in ctx.reader.runs_of(set(jobs), first, last)
+            if status in (None, r.status.value)
+        )
+        if len(found) >= want:
+            break  # the older windows hold only older sessions: never read
+    found.sort(key=lambda r: (r.session, r.started_at), reverse=True)
+    return tuple(found[:want])
+
+
+def _windows(today: date) -> Iterator[tuple[date, date]]:
+    """Session windows newest first: ``WINDOWS`` of ``WINDOW_DAYS`` back from ``today``, then one
+    window for every session before them (a small ``limit`` stops at the first that fills it)."""
+    last = today
+    for _ in range(WINDOWS):
+        first = last - timedelta(days=WINDOW_DAYS - 1)
+        yield first, last
+        last = first - timedelta(days=1)
+    yield FIRST, last
 
 
 def load_screener_run(ctx: Stores, run_id: str) -> ScreenerRunEntry | None:
