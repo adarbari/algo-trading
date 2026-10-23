@@ -66,7 +66,7 @@ purpose = "one edge's edge.toml: thesis, mechanism, persistence, outcome, schedu
 
 [[config_dir]]
 path = "config/site/filters"
-purpose = "filter definitions, one <surface>.toml per table, list or feed (ADR 0082): the surface's [[column]]s and its [[filter]]s (id, label, group, kind, field, options, bins, window_unit, guide), typed by src/algotrade/config/filters/definitions.py; ideas.toml is the Ideas list's"
+purpose = "filter definitions, one <surface>.toml per table, list or feed (ADR 0082): the surface's [[column]]s and its [[filter]]s (id, label, group, kind, field, options, bins, window_unit, guide), typed by src/algotrade/config/filters/definitions.py; ideas.toml, screener_results.toml and universe.toml are the Ideas list's, a screener's results table's and the Explore table's"
 
 [[config_dir]]
 path = "config/site/ranking"

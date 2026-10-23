@@ -36,9 +36,9 @@ see_also = ["filter_screener", "picked_by", "filter_range"]
 [[term]]
 id = "filter_option_tier"
 term = "Option liquidity class filter"
-short = "Keeps the ideas whose options trade well enough for a short put or call."
+short = "Keeps the rows whose options trade well enough for a short put or call."
 body = """
-The class is the worse of the short put's and the short call's tier. A is the easiest to trade and C the hardest that still passes; D means no usable options, including a name the options data did not list. An idea with no class for the session, because the options data was not pulled or failed, never passes this filter and is counted as unknown.
+The class is the worse of the short put's and the short call's tier. A is the easiest to trade and C the hardest that still passes; D means no usable options, including a name the options data did not list. A row with no class for the session, because the options data was not pulled or failed, never passes this filter and is counted as unknown.
 """
 next = "Tick A and B for options you can open and close without giving up much to the spread."
 see_also = ["filter_spread", "filter_unknown_rows"]
@@ -46,9 +46,9 @@ see_also = ["filter_spread", "filter_unknown_rows"]
 [[term]]
 id = "filter_spread"
 term = "Option spread filter"
-short = "Keeps the ideas whose option quote is within a range of bid-ask spread."
+short = "Keeps the rows whose option quote is within a range of bid-ask spread."
 body = """
-The spread is the gap between the ask and the bid at the short put's strike, as a share of the middle price. 5% means the gap is one twentieth of the price. A wide spread costs you that gap each time you trade. It is the stored quote of the session, not a live one, so judge a trade on a live quote. An idea with no put quote that day is unknown. It never passes.
+The spread is the gap between the ask and the bid at the short put's strike, as a share of the middle price. 5% means the gap is one twentieth of the price. A wide spread costs you that gap each time you trade. It is the stored quote of the session, not a live one, so judge a trade on a live quote. A row with no put quote that day is unknown. It never passes.
 """
 next = "Set the maximum to 10% to leave out options that are expensive to trade."
 see_also = ["filter_option_tier", "filter_range", "filter_unknown_rows"]
@@ -56,7 +56,7 @@ see_also = ["filter_option_tier", "filter_range", "filter_unknown_rows"]
 [[term]]
 id = "filter_dollar_volume"
 term = "Dollar volume filter"
-short = "Keeps the ideas whose shares traded within a range of dollars on the session."
+short = "Keeps the rows whose shares traded within a range of dollars on the session."
 body = """
 Dollar volume is the closing price times the shares traded that day: how much money changed hands. It says how much you can trade in the shares, whatever the price. It is one day's figure, so a quiet day understates a normally busy name.
 """
@@ -66,9 +66,9 @@ see_also = ["filter_range", "liquidity_risk"]
 [[term]]
 id = "filter_earnings"
 term = "Earnings window filter"
-short = "Keeps the ideas that report earnings within a number of trading sessions."
+short = "Keeps the rows that report earnings within a number of trading sessions."
 body = """
-The number counts exchange sessions after the session you are reading, so 0 is a report today and 5 is a report within the next five sessions. It uses the report dates known by that session. An idea with no known report date ahead is unknown and never passes, even when you only set an upper limit.
+The number counts exchange sessions after the session you are reading, so 0 is a report today and 5 is a report within the next five sessions. It uses the report dates known by that session. A row with no known report date ahead is unknown and never passes, even when you only set an upper limit.
 """
 next = "Use it to avoid, or to look for, names with a report coming."
 see_also = ["filter_window", "filter_unknown_rows", "event_risk"]
@@ -76,39 +76,159 @@ see_also = ["filter_window", "filter_unknown_rows", "event_risk"]
 [[term]]
 id = "filter_ex_dividend"
 term = "Ex-dividend window filter"
-short = "Keeps the ideas whose next ex-dividend date is within a number of calendar days."
+short = "Keeps the rows whose next ex-dividend date is within a number of calendar days."
 body = """
-The number counts calendar days from the session you are reading to the next ex-dividend date known by then. A date is known only once the dividend is declared. An idea with none is unknown, which is not the same as paying no dividend, and it never passes this filter.
+The number counts calendar days from the session you are reading to the next ex-dividend date known by then. A date is known only once the dividend is declared. A row with none is unknown, which is not the same as paying no dividend, and it never passes this filter.
 """
 next = "Use it to see which short calls risk early assignment around the date."
 see_also = ["filter_window", "filter_unknown_rows"]
 
 [[term]]
+id = "filter_result_decision"
+term = "Result decision filter"
+short = "Keeps the rows of a screener's results that have the decisions you tick."
+body = """
+Every instrument the screener looked at gets a decision in its run: Qualified, Watch, Reject and the rest. Tick one or more and the table keeps the rows with one of them. The number beside each decision counts the rows that have it among those that pass your other filters. Skipped and Unknown rows are listed so you can see where the data was missing.
+"""
+next = "Tick Qualified and Watch to see the names that passed or narrowly missed."
+see_also = ["qualified", "watch", "unknown", "filter_decision", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_rank"
+term = "Rank filter"
+short = "Keeps the rows whose place in the screener's order lies between a minimum and a maximum."
+body = """
+Rank 1 is the screener's best row of the run. The rank is the one stored for the run, so it is the order you see when you sort the table by rank. A row with no rank, because the order follows data you may not see, never passes this filter.
+"""
+next = "Set the maximum to 25 to read only the screener's first 25."
+see_also = ["filter_range", "score", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_score"
+term = "Score filter"
+short = "Keeps the rows whose score, from 0 to 100, lies between a minimum and a maximum."
+body = """
+The score is the run's number for ordering rows: 100 when every threshold is met, less a penalty for each miss. A row with no score never passes. It is not a probability, so a score of 80 is not an 80% chance of anything.
+"""
+next = "Set the minimum to 80 to see the rows that came close to meeting every rule."
+see_also = ["score", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_change"
+term = "Since the previous run filter"
+short = "Keeps the rows new to the screener's picks, or dropped from them, since its previous run."
+body = """
+New means the screener picked the row in this run and did not in its previous run; dropped means it picked it before and no longer does. Both compare two runs of the same screener, not two days of the market. A screener with no earlier run has nothing new or dropped, and its rows are not compared. They do not pass this filter.
+"""
+next = "Tick New to see what the screener found since last time."
+see_also = ["screener_last_run", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_security_type"
+term = "Security type filter"
+short = "Keeps the instruments of the types you tick: common stock, ETF, closed-end fund and so on."
+body = """
+The type is the one the exchange listing and the reference data give the instrument. The options are the types stored for the day you are reading. The number beside each counts the instruments of that type among those that pass your other filters. An instrument whose type is not stored never passes.
+"""
+next = "Tick ETF to leave the stocks out of the table."
+see_also = ["filter_sector", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_sector"
+term = "Sector filter"
+short = "Keeps the instruments in the sectors you tick."
+body = """
+The sector is the company's classification from the reference data. Funds and many ETFs have none, so ticking a sector leaves them out. The number beside each counts the instruments in that sector among those that pass your other filters.
+"""
+next = "Combine it with the market cap range to compare a sector's large names."
+see_also = ["filter_security_type", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_in_sp500"
+term = "S&P 500 filter"
+short = "Keeps the instruments that are, or are not, members of the S&P 500 on the day."
+body = """
+Membership is the stored flag of the day's reference data, so a name added to the index last week shows once the reference data holds it. Yes keeps members, No keeps the rest, Either applies nothing. An instrument with no stored flag passes neither yes nor no. Only the S&P 500 is stored. Other indexes would need their own data first.
+"""
+next = "Choose yes to start from the large, widely held names."
+see_also = ["filter_toggle", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_leveraged"
+term = "Leveraged filter"
+short = "Keeps the funds that are, or are not, leveraged: they move a multiple of an index each day."
+body = """
+A leveraged fund aims for a multiple, such as two or three times, of its index's move in one day, and an inverse one the opposite. Over longer holdings its result drifts from the multiple. The flag comes from the reference data and the fund's name and terms. Choose no to leave them out of a search for ordinary holdings.
+"""
+next = "Choose no to leave the leveraged funds out."
+see_also = ["filter_toggle", "filter_security_type"]
+
+[[term]]
+id = "filter_market_cap"
+term = "Market cap filter"
+short = "Keeps the instruments whose market value, in dollars, lies between a minimum and a maximum."
+body = """
+Market cap is the shares outstanding times the closing price of the session, in dollars. 2,000,000,000 is two billion. Funds have no market cap. Neither has a company whose share count is missing or stale. Those rows are unknown and never pass, even when you only set an upper limit.
+"""
+next = "Set a minimum of 10,000,000,000 to see the large caps."
+see_also = ["filter_range", "filter_price", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_price"
+term = "Price filter"
+short = "Keeps the instruments whose closing price lies between a minimum and a maximum."
+body = """
+The price is the close of the session you are reading. It is not a live quote. A low price does not mean a cheap company: it only says how much one share costs. An instrument with no bar that day is unknown and never passes.
+"""
+next = "Set a minimum of 10 to leave out the lowest-priced shares."
+see_also = ["filter_range", "filter_market_cap", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_liquidity_class"
+term = "Liquidity class filter"
+short = "Keeps the instruments whose shares trade as high, medium or low volume."
+body = """
+High means every high threshold of the site's liquidity rule holds, medium every medium one, and low is the rest. It describes the shares, not their options. The class comes from the session's price and volume, so one quiet day can lower it. An instrument with no bar that day has no class and never passes.
+"""
+next = "Tick High to see the names you can trade without moving the price."
+see_also = ["filter_option_tier", "filter_dollar_volume", "liquidity_risk"]
+
+[[term]]
+id = "filter_optionable"
+term = "Listed options filter"
+short = "Keeps the instruments that have listed options, or that have none."
+body = """
+Yes means an exchange lists options on the instrument. It does not say the options trade well: for that read the option liquidity class on Ideas. The flag comes from the reference data and changes when options are listed or delisted. An instrument with no stored flag passes neither yes nor no.
+"""
+next = "Choose yes before looking for an options trade."
+see_also = ["filter_toggle", "filter_option_tier"]
+
+[[term]]
 id = "filter_group_setup"
 term = "Setup"
-short = "The filters that say how an idea was found: its decision and which screeners picked it."
+short = "The filters that say what a row is or how it was found: its decision, rank and score, its type and size."
 body = """
-A group button opens the filters it holds and shows how many are in use. Setup holds the decision, the screener and how many screeners agree.
+A group button opens the filters it holds and shows how many are in use. On Ideas, Setup holds the decision, the screener and how many screeners agree. On a screener's results it holds the decision, the rank and the score. On Explore it holds the security type, the sector, index membership, leverage, market cap and price.
 """
-see_also = ["filter_decision", "filter_screener", "filter_agreeing"]
+see_also = ["filter_decision", "filter_result_decision", "filter_rank", "filter_security_type"]
 
 [[term]]
 id = "filter_group_changed"
 term = "What changed"
 short = "The filters that compare the session with the one before it."
 body = """
-A group button opens the filters it holds and shows how many are in use. What changed will hold what is new since the previous run and what moved up the ranking; a list offers it once it stores that comparison.
+A group button opens the filters it holds and shows how many are in use. On a screener's results, What changed holds the rows new or dropped since the screener's previous run. A list offers more here once it stores the comparison, such as how far a row moved up the ranking.
 """
-see_also = ["filter_group_setup"]
+see_also = ["filter_change", "filter_group_setup"]
 
 [[term]]
 id = "filter_group_tradeable"
 term = "Tradeable"
 short = "The filters that say how well the shares and their options trade."
 body = """
-A group button opens the filters it holds and shows how many are in use. Tradeable holds the option liquidity class, the option spread and the dollar volume.
+A group button opens the filters it holds and shows how many are in use. Ideas and a screener's results hold the option liquidity class, the option spread and the dollar volume here. Explore holds the liquidity class and whether the name has listed options.
 """
-see_also = ["filter_option_tier", "filter_spread", "filter_dollar_volume"]
+see_also = ["filter_option_tier", "filter_spread", "filter_dollar_volume", "filter_liquidity_class"]
 
 [[term]]
 id = "filter_group_coming_up"
