@@ -278,6 +278,15 @@ def get_ondemand(request: Request) -> OnDemandScreens:
 OnDemand = Annotated[OnDemandScreens, Depends(get_ondemand)]
 
 
+def get_ondemand_if_on(request: Request) -> OnDemandScreens | None:
+    """The on-request screen runner, or None where runs are off (a write that starts a run as a
+    side effect, like finalising a screen, still succeeds without one)."""
+    return cast(OnDemandScreens | None, request.app.state.ondemand)
+
+
+OptionalOnDemand = Annotated[OnDemandScreens | None, Depends(get_ondemand_if_on)]
+
+
 def get_ondemand_edges(request: Request) -> OnDemandEdges:
     """The on-request edge evaluator ``create_app`` set up (ADR 0059); off in tests and the
     OpenAPI export unless one is given."""

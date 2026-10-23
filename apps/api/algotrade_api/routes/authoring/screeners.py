@@ -8,9 +8,10 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from algotrade.config.user import UserContext
 from algotrade.services.authoring import presets, screens
 from algotrade_api import feedback
-from algotrade_api.deps import Drafts, Feedback, User, Writer
+from algotrade_api.deps import Drafts, Feedback, Followed, OptionalOnDemand, User, Writer
 from algotrade_api.schemas.authoring.screeners import (
     CopyBody,
     Draft,
@@ -54,6 +55,8 @@ def finalise(
     user: User,
     sink: Feedback,
     drafts: Drafts,
+    runner: OptionalOnDemand,
+    serving: Followed,
     screener_id: str,
     body: FinaliseBody | None = None,
 ) -> Finalised:
@@ -64,7 +67,18 @@ def finalise(
         sink, drafts, session_id, user, screener_id, body.choices if body else [], writer
     )
     feedback.record_finalised(sink, drafts, session_id, user, screener_id, draft, done.hash)
-    return Finalised.model_validate(done)
+    out = Finalised.model_validate(done)
+    # a finalised screen is run once now (ADR 0033 decision 2), not left for the next nightly
+    if runner is not None:
+        try:
+            run = runner.request(screener_id, UserContext(user), None, serving)
+        except (
+            Exception
+        ):  # the screen is finalised either way: a failed start is not a failed write
+            return out
+        out.run_state = run.state
+        out.run_job_id = run.job_id
+    return out
 
 
 def _draft_of(writer: Writer, user: str, screener_id: str) -> dict[str, Any] | None:
