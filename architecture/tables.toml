@@ -50,7 +50,7 @@ note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Fi
 name = "analyst/estimate_snapshots"
 owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"
 also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/analyst/backfill.py"]  # the one-off Yahoo backfill (ADR 0080 amendment 2026-10-23b): the same rows, a batch a run
-note = "ADR 0068, 0080: our own point-in-time history of FMP, Finnhub and Yahoo analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session; the rows of source `yahoo` carry licence `yahoo` (owner only, ADR 0080) and the estimates, targets and revisions groups read them when FMP has none (v2, ADR 0080); `currency` (nullable, Yahoo's estimates) is additive: older partitions read null"
+note = "ADR 0068, 0080: our own point-in-time history of FMP, Finnhub and Yahoo analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session; the rows of source `yahoo` carry licence `yahoo` (owner only, ADR 0080) and the estimates, targets and revisions groups read them when FMP has none (v2, ADR 0080); `currency` and the four `eps_trend_*` floats (nullable, Yahoo's estimates; ADR 0080 amendment 2026-10-24) are additive: older partitions read null"
 
 [[table]]
 name = "instruments/index_membership"

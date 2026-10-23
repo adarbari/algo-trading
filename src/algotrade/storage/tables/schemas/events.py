@@ -298,6 +298,9 @@ ANALYST_ESTIMATE_SNAPSHOTS = fixed(
     "consensus string",
     "status string",
     "currency string",  # an estimate's currency (Yahoo; null before it and for FMP)
+    # Yahoo's epsTrend (EPS consensus now and as it stood N days before the fetch; null for FMP
+    # and for partitions written before ADR 0080 amendment 2026-10-24)
+    *floats("eps_trend_current", "eps_trend_30d_ago", "eps_trend_60d_ago", "eps_trend_90d_ago"),
     runs="merge",
     key=("instrument_id", "source", "kind", "period"),
 )

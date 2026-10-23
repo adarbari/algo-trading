@@ -32,7 +32,9 @@ The load is a **rolling baseline** with **event pulls on top**, inside one night
 
 A **fingerprint** (``fingerprint``) hashes only the stable values of an answer (target mean, high,
 low; the two annual estimates' period, average and analyst count; the rating counts), not Yahoo's
-epsTrend 7 / 30-days-ago fields nor the month of the rating bucket, which move without news. The
+epsTrend fields nor the month of the rating bucket, which move without news; of the recommendation
+rows only the newest month's (``0m``) counts, so the earlier buckets added in 2026-10-24 and a
+month roll change nothing. The
 item status carries it with Yahoo's next report date and newest analyst action date
 (``OK: fp=ab12cd34 next=2026-11-03 act=2026-10-20``: ``status_label`` splits at the colon), so a
 repeated fingerprint is not new data and ``snapshot.history`` needs no store read.
@@ -221,13 +223,15 @@ def fingerprint(parsed: Mapping[str, pd.DataFrame]) -> str:
         if frame is None or frame.empty:
             parts.append(f"{kind}:-")
             continue
+        if kind == "recommendation" and "period" in frame.columns:
+            frame = frame.sort_values("period").tail(1)  # the newest month only (0m)
         cols = [c for c in columns if c in frame.columns]
         for row in frame[cols].itertuples(index=False):
             parts.append(f"{kind}:" + ",".join(part(v) for v in row))
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:8]
 
 
-# What an answer is fingerprinted by: not epsTrend's 7 / 30-days-ago fields (never parsed) and not
+# What an answer is fingerprinted by: not the epsTrend fields (they restate daily) and not
 # the recommendation's month ``period`` (a roll of the calendar, not of the analysts).
 STABLE: dict[str, tuple[str, ...]] = {
     "price_target": ("target_consensus", "target_high", "target_low"),

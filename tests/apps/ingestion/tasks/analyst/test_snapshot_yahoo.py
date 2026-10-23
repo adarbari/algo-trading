@@ -101,6 +101,10 @@ def test_a_name_fmp_refuses_is_asked_of_yahoo_and_its_rows_are_read_back() -> No
     estimates = yahoo[yahoo["kind"] == "estimates_annual"]
     assert set(estimates["period"]) == {"2026-12-31", "2027-12-31"}
     assert set(estimates["currency"]) == {"USD"}
+    assert estimates.set_index("period").loc["2026-12-31", "eps_trend_90d_ago"] == 0.742
+    months = yahoo[yahoo["kind"] == "recommendation"]
+    assert len(set(months["period"])) == 4  # 0m .. -3m, one row each
+    assert set(read[read["source"] != "yahoo"]["eps_trend_current"].dropna()) == set()
     assert record.items["yahoo:CHWY"].startswith("OK: fp=")
     assert record.stats["licence"]["yahoo"] == "yahoo"
 
