@@ -50,7 +50,8 @@ test('the list shows your screeners and the site presets in one list', async ({ 
   await expect(list.getByRole('button', { name: /Mine/ })).toHaveCount(0);
   await page.getByRole('radio', { name: 'All' }).click();
   await page.getByRole('searchbox', { name: 'Search screeners' }).fill('idea');
-  await expect(list.getByRole('button')).toHaveCount(1);
+  // The column headers' help buttons are not rows.
+  await expect(list.getByRole('button', { name: /Mine|Preset/ })).toHaveCount(1);
   await expectAccessible(page);
   expect(errors).toEqual([]);
 });
