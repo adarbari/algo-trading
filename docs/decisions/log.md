@@ -590,3 +590,12 @@ follow-up PR).
 - status: final
 - Note: owner, chat 2026-10-23: "Ok approved then".
 - Reasoning: the benchmark viewer owns no screens, so an empty list is the correct answer, and the entry expires so it is reviewed.
+
+## 2026-10-23 | Analyst revisions v3 (#883) | Raise the entry-closure bundle budget to 196367 B (+77 B)
+- Question: the Web performance budgets job fails on #883 with the entry closure at 196297 B against 196290 B (+7 B); trim the entry or raise the budget?
+- Options: trim the entry closure by at least 10 B / raise `bundle.entry_closure_gzip_bytes` to the CI value plus the usual 70 B margin.
+- Decision: raise to 196367 B (CI 196297 B + 70 B), noted in `apps/web/perf-budgets.json`; inside the #773 owner waiver (max 196390 B).
+- decided by: Opus on the owner's behalf (owner asleep, routine per the #773 waiver)
+- status: final
+- Note: main's own CI run on f56e951 measured 196290 B, exactly the budget, so any PR touching the chunk graph trips it. The next raise past 196390 B needs the owner.
+- Reasoning: no honest trim exists: `SITE_FEATURES` is tree-shaken out of the entry (the catalogue names, `revisions_basis` included, ship only in the lazy FinancialsTab chunk), and the PR's web diff touches only that lazy chunk and the generated catalogue, so the 7 B is chunk-graph and gzip noise, not code to remove.
