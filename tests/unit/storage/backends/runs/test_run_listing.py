@@ -1,5 +1,6 @@
 """``find_many`` over one cached directory listing: the same records as the per-job globs it
-replaced, one directory scan for any number of calls, a fresh listing after a write."""
+replaced, one directory scan for any number of calls, a fresh listing after a write; ``find``
+through the per-job index equals the full scan and decodes no names per call."""
 
 from __future__ import annotations
 
@@ -9,8 +10,11 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
+import pytest
+
 from algotrade.storage.backends.local import LocalBackend, LocalRuns, safe
-from algotrade.storage.runs import RunRecord, run_session, start_run
+from algotrade.storage.backends.runs import run_listing
+from algotrade.storage.runs import RunRecord, job_of_name, run_session, start_run
 from tests.helpers.stored_frames import T0
 
 D1 = date(2026, 3, 2)
@@ -90,3 +94,57 @@ def test_concurrent_find_many_and_a_save_agree_with_the_listing(tmp_path: Path) 
         t.join()
     assert set(results) <= {4, 5} and len(results) == 4
     assert len(runs.find_many(["ingest"], D1, D1 + timedelta(9))) == 5
+
+
+def _old_find(runs: LocalRuns, job: str, session_date: date | None = None) -> list[RunRecord]:
+    """``find`` before the per-job index: a scan of every stem, decoding each name."""
+    prefix = f"{safe(job)}-"
+    names = [
+        f"{stem}.json"
+        for stem, day in runs._listing.all()
+        if (
+            (stem.startswith(prefix) and session_date in (None, day))
+            if day is not None
+            else (implied := job_of_name(stem)) is None or implied == job
+        )
+    ]
+    records = [r for name in names if (r := runs._record(name)) is not None]
+    hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]
+    return sorted(hits, key=lambda r: r.started_at)
+
+
+def _job_fixture(tmp_path: Path) -> LocalRuns:
+    runs = _fixture(tmp_path)
+    runs.save(RunRecord("job-edge-0123456789abcdef", "job:edge", D1, T0))
+    runs.save(RunRecord("job-edge-eval-0123456789abcdef", "job:edge-eval", D1, T0))
+    runs.save(RunRecord("job-screen-fedcba9876543210", "job:screen", D1 + timedelta(1), T0))
+    runs.save(RunRecord("oddly-named", "screen", D1, T0 + timedelta(1)))  # implies no job
+    return runs
+
+
+def test_find_equals_the_full_scan_it_replaced(tmp_path: Path) -> None:
+    runs = _job_fixture(tmp_path)
+    jobs = [*JOBS, "job:screen", "job:edge", "job:edge-eval", "job:none", "screen-", "oddly"]
+    for job in jobs:
+        for day in (None, D1, D1 + timedelta(1), D1 + timedelta(30)):
+            assert runs.find(job, day) == _old_find(runs, job, day), (job, day)
+    assert len(runs.find("screen")) == 5  # four dated, the odd name (opened, job matches)
+    assert len(runs.find("job:screen")) == 2
+
+
+def test_find_decodes_no_job_name_per_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The call budget: the stems' jobs are decoded once per listing, never per ``find``."""
+    runs = LocalBackend(tmp_path).runs
+    for n in range(300):  # many session-less job records and many dated runs
+        runs.save(RunRecord(f"job-kind{n % 20}-{n:016x}", f"job:kind{n % 20}", D1, T0))
+        runs.save(start_run(f"j{n % 40}", D1 + timedelta(n % 5), T0 + timedelta(n)))
+    calls = []
+    real = job_of_name
+    monkeypatch.setattr(run_listing, "job_of_name", lambda s: calls.append(s) or real(s))
+    runs.find("j1")  # the listing is built: one decode per undated stem
+    built = len(calls)
+    assert built == 300
+    for _ in range(50):
+        runs.find("j1")
+        runs.find("job:kind3")
+    assert len(calls) == built
