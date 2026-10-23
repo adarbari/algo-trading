@@ -273,16 +273,22 @@ function toTableRow(
             }}
           />
           {row.kind === 'mine' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label={`Delete ${row.id}`}
-              onClick={() => {
-                onDelete(row.id);
-              }}
-            >
-              Delete
-            </Button>
+            <>
+              <IconButton
+                icon="copy"
+                label={`Duplicate ${name}`}
+                onClick={() => {
+                  onDuplicate(row);
+                }}
+              />
+              <IconButton
+                icon="trash"
+                label={`Delete ${name}`}
+                onClick={() => {
+                  onDelete(row.id);
+                }}
+              />
+            </>
           )}
         </Stack>
       ) : null,

@@ -249,16 +249,23 @@ describe('ScreenerList', () => {
     expect(onEdit).toHaveBeenCalledWith('my-vrp');
   });
 
+  it('duplicates one of yours and opens the copy to edit', async () => {
+    const { onEdit } = setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicate Name of my-vrp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'finish duplicate of my-vrp' }));
+    expect(onEdit).toHaveBeenCalledWith('copy-of-my-vrp');
+  });
+
   it('asks before deleting one of yours', async () => {
     setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete my-vrp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Name of my-vrp' }));
     await userEvent.click(screen.getByRole('button', { name: 'confirm delete of my-vrp' }));
     expect(screen.queryByRole('button', { name: /confirm delete/ })).toBeNull();
   });
 
   it('copies a preset first, with the pencil, and never offers Delete on one', async () => {
     const { onEdit } = setup();
-    expect(screen.queryByRole('button', { name: 'Delete vrp_scanner' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Delete .*vrp_scanner/ })).toBeNull();
     await userEvent.click(
       screen.getByRole('button', { name: 'Duplicate Name of vrp_scanner to edit' }),
     );

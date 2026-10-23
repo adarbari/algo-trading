@@ -23,6 +23,18 @@ const PATHS = {
   'chevron-left': <path d="M10 4L6 8l4 4" />,
   'chevron-right': <path d="M6 4l4 4-4 4" />,
   check: <path d="M3.5 8.5l3 3 6-7" />,
+  copy: (
+    <>
+      <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.25" />
+      <path d="M10.5 3.5v-.25A.75.75 0 0 0 9.75 2.5h-6A.75.75 0 0 0 3 3.25v6c0 .41.34.75.75.75H4" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M3 4.5h10M6.5 4.5V3h3v1.5" />
+      <path d="M4.5 4.5l.5 8.5h6l.5-8.5M7 7v4M9 7v4" />
+    </>
+  ),
   pencil: <path d="M10.5 3l2.5 2.5L6 12.5l-3 .5.5-3z" />,
   alert: (
     <>
@@ -84,7 +96,7 @@ export type IconTone =
   'inherit' | 'muted' | 'secondary' | 'accent' | 'positive' | 'warning' | 'negative' | 'info';
 
 export interface IconProps {
-  /** Which icon: close, plus, minus, search, chevron-*, check, pencil, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. */
+  /** Which icon: close, plus, minus, search, chevron-*, check, pencil, copy, trash, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. */
   name: IconName;
   /** sm 12, md 14 (default), lg 16 px. */
   size?: 'sm' | 'md' | 'lg';

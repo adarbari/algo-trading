@@ -799,7 +799,7 @@ Source: `design-system/components/Icon`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, pencil, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. |
+| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, pencil, copy, trash, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. |
 | `size` | `'sm' \| 'md' \| 'lg'` | no | sm 12, md 14 (default), lg 16 px. |
 | `tone` | `IconTone` | no | Colour role; `inherit` (default) follows the surrounding text. |
 | `label` | `string` | no | Accessible name when the icon alone carries meaning; omit for decorative icons. |
