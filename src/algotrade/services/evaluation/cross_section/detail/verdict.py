@@ -20,6 +20,7 @@ from algotrade.config.edges.document import MAIN, job_name
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.user import SITE_USER
+from algotrade.features.framework.feature import strictest
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, runs
 from algotrade.services.read.evaluation.edges import Edge
@@ -50,12 +51,10 @@ def canonical_kind(edge: Edge, run: EdgeRun) -> bool:
 
 
 def _licence(rows: tuple[EdgeRow, ...]) -> str | None:
-    """The strictest licence of the main edge variant's rows: ``personal`` if any row has it,
-    else the first by name; None when none is recorded (a run from before licences)."""
+    """The strictest licence of the main edge variant's rows (``strictest``: ``yahoo`` over
+    ``personal`` over ``open``); None when none is recorded (a run from before licences)."""
     found = {r.licence for r in rows if r.edge_variant == MAIN and r.licence}
-    if runs.PERSONAL in found:
-        return runs.PERSONAL
-    return min(found) if found else None
+    return strictest(found) if found else None
 
 
 def verdict_frame(

@@ -1,4 +1,4 @@
-"""``analyst_estimates@v1``: FY1 and FY2 from our own FMP snapshots, the fiscal-year roll, annual
+"""``analyst_estimates@v2``: FY1 and FY2 from our own FMP snapshots, the fiscal-year roll, annual
 estimates only, STALE after 21 days, NOT_COVERED and NOT_FETCHED told apart, the personal
 licence."""
 
@@ -244,12 +244,12 @@ def test_a_late_rerun_does_not_reach_back_to_the_session_before_it() -> None:
     assert run(writer, fri).loc[A, "eps_fy1"] == 50.0
 
 
-def test_the_output_conforms_to_the_declared_types_and_every_feature_is_personal() -> None:
+def test_the_output_conforms_to_the_declared_types_and_every_feature_is_yahoo_licensed() -> None:
     writer = snapshot_of(S, estimates(A, YEARS))
     conform("t", run(writer, S, ids=(A, B)).reset_index(), ae.COLUMNS)
-    assert all(f.licence == "personal" for f in ae.GROUP.features)
+    assert all(f.licence == "yahoo" for f in ae.GROUP.features)
     assert ae.GROUP.optional
-    values = [f for f in ae.GROUP.features if f.name != ae._STATUS]
+    values = [f for f in ae.GROUP.features if f.name not in (ae._STATUS, ae._SOURCE)]
     assert all(f.null_status == ae._STATUS and f.uncovered_statuses == UNCOVERED for f in values)
 
 

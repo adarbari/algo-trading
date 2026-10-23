@@ -326,7 +326,7 @@ def test_a_cursor_from_a_viewer_with_other_licences_is_refused_not_shifted(
         ("site", "settings", "users"): {
             "user": [
                 {"id": "admin", "role": "admin"},
-                {"id": "full", "role": "trader", "licences": ["personal"]},
+                {"id": "full", "role": "trader", "licences": ["personal", "yahoo"]},
                 {"id": "bare", "role": "trader"},
             ]
         },

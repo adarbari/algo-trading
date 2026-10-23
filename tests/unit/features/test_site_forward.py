@@ -28,8 +28,8 @@ from tests.unit.services.screening.test_rule_screens import ACTIVE, DAY, seeded
 
 PRICE = "rollups/instrument/price_stats@v2"
 FINANCIALS = "rollups/instrument/financials@v3"
-ESTIMATES = "rollups/instrument/analyst_estimates@v1"
-TARGETS = "rollups/instrument/analyst_targets@v1"
+ESTIMATES = "rollups/instrument/analyst_estimates@v2"
+TARGETS = "rollups/instrument/analyst_targets@v2"
 TABLES = {
     PRICE: ("close",),
     FINANCIALS: ("revenue_ttm", "eps_diluted_ttm", "financials_status", "eps_stale", "is_adr"),
@@ -197,9 +197,9 @@ def test_nothing_divides_into_an_infinity(fs: FeatureSet) -> None:
 FEATURES = [f"feature.{n}" for n in NAMES]
 
 
-def test_each_forward_feature_inherits_the_personal_licence() -> None:
+def test_each_forward_feature_inherits_the_yahoo_licence() -> None:
     features = catalogue_features()
-    assert {n: licence_of(features, n) for n in FEATURES} == dict.fromkeys(FEATURES, "personal")
+    assert {n: licence_of(features, n) for n in FEATURES} == dict.fromkeys(FEATURES, "yahoo")
 
 
 def test_the_forward_features_are_hidden_from_a_viewer_without_the_licence() -> None:
@@ -247,10 +247,14 @@ def test_a_hard_criterion_on_forward_pe_is_unknown_for_a_viewer_without_the_lice
     BBB (40); without the licence every row is UNKNOWN or rejected, nothing passes, and no
     value is read."""
     reader, config = _forward_session()
-    both = frozenset({"open", "personal"})
+    both = frozenset({"open", "personal", "yahoo"})
     holder = screen_session(reader, config, DAY, now=T0, held=both)
     assert holder.run.coverage is RunCoverage.COMPLETE
     assert holder.rules is not None and holder.rules.summary.passed == 1
+    personal_only = screen_session(
+        reader, config, DAY, now=T0, held=frozenset({"open", "personal"})
+    )
+    assert personal_only.rules is not None and personal_only.rules.summary.passed == 0  # ADR 0080
     hidden = screen_session(reader, config, DAY, now=T0, held=frozenset({"open"}))
     assert hidden.rules is not None and hidden.rules.summary.passed == 0
     for row in hidden.rules.rows:

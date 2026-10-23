@@ -1,0 +1,54 @@
+# Upward EPS revisions (ADR 0053, EB E3b; edge analyst_revision_momentum): a common stock trading
+# at least $5M a day whose consensus EPS for the current fiscal year moved over the last 30 days
+# (rollup.analyst_revisions@v2, our own nightly snapshots of FMP's estimates, else Yahoo's), ranked by the size of the revision,
+# the biggest upward first. A missing value never passes (ADR 0030): a name the free vendor key
+# does not cover has none, and the 30-day column is null until about 2026-11-18. What it does not
+# check: breadth (how many analysts moved), the size of the base, a revision caused by a report.
+# The source (FMP annual estimates, else Yahoo's) is an owner-only licence feed (`yahoo`, ADR 0080). The figure is a percent change in
+# the estimate, not the paper's change over price.
+# v2 (ADR 0080) reads analyst_revisions@v2 (v1 read @v1, now superseded); the rules are the same.
+# Immutable: change it by adding v3.toml (architecture/preset_versions.toml).
+id = "eps_revision_up"
+kind = "screener"
+impl = "rules"
+version = 2
+name = "Upward EPS revisions"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.revision]
+field = "rollup.analyst_revisions@v2.eps_fy1_revision_30d"
+op = "gte"
+value = -10000
+mode = "soft"    # the analyst data is an optional source (ADR 0055): a HARD criterion is refused
+tolerance = 1.0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+eps_fy1_revision_30d = "rollup.analyst_revisions@v2.eps_fy1_revision_30d"
+eps_fy1_revision_90d = "rollup.analyst_revisions@v2.eps_fy1_revision_90d"
+revisions_status = "rollup.analyst_revisions@v2.revisions_status"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.analyst_revisions@v2.eps_fy1_revision_30d"

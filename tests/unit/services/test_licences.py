@@ -3,6 +3,7 @@ field (an expression feature inherits the strictest of what it reads) and the fi
 may not see."""
 
 from algotrade.config.site.users import UsersSettings
+from algotrade.features.framework.feature import strictest
 from algotrade.services.features import site_features
 from algotrade.services.licences import (
     ALL_LICENCES,
@@ -16,7 +17,7 @@ from algotrade.services.licences import (
 USERS = UsersSettings.from_document(
     {
         "user": [
-            {"id": "owner", "role": "admin", "licences": ["personal"]},
+            {"id": "owner", "role": "admin", "licences": ["personal", "yahoo"]},
             {"id": "admin2", "role": "admin"},
             {"id": "trader", "role": "trader"},
         ]
@@ -41,7 +42,7 @@ def test_an_expression_inherits_the_strictest_licence_of_what_it_reads() -> None
     assert licence_of(features, OPEN) == "open"
     assert licence_of(features, "instrument.sector") == "open"  # a reference fact
     # a name the catalogue does not resolve (a run owner's own feature) fails closed
-    assert licence_of(features, "feature.no_such_feature") == "personal"
+    assert licence_of(features, "feature.no_such_feature") == "yahoo"  # the strictest
 
 
 def test_hidden_fields_are_those_outside_the_held_licences() -> None:
@@ -62,3 +63,21 @@ def test_a_stored_run_is_gated_by_its_record_and_the_site_catalogue_never_a_view
     # the stricter of the record and today's licence wins; a run with no record reads by today's
     assert hidden_stored(features, {STORED: "open"}, [STORED], {"open"}) == {STORED}
     assert hidden_stored(features, None, [OPEN, STORED], {"open"}) == {STORED}
+
+
+FORWARD = "feature.forward_pe"  # over analyst_estimates@v2: FMP's or Yahoo's, per name (ADR 0080)
+ESTIMATE = "rollup.analyst_estimates@v2.eps_fy1"
+
+
+def test_analyst_values_are_yahoo_licensed_and_never_served_to_a_personal_only_holder() -> None:
+    features = site_features()
+    assert licence_of(features, ESTIMATE) == "yahoo"
+    assert licence_of(features, FORWARD) == "yahoo"  # an expression inherits the strictest
+    assert licence_of(features, "rollup.analyst_ratings@v1.rating_score") == "personal"
+    assert strictest(["open", "personal", "yahoo", "personal"]) == "yahoo"
+    assert strictest(["open", "personal"]) == "personal" and strictest([]) == "open"
+    asked = [ESTIMATE, FORWARD, OPEN]
+    assert hidden_fields(features, asked, {"open"}) == {ESTIMATE, FORWARD}
+    assert hidden_fields(features, asked, {"open", "personal"}) == {ESTIMATE, FORWARD}
+    assert hidden_fields(features, asked, ALL_LICENCES) == frozenset()
+    assert "yahoo" not in held_by(USERS, "admin2") and "yahoo" in held_by(USERS, "owner")

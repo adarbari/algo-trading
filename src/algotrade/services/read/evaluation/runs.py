@@ -31,6 +31,7 @@ from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.data import StoreReader
+from algotrade.features.framework.feature import LICENCES, strictest
 from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, once_per_request, run_partition
@@ -645,7 +646,7 @@ def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], i
 
 # ---------------------------------------------------------------------------- the trade ledger
 LEDGER = "edge_trades"
-PERSONAL = "personal"
+OPEN = "open"
 # The per-name columns each recorded column licence covers (ADR 0064 decision 10).
 LICENSED: Final = {
     "value_licence": ("value", "gross_value", "reference", "touch"),
@@ -763,15 +764,20 @@ def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
     )
 
 
-def _redacted(row: Mapping[str, Any], holder: bool, table: str) -> dict[str, Unknown]:
-    """The per-name columns of ``row`` the viewer may not see: those whose recorded licence is
-    personal, unless the viewer holds it (decided by the recorded licence, never by name)."""
-    if holder:
-        return {}
+def _covered(licence: Any, held: Collection[str]) -> bool:
+    """Whether a recorded column licence lets the viewer read: none recorded, ``open`` or held
+    (any licence, never only ``personal``: ``yahoo`` columns are redacted the same way)."""
+    return licence is None or licence in (OPEN, "") or licence in held
+
+
+def _redacted(row: Mapping[str, Any], held: Collection[str], table: str) -> dict[str, Unknown]:
+    """The per-name columns of ``row`` the viewer may not see: those whose recorded licence the
+    viewer does not hold (decided by the recorded licence, never by name)."""
     out: dict[str, Unknown] = {}
     for licence_column, columns in LICENSED.items():
-        if to_scalar(row.get(licence_column)) == PERSONAL:
-            why = table_cause(table, f"{licence_column} is personal", "LICENCE")
+        licence = to_scalar(row.get(licence_column))
+        if not _covered(licence, held):
+            why = table_cause(table, f"{licence_column} is {licence}", "LICENCE")
             out.update(dict.fromkeys(columns, Unknown(UnknownCode.LICENCE, why)))
     return out
 
@@ -814,24 +820,25 @@ def load_run_trades(
         keep &= frame["variant"] == variant
     if horizon is not None:
         keep &= frame["horizon_sessions"] == horizon
-    holder = load_users(ctx.configs).holds(ctx.user.user_id, PERSONAL)
+    users, me = load_users(ctx.configs), ctx.user.user_id
+    held = [x for x in LICENCES if users.holds(me, x)]  # what the registry says: never a role
     found = frame[keep].sort_values(LEDGER_ORDER, kind="stable")
     if sort in SORTABLE:
         column = "adv_usd_20d" if sort == "adv_usd" else sort  # the stored column of the field
         key = found[column]
         for licence_column, columns in LICENSED.items():
-            if column in columns and not holder and licence_column in found:
-                key = key.where(found[licence_column] != PERSONAL)
+            if column in columns and licence_column in found:
+                key = key.where(found[licence_column].map(lambda v: _covered(to_scalar(v), held)))
         found = found.assign(_key=key).sort_values(
             "_key", ascending=not descending, na_position="last", kind="stable"
         )
     page = found.iloc[offset : None if limit is None else offset + limit]
     rows = tuple(
-        _trade(r, _redacted(r, holder, table))
+        _trade(r, _redacted(r, held, table))
         for r in ({str(k): v for k, v in row.items()} for row in page.to_dict("records"))
     )
     licences = {str(v) for v in found["licence"].dropna()} if "licence" in found else set()
-    licence = PERSONAL if PERSONAL in licences else (licences.pop() if licences else None)
+    licence = strictest(licences) if licences else None
     return RunTrades(None, rows, len(found), licence)
 
 

@@ -59,9 +59,10 @@ see_also = ["unknown", "liquidity_risk"]
 [[term]]
 id = "unavailable_licence"
 term = "Not available under your data licence"
-short = "The field comes from a personal-licence source that only its owner may read."
+short = "The field comes from a personal-use source (a brokerage feed, or free Financial Modeling Prep or Yahoo data) that only its owner may read."
 body = """
-Some data (from the owner's brokerage connection) is licensed for personal use. Another user
+Some data (from the owner's brokerage connection, or the free analyst data of Financial
+Modeling Prep and Yahoo Finance) is licensed for personal use. Another user
 sees the field as unavailable, and a formula over it inherits the same licence. It is a rule
 of the data, not a fault.
 """
@@ -72,8 +73,9 @@ id = "unavailable_not_covered"
 term = "Not covered by our analyst data"
 short = "The analyst source we use has no estimates for this instrument, so the field has no value."
 body = """
-Analyst estimates, targets and revisions come from a free data source that covers only a
-minority of names, mostly the large and widely followed ones. When the source has nothing for
+Analyst estimates, targets and revisions come from free data sources: Financial Modeling Prep,
+and Yahoo Finance for names the first does not cover. They cover only a minority of names, mostly
+the large and widely followed ones. When the source has nothing for
 an instrument, or the app has not asked it yet, the field shows this word. Most names show
 it for analyst fields, so it is the common case, not a fault. It does not mean analysts
 expect nothing. A screen treats it as missing data, like any other UNKNOWN value: a hard

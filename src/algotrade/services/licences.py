@@ -17,6 +17,7 @@ from algotrade.features.framework.feature import LICENCES, Licence
 
 OPEN: Licence = "open"
 PERSONAL: Licence = "personal"
+STRICTEST: Licence = "yahoo"  # an unknown field: no licence is known to cover it (LICENCES[-1])
 ALL_LICENCES: frozenset[str] = frozenset(LICENCES)  # every licence held: no field is hidden
 # What a caller that reads for no user passes (``held`` has no default): the edge harness,
 # backtests and training record the licence of what they read themselves (ADR 0064), and the
@@ -32,12 +33,12 @@ def held_by(users: UsersSettings, user_id: str) -> frozenset[str]:
 def licence_of(features: FeatureSet, field: str) -> str:
     """The licence of a catalogue field (``rollup.<key>.<col>``, ``market.<key>.<col>``,
     ``feature.<name>``); ``open`` for ``instrument.*`` reference facts. A name the catalogue
-    does not resolve (a run owner's own expression feature, a field since removed) is
-    ``personal``: fail closed, its licence is unknown."""
+    does not resolve (a run owner's own expression feature, a field since removed) carries the
+    strictest licence: fail closed, its licence is unknown."""
     found = features.feature(field)
     if found is not None:
         return str(found.licence)
-    return OPEN if field.partition(".")[0] == "instrument" else PERSONAL
+    return OPEN if field.partition(".")[0] == "instrument" else STRICTEST
 
 
 def hidden_fields(

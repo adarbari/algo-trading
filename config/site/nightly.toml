@@ -52,10 +52,10 @@ enabled = true                   # false: the nightly skips the step (the copies
 market_prefix = "rollups/market/"   # every table under it is copied, all years (a few MB each)
 instrument_tables = [            # the tables Explore reads, copied for the last `recent_years` years: bars and every
     "bars/1d",                   # instrument rollup group (a Features tab history reads them all; test_nightly.py). 176 MB
-    "rollups/instrument/analyst_estimates@v1",
+    "rollups/instrument/analyst_estimates@v2",
     "rollups/instrument/analyst_ratings@v1",
-    "rollups/instrument/analyst_revisions@v1",
-    "rollups/instrument/analyst_targets@v1",
+    "rollups/instrument/analyst_revisions@v2",
+    "rollups/instrument/analyst_targets@v2",
     "rollups/instrument/anchored_vwap@v2",   # 68 MB
     "rollups/instrument/illiquidity@v1",   # about 10 MB a year (2 columns): measure before the first backfill
     "rollups/instrument/balance_sheet@v2",

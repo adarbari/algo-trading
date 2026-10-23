@@ -84,6 +84,7 @@
 "dual_class_cheap_leg/v1.toml" = "040d0ede500674712e462967fe7a9a8d865fbca35cd2e505b5a0a8e2722f0298"
 "momentum_squeeze_entry/v1.toml" = "2f37ad75f23b000c9c9c57fd1093de23e69eed2ca1162ed2e5791ec7a1d3ed0c"
 "eps_revision_up/v1.toml" = "327bc0b7e1fe0259b128a7b30c73c2b0ea405a7e14682066aaa5b3397700281d"
+"eps_revision_up/v2.toml" = "7410588ebdc28877aec0ce69660ba4620c2178079810c80dba356197b69fd850"
 "target_upside_high/v1.toml" = "8a7a670955d3e088acb04c2ddebc744f939d30e3ce94a55b5b4490468a8b656e"
 "trend_positive_3m/v1.toml" = "8b0f046f1e3cd56209f10c5ceef74e535f8cccb5beb7eb3c442afe5e8c526cca"
 "trend_positive_6m/v1.toml" = "2985f9dc4bd78bc468f3477f0fba2b7bc2e30ff24d13f8ff6aa9f2b143de2b05"

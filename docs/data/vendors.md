@@ -47,7 +47,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
-| Analyst estimates, price targets, ratings (free tier) | **Yahoo** (unofficial, owner-only licence, ADR 0080: stored for the names FMP refuses, not yet read), **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v1`, `analyst_targets@v1`, `analyst_ratings@v1`, `analyst_revisions@v1` are built (docs/data/layers.md) |
+| Analyst estimates, price targets, ratings (free tier) | **Yahoo** (unofficial, owner-only licence, ADR 0080: read per name when FMP has none: `analyst_*@v2`), **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v1`, `analyst_targets@v1`, `analyst_ratings@v1`, `analyst_revisions@v1` are built (docs/data/layers.md) |
 | Short interest (twice a month) and daily short-sale volume | **FINRA Query API** (`api.finra.org`, anonymous; `consolidatedShortInterest` by `settlementDate`, `regShoDaily` by `tradeReportDate`); `no_ml` tables | `cdn.finra.org` daily files (website terms: no ML, no database), Nasdaq short-interest pages (scraping), FMP (paid) | Implemented (EB D9): `short-interest`, `short-volume` |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
@@ -348,8 +348,9 @@ bypasses the limiter, so `[yahoo] min_interval_s = 1.0`); an ETF 404 `No fundame
 reports say Yahoo answers 429 per IP under heavy use, so the step is capped (`[yahoo] per_night = 60`),
 fail-soft and stops after three failures in a row. Not USD: no estimate rows, and no targets when
 `financialCurrency` is not USD, until the forward formulas handle currency. It asks only the names
-FMP's plan refuses (the "Financial Modeling Prep" section above: 402 is held 90 days); nothing reads
-its rows yet.
+FMP's plan refuses (the "Financial Modeling Prep" section above: 402 is held 90 days). The estimates, targets
+and revisions groups read one vendor per name, FMP first (`analyst_status.choose_vendor`, `*_source` column,
+`@v2`, licence `yahoo`, owner only: ADR 0080).
 
 ### What is stored and when
 

@@ -1,4 +1,4 @@
-"""``analyst_revisions@v1``: the change of the FY1 consensus against our own earlier snapshots of
+"""``analyst_revisions@v2``: the change of the FY1 consensus against our own earlier snapshots of
 the SAME fiscal year (matched on the year end, never the FY1 label), the MIN_BASE floor, OK /
 BUILDING / NO_PRIOR, and no snapshot the session could not know."""
 
@@ -29,7 +29,7 @@ def fin(iid: str, fy_end: str = "2025-12-31") -> pd.DataFrame:
 
 
 def rollup(writer, session: date = S, ids=(A,), fy_end: str = "2025-12-31") -> pd.DataFrame:
-    """``analyst_estimates@v1`` for the session as the store holds it (typed as stored)."""
+    """``analyst_estimates@v2`` for the session as the store holds it (typed as stored)."""
     inputs = {
         ae.SNAPSHOTS: visible(writer, session),
         ae.UNIVERSE: universe(*ids),
@@ -209,7 +209,9 @@ def test_names_without_served_estimates_pass_their_status_through_with_null_valu
     }
     assert got.loc[[B, C, "EQ:D"], REVISIONS].isna().all().all()
     assert got.loc[[B, C, "EQ:D"], "eps_fy1_analysts_change_90d"].isna().all()
-    values = [f for f in rv.GROUP.features if f.name != "revisions_status"]
+    values = [
+        f for f in rv.GROUP.features if f.name not in ("revisions_status", "revisions_source")
+    ]
     assert all(f.null_status == "revisions_status" for f in values)
     assert all(f.uncovered_statuses == UNCOVERED for f in values)
 
@@ -226,11 +228,11 @@ def test_the_estimates_rollup_is_a_required_input() -> None:
     assert spec[rv.ESTIMATES_TABLE].required and not spec[rv.SNAPSHOTS].required
 
 
-def test_the_output_conforms_and_every_feature_is_personal_and_optional() -> None:
+def test_the_output_conforms_and_every_feature_is_yahoo_licensed_and_optional() -> None:
     writer = store()
     history(writer)
     put(writer, S, [marker(B, "NOT_COVERED")], run_id="m")
     conform("t", run(writer, ids=(A, B)).reset_index(), rv.COLUMNS)
-    assert all(f.licence == "personal" for f in rv.GROUP.features) and rv.GROUP.optional
+    assert all(f.licence == "yahoo" for f in rv.GROUP.features) and rv.GROUP.optional
     assert rv.WINDOWS == (30, 60, 90) and not any("7d" in f.name for f in rv.GROUP.features)
     assert rv.GROUP.params is None

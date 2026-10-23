@@ -118,6 +118,7 @@ def test_licences_default_open_and_the_strictest_wins() -> None:
     assert _feature().licence == "open"
     assert strictest([]) == "open" and strictest(["open", "open"]) == "open"
     assert strictest(["open", "personal"]) == "personal"
+    assert strictest(["personal", "yahoo", "open"]) == "yahoo"  # ADR 0080
 
 
 def test_applicability_is_inherited_from_the_group_and_status_fields_resolve() -> None:

@@ -247,6 +247,11 @@ SUPERSEDED: dict[str, Superseded] = {
     "financials@v2": Superseded("financials@v3"),
     # the statement groups and growth_history read the facts by SEC acceptance session as well
     # (ADR 0067 amendment); every v1 column is unchanged, the values are not
+    # v2 reads Yahoo's rows when FMP has none for a name and adds the *_source column (ADR 0080);
+    # every v1 column is unchanged, the licence is now `yahoo` (the stricter of the two vendors)
+    "analyst_estimates@v1": Superseded("analyst_estimates@v2"),
+    "analyst_targets@v1": Superseded("analyst_targets@v2"),
+    "analyst_revisions@v1": Superseded("analyst_revisions@v2"),
     "growth_history@v1": Superseded("growth_history@v2"),
     "income_statement@v1": Superseded("income_statement@v2"),
     "cash_flow@v1": Superseded("cash_flow@v2"),

@@ -564,7 +564,7 @@ Sources: SEC EDGAR company facts (docs/data/vendors.md)
 
 Sources: SEC EDGAR company facts (docs/data/vendors.md)
 
-### `rollup.analyst_estimates@v1.fy1_period_end`
+### `rollup.analyst_estimates@v2.fy1_period_end`
 
 **How to read it.** The fiscal year end of the first estimate year: the first year the vendor lists after the last annual report we know. It is the current year, not yet reported, so a December filer reads 2026-12-31 until its 10-K is public.
 
@@ -576,14 +576,14 @@ Sources: SEC EDGAR company facts (docs/data/vendors.md)
 
 **When the reading lies**
 
-- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.
+- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v2.fy1_period_end.
 - A 52 or 53 week year can differ from the vendor's date by a few days; years ending within 60 days of the last report count as that report.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.fy2_period_end`
+### `rollup.analyst_estimates@v2.fy2_period_end`
 
 **How to read it.** The fiscal year end of the second estimate year, the next year the vendor lists after the first. It is one year after fy1_period_end for most names.
 
@@ -596,13 +596,13 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 **When the reading lies**
 
 - Null when the vendor lists only one forward year, which is common for thinly covered names. A hard criterion then drops them.
-- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.
+- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v2.fy1_period_end.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.eps_fy1`
+### `rollup.analyst_estimates@v2.eps_fy1`
 
 **How to read it.** The analysts' average estimate of earnings per share for the first estimate year, in dollars. Divided into the price it is the forward P/E; against the last reported EPS it is the growth analysts expect this year.
 
@@ -614,16 +614,16 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 
 **When the reading lies**
 
-- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.
+- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v2.fy1_period_end.
 - The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.
-- A consensus of one or two analysts is an opinion, not a consensus: read the analyst count beside it. Check rollup.analyst_estimates@v1.eps_fy1_analysts.
+- A consensus of one or two analysts is an opinion, not a consensus: read the analyst count beside it. Check rollup.analyst_estimates@v2.eps_fy1_analysts.
 - A negative estimate is a forecast loss; a forward P/E on it has no meaning. Check the sign before dividing.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.eps_fy2`
+### `rollup.analyst_estimates@v2.eps_fy2`
 
 **How to read it.** The analysts' average estimate of earnings per share for the second estimate year, in dollars. Against eps_fy1 it shows the growth analysts expect from one year to the next.
 
@@ -635,15 +635,15 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 
 **When the reading lies**
 
-- Fewer analysts cover the second year than the first, so it moves more between snapshots. Read it with rollup.analyst_estimates@v1.eps_fy1_analysts as the minimum count.
-- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.
+- Fewer analysts cover the second year than the first, so it moves more between snapshots. Read it with rollup.analyst_estimates@v2.eps_fy1_analysts as the minimum count.
+- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v2.fy1_period_end.
 - The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.revenue_fy1`
+### `rollup.analyst_estimates@v2.revenue_fy1`
 
 **How to read it.** The analysts' average estimate of revenue for the first estimate year, in dollars. Against rollup.financials@v3.revenue_ttm it is the growth analysts expect in sales.
 
@@ -655,16 +655,16 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 
 **When the reading lies**
 
-- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.
+- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v2.fy1_period_end.
 - The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.
-- A consensus of one or two analysts is an opinion, not a consensus: read the analyst count beside it. Check rollup.analyst_estimates@v1.revenue_fy1_analysts.
+- A consensus of one or two analysts is an opinion, not a consensus: read the analyst count beside it. Check rollup.analyst_estimates@v2.revenue_fy1_analysts.
 - Revenue is defined by each analyst: banks and insurers report it differently, and the average mixes the definitions.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.revenue_fy2`
+### `rollup.analyst_estimates@v2.revenue_fy2`
 
 **How to read it.** The analysts' average estimate of revenue for the second estimate year, in dollars.
 
@@ -677,14 +677,14 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 **When the reading lies**
 
 - Fewer analysts cover the second year than the first, so it moves more between snapshots.
-- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.
+- At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v2.fy1_period_end.
 - The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.eps_fy1_analysts`
+### `rollup.analyst_estimates@v2.eps_fy1_analysts`
 
 **How to read it.** How many analysts' EPS estimates the first year's average holds. Three or more is a consensus; one or two is a single view that can be stale.
 
@@ -699,11 +699,11 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 - The count is the vendor's at the snapshot, and an analyst who stopped covering the name may still be counted for weeks.
 - Large companies have 20 or more; below 5 one revision moves the average.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.revenue_fy1_analysts`
+### `rollup.analyst_estimates@v2.revenue_fy1_analysts`
 
 **How to read it.** How many analysts' revenue estimates the first year's average holds. It can differ from the EPS count, as some analysts publish one and not the other.
 
@@ -717,11 +717,11 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 
 - The count is the vendor's at the snapshot, and an analyst who stopped covering the name may still be counted for weeks.
 - Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.
+- Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v2.estimates_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.estimates_age_days`
+### `rollup.analyst_estimates@v2.estimates_age_days`
 
 **How to read it.** Days from the session the snapshot was fetched for to this session: how old the estimates are. The nightly rotation refreshes each covered name about every few days, so 0 to 10 is normal.
 
@@ -738,7 +738,7 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_estimates@v1.estimates_status`
+### `rollup.analyst_estimates@v2.estimates_status`
 
 **How to read it.** Whether the analyst estimates of the name can be used. OK: a snapshot at most 21 days old. STALE: older, so no value is served. NOT_COVERED: the vendor has no estimates for the name. NOT_FETCHED: we have not asked yet.
 
@@ -757,7 +757,7 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_targets@v1.target_consensus`
+### `rollup.analyst_targets@v2.target_consensus`
 
 **How to read it.** The average analyst price target, in dollars: where the analysts who cover the name expect the price in about twelve months. Against the close it is the upside they see, 20% above is a strong view.
 
@@ -773,11 +773,11 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 - The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.
 - The average mixes analysts who updated last week with ones who updated a year ago: the vendor does not date each target.
 - Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.
+- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v2.targets_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_targets@v1.target_median`
+### `rollup.analyst_targets@v2.target_median`
 
 **How to read it.** The median analyst price target, in dollars. It is less moved by one extreme target than the consensus, so a gap between the two means a skewed range.
 
@@ -792,11 +792,11 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 - Analysts raise targets after a rise and cut them after a fall, so a target above the price is often the lag of a rally.
 - The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.
 - Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.
+- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v2.targets_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_targets@v1.target_high`
+### `rollup.analyst_targets@v2.target_high`
 
 **How to read it.** The highest analyst price target, in dollars: the most optimistic single view.
 
@@ -811,11 +811,11 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 - One analyst sets it, and it can be old or built on a case the others reject. Never read it as the likely price.
 - The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.
 - Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.
+- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v2.targets_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_targets@v1.target_low`
+### `rollup.analyst_targets@v2.target_low`
 
 **How to read it.** The lowest analyst price target, in dollars: the most cautious single view. A low target above the price means every analyst expects a gain.
 
@@ -830,11 +830,11 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 - One analyst sets it, and it can be old or built on a case the others reject. Never read it as the likely price.
 - The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.
 - Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.
-- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.
+- Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v2.targets_age_days says how old it is.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_targets@v1.targets_age_days`
+### `rollup.analyst_targets@v2.targets_age_days`
 
 **How to read it.** Days from the session the snapshot was fetched for to this session: how old the targets are. The nightly rotation refreshes each covered name about every few days, so 0 to 10 is normal.
 
@@ -851,7 +851,7 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_targets@v1.targets_status`
+### `rollup.analyst_targets@v2.targets_status`
 
 **How to read it.** Whether the price targets of the name can be used. OK: a snapshot at most 21 days old. STALE: older, so no value is served. NOT_COVERED: the vendor has no target for the name. NOT_FETCHED: we have not asked yet.
 

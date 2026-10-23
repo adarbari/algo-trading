@@ -56,12 +56,12 @@ and the endpoint is unofficial; community reports are of 429s per IP under heavy
    `NOT_COVERED` (true of FMP); a reader does not look across names or vendors to call it
    `NOT_FETCHED`.
 
-## PR B design (decided now, built later)
+## PR B design (built 2026-10-23, see the amendment below)
 The reader chooses the vendor per (name, kind), FMP first: FMP's row set wins when its status is OK
 or STALE; the other vendor's rows and its coverage markers for that (name, kind) are dropped, so a
 flip from Yahoo to FMP leaves no mixed history. The groups move to `analyst_estimates@v2`,
 `analyst_targets@v2` and `analyst_revisions@v2` with a `*_source` string column (`fmp` / `yahoo`);
-revisions are null until 90 days of the new vendor's rows exist after a flip. Yahoo's and FMP's EPS
+revisions are null until 90 days of the new vendor's rows exist after a flip (sooner if it had already been fetching the name). Yahoo's and FMP's EPS
 bases differ (which EPS an analyst reports), so the two are never differenced. Ratings stay
 Finnhub-only. `parse_targets` gates on `financialCurrency` (the reporting currency), so an ADR such as
 TSM loses valid USD targets; PR B should gate on the listing currency instead. The `yahoo` licence is owner-only: the groups carry it and a viewer without it reads
@@ -74,3 +74,41 @@ TSM loses valid USD targets; PR B should gate on the listing currency instead. T
   resets on a 429 and transport errors never reach it, so the breaker cannot be relied on) and
   `per_night` is the knob; nothing downstream
   reads the rows until PR B.
+
+## Amendment 2026-10-23: PR B, the reader (built)
+- **Choice.** `analyst_status.choose_vendor` resolves each name for FMP and for Yahoo from the frame
+  the session sees (point in time, no look across names): FMP when OK or STALE, else Yahoo when it
+  has a row or a non-FAILED marker (status not NOT_FETCHED), else FMP. `effective_snapshots` keeps
+  only the chosen vendor's rows of the kind and its coverage markers (relabelled `fmp`, so the rest
+  of the group reads as before); `history_of_chosen` does the same for the revisions' history from
+  the estimates' `estimates_source`, so after a flip the new vendor's revisions are BUILDING /
+  NO_PRIOR until its own snapshots span the windows (90 days, sooner if it had already been
+  fetching the name). A fitness test checks every group
+  reads through them.
+- **Versions.** `analyst_estimates@v2`, `analyst_targets@v2`, `analyst_revisions@v2` (v1 in
+  `SUPERSEDED`), each with `estimates_source` / `targets_source` / `revisions_source` (fmp / yahoo;
+  fmp for a name neither has reached). Every v1 column is unchanged. The preset `eps_revision_up`
+  gains v2 (v1 is immutable and names the superseded fields); `target_upside_high` and the forward
+  formulas are expression features and moved by name. Ratings stay Finnhub-only (`@v1`, `personal`).
+- **Licence of a mixed column (the decision).** A feature's licence is static per column, and the
+  gate (0069) tests `licence in held`, so a column that holds FMP's value for one name and Yahoo's
+  for another cannot carry two. Every column of the three groups carries the stricter, `yahoo`
+  (`LICENCES` is ordered `open < personal < yahoo`; `strictest` takes the highest; expression
+  features inherit it). `yahoo` is held by the owner only (`config/site/users.toml`,
+  `DEFAULT_USERS`); nobody holds `personal` without `yahoo`, so no viewer loses a value they could
+  read, but FMP-derived analyst values are now gated by `yahoo` too. A field the catalogue does not
+  resolve fails closed to the strictest licence.
+- **The ledger gate found and fixed.** The edge-trade ledger redacted a column only when its
+  recorded licence was `personal` and the viewer lacked `personal`; a `yahoo` column (the analyst
+  edges' scores) would have been served to a viewer holding `personal` alone, and the verdict /
+  run licence took `min` of the strings. Redaction is now by any recorded licence the viewer does
+  not hold, and the run's licence is `strictest`.
+- **Currency limitation.** `parse_targets` gates on `financialCurrency` (the reporting currency), so
+  an ADR such as TSM loses valid USD targets from Yahoo; a later change should gate on the listing
+  currency. Estimates in another currency are dropped, as before.
+- **Not done here.** The Financials panel moved to the v2 fields; it does not display the source.
+  Showing "from Yahoo" beside a value is a later UI change (a Guide entry exists for each
+  `*_source` field).
+- **Holding `yahoo` requires holding `personal`** (`UserRecord` refuses otherwise). The ranking makes
+  an expression over an IBKR (`personal`) and an analyst (`yahoo`) feature `yahoo`, and the gate
+  asks for that exact licence, so a `yahoo`-only holder would otherwise read IBKR values.

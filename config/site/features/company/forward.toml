@@ -1,7 +1,8 @@
 # L3 site setting: expression features (ADR 0023), the "forward" theme: formulas over the analyst
-# consensus groups (rollup.analyst_estimates@v1, rollup.analyst_targets@v1; ADR 0068) and the
-# reported figures they are compared with. Every feature here reads a personal-use source, so it
-# inherits licence "personal" (ADR 0069: the strictest of its inputs): a viewer without the
+# consensus groups (rollup.analyst_estimates@v2, rollup.analyst_targets@v2; ADR 0068) and the
+# reported figures they are compared with. Every feature here reads an owner-only source (FMP's
+# or Yahoo's estimates, per name), so it inherits licence "yahoo" (ADR 0069, 0080: the strictest
+# of its inputs): a viewer without the
 # licence never sees a value, and a hard criterion on it reads UNKNOWN.
 #
 # FY1 is the first fiscal year ending after the last reported year, so at a fiscal-year roll (the

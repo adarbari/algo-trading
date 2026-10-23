@@ -123,10 +123,10 @@ def test_finnhub_warns_with_the_reason_when_the_run_skipped_it() -> None:
 # The groups that declare NOT_FETCHED, and the step and check that grade the names they hide (the
 # vendor the group reads: FMP for the estimates and targets, Finnhub for the ratings).
 DECLARING = {
-    "analyst_estimates@v1": ("analyst-snapshot", check_analyst_backlog),
-    "analyst_targets@v1": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_estimates@v2": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_targets@v2": ("analyst-snapshot", check_analyst_backlog),
     "analyst_ratings@v1": ("analyst-snapshot", check_finnhub_backlog),
-    "analyst_revisions@v1": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_revisions@v2": ("analyst-snapshot", check_analyst_backlog),
 }
 
 
