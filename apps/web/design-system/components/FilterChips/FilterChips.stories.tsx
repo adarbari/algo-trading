@@ -2,7 +2,12 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { narrow } from '../../testing';
-import { FilterChips, type FilterValues } from './FilterChips';
+import {
+  FilterChips,
+  type FilterChipItem,
+  type FilterValues,
+  type LegacyFilterChipsProps,
+} from './FilterChips';
 
 const FILTERS = [
   {
@@ -44,7 +49,32 @@ function Held({ initial = {} }: { initial?: FilterValues }) {
   );
 }
 
-const meta = {
+const ITEMS: FilterChipItem[] = [
+  { id: 'decision', label: 'Decision', valueText: 'Qualified, Watch', removes: 212, active: true },
+  { id: 'dte', label: 'DTE', valueText: '..14', removes: 96, unknown: 4, active: true },
+  { id: 'liq', label: 'Liquidity', valueText: 'risk', removes: 31, active: false },
+];
+
+/** The structured form with the caller's items. */
+function Applied({ initial = ITEMS }: { initial?: FilterChipItem[] }) {
+  const [items, setItems] = useState(initial);
+  return (
+    <FilterChips
+      items={items}
+      onToggle={(id) => {
+        setItems((now) => now.map((i) => (i.id === id ? { ...i, active: !i.active } : i)));
+      }}
+      onRemove={(id) => {
+        setItems((now) => now.filter((i) => i.id !== id));
+      }}
+      onClear={() => {
+        setItems([]);
+      }}
+    />
+  );
+}
+
+const meta: Meta<LegacyFilterChipsProps> = {
   title: 'Components/FilterChips',
   component: FilterChips,
   args: { filters: FILTERS, values: {}, onChange: () => undefined, onClear: () => undefined },
@@ -56,7 +86,7 @@ const meta = {
       },
     },
   },
-} satisfies Meta<typeof FilterChips>;
+};
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -76,3 +106,12 @@ export const Dense: Story = {
 
 /** A 375 px phone frame: the chips wrap, never scroll the page sideways. */
 export const Narrow: Story = { ...Dense, decorators: [narrow] };
+
+/** Structured chips (ADR 0082): "removes N", an unknown count, and one switched off (struck through). */
+export const Structured: Story = { render: () => <Applied /> };
+
+/** Structured chips at 375 px: the row wraps. */
+export const StructuredNarrow: Story = { render: () => <Applied />, decorators: [narrow] };
+
+/** No chips applied: the structured row renders nothing to clear. */
+export const StructuredNone: Story = { render: () => <Applied initial={[]} /> };

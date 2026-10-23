@@ -24,6 +24,20 @@ function Chosen(props: OptionListProps) {
   return <OptionList {...props} value={value} onSelect={setValue} />;
 }
 
+/** The multi-select with the caller's chosen ids. */
+function Toggled(props: OptionListProps) {
+  const [on, setOn] = useState<string[]>(['QUALIFIED']);
+  return (
+    <OptionList
+      {...props}
+      values={on}
+      onSelect={(id) => {
+        setOn((now) => (now.includes(id) ? now.filter((v) => v !== id) : [...now, id]));
+      }}
+    />
+  );
+}
+
 const meta = {
   title: 'Components/OptionList',
   component: OptionList,
@@ -68,5 +82,19 @@ export const Dense: Story = {
   args: {
     mono: false,
     items: fields.map(({ id, title }) => ({ id, title })),
+  },
+};
+
+/** Multi-select with counts (a filter's values): toggles with a check mark and the row count. */
+export const MultiWithCounts: Story = {
+  render: (args) => <Toggled {...args} />,
+  args: {
+    mono: false,
+    label: 'Decision',
+    items: [
+      { id: 'QUALIFIED', title: 'Qualified', count: 1234 },
+      { id: 'WATCH', title: 'Watch', count: 87 },
+      { id: 'AVOID', title: 'Avoid', count: 0 },
+    ],
   },
 };
