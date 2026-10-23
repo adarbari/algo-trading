@@ -200,7 +200,7 @@ licence = "yahoo"                # owner only: never served to another viewer, n
 per_night = 360                  # analyst-snapshot: baseline names a night at most (1 call each; ~5,000 names / refresh_days = ~360, amendment 2026-10-23b)
 refresh_days = 14                # a name FMP does not answer is asked again after this many days (the reader goes stale at 21); a refused one (404) after 4 x this
 standby_days = 45                # a name FMP answers is asked this rarely (the reader prefers FMP; Yahoo's row is the standby)
-nightly_ceiling = 400            # every Yahoo call a night, event pulls and the baseline together; the baseline yields (amendment 2026-10-23c)
+nightly_ceiling = 600            # every Yahoo call a night, event pulls and the baseline together; the baseline yields (amendment 2026-10-23c)
 events_enabled = true            # false: only the rolling baseline (no pull around a report date)
 cycle_anchor = "2026-10-23"      # day 0 of the rolling cycles: a name is due on the day its stable slot (hash of its id) falls in refresh_days / standby_days
 run_budget_s = 900               # its own time cap (the step runs last, so [fmp] run_budget_s cannot starve it); after it no further

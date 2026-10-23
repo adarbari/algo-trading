@@ -177,7 +177,7 @@ gathers its inputs and asks).
   fallback and the refresh; a date that is not after the session (stale, or past with no report
   seen) is unknown. The first sketch (enable about 83 days after the last pull, try daily until
   new data) guessed the gap; this is timed by the date and stops at the first new data.
-- **One ceiling.** `[yahoo] nightly_ceiling = 400` calls a night, in this order: names near the
+- **One ceiling.** `[yahoo] nightly_ceiling = 600` calls a night (owner decision 2026-10-23: 400 saturated at the peak, 600 keeps every gap at 13 days; the 2026-10-23c measurement below was at 400), in this order: names near the
   reader's staleness (18 days, so a busy season never starves the baseline), post pulls, pre
   pulls (each largest market cap first), then the baseline (at most `per_night = 360`, stalest
   first, then largest cap). A small cap past the ceiling falls back to its baseline slot.

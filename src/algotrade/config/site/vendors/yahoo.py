@@ -34,7 +34,7 @@ class YahooSettings:
     per_night: int = 360  # baseline names asked a night (one call each, stalest, then largest cap)
     refresh_days: int = 14  # a name FMP does not answer is asked again after this many days
     standby_days: int = 45  # a name FMP answers (the reader prefers FMP) is asked this rarely
-    nightly_ceiling: int = 400  # every Yahoo call a night, event pulls and baseline together
+    nightly_ceiling: int = 600  # every Yahoo call a night, event pulls and baseline together
     events_enabled: bool = True  # false: only the rolling baseline (the event pulls are off)
     cycle_anchor: date = date(2026, 10, 23)  # day 0 of the rolling cycles (the backfill's day)
     run_budget_s: int = 900  # its own time cap: after it no further call is made
