@@ -1,0 +1,97 @@
+# L3 site setting: the filters of the Explore table, the instrument universe (ADR 0082,
+# docs/ui/filtering.md). They replace the typed UniverseFilter arguments (security type, sector,
+# liquidity class, leveraged, optionable). Typed by src/algotrade/config/filters/definitions.py;
+# fitness tests: tests/unit/config/filters/. Every field is a catalogue name; the table has no
+# [[column]] of its own. Every filter's `guide` entry is in
+# config/site/guide/glossary/filters.toml.
+#
+# Not here, because the fact is not stored (listed in the PR as "needs new data"):
+#   setup:     nasdaq_listed / index membership other than the S&P 500 (only
+#              instrument.in_sp500 is stored; the exchange is a pick away under "More filters")
+
+label = "Explore"
+
+# ------------------------------------------------------------------------------------ setup
+
+[[filter]]
+id = "security_type"
+label = "Security type"
+group = "setup"
+kind = "pick"
+field = "instrument.security_type"
+options = "values"
+guide = "term:filter_security_type"
+
+[[filter]]
+id = "sector"
+label = "Sector"
+group = "setup"
+kind = "pick"
+field = "instrument.sector"
+options = "values"
+guide = "term:filter_sector"
+
+[[filter]]
+id = "in_sp500"
+label = "In the S&P 500"
+group = "setup"
+kind = "toggle"
+field = "instrument.in_sp500"
+guide = "term:filter_in_sp500"
+
+[[filter]]
+id = "leveraged"
+label = "Leveraged"
+group = "setup"
+kind = "toggle"
+field = "instrument.is_leveraged"
+guide = "term:filter_leveraged"
+
+[[filter]]
+id = "market_cap"
+label = "Market cap"
+group = "setup"
+kind = "range"
+field = "feature.market_cap"
+bins = [0, 300_000_000, 2_000_000_000, 10_000_000_000, 50_000_000_000, 200_000_000_000, 1_000_000_000_000, 5_000_000_000_000]
+guide = "term:filter_market_cap"
+
+[[filter]]
+id = "price"
+label = "Price"
+group = "setup"
+kind = "range"
+field = "rollup.price_stats@v2.close"
+bins = [0, 5, 10, 25, 50, 100, 250, 500, 1000, 5000]
+guide = "term:filter_price"
+
+# ------------------------------------------------------------------------------------ tradeable
+
+[[filter]]
+id = "liquidity_class"
+label = "Liquidity class"
+group = "tradeable"
+kind = "pick"
+field = "feature.liquidity_class"
+options = "static"
+guide = "term:filter_liquidity_class"
+
+[[filter.option]]
+value = "HIGH"
+label = "High"
+
+[[filter.option]]
+value = "MEDIUM"
+label = "Medium"
+
+[[filter.option]]
+value = "LOW"
+label = "Low"
+
+[[filter]]
+id = "optionable"
+label = "Has listed options"
+group = "tradeable"
+kind = "toggle"
+field = "instrument.optionable"
+guide = "term:filter_optionable"
