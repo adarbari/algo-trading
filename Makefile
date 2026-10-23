@@ -161,6 +161,9 @@ api-latency-views-capture: ## crawl the views on a CLONE (starts its own API on 
 api-latency:     ## per-API latency baseline (cold / warm / nocache) on its own API, real store -> docs/perf/api-latency-baseline.md; idle machine; ARGS="--uncached --data-url file://<clone>" for the truly uncached run (docs/perf/api-latency-uncached-run.md)
 	$(PY) scripts/perf/api_latency.py $(ARGS)
 
+api-latency-fast: ## the page-latency bar (1 s critical path per view, 1 s shell) on a CLONE, minutes: ARGS="--data-url file://<clone> [--record] [--ratio-mode]"; ARGS=--history prints the trend (docs/perf/page-latency-bar.md)
+	$(PY) scripts/perf/fast_bench.py $(ARGS)
+
 datasets-verify: ## committed golden CSVs match their checksums
 	$(BIN)algotrade-ingest golden verify
 

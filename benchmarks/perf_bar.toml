@@ -1,0 +1,38 @@
+# The page-latency bar (owner decisions 2026-10-22, docs/decisions/log.md): read by
+# scripts/perf/fast_bench.py (`make api-latency-fast`) and checked by tests/scripts/perf.
+# A VIEW is judged on its CRITICAL PATH (its slowest request, empty-cache first request).
+# The SHELL requests every screen asks for are judged together, as a separate limit.
+
+critical_path_limit_s = 1.0
+shell_total_limit_s = 1.0
+
+# the shell operations (a GuideEntries variant counts once, its slowest)
+shell_operations = ["Viewer", "SessionDate", "Regime", "StatusStrip", "EdgeDesk", "GuideEntries"]
+
+# Accepted exceptions: NONE. Round 8 (2026-10-22, quiet machine) had one view over the bar, /regime
+# (RegimeSignals 12.6 s, MarketHistory 7.6 s), from the clone snapshot's 257k small rollup files,
+# fixed by data steps (compaction of rollups/market), not by an exception. The entries held until
+# round 5-7 (ScreenerResults, HarnessRuns, InstrumentFacts, MarketHistory, RegimeSignals) were
+# withdrawn: every other view passed in round 8.
+#
+# A view whose critical-path operation is named here may exceed the limit until `expiry`. Every
+# entry needs the owner's approval (a docs/decisions/log.md link in `approval`), a reason, the date
+# granted and an expiry; an agent never adds or renews one (docs/perf/page-latency-bar.md):
+#
+# [[exception]]
+# operation = "OperationName"
+# reason = "the named fix, and why it is not done"
+# approval = "owner, docs/decisions/log.md 2026-MM-DD"
+# date = "2026-10-22"
+# expiry = "2026-11-22"
+
+# Views the capture cannot cover: NONE. The parametrised guide routes are measured with ids picked
+# from the clone at run time (VARIABLE_RESOLVERS in scripts/perf/fast_bench.py); any view or
+# operation that cannot be measured fails the gate.
+# (`unmeasured_views = [...]` with `unmeasured_expiry` is still honoured, owner approval needed.)
+
+# Operations whose answer may be empty by design: every other operation that answers null or
+# empty fails the gate (a stale capture). MyScreens: the benchmark viewer owns no screens, so []
+# is the right answer. Approved by the owner 2026-10-23.
+empty_ok_expiry = "2026-12-22"
+empty_ok = ["MyScreens"]

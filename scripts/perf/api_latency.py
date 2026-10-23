@@ -792,7 +792,7 @@ def run_profile(args: argparse.Namespace, ops: dict[str, dict]) -> int:
             patch=PATCH,
             data_url=args.data_url,
             config_dir=config,
-            out=PROFILE_DOC_OUT,
+            out=Path(args.profile_out) if args.profile_out else PROFILE_DOC_OUT,
             problem=answer_problem,
             rows_of=largest_list,
             min_free_mb=SWAP_FLOOR_MB[0],
@@ -831,6 +831,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="one uncached call per operation of ONE --page (or of --ops) in process under "
         "cProfile -> docs/perf/page-profiles.md",
+    )
+    p.add_argument(
+        "--profile-out",
+        metavar="FILE",
+        help="--profile: write here, not docs/perf/page-profiles.md",
     )
     p.add_argument(
         "--profile-limit",
