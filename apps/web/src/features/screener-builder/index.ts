@@ -10,6 +10,5 @@ export {
 export { previewPanelState, type PreviewPanelState } from './model/preview-state';
 export { CriterionRow } from './ui/CriterionRow';
 export { DescriptionField, DESCRIPTION_REQUIRED } from './ui/DescriptionField';
-export { FeaturePicker } from './ui/FeaturePicker';
 export { NewScreenerForm } from './ui/NewScreenerForm';
 export { TieBreakField } from './ui/TieBreakField';
