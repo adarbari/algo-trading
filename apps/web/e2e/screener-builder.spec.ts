@@ -42,11 +42,11 @@ test('the list shows your screeners and the site presets in one list', async ({ 
   await expect(rowOf('vrp_scanner')).toContainText('12 picks');
   await expect(rowOf('vrp_scanner')).toContainText('+3');
   await expect(rowOf('short_premium_liquidity')).toBeVisible();
-  // Every screener can be viewed, one built in code too.
+  // Every screener opens from its picks cell, one built in code too ("Not run" without a run).
   await expect(
-    rowOf('short_premium_liquidity').getByRole('button', { name: 'View' }),
+    rowOf('short_premium_liquidity').getByRole('button', { name: /^Open .*: not run$/ }),
   ).toBeVisible();
-  // The columns are the screener, its evidence, today's picks and the edit button.
+  // The columns are the screener, its evidence, today's picks and the actions.
   await expect(list.getByRole('columnheader')).toHaveText([
     'Screener',
     'Evidence and edges',
