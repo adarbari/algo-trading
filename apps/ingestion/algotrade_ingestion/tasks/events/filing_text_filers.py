@@ -140,7 +140,8 @@ def walk_index(
     weekday that is no holiday is re-read ``INDEX_RETRY_BACKOFF`` times, sleeping between reads,
     before it counts as missing; then the quarter's full index (one read per quarter) is asked,
     for SEC has no daily file for some quarters (all of 2011 Q3); a day with no row there either
-    is a gap.
+    is a gap. Once a quarter's full index is loaded it answers for every later missing day of that
+    quarter with no re-reads.
     A block or a failing day raises, so does a weekday with no index that is no SEC holiday (the
     run's own day may not be published yet) unless an operator verified it and listed it in
     ``allowed`` (``--allow-gap``): the list is never a partial one."""
@@ -194,7 +195,13 @@ def walk_index(
                     if day >= run.session:  # today's index comes after the close
                         continue
                     again: frozenset[str] | None = None
-                    for pause in INDEX_RETRY_BACKOFF:
+                    # a quarter whose full index is loaded already answers for the day: the
+                    # re-reads (6 s and 2 requests a day) are for the first gap of a quarter only
+                    for pause in (
+                        ()
+                        if (day.year, (day.month - 1) // 3 + 1) in quarters
+                        else (INDEX_RETRY_BACKOFF)
+                    ):
                         (sleep or nap)(pause)
                         again = read(day)
                         if again is not None:
@@ -206,8 +213,9 @@ def walk_index(
                         ciks.update(again)
                         continue
                     raise IndexGapError(
-                        f"no daily index for {day}, a weekday that is no SEC holiday: if SEC was "
-                        f"closed (verified by hand), pass --allow-gap {day}"
+                        f"no daily index for {day}, a weekday that is no SEC holiday, and the "
+                        f"quarter's full index has rows for no 10-K / 10-Q form filed that day: "
+                        f"if SEC was closed (verified by hand), pass --allow-gap {day}"
                     )
                 ciks.update(found)
         except BaseException:

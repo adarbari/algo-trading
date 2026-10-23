@@ -46,7 +46,7 @@ from algotrade.services.evaluation.cross_section.harness import (
 )
 from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
 from algotrade.services.evaluation.cross_section.measuring import MEASURED_COVERAGE, names_for
-from algotrade.services.evaluation.cross_section.picks import eligible, screen_variant
+from algotrade.services.evaluation.cross_section.picks import eligible, long_picks, screen_variant
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.storage.configs.store import ConfigStore
 
@@ -181,7 +181,6 @@ def edge_signals(
         return made(skipped=f"the screen read incomplete data ({run.coverage.value})")
     names = None if events is None else events.names[session]
     pickable = names_for(edge, universe.ids, names).pickable
-    chosen = [i for i in run.qualified if i in pickable]
-    picks = chosen if edge.top_k is None else chosen[: edge.top_k]
+    picks = long_picks(edge, run.qualified, pickable)
     sell = advance(leg.entry, horizon)
     return made(tuple(Signal(i, rank, leg.entry, sell) for rank, i in enumerate(picks, start=1)))

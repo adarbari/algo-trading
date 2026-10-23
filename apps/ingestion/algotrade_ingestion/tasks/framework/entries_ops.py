@@ -3,6 +3,7 @@
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import history_copy
+from algotrade_ingestion.tasks.edges import picks as edge_picks
 from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
 from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
@@ -105,6 +106,12 @@ def run_bar_quality(ctx: TaskContext, p: Params) -> RunRecord:
 
 def run_history_copy(ctx: TaskContext, p: Params) -> RunRecord:
     return history_copy.build_copies(ctx, session_of(p))
+
+
+def run_edge_picks(ctx: TaskContext, p: Params) -> RunRecord:
+    """``--date D`` is the one session (the nightly's); ``--from`` / ``--to`` a window."""
+    options = edge_picks.Options(p.get("start"), p.get("end"), p.get("edge"))
+    return edge_picks.store_picks(ctx, session_of(p), options)
 
 
 def run_edge_verdicts(ctx: TaskContext, p: Params) -> RunRecord:

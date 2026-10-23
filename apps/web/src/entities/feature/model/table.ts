@@ -48,6 +48,18 @@ type Served = NonNullable<gqlTypes.FeatureTableQuery['table']>;
 /** The catalogue entry of a column, as the table reads it (its format from the server). */
 export type ColumnInfo = Served['columns'][number];
 
+/** One edge's verdict on a pick of a screener's run, as the server decided it. */
+export interface PickEdge {
+  edgeId: string;
+  edgeName: string;
+  counts: boolean;
+  /** counts, paused, not_counted, not_a_decision_day, unjudged, not_stored or withheld. */
+  code: string;
+  topK?: number | null | undefined;
+  /** The pick's place among the run's qualified rows. */
+  place?: number | null | undefined;
+}
+
 /**
  * A table row: an instrument and its cells; a screener's result rows (a stored run, or the
  * Builder's preview) add their typed fields.
@@ -89,6 +101,8 @@ export interface TableRow {
   previousDecision?: string | null | undefined;
   /** The screen's display columns (`[columns]`): name -> the value the run stored. */
   columns?: Readonly<Record<string, unknown>> | undefined;
+  /** What each edge that lists the screener does with this pick (the server's rule): counted or not, and why. */
+  countsToward?: readonly PickEdge[] | undefined;
   /** Why the decision is not QUALIFIED. */
   reasons?: string | undefined;
   /** A preview row's criteria with their penalties: how its score was worked out. */

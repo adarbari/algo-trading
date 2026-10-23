@@ -6,11 +6,28 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from algotrade.config.edges.document import QUALITY_BAR
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
+from algotrade.services.evaluation.edge_picks.frame import RESULT, edge_picks_frame
+from algotrade.services.evaluation.edge_picks.night import (
+    NOT_DECISION_DAY,
+    PICKED,
+    SKIPPED,
+    EdgePicks,
+)
 from algotrade.services.features import catalogue
 from algotrade.services.licences import hidden_stored
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.evaluation.pick_edges import (
+    COUNTS,
+    NOT_A_DECISION_DAY,
+    NOT_COUNTED,
+    NOT_STORED,
+    PAUSED,
+    UNJUDGED,
+    PickEdge,
+)
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.results import (
@@ -29,9 +46,18 @@ from algotrade.services.read.screens.results import (
 from algotrade.services.read.screens.runs import ScreenerRun, latest_run
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
-from tests.unit.services.read.screens.conftest import D0, D1, T, context, write_gated, write_run
+from tests.unit.services.read.screens.conftest import (
+    D0,
+    D1,
+    Docs,
+    T,
+    context,
+    write_gated,
+    write_run,
+)
 
 
 def test_results_carry_criteria_columns_flags_and_identity(ctx: ReadContext) -> None:
@@ -556,3 +582,139 @@ def test_a_run_without_a_record_still_reads_its_values_file(
         assert run_withheld(trader, run) == {PERSONAL_FIELD}
         assert reads == ["results/rule_screen_values"]
         monkeypatch.undo()
+
+
+# --- counts toward (the harness's rule, decided on the server) ---
+
+
+def _edge(
+    edge_id: str,
+    screener: str,
+    top_k: int | None,
+    schedule: str = "every_session",
+    side: str | None = None,
+) -> Docs:
+    doc: dict[str, Any] = {
+        "id": edge_id, "name": edge_id.title(), "thesis": "Names keep rising.", "mechanism": "m",
+        "persistence": "p", "schedule": schedule, "universe": "all_active",
+        "screeners": [screener], "baselines": [], "status": "candidate",
+        "sources": [{"title": "A paper"}],
+        "outcome": {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+                    "start_offset_sessions": 1},
+        "quality_bar": {k: f"answer {k}" for k in QUALITY_BAR},
+    }  # fmt: skip
+    doc["top_k"] = "all" if top_k is None else top_k
+    if side is not None:
+        doc["outcome"]["side"] = side
+        doc["outcome"]["borrow_bps_annual"] = 30
+    return {("site", "edges", edge_id): doc}
+
+
+def _store(
+    backend: MemoryBackend, status: str, picks: Sequence[str] = (), edge_id: str = "drift",
+    screener: str = "beta", day: Any = D1,
+) -> None:  # fmt: skip
+    """The nightly's row for (``edge_id``, ``screener``) at ``day`` (ADR 0081)."""
+    row = EdgePicks(edge_id, screener, status, tuple(f"EQ:{p}" for p in picks), top_k=2)
+    frame = edge_picks_frame([row], day, f"picks-{edge_id}-{screener}", T)
+    ResultWriter(backend).write_result(RESULT, day, f"picks-{edge_id}-{screener}", frame)
+
+
+def _toward(ctx: ReadContext, owner: str, screener: str) -> dict[str, tuple[PickEdge, ...]]:
+    run = latest_run(ctx, owner, screener).run
+    assert run is not None
+    page = load_result_page(ctx, run)
+    return {r.instrument_id: r.counts_toward for r in page.results}
+
+
+def _codes(found: dict[str, tuple[PickEdge, ...]]) -> dict[str, list[tuple[str, int | None]]]:
+    return {i: [(e.code, e.place) for e in edges] for i, edges in found.items()}
+
+
+def test_a_pick_counts_where_the_edges_own_stored_picks_put_it(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    """The edge's stored list is the truth, whatever the run's own rank was."""
+    _store(backend, PICKED, ["CCC"])
+    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "site", "beta")
+    assert _codes(found) == {"EQ:CCC": [(COUNTS, 1)]}
+    (ccc,) = found["EQ:CCC"]
+    assert (ccc.edge_id, ccc.edge_name, ccc.counts, ccc.top_k) == ("drift", "Drift", True, 2)
+
+
+def test_a_session_with_no_stored_picks_says_not_stored_never_an_older_night(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    _store(backend, PICKED, ["CCC"], day=D0)  # an older session's picks are not this one's
+    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "site", "beta")
+    assert {e.code for edges in found.values() for e in edges} == {NOT_STORED}
+    assert not any(e.counts for edges in found.values() for e in edges)
+
+
+def test_an_edge_with_no_row_is_not_stored_while_another_has_its_picks(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    _store(backend, PICKED, ["CCC"], edge_id="alpha")
+    ctx = context(reader, {**_edge("alpha", "beta", 2), **_edge("zeta", "beta", 2)})
+    found = _toward(ctx, "site", "beta")
+    assert [(e.edge_id, e.code) for e in found["EQ:CCC"]] == [
+        ("alpha", COUNTS),
+        ("zeta", NOT_STORED),
+    ]
+
+
+def test_a_pick_the_regime_gate_held_back_is_never_counted(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)  # AAA QUALIFIED, BBB and DDD PAUSED, CCC REJECT
+    _store(backend, PICKED, ["AAA"], screener="alpha")
+    found = _toward(context(reader, _edge("drift", "alpha", top_k=None)), "site", "alpha")
+    assert _codes(found) == {
+        "EQ:AAA": [(COUNTS, 1)],
+        "EQ:BBB": [(PAUSED, None)],
+        "EQ:CCC": [(NOT_COUNTED, None)],
+        "EQ:DDD": [(PAUSED, None)],
+    }
+
+
+def test_a_screener_no_edge_lists_has_none(reader: StoreReader) -> None:
+    assert _toward(context(reader), "site", "beta")["EQ:CCC"] == ()
+
+
+def test_a_session_the_schedule_does_not_decide_and_an_unjudged_edge_count_nothing(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    _store(backend, NOT_DECISION_DAY, edge_id="monthly")
+    _store(backend, "unjudged", edge_id="shorty")
+    _store(backend, SKIPPED, edge_id="gap")
+    ctx = context(
+        reader,
+        {
+            **_edge("monthly", "beta", 5, schedule="month_end"),
+            **_edge("shorty", "beta", 5, side="short"),
+            **_edge("gap", "beta", 5),
+        },
+    )
+    for edges in _toward(ctx, "site", "beta").values():
+        assert [(e.edge_id, e.code, e.counts, e.place) for e in edges] == [
+            ("gap", NOT_STORED, False, None),
+            ("monthly", NOT_A_DECISION_DAY, False, None),
+            ("shorty", UNJUDGED, False, None),
+        ]
+
+
+def test_a_users_own_edge_is_not_stored_whatever_a_row_says(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    _store(backend, PICKED, ["BBB"], edge_id="mine")
+    own = {("me", "edges", "mine"): _edge("mine", "beta", 2)[("site", "edges", "mine")]}
+    found = _toward(context(reader, own), "site", "beta")
+    assert [(e.edge_id, e.code) for e in found["EQ:CCC"]] == [("mine", NOT_STORED)]
+
+
+def test_a_viewers_own_run_is_not_judged_by_the_sites_picks(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    _store(backend, PICKED, ["BBB"])
+    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "me", "beta")  # me's beta
+    assert {e.code for edges in found.values() for e in edges} == {NOT_STORED}

@@ -17,7 +17,7 @@ the previous stored session (``runs.load_previous_run``): a ticker is *picked* w
 ``runs.is_picked`` says so (the Ideas rule)."""
 
 from collections.abc import Hashable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any
 
@@ -37,6 +37,7 @@ from algotrade.services.read.context import (
     catalogue_key,
     run_rows_of,
 )
+from algotrade.services.read.evaluation.pick_edges import PickEdge, load_pick_edges
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -125,6 +126,9 @@ class ScreenResult:
     regime: str | None = None
     size_multiplier: float | None = None
     groups: tuple[ScreenGroup, ...] = ()  # the screen's groups, each with its outcome (ADR 0071)
+    # What each edge that lists the screener does with the row (``pick_edges``); only a review
+    # table page fills it (empty: no edge lists the screener, or a read that does not ask)
+    counts_toward: tuple[PickEdge, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -717,6 +721,8 @@ def load_result_page(
     changes = {run.run_id: load_run_changes(ctx, run)}
     found = load_results(ctx, {run.run_id: shown}, [run], changes)
     results = [found[(run.run_id, i)] for i in shown if (run.run_id, i) in found]
+    toward = load_pick_edges(ctx, run, [(r.instrument_id, r.decision, r.rank) for r in results])
+    results = [replace(r, counts_toward=toward.get(r.instrument_id, ())) for r in results]
     cells = load_feature_values(ctx, shown, wanted) if wanted and shown else {}
     codes = cell_codes(cells, [r.instrument_id for r in results])
     return ResultPage(

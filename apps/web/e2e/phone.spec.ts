@@ -447,3 +447,20 @@ test('Feature requests: the ranked list and the accepted formulas fit a phone an
     page.viewportSize()?.width ?? 0,
   );
 });
+
+test('Screener results: the edge line and the evidence fit a phone and the pick sheet lists what it counts toward', async ({
+  page,
+}) => {
+  await page.goto('/screeners/vrp_scanner');
+  await expect(page.getByText('Earnings drift').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Evidence' }).tap();
+  await expect(page.getByRole('button', { name: 'Momentum 12-1' })).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(false);
+  await page.getByRole('grid').first().getByRole('row', { name: /AAPL/ }).tap();
+  const sheet = page.getByRole('dialog', { name: 'AAPL' });
+  await expect(sheet.getByRole('heading', { level: 3, name: 'Counts toward' })).toBeVisible();
+  await expectAccessible(page);
+});

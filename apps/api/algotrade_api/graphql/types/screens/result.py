@@ -12,11 +12,42 @@ from strawberry.scalars import JSON
 from algotrade.services.read import values
 from algotrade.services.read.availability.cause import UnavailableKind, kind_texts
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.evaluation import pick_edges
 from algotrade.services.read.screens import results as stored
 from algotrade.services.read.screens import screeners as stored_screeners
 from algotrade_api.graphql.types.availability import KindText, Unavailable
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
+
+
+@strawberry.type(
+    description="What one edge that lists the screener did with a pick of its run, read from the "
+    "picks the edge itself stored for the session (its universe, schedule and cut applied by "
+    "the harness's own rule): `counts` the edge took it, and the `code` that says why (counts; "
+    "paused: the regime gate held it back; not_counted: the edge decided and did not take it; "
+    "not_a_decision_day: its schedule does not decide at the session; unjudged: a short, "
+    "long-short or portfolio outcome; not_stored: no picks stored for the session; withheld: "
+    "its rank is withheld from the viewer), `place` its place in the edge's own list. It does "
+    "not read an outcome: it says what the edge took, not what it has earned"
+)
+class PickEdge:
+    edge_id: str
+    edge_name: str
+    counts: bool
+    code: str
+    top_k: int | None
+    place: int | None
+
+    @classmethod
+    def of(cls, d: pick_edges.PickEdge) -> Self:
+        return cls(
+            edge_id=d.edge_id,
+            edge_name=d.edge_name,
+            counts=d.counts,
+            code=d.code,
+            top_k=d.top_k,
+            place=d.place,
+        )
 
 
 @strawberry.type(
@@ -108,6 +139,10 @@ class ScreenResult:
     regime: str | None
     size_multiplier: float | None
     groups: list[ScreenGroup]
+    counts_toward: list[PickEdge] = strawberry.field(
+        description="Each edge that lists the screener and whether it counts this row (empty: "
+        "none does); filled on `ScreenerRun.results` only"
+    )
 
     @classmethod
     def of(cls, d: stored.ScreenResult, ctx: ReadContext) -> Self:
@@ -129,6 +164,7 @@ class ScreenResult:
             regime=d.regime,
             size_multiplier=d.size_multiplier,
             groups=[ScreenGroup.of(g) for g in d.groups],
+            counts_toward=[PickEdge.of(e) for e in d.counts_toward],
         )
 
 

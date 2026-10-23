@@ -285,6 +285,7 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "ScreenerConfigs",
         "ScreenerRuns",
         "ScreenerTrackRecords",
+        "ScreenerEdges",
         "EdgesPage",
         "EdgeDetail",  # one edge in full (verdict, runs, definition): the edge page
         "EdgeDocument",  # one edge's document for the builder: no verdict, no runs

@@ -263,6 +263,13 @@ export type EdgeTradesQueryVariables = Exact<{
 
 export type EdgeTradesQuery = { edgeTrades: { period: TradePeriod, page: number, pageSize: number, total: number, basis: string | null, licence: string | null, oosHidden: boolean, symbolsSnapshot: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ variant: string, horizonSessions: number, decisionSession: string, entrySession: string | null, exitSession: string | null, instrumentId: string, symbolAsOf: string | null, rank: number | null, status: string, excludedReason: string | null, hit: boolean | null, delisted: boolean, beforeSplit: boolean, source: string, maxDrawdown: number | null, symbol: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, company: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, score: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, value: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, grossValue: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, advUsd: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, reference: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, touch: { value: boolean | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }> } | null };
 
+export type ScreenerEdgesQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type ScreenerEdgesQuery = { edges: Array<{ id: string, status: string }>, screener: { id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, splitFrom: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, liftPts: number | null, sessions: number | null, picks: number | null }> }> } | null };
+
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -640,7 +647,7 @@ export type ScreenerResultsQueryVariables = Exact<{
 }>;
 
 
-export type ScreenerResultsQuery = { session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string, group: string | null }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, latestRun: { runId: string, session: string, previousSession: string | null, status: string | null, coverage: string | null, regime: string | null, paused: number, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, kindTexts: Array<{ kind: UnavailableKind, text: string }>, results: Array<{ instrumentId: string, rank: number | null, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null, group: string | null }>, groups: Array<{ id: string, kind: string, members: Array<string>, parent: string | null, outcome: string | null, decidedBy: string | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
+export type ScreenerResultsQuery = { session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string, group: string | null }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, latestRun: { runId: string, session: string, previousSession: string | null, status: string | null, coverage: string | null, regime: string | null, paused: number, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, kindTexts: Array<{ kind: UnavailableKind, text: string }>, results: Array<{ instrumentId: string, rank: number | null, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null, group: string | null }>, groups: Array<{ id: string, kind: string, members: Array<string>, parent: string | null, outcome: string | null, decidedBy: string | null }>, columns: Array<{ name: string, value: unknown }>, countsToward: Array<{ edgeId: string, edgeName: string, counts: boolean, code: string, topK: number | null, place: number | null }> }> } } | null } | null };
 
 export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1561,6 +1568,49 @@ export const EdgeTradesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgeTradesQuery, EdgeTradesQueryVariables>;
+export const ScreenerEdgesDocument = new TypedDocumentString(`
+    query ScreenerEdges($id: String!) {
+  edges {
+    id
+    status
+  }
+  screener(id: $id) {
+    id
+    trackRecords {
+      screenerId
+      edgeId
+      edgeName
+      runLabel
+      splitFrom
+      afterSession
+      notRun {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      horizons {
+        horizonSessions
+        hitRate
+        baseRate
+        liftPts
+        sessions
+        picks
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenerEdgesQuery, ScreenerEdgesQueryVariables>;
 export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
     query ScreenerTrackRecords {
   edges {
@@ -4131,6 +4181,14 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
           columns {
             name
             value
+          }
+          countsToward {
+            edgeId
+            edgeName
+            counts
+            code
+            topK
+            place
           }
         }
       }

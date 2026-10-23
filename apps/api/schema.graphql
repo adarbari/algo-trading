@@ -2462,6 +2462,18 @@ type PickCount {
 }
 
 """
+What one edge that lists the screener did with a pick of its run, read from the picks the edge itself stored for the session (its universe, schedule and cut applied by the harness's own rule): `counts` the edge took it, and the `code` that says why (counts; paused: the regime gate held it back; not_counted: the edge decided and did not take it; not_a_decision_day: its schedule does not decide at the session; unjudged: a short, long-short or portfolio outcome; not_stored: no picks stored for the session; withheld: its rank is withheld from the viewer), `place` its place in the edge's own list. It does not read an outcome: it says what the edge took, not what it has earned
+"""
+type PickEdge {
+  edgeId: String!
+  edgeName: String!
+  counts: Boolean!
+  code: String!
+  topK: Int
+  place: Int
+}
+
+"""
 The tickers a run picked, in rank order, without the rows behind them: `instrumentIds` (at most `size`) and `total`, the picks in all (the picks and the ones the regime gate held back)
 """
 type PickIds {
@@ -3245,6 +3257,11 @@ type ScreenResult {
   regime: String
   sizeMultiplier: Float
   groups: [ScreenGroup!]!
+
+  """
+  Each edge that lists the screener and whether it counts this row (empty: none does); filled on `ScreenerRun.results` only
+  """
+  countsToward: [PickEdge!]!
 }
 
 """
