@@ -108,6 +108,8 @@ with the primitives (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, Vi
 Every folder is a `[[web_dir]]` in `architecture/web_layout.toml`. Lint messages name the rule and
 the skill with the fix.
 
+Every table, list or feed uses the shared filter bar (ADR 0082, once accepted) and ships its user-case list; skill `add-ui-component`.
+
 
 ## Code rules (enforced by CI; follow them up front)
 

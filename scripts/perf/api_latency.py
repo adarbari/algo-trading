@@ -347,8 +347,10 @@ class Api:
         data_url: str | None = None,
         config_dir: Path | None = None,
         user: str | None = None,
+        log: Path | None = None,
     ) -> None:
         self.mode = mode
+        self.log = log  # the API process's stdout / stderr (the flight recorder's api.log)
         self.port = free_port()
         self.url = f"http://127.0.0.1:{self.port}"
         env = {
@@ -370,12 +372,13 @@ class Api:
             raise
 
     def _start(self, env: dict[str, str]) -> None:
+        sink = self.log.open("ab") if self.log else subprocess.DEVNULL  # the child keeps it
         self.proc = subprocess.Popen(
             [sys.executable, "-c", LAUNCH, str(self.port), MODES[self.mode]],
             cwd=REPO,
             env={**os.environ, **env},
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=sink,
+            stderr=subprocess.STDOUT if self.log else subprocess.DEVNULL,
         )
         end = time.monotonic() + 90
         while time.monotonic() < end:

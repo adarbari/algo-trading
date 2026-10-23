@@ -19,7 +19,9 @@
 #     (never lowered), appends a line to var/logs/perf_gate.status, deletes the clone, and
 #     notifies the owner (osascript, as deploy.sh) when a view is over the bar.
 #   - EVIDENCE: var/logs/perf_gate/YYYY-MM-DD/ (the last 14 kept; nothing is written outside
-#     var/logs): status.json, run.log, ops.json, views.json, samples-partial.json (per op per
+#     var/logs; README.txt in it says which file answers which question; the FLIGHT RECORDER
+#     (scripts/perf/flight_recorder.py) adds timeline.csv every 10 s, ops-stream.jsonl, bench-progress.json,
+#     prekill/ at 70% of a cap, kill-report.json on every stop, api.log, bench-head.txt): status.json, run.log, ops.json, views.json, samples-partial.json (per op per
 #     pass), run-meta.json, load.csv (epoch before the commands, load, free disk, how late the tick was, how long the sample took; every 10 s), procs-start.txt /
 #     procs-end.txt (top 10 by CPU), snapshot.json, profiles.md (page_profile.py on the 3 slowest
 #     ops over the bar, 60 s at most); one line per run in var/logs/perf_gate/summary.csv. The bench stops
@@ -143,6 +145,8 @@ wd_pid=
 clone_made=0
 cleanup() {
   [ -n "${sampler_pid:-}" ] && kill "$sampler_pid" 2>/dev/null
+  [ -n "${timeline_pid:-}" ] && kill "$timeline_pid" 2>/dev/null
+  [ -n "${prekill_pid:-}" ] && kill "$prekill_pid" 2>/dev/null
   [ "$lock_held" = 1 ] && [ "$(holder_of "$lockdir")" = "$mytag" ] && rm -f "$lockdir"
   return 0
 }
@@ -169,7 +173,7 @@ finish_evidence() {
   STOP_REASON=$1 RUNDIR=$rundir SUMMARY=$logs/perf_gate/summary.csv TODAY=$today SHA=${sha:-unknown} \
     CODE=${code:-3} WAIT_S=${wait_s:-0} SNAPSHOT_S=${snapshot_s:-0} BENCH_S=${bench_s:-0} \
     CLEANUP_S=${cleanup_s:-0} TOTAL_S=$(( $(date +%s) - t_start )) VIEWS_OVER=${views_over:-} \
-    ABOVE=${above:-} KEEP=$keep_runs python3 - <<'PY'
+    ABOVE=${above:-} KEEP=$keep_runs NOTE=${kr_note:-} python3 - <<'PY'
 import csv, json, os, re, shutil
 from pathlib import Path
 e = os.environ
@@ -197,15 +201,19 @@ with (summary.open("a", newline="") if e["STOP_REASON"] != "guard" else open(os.
         w.writerow("date sha total_s snapshot_s bench_s passes views_over_bar seconds_above noisy notes".split())
     w.writerow([status["date"], status["sha"], status["total_s"], status["snapshot_s"],
                 status["bench_s"], status["passes"], status["views_over_bar"],
-                status["seconds_above"], status["noisy"], reason])
+                status["seconds_above"], status["noisy"],
+                reason + (f" | {e['NOTE']}" if e.get("NOTE") else "")])
 days = sorted(d for d in run.parent.iterdir() if d.is_dir() and re.fullmatch(r"\d{4}-\d{2}-\d{2}", d.name))
 for old in days[: max(0, len(days) - int(e["KEEP"]))]:
     shutil.rmtree(old, ignore_errors=True)
 PY
+  [ -f "$fr" ] && python3 "$fr" finish --rundir "$rundir" >/dev/null 2>&1
+  return 0
 }
 
 busy() {  # a guard: record why, exit 3
   say "busy, retry: $1"
+  stop_prekill; kill_report "$phase" 0 "guard: $1"
   code=3; finish_evidence guard
   exit 3
 }
@@ -254,6 +262,29 @@ sample_row() {  # $1 = epoch before, $2 = late_s
   done
 ) >/dev/null 2>&1 &
 sampler_pid=$!
+
+# the FLIGHT RECORDER (scripts/perf/flight_recorder.py): a timeline every 10 s across all phases, a
+# pre-kill sample at 70% of a phase's cap, a kill report on every stop; all inside $rundir
+fr=$repo/scripts/perf/flight_recorder.py
+phase=wait; timeline_pid=; prekill_pid=; kr_msg=; kr_note=
+set_phase() { phase=$1; echo "$1" >"$rundir/phase.txt"; echo "$1 $(date +%s)" >>"$rundir/phases.txt"; }
+set_phase wait
+if [ -f "$fr" ]; then
+  python3 "$fr" timeline --rundir "$rundir" --root $$ --every "${PERF_SAMPLE_S:-10}" --store "$logs" >/dev/null 2>&1 &
+  timeline_pid=$!
+fi
+start_prekill() {  # $1 = phase, $2 = seconds into it: a sample then, if it still runs
+  [ -f "$fr" ] || return 0
+  python3 "$fr" prekill --rundir "$rundir" --root $$ --phase "$1" --after "$2" >/dev/null 2>&1 &
+  prekill_pid=$!
+}
+stop_prekill() { [ -n "$prekill_pid" ] && kill "$prekill_pid" 2>/dev/null; prekill_pid=; return 0; }
+kill_report() {  # $1 = phase, $2 = cap in seconds, $3 = why: kill-report.json; kr_msg for the notice
+  kr_msg=; kr_note=
+  [ -f "$fr" ] || return 0
+  kr_note=$(python3 "$fr" report --rundir "$rundir" --phase "$1" --cap "$2" --reason "$3" 2>/dev/null) || return 0
+  kr_msg=" ($kr_note)"
+}
 # CPU priority only for the copy and the delete. NOT `taskpolicy -b`: it throttles disk I/O and made the
 # CoW copy 4.0x slower (measured 2026-10-23: 42 s normal, 170 s under -b, 42 s under nice -n 10).
 : "${PERF_LOWPRI=nice -n 10}"
@@ -388,6 +419,7 @@ if [ "$(dev_of "$src")" != "$(dev_of "$(dirname "$clone")")" ]; then
   say "refusing: $clone is not on the same volume as $src (cp -c would copy every byte)"; exit 2
 fi
 top_procs >"$rundir/procs-start.txt"
+set_phase copy; start_prekill copy "$(( snapshot_limit * 7 / 10 ))"
 free_before=$free_gb
 clone_made=1
 mkdir -p "$clone"
@@ -464,6 +496,7 @@ wd_pid=
 if [ -n "$paused_s" ]; then
   snapshot_s=$(( $(date +%s) - t_ready )); wait_s=$((t_ready - t_start))
   write_progress machine-paused
+  stop_prekill; kill_report copy "$snapshot_limit" "machine paused $paused_s s"
   discard_clone
   aborts=$(( $(grep -c "^date=$today pause_abort=" "$status" 2>/dev/null || true) + 1 ))
   echo "date=$today pause_abort=$aborts finished=no" >>"$status"
@@ -473,7 +506,7 @@ if [ -n "$paused_s" ]; then
     echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=repeated-pauses over_time=no wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
     say "repeated pauses: $aborts copies stopped by a paused machine today"
     code=4; bench_s=0; cleanup_s=0; finish_evidence repeated-pauses
-    msg="1 s page gate: the machine paused during the copy $aborts times today; no result tonight; evidence in var/logs/perf_gate/$today/"
+    msg="1 s page gate: the machine paused during the copy $aborts times today; no result tonight$kr_msg; evidence in var/logs/perf_gate/$today/"
     if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
     else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
     exit 4
@@ -488,17 +521,19 @@ fi
 if [ "$cap_hit" = 1 ]; then
   t_now=$(date +%s); snapshot_s=$((t_now - t_ready)); wait_s=$((t_ready - t_start))
   write_progress over-time
+  stop_prekill; kill_report copy "$snapshot_limit" "snapshot cap"
   discard_clone
   total_s=$(( $(date +%s) - t_start ))
   sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
   say "snapshot over-time: the copy was killed at ${snapshot_limit}s"
   echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=snapshot-over-time over_time=yes wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
   code=4; bench_s=0; cleanup_s=0; finish_evidence snapshot-over-time
-  msg="1 s page gate: the snapshot copy was killed at ${snapshot_limit}s (no result); evidence in var/logs/perf_gate/$today/"
+  msg="1 s page gate: the snapshot copy was killed at ${snapshot_limit}s (no result)$kr_msg; evidence in var/logs/perf_gate/$today/"
   if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
   else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
   exit 4
 fi
+stop_prekill
 if [ "$copy_code" -ne 0 ]; then discard_clone; busy "the copy failed"; fi
 t_copied=$(date +%s)
 snapshot_s=$((t_copied - t_ready)); wait_s=$((t_ready - t_start))
@@ -520,16 +555,21 @@ out=$(mktemp)
 py=${PERF_PY:-$repo/.venv/bin/python}
 cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
 
+rm -f "$rundir/sample-window-bench.json"
+set_phase bench; start_prekill bench "${PERF_BENCH_PREKILL_AFTER_S:-$(( bench_limit > 9 ? bench_limit - 8 : 1 ))}"
 head_before=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
 t_bench=$(date +%s)
-hist=$logs/perf_gate/history.jsonl; hist_size=$(wc -c <"$hist" 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
+hist=$logs/perf_gate/history.jsonl; hist_size=$({ wc -c <"$hist"; } 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
 # shellcheck disable=SC2086
 watchdog "$bench_limit" $cmd >"$out" 2>&1 &
 wd_pid=$!
 wait "$wd_pid"
 code=$?
 wd_pid=
+stop_prekill
 t_benched=$(date +%s)
+set_phase cleanup
+head -200 "$out" >"$rundir/bench-head.txt"
 bench_s=$((t_benched - t_bench))
 top_procs >"$rundir/procs-end.txt"
 over=$(sed -n 's/^\([0-9]*\) views over.*(\([0-9.]*\) s above the bar).*/\1 \2/p' "$out" | tail -1)
@@ -551,14 +591,27 @@ if [ "${paused_bench:-0}" -gt 0 ] && [ "$outcome" != crashed ] && [ "$outcome" !
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "the machine paused or stalled during the bench ($paused_bench late samples): not recorded"
 fi
+# a pre-kill `sample` suspended the bench or its API for 3 s (armed 8 s before the cap, so only a bench about to
+# be killed gets one; an over-time run keeps its over-time cause):
+# its times are worthless; the window is in sample-window-bench.json, the run is not recorded
+if [ -f "$rundir/sample-window-bench.json" ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ] \
+   && [ "$outcome" != integrity ] && [ "$outcome" != paused ] && [ "$outcome" != over-time ]; then
+  outcome=sampled
+  [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
+  say "a pre-kill stack sample paused the bench ($(cat "$rundir/sample-window-bench.json")): not recorded"
+fi
 # the release tree's HEAD moved during the bench (a deploy checked out other code): not recorded
 head_after=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
 if [ "$head_after" != "$head_before" ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ] \
-   && [ "$outcome" != integrity ] && [ "$outcome" != paused ]; then
+   && [ "$outcome" != integrity ] && [ "$outcome" != paused ] && [ "$outcome" != sampled ]; then
   outcome=code-changed
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "code changed during the bench (${head_before:0:9} -> ${head_after:0:9}): not recorded"
 fi
+[ "$outcome" = over-time ] && [ -f "$rundir/sample-window-bench.json" ] && say "a pre-kill stack sample was taken in the last seconds of the bench (sample-window-bench.json)"
+case "$outcome" in over-time|paused|code-changed|crashed|sampled)
+  kill_report bench "$bench_limit" "$outcome" ;;
+esac
 cat "$out" >>"$rundir/run.log"
 out_copy=$rundir/run.log
 cp "$out" "$logs/perf_gate.last.log"
@@ -585,17 +638,19 @@ echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?}
 reason=""; [ "$overtime" = yes ] && reason=over-time
 [ "$outcome" = integrity ] && reason=integrity
 [ "$outcome" = refused ] && reason=refused; [ "$outcome" = crashed ] && reason=crashed
-[ "$outcome" = paused ] && reason=paused; [ "$outcome" = code-changed ] && reason=code-changed
+[ "$outcome" = paused ] && reason=paused; [ "$outcome" = code-changed ] && reason=code-changed; [ "$outcome" = sampled ] && reason=sampled
 finish_evidence "$reason"
 
-if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
+if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$outcome" = sampled ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); snapshot ${snapshot_s}s, bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
     msg="1 s page gate INTEGRITY FAILURE (not a timing result): $why evidence in var/logs/perf_gate/$today/"
   fi
+  [ "$outcome" = sampled ] && msg="1 s page gate: a pre-kill stack sample paused the bench (NOT recorded, no verdict): $msg"
   [ "$outcome" = code-changed ] && msg="1 s page gate: the code changed during the bench (a deploy; NOT recorded, no verdict): $msg"
   [ "$outcome" = paused ] && msg="1 s page gate: the machine paused or stalled during the bench (noisy, NOT recorded, no verdict): $msg"
+  [ -n "$kr_msg" ] && msg="$msg$kr_msg"
   [ "$outcome" = crashed ] && msg="1 s page gate CRASHED (no result): $msg"
   [ "$outcome" = refused ] && msg="1 s page gate REFUSED by the bench (no result): $msg"
   [ "$overtime" = yes ] && msg="1 s page gate OVER-TIME: bench killed at ${bench_limit}s (not recorded); $msg"

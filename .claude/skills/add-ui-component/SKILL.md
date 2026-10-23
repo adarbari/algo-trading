@@ -50,4 +50,13 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
    its help button in `actions` (ADR 0051, `.claude/skills/add-guide-content`).
 6. **Style check:** dense but calm. No gradients, glows, decorative shadows, emoji icons,
    or numbers wrapped in big cards. One accent colour. Borders, not shadows.
-7. Run `make changed` (it maps the web checks), `make web-visual` when the design system changed, then push: CI is the full gate.
+7. **Tables, lists and feeds:** before building one, write down the user cases it serves
+   (find a name, narrow many to few, what changed since the last session, why is this here or
+   not here, compare, come back later) and tick the capability checklist: text search, facet
+   filters, range and percentile filters, sort, column sets, saved views, applied chips with
+   counts, URL state, zero-result recovery, export, keyboard, phone. Anything left out needs a
+   one-line reason in the PR. Filtering is server-side (counts, the licence gate ADR 0069,
+   UNKNOWN never passes); the browser derives no counts or percentiles (ADR 0038). Use the
+   shared filter bar (ADR 0082, once accepted); a new visual pattern such as a filter bar
+   needs an owner-approved mockup (mockup gate, step 2).
+8. Run `make changed` (it maps the web checks), `make web-visual` when the design system changed, then push: CI is the full gate.
