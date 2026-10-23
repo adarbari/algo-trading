@@ -49,7 +49,7 @@ note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Fi
 [[table]]
 name = "analyst/estimate_snapshots"
 owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"
-note = "ADR 0068: our own point-in-time history of FMP and Finnhub analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session"
+note = "ADR 0068, 0080: our own point-in-time history of FMP, Finnhub and Yahoo analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session; the rows of source `yahoo` carry licence `yahoo` (owner only, ADR 0080) and nothing reads them yet; `currency` (nullable, Yahoo's estimates) is additive: older partitions read null"
 
 [[table]]
 name = "instruments/index_membership"

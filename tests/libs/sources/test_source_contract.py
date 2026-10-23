@@ -69,6 +69,7 @@ from algotrade_sources.vendors.tiingo.listings import TiingoSupportedTickers
 from algotrade_sources.vendors.tiingo.meta import TiingoListingMeta
 from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
+from algotrade_sources.vendors.yahoo.analyst import YahooAnalyst
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 from tests.helpers.fake_ib import FakeIB
 from tests.helpers.finra import payloads as finra_payloads
@@ -335,6 +336,11 @@ def fmp_ratings() -> Adapter:
     return FmpRatings(http_for(lambda url: payload)), FetchRequest("AAPL")
 
 
+def yahoo_analyst() -> Adapter:
+    payload = (FIXTURES / "yahoo" / "quote_summary_arx.json").read_bytes()
+    return YahooAnalyst(http_for(lambda url: payload)), FetchRequest("ARX")
+
+
 def finnhub_recommendations() -> Adapter:
     payload = (FIXTURES / "finnhub" / "recommendation_aapl.json").read_bytes()
     return FinnhubRecommendations(http_for(lambda url: payload)), FetchRequest("AAPL")
@@ -345,6 +351,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "fmp_targets": fmp_targets,
     "fmp_ratings": fmp_ratings,
     "finnhub_recommendations": finnhub_recommendations,
+    "yahoo_analyst": yahoo_analyst,
     "fred": fred,
     "fred_release_dates": fred_release_dates,
     "sec_filings": sec_filings,

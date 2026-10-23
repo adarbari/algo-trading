@@ -583,6 +583,7 @@ modules = [
     "algotrade_sources.vendors.ssga",
     "algotrade_sources.vendors.tiingo",
     "algotrade_sources.vendors.treasury",
+    "algotrade_sources.vendors.yahoo",
 ]
 
 [[tool.importlinter.contracts]]
