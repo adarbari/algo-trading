@@ -39,15 +39,7 @@ describe('ScreenersPage', () => {
     const onOpen = vi.fn();
     const onEdit = vi.fn();
     const onNew = vi.fn();
-    render(
-      <ScreenersPage
-        onOpen={onOpen}
-        onEdit={onEdit}
-        onOpenTicker={vi.fn()}
-        onOpenEdge={vi.fn()}
-        onNew={onNew}
-      />,
-    );
+    render(<ScreenersPage onOpen={onOpen} onEdit={onEdit} onOpenEdge={vi.fn()} onNew={onNew} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Screeners' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '+ New screener' }));
     expect(onNew).toHaveBeenCalled();

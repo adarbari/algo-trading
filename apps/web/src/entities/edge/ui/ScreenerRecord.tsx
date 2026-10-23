@@ -1,8 +1,8 @@
 /**
- * A screener's track record in a table cell of the Screeners list (ADR 0053): win rate against
+ * A screener's track record as one line (ADR 0053), in the Edge Builder's screens step: win rate against
  * the base rate, then trades and holding period (the lift waits for a served points field); "No record yet" without one. Only the server's
- * frozen-period record is read, never an exploratory one. `ScreenerEdgeName` is the edge a
- * screener implements, or that it is part of none.
+ * frozen-period record is read, never an exploratory one. The Screeners list has its own evidence
+ * cell (`ScreenerEvidence`).
  */
 import { formatValue, Skeleton, Text } from '@algotrade/ui';
 
@@ -14,18 +14,6 @@ const trades = (n: number) => `${formatValue(n, { kind: 'number' }).text} trades
 
 export interface ScreenerRecordProps {
   screenerId: string;
-}
-
-/** The edge name under a screener's name, or that it is part of none. */
-export function ScreenerEdgeName({ screenerId }: { screenerId: string }) {
-  const records = useTrackRecords(screenerId);
-  const first = records.data?.[0];
-  if (records.isPending) return null;
-  return (
-    <Text size="xs" tone="muted">
-      {first ? `Edge: ${first.edgeName}` : 'Not part of an edge'}
-    </Text>
-  );
 }
 
 function Cell({ figures }: { figures: RecordFigures }) {

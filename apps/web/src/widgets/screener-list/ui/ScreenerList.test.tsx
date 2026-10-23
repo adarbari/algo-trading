@@ -12,7 +12,6 @@ const hooks = vi.hoisted(() => ({
   useScreeners: vi.fn(),
   useMyScreeners: vi.fn(),
   useScreenerRuns: vi.fn(),
-  useScreenerResults: vi.fn(),
 }));
 vi.mock('@/entities/screen', async (importOriginal) => {
   return {
@@ -20,38 +19,38 @@ vi.mock('@/entities/screen', async (importOriginal) => {
     useScreeners: hooks.useScreeners,
     useMyScreeners: hooks.useMyScreeners,
     useScreenerRuns: hooks.useScreenerRuns,
-    useScreenerResults: hooks.useScreenerResults,
-    useCriterionLines: () => ({
-      isPending: false,
-      lines: [{ id: 'iv', label: 'IV rank', rule: '≥ 50', mode: 'hard' }],
-    }),
   };
 });
 vi.mock('@/entities/edge', async () => {
-  const { Text } = await import('@algotrade/ui');
+  const { Button, ExpandLink, Text } = await import('@algotrade/ui');
   return {
-    ScreenerEdgeName: ({ screenerId }: { screenerId: string }) => (
-      <Text>{`edge of ${screenerId}`}</Text>
+    ScreenerEvidenceCell: ({
+      screenerId,
+      open,
+      onOpenChange,
+    }: {
+      screenerId: string;
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+    }) =>
+      screenerId === 'idea' ? (
+        <Text>Not part of an edge</Text>
+      ) : (
+        <ExpandLink open={open} onOpenChange={onOpenChange}>{`Win of ${screenerId}`}</ExpandLink>
+      ),
+    ScreenerEvidenceDetail: ({
+      screenerId,
+      onOpenEdge,
+    }: {
+      screenerId: string;
+      onOpenEdge: (edgeId: string) => void;
+    }) => (
+      <Button
+        onClick={() => {
+          onOpenEdge(`edge-of-${screenerId}`);
+        }}
+      >{`edges of ${screenerId}`}</Button>
     ),
-    ScreenerRecord: ({ screenerId }: { screenerId: string }) => (
-      <Text>{`cell record of ${screenerId}`}</Text>
-    ),
-    useTrackRecords: () => ({
-      isPending: false,
-      isError: false,
-      data: [{ edgeId: 'edge-1', edgeName: 'Edge one', notRun: null }],
-    }),
-    recordFigures: (entries: { edgeId: string; edgeName: string }[]) =>
-      entries[0]
-        ? {
-            ...entries[0],
-            hitRate: 0.6,
-            baseRate: 0.5,
-            liftPts: 12,
-            sessions: 100,
-            horizonSessions: 10,
-          }
-        : null,
   };
 });
 vi.mock('@/features/screener-copy', async () => {
@@ -140,14 +139,6 @@ const summary = (id: string, picked: number | null): ScreenerRunSummary => ({
         },
 });
 
-const HIT = {
-  instrumentId: 'EQ:1',
-  decision: 'QUALIFIED',
-  score: 91.5,
-  reasons: 'Above the 50d high on volume',
-  instrument: { symbol: 'AAPL', name: 'Apple Inc.' },
-};
-
 beforeEach(() => {
   hooks.useScreeners.mockReturnValue(
     fakeQuery([
@@ -174,165 +165,110 @@ beforeEach(() => {
       ]),
     }),
   );
-  hooks.useScreenerResults.mockReturnValue(
-    fakeQuery({
-      screener: {
-        latestRun: {
-          status: 'complete',
-          coverage: 'FULL',
-          unavailable: [],
-          results: { results: [HIT] },
-        },
-      },
-    }),
-  );
 });
 
 const setup = () => {
   const onOpen = vi.fn();
   const onEdit = vi.fn();
-  const onOpenTicker = vi.fn();
   const onOpenEdge = vi.fn();
   const view = render(
     <TestQueryProvider>
-      <ScreenerList
-        onOpen={onOpen}
-        onEdit={onEdit}
-        onOpenTicker={onOpenTicker}
-        onOpenEdge={onOpenEdge}
-      />
+      <ScreenerList onOpen={onOpen} onEdit={onEdit} onOpenEdge={onOpenEdge} />
     </TestQueryProvider>,
   );
-  return { onOpen, onEdit, onOpenTicker, onOpenEdge, ...view };
+  return { onOpen, onEdit, onOpenEdge, ...view };
 };
-const toggle = (name: RegExp) => screen.getByRole('button', { name });
-
-/** Open a row and wait for its lazily loaded detail. */
-const openRow = async (name: RegExp) => {
-  await userEvent.click(toggle(name));
-  await screen.findByRole('heading', { level: 3, name: 'Criteria' });
-};
-
-/** The help buttons of the five column headers (ADR 0051), also `expanded: false`. */
-const HEADER_HELP = 5;
 
 describe('ScreenerList', () => {
-  it('lists mine and presets in one list with type pills, hits and runs', async () => {
+  it('lists mine and presets with kind pills, last run, evidence and picks', async () => {
     const { container } = setup();
     const table = screen.getByRole('table', { name: 'Screeners' });
-    // The five rows' toggles and the five column headers' help buttons.
-    expect(within(table).getAllByRole('button')).toHaveLength(10);
-    expect(toggle(/^Name of my-vrp Mine/)).toHaveTextContent('edge of my-vrp');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Screener', 'Evidence and edges', 'Picks today', 'Actions']);
+    expect(within(table).getByText('Name of my-vrp')).toBeInTheDocument();
+    expect(screen.getAllByText('Mine').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Preset').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Last run 2026-10-07').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: 'Open Name of vrp_scanner: 12 picks' }),
+    ).toHaveTextContent('12 picks');
     expect(screen.getAllByText('+2').length).toBeGreaterThan(0);
     expect(screen.getAllByText('−1').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('2026-10-07').length).toBeGreaterThan(0);
-    expect(screen.getByText('12')).toBeInTheDocument();
-    expect(
-      within(table).getByRole('img', { name: /Decisions of vrp_scanner: Qualified 12/ }),
-    ).toBeInTheDocument();
-    expect(
-      within(table).getByRole('img', { name: /^my-vrp picks, last 3 sessions/ }),
-    ).toBeInTheDocument();
     expect(screen.getAllByText('No run today')).toHaveLength(1);
-    expect(toggle(/^Name of broken Mine/)).toHaveTextContent('Does not resolve');
-    expect(toggle(/^idea Mine/)).toHaveTextContent('Draft');
-    expect(screen.getByText('cell record of my-vrp')).toBeInTheDocument();
+    expect(screen.getByText('Does not resolve')).toBeInTheDocument();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+    expect(screen.getByText('Not part of an edge')).toBeInTheDocument();
+    expect(screen.getByText('Built in code')).toBeInTheDocument();
+    // No decisions column and no 30-day history any more.
+    expect(screen.queryByText('Decisions')).toBeNull();
+    expect(screen.queryByText('30d picks')).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it('does not expand as a whole: only the evidence headline opens the edges', async () => {
+    setup();
+    expect(screen.queryByRole('button', { name: /edges of/ })).toBeNull();
+    await userEvent.click(screen.getByText('Name of my-vrp'));
+    expect(screen.queryByRole('button', { name: /edges of/ })).toBeNull();
+  });
+
+  it('opens one evidence block at a time, in place', async () => {
+    const { onOpenEdge } = setup();
+    const mine = screen.getByRole('button', { name: 'Win of my-vrp' });
+    const preset = screen.getByRole('button', { name: 'Win of vrp_scanner' });
+    await userEvent.click(mine);
+    expect(mine).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'edges of my-vrp' })).toBeInTheDocument();
+    await userEvent.click(preset);
+    expect(mine).toHaveAttribute('aria-expanded', 'false');
+    expect(preset).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('button', { name: 'edges of my-vrp' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'edges of vrp_scanner' }));
+    expect(onOpenEdge).toHaveBeenCalledWith('edge-of-vrp_scanner');
   });
 
   it('narrows by segment and by search', async () => {
     setup();
     await userEvent.click(screen.getByRole('radio', { name: 'Presets' }));
-    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2 + HEADER_HELP);
+    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(1);
     await userEvent.click(screen.getByRole('radio', { name: 'All' }));
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'vrp');
-    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2 + HEADER_HELP);
+    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'zzz');
     expect(screen.getByText('No screener matches')).toBeInTheDocument();
   });
 
-  it('opens one row at a time and loads the hits only for the open row', async () => {
-    setup();
-    expect(hooks.useScreenerResults).not.toHaveBeenCalled();
-    await openRow(/^Name of my-vrp/);
-    expect(toggle(/^Name of my-vrp/)).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('IV rank')).toBeInTheDocument();
-    expect(screen.getByText('≥ 50')).toBeInTheDocument();
-    expect(screen.getByText('AAPL')).toBeInTheDocument();
-    expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
-    expect(screen.getByText('Above the 50d high on volume')).toBeInTheDocument();
-    expect(screen.getByText('60.0%')).toBeInTheDocument();
-    await openRow(/^Name of vrp_scanner/);
-    expect(toggle(/^Name of my-vrp/)).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle(/^Name of vrp_scanner/)).toHaveAttribute('aria-expanded', 'true');
+  it('links the picks to the screener and the pencil edits one of yours', async () => {
+    const { onOpen, onEdit } = setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Open Name of my-vrp: 3 picks' }));
+    expect(onOpen).toHaveBeenCalledWith('my-vrp');
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Name of my-vrp' }));
+    expect(onEdit).toHaveBeenCalledWith('my-vrp');
   });
 
-  it('offers View N hits, Edit criteria, Duplicate and Delete on one of yours', async () => {
-    const { onOpen, onEdit } = setup();
-    await openRow(/^Name of my-vrp/);
-    await userEvent.click(screen.getByRole('button', { name: 'View 3 hits' }));
-    expect(onOpen).toHaveBeenCalledWith('my-vrp');
-    await userEvent.click(screen.getByRole('button', { name: 'Edit criteria' }));
-    expect(onEdit).toHaveBeenCalledWith('my-vrp');
-    await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
-    await userEvent.click(screen.getByRole('button', { name: 'finish duplicate of my-vrp' }));
-    expect(onEdit).toHaveBeenCalledWith('copy-of-my-vrp');
+  it('asks before deleting one of yours', async () => {
+    setup();
     await userEvent.click(screen.getByRole('button', { name: 'Delete my-vrp' }));
     await userEvent.click(screen.getByRole('button', { name: 'confirm delete of my-vrp' }));
     expect(screen.queryByRole('button', { name: /confirm delete/ })).toBeNull();
   });
 
-  it('opens a hit in Explore through its screener and the edge evidence', async () => {
-    const { onOpenTicker, onOpenEdge } = setup();
-    await openRow(/^Name of my-vrp/);
-    await userEvent.click(screen.getByRole('button', { name: 'Open AAPL in Explore' }));
-    expect(onOpenTicker).toHaveBeenCalledWith('AAPL', 'my-vrp');
-    await userEvent.click(screen.getByRole('button', { name: 'Edge evidence' }));
-    expect(onOpenEdge).toHaveBeenCalledWith('edge-1');
-  });
-
-  it('says the run is partial in a notice line', async () => {
-    hooks.useScreenerResults.mockReturnValue(
-      fakeQuery({
-        screener: {
-          latestRun: {
-            status: 'partial',
-            coverage: 'PARTIAL',
-            unavailable: [{ kindText: 'a table is missing' }],
-            results: { results: [HIT] },
-          },
-        },
-      }),
-    );
-    setup();
-    await openRow(/^Name of my-vrp/);
-    expect(screen.getByRole('button', { name: /Partial run/ })).toBeInTheDocument();
-  });
-
-  it('says a screener with no run is not run, in its open row', async () => {
-    setup();
-    await openRow(/^Name of broken/);
-    expect(screen.getByRole('button', { name: /Not run/ })).toBeInTheDocument();
-  });
-
-  it('offers Duplicate to edit on a preset, never Edit criteria or Delete', async () => {
+  it('copies a preset first, with the pencil, and never offers Delete on one', async () => {
     const { onEdit } = setup();
-    await openRow(/^Name of vrp_scanner/);
-    expect(screen.queryByRole('button', { name: 'Edit criteria' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Screener' })).toHaveAttribute(
-      'href',
-      '/guide/screeners/vrp_scanner',
+    expect(screen.queryByRole('button', { name: 'Delete vrp_scanner' })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Duplicate Name of vrp_scanner to edit' }),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Duplicate to edit' }));
     await userEvent.click(screen.getByRole('button', { name: 'finish copy of vrp_scanner' }));
     expect(onEdit).toHaveBeenCalledWith('copy-of-vrp_scanner');
   });
 
-  it('opens a Python preset with no actions', async () => {
+  it('gives a Python preset no pencil', () => {
     setup();
-    await openRow(/^short_premium/);
-    expect(screen.queryByRole('button', { name: /Duplicate|View/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /short_premium to edit/ })).toBeNull();
   });
 
   it('says when the list failed to load', () => {
