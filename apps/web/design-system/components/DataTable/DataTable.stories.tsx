@@ -409,6 +409,15 @@ export const Grouped: Story = {
   },
 };
 
+/** Every row at full height (`visibleRows="all"`): the page scrolls and the header stays at the top of the window. */
+export const ShowAll: Story = {
+  render: () => <TickerTable rows={smallUniverse} visibleRows="all" />,
+  play: async ({ canvasElement }) => {
+    const grid = within(canvasElement).getByRole('grid');
+    await expect(grid).toHaveAttribute('data-fit');
+  },
+};
+
 /** Grouped on a phone: the headings span the narrow table. */
 export const GroupedNarrow: Story = {
   ...Grouped,

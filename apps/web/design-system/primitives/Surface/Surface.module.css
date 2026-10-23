@@ -69,8 +69,10 @@
   flex: 1 1 0;
 }
 
+/* `clip`, not `hidden`: the corners still clip, but the surface is not a scroll container, so a
+   * sticky table header inside it sticks to the window. */
 .surface[data-clip] {
-  overflow: hidden;
+  overflow: clip;
 }
 
 .surface[data-padding='0'] {
