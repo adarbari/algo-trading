@@ -98,7 +98,7 @@ from algotrade.storage.backends.runs.run_selection import (
     visible_entries,
 )
 from algotrade.storage.locks import FileLock, held
-from algotrade.storage.runs import RunRecord, is_job_record_name, job_of_name, run_session
+from algotrade.storage.runs import RunRecord, is_job_record_name, run_session
 from algotrade.storage.tables.interfaces import CompactionReport, PartitionStats, RowFilter
 from algotrade.storage.tables.schemas import require_retention
 
@@ -898,15 +898,7 @@ class LocalRuns:
         # a ``services/jobs`` id names its job too (``job-<kind>-<hash>``, job ``job:<kind>``):
         # opened only for that job; a name that implies no job is opened whatever is asked
         prefix = f"{safe(job)}-"
-        names = [
-            f"{stem}.json"
-            for stem, day in self._listing.all()
-            if (
-                (stem.startswith(prefix) and session_date in (None, day))
-                if day is not None
-                else (implied := job_of_name(stem)) is None or implied == job
-            )
-        ]
+        names = [f"{stem}.json" for stem in self._listing.for_job(job, prefix, session_date)]
         records = [r for name in names if (r := self._record(name)) is not None]
         hits = [r for r in records if r.job == job and session_date in (None, r.session_date)]
         return sorted(hits, key=lambda r: r.started_at)

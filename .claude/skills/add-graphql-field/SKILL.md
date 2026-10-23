@@ -46,6 +46,14 @@ Add or extend `load_<thing>(ctx, ...)` in the object's module
 
 Verify: `.venv/bin/python -m pytest tests/unit/services/read -q -x` then `make arch ownership`.
 
+(Step 3 rule, also for `add-domain-object`.) A read path that touches stored partitions has a files-opened-per-request budget test on a synthetic
+store of many partitions with several superseded runs each. A memo or cache change has a test
+through the real context, not a fake. (27,900 files per request; the /edges memo was never applied
+because the test used a fake seam.)
+
+A new or changed page read states its critical-path budget (bar: 1 s) and its store choice in the PR
+(`docs/perf/page-latency-bar.md`, `docs/data/storage.md`).
+
 ## Step 4: the resolver (no logic)
 
 In `apps/api/algotrade_api/graphql/types/<area>/<object>.py` (`<area>` mirrors the read model: `instruments/`, `screens/`; `types/` itself holds only `query.py` and `session.py`):

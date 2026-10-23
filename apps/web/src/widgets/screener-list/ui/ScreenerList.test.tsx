@@ -213,11 +213,15 @@ const openRow = async (name: RegExp) => {
   await screen.findByRole('heading', { level: 3, name: 'Criteria' });
 };
 
+/** The help buttons of the five column headers (ADR 0051), also `expanded: false`. */
+const HEADER_HELP = 5;
+
 describe('ScreenerList', () => {
   it('lists mine and presets in one list with type pills, hits and runs', async () => {
     const { container } = setup();
     const table = screen.getByRole('table', { name: 'Screeners' });
-    expect(within(table).getAllByRole('button')).toHaveLength(5);
+    // The five rows' toggles and the five column headers' help buttons.
+    expect(within(table).getAllByRole('button')).toHaveLength(10);
     expect(toggle(/^Name of my-vrp Mine/)).toHaveTextContent('edge of my-vrp');
     expect(screen.getAllByText('+2').length).toBeGreaterThan(0);
     expect(screen.getAllByText('−1').length).toBeGreaterThan(0);
@@ -239,10 +243,10 @@ describe('ScreenerList', () => {
   it('narrows by segment and by search', async () => {
     setup();
     await userEvent.click(screen.getByRole('radio', { name: 'Presets' }));
-    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2 + HEADER_HELP);
     await userEvent.click(screen.getByRole('radio', { name: 'All' }));
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'vrp');
-    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2 + HEADER_HELP);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'zzz');
     expect(screen.getByText('No screener matches')).toBeInTheDocument();
   });

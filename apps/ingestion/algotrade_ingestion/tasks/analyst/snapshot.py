@@ -24,12 +24,15 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
   the same cadence, stalest first;
 - Yahoo (ADR 0080, owner-only licence ``yahoo``): one call a name (``quoteSummary``: targets,
   estimates, recommendation counts), asked of the names FMP refuses (its last outcome a 402, or
-  refused tonight; never one FMP answers), at most ``[yahoo] per_night``, due by ``[yahoo]
-  refresh_days``, largest market cap first, within its own ``[yahoo] run_budget_s``; an unknown
-  symbol (404) is ``NOT_COVERED`` and waits four refresh windows. It is fail-soft: every error is
-  a ``FETCH_ERROR`` item (asked again next night) and three failures in a row stop the step, the
-  names left being ``OVER_BUDGET``. Its calls are not FMP's (``budget.py`` counts ``fmp:`` items).
-  With no FMP built, every name FMP never answered is a candidate;
+  refused tonight) and of every name Yahoo has answered (ADR 0080 amendment 2026-10-23b: the
+  one-off ``analyst-backfill`` answers the whole stock population, ``population.py``), at most
+  ``[yahoo] per_night``, largest market cap first, within its own ``[yahoo] run_budget_s``. A name
+  FMP does not answer is due by ``[yahoo] refresh_days`` (the reader goes stale at 21 days); one
+  FMP answers (the reader prefers FMP, so Yahoo's row is a standby) only every ``standby_days``;
+  an unknown symbol (404) is ``NOT_COVERED`` and waits four refresh windows. It is fail-soft:
+  every error is a ``FETCH_ERROR`` item (asked again next night) and three failures in a row
+  stop the step, the names left being ``OVER_BUDGET``. Its calls are not FMP's (``budget.py``
+  counts ``fmp:`` items). With no FMP built, every name FMP never answered is a candidate;
 - which names a night asked is the run record's items (``fmp:SYM:price_target``,
   ``finnhub:SYM``, ``yahoo:SYM``...), read back by the next night: the rotation keeps no state of
   its own. An
@@ -66,6 +69,7 @@ from algotrade.services.events.scope import LIST, REFERENCE, scoped_instruments
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst.budget import NOT_MADE, PREFIX, fmp_calls_today
 from algotrade_ingestion.tasks.analyst.ordering import by_market_cap, market_caps
+from algotrade_ingestion.tasks.analyst.population import Name, listed_names
 from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
@@ -78,6 +82,8 @@ from algotrade_ingestion.tasks.framework.run import (
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "analyst-snapshot"
+BACKFILL_TASK = "analyst-backfill"  # the one-off Yahoo backfill whose items ``history`` also reads
+HISTORY_DAYS = 200  # how far back ``history`` reads run records: past every hold (FMP 90, Yahoo 56)
 TABLE = "analyst/estimate_snapshots"
 ACCESS = "analyst/vendor_access"
 SOURCES = source_guards.ANALYST_SOURCES
@@ -92,6 +98,10 @@ FINNHUB = "finnhub:"
 YAHOO = "yahoo:"
 YAHOO_NOT_FOUND = 404  # Yahoo: an unknown symbol, or one with no fundamentals (an ETF)
 YAHOO_KINDS = ("price_target", "estimates_annual", "recommendation")  # the frames one call parses
+YAHOO_RATE_LIMITED = (
+    429  # Yahoo: it is throttling us; the step (or backfill batch) stops at the first
+)
+RATE_LIMITED_REASON = f"yahoo answered HTTP {YAHOO_RATE_LIMITED} (rate limited)"
 YAHOO_MAX_FAILURES = 3  # consecutive failed calls after which the step stops for the night
 
 # FMP calls of a name in order: (item kind, source name, probe endpoint, snapshot kind).
@@ -101,12 +111,6 @@ FMP_CALLS = (
     ("estimates", "fmp_estimates", "estimates_annual", "estimates_annual"),
 )
 RECOMMENDATION = ("recommendation", "finnhub_recommendations", "recommendation")
-
-
-@dataclass(frozen=True)
-class Name:
-    instrument_id: str
-    symbol: str
 
 
 def run(ctx: TaskContext, params: Mapping[str, Any]) -> RunRecord:
@@ -159,13 +163,16 @@ class History:
 
 
 def history(run: IngestRun) -> History:
-    """From the earlier published runs' items: the session each symbol's FMP data was last
+    """From the earlier published runs' items (``analyst-snapshot`` and ``analyst-backfill``, the
+    ``HISTORY_DAYS`` before the session): the session each symbol's FMP data was last
     answered (``answered``, any of its calls: the probe may deny some kinds), refused
     (``refused_on``), its Finnhub call answered and Yahoo's answered or refused. Dated by the
     run's session, the day the rotation counts in (a nightly starts after midnight UTC, so its
     start date is a day late)."""
     out = History({}, {}, {}, {}, {})
-    for record in sorted(run.writer.runs_for(TASK), key=lambda r: r.started_at):
+    first = run.session - timedelta(days=HISTORY_DAYS)
+    records = run.reader.runs_of((TASK, BACKFILL_TASK), first, run.session)
+    for record in sorted(records, key=lambda r: r.started_at):
         if record.run_id == run.run_id or record.status not in PUBLISHED:
             continue
         day = record.session_date
@@ -290,8 +297,15 @@ def snapshot_analyst(ctx: TaskContext, session: date, limit: Any = None) -> RunR
             stats["finnhub"] = {"skipped": _why_not(ctx, "finnhub")}
         if yahoo_ready:
             candidates = _yahoo_candidates(past, names, refused_tonight, fmp_ready)
+            known = {n.symbol: n for n in listed_names(run.reader, session)}
+            known.update({n.symbol: n for n in names})  # the scope list's id wins, as before
             stats["yahoo"] = _yahoo(
-                run, sources[source_guards.YAHOO_SOURCE], names, candidates, past, limit
+                run,
+                sources[source_guards.YAHOO_SOURCE],
+                list(known.values()),
+                candidates,
+                past,
+                limit,
             )
         else:
             stats["yahoo"] = {"skipped": _why_not(ctx, "yahoo")}
@@ -426,11 +440,12 @@ def _yahoo_candidates(
 ) -> set[str]:
     """The symbols Yahoo may be asked: the ones whose last FMP outcome is a refusal (``history``
     drops a name from ``refused_on`` once FMP answers it, and the hold's end does not release it:
-    FMP's budget may delay asking again), or refused tonight; never one FMP answers. With no FMP
-    built, every symbol FMP never answered."""
+    FMP's budget may delay asking again), or refused tonight, and every symbol Yahoo has answered
+    (the backfill's, or an earlier night's), which ``_yahoo`` asks again on its own cadence. With
+    no FMP built, every symbol FMP never answered."""
     if not fmp_ready:
-        return {n.symbol for n in names if n.symbol not in past.answered}
-    return set(past.refused_on) | refused_tonight
+        return {n.symbol for n in names if n.symbol not in past.answered} | set(past.yahoo)
+    return set(past.refused_on) | refused_tonight | set(past.yahoo)
 
 
 def _yahoo(
@@ -445,8 +460,12 @@ def _yahoo(
     by_symbol = {n.symbol: n for n in names if n.symbol in candidates}
     hold = timedelta(days=RETRY_WINDOWS * settings.refresh_days)
     holding = {s for s, day in past.yahoo_refused.items() if run.session - day < hold}
-    due = due_keys(
-        [s for s in by_symbol if s not in holding], past.yahoo, run.session, settings.refresh_days
+    askable = [s for s in by_symbol if s not in holding]
+    standby = [s for s in askable if s in past.answered and s in past.yahoo]  # FMP is read first
+    waiting = set(standby)
+    fast = [s for s in askable if s not in waiting]
+    due = due_keys(fast, past.yahoo, run.session, settings.refresh_days) + due_keys(
+        standby, past.yahoo, run.session, settings.standby_days
     )
     due = by_market_cap(due, {s: n.instrument_id for s, n in by_symbol.items()}, caps(run))
     cap = settings.per_night if limit is None else min(settings.per_night, int(limit))
@@ -461,17 +480,21 @@ def _yahoo(
         if stopped:
             run.record_item(key, f"{NOT_MADE}: {stopped}")
             continue
-        label = _ask_yahoo(run, source, key, by_symbol[symbol])
+        errors: list[int] = []
+        label = ask_yahoo(run, source, key, by_symbol[symbol], errors)
         mark_coverage(run, by_symbol[symbol], "yahoo", [label])
         labels.append(label)
         streak = streak + 1 if label in FAILURES else 0
-        if streak >= YAHOO_MAX_FAILURES:
+        if YAHOO_RATE_LIMITED in errors:
+            stopped = RATE_LIMITED_REASON  # one 429 ends the step: more calls only deepen the block
+        elif streak >= YAHOO_MAX_FAILURES:
             stopped = f"yahoo failed {YAHOO_MAX_FAILURES} calls in a row"
         if done % CHECKPOINT_EVERY == 0:
             run.checkpoint()
     return {
         "due": len(due),
         "held_not_covered": len(holding),
+        "standby": len(standby),
         "asked": len(labels),
         "fetched": sum(1 for x in labels if x in (OK, EMPTY)),
         "not_covered": labels.count(NOT_COVERED),
@@ -481,9 +504,12 @@ def _yahoo(
     }
 
 
-def _ask_yahoo(run: IngestRun, source: Source, key: str, name: Name) -> str:
+def ask_yahoo(
+    run: IngestRun, source: Source, key: str, name: Name, errors: list[int] | None = None
+) -> str:
     """One Yahoo call -> its item label; each kind it parsed to rows is staged (``ts`` = now).
-    A 404 is ``NOT_COVERED``; every other error is a failure (the name is asked again)."""
+    A 404 is ``NOT_COVERED``; every other error is a failure (the name is asked again), its HTTP
+    status (when it has one) appended to ``errors`` so the backfill can stop on a 429."""
 
     def ask() -> str:
         request = FetchRequest(name.symbol, name.instrument_id, run.session)
@@ -491,8 +517,11 @@ def _ask_yahoo(run: IngestRun, source: Source, key: str, name: Name) -> str:
         try:
             normalized = run.fetch(source, request)
         except Exception as exc:
-            if getattr(exc, "status", None) == YAHOO_NOT_FOUND:
+            status = getattr(exc, "status", None)
+            if status == YAHOO_NOT_FOUND:
                 return f"{NOT_COVERED}: HTTP {YAHOO_NOT_FOUND}"
+            if errors is not None and isinstance(status, int):
+                errors.append(status)
             raise
         assert normalized is not None
         staged = 0

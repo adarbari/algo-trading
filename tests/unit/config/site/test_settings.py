@@ -127,6 +127,9 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"yahoo": {"licence": "free"}}, r"\[yahoo\] licence"),
         ({"yahoo": {"per_night": -1}}, r"\[yahoo\] per_night: expected an integer >= 0"),
         ({"yahoo": {"run_budget_s": 0}}, r"\[yahoo\] run_budget_s: expected an integer >= 1"),
+        ({"yahoo": {"standby_days": 0}}, r"\[yahoo\] standby_days: expected an integer >= 1"),
+        ({"yahoo": {"backfill_batch": 0}}, r"\[yahoo\] backfill_batch: expected an integer >= 1"),
+        ({"yahoo": {"backfill_min_interval_s": -1}}, r"\[yahoo\] backfill_min_interval_s"),
         ({"ssga": {"etf_files": "no"}}, r"\[ssga\] etf_files: expected true or false"),
         ({"etf_holdings": {"refresh": 7}}, r"\[etf_holdings\]: unknown keys \['refresh'\]"),
     ],
@@ -524,7 +527,8 @@ def test_yahoo_is_owner_only_with_its_own_caps_and_cache() -> None:
     site_value = SourcesSettings.from_document(tomllib.loads((SITE / "sources.toml").read_text()))
     assert site_value.yahoo == SourcesSettings().yahoo  # the default is the site value (ADR 0080)
     y = site_value.yahoo
-    assert (y.licence, y.per_night, y.refresh_days, y.run_budget_s) == ("yahoo", 60, 14, 600)
+    assert (y.licence, y.per_night, y.refresh_days, y.run_budget_s) == ("yahoo", 360, 14, 900)
+    assert (y.standby_days, y.backfill_batch, y.backfill_min_interval_s) == (45, 500, 0.3)
     assert y.cache_dir == "var/cache/yahoo"
     assert site_value.vendor("yahoo").min_interval_s == 1.0
     assert site_value.vendor("yahoo").raw_retention_days == 365  # Yahoo cannot replay a day

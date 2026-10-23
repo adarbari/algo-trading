@@ -6,6 +6,7 @@ The reference is a read at an ``as_of`` after every run, which always takes the 
 and resolves to what ``as_of`` None does. The ``perf`` test is the budget of an Explore chart's
 read (one instrument, one year) from the copy (``make perf``)."""
 
+import json
 import shutil
 import time
 from collections.abc import Iterator
@@ -211,6 +212,34 @@ def test_a_copied_store_with_new_inodes_and_mtimes_keeps_its_copy_fresh(tmp_path
         got = cloned.tables.read_range(TABLE, *args, instruments=["EQ:A"])
     assert taken == [2025, 2026]
     _same(got, _reference(cloned, TABLE, *args, instruments=["EQ:A"]))
+
+
+def test_a_manifest_in_the_old_inode_mtime_size_format_is_stale_and_the_build_repairs_it(
+    tmp_path: Path,
+) -> None:
+    # #814 changed the signature (inode:mtime:size -> size and digest) without a rebuild, and
+    # every read silently fell back to a full scan (/regime 0.5 s -> 12.6 s): a copy in the old
+    # format must read as stale, and the history-copy build must repair it
+    backend = _store(tmp_path / "data")
+    backend.tables.build_history(TABLE, [2025, 2026])
+    path = tmp_path / "data" / "tables" / TABLE / HISTORY / MANIFEST
+    manifest = json.loads(path.read_text())
+    for year in manifest["years"].values():
+        year["days"] = {d: f"123:456789:{i}" for i, d in enumerate(year["days"])}
+    path.write_text(json.dumps(manifest))
+    old = LocalBackend(tmp_path / "data")
+    day = date(2026, 1, 5)
+    assert not old.tables.history_current(TABLE, day)
+    args = (date(2025, 12, 1), date(2026, 3, 1))
+    with _copy_reads(old) as taken:
+        got = old.tables.read_range(TABLE, *args, instruments=["EQ:A"])
+    assert taken == []  # fell back to the partitions, same frame
+    _same(got, _reference(old, TABLE, *args, instruments=["EQ:A"]))
+    assert old.tables.build_history(TABLE, [2025, 2026]) == [2025, 2026]
+    assert old.tables.history_current(TABLE, day)
+    with _copy_reads(old) as taken:
+        old.tables.read_range(TABLE, *args, instruments=["EQ:A"])
+    assert taken == [2025, 2026]
 
 
 def test_a_partition_rewritten_in_a_cloned_store_is_still_detected(tmp_path: Path) -> None:

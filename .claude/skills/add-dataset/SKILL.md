@@ -51,3 +51,24 @@ settings owner and must drive code (a test checks).
      its own `known_from`, never by rewriting the earlier row.
    - A table over a restricted-licence source says so in its `tables.toml` note and its features carry `licence` (ADR 0028).
 9. Update `docs/data/storage.md`, run `make changed`, push (CI is the full gate).
+
+## Choosing a store
+
+Parquet or SQLite (or a file)? The rule and its triggers are `docs/data/storage.md`, "Choosing a
+store": Parquet for analytical domain data, SQLite only for small, mutable or keyed operational
+state and derived rebuildable indexes, TOML files for human-edited configuration; no third engine
+without an ADR. Measure on a real-shaped store first (`docs/perf/page-latency-bar.md`).
+
+## Changing a derived store
+
+Changing a derived store's key, signature or schema (history copy, release, caches) ships its
+rebuild in the same PR, or the read self-heals on first use. Add a fitness test that builds a store
+in the old format and asserts the new code detects it and the rebuild task repairs it. A read that
+falls back to a full scan logs and counts it. (#814 changed the history-copy signature without a
+rebuild: /regime went 0.5 s -> 12.6 s on the real store.)
+
+## Writers and the ingest lock
+
+A writer outside the ingest lock must be crash-safe against `recover_unpublished` (ADR 0022: it
+drops unpublished ingest runs; it runs on every writing command, `cli/main.py:578`, under the lock); the default is to take the lock. (The
+edge-verdicts post-session step ran outside it and a CLI ingest dropped its pending rows.)

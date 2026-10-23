@@ -10,6 +10,7 @@ from datetime import date
 from types import ModuleType
 from typing import Any
 
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import TaskContext
 
@@ -42,6 +43,8 @@ class Task:
     params: tuple[Param, ...] = ()
     # Workflows (nightly) skip the task when this returns a reason; explicit runs ignore it.
     skip: Callable[[TaskContext], str | None] | None = None
+    # An explicit run builds its sources with these settings instead (e.g. a slower pacing floor).
+    paced: Callable[[SourcesSettings], SourcesSettings] | None = None
 
 
 SESSION = Param("session", ("--date",), date.fromisoformat, "session (default: last session)")
