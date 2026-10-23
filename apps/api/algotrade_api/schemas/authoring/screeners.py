@@ -12,6 +12,14 @@ class Finalised(Schema):
     screener_id: str
     version: int
     hash: str
+    run_job_id: str | None = Field(
+        None,
+        description="the one-off run finalising started (poll GET /jobs/{id}); None when the "
+        "results for this version were already stored or runs are off",
+    )
+    run_state: str | None = Field(
+        None, description="that run's state (ready, queued, running, ...); None when none was asked"
+    )
 
 
 class Draft(Schema):
