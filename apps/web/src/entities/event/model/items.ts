@@ -126,9 +126,11 @@ export function studyChartEvents(
   for (const f of study.filings) {
     byDay.set(f.filingDate, [...(byDay.get(f.filingDate) ?? []), `${f.form} ${f.label}`]);
   }
-  const filings = [...byDay].map(
-    ([time, details]): ChartEvent => ({ time, kind: 'filing', detail: details.join('; ') }),
-  );
+  const filings = [...byDay].map(([time, details]): ChartEvent => ({
+    time,
+    kind: 'filing',
+    detail: details.join('; '),
+  }));
   return [...filings, ...ahead].sort((a, b) => a.time.localeCompare(b.time));
 }
 
