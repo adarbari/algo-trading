@@ -14,6 +14,7 @@ from algotrade_sources.vendors.yahoo.analyst import (
     TARGET_COLUMNS,
     YahooAnalyst,
     number,
+    parse_recommendation,
 )
 from algotrade_sources.vendors.yahoo.client import refused, url, vendor_symbol
 from tests.conftest import REPO_ROOT
@@ -50,12 +51,45 @@ def test_the_annual_estimates_are_the_0y_and_plus_1y_periods_by_end_date() -> No
     assert first["revenue_avg"] > 1e9 and first["currency"] == "USD"  # the quarters are dropped
 
 
-def test_the_recommendation_is_the_current_month_dated_the_first_of_the_session_month() -> None:
+def test_the_eps_trend_columns_are_floats_and_the_seven_day_value_is_not_kept() -> None:
+    frame = parsed(ARX)["estimates_annual"]
+    first = frame.iloc[0]  # 0y
+    assert first["eps_trend_current"] == pytest.approx(0.8925)
+    assert first["eps_trend_30d_ago"] == pytest.approx(0.89375)
+    assert first["eps_trend_60d_ago"] == pytest.approx(0.78444)
+    assert first["eps_trend_90d_ago"] == pytest.approx(0.742)
+    assert frame.iloc[1]["eps_trend_90d_ago"] == pytest.approx(0.923)
+    assert {str(frame[c].dtype) for c in frame.columns if c.startswith("eps_trend")} == {"float64"}
+    assert not any("7d" in c for c in frame.columns)
+
+
+def test_the_recommendation_is_four_months_dated_from_the_first_of_the_session_month() -> None:
     frame = parsed(ARX)["recommendation"]
     assert list(frame.columns) == RECOMMENDATION_COLUMNS
-    row = frame.iloc[0]
-    assert row["period"] == pd.Timestamp("2026-10-01", tz="UTC")
-    assert [row[c] for c in RECOMMENDATION_COLUMNS[2:]] == [0, 0, 5, 0, 1]
+    assert [p.strftime("%Y-%m-%d") for p in frame["period"]] == [
+        "2026-10-01",
+        "2026-09-01",
+        "2026-08-01",
+        "2026-07-01",
+    ]
+    counts = [[row[c] for c in RECOMMENDATION_COLUMNS[2:]] for _, row in frame.iterrows()]
+    assert counts[0] == [0, 0, 5, 0, 1]  # 0m: hold 5, strongSell 1
+    assert counts[2] == [0, 1, 5, 0, 0]  # -2m
+    assert counts[3] == [4, 5, 1, 0, 0]  # -3m
+
+
+def test_the_months_count_back_across_a_year_end_and_absent_ones_are_skipped() -> None:
+    found = {
+        "recommendationTrend": {
+            "trend": [
+                {"period": "0m", "buy": 1},
+                {"period": "-3m", "buy": 2},
+                {"period": "+1m", "buy": 9},
+            ]
+        }
+    }
+    frame = parse_recommendation("A", found, date(2026, 2, 17))
+    assert [p.strftime("%Y-%m-%d") for p in frame["period"]] == ["2026-02-01", "2025-11-01"]
 
 
 def test_a_non_usd_name_stores_no_estimates_and_no_targets_but_keeps_the_counts() -> None:

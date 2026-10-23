@@ -6,8 +6,9 @@ upgradeDowngradeHistory`` answers
 ``quoteSummary.result[0]`` with ``financialData`` (``targetMeanPrice``, ``targetMedianPrice``,
 ``targetHighPrice``, ``targetLowPrice``, ``financialCurrency``), ``earningsTrend.trend[]``
 (``period`` 0q / +1q / 0y / +1y, ``endDate`` the fiscal period end, ``earningsEstimate`` and
-``revenueEstimate`` with ``avg``, ``numberOfAnalysts`` and the currency) and
-``recommendationTrend.trend[]`` (``period`` 0m, -1m.., the five counts). Recorded 2026-10-22
+``revenueEstimate`` with ``avg``, ``numberOfAnalysts`` and the currency, ``epsTrend`` with the EPS
+consensus ``current`` and as it stood ``30daysAgo`` / ``60daysAgo`` / ``90daysAgo``) and
+``recommendationTrend.trend[]`` (``period`` 0m, -1m, -2m, -3m, the five counts). Recorded 2026-10-22
 (``tests/fixtures/sources/yahoo``): the request asks ``formatted=false``, and ``financialData``
 numbers come bare while ``earningsTrend`` ones still come as ``{"raw": 1.5, "fmt": "1.5"}``, so a
 number is read as either (an empty ``{}`` is missing). An unknown symbol answers 404
@@ -21,8 +22,11 @@ Request key: the symbol. ``normalize`` returns ``parsed["price_target"]``, ``["e
 and ``["recommendation"]`` (a kind with nothing to store is an empty frame), shaped like the FMP
 and Finnhub frames the snapshot task already turns into rows. Estimates keep the annual periods
 (``0y``, ``+1y``) by their ``endDate`` (a period without one is dropped); which of them is the
-forward year is the reader's job. Recommendation counts are the ``0m`` row, dated the first of the
-session's month (Finnhub's convention).
+forward year is the reader's job. ``eps_trend_current`` / ``_30d_ago`` / ``_60d_ago`` /
+``_90d_ago`` are the ``epsTrend`` values (Yahoo's restatement as of the fetch day; the 7-day one
+is not kept). Recommendation counts are one row per bucket present of ``0m``, ``-1m``, ``-2m``,
+``-3m``, ``period`` the first of the session's month less k calendar months (Finnhub's
+convention).
 
 Currency: the forward formulas assume USD, so a name whose estimates are not in USD stages no
 estimate rows, and one whose ``financialCurrency`` is not USD (or missing) no targets, until the
@@ -56,6 +60,14 @@ COUNTS = {
     "strongSell": "strong_sell",
 }
 TARGET_COLUMNS = ["symbol", "target_high", "target_low", "target_consensus", "target_median"]
+TREND = {
+    "current": "eps_trend_current",
+    "30daysAgo": "eps_trend_30d_ago",
+    "60daysAgo": "eps_trend_60d_ago",
+    "90daysAgo": "eps_trend_90d_ago",
+}
+TREND_COLUMNS = list(TREND.values())
+MONTHS = {"0m": 0, "-1m": 1, "-2m": 2, "-3m": 3}
 ESTIMATE_COLUMNS = [
     "symbol",
     "period",
@@ -65,6 +77,7 @@ ESTIMATE_COLUMNS = [
     "num_analysts_eps",
     "num_analysts_revenue",
     "currency",
+    *TREND_COLUMNS,
 ]
 RECOMMENDATION_COLUMNS = ["symbol", "period", *COUNTS.values()]
 CALENDAR_COLUMNS = ["symbol", "next_report", "last_action"]
@@ -109,8 +122,10 @@ def parse_estimates(symbol: str, found: dict[str, Any]) -> pd.DataFrame:
         end = pd.to_datetime(trend.get("endDate"), utc=True, errors="coerce")
         if trend.get("period") not in ANNUAL or pd.isna(end) or currencies != {USD}:
             continue
+        trend_eps = trend.get("epsTrend") or {}
         out.append(
             {
+                **{ours: number(trend_eps.get(theirs)) for theirs, ours in TREND.items()},
                 "symbol": symbol,
                 "period": "annual",
                 "fiscal_date": end,
@@ -124,23 +139,29 @@ def parse_estimates(symbol: str, found: dict[str, Any]) -> pd.DataFrame:
     frame = pd.DataFrame(out, columns=ESTIMATE_COLUMNS)
     for col in ("num_analysts_eps", "num_analysts_revenue"):
         frame[col] = frame[col].astype("Int64")
+    frame = frame.astype(dict.fromkeys(TREND_COLUMNS, "float64"))
     kept = frame.drop_duplicates("fiscal_date").sort_values("fiscal_date")
     return kept.reset_index(drop=True)
 
 
 def parse_recommendation(symbol: str, found: dict[str, Any], session: date) -> pd.DataFrame:
-    """The ``0m`` counts as one row dated the first of the session's month; none without it."""
+    """The ``0m`` .. ``-3m`` counts as one row each (those present), ``period`` the first of the
+    session's month less k months; none without any."""
     trend = (found.get("recommendationTrend") or {}).get("trend") or []
-    current = [t for t in trend if t.get("period") == "0m"]
-    if not current:
-        return pd.DataFrame(columns=RECOMMENDATION_COLUMNS)
-    month = pd.Timestamp(session.replace(day=1), tz="UTC")
-    row: dict[str, Any] = {"symbol": symbol, "period": month}
-    for theirs, ours in COUNTS.items():
-        value = number(current[0].get(theirs))
-        row[ours] = None if value is None else int(value)
-    frame = pd.DataFrame([row], columns=RECOMMENDATION_COLUMNS)
-    return frame.astype(dict.fromkeys(COUNTS.values(), "Int64"))
+    rows: list[dict[str, Any]] = []
+    for item in trend:
+        back = MONTHS.get(item.get("period"))
+        if back is None:
+            continue
+        month = pd.Timestamp(session.replace(day=1), tz="UTC") - pd.DateOffset(months=back)
+        row: dict[str, Any] = {"symbol": symbol, "period": month}
+        for theirs, ours in COUNTS.items():
+            value = number(item.get(theirs))
+            row[ours] = None if value is None else int(value)
+        rows.append(row)
+    frame = pd.DataFrame(rows, columns=RECOMMENDATION_COLUMNS)
+    frame = frame.drop_duplicates("period", keep="first").sort_values("period", ascending=False)
+    return frame.reset_index(drop=True).astype(dict.fromkeys(COUNTS.values(), "Int64"))
 
 
 def day(seconds: Any) -> date | None:
