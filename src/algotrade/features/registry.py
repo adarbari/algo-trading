@@ -255,6 +255,9 @@ SUPERSEDED: dict[str, Superseded] = {
     # amendment 2026-10-24); every v2 column keeps its meaning
     "analyst_revisions@v1": Superseded("analyst_revisions@v3"),
     "analyst_revisions@v2": Superseded("analyst_revisions@v3"),
+    # v2 reads Yahoo's rows when Finnhub has none for a name and adds ratings_source (ADR 0080);
+    # every v1 column is unchanged, the licence is now `yahoo`
+    "analyst_ratings@v1": Superseded("analyst_ratings@v2"),
     "growth_history@v1": Superseded("growth_history@v2"),
     "income_statement@v1": Superseded("income_statement@v2"),
     "cash_flow@v1": Superseded("cash_flow@v2"),

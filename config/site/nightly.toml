@@ -53,7 +53,7 @@ market_prefix = "rollups/market/"   # every table under it is copied, all years 
 instrument_tables = [            # the tables Explore reads, copied for the last `recent_years` years: bars and every
     "bars/1d",                   # instrument rollup group (a Features tab history reads them all; test_nightly.py). 176 MB
     "rollups/instrument/analyst_estimates@v2",
-    "rollups/instrument/analyst_ratings@v1",
+    "rollups/instrument/analyst_ratings@v2",
     "rollups/instrument/analyst_revisions@v3",
     "rollups/instrument/analyst_targets@v2",
     "rollups/instrument/anchored_vwap@v2",   # 68 MB

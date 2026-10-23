@@ -218,9 +218,9 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0068, 0080: price-target consensus, median, high and low from our own analyst snapshots, FMP first then Yahoo per name (targets_source); licence yahoo (owner only), optional"
 
 [[table]]
-name = "rollups/instrument/analyst_ratings@v1"
+name = "rollups/instrument/analyst_ratings@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "ADR 0068: analysts' strong buy to strong sell counts, mean rating and its 90-day change from our own Finnhub snapshots; personal licence, optional"
+note = "ADR 0068, 0080: analysts' strong buy to strong sell counts, mean rating and its change over about 90 days from our own snapshots, Finnhub first then Yahoo per name (ratings_source); licence yahoo (owner only), optional"
 
 [[table]]
 name = "rollups/instrument/analyst_revisions@v3"
