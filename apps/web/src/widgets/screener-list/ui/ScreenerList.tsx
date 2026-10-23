@@ -9,6 +9,7 @@
  */
 import {
   Banner,
+  Button,
   EmptyState,
   ActionGroup,
   ExpandableTable,
