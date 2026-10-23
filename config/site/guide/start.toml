@@ -542,3 +542,33 @@ body = """
 Below the requests, each row is one formula traders wrote in Describe it and saved as their own feature. Equal formulas are one row, grouped by their fingerprint. The row counts distinct users and acceptances and never names a user. Open a row to read its canonical form.
 The Duplicates column names the site feature that already computes the same thing, and the Backlog column the backlog item exactly tied to it. A formula with neither is a candidate to promote; promoting it is a reviewed change, like any other.
 """
+
+# --------------------------------------------------------------------------------------- 10
+[[page]]
+id = "read_screener_runs"
+order = 10
+title = "Read the Screener runs page"
+summary = "Admins: every screener run of any status, what it picked, what it lacked and how it differs from the run before."
+links = [
+  { kind = "term", id = "screener_run_status" },
+  { kind = "term", id = "screener_run_missing_tables" },
+  { kind = "term", id = "screener_run_changes" },
+]
+
+[[page.section]]
+title = "What the page lists"
+body = """
+Each row is one run of one screener for one owner and one session, newest first, of any status. Narrow the list by user, screener or status. The server applies the filters; the page only shows the rows it sends.
+"""
+
+[[page.section]]
+title = "Reading a run"
+body = """
+Open a row to see its config version, every decision with its count, and the regime and coverage it recorded. It also lists the tables the run lacked and how it differs from the run before. A figure the run never recorded is shown as not recorded, never as zero.
+"""
+
+[[page.section]]
+title = "When a run is not complete"
+body = """
+A partial or failed run names the tables it lacked, and an admin sees the chain behind each gap: the source, the step and the table. Fix the cause in the Ingestion tab, then wait for the next nightly run. This page cannot rerun a screener.
+"""
