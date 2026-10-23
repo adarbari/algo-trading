@@ -73,7 +73,7 @@ def test_analyst_values_are_yahoo_licensed_and_never_served_to_a_personal_only_h
     features = site_features()
     assert licence_of(features, ESTIMATE) == "yahoo"
     assert licence_of(features, FORWARD) == "yahoo"  # an expression inherits the strictest
-    assert licence_of(features, "rollup.analyst_ratings@v1.rating_score") == "personal"
+    assert licence_of(features, "rollup.analyst_ratings@v2.rating_score") == "yahoo"
     assert strictest(["open", "personal", "yahoo", "personal"]) == "yahoo"
     assert strictest(["open", "personal"]) == "personal" and strictest([]) == "open"
     asked = [ESTIMATE, FORWARD, OPEN]

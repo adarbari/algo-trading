@@ -581,3 +581,12 @@ follow-up PR).
 - status: final
 - Note: the owner starts the SQLite work in a separate session; the hand-off note is outside the repo.
 - Reasoning: IdeasPage is 0.91 s cold on a quiet machine (0.85 s for a trader without the personal licence) after #860 (skip the values-file read) and #861 (light IdeaScreener.top), against a 1 s bar. The architect's profile showed run-file reads (about 65% of load_ideas) were the cost, and an index would save only about 0.1-0.3 s; the batched run-file read (#863) was closed after measuring 0.018 s against an estimated 0.15-0.2 s.
+
+## 2026-10-23 | Page-latency gate (#848) | `MyScreens` may answer empty on the benchmark clone (`empty_ok`, expiry 2026-12-22)
+- Question: `MyScreens` empty_ok: the benchmark viewer owns no screens, `[]` is the right answer, expiry 2026-12-22; approve it as the one named empty answer the gate accepts?
+- Options: approve `empty_ok = ["MyScreens"]` with a reason and an expiry / fail the gate on it every night.
+- Decision: approve. `benchmarks/perf_bar.toml` carries `empty_ok = ["MyScreens"]` with `empty_ok_expiry = "2026-12-22"`; every other operation that answers null or empty fails the gate.
+- decided by: owner
+- status: final
+- Note: owner, chat 2026-10-23: "Ok approved then".
+- Reasoning: the benchmark viewer owns no screens, so an empty list is the correct answer, and the entry expires so it is reviewed.
