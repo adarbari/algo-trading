@@ -29,7 +29,7 @@ beforeEach(() => {
 describe('HarnessRunList', () => {
   it('lists each run with its split, exclusions and Guide buttons; unrecorded figures stay empty', async () => {
     const { container } = render(<HarnessRunList selected={null} onSelect={vi.fn()} />);
-    const table = screen.getByRole('grid', { name: 'Harness runs' });
+    const table = screen.getByRole('grid', { name: 'Edge runs' });
     const done = within(table).getByRole('row', { name: /run-b/ });
     expect(within(done).getByText('complete')).toBeInTheDocument();
     expect(within(done).getByText('2024-01-01')).toBeInTheDocument();
@@ -54,10 +54,10 @@ describe('HarnessRunList', () => {
   it('shows the loading, error and empty states', () => {
     hooks.useHarnessRuns.mockReturnValue(fakeQuery(undefined));
     const { rerender } = render(<HarnessRunList selected={null} onSelect={vi.fn()} />);
-    expect(screen.getByText('Loading harness runs…')).toBeInTheDocument();
+    expect(screen.getByText('Loading edge runs…')).toBeInTheDocument();
     hooks.useHarnessRuns.mockReturnValue(fakeQuery(undefined, { isError: true }));
     rerender(<HarnessRunList selected={null} onSelect={vi.fn()} />);
-    expect(screen.getByText('The harness runs failed to load.')).toBeInTheDocument();
+    expect(screen.getByText('The edge runs failed to load.')).toBeInTheDocument();
     hooks.useHarnessRuns.mockReturnValue(fakeQuery([]));
     rerender(<HarnessRunList selected={null} onSelect={vi.fn()} />);
     expect(screen.getByText('No evaluation run is recorded.')).toBeInTheDocument();
