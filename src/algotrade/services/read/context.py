@@ -71,6 +71,7 @@ __all__ = [
     "partition_on",
     "partition_stats_on",
     "previous_session",
+    "run_day_rows",
     "run_partition",
     "run_rows_of",
     "served_session",
@@ -511,6 +512,29 @@ def _run_file_rows(
     if grain is not Grain.SESSION:
         raise ValueError(f"{table} is {grain} grain: {why}")
     return ctx.reader.read_run(table, day, run_id, columns, instruments, where)
+
+
+def run_day_rows(
+    ctx: Stores, table: str, day: date, key: tuple[str, ...]
+) -> dict[tuple[Any, ...], dict[str, Any]]:
+    """The merged rows of the run-keyed ``results/*`` ``table`` on ``day``, a run's end session,
+    each as a dict under its ``key`` columns' values (runs are read by run, not by session,
+    ADR 0036): once per request. Empty when the partition is absent. The caller looks up the
+    exact key it computed, so a row of another run, another fingerprint or another user is never
+    returned for it. ``ValueError`` for a table that is not session grain."""
+    grain = grain_of(table)
+    if grain is not Grain.SESSION:
+        raise ValueError(f"{table} is {grain} grain: a run's results are session grain")
+
+    def read() -> dict[tuple[Any, ...], dict[str, Any]]:
+        frame = ctx.reader.table(table, day)
+        if frame is None or frame.empty:
+            return {}
+        rows = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
+        return {tuple(r[c] for c in key): r for r in rows}
+
+    memo_key = ("run-day-rows", table, day, ctx.reader.version(), ctx.reader.runs_generation())
+    return once_per_request(ctx, memo_key, read)
 
 
 def run_rows_of(

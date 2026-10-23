@@ -23,6 +23,10 @@ from algotrade.services.read.evaluation.verdict.rule import JudgeCall
 
 JUDGE_VERSION = 1  # bump on a semantic change of the judge outside JUDGED_CODE (a parse, a column)
 
+# Modules of the package that read a stored headline and never judge (``stored.py``): they are
+# no part of the judge, so editing one neither changes the digest nor needs a re-judge.
+READER_MODULES = ("stored.py",)
+
 # Each name outside the verdict package that the headline path runs, as ``module:name`` (a
 # function, a class or a module constant): the source digest hashes its definition. The fitness
 # test (tests/unit/.../test_fingerprint.py) lists every name the package imports from outside
@@ -107,8 +111,13 @@ def _definition(entry: str) -> str:
 
 
 def digest_of(package: Path, entries: tuple[str, ...]) -> str:
-    """The source digest of every module of ``package`` and of ``entries``."""
-    parts = [f"{f.name}:{_dump(f.read_text())}" for f in sorted(package.glob("*.py"))]
+    """The source digest of every judging module of ``package`` (not ``READER_MODULES``) and of
+    ``entries``."""
+    parts = [
+        f"{f.name}:{_dump(f.read_text())}"
+        for f in sorted(package.glob("*.py"))
+        if f.name not in READER_MODULES
+    ]
     parts += [f"{e}:{_definition(e)}" for e in sorted(entries)]
     return hashlib.sha256("\n".join(parts).encode()).hexdigest()
 

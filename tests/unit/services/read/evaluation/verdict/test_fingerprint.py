@@ -130,6 +130,8 @@ def _imports(package: Path) -> set[str]:
     an imported module such as ``runs.MAIN``)."""
     found: set[str] = set()
     for file in package.glob("*.py"):
+        if file.name in fp.READER_MODULES:
+            continue  # the stored-headline reader judges nothing
         tree = ast.parse(file.read_text())
         modules: dict[str, str] = {}
         for node in ast.walk(tree):
