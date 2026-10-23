@@ -420,6 +420,7 @@ def time_ops(
         "budget_s": budget_s,
         "elapsed_s": round(clock() - t0, 1),
         "low_confidence": done < CONFIDENT_PASSES,
+        "stop_reason": "reps" if done >= reps else "budget",
     }
     return {
         s: {
@@ -463,8 +464,10 @@ def git_sha() -> str:
 # ---- entry point ----------------------------------------------------------------------------
 
 
-def write_outputs(out: Path, ops: dict, views: dict, skipped: dict[str, str]) -> None:
-    """ops.json (per operation) and views.json (per view, and the views not measured)."""
+def write_outputs(out: Path, ops: dict, views: dict, skipped: dict[str, str], meta: dict) -> None:
+    """ops.json (per operation), views.json (per view, and the views not measured) and
+    run-meta.json (passes, budget, stop reason)."""
+    (out / "run-meta.json").write_text(json.dumps(meta, indent=1))
     (out / "ops.json").write_text(json.dumps(ops, indent=1))
     (out / "views.json").write_text(json.dumps({"views": views, "not_measured": skipped}, indent=1))
 
@@ -587,9 +590,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     for vid, why in skipped.items():
         print(f"not measured: {vid}: {why}")
-    if out_dir:
-        write_outputs(out_dir, ops, views, skipped)
     noisy, may_record = report_run(ops, meta, args, bool(names))
+    if out_dir:
+        write_outputs(out_dir, ops, views, skipped, {**meta, "noisy": noisy})
     if args.record and not may_record:
         print(
             "not recorded: a noisy, low-confidence or --only run (--record-noisy to keep it)",

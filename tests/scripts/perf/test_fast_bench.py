@@ -226,12 +226,14 @@ def test_a_fast_run_does_all_its_reps_and_is_confident(
 ) -> None:
     ops, meta = _run_budget(monkeypatch, tmp_path, 1.0, 5, 270)
     assert meta["passes"] == 5 and not meta["low_confidence"] and ops["A#1"]["n"] == 5
+    assert meta["stop_reason"] == "reps"
 
 
 def test_a_loaded_run_stops_early_when_the_next_pass_would_overrun(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     ops, meta = _run_budget(monkeypatch, tmp_path, 10.0, 5, 70)  # a pass = 20 s
+    assert meta["stop_reason"] == "budget"
     assert meta["passes"] == 3 and not meta["low_confidence"]  # 60 s done, the 4th would end at 80
     assert ops["A#1"]["n"] == 3 and ops["A#1"]["avg"] == 10000.0
 

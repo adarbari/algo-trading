@@ -122,6 +122,22 @@ and the clone is deleted. Every run appends `wait_s snapshot_s bench_s cleanup_s
 `snapshot_s` (`--timings`). The owner is notified when `bench_s` is over 300, `total_s` over 15
 minutes, or any view is over the bar.
 
+**Reading a run.** Each run leaves `var/logs/perf_gate/YYYY-MM-DD/` (the last 14 kept; nothing is
+written outside `var/logs`) and one line in `var/logs/perf_gate/summary.csv` (date, sha, total_s,
+snapshot_s, bench_s, passes, views_over_bar, seconds_above, noisy, notes: the trend is that one
+file). Which file answers which question:
+
+| question | file |
+|---|---|
+| what happened, how long was each phase, why did the bench stop (reps / budget / low-confidence / over-time / guard) | `status.json`, `run.log` |
+| why was the snapshot slow | `snapshot.json` (copy seconds, free disk before and after, an ingest during the copy), `load.csv` (load and free disk every 10 s across all phases) |
+| why was the run noisy | `procs-start.txt` and `procs-end.txt` (top 10 processes by CPU at the start of the snapshot and the end of the bench), `load.csv` |
+| which view or operation is slow, and is it stable | `views.json`, `ops.json`, `samples-partial.json` (every operation's time per pass), `run-meta.json` (passes, budget) |
+| why is an operation over the bar | `profiles.md` (`page_profile.py`: cProfile buckets, files opened, top functions, for the 3 slowest operations over the bar, 60 s at most; written only when something is over) |
+
+The desktop notification names the directory. The file count of the snapshot is skipped by
+default (counting 750k files costs more than it tells; `PERF_COUNT_FILES=1` counts).
+
 **The launchd entry** (not written or loaded by anything in this repo; the owner installs it like
 the nightly's, `docs/hosting.md`): label `com.algotrade.perf-gate`, `ProgramArguments`
 `/Users/adarbari/workspace/algo-trading/scripts/ops/perf_gate_nightly.sh`, `StartCalendarInterval`

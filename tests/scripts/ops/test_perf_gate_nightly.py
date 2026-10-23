@@ -1,6 +1,7 @@
 """`scripts/ops/perf_gate_nightly.sh`: the path guards, the busy guards (exit 3), and the
 per-date idempotence (before 03:00, done today, next day), with a fake bench and no real store."""
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -144,3 +145,58 @@ def test_the_watchdog_kills_a_slow_bench_and_its_child_and_marks_over_time(rig: 
     with pytest.raises(ProcessLookupError):  # the whole process group died
         os.kill(child, 0)
     assert rig.run().returncode == 0  # a finished day: no retry loop
+
+
+def _evidence(rig: Rig, day: str = "2026-10-23") -> Path:
+    return rig.tmp / "logs" / "perf_gate" / day
+
+
+def test_the_run_leaves_its_evidence_directory_and_a_summary_line(rig: Rig) -> None:
+    ev = _evidence(rig)
+    rig.bench_body = (
+        f"echo '{rig.bench_out}'\n"
+        f'echo \'{{"a#1": {{"name": "Slow", "avg": 2000}}}}\' > {ev}/ops.json\n'
+        f'echo \'{{"passes": 4, "budget_s": 270, "elapsed_s": 100, "stop_reason": '
+        f'"reps", "low_confidence": false, "noisy": false}}\' > {ev}/run-meta.json\n'
+        "exit 1\n"
+    )
+    prof = rig.tmp / "prof.sh"
+    prof.write_text(f'#!/bin/sh\necho "profiled $@" > {ev}/profiles.md\n')
+    prof.chmod(0o755)
+    assert rig.run(PERF_PROFILE_CMD=str(prof), PERF_SAMPLE_S="1").returncode == 1
+    for name in (
+        "status.json",
+        "run.log",
+        "load.csv",
+        "procs-start.txt",
+        "procs-end.txt",
+        "snapshot.json",
+        "profiles.md",
+        "ops.json",
+    ):
+        assert (ev / name).is_file(), name
+    status = json.loads((ev / "status.json").read_text())
+    assert status["passes"] == 4 and status["stop_reason"] == "reps" and status["exit_code"] == 1
+    assert {"wait_s", "snapshot_s", "bench_s", "cleanup_s", "total_s"} <= set(status)
+    assert (
+        "profiled" in (ev / "profiles.md").read_text()
+        and "Slow" in (ev / "profiles.md").read_text()
+    )
+    assert json.loads((ev / "snapshot.json").read_text())["ingest_started_during_copy"] is False
+    rows = (rig.tmp / "logs" / "perf_gate" / "summary.csv").read_text().splitlines()
+    assert rows[0].startswith("date,sha,total_s,snapshot_s,bench_s,passes,views_over_bar")
+    assert rows[1].startswith("2026-10-23,") and ",4,3,2.5," in rows[1]
+    assert str(ev.relative_to(rig.tmp)) in (rig.tmp / "notified").read_text()
+
+
+def test_a_guard_day_records_why_and_only_the_last_14_run_directories_are_kept(rig: Rig) -> None:
+    base = rig.tmp / "logs" / "perf_gate"
+    for d in range(1, 21):
+        (base / f"2026-09-{d:02d}").mkdir(parents=True)
+    (base / "keepme").mkdir()
+    rig.ps.write_text(QUIET_PS + "  9 algotrade-ingest nightly\n")
+    assert rig.run().returncode == 3
+    days = sorted(p.name for p in base.iterdir() if p.name.startswith("2026-"))
+    assert len(days) == 14 and days[-1] == "2026-10-23" and days[0] == "2026-09-08"
+    assert (base / "keepme").exists()  # only dated directories are ever deleted
+    assert json.loads((base / "2026-10-23" / "status.json").read_text())["stop_reason"] == "guard"
