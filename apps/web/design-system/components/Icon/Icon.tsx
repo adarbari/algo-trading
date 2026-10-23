@@ -23,19 +23,9 @@ const PATHS = {
   'chevron-left': <path d="M10 4L6 8l4 4" />,
   'chevron-right': <path d="M6 4l4 4-4 4" />,
   check: <path d="M3.5 8.5l3 3 6-7" />,
-  copy: (
-    <>
-      <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.25" />
-      <path d="M10.5 3.5v-.25A.75.75 0 0 0 9.75 2.5h-6A.75.75 0 0 0 3 3.25v6c0 .41.34.75.75.75H4" />
-    </>
-  ),
-  trash: (
-    <>
-      <path d="M3 4.5h10M6.5 4.5V3h3v1.5" />
-      <path d="M4.5 4.5l.5 8.5h6l.5-8.5M7 7v4M9 7v4" />
-    </>
-  ),
-  pencil: <path d="M10.5 3l2.5 2.5L6 12.5l-3 .5.5-3z" />,
+  copy: <path d="M5 5h8v8H5zM10 5V3H3v7h2" />,
+  trash: <path d="M3 4h10M6 4V2h4v2M4 4l1 9h6l1-9M7 7v4M9 7v4" />,
+  pencil: <path d="M10 3l3 3-7 7H3v-3z" />,
   alert: (
     <>
       <path d="M8 2.5l6 10.5H2z" />
