@@ -240,3 +240,4 @@ config/site/*.local.toml
 # real trader sentences: the owner's curation input and the candidates export stay local (ADR 0066)
 curation*.json
 candidates*.json
+.DS_Store
