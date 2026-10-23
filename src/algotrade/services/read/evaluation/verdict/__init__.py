@@ -4,10 +4,11 @@ Waiting on data, judged on its official result (the canonical run) by one determ
 Split by kind: ``model`` (the status words and the records), ``criteria`` (each test of Promising
 and Works), ``level`` (a candidate's level and columns), ``basis`` (the basis choice, ADR 0065:
 fixed on the in-sample figures alone, before the frozen period is read), ``rule`` (``judge``,
-``judge_call`` and ``load_edge_verdict``) and ``fingerprint`` (the digest of everything the judge
-reads, for a stored headline). The thresholds are site data (``config/site/verdict.toml``);
-the statistics are the stored rows' (``quant/edges/statistics.py``), never recomputed; the
-sentences are the server's, the browser words nothing. Importers use this package's names."""
+``judge_call`` and ``load_edge_verdict``), ``fingerprint`` (the digest of everything the judge
+reads, for a stored headline) and ``stored`` (that headline, read only on a fingerprint match).
+The thresholds are site data (``config/site/verdict.toml``); the statistics are the stored rows'
+(``quant/edges/statistics.py``), never recomputed; the sentences are the server's, the browser words
+nothing. Importers use this package's names."""
 
 from algotrade.services.read.evaluation.verdict.basis import (
     UNDECLARED as UNDECLARED,
@@ -143,4 +144,7 @@ from algotrade.services.read.evaluation.verdict.rule import (
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     projection_of as projection_of,
+)
+from algotrade.services.read.evaluation.verdict.stored import (
+    load_stored_summary as load_stored_summary,
 )
