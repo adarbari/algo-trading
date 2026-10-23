@@ -67,8 +67,6 @@ const step = (name: string, status: string, durationS: number) => ({
   name,
   status,
   durationS,
-  reason: null,
-  error: null,
   counts: {},
   origin: null,
   originStartedAt: null,

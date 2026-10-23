@@ -7,8 +7,6 @@ const step = (name: string, status: string, durationS: number | null) => ({
   name,
   status,
   durationS,
-  reason: null,
-  error: null,
   counts: {},
   origin: null,
   originStartedAt: null,

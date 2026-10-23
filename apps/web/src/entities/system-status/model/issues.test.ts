@@ -13,8 +13,8 @@ const run = (over: Partial<NightlyRun>): NightlyRun => ({
   durationS: null,
   problems: ['steps not complete: ibkr-iv'],
   steps: [
-    { name: 'chains', status: 'SUCCEEDED', durationS: 1, reason: null, error: null, ...ran },
-    { name: 'ibkr-iv', status: 'FAILED', durationS: 1, reason: null, error: 'x', ...ran },
+    { name: 'chains', status: 'SUCCEEDED', durationS: 1, ...ran },
+    { name: 'ibkr-iv', status: 'FAILED', durationS: 1, ...ran },
   ],
   ...over,
 });

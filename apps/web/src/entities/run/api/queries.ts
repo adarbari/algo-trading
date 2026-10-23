@@ -24,8 +24,6 @@ const NightlyRuns = graphql(`
         name
         status
         durationS
-        reason
-        error
         origin
         originStartedAt
         originDurationS
