@@ -5,10 +5,11 @@
  * (`OtherTabs`). A ticker named inside a panel (a holding, a peer, a row of the comparison)
  * opens in a tab of its own.
  */
-import { Skeleton } from '@algotrade/ui';
+import { Skeleton, Stack } from '@algotrade/ui';
 import { Suspense } from 'react';
 
 import { lazyPage } from '@/shared/lib/lazy';
+import { ChartEventListPanel } from '@/widgets/chart-event-list';
 import { HoldingsPanel } from '@/widgets/holdings-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
@@ -41,13 +42,16 @@ function Content(props: DetailTabsProps) {
   switch (state.tab) {
     case 'chart':
       return (
-        <PriceChartPanel
-          symbol={symbol}
-          range={state.range}
-          onRangeChange={(range) => {
-            onSearchChange({ range });
-          }}
-        />
+        <Stack gap={4}>
+          <PriceChartPanel
+            symbol={symbol}
+            range={state.range}
+            onRangeChange={(range) => {
+              onSearchChange({ range });
+            }}
+          />
+          <ChartEventListPanel symbol={symbol} range={state.range} />
+        </Stack>
       );
     case 'overview':
       return (

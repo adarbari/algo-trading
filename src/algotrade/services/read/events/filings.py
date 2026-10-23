@@ -19,6 +19,7 @@ import pandas as pd
 from algotrade.data.events import ALL_TIME, acceptance_sessions, read_events
 from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.events.links import RESULTS_ITEM, FilingRef, filing_url
 from algotrade.services.read.values import Unknown, UnknownCode
 
 FILING_TABLE = "events/filing"
@@ -47,7 +48,8 @@ ITEM_LABELS = {
 class Filing:
     """One 8-K: ``accepted`` the SEC acceptance instant (UTC), ``filing_date`` the date SEC
     files it under, ``form`` 8-K or 8-K/A, ``items`` as SEC lists them, ``label`` the first
-    item in words, ``known_from`` the session it was public on."""
+    item in words, ``known_from`` the session it was public on, ``source_url`` its sec.gov filing
+    index (None: the stored ``cik`` or ``accession`` is not the digits SEC writes)."""
 
     accepted: datetime
     filing_date: date
@@ -55,6 +57,7 @@ class Filing:
     items: tuple[str, ...]
     label: str
     known_from: date
+    source_url: str | None = None
 
 
 def months_before(day: date, months: int) -> date:
@@ -80,7 +83,36 @@ def _filing(row: Mapping[Any, Any], accepted: pd.Timestamp, known: date) -> Fili
         items=items,
         label=item_label(items, form),
         known_from=known,
+        source_url=filing_url(str(row["cik"]), str(row["accession"])),
     )
+
+
+def load_results_filings(
+    ctx: ReadContext, instrument_ids: Sequence[str]
+) -> dict[str, tuple[FilingRef, ...]]:
+    """Each instrument's 8-Ks with Item 2.02 (a results release) known by the session, all
+    time, as what a link needs (``FilingRef``): one read for them all. The report rows stored
+    from these filings find their page here (``links.source_link``)."""
+    ids = list(dict.fromkeys(instrument_ids))
+    if not ids:
+        return {}
+    frame = read_events(ctx.reader, FILING_TABLE, *ALL_TIME, ids).frame
+    out: dict[str, list[FilingRef]] = {iid: [] for iid in ids}
+    if frame.empty:
+        return dict.fromkeys(ids, ())
+    frame = frame[
+        (acceptance_sessions(frame["ts"]) <= ctx.session.date) & frame["form"].isin(EIGHT_K_FORMS)
+    ]
+    for row in frame.to_dict("records"):
+        items = {i.strip() for i in str(row["items"] or "").split(",")}
+        if RESULTS_ITEM in items:
+            accepted = pd.Timestamp(row["ts"])
+            accepted = accepted.tz_localize("UTC") if accepted.tzinfo is None else accepted
+            ref = FilingRef(
+                str(row["cik"]), str(row["accession"]), accepted.to_pydatetime(), str(row["form"])
+            )
+            out.setdefault(str(row["instrument_id"]), []).append(ref)
+    return {iid: tuple(found) for iid, found in out.items()}
 
 
 def load_filings(

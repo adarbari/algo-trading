@@ -133,6 +133,7 @@ RELEASE_FIELDS: dict[str, frozenset[str]] = {
             "instrument.events",
             "instrument.events.date",
             "instrument.events.kind",
+            "instrument.events.sourceUrl",
             "instrument.events.table",
             "instrument.events.ts",
             "instrument.events.values",

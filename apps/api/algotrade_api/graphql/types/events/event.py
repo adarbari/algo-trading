@@ -13,7 +13,8 @@ from algotrade.services.read.events import stored as events
 
 @strawberry.type(
     description="A stored event: `table` events/<kind>, `date` the event date (UTC), "
-    "`values` the row's other columns"
+    "`values` the row's other columns, `sourceUrl` the page the row came from (a report stored "
+    "from an 8-K: its sec.gov filing index; null when there is none)"
 )
 class Event:
     instrument_id: str
@@ -22,6 +23,7 @@ class Event:
     date: dt.date
     ts: dt.datetime
     values: JSON
+    source_url: str | None
 
     @classmethod
     def of(cls, d: events.Event) -> Self:
@@ -32,4 +34,5 @@ class Event:
             date=d.date,
             ts=d.ts,
             values=JSON(d.values),
+            source_url=d.source_url,
         )

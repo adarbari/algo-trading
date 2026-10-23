@@ -87,6 +87,7 @@ const earnings = (ts: string, values: Record<string, unknown>): InstrumentEvent 
   date: ts,
   ts: `${ts}T00:00:00+00:00`,
   values,
+  sourceUrl: null,
 });
 
 describe('profileOf', () => {

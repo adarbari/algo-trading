@@ -15,7 +15,7 @@ events list shows; the earnings dates a page reads as facts are catalogue featur
 (``rollup.earnings@v1.*``), never derived from these rows."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from functools import partial
 
@@ -26,8 +26,11 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.events import ALL_TIME, NO_INSTRUMENT_ROWS, knowledge_bound, read_events
 from algotrade.services.read.context import Held, ReadContext
+from algotrade.services.read.events.filings import load_results_filings
+from algotrade.services.read.events.links import source_link
 from algotrade.services.read.session import Grain, grain_of
 from algotrade.services.read.values import stored_values
+from algotrade.storage.tables.schemas.events import EARNINGS_8K_SOURCE
 
 EVENTS_PREFIX = "events/"
 
@@ -60,7 +63,9 @@ NOT_TIMELINE: dict[str, str] = {
 @dataclass(frozen=True)
 class Event:
     """One stored event. ``table``: ``events/<kind>``; ``date``: the event date (UTC);
-    ``values``: the row's other columns (point-in-time stamps dropped), JSON scalars."""
+    ``values``: the row's other columns (point-in-time stamps dropped), JSON scalars;
+    ``source_url``: the page the row came from (``links.source_link``: a report stored from an
+    8-K, its filing index; None for every other row)."""
 
     instrument_id: str
     table: str
@@ -68,6 +73,7 @@ class Event:
     date: date
     ts: datetime
     values: dict[str, Scalar]
+    source_url: str | None = None
 
 
 def event_tables(ctx: ReadContext, kinds: Sequence[str] | None = None) -> tuple[str, ...]:
@@ -164,6 +170,7 @@ def _read_events(
 ) -> dict[str, tuple[Event, ...]]:
     """The uncached read of ``load_events``: one read per table of ``kinds``."""
     found: dict[str, list[Event]] = {iid: [] for iid in instrument_ids}
+    from_8k: list[Event] = []  # reports stored from an 8-K: their page is its Item 2.02 filing
     for table in event_tables(ctx, kinds):
         through = knowledge_bound(table, ctx.session.date)
         frame = read_events(
@@ -175,9 +182,29 @@ def _read_events(
             iid = str(row["instrument_id"])
             values = stored_values(row, ("instrument_id", "ts"))
             kind = table.removeprefix(EVENTS_PREFIX)
-            found.setdefault(iid, []).append(
-                Event(iid, table, kind, ts.date(), ts.to_pydatetime(), values)
-            )
+            event = Event(iid, table, kind, ts.date(), ts.to_pydatetime(), values)
+            found.setdefault(iid, []).append(event)
+            if kind == "earnings" and row.get("source") == EARNINGS_8K_SOURCE:
+                from_8k.append(event)
+    links = _links(ctx, from_8k)
     return {
-        iid: tuple(sorted(events, key=lambda e: (e.ts, e.table))) for iid, events in found.items()
+        iid: tuple(sorted((links.get(id(e), e) for e in events), key=lambda e: (e.ts, e.table)))
+        for iid, events in found.items()
     }
+
+
+def _links(ctx: ReadContext, reports: Sequence[Event]) -> dict[int, Event]:
+    """Each report stored from an 8-K with its ``source_url`` (the Item 2.02 filing it came
+    from; none found: the report as it is), keyed by the identity of the event it replaces."""
+    filings = load_results_filings(ctx, [e.instrument_id for e in reports])
+    out: dict[int, Event] = {}
+    for event in reports:
+        url = source_link(
+            event.kind,
+            source=EARNINGS_8K_SOURCE,
+            at=event.ts,
+            filings=filings.get(event.instrument_id, ()),
+        )
+        if url is not None:
+            out[id(event)] = replace(event, source_url=url)
+    return out

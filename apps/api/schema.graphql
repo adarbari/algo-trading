@@ -32,7 +32,7 @@ enum Adjustment {
 }
 
 """
-A dated event ahead: `kind` own_earnings | reference_earnings | macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown for a report, the release time for a macro release (08:30 ET), close for a market-structure day; `label` short, `name` in words; `subjectId` whose event (the instrument, the fund's reference, the MACRO: release; null for a market-structure day); `knownFrom` the first session the stored row was known on (null: a catalogue value or a calendar rule); `expiry` a monthly or quarterly option expiry day
+A dated event ahead: `kind` own_earnings | reference_earnings | macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown for a report, the release time for a macro release (08:30 ET), close for a market-structure day; `label` short, `name` in words; `subjectId` whose event (the instrument, the fund's reference, the MACRO: release; null for a market-structure day); `knownFrom` the first session the stored row was known on (null: a catalogue value or a calendar rule); `expiry` a monthly or quarterly option expiry day; `sourceUrl` the agency page of a macro release (null for every other kind)
 """
 type AheadEvent {
   date: Date!
@@ -44,6 +44,7 @@ type AheadEvent {
   source: String!
   knownFrom: Date
   expiry: Boolean!
+  sourceUrl: String
 }
 
 """
@@ -1001,7 +1002,7 @@ type EquityPoint {
 }
 
 """
-A stored event: `table` events/<kind>, `date` the event date (UTC), `values` the row's other columns
+A stored event: `table` events/<kind>, `date` the event date (UTC), `values` the row's other columns, `sourceUrl` the page the row came from (a report stored from an 8-K: its sec.gov filing index; null when there is none)
 """
 type Event {
   instrumentId: String!
@@ -1010,6 +1011,7 @@ type Event {
   date: Date!
   ts: DateTime!
   values: JSON!
+  sourceUrl: String
 }
 
 """
@@ -1212,7 +1214,7 @@ type FieldGuide {
 }
 
 """
-An 8-K or 8-K/A: `accepted` the SEC acceptance instant (UTC), `items` as SEC lists them, `label` the first item in words, `knownFrom` the session it was public on
+An 8-K or 8-K/A: `accepted` the SEC acceptance instant (UTC), `items` as SEC lists them, `label` the first item in words, `knownFrom` the session it was public on, `sourceUrl` its sec.gov filing index (null when the stored ids are not the digits SEC writes)
 """
 type Filing {
   accepted: DateTime!
@@ -1221,6 +1223,7 @@ type Filing {
   items: [String!]!
   label: String!
   knownFrom: Date!
+  sourceUrl: String
 }
 
 """One simulated fill"""

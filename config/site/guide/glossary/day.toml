@@ -136,3 +136,24 @@ income). It says what a hit looks like and what the screen does not check. It li
 shows the preset in the Builder, where your first edit makes your own copy.
 """
 see_also = ["preset", "criterion"]
+
+[[term]]
+id = "chart_events"
+term = "Events on the chart"
+short = "The list under the price chart: one dated row for each marker on it, linked to its source page when one exists."
+body = """
+Each row is one marker on the chart, newest first, for the range you chose. The letter is the
+marker's kind: E for earnings, F for an 8-K filing, D for an ex-dividend date and S for a split.
+M is a macro release such as CPI. The chips above the list count each kind and hide or show it.
+
+An 8-K row links to its filing index on SEC's EDGAR site. Several 8-Ks filed on one day are one marker
+and one row, with one link each. A reported earnings row links to the 8-K with Item 2.02 (the
+results release) that the app matched by its acceptance time, or else its day. An earnings date
+still ahead, and a report known only from the exchange calendar, has no link because no filing
+exists. A macro release links to the agency's own page for that release, not to the day's figures.
+Dividends and splits have no link because the app stores no source page for them.
+
+Don't read a link as a copy of the figures: the filing and the agency page are the authority, and
+the row only points to them. Links open in a new tab, on SEC's EDGAR site or the agency's own.
+"""
+see_also = ["session", "knowledge_time"]

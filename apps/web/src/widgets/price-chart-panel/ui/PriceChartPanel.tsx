@@ -7,15 +7,9 @@
 import { Chart, Panel, type ChartRange } from '@algotrade/ui';
 import { useMemo } from 'react';
 
-import { studyChartEvents, useInstrumentEventStudy } from '@/entities/event';
-import {
-  RangeControl,
-  rangeFrom,
-  toChartEvents,
-  useInstrumentEvents,
-  useInstrumentPrices,
-} from '@/entities/instrument';
+import { RangeControl, rangeFrom, useInstrumentPrices } from '@/entities/instrument';
 import { toChartBands, useRegimeBands } from '@/entities/regime';
+import { useChartEvents } from '@/features/chart-events';
 
 export interface PriceChartPanelProps {
   symbol: string;
@@ -26,8 +20,7 @@ export interface PriceChartPanelProps {
 export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPanelProps) {
   const from = rangeFrom(range);
   const bars = useInstrumentPrices(symbol, from);
-  const events = useInstrumentEvents(symbol);
-  const study = useInstrumentEventStudy(symbol);
+  const markers = useChartEvents(symbol, from).events;
   const items = useMemo(() => bars.data ?? [], [bars.data]);
   // Storm and Severe-storm sessions shade the window, up to the last stored bar.
   const regimeBands = useRegimeBands(from, items.at(-1)?.session);
@@ -43,14 +36,6 @@ export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPane
     [items, symbol],
   );
   const volume = useMemo(() => items.map((b) => ({ time: b.session, value: b.volume })), [items]);
-  const markers = useMemo(() => {
-    const stored = toChartEvents(events.data ?? []);
-    const earnings = new Set(stored.filter((e) => e.kind === 'earnings').map((e) => e.time));
-    const studied = study.data ? studyChartEvents(study.data, earnings) : [];
-    return [...stored, ...studied]
-      .filter((e) => e.time >= from)
-      .sort((a, b) => a.time.localeCompare(b.time));
-  }, [events.data, study.data, from]);
   return (
     <Panel
       title={`${symbol} · price`}
