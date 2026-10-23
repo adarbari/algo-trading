@@ -85,7 +85,7 @@ test('the pencil of one of yours opens its edit page', async ({ page }) => {
   await list
     .getByRole('row')
     .filter({ hasText: 'my-vrp' })
-    .getByRole('button', { name: 'Edit', exact: true })
+    .getByRole('button', { name: 'Edit criteria' })
     .click();
   await expect(page).toHaveURL(/\/screeners\/my-vrp\/edit$/);
 });

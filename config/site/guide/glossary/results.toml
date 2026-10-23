@@ -194,9 +194,9 @@ id = "screener_picks"
 term = "Picks today"
 short = "How many names the screener picked in the latest session, with how many joined and left since the run before."
 body = """
-The number counts the names the screener kept after its criteria and its ranking. The green +N is the names that are new since the previous run, the red −N the names that dropped out. A muted line says how many were paused because the market regime stopped the screener that session. For example, 12 with +3 −2 means three new names, two gone and ten kept. A dash means no run is stored for the session. Don't read a long list as a better screener: a loose screen picks many names, and the track record says whether the picks did well.
+The number counts the names the screener kept after its criteria and its ranking. The green +N is the names that are new since the previous run, the red −N the names that dropped out. A muted line says how many were paused because the market regime stopped the screener that session. For example, 12 with +3 −2 means three new names, two gone and ten kept. Not run means no run is stored for the session, and it opens the screener too. Don't read a long list as a better screener: a loose screen picks many names, and the track record says whether the picks did well.
 """
-next = "Click the pick count, or View, to open the screener and see each pick and the criterion behind its decision."
+next = "Click the pick count to open the screener and see each pick and the criterion behind its decision."
 see_also = ["paused", "idea_decision", "screener_track_record"]
 
 [[term]]
@@ -222,11 +222,11 @@ see_also = ["screener_picks", "paused", "not_run"]
 [[term]]
 id = "screener_actions"
 term = "Screener actions"
-short = "What you can do with a screener from the list: View it, edit it, duplicate it or delete it."
+short = "What you can do with a screener from the list: edit its criteria, duplicate it or delete it."
 body = """
-View opens the screener page with its picks and criteria; every screener has it, a preset and a screener built in code too. On one of yours, Edit opens its criteria in the Builder and Delete removes it after asking. Duplicate makes a copy you can change; on a preset it is Duplicate to edit, because a site preset is never changed in place. A screener built in code can be viewed but not copied or edited, since its rules are not criteria. On a narrow screen the actions turn into icons with the same names.
+Click the pick count in the Picks today column to open the screener page with its picks and criteria. Every screener has that link: without a run today it reads Not run, and a screener built in code has it too. On one of yours, Edit criteria opens its criteria in the Builder and Delete removes it after asking. Duplicate makes a copy you can change. A site preset is never changed in place, so its only action is Duplicate to edit. A screener built in code has no actions, since its rules are not criteria. On a narrow screen the actions turn into icons with the same names.
 """
-next = "Use View to read a screener before you copy it."
+next = "Open the screener from its pick count to read it before you copy it."
 see_also = ["screener_column", "screener_picks"]
 
 [[term]]

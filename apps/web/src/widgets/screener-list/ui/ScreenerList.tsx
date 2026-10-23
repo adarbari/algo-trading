@@ -3,9 +3,9 @@
  * by a segment (All / Mine / Presets) and a search. A row is not expandable as a whole: it shows
  * the screener (kind, last run), its evidence (the strongest edge's name first, opening in place
  * whenever it has edges to one block per edge, one row at a time), today's picks (a link to the
- * screener) and labelled actions: View for every screener, Edit and Delete for yours, Duplicate
- * (a preset's "Duplicate to edit"). Python screeners are listed, viewable, but built in code.
- * Deleting asks first.
+ * screener, "Not run" without a run: the one way into the screener page, for presets and Python
+ * screeners too) and labelled actions: Edit criteria, Duplicate and Delete for yours, only
+ * "Duplicate to edit" for a preset. Deleting asks first.
  */
 import {
   Banner,
@@ -19,6 +19,7 @@ import {
   Stack,
   StatusBadge,
   Text,
+  type ActionItem,
   type ExpandableTableColumn,
   type ExpandableTableRow,
 } from '@algotrade/ui';
@@ -173,7 +174,7 @@ interface RowActions {
   onDuplicate: (row: ListRow) => void;
 }
 
-/** One row: the screener, its evidence, today's picks and the edit button; the evidence opens under it. */
+/** One row: the screener, its evidence, today's picks link and the actions; the evidence opens under it. */
 function toTableRow(
   row: ListRow,
   summary: ScreenerRunSummary | undefined,
@@ -260,60 +261,86 @@ function toTableRow(
           {run.paused > 0 && <Text size="xs" tone="muted">{`${String(run.paused)} paused`}</Text>}
         </>
       ) : (
-        '—'
+        <LinkButton
+          aria-label={`Open ${name}: not run`}
+          onClick={() => {
+            onOpen(row.id);
+          }}
+        >
+          Not run
+        </LinkButton>
       ),
       actions: (
-        <ActionGroup
-          label={`Actions of ${name}`}
-          actions={[
-            {
-              id: 'view',
-              label: 'View',
-              icon: 'chevron-right',
-              onClick: () => {
-                onOpen(row.id);
-              },
-            },
-            ...(row.rules && row.kind === 'mine'
-              ? [
-                  {
-                    id: 'edit',
-                    label: 'Edit',
-                    icon: 'pencil' as const,
-                    onClick: () => {
-                      onEdit(row.id);
-                    },
-                  },
-                ]
-              : []),
-            ...(row.rules
-              ? [
-                  {
-                    id: 'duplicate',
-                    label: row.kind === 'mine' ? 'Duplicate' : 'Duplicate to edit',
-                    icon: 'copy' as const,
-                    onClick: () => {
-                      onDuplicate(row);
-                    },
-                  },
-                ]
-              : []),
-            ...(row.kind === 'mine'
-              ? [
-                  {
-                    id: 'delete',
-                    label: 'Delete',
-                    icon: 'trash' as const,
-                    variant: 'ghost' as const,
-                    onClick: () => {
-                      onDelete(row.id);
-                    },
-                  },
-                ]
-              : []),
-          ]}
+        <RowActionGroup
+          name={name}
+          row={row}
+          onEdit={onEdit}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
         />
       ),
     },
   };
+}
+
+/**
+ * The row's actions, labelled: yours get Edit criteria, Duplicate and Delete; a preset is never
+ * changed in place, so it gets Duplicate to edit only; a screener built in code has none.
+ */
+function RowActionGroup({
+  name,
+  row,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  name: string;
+  row: ListRow;
+  onEdit: (id: string) => void;
+  onDuplicate: (row: ListRow) => void;
+  onDelete: (id: string) => void;
+}) {
+  const mine = row.kind === 'mine';
+  const actions: ActionItem[] = [
+    ...(mine && row.rules
+      ? [
+          {
+            id: 'edit',
+            label: 'Edit criteria',
+            icon: 'pencil' as const,
+            onClick: () => {
+              onEdit(row.id);
+            },
+          },
+        ]
+      : []),
+    ...(row.rules
+      ? [
+          {
+            id: 'duplicate',
+            label: mine ? 'Duplicate' : 'Duplicate to edit',
+            icon: 'copy' as const,
+            onClick: () => {
+              onDuplicate(row);
+            },
+          },
+        ]
+      : []),
+    ...(mine
+      ? [
+          {
+            id: 'delete',
+            label: 'Delete',
+            icon: 'trash' as const,
+            variant: 'ghost' as const,
+            onClick: () => {
+              onDelete(row.id);
+            },
+          },
+        ]
+      : []),
+  ];
+  return actions.length === 0 ? null : (
+    <ActionGroup label={`Actions of ${name}`} actions={actions} />
+  );
 }

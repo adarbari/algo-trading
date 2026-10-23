@@ -203,7 +203,6 @@ test('Screeners: each row is a card with evidence, picks and labelled actions, a
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await expect(row.getByRole('button', { name: 'View' })).toBeVisible();
   await expectAccessible(page);
   await row.getByRole('button', { name: /: 12 picks$/ }).tap();
   await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
