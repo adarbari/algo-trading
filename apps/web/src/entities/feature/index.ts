@@ -120,3 +120,5 @@ export {
   type FeatureDistribution,
 } from './model/distribution';
 export { factItem, type Fact, type FactSpec, type Values } from './model/fact';
+export { columnOptions, fieldOptions } from './ui/options';
+export { FeatureCombobox, type FeatureComboboxProps } from './ui/FeatureCombobox';

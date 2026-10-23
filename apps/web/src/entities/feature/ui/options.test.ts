@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CatalogueFeature } from '@/entities/feature';
-
-import { featureOptions } from './options';
+import type { CatalogueFeature } from '../model/catalogue';
+import { columnOptions, fieldOptions } from './options';
 
 const feature = (patch: Partial<CatalogueFeature>): CatalogueFeature => ({
   name: 'feature.market_cap',
@@ -26,7 +25,7 @@ const feature = (patch: Partial<CatalogueFeature>): CatalogueFeature => ({
   ...patch,
 });
 
-describe('feature options', () => {
+describe('column options', () => {
   it('describes each feature with its unit and kind, skipping chosen and identity fields', () => {
     const catalogue = [
       feature({}),
@@ -52,7 +51,7 @@ describe('feature options', () => {
         licence: 'personal',
       }),
     ];
-    expect(featureOptions(catalogue, ['rollup.iv30@v1.iv30'])).toEqual([
+    expect(columnOptions(catalogue, ['rollup.iv30@v1.iv30'])).toEqual([
       {
         value: 'feature.market_cap',
         label: 'feature.market_cap',
@@ -68,5 +67,40 @@ describe('feature options', () => {
         group: 'Your features',
       },
     ]);
+  });
+});
+
+describe('field options', () => {
+  const CATALOGUE = [
+    feature({
+      name: 'rollup.iv30@v1.iv30',
+      description: 'Our 30-day IV',
+      unit: 'decimal',
+      group: 'iv30@v1',
+      licence: 'personal',
+    }),
+    feature({
+      name: 'feature.vol_gap',
+      description: 'IV minus HV',
+      unit: 'ratio',
+      scope: 'user',
+    }),
+  ];
+
+  it("describes a field by its guide's one-line summary when it has one", () => {
+    const guided = {
+      ...CATALOGUE[0],
+      guide: { summary: 'The 30-day at-the-money implied volatility.' },
+    } as CatalogueFeature;
+    expect(fieldOptions([guided])[0]?.description).toBe(
+      'The 30-day at-the-money implied volatility. · fraction (shown as %) · personal licence',
+    );
+  });
+
+  it('describes each feature with its unit and licence, and badges formulas', () => {
+    const [iv, own] = fieldOptions(CATALOGUE);
+    expect(iv).toMatchObject({ value: 'rollup.iv30@v1.iv30', group: 'iv30@v1' });
+    expect(iv?.description).toBe('Our 30-day IV · fraction (shown as %) · personal licence');
+    expect(own).toMatchObject({ badge: 'yours', group: 'Your features' });
   });
 });
