@@ -378,6 +378,7 @@ wait_deploy_done() {
 # and its ps / iostat probes, the watchdog, the bench, the copy): never a writer, whatever their args say
 # (hand run 7b: the timeline's `--rundir .../var/logs/...` matched the marker and its probe child was "live")
 own_tree() {
+  [ -n "${PERF_PS_FILE:-}" ] && return 0  # a fake ps listing: its pids are not this machine's descendants
   ps -Ao pid=,ppid= 2>/dev/null | awk -v root=$$ '
     { parent[$1] = $2 }
     END { for (p in parent) { x = p; for (i = 0; i < 60 && x != "" && x != 0; i++) {
@@ -385,7 +386,7 @@ own_tree() {
 }
 busy_writer() {  # $1 = copy: a deploy is no writer while the copy runs (it is for everything else)
   local pid args own
-  own=" $(own_tree | tr '\n' ' ') $$ "
+  own=" $(own_tree | tr '\n' ' ') "
   ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench|flight_recorder" | {
     while read -r pid args; do
       case "$own" in *" $pid "*) continue ;; esac
