@@ -1,0 +1,4 @@
+/* ZeroResults: the empty state stays inside its container. */
+.root {
+  min-width: 0;
+}

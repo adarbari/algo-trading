@@ -72,6 +72,12 @@
   border-style: dashed;
 }
 
+.button[data-selected] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
 .button:disabled,
 .button[aria-busy='true'] {
   cursor: not-allowed;
