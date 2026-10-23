@@ -58,6 +58,31 @@ describe('OptionList', () => {
     expect(screen.getByText('None.')).toBeInTheDocument();
   });
 
+  it('multi-select: options are toggles with a count', async () => {
+    const onSelect = vi.fn();
+    const { container } = render(
+      <OptionList
+        items={[
+          { id: 'a', title: 'Qualified', count: 1234 },
+          { id: 'b', title: 'Watch', count: 7 },
+        ]}
+        value={null}
+        values={['a']}
+        onSelect={onSelect}
+        label="Decision"
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Qualified/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /Watch/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('1,234')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Watch/ }));
+    expect(onSelect).toHaveBeenCalledWith('b');
+    await expectNoA11yViolations(container);
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <OptionList items={items} value="a" onSelect={vi.fn()} label="Fields" mono />,

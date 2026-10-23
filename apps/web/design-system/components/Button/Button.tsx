@@ -33,6 +33,8 @@ export interface ButtonProps extends Pick<
   disabled?: boolean;
   /** Form role; `button` by default so it never submits by accident. */
   type?: 'button' | 'submit' | 'reset';
+  /** Drawn as in force (accent border and tint): a group button that holds filters. */
+  selected?: boolean;
   /** Stretch to the container's width (stacked forms on phones). */
   fullWidth?: boolean;
   onClick?: MouseEventHandler<HTMLButtonElement>;
@@ -50,6 +52,7 @@ export function Button({
   disabled = false,
   type = 'button',
   fullWidth = false,
+  selected = false,
   onClick,
   children,
   ...rest
@@ -62,6 +65,7 @@ export function Button({
       data-variant={variant}
       data-size={size}
       data-full-width={fullWidth || undefined}
+      data-selected={selected || undefined}
       disabled={disabled}
       aria-disabled={loading || undefined}
       aria-busy={loading || undefined}

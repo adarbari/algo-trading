@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
-import { FilterChips } from './FilterChips';
+import { FilterChips, type FilterChipItem } from './FilterChips';
 
 const FILTERS = [
   {
@@ -46,5 +47,79 @@ describe('FilterChips', () => {
     expect(onChange).toHaveBeenCalledWith('screener', undefined);
     await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(onClear).toHaveBeenCalledOnce();
+  });
+
+  describe('structured items', () => {
+    const ITEMS: FilterChipItem[] = [
+      { id: 'a', label: 'Decision', valueText: 'Qualified', removes: 1200, active: true },
+      { id: 'b', label: 'DTE', valueText: '..14', removes: 9, unknown: 3, active: false },
+      { id: 'c', label: 'Liq', valueText: 'risk', active: true },
+    ];
+
+    it('shows removes, unknown and off, and toggles through aria-pressed', async () => {
+      const onToggle = vi.fn();
+      const { container } = render(
+        <FilterChips items={ITEMS} onToggle={onToggle} onRemove={vi.fn()} onClear={vi.fn()} />,
+      );
+      expect(screen.getByText(/removes 1,200/)).toBeInTheDocument();
+      expect(screen.getByText(/3 unknown/)).toBeInTheDocument();
+      expect(screen.queryByText(/removes 9/)).toBeNull();
+      const off = screen.getByRole('button', { name: /^DTE \.\.14, off/ });
+      expect(off).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('button', { name: /^Decision Qualified/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await userEvent.click(off);
+      expect(onToggle).toHaveBeenCalledWith('b');
+      await expectNoA11yViolations(container);
+    });
+
+    it('removes a chip, moves focus to the next one, and clears all', async () => {
+      function Held() {
+        const [items, setItems] = useState(ITEMS);
+        return (
+          <FilterChips
+            items={items}
+            onToggle={vi.fn()}
+            onRemove={(id) => {
+              setItems((now) => now.filter((i) => i.id !== id));
+            }}
+            onClear={() => {
+              setItems([]);
+            }}
+          />
+        );
+      }
+      render(<Held />);
+      await userEvent.click(screen.getByRole('button', { name: 'Remove Decision Qualified' }));
+      expect(screen.getByRole('button', { name: /^DTE/ })).toHaveFocus();
+      await userEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+      expect(screen.queryByRole('button', { name: /Remove/ })).toBeNull();
+    });
+
+    it('moves focus to emptyFocusRef when the last chip goes, and draws Clear all only if passed', async () => {
+      function Held() {
+        const [items, setItems] = useState(ITEMS.slice(0, 1));
+        const target = useRef<HTMLInputElement>(null);
+        return (
+          <>
+            <input ref={target} aria-label="Search" />
+            <FilterChips
+              items={items}
+              emptyFocusRef={target}
+              onToggle={vi.fn()}
+              onRemove={() => {
+                setItems([]);
+              }}
+            />
+          </>
+        );
+      }
+      render(<Held />);
+      expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Remove Decision Qualified' }));
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
+    });
   });
 });

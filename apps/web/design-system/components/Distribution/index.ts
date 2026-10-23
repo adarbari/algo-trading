@@ -1,5 +1,6 @@
 export {
   Distribution,
+  describeDistribution,
   type DistributionBin,
   type DistributionMarker,
   type DistributionProps,

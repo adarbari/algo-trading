@@ -77,4 +77,40 @@ describe('FilterBar', () => {
     expect(screen.getByRole('button', { name: 'Remove Sector: Technology' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('wide: groups share the toolbar row, the count is a polite live region, actions follow it', () => {
+    vi.stubGlobal('innerWidth', 1400);
+    render(
+      <Bar
+        groups={<button type="button">Setup</button>}
+        actions={<button type="button">Save view</button>}
+        count="12 of 340"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Setup' })).toBeInTheDocument();
+    expect(screen.getByText('12 of 340')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('button', { name: 'Save view' })).toBeInTheDocument();
+  });
+
+  it('narrow: the sheet holds the groups and a footer button that applies and closes', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    const onApply = vi.fn();
+    const { container } = render(
+      <Bar
+        groups={<button type="button">Setup</button>}
+        count="12 of 340"
+        applyLabel="Show 12 results"
+        onApply={onApply}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Setup' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const sheet = screen.getByRole('dialog', { name: 'Filters' });
+    expect(within(sheet).getByRole('button', { name: 'Setup' })).toBeInTheDocument();
+    expect(within(sheet).getByText('12 of 340')).toHaveAttribute('aria-live', 'polite');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Show 12 results' }));
+    expect(onApply).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
 });
