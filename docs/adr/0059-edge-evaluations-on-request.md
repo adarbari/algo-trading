@@ -31,7 +31,9 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
    worker (an evaluation never holds a screen run behind it) whose only kind is `edge-eval`; it
    does not wait for ingestion (the harness reads committed data and publishes atomically, ADR
    0022) and writes only `results/edge_eval` and run records through `ResultWriter`. Market,
-   feature and outcome data stay ingestion's alone (ADR 0005, 0053).
+   feature and outcome data stay ingestion's alone (ADR 0005, 0053). The run also writes, in the
+   same publish, its series and trade ledger (ADR 0064) and, for a site edge's canonical run,
+   its verdict headline `results/edge_verdict` (ADR 0053 amendment 2026-10-22).
 5. **REST allow-list.** The poll was one more `GET` kept REST by design (job polling):
    `max_get_routes` went from 4 to 5 with an amendment of ADR 0037. Superseded 2026-10-08: both
    polls are the one `GET /jobs/{job_id}`, count back to 4.

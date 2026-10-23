@@ -313,9 +313,14 @@ Owner decision 2026-10-22 ("The domain tables look good. Let us go with them", l
       (ScreenPick, a run's picked and paused instruments), written by the screen's own writer
       in the same atomic publish as `rule_screen` (ADR 0022);
     - `market.macro_asof@v1`, a market feature group, built only if profiling shows the regime
-      provenance read is most of the regime page cost.
+      provenance read is most of the regime page cost;
+    - `results/edge_verdict` (the EdgeVerdict headline, ADR 0053 amendment 2026-10-22), a
+      business object read by the edges list and the follow check `verdict_level`, so not a
+      page table; written by the edge-eval run's publish and the `edge-verdicts` task, and
+      read only on a fingerprint match (else judged live).
 27. **Decision 16 stays unchanged:** run operations are not release-shared and keep the
-    runs generation; the two results tables make them fast enough live. ADR 0005 and the
+    runs generation; the results tables (`screen_runs`, `screen_picks`, `edge_verdict`) make them
+    fast enough live. ADR 0005 and the
     writers line in `CLAUDE.md` do not change (the on-request run already writes `results/`,
     ADR 0033).
 

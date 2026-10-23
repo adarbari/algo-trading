@@ -1,7 +1,7 @@
 """The schemas of the edge harness's result tables (ADR 0053, 0063, 0064): ``results/edge_eval``,
 ``results/edge_series``, ``results/winners_study``, ``results/edge_paper``,
-``results/edge_legs`` and ``results/edge_trades``. Declared here, registered in
-``schemas.KNOWN``."""
+``results/edge_legs``, ``results/edge_trades`` and ``results/edge_verdict``. Declared here,
+registered in ``schemas.KNOWN``."""
 
 from algotrade.storage.tables.spec import fixed, floats, strings
 
@@ -280,4 +280,36 @@ EDGE_TRADES = fixed(
         "split_from", "decision_session", "instrument_id",
     ),
     retention_days=45,  # owner decision D10 (2026-10-10); the purge spares the kept runs
+)  # fmt: skip
+
+# The stored headline of a site edge's verdict (ADR 0053 amendment 2026-10-22): the label, the
+# one-line result, the basis, the trades and the lift of the edge's canonical run, as the one
+# judge framed them (``services/read/evaluation/verdict``), so the edges list reads a row instead
+# of judging every edge. Only the headline: no criteria, years, outlook, decay, robustness or
+# haircut (the haircut moves with the site's trials). One row per (edge, judged run, fingerprint):
+# ``judged_run_id`` is the edge-eval run whose rows were judged, ``fingerprint`` the sha256 of
+# everything the judge read (the judge call, the settings, the judge's source, ``JUDGE_VERSION``),
+# so a reader uses a row only when its own fingerprint equals it and judges live otherwise; the
+# ``judge_*`` and ``settings_hash`` columns are the audit of what the row was made under.
+# Partition ``session_date`` = the judged run's range end, as its ``edge_eval`` rows (a verdict is
+# read by run, ADR 0036); ``run_id`` is the writer's run, ``knowledge_ts`` the write instant,
+# never back-dated. ``user_id`` is always ``site`` (the writer refuses another). ``basis`` null:
+# none; ``trades``, ``oos_trades``, ``lift`` and ``lift_pts`` null: not measured, never 0.
+# ``licence``: the strictest licence of the judged run's main-variant rows (ADR 0028), recorded so
+# an export can leave out a personal-licence derivative; the aggregates are served as the live
+# verdict serves them. Framed only by ``services/evaluation/cross_section/detail/verdict.py``
+# (the edge-eval publish and the edge-verdicts task; ML never writes it, ADR 0053 decision 8).
+EDGE_VERDICT = fixed(
+    "results/edge_verdict",
+    "results",
+    ("edge_id", "user_id", "judged_run_id", "fingerprint"),
+    *("edge_id string!", "user_id string!", "judged_run_id string!", "fingerprint string!"),
+    "judge_version int64!",
+    *("judge_digest string!", "settings_hash string!", "verdict string!", "result string!"),
+    *strings("basis", "licence"),
+    "split_from date",
+    *("trades int64", "oos_trades int64"),
+    *floats("lift", "lift_pts"),
+    runs="merge",
+    key=("edge_id", "user_id", "judged_run_id", "fingerprint"),
 )  # fmt: skip
