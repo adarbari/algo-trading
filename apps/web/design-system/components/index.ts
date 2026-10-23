@@ -55,6 +55,7 @@ export {
 } from './DataTable';
 export { Dialog, type DialogProps } from './Dialog';
 export { Disclosure, type DisclosureProps } from './Disclosure';
+export { ExpandLink, type ExpandLinkProps } from './ExpandLink';
 export { ExpandableRow, type ExpandableRowProps } from './ExpandableRow';
 export {
   ExpandableTable,

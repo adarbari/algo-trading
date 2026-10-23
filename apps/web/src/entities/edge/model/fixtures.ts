@@ -339,6 +339,7 @@ export const TRACK_RECORDS_FIXTURE = {
           edgeId: 'momentum_12_1',
           edgeName: 'Momentum 12-1',
           runLabel: 'momentum_12_1 from 2024-01-01 to 2026-10-02',
+          splitFrom: '2026-04-01',
           afterSession: false,
           notRun: null,
           horizons: [horizon(120)],
@@ -348,6 +349,7 @@ export const TRACK_RECORDS_FIXTURE = {
           edgeId: 'earnings_drift',
           edgeName: 'Earnings drift',
           runLabel: 'earnings_drift from 2024-01-01 to 2026-10-02',
+          splitFrom: '2026-05-01',
           afterSession: false,
           notRun: null,
           horizons: [horizon(80)],
@@ -362,6 +364,7 @@ export const TRACK_RECORDS_FIXTURE = {
           edgeId: 'vrp',
           edgeName: 'VRP',
           runLabel: null,
+          splitFrom: null,
           afterSession: false,
           notRun: {
             code: 'NOT_RUN',

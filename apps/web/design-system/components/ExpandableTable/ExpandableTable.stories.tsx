@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Mono } from '../../primitives/Mono';
 import { Text } from '../../primitives/Text';
 import { narrow } from '../../testing';
+import { ExpandLink } from '../ExpandLink';
 import { StackedBar } from '../StackedBar';
 import { StatusBadge } from '../StatusBadge';
 import { ExpandableTable, type ExpandableTableColumn } from './ExpandableTable';
@@ -113,3 +114,38 @@ export const Open: Story = { parameters: { open: 'breakout' } };
 
 /** A phone (375 px): the columns marked `narrow` only, the header following. */
 export const Narrow: Story = { decorators: [narrow] };
+
+/** No row toggle: the cells hold their own controls, here an ExpandLink opens the row. */
+export const Cards: Story = {
+  render: (args) => {
+    const [open, setOpen] = useState<string | null>('breakout');
+    return (
+      <ExpandableTable
+        {...args}
+        rowToggle={false}
+        rows={ROWS.map((r) => ({
+          ...r,
+          cells: {
+            ...r.cells,
+            record: (
+              <ExpandLink
+                open={open === r.id}
+                onOpenChange={(next) => {
+                  setOpen(next ? r.id : null);
+                }}
+              >
+                61% vs 53% base
+              </ExpandLink>
+            ),
+          },
+          open: open === r.id,
+          onOpenChange: () => undefined,
+          detail: <Text size="sm">One block per edge.</Text>,
+        }))}
+      />
+    );
+  },
+};
+
+/** Cards on a phone: no header, each row's cells stacked, the detail inside the card. */
+export const CardsNarrow: Story = { ...Cards, decorators: [narrow] };

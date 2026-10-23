@@ -101,3 +101,24 @@
     display: none;
   }
 }
+
+/* Without a row toggle a narrow container shows cards: no header, every cell stacked. */
+@container (width < 720px) {
+  .root[data-cards] .head {
+    display: none;
+  }
+
+  .root[data-cards] .row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-1-5);
+  }
+
+  .root[data-cards] .cell[data-wide] {
+    display: flex;
+  }
+
+  .root[data-cards] .cell[data-align='end'] {
+    align-items: flex-start;
+    text-align: start;
+  }
+}

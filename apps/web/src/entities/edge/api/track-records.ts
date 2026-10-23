@@ -22,6 +22,7 @@ const ScreenerTrackRecords = graphql(`
         edgeId
         edgeName
         runLabel
+        splitFrom
         afterSession
         notRun {
           code

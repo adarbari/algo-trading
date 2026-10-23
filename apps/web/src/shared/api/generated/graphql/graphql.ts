@@ -273,7 +273,7 @@ export type ScreenerEdgesQuery = { edges: Array<{ id: string, status: string }>,
 export type ScreenerTrackRecordsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: string }>, screeners: Array<{ id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, liftPts: number | null, sessions: number | null, picks: number | null }> }> }> };
+export type ScreenerTrackRecordsQuery = { edges: Array<{ id: string, status: string }>, screeners: Array<{ id: string, trackRecords: Array<{ screenerId: string, edgeId: string, edgeName: string, runLabel: string | null, splitFrom: string | null, afterSession: boolean, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, horizons: Array<{ horizonSessions: number, hitRate: number | null, baseRate: number | null, liftPts: number | null, sessions: number | null, picks: number | null }> }> }> };
 
 export type EventCalendarQueryVariables = Exact<{
   instrumentIds: Array<string> | string;
@@ -1624,6 +1624,7 @@ export const ScreenerTrackRecordsDocument = new TypedDocumentString(`
       edgeId
       edgeName
       runLabel
+      splitFrom
       afterSession
       notRun {
         code

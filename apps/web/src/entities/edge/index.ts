@@ -122,14 +122,26 @@ export {
 } from './model/paper';
 export { screenerEdges, type ScreenerEdge } from './model/screener-edges';
 export {
+  MIN_TRADES,
   oddsEntry,
+  rankedRecords,
   recordFigures,
+  screenerEvidence,
   toTrackRecords,
+  type EdgeRecord,
   type RecordFigures,
+  type ScreenerEvidence,
   type TrackEntry,
 } from './model/track-records';
 export { EdgeLiveBadge } from './ui/EdgeLiveBadge';
-export { ScreenerEdgeName, ScreenerRecord, type ScreenerRecordProps } from './ui/ScreenerRecord';
+export {
+  EDGES_SHOWN,
+  ScreenerEvidenceCell,
+  ScreenerEvidenceDetail,
+  type ScreenerEvidenceCellProps,
+  type ScreenerEvidenceDetailProps,
+} from './ui/ScreenerEvidence';
+export { ScreenerRecord, type ScreenerRecordProps } from './ui/ScreenerRecord';
 export {
   CURVE_FIXTURE,
   DECAY_FIXTURE,

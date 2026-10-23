@@ -166,11 +166,17 @@ test('a user runs an evaluation of the chosen edge and sees it finish', async ({
   expect(errors).toEqual([]);
 });
 
-test('Screeners shows the track record of a screener in an edge', async ({ page }) => {
+test('Screeners shows the track record of a screener in an edge and opens it in place', async ({
+  page,
+}) => {
   const errors = collectErrors(page);
   await page.goto('/screeners');
-  await expect(page.getByText(/vs \d+% base/).first()).toBeVisible();
-  await expect(page.getByText(/^Edge: /).first()).toBeVisible();
+  const headline = page.getByRole('button', { name: /^Win \d+% vs \d+% base$/ }).first();
+  await expect(headline).toBeVisible();
+  await headline.click();
+  await expect(headline).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('list', { name: /^Edges of / })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Open edge / }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
 

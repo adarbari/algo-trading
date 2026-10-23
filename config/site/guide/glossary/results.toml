@@ -196,7 +196,7 @@ short = "How many names the screener picked in the latest session, with how many
 body = """
 The number counts the names the screener kept after its criteria and its ranking. The green +N is the names that are new since the previous run, the red −N the names that dropped out. A muted line says how many were paused because the market regime stopped the screener that session. For example, 12 with +3 −2 means three new names, two gone and ten kept. A dash means no run is stored for the session. Don't read a long list as a better screener: a loose screen picks many names, and the track record says whether the picks did well.
 """
-next = "Open the screener to see each pick and the criterion behind its decision."
+next = "Open the pick count to see each pick and the criterion behind its decision."
 see_also = ["paused", "idea_decision", "screener_track_record"]
 
 [[term]]
@@ -210,14 +210,34 @@ next = "Open the screener's row to see its criteria and which one decides most p
 see_also = ["qualified", "watch", "reject", "idea_decision"]
 
 [[term]]
-id = "screener_track_record"
-term = "Screener track record"
-short = "How the picks of the edge this screener implements did in the past: win rate against the base rate, trades and holding period."
+id = "screener_column"
+term = "Screener name and last run"
+short = "The screener's name, whether it is a site preset or yours, and the session of its latest run."
 body = """
-A screener has a record only when it implements an edge. The figures are the edge's frozen-period record: the out-of-sample test whose date was fixed before it was read, never an exploratory run. The win rate is the share of picks whose outcome came true, the base rate the same share for every eligible name. A win rate only means something beside its base rate. The trades are the independent test dates behind the numbers, and the holding period is how many sessions each outcome was given. For example, 62% against a 55% base rate on 40 trades with a 20-session hold means the picks beat the field by 7 points. With few trades it is noise. No record yet means no edge covers the screener, or its test has not run. It does not mean the screener is bad. Don't read it as profit: it counts outcomes, not amounts.
+A Preset is a screener the site ships; Mine is one you built. Draft means you have not finalized it, so it has not run. Does not resolve means its config no longer loads. The muted line is the session of the latest run, not the day it started. No run today means the screener has no run for the session the page shows, so its picks are not the latest. Paused means the market regime stopped it that session and it picked nothing on purpose.
 """
-next = "Open Edge evidence in the row to see the curve, the sample size and the verdict."
-see_also = ["win_rate", "base_rate", "lift", "trades", "out_of_sample"]
+next = "Check the run date before you act on a screener's picks."
+see_also = ["screener_picks", "paused", "not_run"]
+
+[[term]]
+id = "screener_track_record"
+term = "Evidence and edges"
+short = "How the picks of the strongest edge this screener implements did in the past: win rate against the base rate, lift, trades and holding period."
+body = """
+A screener has a record only when it implements an edge. The headline is the strongest edge it is in: an evidenced edge beats a candidate, and ties go to the one with more trades. The figures are that edge's frozen-period record: the out-of-sample test whose date was fixed before it was read, never an exploratory run. The win rate is the share of picks whose outcome came true, the base rate the same share for every eligible name, and the lift the gap in points. The trades are the independent test dates behind the numbers, and the holding period is how many sessions each outcome was given. For example, 62% against a 55% base rate on 40 trades with a 20-session hold means the picks beat the field by 7 points. Click the headline to see every edge the screener is in, each with its own record and the date its test was frozen. No record yet means the edge has no frozen run, or fewer than 20 trades since the freeze, and the line under it says which. It does not mean the screener is bad. Not part of an edge means no edge uses this screener. Don't read a record as profit: it counts outcomes, not amounts.
+"""
+next = "Click the headline, then Open edge to see the curve, the sample size and the verdict."
+see_also = ["win_rate", "base_rate", "lift", "trades", "out_of_sample", "record_how_to_read"]
+
+[[term]]
+id = "record_how_to_read"
+term = "How to read a record"
+short = "Read the win rate beside its base rate, the trades behind it and the date the test was frozen; never the win rate alone."
+body = """
+Start with the base rate: a win rate means something only beside it, and the lift is their gap in points. Then look at the trades: a lift on a few dozen trades is noise, and a record with fewer than 20 trades since the freeze is not shown at all. Then the freeze date: figures after it were never used to tune the edge, which is why they can be trusted more than the older history. Last, the status of the edge: evidenced passed its out-of-sample test, a candidate has not yet. Two edges on one screener are two separate records, not an average.
+"""
+next = "Open the edge to see how its record built up over time."
+see_also = ["win_rate", "base_rate", "lift", "trades", "screener_track_record"]
 
 [[term]]
 id = "screener_history"

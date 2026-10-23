@@ -108,7 +108,7 @@
     "kind": "graphql",
     "op": "ScreenerTrackRecords",
     "variables": {},
-    "query": "\n  query ScreenerTrackRecords {\n    edges {\n      id\n      status\n    }\n    screeners {\n      id\n      trackRecords {\n        screenerId\n        edgeId\n        edgeName\n        runLabel\n        afterSession\n        notRun {\n          code\n          reason\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        horizons {\n          horizonSessions\n          hitRate\n          baseRate\n          liftPts\n          sessions\n          picks\n        }\n      }\n    }\n  }\n"
+    "query": "\n  query ScreenerTrackRecords {\n    edges {\n      id\n      status\n    }\n    screeners {\n      id\n      trackRecords {\n        screenerId\n        edgeId\n        edgeName\n        runLabel\n        splitFrom\n        afterSession\n        notRun {\n          code\n          reason\n          kind\n          guideTerm\n          kindText\n          cause {\n            links {\n              level\n              subject\n              status\n              message\n              runId\n            }\n          }\n        }\n        horizons {\n          horizonSessions\n          hitRate\n          baseRate\n          liftPts\n          sessions\n          picks\n        }\n      }\n    }\n  }\n"
    }
   ],
   "/screeners/vrp_scanner": [

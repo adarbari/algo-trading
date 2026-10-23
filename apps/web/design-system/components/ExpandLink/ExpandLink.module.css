@@ -1,0 +1,35 @@
+/* ExpandLink: accent text with a caret, underline on hover; the caret turns when open. */
+.link {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-strong);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+}
+
+.text {
+  min-width: 0;
+}
+
+.link:hover .text {
+  text-decoration: underline;
+}
+
+.caret {
+  display: inline-flex;
+  flex: none;
+  transition: transform var(--duration-fast) var(--easing-standard);
+}
+
+.caret[data-open] {
+  transform: rotate(180deg);
+}

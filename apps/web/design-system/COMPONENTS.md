@@ -620,6 +620,19 @@ Source: `design-system/components/EvidenceMeter`
 | `state` | `'known' \| 'unknown'` | no | `known` (default) or `unknown`: no fill, a hatched track, the reason as text. |
 | `unknownLabel` | `string` | no | Why the evidence is not known ("No trades recorded yet"); shown instead of the reading. |
 
+### ExpandLink
+
+ExpandLink: a link-styled button that opens a block in place, under the row or paragraph it sits in (a screener's win rate opening one record per edge). A caret turns when open; `aria-expanded` carries the state. It is a control, not a navigation: a link to another page is a TextLink.
+
+Source: `design-system/components/ExpandLink`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the block it opens is shown. |
+| `onOpenChange` | `(open: boolean) => void` | yes |  |
+| `controls` | `string` | no | The id of the block it opens, set while that block is rendered. |
+| `children` | `ReactNode` | yes | The words of the link ("Win 58% vs 51% base"). |
+
 ### ExpandableRow
 
 ExpandableRow: one row of a list that opens its detail in place (a screener with its criteria, hits and actions). The summary is a button with `aria-expanded` controlling the detail region; it shows a title, an optional badge, a figure that stays on a phone (`essential`) and further cells (`secondary`) that drop out in a narrow container. Controlled by the caller, so a list keeps one row open at a time. For a labelled count with hidden detail use Disclosure.
@@ -638,7 +651,7 @@ Source: `design-system/components/ExpandableRow`
 
 ### ExpandableTable
 
-ExpandableTable: a table whose rows open their detail in place (a screener's criteria, today's run and hits). Columns line up under a header row; each row's first cell holds the toggle (a button with `aria-expanded`, its stretched hit area covers the whole row) and the other cells are plain. In a narrow container (phone) only the columns marked `narrow` stay and the header follows. Controlled by the caller, so a list keeps one row open at a time; the detail is rendered only while open, so it can load lazily. For a flat list of rows use ExpandableRow; for sortable, virtualised data DataTable.
+ExpandableTable: a table whose rows open their detail in place (a screener's criteria, today's run and hits). Columns line up under a header row; each row's first cell holds the toggle (a button with `aria-expanded`, its stretched hit area covers the whole row) and the other cells are plain. In a narrow container (phone) only the columns marked `narrow` stay and the header follows. Controlled by the caller, so a list keeps one row open at a time; the detail is rendered only while open, so it can load lazily. With `rowToggle={false}` the rows carry no toggle: a control inside a cell (a link, an `ExpandLink`) opens the row's detail, the other cells keep their own links and buttons, and a narrow container shows each row as a card of stacked cells under no header. For a flat list of rows use ExpandableRow; for sortable, virtualised data DataTable.
 
 Source: `design-system/components/ExpandableTable`
 
@@ -647,6 +660,7 @@ Source: `design-system/components/ExpandableTable`
 | `columns` | `readonly ExpandableTableColumn[]` | yes |  |
 | `rows` | `readonly ExpandableTableRow[]` | yes |  |
 | `label` | `string` | yes | Accessible name of the table. |
+| `rowToggle` | `boolean` | no | `false`: no row toggle, cells hold their own controls and a phone shows cards (default `true`). |
 
 ### ExpiryLadder
 
@@ -785,7 +799,7 @@ Source: `design-system/components/Icon`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. |
+| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, pencil, copy, trash, alert, info, external, drag-handle, refresh, filter, columns, book, zoom-in, zoom-out, fit, spinner. |
 | `size` | `'sm' \| 'md' \| 'lg'` | no | sm 12, md 14 (default), lg 16 px. |
 | `tone` | `IconTone` | no | Colour role; `inherit` (default) follows the surrounding text. |
 | `label` | `string` | no | Accessible name when the icon alone carries meaning; omit for decorative icons. |

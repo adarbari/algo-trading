@@ -4,7 +4,10 @@
  * button with `aria-expanded`, its stretched hit area covers the whole row) and the other cells
  * are plain. In a narrow container (phone) only the columns marked `narrow` stay and the header
  * follows. Controlled by the caller, so a list keeps one row open at a time; the detail is
- * rendered only while open, so it can load lazily. For a flat list of rows use ExpandableRow;
+ * rendered only while open, so it can load lazily. With `rowToggle={false}` the rows carry no
+ * toggle: a control inside a cell (a link, an `ExpandLink`) opens the row's detail, the other
+ * cells keep their own links and buttons, and a narrow container shows each row as a card of
+ * stacked cells under no header. For a flat list of rows use ExpandableRow;
  * for sortable, virtualised data DataTable.
  */
 import { useId, type CSSProperties, type ReactNode } from 'react';
@@ -39,6 +42,8 @@ export interface ExpandableTableProps {
   rows: readonly ExpandableTableRow[];
   /** Accessible name of the table. */
   label: string;
+  /** `false`: no row toggle, cells hold their own controls and a phone shows cards (default `true`). */
+  rowToggle?: boolean;
 }
 
 const track = (column: ExpandableTableColumn) => `minmax(0, ${String(column.grow ?? 1)}fr)`;
@@ -46,9 +51,11 @@ const track = (column: ExpandableTableColumn) => `minmax(0, ${String(column.grow
 function TableRow({
   row,
   columns,
+  rowToggle,
 }: {
   row: ExpandableTableRow;
   columns: readonly ExpandableTableColumn[];
+  rowToggle: boolean;
 }) {
   const id = useId();
   return (
@@ -62,7 +69,7 @@ function TableRow({
             data-align={column.align}
             data-wide={column.narrow ? undefined : true}
           >
-            {index === 0 ? (
+            {rowToggle && index === 0 ? (
               <button
                 type="button"
                 className={styles.toggle}
@@ -90,7 +97,7 @@ function TableRow({
   );
 }
 
-export function ExpandableTable({ columns, rows, label }: ExpandableTableProps) {
+export function ExpandableTable({ columns, rows, label, rowToggle = true }: ExpandableTableProps) {
   const wide = columns.map(track).join(' ');
   const narrow = columns
     .filter((c) => c.narrow)
@@ -101,6 +108,7 @@ export function ExpandableTable({ columns, rows, label }: ExpandableTableProps) 
       role="table"
       aria-label={label}
       className={styles.root}
+      data-cards={rowToggle ? undefined : true}
       style={{ '--et-wide': wide, '--et-narrow': narrow } as CSSProperties}
     >
       <div role="row" className={`${styles.row} ${styles.head}`}>
@@ -117,7 +125,7 @@ export function ExpandableTable({ columns, rows, label }: ExpandableTableProps) 
         ))}
       </div>
       {rows.map((row) => (
-        <TableRow key={row.id} row={row} columns={columns} />
+        <TableRow key={row.id} row={row} columns={columns} rowToggle={rowToggle} />
       ))}
     </div>
   );

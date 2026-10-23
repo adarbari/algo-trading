@@ -64,6 +64,20 @@ describe('ExpandableTable', () => {
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
+  it('has no row toggle with rowToggle off: the cells keep their own controls', () => {
+    render(
+      <ExpandableTable
+        label="Screeners"
+        columns={COLUMNS}
+        rowToggle={false}
+        rows={[row('a', true), row('b')]}
+      />,
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByText('detail of a')).toBeInTheDocument();
+    expect(screen.queryByText('detail of b')).toBeNull();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <ExpandableTable label="Screeners" columns={COLUMNS} rows={[row('a', true), row('b')]} />,
