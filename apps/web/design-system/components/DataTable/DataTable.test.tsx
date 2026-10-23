@@ -279,6 +279,12 @@ describe('DataTable', () => {
     expect(bodyRows().length).toBeLessThan(40);
   });
 
+  it('shows every row with visibleRows all: no inner scroll, the page scrolls', () => {
+    render(<Table rows={makeUniverse(60)} visibleRows="all" />);
+    expect(screen.getByRole('grid')).toHaveAttribute('data-fit', 'all');
+    expect(bodyRows()).toHaveLength(60);
+  });
+
   it('reports the rows in its scroll window, so a page can load data for those only', () => {
     const seen = vi.fn();
     render(<Table rows={makeUniverse(11_427)} visibleRows={12} onVisibleRowsChange={seen} />);

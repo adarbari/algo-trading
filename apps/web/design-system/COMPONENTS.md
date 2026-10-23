@@ -450,7 +450,7 @@ Source: `design-system/components/DataTable`
 | `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` (placeholder rows) or `error` (shows `errorMessage`). |
 | `errorMessage` | `ReactNode` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no rows. |
-| `visibleRows` | `number` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. |
+| `visibleRows` | `number \| 'all'` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. `'all'` shows every row at its full height: the page scrolls instead of the table and the header stays at the top of the window (on a narrow table, which scrolls sideways, it falls back to 12 rows). |
 | `rowLines` | `1 \| 2 \| 3` | no | Lines of text per row: 1 (default), 2 (a symbol with its name underneath) or 3 (a cell that wraps a short list of links). |
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
 | `toolbarEnd` | `ReactNode` | no | Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the two sit in one row, so a narrow table does not spend a row on each. |

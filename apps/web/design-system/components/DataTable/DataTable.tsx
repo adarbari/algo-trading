@@ -134,8 +134,12 @@ export interface DataTableProps<TRow> {
   errorMessage?: ReactNode;
   /** Shown when there are no rows. */
   emptyMessage?: ReactNode;
-  /** Height of the scrolling body in rows (default 12); fewer rows shrink the table. */
-  visibleRows?: number;
+  /**
+   * Height of the scrolling body in rows (default 12); fewer rows shrink the table. `'all'` shows
+   * every row at its full height: the page scrolls instead of the table and the header stays at
+   * the top of the window (on a narrow table, which scrolls sideways, it falls back to 12 rows).
+   */
+  visibleRows?: number | 'all';
   /** Lines of text per row: 1 (default), 2 (a symbol with its name underneath) or 3 (a cell that wraps a short list of links). */
   rowLines?: 1 | 2 | 3;
   /** Toolbar content before the column picker (a count, filters). */
@@ -192,7 +196,7 @@ export function DataTable<TRow extends RowData>({
   status = 'ready',
   errorMessage = 'The data failed to load.',
   emptyMessage = 'No rows to show',
-  visibleRows = 12,
+  visibleRows: visibleRowsProp = 12,
   rowLines = 1,
   toolbar,
   toolbarEnd,
@@ -205,6 +209,8 @@ export function DataTable<TRow extends RowData>({
   // Scrolled sideways: the pinned column shows its end border over the cells sliding under it.
   const [scrolledX, setScrolledX] = useState(false);
   const { base: baseHeight, row: rowHeight } = useRowHeight(scrollRef, rowLines);
+  const fitAll = visibleRowsProp === 'all' && !narrow;
+  const visibleRows = visibleRowsProp === 'all' ? 12 : visibleRowsProp;
 
   // Sort and hidden columns: controlled when the prop is given, otherwise owned here.
   const [ownSort, setOwnSort] = useState<DataTableSort | null>(defaultSort);
@@ -328,7 +334,7 @@ export function DataTable<TRow extends RowData>({
       if (item?.kind === 'group') return `group:${item.group}`;
       return item ? (tableRows[item.row]?.id ?? index) : index;
     },
-    overscan: 8,
+    overscan: fitAll ? itemCount : 8,
     scrollMargin: baseHeight,
     scrollPaddingStart: baseHeight,
     initialRect: { width: 0, height: rowHeight * visibleRows },
@@ -367,7 +373,14 @@ export function DataTable<TRow extends RowData>({
     if (!row) return;
     setActiveId(row.id);
     onActiveRowChange?.(row.original);
-    virtualizer.scrollToIndex(rowItem[next] ?? next, { align: 'auto' });
+    if (fitAll) {
+      // The page scrolls, not the table: bring the row into the window once it renders.
+      requestAnimationFrame(() => {
+        document.getElementById(rowIdFor(row.id))?.scrollIntoView({ block: 'nearest' });
+      });
+    } else {
+      virtualizer.scrollToIndex(rowItem[next] ?? next, { align: 'auto' });
+    }
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -492,6 +505,7 @@ export function DataTable<TRow extends RowData>({
       <div
         ref={scrollRef}
         className={styles.scroller}
+        data-fit={fitAll ? 'all' : undefined}
         role="grid"
         aria-label={label}
         aria-rowcount={ready ? itemCount + 1 : -1}
