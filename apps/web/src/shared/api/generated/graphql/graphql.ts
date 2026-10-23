@@ -13,6 +13,26 @@ export type CauseLevel =
   | 'STEP'
   | 'TABLE';
 
+/** What the session's data amounts to */
+export type DataState =
+  | 'COMPLETE'
+  | 'NEXT_FAILED_SHOWING_PREVIOUS'
+  | 'NEXT_PROCESSING'
+  | 'PARTIAL';
+
+/** A dataset the data status reports */
+export type DatasetName =
+  | 'FUNDAMENTALS'
+  | 'OPTIONS_CHAINS'
+  | 'PRICES';
+
+/** How much of a dataset the session has */
+export type DatasetState =
+  | 'COMPLETE'
+  | 'MISSING'
+  | 'PARTIAL'
+  | 'UNKNOWN';
+
 /** How a client shows a feature's value */
 export type FeatureFormat =
   | 'CATEGORY'
@@ -659,7 +679,7 @@ export type StatusStripQueryVariables = Exact<{
 }>;
 
 
-export type StatusStripQuery = { session: { date: string, newer: { date: string, state: NewerState } | null } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, problems: Array<string>, steps: Array<{ name: string, status: string }> }>, completeness?: { sessions: Array<string>, lastClosed: string } | null };
+export type StatusStripQuery = { session: { date: string, newer: { date: string, state: NewerState } | null, dataStatus: { state: DataState, knowledgeTs: string | null, affectedScreeners: number, totalScreeners: number, datasets: Array<{ name: DatasetName, status: DatasetState, present: number | null, expected: number | null, share: number | null, unavailable: Array<{ kindText: string, cause?: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string }> } | null }> }> } } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, problems: Array<string>, steps: Array<{ name: string, status: string }> }>, completeness?: { sessions: Array<string>, lastClosed: string } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -4245,6 +4265,30 @@ export const StatusStripDocument = new TypedDocumentString(`
     newer {
       date
       state
+    }
+    dataStatus {
+      state
+      knowledgeTs
+      datasets {
+        name
+        status
+        present
+        expected
+        share
+        unavailable {
+          kindText
+          cause @include(if: $admin) {
+            links {
+              level
+              subject
+              status
+              message
+            }
+          }
+        }
+      }
+      affectedScreeners
+      totalScreeners
     }
   }
   screeners {

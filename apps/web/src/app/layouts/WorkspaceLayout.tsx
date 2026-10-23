@@ -6,7 +6,7 @@
  * design system knows no routes). The account menu (the viewer's name) holds the workspace
  * switch, listing only the workspaces the viewer may enter (hidden when there is one), and,
  * when they signed in through Supabase, a sign-out action; the regime chip (ADR 0047) sits
- * before the name, on both workspaces, and opens the Regime page. The status strip (open system
+ * before the name, on both workspaces, and opens the Regime page; the data-status pill sits before the chip. The status strip (open system
  * issues, ADR 0052's one tree) sits under the bar on every page once the viewer is known. The Guide's search dialog
  * (Ctrl+K / ⌘K) is mounted here once, for every page of both workspaces and the Guide. A viewer that turns null (the
  * API refused the token) goes back to the login page.
@@ -24,7 +24,7 @@ import {
   WorkspaceSwitch,
 } from '@algotrade/ui';
 import { Link, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
@@ -41,6 +41,11 @@ import {
 
 import { renderRouterLink } from './router-link';
 import { useGuideShortcut } from './use-guide-shortcut';
+
+// The pill loads after the shell (the entry chunk is at its budget): a lazy chunk with the badge.
+const DataStatusPill = lazy(() =>
+  import('@/widgets/data-status').then((m) => ({ default: m.DataStatusPill })),
+);
 
 /** The section a path belongs to (`/screeners/new` is in `/screeners`), else the path itself. */
 const activeSection = (workspace: Workspace, pathname: string): string =>
@@ -94,6 +99,9 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
               end={
                 viewer && (
                   <Stack direction="row" gap={2} align="center">
+                    <Suspense fallback={null}>
+                      <DataStatusPill admin={canEnter(viewer, 'admin')} />
+                    </Suspense>
                     <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
                     <AccountMenu
                       name={viewer.name}
