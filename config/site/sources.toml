@@ -351,3 +351,13 @@ core_min = 1.0
 rest_min = 0.0
 max_drop = 1.0
 level = "WARN"
+
+# Fundamentals (the data-status pill's third dataset, ADR 0062 amendment 2026-10-23): the share
+# of names with a SEC share count. Measured on 2026-10-22 over the stored store: core 513 of 521
+# (98.5%), rest 4,988 of 11,171 (44.7%; most funds and many small listings report none), so the
+# minimums sit below that and the rule only warns.
+[quality.coverage.fundamentals.shares_outstanding]
+core_min = 0.95
+rest_min = 0.40
+max_drop = 0.05
+level = "WARN"

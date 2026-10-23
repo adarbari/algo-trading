@@ -1,11 +1,12 @@
 """``DataStatus``: how complete the data of the session a read serves is, in one object a trader
 reads without the admin's ops pages (the top bar's data-status pill, ADR 0062 amendment).
 
-It reads run records only, never a partition: Prices are the ``daily_bars`` run's items that
-are OK against all of them; Options chains are the chains task's coverage of the session
-(``run_items.chain_coverage``, the function the admin read uses); Fundamentals are the cells of
-the ``coverage_<feature>`` checks the nightly's ``rollups`` step stored for the fundamentals
-key features. Each is a ``DatasetStatus`` graded by ``share_status`` (the one rule the admin's
+It reads run records only, never a partition: Prices and Fundamentals are the
+cells (names covered of names applicable, by tier) of the ``coverage_price_stats.close`` and
+``coverage_fundamentals.shares_outstanding`` checks the nightly's ``rollups`` step stored (the
+newest record that holds them: a retry carries the step over without its checks); Options chains
+are the chains task's coverage of the session (``run_items.chain_coverage``, the admin read's
+function). Each is a ``DatasetStatus`` graded by ``share_status`` (the one rule the admin's
 completeness grid uses); a dataset whose record is missing is ``UNKNOWN`` with a ``NOT_RUN``
 ``Unavailable``, never 0%. ``DataState`` is decided here, on the server, from the session
 (``Session.complete``, ``Session.newer``) and the datasets; ``affected_screeners`` counts the
@@ -20,14 +21,12 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
-from algotrade.core.time.calendar import sessions_ending
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind, run_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens.runs import load_latest_runs
 from algotrade.services.read.screens.screeners import load_screeners
 from algotrade.services.read.session import NIGHTLY, NewerState
-from algotrade.services.run_items import CHAINS_JOB, CHRONIC_WINDOW, chain_coverage, status_code
-from algotrade.storage.runs import RunRecord
+from algotrade.services.run_items import CHAINS_JOB, chain_coverage
 
 __all__ = [
     "COMPLETE_SHARE",
@@ -36,16 +35,17 @@ __all__ = [
     "DatasetName",
     "DatasetState",
     "DatasetStatus",
+    "check_name",
     "load_data_status",
     "share_status",
 ]
 
 COMPLETE_SHARE = 0.98
-BARS_JOB = "daily_bars"  # the bars task's run-record job (apps/ingestion tasks/market/bars.py)
 ROLLUPS_STEP = "rollups"  # the nightly step whose acceptance is the coverage of the key features
-# The coverage checks (``coverage_<feature>``, sources.toml [quality.coverage.*]) that stand for
-# the fundamentals: the key features a company reports on a schedule.
-FUNDAMENTALS_CHECKS = ("coverage_next_earnings_date",)
+# The coverage rules (sources.toml [quality.coverage.*]) the datasets are read from: the session's
+# close (a bars run's items are keyed by day, not by name) and the SEC share count.
+PRICES_FEATURE = "price_stats.close"
+FUNDAMENTALS_FEATURE = "fundamentals.shares_outstanding"
 
 
 class DatasetName(StrEnum):
@@ -122,37 +122,23 @@ def _unknown(name: DatasetName, job: str, day: date) -> DatasetStatus:
     return DatasetStatus(name, DatasetState.UNKNOWN, None, None, None, (gap,))
 
 
-def _latest(records: list[RunRecord]) -> RunRecord | None:
-    return max(records, key=lambda r: r.started_at) if records else None
+def check_name(feature: str) -> str:
+    """The acceptance check of a coverage rule (``<group>.<column>``): the ingestion's
+    ``coverage_<feature>`` (apps/ingestion tasks/maintenance/coverage.py)."""
+    return f"coverage_{feature}"
 
 
-def _prices(ctx: ReadContext) -> DatasetStatus:
-    day = ctx.session.date
-    record = _latest([r for r in ctx.reader.runs(BARS_JOB, day) if r.items])
-    if record is None:
-        return _unknown(DatasetName.PRICES, BARS_JOB, day)
-    ok = sum(1 for s in record.items.values() if status_code(s) == "OK")
-    return _measured(DatasetName.PRICES, ok, len(record.items))
-
-
-def _options(ctx: ReadContext) -> DatasetStatus:
-    day = ctx.session.date
-    days = sessions_ending(day, CHRONIC_WINDOW + 1)
-    found = chain_coverage(ctx.reader.runs_of([CHAINS_JOB], days[0], days[-1]), days)
-    if found is None or not found.total:
-        return _unknown(DatasetName.OPTIONS_CHAINS, CHAINS_JOB, day)
-    return _measured(DatasetName.OPTIONS_CHAINS, found.ok, found.total)
-
-
-def _coverage_cells(steps: Any) -> tuple[int, int] | None:
-    """-> (covered, applicable) summed over the fundamentals checks' cells; None: none stored."""
+def _cells_of(steps: Any, name: str) -> tuple[int, int] | None:
+    """-> (covered, applicable) summed over the cells of check ``name`` on the nightly's
+    ``rollups`` step; None: the step holds no such check (a retry carries the step over
+    without its checks)."""
     step = steps.get(ROLLUPS_STEP) if isinstance(steps, Mapping) else None
     checks = step.get("checks") if isinstance(step, Mapping) else None
     covered = applicable = 0
     found = False
     for c in checks if isinstance(checks, list) else []:
         data = c.get("data") if isinstance(c, Mapping) else None
-        if c.get("name") not in FUNDAMENTALS_CHECKS or not isinstance(data, Mapping):
+        if c.get("name") != name or not isinstance(data, Mapping):
             continue
         for cell in data.get("cells", []):
             covered += int(cell.get("covered", 0))
@@ -161,13 +147,31 @@ def _coverage_cells(steps: Any) -> tuple[int, int] | None:
     return (covered, applicable) if found and applicable else None
 
 
-def _fundamentals(ctx: ReadContext) -> DatasetStatus:
+def _from_coverage(ctx: ReadContext, name: DatasetName, feature: str) -> DatasetStatus:
+    """The dataset from the coverage check of ``feature``, read from the newest nightly record
+    of the session whose ``rollups`` step holds it (per name, by tier)."""
     day = ctx.session.date
-    record = _latest(ctx.reader.runs(NIGHTLY, day))
-    cells = _coverage_cells(record.stats.get("steps")) if record is not None else None
-    if cells is None:
-        return _unknown(DatasetName.FUNDAMENTALS, NIGHTLY, day)
-    return _measured(DatasetName.FUNDAMENTALS, cells[0], cells[1])
+    for record in sorted(ctx.reader.runs(NIGHTLY, day), key=lambda r: r.started_at, reverse=True):
+        cells = _cells_of(record.stats.get("steps"), check_name(feature))
+        if cells is not None:
+            return _measured(name, cells[0], cells[1])
+    return _unknown(name, NIGHTLY, day)
+
+
+def _prices(ctx: ReadContext) -> DatasetStatus:
+    return _from_coverage(ctx, DatasetName.PRICES, PRICES_FEATURE)
+
+
+def _fundamentals(ctx: ReadContext) -> DatasetStatus:
+    return _from_coverage(ctx, DatasetName.FUNDAMENTALS, FUNDAMENTALS_FEATURE)
+
+
+def _options(ctx: ReadContext) -> DatasetStatus:
+    day = ctx.session.date
+    found = chain_coverage(ctx.reader.runs(CHAINS_JOB, day), [day])
+    if found is None or not found.total:
+        return _unknown(DatasetName.OPTIONS_CHAINS, CHAINS_JOB, day)
+    return _measured(DatasetName.OPTIONS_CHAINS, found.ok, found.total)
 
 
 def _screeners(ctx: ReadContext) -> tuple[int, int]:

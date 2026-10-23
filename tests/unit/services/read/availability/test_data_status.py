@@ -3,6 +3,7 @@ with a public NOT_RUN gap (never 0%); each ``DataState`` follows from the sessio
 the datasets; a screener is affected when it has no run, a PARTIAL run or a run without a
 required table (a gap in an optional table alone does not count)."""
 
+import tomllib
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
@@ -13,9 +14,12 @@ from algotrade.data import StoreReader
 from algotrade.services.read.availability import data_status as module
 from algotrade.services.read.availability.cause import CauseLevel, UnavailableKind
 from algotrade.services.read.availability.data_status import (
+    FUNDAMENTALS_FEATURE,
+    PRICES_FEATURE,
     DatasetName,
     DatasetState,
     DataState,
+    check_name,
     load_data_status,
     share_status,
 )
@@ -23,26 +27,31 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.session import NewerSession, NewerState, Session
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import start_run
+from tests.conftest import REPO_ROOT
 
 DAY = date(2026, 10, 2)
 DONE = datetime(2026, 10, 3, 2, tzinfo=UTC)
-COVERAGE_STEP = {
-    "rollups": {
-        "checks": [
-            {
-                "name": "coverage_next_earnings_date",
-                "status": "PASS",
-                "detail": "",
-                "data": {
-                    "cells": [
-                        {"tier": "core", "applicable": 100, "covered": 100},
-                        {"tier": "rest", "applicable": 900, "covered": 899},
-                    ]
-                },
-            }
+
+
+def _step(prices: tuple[int, int] = (1000, 1000), shares: tuple[int, int] = (999, 1000)) -> Any:
+    """A ``rollups`` step with the two coverage checks, as ``judge`` stores them: (covered,
+    applicable) split into a core and a rest cell."""
+
+    def check(feature: str, covered: int, applicable: int) -> dict[str, Any]:
+        cells = [
+            {"tier": "core", "applicable": 100, "covered": min(covered, 100)},
+            {"tier": "rest", "applicable": applicable - 100, "covered": max(covered - 100, 0)},
         ]
+        return {"name": check_name(feature), "status": "PASS", "data": {"cells": cells}}
+
+    return {
+        "rollups": {
+            "checks": [
+                check(PRICES_FEATURE, *prices),
+                check(FUNDAMENTALS_FEATURE, *shares),
+            ]
+        }
     }
-}
 
 
 def _session(newer: NewerSession | None = None, complete: bool = True) -> Session:
@@ -52,16 +61,14 @@ def _session(newer: NewerSession | None = None, complete: bool = True) -> Sessio
 
 
 def _records(
-    bars: dict[str, str] | None = None,
     chains: dict[str, str] | None = None,
     steps: dict[str, Any] | None = None,
 ) -> MemoryBackend:
     backend = MemoryBackend()
-    for job, items in (("daily_bars", bars), ("option_chains", chains)):
-        if items is not None:
-            run = start_run(job, DAY, DONE - timedelta(hours=1))
-            run.items = items
-            backend.runs.save(run)
+    if chains is not None:
+        run = start_run("option_chains", DAY, DONE - timedelta(hours=1))
+        run.items = chains
+        backend.runs.save(run)
     if steps is not None:
         run = start_run("nightly", DAY, DONE - timedelta(hours=2))
         run.stats = {"steps": steps}
@@ -94,7 +101,7 @@ def _status(
 
 
 def _full() -> MemoryBackend:
-    return _records({"A": "OK", "B": "OK"}, {"A": "OK", "B": "OK"}, COVERAGE_STEP)
+    return _records({"A": "OK", "B": "OK"}, _step())
 
 
 def test_a_missing_record_is_unknown_with_a_public_gap_not_zero(
@@ -111,16 +118,15 @@ def test_a_missing_record_is_unknown_with_a_public_gap_not_zero(
 
 def test_the_datasets_are_graded_from_their_records(monkeypatch: pytest.MonkeyPatch) -> None:
     backend = _records(
-        {"A": "OK", "B": "FAILED: no data"},
         {"A": "OK", "B": "OK", "C": "STALE_DATA: old", "D": "OK"},
-        COVERAGE_STEP,
+        _step(prices=(500, 1000)),
     )
     prices, options, fundamentals = _status(backend, monkeypatch=monkeypatch).datasets
     assert (prices.name, prices.status, prices.present, prices.expected) == (
         DatasetName.PRICES,
         DatasetState.PARTIAL,
-        1,
-        2,
+        500,
+        1000,
     )
     assert (options.name, options.status, options.share) == (
         DatasetName.OPTIONS_CHAINS,
@@ -134,9 +140,35 @@ def test_the_datasets_are_graded_from_their_records(monkeypatch: pytest.MonkeyPa
     )
 
 
-def test_a_record_with_nothing_ok_is_missing_not_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
-    prices = _status(_records({"A": "FAILED: x"}), monkeypatch=monkeypatch).datasets[0]
+def test_a_retry_record_without_the_checks_does_not_hide_the_ones_before(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A retry nightly carries the ``rollups`` step over without its checks (nightly.py
+    ``_carry``): the newest record that holds them answers, not the newest record."""
+    backend = _records({"A": "OK"}, _step())
+    retry = start_run("nightly", DAY, DONE)
+    retry.stats = {"steps": {"rollups": {"status": "SUCCEEDED", "origin": "earlier"}}}
+    backend.runs.save(retry)
+    prices = _status(backend, monkeypatch=monkeypatch).datasets[0]
+    assert (prices.status, prices.present, prices.expected) == (DatasetState.COMPLETE, 1000, 1000)
+
+
+def test_a_check_with_nothing_covered_is_missing_not_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prices = _status(_records(steps=_step(prices=(0, 1000))), monkeypatch=monkeypatch).datasets[0]
     assert (prices.status, prices.present, prices.share) == (DatasetState.MISSING, 0, 0.0)
+
+
+def test_the_checks_are_named_as_the_ingestion_names_them() -> None:
+    """``coverage_<group>.<column>``, and the rules exist in sources.toml."""
+    rules = tomllib.loads((REPO_ROOT / "config/site/sources.toml").read_text())["quality"][
+        "coverage"
+    ]
+    for feature in (PRICES_FEATURE, FUNDAMENTALS_FEATURE):
+        group, column = feature.split(".")
+        assert column in rules[group]
+        assert check_name(feature) == f"coverage_{group}.{column}"
 
 
 @pytest.mark.parametrize(
@@ -144,7 +176,7 @@ def test_a_record_with_nothing_ok_is_missing_not_unknown(monkeypatch: pytest.Mon
     [
         (None, True, _full, DataState.COMPLETE),
         (None, False, _full, DataState.PARTIAL),
-        (None, True, lambda: _records({"A": "OK"}, {"A": "OK"}), DataState.PARTIAL),
+        (None, True, lambda: _records({"A": "OK"}), DataState.PARTIAL),
         (
             NewerSession(DAY + timedelta(days=1), NewerState.IN_PROGRESS),
             True,

@@ -74,10 +74,13 @@ See [0077](0077-serving-release.md): the default session is the current serving 
 `Session.dataStatus` (`services/read/availability/data_status.py`, `load_data_status`) tells every
 viewer, trader included, how complete the served session is, so the top bar's pill answers "can I
 trust today and did my screeners run" without the admin's ops pages. It describes exactly
-`Session.date` from run records alone (no partition read): Prices (the `daily_bars` items that are
-OK), Options chains (`run_items.chain_coverage`, the admin read's function) and Fundamentals (the
-cells of the `coverage_*` checks the nightly's `rollups` step stored for the key fundamentals
-features), each graded by `share_status` (COMPLETE at 98% or more, PARTIAL, MISSING; the admin
+`Session.date` from run records alone (no partition read): Prices (the cells of the
+`coverage_price_stats.close` check the nightly's `rollups` step stored: names with a close, by
+tier; a `daily_bars` record is keyed by day, not name), Options chains (`run_items.chain_coverage`,
+the admin read's function) and Fundamentals (the cells of `coverage_fundamentals.shares_outstanding`,
+a new WARN rule in `sources.toml` measured on 2026-10-22: core 98.5%, rest 44.7%; UNKNOWN until a
+nightly has run with it). The newest nightly record whose `rollups` step holds the check answers (a
+retry carries the step over without its checks). Each graded by `share_status` (COMPLETE at 98% or more, PARTIAL, MISSING; the admin
 completeness grid's rule). A dataset with no record is UNKNOWN with a public NOT_RUN gap, never 0%.
 `DataState` is decided on the server: COMPLETE, PARTIAL, NEXT_PROCESSING (`Session.newer` is
 IN_PROGRESS or PUBLISHING) or NEXT_FAILED_SHOWING_PREVIOUS (FAILED_RETRYING); a newer session wins

@@ -58,7 +58,8 @@ names = { COMPLETE = "complete", PARTIAL = "partial", MISSING = "missing", UNKNO
 
 [[enum]]
 source = "graphql:DatasetName"
-exempt = "the name of a dataset the pill lists (prices, option chains, fundamentals), not a state; each row's help is the dataset_status term"
+values = { PRICES = "term:dataset_status", OPTIONS_CHAINS = "term:dataset_status", FUNDAMENTALS = "term:dataset_status" }
+names = { PRICES = "Prices", OPTIONS_CHAINS = "Option chains", FUNDAMENTALS = "Fundamentals" }
 
 [[enum]]
 source = "graphql:UnavailableKind"
