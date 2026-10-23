@@ -15,7 +15,9 @@
 #     did: the clone is discarded, exit 3);
 #   - runs scripts/perf/fast_bench.py --data-url file://<clone> --record with the default guards
 #     (never lowered), appends a line to var/logs/perf_gate.status, deletes the clone, and
-#     notifies the owner (osascript, as deploy.sh) when a view is over the bar.
+#     notifies the owner (osascript, as deploy.sh) when a view is over the bar. The bench stops
+#     itself within 5 minutes (--budget-s 270); with the snapshot the night's run is ~10 minutes.
+#     A noisy or low-confidence bench run is not recorded (it is still a finished day).
 #
 # Exit codes: 0 done (clean) or nothing to do today; 1 finished with a view over the bar without
 # a named exception, or an operation that failed; 2 refused (a path guard, or the bench refused);

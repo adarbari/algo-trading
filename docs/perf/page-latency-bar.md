@@ -22,7 +22,7 @@ On a **clone** of the store only (`--data-url` is required and the real store is
 
 One API process (warmer off, `release_reads=false`), a patched endpoint empties every cache before
 each timing, each distinct operation is timed 5 times and averaged (3 when over 10 s), the 1-minute
-load is gated at 4. A run takes minutes. The views and their documents come from
+load is gated at 4. A run takes at most 5 minutes (below). The views and their documents come from
 `benchmarks/api_latency_views.json`; its `captured` entries are filled by
 `make api-latency-views-capture` on the clone (re-crawl when `make api-latency-docs` says the
 documents drifted); a view with no captured document is listed as not measured.
@@ -37,6 +37,18 @@ keeps it, flagged). Exit codes: 0 every view and the shell within the bar or a n
 1 something over, or an operation that failed (a fast failure is no pass); 2 refused (no clone).
 Do not point it at `var/`, the real store, launchd or the live API, and never export
 `ALGOTRADE_DATA_URL`.
+
+## The time budget
+
+A round must stay under 5 minutes, so `--budget-s` (default 270 s) caps the timed passes: after
+each pass the tool stops when the next one (predicted as the mean of the passes so far) would
+overrun it. At least 2 passes always run, at most `--reps` (default 5); an operation over 10 s on
+its first timing still gets 3 only. The output states the passes done and the budget used, and a
+view's critical path is the average of the passes done. A run of fewer than 3 passes is
+`LOW-CONFIDENCE` and, like a noisy run, is not recorded. The wait for the load gate ends after
+60 s: the pass runs and its operations are flagged noisy. With the process start and the op-set
+build the run ends under 300 s; the nightly wrapper's total, with its CoW snapshot (about 5
+minutes), is about 10 minutes.
 
 ## Read the table
 
@@ -79,8 +91,8 @@ or nothing to do; 1 finished with a view over the bar without a named exception 
 notified, as `deploy.sh` does, by a desktop notification), or an operation failed; 2 refused (a
 path guard, or the bench refused); 3 busy, retry. Each run appends `date= sha= views_over=
 seconds_above= exit= finished=` to `var/logs/perf_gate.status`, keeps the output in
-`var/logs/perf_gate.last.log`, and records the history line (`--record`: a noisy run is not
-recorded). The history is committed by the next harness PR, never by the agent.
+`var/logs/perf_gate.last.log`, and records the history line (`--record`: a noisy or
+low-confidence run is not recorded). The history is committed by the next harness PR, never by the agent.
 
 **The launchd entry** (not written or loaded by anything in this repo; the owner installs it like
 the nightly's, `docs/hosting.md`): label `com.algotrade.perf-gate`, `ProgramArguments`

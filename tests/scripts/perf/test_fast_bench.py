@@ -174,9 +174,74 @@ def test_time_ops_dumps_the_samples_after_every_pass(
     monkeypatch.setattr(fb.al, "guard", lambda: None)
     monkeypatch.setattr(fb, "wait_quiet", lambda limit, load_max: 1.0)
     partial = tmp_path / "samples-partial.json"
-    ops = fb.time_ops(
+    ops, _ = fb.time_ops(
         {"A#1": {"name": "A", "query": "q", "variables": {}}}, "file:///c", 2, 4.0, partial
     )
     dumped = json.loads(partial.read_text())
     assert dumped["samples"] == {"A#1": [12.0, 12.0]} and dumped["names"] == {"A#1": "A"}
     assert ops["A#1"]["avg"] == 12.0 and not ops["A#1"]["noisy"] and not ops["A#1"]["failed"]
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _run_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, call_s: float, reps: int, budget: float
+) -> tuple[dict, dict]:
+    """time_ops over 2 operations on a fake clock where every timing takes ``call_s``."""
+    clock = _Clock()
+
+    class FakeApi:
+        url = "http://x"
+        last_error = ""
+
+        def __init__(self, *a: object, **k: object) -> None:
+            self.client = type("C", (), {"get": staticmethod(lambda url: None)})()
+
+        def call(self, body: dict) -> tuple[float, int, int, int]:
+            clock.now += call_s
+            return call_s * 1000, 200, 10, 1
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(fb.al, "Api", FakeApi)
+    monkeypatch.setattr(fb.al, "uncached_config", lambda src, dst: dst)
+    monkeypatch.setattr(fb.al, "guard", lambda: None)
+    monkeypatch.setattr(fb, "wait_quiet", lambda limit, load_max: 1.0)
+    ops = {f"{n}#1": {"name": n, "query": "q", "variables": {}} for n in "AB"}
+    return fb.time_ops(ops, "file:///c", reps, 4.0, None, budget, clock)
+
+
+def test_a_fast_run_does_all_its_reps_and_is_confident(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    ops, meta = _run_budget(monkeypatch, tmp_path, 1.0, 5, 270)
+    assert meta["passes"] == 5 and not meta["low_confidence"] and ops["A#1"]["n"] == 5
+
+
+def test_a_loaded_run_stops_early_when_the_next_pass_would_overrun(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    ops, meta = _run_budget(monkeypatch, tmp_path, 10.0, 5, 70)  # a pass = 20 s
+    assert meta["passes"] == 3 and not meta["low_confidence"]  # 60 s done, the 4th would end at 80
+    assert ops["A#1"]["n"] == 3 and ops["A#1"]["avg"] == 10000.0
+
+
+def test_two_passes_are_always_done_but_flagged_low_confidence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    ops, meta = _run_budget(monkeypatch, tmp_path, 100.0, 5, 30)
+    assert meta["passes"] == fb.MIN_PASSES == 2 and meta["low_confidence"]
+    assert ops["B#1"]["n"] == 2
+
+
+def test_keep_going_never_exceeds_reps_and_predicts_with_the_mean() -> None:
+    assert not fb.keep_going(5, 5, 1.0, 270)
+    assert fb.keep_going(1, 5, 999.0, 270)  # the minimum
+    assert fb.keep_going(3, 5, 150.0, 270) and not fb.keep_going(3, 5, 210.0, 270)

@@ -11,7 +11,10 @@ Method: ONE API process on a CLONE of the store (`--data-url` is required; the r
 refused as in api_latency.py), start-up warmer off, `release_reads=false`, and a patched endpoint
 that empties the ResponseCache and every loader ResultCache before EVERY timing. Each distinct
 (operation, document, variables) is timed 5 times and averaged (3 for operations whose first
-timing is over 10 s) while the 1-minute load is gated at `--load-max`; a view's critical path is
+timing is over 10 s) while the 1-minute load is gated at `--load-max` (a wait for it ends after
+60 s: the pass runs and is flagged noisy). A wall-clock budget (`--budget-s`, default 270 s) stops
+starting passes the mean of the passes so far predicts would overrun it: at least 2 passes, at
+most `--reps`; fewer than 3 is LOW-CONFIDENCE and is not recorded. A view's critical path is
 its slowest operation's average, its sum the total of its operations' averages. The views come from
 `benchmarks/api_latency_views.json` with its crawled `captured` documents (`make
 api-latency-views-capture` on the clone; `--views-file` points at another copy).
@@ -38,6 +41,7 @@ import sys
 import tempfile
 import time
 import tomllib
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -50,6 +54,11 @@ BAR_FILE = REPO / "benchmarks" / "perf_bar.toml"
 HISTORY_FILE = REPO / "benchmarks" / "critical_path_history.jsonl"
 SLOW_FIRST_MS = 10_000.0  # an operation over this on its first timing is repeated only 3 times
 SLOW_REPS = 3
+BUDGET_S = 270.0  # wall clock for the timed passes; the whole run (start, op set) stays under 300 s
+MIN_PASSES = 2  # always done, whatever the budget
+CONFIDENT_PASSES = 3  # fewer passes than this is "low-confidence" and is not recorded
+GATE_WAIT_S = 60.0  # the most a pass waits for the load gate before running (and flagging noisy)
+OP_WAIT_S = 2.0
 HISTORY_KEYS = ("date", "sha", "load_before", "load_after", "machine", "views", "totals")
 VIEW_KEYS = ("crit_s", "sum_s", "slowest_op")
 TOTAL_KEYS = ("views_over_1s", "seconds_above_bar", "shell_total_s")
@@ -337,14 +346,27 @@ def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, 
     return distinct, view_ops, skipped
 
 
+def keep_going(done: int, reps: int, elapsed_s: float, budget_s: float) -> bool:
+    """Whether to start another pass: never before MIN_PASSES, never past ``reps``, and not when
+    the next pass (predicted as the mean of the passes so far) would overrun the budget."""
+    if done >= reps:
+        return False
+    if done < MIN_PASSES:
+        return True
+    return elapsed_s + elapsed_s / done <= budget_s
+
+
 def time_ops(
     distinct: dict[str, dict],
     data_url: str,
     reps: int,
     load_max: float,
     partial: Path | None = None,
-) -> dict[str, dict]:
-    """Time every distinct op ``reps`` times, caches emptied before each timing.
+    budget_s: float = BUDGET_S,
+    clock: Callable[[], float] = time.monotonic,
+) -> tuple[dict[str, dict], dict]:
+    """Time every distinct op, up to ``reps`` passes within ``budget_s``, caches emptied before
+    each timing. Returns (per-operation results, {passes, budget_s, elapsed_s, low_confidence}).
 
     ``partial``: a file rewritten after every pass with the samples so far (an aborted run
     keeps them)."""
@@ -356,13 +378,15 @@ def time_ops(
     last: dict[str, dict] = {}
     api = al.Api("empty", data_url=data_url, config_dir=cfg)
     try:
-        for p in range(reps):
-            print(f"pass {p + 1}/{reps} (load {wait_quiet(180, load_max)})", flush=True)
+        t0, done = clock(), 0
+        while keep_going(done, reps, clock() - t0, budget_s):
+            p = done
+            print(f"pass {p + 1}/{reps} (load {wait_quiet(GATE_WAIT_S, load_max)})", flush=True)
             for sig, d in distinct.items():
                 if p >= SLOW_REPS and samples[sig] and samples[sig][0] > SLOW_FIRST_MS:
                     continue
                 al.guard()
-                loads[sig].append(wait_quiet(8, load_max))
+                loads[sig].append(wait_quiet(OP_WAIT_S, load_max))
                 api.client.get(f"{api.url}/__bench_clear")
                 ms, status, size, _ = api.call({"query": d["query"], "variables": d["variables"]})
                 samples[sig].append(round(ms, 1))
@@ -370,8 +394,15 @@ def time_ops(
             if partial is not None:
                 names = {s: distinct[s]["name"] for s in distinct}
                 partial.write_text(json.dumps({"samples": samples, "loads": loads, "names": names}))
+            done += 1
     finally:
         api.close()
+    meta = {
+        "passes": done,
+        "budget_s": budget_s,
+        "elapsed_s": round(clock() - t0, 1),
+        "low_confidence": done < CONFIDENT_PASSES,
+    }
     return {
         s: {
             "name": distinct[s]["name"],
@@ -381,7 +412,7 @@ def time_ops(
             "failed": last[s]["status"] != 200 or bool(last[s]["err"]),
         }
         for s, x in samples.items()
-    }
+    }, meta
 
 
 def per_view(ops: dict[str, dict], view_ops: dict[str, list[str]]) -> dict[str, dict]:
@@ -441,9 +472,30 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="allow --record of a run with a noisy operation or an --only subset (flagged)",
     )
+    p.add_argument(
+        "--budget-s",
+        type=float,
+        default=BUDGET_S,
+        help="wall clock for the timed passes (at least 2 passes always, at most --reps)",
+    )
     p.add_argument("--min-free-disk-gb", type=float, default=al.pp.MIN_FREE_DISK_GB)
     p.add_argument("--min-free-swap-mb", type=int, default=al.pp.MIN_FREE_SWAP_MB)
     return p.parse_args(argv)
+
+
+def report_run(ops: dict, meta: dict, args: argparse.Namespace, subset: bool) -> tuple[bool, bool]:
+    """Print the passes, budget and flags; (noisy, whether the run may be recorded)."""
+    noisy = any(o["noisy"] for o in ops.values())
+    print(
+        f"{meta['passes']} passes in {meta['elapsed_s']} s (budget {meta['budget_s']:.0f} s, "
+        f"at most {args.reps})"
+    )
+    if meta["low_confidence"]:
+        print(f"LOW-CONFIDENCE: fewer than {CONFIDENT_PASSES} passes; not a clean run")
+    if noisy:
+        print("NOISY: an operation was timed above --load-max; the numbers are not a clean run")
+    clean = not (noisy or meta["low_confidence"] or subset)
+    return noisy, clean or args.record_noisy
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -477,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     load_before = load1()
     partial = out_dir / "samples-partial.json" if out_dir else None
-    ops = time_ops(distinct, data_url, args.reps, args.load_max, partial)
+    ops, meta = time_ops(distinct, data_url, args.reps, args.load_max, partial, args.budget_s)
     load_after = load1()
     views = per_view(ops, view_ops)
     by_name: dict[str, list[float]] = {}
@@ -499,11 +551,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"not measured: {vid}: {why}")
     if out_dir:
         write_outputs(out_dir, ops, views, skipped)
-    noisy = any(o["noisy"] for o in ops.values())
-    if noisy:
-        print("NOISY: an operation was timed above --load-max; the numbers are not a clean run")
-    if args.record and (noisy or names) and not args.record_noisy:
-        print("not recorded: a noisy or --only run (--record-noisy to keep it)", file=sys.stderr)
+    noisy, may_record = report_run(ops, meta, args, bool(names))
+    if args.record and not may_record:
+        print(
+            "not recorded: a noisy, low-confidence or --only run (--record-noisy to keep it)",
+            file=sys.stderr,
+        )
     elif args.record:
         note = args.machine + ("; ratio mode" if args.ratio_mode else "")
         rec = history_record(
