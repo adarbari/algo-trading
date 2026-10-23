@@ -261,11 +261,13 @@ Each step that writes a lot refuses to start under a free-disk floor on the data
 that skips for a floor says so loudly (its run record and the nightly summary name the floor and
 the free space), never as a quiet success.
 
-| Floor | Guards | Setting |
+| Floor | Guards | Where |
 |---|---|---|
-| 8 GB | the bench (a benchmark run writes a store copy) | bench settings |
-| 10 GB | the history copy (a rebuilt year exists twice) | `nightly.toml [history_copy]` |
-| 15 GB (6 GB while the owner's temporary lowering stands) | the nightly start (a full disk stops every agent) | `nightly.toml [resources] min_free_gb` |
+| 8 GB | the bench (a benchmark run writes a store copy) | `scripts/perf/page_profile.py:36` (`MIN_FREE_DISK_GB`) |
+| 10 GB plus the table's current copy | the history copy (a rebuilt year exists twice); a skip is a WARN naming the floor | `config/site/nightly.toml:145` (`free_disk_floor_gb`), `tasks/derived/history_copy.py:67` |
+| 6 GB, TEMPORARY (code default 15) | the nightly start (a full disk stops every agent) | `config/site/nightly.toml:37` (`[resources] min_free_gb`; the owner lowered it 2026-10-20 so the outcomes compaction can run beside the backfill and says to restore 15 once done), `ops/disk.py` |
+| `min_free_gb` plus one partition | the outcomes compaction, before each dispatch | `tasks/maintenance/compaction/task.py:23,141` |
+| 5 GB | filing-text, which stops when under it | `config/site/sources.toml:131` (`filing_text_min_free_gb`), `tasks/events/filing_text.py:660` |
 
 ## The Mac
 

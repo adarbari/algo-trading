@@ -70,5 +70,5 @@ rebuild: /regime went 0.5 s -> 12.6 s on the real store.)
 ## Writers and the ingest lock
 
 A writer outside the ingest lock must be crash-safe against `recover_unpublished` (ADR 0022: it
-drops unpublished ingest runs at a nightly's start); the default is to take the lock. (The
+drops unpublished ingest runs; it runs on every writing command, `cli/main.py:578`, under the lock); the default is to take the lock. (The
 edge-verdicts post-session step ran outside it and a CLI ingest dropped its pending rows.)

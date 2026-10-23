@@ -154,7 +154,7 @@ the skill with the fix.
     In the desktop app, bind the PR and turn on its Auto-fix monitor so CI failures wake you
     (`docs/ci.md`, "Watching CI"); never poll or wait on CI.
     **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
-    passes (`.github/workflows/auto-merge.yml`); merging only when up to date with main is a repo setting (`docs/ci.md`). Open work in progress as a draft, or label
+    passes (`.github/workflows/auto-merge.yml`); up-to-date merging is not enforced yet (`docs/ci.md`). Open work in progress as a draft, or label
     it `no-automerge`, to keep it open for review. **Never merge yourself**: no
     `gh pr merge` (with or without `--auto`), no enabling GitHub auto-merge, no admin
     bypass. Branch protection on `main` requires the CI checks (admins included); only

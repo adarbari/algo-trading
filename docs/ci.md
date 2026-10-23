@@ -270,9 +270,10 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
 
 ## Merging on the merged result
 
-PRs merge only when up to date with main (strict required checks or a merge queue), so the cap and
-layout checks run on the merged result (#855 and #856 each added a module to a folder one below its
-cap; main went red). This is a GitHub repository setting (owner); the repo does not set it.
+Not enforced yet: `required_status_checks.strict` is false, so a PR can merge on checks that ran
+before main moved. #855 and #856 each added a module to a folder one below its cap and main went
+red. The owner decides strict checks plus branch update, or a merge queue (a GitHub repository
+setting; the repo does not set it).
 
 ## Running the checks locally before pushing
 

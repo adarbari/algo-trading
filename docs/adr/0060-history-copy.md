@@ -157,5 +157,5 @@ the per-file Parquet opens that dominate warm.
 
 ## Changing the signature or format
 
-A change to the manifest signature or the copy's format ships its rebuild in the same PR, with a
+A change to the manifest signature or the copy's format ships its rebuild in the same PR (or the read self-heals), with a
 fitness test over an old-format store (`.claude/skills/add-dataset`, "Changing a derived store").

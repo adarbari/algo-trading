@@ -17,9 +17,7 @@ session, else decided by a Fable agent on their behalf, and always logged.
 2. The orchestrator sends the diff to the `architect` (Opus) with a focus list. The report
    ends with `Owner decisions:` (policy only, each with options and a recommendation), then
    `Re-review: yes | no`.
-   A plan's seconds-saved figures are tagged [M] measured or [I] inferred; an [I] above 0.2 s is
-   measured by a microbenchmark or profile in the PR before review, and the PR says estimated X,
-   measured Y.
+   The reviewer enforces the [M] / [I] tagging of seconds-saved figures (`.claude/agents/architect.md`).
 3. The implementer fixes the findings and hands back a per-finding list (finding -> commit or
    `path:line` -> test). The orchestrator sends it to the same reviewer (SendMessage). Repeat
    while the reviewer answers `Re-review: yes`.

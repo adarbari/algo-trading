@@ -270,18 +270,17 @@ internal detail of the backend; nothing outside `storage/backends/` relies on it
 
 Two engines plus files, no third without an ADR (decision log 2026-10-22, "Two engines: Parquet for
 domain data, SQLite for operational state, files for configuration"; ADR 0006, amendment of
-2026-10-22, Ideas):
+2026-10-22):
 
-- **Parquet**: analytical data (many rows, few columns, immutable, bulk-written by ingestion,
-  versioned point-in-time).
-- **SQLite**: small, mutable or keyed operational state and derived, rebuildable indexes (lookups of
-  few rows among many, ordering and pagination, transactional updates, a per-viewer prestored
-  list). Parquet stays the truth for a derived index.
+- **Parquet**: analytical domain data (many rows, few columns, immutable, bulk-written by
+  ingestion, versioned point-in-time) and derived business objects.
+- **SQLite**: operational state (the run ledger) and the one derived Ideas index. Any other derived
+  index needs its own ADR or owner decision; Parquet stays the truth for it.
 - **Files (TOML)**: human-edited configuration and documents.
 
-Triggers to move something to SQLite: a keyed read still above about 0.3 s after row-group pruning
-and the history copy; run files past about 100,000; a list that needs ordering and paging. The
-first answer is always to measure on a real-shaped store (`docs/perf/page-latency-bar.md`).
+Measured triggers for the run ledger (the decision log): a run-record lookup still above about
+100 ms warm, run files past about 100,000, or an admin page needing the list under 1 s. The first
+answer is always to measure on a real-shaped store (`docs/perf/page-latency-bar.md`).
 
 ## Adapters: changing storage without touching callers
 
