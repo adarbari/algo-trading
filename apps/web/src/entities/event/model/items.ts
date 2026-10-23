@@ -121,11 +121,14 @@ export function studyChartEvents(
     }
     return [];
   });
-  const filings = study.filings.map((f): ChartEvent => ({
-    time: f.filingDate,
-    kind: 'filing',
-    detail: `${f.form} ${f.label}`,
-  }));
+  // One marker a day: several 8-Ks filed together would stack on the same point.
+  const byDay = new Map<string, string[]>();
+  for (const f of study.filings) {
+    byDay.set(f.filingDate, [...(byDay.get(f.filingDate) ?? []), `${f.form} ${f.label}`]);
+  }
+  const filings = [...byDay].map(
+    ([time, details]): ChartEvent => ({ time, kind: 'filing', detail: details.join('; ') }),
+  );
   return [...filings, ...ahead].sort((a, b) => a.time.localeCompare(b.time));
 }
 
