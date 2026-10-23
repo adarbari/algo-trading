@@ -74,3 +74,8 @@ def gateway_down(ctx: TaskContext) -> str | None:
     source = ctx.sources.get("ibkr")
     reason = source.probe() if isinstance(source, SessionSource) else None
     return f"skipped: WARN: {reason}" if reason else None
+
+
+def no_config_store(ctx: TaskContext) -> str | None:
+    """Workflows skip a task over the site's documents (``edge-verdicts``) with no config store."""
+    return None if ctx.configs is not None else "skipped: no config store to read the edges from"

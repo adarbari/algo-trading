@@ -39,6 +39,7 @@ algotrade-ingest quality                        # data-quality checks for a sess
 algotrade-ingest schedule                       # writes the launchd agents (nightly: weekdays 15:00, at login, hourly; monthly Tiingo fill); prints install commands
 algotrade-ingest purge-raw [--keep-days 90]     # raw per source (SEC 7 days) + unfinished-run scratch older than 14 days (defaults: sources.toml)
 algotrade-ingest migrate-ids [--dry-run]        # symbol ids -> FIGI ids per instruments/id_map (new runs, ADR 0018)
+algotrade-ingest run edge-verdicts [--edge ID] [--from D --to D] [--limit N] [--dry-run] [--verify (read-only check)]  # store each site edge's verdict headline (results/edge_verdict): backfill and re-judge in one (owner-run once after deploy, then the post-session step; resumable, idempotent)
 algotrade-ingest run screen-runs-backfill [--from D --to D] [--limit N]  # frame screen_runs / screen_picks for runs stored before them (owner-run, resumable, idempotent)
 algotrade-ingest run <task> [--date D | --from D --to D]   # any registry task (tasks/framework/registry.py), same flags
 ```
