@@ -372,7 +372,14 @@ def _first_feature(d: dict) -> str:
 
 
 _FEATURE = ("FeatureCatalogue", {}, _first_feature)
-_SCREENER = ("GuideIndex", {}, lambda d: d["guideIndex"]["families"][0]["screeners"][0]["id"])
+
+
+def _edge_screener(d: dict) -> str:
+    """A screener an edge implements: any other has no edges in the guide."""
+    return next(sc for e in d["edges"] for sc in e["screeners"])
+
+
+_SCREENER = ("EdgesPage", {}, _edge_screener)
 VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object]]]] = {
     "HarnessRun": {"runId": ("HarnessRuns", {"limit": 1}, lambda d: d["harnessRuns"][0]["runId"])},
     "GuideField": {"name": _FEATURE},
@@ -407,8 +414,8 @@ def resolve_variables(post: Callable[[str, dict], dict], distinct: dict[str, dic
                 var: pick(post(docs[source], variables))
                 for var, (source, variables, pick) in rules.items()
             }
-        except (KeyError, IndexError, TypeError):
-            unresolved.append(d["name"])
+        except (KeyError, IndexError, TypeError, ValueError, StopIteration):
+            unresolved.append(d["name"])  # incl. a non-JSON answer
             continue
         d["variables"] = {**d["variables"], **found}
     return unresolved

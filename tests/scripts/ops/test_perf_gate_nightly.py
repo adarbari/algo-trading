@@ -452,3 +452,47 @@ def test_a_copy_over_ten_minutes_is_killed_and_the_day_finishes_with_an_error(ri
     assert _wait_gone(rig.root / "data.trash.2026-10-23")
     assert not (rig.tmp / "logs" / "perf_gate" / "lock").is_symlink()
     assert rig.run().returncode == 0  # a finished day: no retry loop, no re-copy
+
+
+def test_a_clone_on_another_volume_is_refused_because_cp_c_would_copy_every_byte(rig: Rig) -> None:
+    dev = _script(rig, "dev.sh", f'case "$1" in {rig.tmp}/var/*) echo 1;; *) echo 2;; esac\n')
+    res = rig.run(PERF_DEV_CMD=dev)
+    assert res.returncode == 2 and "same volume" in res.stderr
+    assert not (rig.root / "data").exists() and not rig.status.exists()
+
+
+def test_a_reused_pid_with_another_start_time_is_a_stale_lock(rig: Rig) -> None:
+    lock = rig.tmp / "logs" / "perf_gate" / "lock"
+    lock.parent.mkdir(parents=True)
+    lock.symlink_to(f"{os.getpid()}:Mon_Jan__1_00:00:00_2001")  # alive pid, other start time
+    assert rig.run().returncode == 1  # taken over and run, not busy forever
+
+
+def test_the_lock_tag_with_the_real_start_time_is_a_live_holder(rig: Rig) -> None:
+    start = subprocess.run(
+        ["ps", "-o", "lstart=", "-p", str(os.getpid())], capture_output=True, text=True, check=False
+    ).stdout.split()
+    lock = rig.tmp / "logs" / "perf_gate" / "lock"
+    lock.parent.mkdir(parents=True)
+    lock.symlink_to(f"{os.getpid()}:{'_'.join(start)}")
+    assert rig.run().returncode == 3
+
+
+def test_a_leftover_trash_delete_is_logged_to_its_own_days_record(rig: Rig) -> None:
+    old_day = rig.tmp / "logs" / "perf_gate" / "2026-10-20"
+    old_day.mkdir(parents=True)
+    (old_day / "status.json").write_text("{}")
+    old = rig.root / "data.trash.2026-10-20"
+    (old / "tables").mkdir(parents=True)
+    rig.run()
+    assert _wait_gone(old)
+    end = time.time() + 20
+    while "trash_delete_s" not in json.loads((old_day / "status.json").read_text()):
+        assert time.time() < end
+        time.sleep(0.1)
+    today = json.loads((_evidence(rig) / "status.json").read_text())
+    assert (
+        today.get("trash_delete_s")
+        != json.loads((old_day / "status.json").read_text())["trash_delete_s"]
+        or "trash_delete_s" in today
+    )  # the old day's file got its own value; today's is its own

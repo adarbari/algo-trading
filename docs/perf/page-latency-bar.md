@@ -105,12 +105,14 @@ runs at low I/O priority (`taskpolicy -b`, `nice` where there is none) so it doe
 live site: the effect on the copy time is to be measured on the first night. The clone is renamed
 to a sibling `data.trash.<date>` at the end (instant) and deleted afterwards, detached, at low
 priority; a leftover trash of an earlier run is deleted first, in the background, never blocking
-the start (a free-disk refusal then says the trash is still being deleted). Only a path
-`<PERF_CLONE_ROOT>/../perf-clone/data.trash.*` is ever deleted.
+the start (a free-disk refusal then says the trash is still being deleted). Only a sibling
+`<PERF_CLONE_ROOT>.trash.*` (for example `/Users/adarbari/perf-clone/data.trash.2026-10-23`) is
+ever deleted. The clone must be on the store's volume (`cp -c` silently copies every byte across
+volumes): the wrapper refuses, exit 2, when the device ids differ.
 
 **Idempotent per local date, one instance at a time.** Before 03:00, or when
 `var/logs/perf_gate.status` already holds a finished run for today, it exits 0 at once. An atomic
-lock (a symlink to the holder's pid, `var/logs/perf_gate/lock`; a dead, empty or garbage pid is stale and taken over under a guard; released
+lock (a symlink to the holder's pid, `var/logs/perf_gate/lock`; a dead pid, an empty or garbage target or a pid with another process start time (a reused pid) is stale and taken over under a guard; released
 on every exit including TERM / INT, which also kill the bench's process group and drop the clone)
 makes a second instance (the 900 s retry) exit 3 "busy" without touching the first one's clone.
 A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
@@ -149,8 +151,8 @@ capture's edge id and the first-render values of the trades ledger; one that can
 fails the gate. Expired exceptions and an expired list are reported at run time, not in CI.
 
 **Timing, and the 5-minute cap.** The cap applies to the benchmark phase; the snapshot is a
-separate step. Expected breakdown: the copy about 3.5-4 minutes on a quiet machine (4m17s-5m07s
-measured for the whole store, 9m41s under load; fewer files now), the bench at most 5 minutes by
+separate step. Expected breakdown: the copy about 3.5-4 minutes [I] on a quiet machine (inferred: fewer files than the 4m17s-5m07s
+measured for the whole store, 9m41s under load), the bench at most 5 minutes by
 its budget (typically 2.5), the cleanup an instant rename: about 6-9 minutes wall, worst case
 10-11. The bench is hard-capped: a watchdog runs it in its own process group and at 300 s kills
 the whole group (the bench and its API child), marks the run over-time (exit 4; a finished day,

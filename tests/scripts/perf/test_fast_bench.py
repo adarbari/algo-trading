@@ -9,6 +9,11 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
+
+from algotrade_api.deps import ApiSettings
+from algotrade_api.main import create_app
+from tests.helpers.api_store import as_user
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "perf"))
@@ -423,12 +428,8 @@ GUIDE_FIXTURE = {
     "FeatureCatalogue": {
         "catalogue": [{"name": "a", "guide": None}, {"name": "b", "guide": {"theme": "t"}}]
     },
-    "GuideIndex": {
-        "guideIndex": {
-            "situations": [{"slug": "sit-1"}],
-            "families": [{"screeners": [{"id": "scr-1"}]}],
-        }
-    },
+    "GuideIndex": {"guideIndex": {"situations": [{"slug": "sit-1"}]}},
+    "EdgesPage": {"edges": [{"screeners": []}, {"screeners": ["scr-1", "scr-2"]}]},
     "GuideScreenerIndex": {"guideScreenerIndex": {"categories": [{"id": "cat-1"}]}},
     "HarnessRuns": {"harnessRuns": [{"runId": "run-9"}]},
 }
@@ -513,3 +514,39 @@ def test_an_operation_failing_in_an_early_pass_is_failed_even_if_the_last_pass_i
     monkeypatch.setattr(fb, "wait_quiet", lambda limit, load_max: 1.0)
     ops, _ = fb.time_ops({"A#1": {"name": "A", "query": "q", "variables": {}}}, "file:///c", 3, 4.0)
     assert ops["A#1"]["failed"] is True
+
+
+def test_a_non_json_or_error_answer_leaves_the_operation_unresolved_not_a_crash() -> None:
+    def post(query: str, variables: dict) -> dict:
+        raise ValueError("Expecting value")  # r.json() of an HTML error page
+
+    ops = _op_dicts("GuideSituation", "HarnessRun")
+    assert fb.resolve_variables(post, ops) == ["GuideSituation", "HarnessRun"]
+    assert "GuideSituation" in _failures(unresolved=["GuideSituation"])[0]
+
+
+@pytest.mark.allow_localhost
+def test_every_resolver_picks_an_id_the_real_api_answers_with_content(
+    api_golden: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fitness: run every resolver against the real API app (in process) and replay each
+    resolved operation: none may answer empty (an entry that is legitimately empty would fail the
+    gate every night). HarnessRun is excepted: the fixture store has no harness runs."""
+    client = TestClient(
+        create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user())
+    )
+
+    def raw(query: str, variables: dict):
+        return client.post("/graphql", json={"query": query, "variables": variables})
+
+    def post(query: str, variables: dict) -> dict:
+        return raw(query, variables).json()["data"]
+
+    docs = fb.pdocs.web_documents()
+    names = sorted(set(fb.VARIABLE_RESOLVERS) - {"HarnessRun"})
+    ops = {f"{n}#1": {"name": n, "query": docs[n], "variables": {}} for n in names}
+    assert fb.resolve_variables(post, ops) == []
+    for d in ops.values():
+        r = raw(d["query"], d["variables"])
+        assert r.status_code == 200 and fb.al.answer_problem(r.status_code, r.content) is None
+        assert fb.al.empty_note(r.status_code, r.content) is None, (d["name"], d["variables"])

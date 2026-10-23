@@ -87,24 +87,32 @@ lockdir=$logs/perf_gate/lock   # a symlink whose target is the holder's pid: cre
 guard=$lockdir.takeover
 mkdir -p "$logs/perf_gate"
 lock_held=0
-alive() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; kill -0 "$1" 2>/dev/null; }
+start_of() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' '_' | sed 's/^_//; s/_$//'; }
+mytag="$$:$(start_of $$)"  # pid and process start time: a reused pid has another start time
+alive() {  # a holder tag is pid or pid:start; a dead pid, a garbage tag or another start = stale
+  local pid=${1%%:*} start=
+  case "$1" in *:*) start=${1#*:} ;; esac
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  kill -0 "$pid" 2>/dev/null || return 1
+  [ -z "$start" ] || [ "$(start_of "$pid")" = "$start" ]
+}
 holder_of() { readlink "$1" 2>/dev/null || true; }  # empty or garbage = no live holder
 take_lock() {
   # (never `ln -s` onto a real directory: it would link inside it; a leftover directory is stale)
-  if { [ ! -d "$lockdir" ] || [ -L "$lockdir" ]; } && ln -s "$$" "$lockdir" 2>/dev/null; then
+  if { [ ! -d "$lockdir" ] || [ -L "$lockdir" ]; } && ln -s "$mytag" "$lockdir" 2>/dev/null; then
     lock_held=1; return 0
   fi
   alive "$(holder_of "$lockdir")" && return 1
   # stale (a dead pid, an empty or garbage target, or a leftover directory). Takeovers are
   # serialised by a guard that is itself a pid symlink (a dead one is cleaned), and the holder is
   # read again under it, so two instances never both take over, nor take a live lock.
-  if ! ln -s "$$" "$guard" 2>/dev/null; then
+  if ! ln -s "$mytag" "$guard" 2>/dev/null; then
     alive "$(holder_of "$guard")" && return 1
-    rm -rf "$guard"; ln -s "$$" "$guard" 2>/dev/null || return 1
+    rm -rf "$guard"; ln -s "$mytag" "$guard" 2>/dev/null || return 1
   fi
   if alive "$(holder_of "$lockdir")"; then rm -f "$guard"; return 1; fi
   rm -rf "$lockdir"
-  if ln -s "$$" "$lockdir" 2>/dev/null; then lock_held=1; fi
+  if ln -s "$mytag" "$lockdir" 2>/dev/null; then lock_held=1; fi
   rm -f "$guard"
   [ "$lock_held" = 1 ]
 }
@@ -113,7 +121,7 @@ wd_pid=
 clone_made=0
 cleanup() {
   [ -n "${sampler_pid:-}" ] && kill "$sampler_pid" 2>/dev/null
-  [ "$lock_held" = 1 ] && [ "$(holder_of "$lockdir")" = "$$" ] && rm -f "$lockdir"
+  [ "$lock_held" = 1 ] && [ "$(holder_of "$lockdir")" = "$mytag" ] && rm -f "$lockdir"
   return 0
 }
 abort() {  # TERM / INT: stop the bench's whole process group, drop the clone, release the lock
@@ -225,8 +233,11 @@ delete_trash() {  # detached, low priority, guarded; logs trash_delete_s when it
     t0=$(date +%s)
     $PERF_LOWPRI rm -rf "$1"
     took=$(( $(date +%s) - t0 ))
-    echo "$took" >"$rundir/trash_delete_s.txt"
-    TOOK=$took RUNDIR=$rundir python3 - <<'PY'
+    day=${1##*.trash.}; day=${day%%.*}  # the day of the run that made this trash, not today
+    dayrun=$logs/perf_gate/$day
+    [ -d "$dayrun" ] || exit 0
+    echo "$took" >"$dayrun/trash_delete_s.txt"
+    TOOK=$took RUNDIR=$dayrun python3 - <<'PY'
 import json, os
 from pathlib import Path
 f = Path(os.environ["RUNDIR"]) / "status.json"
@@ -261,6 +272,11 @@ if awk "BEGIN {exit !($load > $max_load)}"; then busy "load $load over $max_load
 t_ready=$(date +%s)
 case "$clone" in */perf-clone/data) ;; *) exit 2 ;; esac
 mkdir -p "$(dirname "$clone")"
+dev_of() { if [ -n "${PERF_DEV_CMD:-}" ]; then $PERF_DEV_CMD "$1"; else stat -c %d "$1" 2>/dev/null || stat -f %d "$1"; fi; }
+# cp -c silently falls back to a full copy across volumes: the clone must be on the store's volume
+if [ "$(dev_of "$src")" != "$(dev_of "$(dirname "$clone")")" ]; then
+  say "refusing: $clone is not on the same volume as $src (cp -c would copy every byte)"; exit 2
+fi
 top_procs >"$rundir/procs-start.txt"
 free_before=$free_gb
 clone_made=1
