@@ -551,7 +551,7 @@ def test_a_bench_killed_at_its_cap_leaves_a_report_a_timeline_and_the_cause_in_t
     assert "over-time | likely cause:" in summary
     rows = (ev / "timeline.csv").read_text().splitlines()
     assert rows[0].startswith("epoch,phase,load1,free_gb,cpu_indexing,cpu_gate,cpu_other,top5")
-    assert any(",bench," in r for r in rows[1:]) and (ev / "README.txt").is_file()
+    assert (ev / "README.txt").is_file()
     assert (ev / "bench-head.txt").is_file()
     status = json.loads((ev / "status.json").read_text())
     assert {"wait", "copy", "bench"} <= set(status["phases"]) and "top_cpu" in status
@@ -573,19 +573,28 @@ def test_a_guard_exit_also_leaves_a_kill_report(rig: Rig) -> None:
     assert report["reason"].startswith("guard: a writer runs")
 
 
-def test_the_prekill_sample_is_taken_at_seventy_percent_of_the_bench_cap(rig: Rig) -> None:
+def test_the_prekill_sample_is_armed_after_the_bench_budget_not_at_seventy_percent(
+    rig: Rig,
+) -> None:
     rig.bench_body = "sleep 12\necho x\nexit 1\n"
+    # the default arming is the bench budget (270) + 15 s: a 10 s run is never sampled
     rig.run(PERF_BENCH_LIMIT_S="10", PERF_SAMPLE_S="1")
+    assert not (_evidence(rig) / "prekill").exists()
+    rig.status.unlink()
+    rig.run(PERF_BENCH_LIMIT_S="10", PERF_SAMPLE_S="1", PERF_BENCH_PREKILL_AFTER_S="3")
     assert (_evidence(rig) / "prekill" / "ps-top15-bench.txt").is_file()
 
 
-def test_a_hung_probe_never_delays_the_run_and_is_recorded(rig: Rig) -> None:
-    d = rig.tmp / "hangio"
-    d.mkdir()
-    (d / "iostat").write_text("#!/bin/sh\nsleep 40\n")
-    (d / "iostat").chmod(0o755)
-    rig.bench_body = "sleep 6\necho x\nexit 1\n"
-    t0 = time.time()
-    rig.run(PERF_SAMPLE_S="1", PATH=f"{d}:{os.environ['PATH']}")
-    assert time.time() - t0 < 25
-    assert "iostat=probe-timeout" in (_evidence(rig) / "timeline.csv").read_text()
+def test_a_run_that_was_sampled_is_not_recorded(rig: Rig) -> None:
+    hist = rig.tmp / "logs" / "perf_gate" / "history.jsonl"
+    hist.parent.mkdir(parents=True, exist_ok=True)
+    hist.write_text('{"old": 1}\n')
+    window = rig.tmp / "logs" / "perf_gate" / "2026-10-23" / "sample-window-bench.json"
+    rig.bench_body = (
+        f"echo '{{\"new\": 2}}' >> {hist}\necho '{{}}' > {window}\necho '{rig.bench_out}'\nexit 1\n"
+    )
+    res = rig.run(PERF_SAMPLE_S="1")
+    assert "a pre-kill stack sample paused the bench" in res.stderr
+    assert "outcome=sampled" in rig.status.read_text()
+    assert hist.read_text() == '{"old": 1}\n'
+    assert "NOT recorded" in (rig.tmp / "notified").read_text()

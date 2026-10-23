@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shutil
+import statistics
 import subprocess
 import sys
 import threading
@@ -182,15 +183,20 @@ def timeline(
     path = rundir / "timeline.csv"
     if not path.exists():
         path.write_text(",".join(COLUMNS) + "\n")
-    last = time.time()
-    while stop_file is None or not stop_file.exists():
-        now = time.time()
-        late = max(0, int(now - last - every))
-        last = now
+    prev_start, prev_dur = None, 0.0
+    # leave when the wrapper died without its EXIT trap (kill -9): the parent is not the root
+    while (stop_file is None or not stop_file.exists()) and os.getppid() == root:
+        start = time.time()
+        # late: tick start vs the last, less the interval and the last probes' own time
+        late = 0
+        if prev_start is not None:
+            late = max(0, int(start - prev_start - max(every, prev_dur)))
+        prev_start = start
         row = sample_row(rundir, root, late, store)
         with path.open("a", newline="") as f:
             csv.writer(f).writerow(row)
-        time.sleep(every)
+        prev_dur = time.time() - start
+        time.sleep(max(0.0, every - prev_dur))
 
 
 def read_rows(rundir: Path) -> list[dict]:
@@ -232,8 +238,33 @@ def top_consumers(rows: list[dict], n: int = 3) -> list[tuple[str, float]]:
     return [(name, round(v / count, 1)) for name, v in best]
 
 
-def likely_cause(rows: list[dict], cpus: int, copy_files_per_s: float | None = None) -> str:
-    """One line from simple rules, strongest first."""
+_KNOWN_CAUSES = {
+    "paused": "machine paused",
+    "code-changed": "code changed during the bench (a deploy)",
+    "crashed": "the bench crashed",
+    "integrity": "an integrity failure (not a timing cause)",
+    "sampled": "a pre-kill stack sample paused the bench",
+}
+
+
+def named_cause(reason: str) -> str | None:
+    """The cause a KNOWN stop reason names (None for over-time and unknown reasons)."""
+    if reason in _KNOWN_CAUSES:
+        return _KNOWN_CAUSES[reason]
+    if reason.startswith("machine paused"):
+        return "machine paused"
+    if reason.startswith("guard:"):
+        return "stopped by a guard (" + reason[len("guard:") :].strip()[:80] + ")"
+    return None
+
+
+def likely_cause(
+    rows: list[dict], cpus: int, copy_files_per_s: float | None = None, reason: str = ""
+) -> str:
+    """One line. A KNOWN stop reason names the cause; the CPU and load rules run only for an
+    over-time or unknown stop, and read the median of the phase's rows (a spike is no cause)."""
+    if (named := named_cause(reason)) is not None:
+        return named
 
     def col(name: str) -> list[float]:
         out = []
@@ -246,9 +277,10 @@ def likely_cause(rows: list[dict], cpus: int, copy_files_per_s: float | None = N
 
     if any(v > 60 for v in col("late_s")):
         return "machine paused"
-    if col("cpu_indexing") and max(col("cpu_indexing")) > 150:
+    idx, load = col("cpu_indexing"), col("load1")
+    if idx and statistics.median(idx) > 150:
         return "Spotlight/FSEvents indexing contended"
-    if col("load1") and max(col("load1")) > 2 * cpus:
+    if load and statistics.median(load) > 2 * cpus:
         return "machine overloaded"
     if copy_files_per_s is not None and copy_files_per_s < 1000:
         return "slow filesystem"
@@ -292,8 +324,9 @@ def report(rundir: Path, phase: str, cap: int, reason: str, cpus: int | None = N
     """Write kill-report.json; returns it."""
     spans = phase_starts(rundir)
     start, end = spans.get(phase, [int(time.time())] * 2)
-    rows = read_rows(rundir)
-    in_phase = [r for r in rows if r["phase"] == phase] or rows[-6:]
+    # only this attempt's rows: the folder holds every attempt of the day
+    rows = [r for r in read_rows(rundir) if str(r["epoch"]).isdigit() and int(r["epoch"]) >= start]
+    in_phase = [r for r in rows if r["phase"] == phase]
     snap = (
         json.loads((rundir / "snapshot.json").read_text())
         if (rundir / "snapshot.json").is_file()
@@ -302,7 +335,7 @@ def report(rundir: Path, phase: str, cap: int, reason: str, cpus: int | None = N
     rate = None
     if phase == "copy" and snap.get("copy_s") and str(snap.get("files_so_far", "")).isdigit():
         rate = int(snap["files_so_far"]) / max(int(snap["copy_s"]), 1)
-    cause = likely_cause(in_phase, cpus or os.cpu_count() or 1, rate)
+    cause = likely_cause(in_phase, cpus or os.cpu_count() or 1, rate, reason)
     top = top_consumers(in_phase)
     progress = rundir / "bench-progress.json"
     entry = rundir / "copy-entry.txt"
@@ -326,6 +359,8 @@ def prekill(rundir: Path, root: int, phase: str, after: float) -> None:
     """At ``after`` s of ``phase`` (its start is now), if it still runs: samples and a ps top 15."""
     end = time.time() + after
     while time.time() < end:
+        if os.getppid() != root:  # the wrapper died without its trap
+            return
         time.sleep(min(1.0, max(0.0, end - time.time())))
     pf = rundir / "phase.txt"
     if not pf.is_file() or pf.read_text().strip() != phase:
@@ -346,6 +381,9 @@ def prekill(rundir: Path, root: int, phase: str, after: float) -> None:
     except Exception:
         return
     mine = [r for r in table if "python" in r[3].lower() and _descends(table, r[0], root)]
+    window = rundir / f"sample-window-{phase}.json"
+    if mine:  # `sample` suspends the process for its 3 s: say when, the run is then not recorded
+        window.write_text(json.dumps({"start": int(time.time()), "pids": [r[0] for r in mine[:2]]}))
     for pid, _, _, _ in sorted(mine, key=lambda r: r[2], reverse=True)[:2]:
         target = folder / f"sample-{phase}-{pid}.txt"
         with contextlib.suppress(Exception):
@@ -353,6 +391,8 @@ def prekill(rundir: Path, root: int, phase: str, after: float) -> None:
                 [sampler, str(pid), "3", "-file", str(target)],
                 timeout=10, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )  # fmt: skip
+    if mine:
+        window.write_text(json.dumps({**json.loads(window.read_text()), "end": int(time.time())}))
     cap_folder(folder, PREKILL_BYTES)
 
 

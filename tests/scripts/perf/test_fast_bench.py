@@ -625,3 +625,22 @@ def test_a_request_stream_leaves_every_request_and_the_progress_after_a_kill(
     assert progress["op"] == "RegimeSignals" and progress["passes_done"] == 1
     assert progress["requests"] == 1
     rs.close()
+
+
+def test_a_recorder_write_error_never_fails_the_bench(tmp_path: Path) -> None:
+    class Broken:
+        def write(self, text: str) -> None:
+            raise OSError("disk full")
+
+        def flush(self) -> None:
+            raise OSError("disk full")
+
+    rs = fb.RequestStream(tmp_path)
+    rs.stream.close()
+    rs.stream = Broken()
+    rs.progress = tmp_path / "missing" / "bench-progress.json"
+    rs.begin("IdeasPage", 1, 0)  # no raise
+    rs.end("IdeasPage", "IdeasPage#1", 1, 5.0, 10, 200, 1.0)
+    assert rs.requests == 1
+    # an unwritable folder at start-up is not fatal either
+    fb.RequestStream(tmp_path / "does-not-exist").close()

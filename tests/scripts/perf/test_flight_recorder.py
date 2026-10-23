@@ -5,6 +5,9 @@ import csv
 import importlib.util
 import json
 import os
+import signal
+import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -69,8 +72,10 @@ def _rows(**cols: list) -> list[dict]:
     ("rows", "rate", "cause"),
     [
         (_rows(late_s=[0, 700]), None, "machine paused"),
-        (_rows(cpu_indexing=[10, 160]), None, "Spotlight/FSEvents indexing contended"),
-        (_rows(load1=[1, 20]), None, "machine overloaded"),
+        (_rows(cpu_indexing=[10, 160, 170]), None, "Spotlight/FSEvents indexing contended"),
+        (_rows(cpu_indexing=[10, 10, 400]), None, "unknown"),  # one spike is not a cause
+        (_rows(load1=[1, 20, 25]), None, "machine overloaded"),
+        (_rows(load1=[1, 1, 30]), None, "unknown"),
         (_rows(load1=[1, 2]), 400.0, "slow filesystem"),
         (_rows(load1=[1, 2]), 5000.0, "unknown"),
         (_rows(load1=[1, 2]), None, "unknown"),
@@ -81,6 +86,26 @@ def _rows(**cols: list) -> list[dict]:
 )
 def test_the_likely_cause_rules(rows: list[dict], rate: float | None, cause: str) -> None:
     assert fr.likely_cause(rows, cpus=8, copy_files_per_s=rate) == cause
+
+
+@pytest.mark.parametrize(
+    ("reason", "cause"),
+    [
+        ("code-changed", "code changed during the bench (a deploy)"),
+        ("crashed", "the bench crashed"),
+        ("integrity", "an integrity failure (not a timing cause)"),
+        ("machine paused 601 s", "machine paused"),
+        (
+            "guard: a writer runs: 9 algotrade-ingest rollups",
+            "stopped by a guard (a writer runs: 9 algotrade-ingest rollups)",
+        ),
+    ],
+)
+def test_a_known_stop_reason_names_the_cause_whatever_the_cpu_says(reason: str, cause: str) -> None:
+    hot = _rows(cpu_indexing=[500, 500, 500], load1=[40, 40, 40])
+    assert fr.likely_cause(hot, cpus=8, reason=reason) == cause
+    # over-time and unknown reasons still use the rules
+    assert fr.likely_cause(hot, cpus=8, reason="over-time").startswith("Spotlight")
 
 
 def test_top_consumers_are_means_over_the_rows() -> None:
@@ -122,6 +147,64 @@ def test_the_kill_report_says_what_was_in_flight_and_the_likely_cause(tmp_path: 
     assert json.loads((d / "kill-report.json").read_text())["reason"] == "over-time"
 
 
+def test_a_report_reads_only_this_attempts_rows_not_an_earlier_one_of_the_day(
+    tmp_path: Path,
+) -> None:
+    d = _run_folder(tmp_path)
+    rows = (d / "timeline.csv").read_text().splitlines()
+    old = rows[1].replace(rows[1].split(",")[0], str(int(time.time()) - 5000))
+    quiet = rows[1].split(",")
+    quiet[fr.COLUMNS.index("cpu_indexing")] = "1"
+    quiet[fr.COLUMNS.index("load1")] = "1"
+    new = [",".join(quiet).replace(quiet[0], str(int(time.time()) - 10))]
+    (d / "timeline.csv").write_text("\n".join([rows[0], *[old] * 5, *new]) + "\n")
+    data = fr.report(d, "bench", 300, "over-time", cpus=8)
+    assert data["likely_cause"] == "unknown" and len(data["timeline_tail"]) == 1
+
+
+def test_the_timeline_leaves_when_its_wrapper_dies_without_its_trap(tmp_path: Path) -> None:
+    script = ROOT / "scripts" / "perf" / "flight_recorder.py"
+    shell = subprocess.Popen(
+        ["sh", "-c", f"python3 {script} timeline --rundir {tmp_path} --root $$ --every 0.2 "
+         f"--store {tmp_path} & echo $!; sleep 60"],
+        stdout=subprocess.PIPE, text=True,
+    )  # fmt: skip
+    pid = int(shell.stdout.readline())
+    end = time.time() + 20
+    while not (tmp_path / "timeline.csv").exists() and time.time() < end:
+        time.sleep(0.1)
+    os.kill(shell.pid, signal.SIGKILL)  # no EXIT trap runs
+    shell.wait()
+    end = time.time() + 20
+    gone = False
+    while time.time() < end and not gone:
+        try:
+            os.kill(pid, 0)
+            time.sleep(0.2)
+        except ProcessLookupError:
+            gone = True
+    shell.stdout.close()
+    assert gone
+
+
+def test_late_s_does_not_count_the_probes_own_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lates = []
+
+    def slow_row(rundir: Path, root: int, late: int, store: str) -> list:
+        lates.append(late)
+        time.sleep(0.5)  # the probes take longer than the interval
+        return [""] * len(fr.COLUMNS)
+
+    monkeypatch.setattr(fr, "sample_row", slow_row)
+    stop = tmp_path / "stop"
+    root = os.getppid()
+    threading.Timer(2.2, stop.write_text, args=("x",)).start()
+    fr.timeline(tmp_path, root, 0.2, str(tmp_path), stop)
+    assert len(lates) >= 3 and set(lates) == {0}
+
+
 def test_the_report_names_the_slow_copy_from_the_snapshot_rate(tmp_path: Path) -> None:
     d = _run_folder(tmp_path)
     (d / "timeline.csv").write_text(",".join(fr.COLUMNS) + "\n")  # nothing else explains it
@@ -156,6 +239,8 @@ def test_the_prekill_sample_is_taken_only_while_the_phase_runs_and_is_size_cappe
         ],
     )
     fr.prekill(d, me, "bench", 0)
+    window = json.loads((d / "sample-window-bench.json").read_text())  # the safety net's evidence
+    assert window["end"] >= window["start"]
     folder = d / "prekill"
     assert (folder / "ps-top15-bench.txt").is_file()
     assert sum(f.stat().st_size for f in folder.iterdir()) <= fr.PREKILL_BYTES

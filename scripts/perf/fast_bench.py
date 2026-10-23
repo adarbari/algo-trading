@@ -34,8 +34,10 @@ Docs: docs/perf/page-latency-bar.md.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
+import os
 import statistics
 import subprocess
 import sys
@@ -535,15 +537,19 @@ class RequestStream:
 
     def __init__(self, folder: Path, clock: Callable[[], float] = time.monotonic) -> None:
         self.folder, self.clock, self.t0, self.requests = folder, clock, clock(), 0
-        self.stream = (folder / "ops-stream.jsonl").open("a", buffering=1)
+        try:
+            self.stream = (folder / "ops-stream.jsonl").open("a", buffering=1)
+        except OSError:  # the recorder never fails the bench
+            self.stream = Path(os.devnull).open("w")  # noqa: SIM115
         self.progress = folder / "bench-progress.json"
 
     def _write(self, op: str | None, pass_no: int, done: int) -> None:
         state = {"pass": pass_no, "op": op, "passes_done": done, "requests": self.requests}
         state["elapsed_s"] = round(self.clock() - self.t0, 1)
-        tmp = self.progress.with_suffix(".tmp")
-        tmp.write_text(json.dumps(state))
-        tmp.replace(self.progress)
+        with contextlib.suppress(OSError):  # the recorder never fails the bench
+            tmp = self.progress.with_suffix(".tmp")
+            tmp.write_text(json.dumps(state))
+            tmp.replace(self.progress)
 
     def close(self) -> None:
         self.stream.close()
@@ -563,8 +569,9 @@ class RequestStream:
             "ms": round(ms, 1),
         }
         row |= {"bytes": size, "status": status, "load1": load}
-        self.stream.write(json.dumps(row) + "\n")
-        self.stream.flush()
+        with contextlib.suppress(OSError):
+            self.stream.write(json.dumps(row) + "\n")
+            self.stream.flush()
 
 
 def time_ops(

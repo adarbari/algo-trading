@@ -273,9 +273,9 @@ if [ -f "$fr" ]; then
   python3 "$fr" timeline --rundir "$rundir" --root $$ --every "${PERF_SAMPLE_S:-10}" --store "$logs" >/dev/null 2>&1 &
   timeline_pid=$!
 fi
-start_prekill() {  # $1 = phase, $2 = its cap in seconds: a sample at 70% of it, if it still runs
+start_prekill() {  # $1 = phase, $2 = seconds into it: a sample then, if it still runs
   [ -f "$fr" ] || return 0
-  python3 "$fr" prekill --rundir "$rundir" --root $$ --phase "$1" --after "$(( $2 * 7 / 10 ))" >/dev/null 2>&1 &
+  python3 "$fr" prekill --rundir "$rundir" --root $$ --phase "$1" --after "$2" >/dev/null 2>&1 &
   prekill_pid=$!
 }
 stop_prekill() { [ -n "$prekill_pid" ] && kill "$prekill_pid" 2>/dev/null; prekill_pid=; return 0; }
@@ -419,7 +419,7 @@ if [ "$(dev_of "$src")" != "$(dev_of "$(dirname "$clone")")" ]; then
   say "refusing: $clone is not on the same volume as $src (cp -c would copy every byte)"; exit 2
 fi
 top_procs >"$rundir/procs-start.txt"
-set_phase copy; start_prekill copy "$snapshot_limit"
+set_phase copy; start_prekill copy "$(( snapshot_limit * 7 / 10 ))"
 free_before=$free_gb
 clone_made=1
 mkdir -p "$clone"
@@ -555,7 +555,8 @@ out=$(mktemp)
 py=${PERF_PY:-$repo/.venv/bin/python}
 cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
 
-set_phase bench; start_prekill bench "$bench_limit"
+rm -f "$rundir/sample-window-bench.json"
+set_phase bench; start_prekill bench "${PERF_BENCH_PREKILL_AFTER_S:-$(( ${PERF_BENCH_BUDGET_S:-270} + 15 ))}"
 head_before=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
 t_bench=$(date +%s)
 hist=$logs/perf_gate/history.jsonl; hist_size=$(wc -c <"$hist" 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
@@ -590,15 +591,23 @@ if [ "${paused_bench:-0}" -gt 0 ] && [ "$outcome" != crashed ] && [ "$outcome" !
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "the machine paused or stalled during the bench ($paused_bench late samples): not recorded"
 fi
+# a pre-kill `sample` suspended the bench or its API for 3 s (armed only once the bench overran its budget):
+# its times are worthless; the window is in sample-window-bench.json, the run is not recorded
+if [ -f "$rundir/sample-window-bench.json" ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ] \
+   && [ "$outcome" != integrity ] && [ "$outcome" != paused ]; then
+  outcome=sampled
+  [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
+  say "a pre-kill stack sample paused the bench ($(cat "$rundir/sample-window-bench.json")): not recorded"
+fi
 # the release tree's HEAD moved during the bench (a deploy checked out other code): not recorded
 head_after=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
 if [ "$head_after" != "$head_before" ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ] \
-   && [ "$outcome" != integrity ] && [ "$outcome" != paused ]; then
+   && [ "$outcome" != integrity ] && [ "$outcome" != paused ] && [ "$outcome" != sampled ]; then
   outcome=code-changed
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "code changed during the bench (${head_before:0:9} -> ${head_after:0:9}): not recorded"
 fi
-case "$outcome" in over-time|paused|code-changed|crashed)
+case "$outcome" in over-time|paused|code-changed|crashed|sampled)
   kill_report bench "$bench_limit" "$outcome" ;;
 esac
 cat "$out" >>"$rundir/run.log"
@@ -627,15 +636,16 @@ echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?}
 reason=""; [ "$overtime" = yes ] && reason=over-time
 [ "$outcome" = integrity ] && reason=integrity
 [ "$outcome" = refused ] && reason=refused; [ "$outcome" = crashed ] && reason=crashed
-[ "$outcome" = paused ] && reason=paused; [ "$outcome" = code-changed ] && reason=code-changed
+[ "$outcome" = paused ] && reason=paused; [ "$outcome" = code-changed ] && reason=code-changed; [ "$outcome" = sampled ] && reason=sampled
 finish_evidence "$reason"
 
-if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
+if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$outcome" = sampled ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); snapshot ${snapshot_s}s, bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
     msg="1 s page gate INTEGRITY FAILURE (not a timing result): $why evidence in var/logs/perf_gate/$today/"
   fi
+  [ "$outcome" = sampled ] && msg="1 s page gate: a pre-kill stack sample paused the bench (NOT recorded, no verdict): $msg"
   [ "$outcome" = code-changed ] && msg="1 s page gate: the code changed during the bench (a deploy; NOT recorded, no verdict): $msg"
   [ "$outcome" = paused ] && msg="1 s page gate: the machine paused or stalled during the bench (noisy, NOT recorded, no verdict): $msg"
   [ -n "$kr_msg" ] && msg="$msg$kr_msg"
