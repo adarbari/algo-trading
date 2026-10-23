@@ -1,0 +1,14 @@
+/* The short wording is hidden until the container is narrow (the TopBar is a size container). */
+.short {
+  display: none;
+}
+
+@container (width < 720px) {
+  .full {
+    display: none;
+  }
+
+  .short {
+    display: inline;
+  }
+}

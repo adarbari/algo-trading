@@ -7,7 +7,7 @@
  */
 import { lazy, Suspense } from 'react';
 
-import { Button, formatValue, Popover, Skeleton, StatusBadge } from '@algotrade/ui';
+import { Button, formatValue, Popover, ShortLabel, Skeleton, StatusBadge } from '@algotrade/ui';
 
 import { DATA_STATE_TONE, useDataStatus, type DataStatusView } from '@/entities/system-status';
 
@@ -36,6 +36,14 @@ export function pillText(data: DataStatusView): string {
   }
 }
 
+/** The phone's wording: the date is in the popover. */
+const SHORT: Record<DataStatusView['state'], string> = {
+  COMPLETE: 'Data: complete',
+  PARTIAL: 'Data: partial',
+  NEXT_PROCESSING: 'Processing',
+  NEXT_FAILED_SHOWING_PREVIOUS: 'Failed',
+};
+
 export function DataStatusPill({ admin }: DataStatusPillProps) {
   const data = useDataStatus(admin);
   if (data === null) return null;
@@ -45,8 +53,10 @@ export function DataStatusPill({ admin }: DataStatusPillProps) {
       placement="bottom-end"
       width="wide"
       trigger={(props) => (
-        <Button variant="ghost" size="sm" {...props}>
-          <StatusBadge tone={DATA_STATE_TONE[data.state]}>{pillText(data)}</StatusBadge>
+        <Button variant="ghost" size="sm" aria-label={pillText(data)} {...props}>
+          <StatusBadge tone={DATA_STATE_TONE[data.state]}>
+            <ShortLabel short={SHORT[data.state]}>{pillText(data)}</ShortLabel>
+          </StatusBadge>
         </Button>
       )}
     >

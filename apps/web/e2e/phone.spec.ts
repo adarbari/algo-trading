@@ -466,3 +466,84 @@ test('Screener results: the edge line and the evidence fit a phone and the pick 
   await expect(sheet.getByRole('heading', { level: 3, name: 'Counts toward' })).toBeVisible();
   await expectAccessible(page);
 });
+
+/** The status strip's one read with a session and its data status (the pill's states). */
+async function mockDataStatus(page: Page, state: string, newer: string | null) {
+  await page.route('**/api/graphql', async (route) => {
+    const body = route.request().postDataJSON() as { query?: string } | null;
+    if (!/query\s+StatusStrip\b/.test(body?.query ?? '')) {
+      await route.fallback();
+      return;
+    }
+    const dataset = (name: string, status: string, share: number) => ({
+      name,
+      status,
+      present: share * 100,
+      expected: 100,
+      share,
+      unavailable: [],
+    });
+    await route.fulfill({
+      json: {
+        data: {
+          session: {
+            date: '2026-10-22',
+            newer: newer === null ? null : { date: newer, state: 'IN_PROGRESS' },
+            dataStatus: {
+              state,
+              knowledgeTs: '2026-10-22T21:05:00+00:00',
+              datasets: [
+                dataset('PRICES', 'COMPLETE', 0.99),
+                dataset('OPTIONS_CHAINS', 'PARTIAL', 0.62),
+                dataset('FUNDAMENTALS', 'COMPLETE', 0.9),
+              ],
+              affectedScreeners: 2,
+              totalScreeners: 7,
+            },
+          },
+          screeners: [],
+        },
+      },
+    });
+  });
+}
+
+const PILL_STATES = [
+  ['COMPLETE', null, 'Data: 22 Oct, complete', 'Data: complete'],
+  ['PARTIAL', null, 'Data: 22 Oct, partial', 'Data: partial'],
+  ['NEXT_PROCESSING', '2026-10-23', '23 Oct is processing', 'Processing'],
+  ['NEXT_FAILED_SHOWING_PREVIOUS', '2026-10-23', '23 Oct failed, showing 22 Oct', 'Failed'],
+] as const;
+
+for (const [state, newer, full, short] of PILL_STATES) {
+  test(`Data-status pill ${state}: the phone shows "${short}" and the full wording names it`, async ({
+    page,
+  }) => {
+    await mockDataStatus(page, state, newer);
+    await page.goto('/ideas');
+    const pill = page.getByRole('button', { name: full });
+    await expect(pill).toBeVisible();
+    await expect(pill.getByText(short, { exact: true })).toBeVisible();
+    await expect(pill.getByText(full, { exact: true })).toBeHidden();
+    const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+  });
+}
+
+test('Data-status pill: a tap opens the datasets inside the phone screen', async ({ page }) => {
+  await mockDataStatus(page, 'PARTIAL', null);
+  await page.goto('/ideas');
+  await page.getByRole('button', { name: 'Data: 22 Oct, partial' }).tap();
+  const panel = page.getByRole('dialog', { name: 'Data status' });
+  for (const name of ['Prices', 'Options chains', 'Fundamentals'])
+    await expect(panel.getByText(name, { exact: true })).toBeVisible();
+  await expect(panel.getByText('62% of names')).toBeVisible();
+  await expect(panel.getByText('Affects 2 of your 7 screeners')).toBeVisible();
+  const box = await panel.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+});

@@ -32,8 +32,6 @@ const StatusStrip = graphql(`
         datasets {
           name
           status
-          present
-          expected
           share
           unavailable {
             kindText
