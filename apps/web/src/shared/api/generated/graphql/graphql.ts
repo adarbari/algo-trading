@@ -664,6 +664,13 @@ export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ViewerQuery = { viewer: { id: string, name: string, role: string, workspaces: Array<string> } };
 
+export type InstrumentEventListQueryVariables = Exact<{
+  key: string;
+}>;
+
+
+export type InstrumentEventListQuery = { instrument: { instrumentId: string, events: Array<{ table: string, kind: string, date: string, ts: string, values: unknown, sourceUrl: string | null, confirmed: boolean }>, eventStudy: { session: string, ahead: Array<{ date: string, time: string, kind: string, label: string, sourceUrl: string | null }>, filings: Array<{ filingDate: string, form: string, label: string, sourceUrl: string | null }> } | null } | null };
+
 export type GuideHelpFieldQueryVariables = Exact<{
   name: string;
 }>;
@@ -4240,6 +4247,38 @@ export const ViewerDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ViewerQuery, ViewerQueryVariables>;
+export const InstrumentEventListDocument = new TypedDocumentString(`
+    query InstrumentEventList($key: String!) {
+  instrument(key: $key) {
+    instrumentId
+    events {
+      table
+      kind
+      date
+      ts
+      values
+      sourceUrl
+      confirmed
+    }
+    eventStudy {
+      session
+      ahead {
+        date
+        time
+        kind
+        label
+        sourceUrl
+      }
+      filings {
+        filingDate
+        form
+        label
+        sourceUrl
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<InstrumentEventListQuery, InstrumentEventListQueryVariables>;
 export const GuideHelpFieldDocument = new TypedDocumentString(`
     query GuideHelpField($name: FeatureName!) {
   guideField(name: $name) {
