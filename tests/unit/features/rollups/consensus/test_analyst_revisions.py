@@ -1,4 +1,4 @@
-"""``analyst_revisions@v2``: the change of the FY1 consensus against our own earlier snapshots of
+"""``analyst_revisions@v3``: the change of the FY1 consensus against our own earlier snapshots of
 the SAME fiscal year (matched on the year end, never the FY1 label), the MIN_BASE floor, OK /
 BUILDING / NO_PRIOR, and no snapshot the session could not know."""
 
@@ -210,7 +210,9 @@ def test_names_without_served_estimates_pass_their_status_through_with_null_valu
     assert got.loc[[B, C, "EQ:D"], REVISIONS].isna().all().all()
     assert got.loc[[B, C, "EQ:D"], "eps_fy1_analysts_change_90d"].isna().all()
     values = [
-        f for f in rv.GROUP.features if f.name not in ("revisions_status", "revisions_source")
+        f
+        for f in rv.GROUP.features
+        if f.name not in ("revisions_status", "revisions_source", "revisions_basis")
     ]
     assert all(f.null_status == "revisions_status" for f in values)
     assert all(f.uncovered_statuses == UNCOVERED for f in values)
