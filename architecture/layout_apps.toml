@@ -203,7 +203,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/edges"
-purpose = "edge result tasks: the edge-verdicts task that judges site edges' canonical runs into results/edge_verdict (the headline the edges list reads) when the judge, its settings or an edge document changed, and backfills runs stored before the table (ADR 0053 amendment 2026-10-22)"
+purpose = "edge result tasks: the edge-verdicts task that judges site edges' canonical runs into results/edge_verdict (the headline the edges list reads) when the judge, its settings or an edge document changed, and backfills runs stored before the table (ADR 0053 amendment 2026-10-22), and the edge-picks task that stores what each site edge took at a session into results/edge_picks (ADR 0081)"
 kind = "task-domain"
 
 [[dir]]
@@ -308,6 +308,10 @@ reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 reason = "the option-chain coverage (`select_underlyings`: every active optionable instrument) is the coverage IBKR contract resolution enriches (ADR 0028), and `prioritise` is the one fetch order (priority symbols, S&P 500, liquidity) the descriptions task follows too (ADR 0034)"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/edges/picks.py"
+reason = "its acceptance check (`check_edge_picks`, FAIL when an edge has no row for the session) is declared by the nightly workflow on the `edge-picks` step (ADR 0081), like the other step checks"
 
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/history_copy.py"

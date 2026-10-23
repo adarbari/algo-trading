@@ -16,19 +16,21 @@ import { shownValue, valueFormat } from './value';
 export const PICK_EDGE_TERM: Readonly<Record<string, string>> = {
   counts: 'edge_pick_counts',
   paused: 'edge_pick_paused',
-  not_qualified: 'edge_pick_not_qualified',
-  below_top_k: 'edge_pick_below_top_k',
+  not_counted: 'edge_pick_not_counted',
+  not_a_decision_day: 'edge_pick_not_a_decision_day',
   withheld: 'edge_pick_withheld',
   unjudged: 'edge_pick_unjudged',
+  not_stored: 'edge_pick_not_stored',
 };
 
 const WORDS: Readonly<Record<string, string>> = {
   counts: 'Counts',
   paused: 'Held back by the regime gate',
-  not_qualified: 'Not counted: not qualified',
-  below_top_k: 'Not counted: below the cut',
+  not_counted: 'Not counted',
+  not_a_decision_day: 'Not a decision day',
   withheld: 'Not judged',
-  unjudged: 'Not judged: other schedule or side',
+  unjudged: 'Not judged: other side',
+  not_stored: 'Picks not stored',
 };
 
 /** The short words of a pick's verdict under one edge. */

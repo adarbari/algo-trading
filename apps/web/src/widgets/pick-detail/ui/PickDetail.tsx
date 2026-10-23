@@ -57,7 +57,7 @@ const KEY_HINTS: readonly KeyHint[] = [
   { keys: ['Enter'], label: 'open in Explore' },
 ];
 
-/** Where the pick stands under an edge: its place among the qualified rows against the edge's cut. */
+/** Where the pick stands under an edge: its place among the edge's own stored picks against the edge's cut. */
 function placeText(edge: PickEdge): string | null {
   if (edge.place === null || edge.place === undefined) return null;
   return edge.topK

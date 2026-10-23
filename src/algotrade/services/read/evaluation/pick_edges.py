@@ -1,44 +1,44 @@
-"""Which edges a pick of a screener's run counts toward (``PickEdge``), decided here, never in the
-browser: the edge harness takes a screener's QUALIFIED names in stored rank order and keeps the
-first ``top_k`` (``services/evaluation/cross_section/picks.py``), so a row counts toward an edge
-that lists the screener when it is QUALIFIED and its place among the run's qualified rows is
-within the edge's ``top_k`` (no ``top_k``: every qualified name). A name the regime gate PAUSED or
-that failed a rule is a pick the edge does not count; a row whose rank is withheld (a licence)
-is not judged. Only an edge that picks long on every session is judged: a short or long-short edge
-ranks shortable names by its own score, and a month-end, calendar or event edge counts nothing on
-other sessions, so those say ``unjudged`` and never ``counts``. The edge's own universe is not
-applied here (the Guide says so). Reads the run's cached rows and the edge documents, nothing
-else; it does not read an outcome, so it says what the edge would take, not what it has
-already earned."""
+"""Which edges a pick of a screener's run counts toward (``PickEdge``), read from what each edge
+itself took (ADR 0081), never decided from the run's own ranking: ``results/edge_picks`` holds,
+per site edge and screener it lists, the picks the harness's one rule gave at the session (the
+screener's qualified names inside the edge's universe, the first ``top_k``, ``picks.long_picks``)
+or why there are none (not a decision day of its schedule, an outcome that is not the screener's
+long picks, the data missing). A row counts toward an edge when its id is in that list, ``place``
+its place there. Read for the served session only (ADR 0036): a run of another session, a session
+the step has not stored, an edge with no row (a user's own edge, a new edge, a skipped night)
+says ``not_stored``, never an older night's picks. A row the regime gate PAUSED is ``paused`` and
+one whose rank is withheld by a licence ``withheld``: neither is counted or placed. It reads no
+outcome: it says what the edge would take, not what it has already earned."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
-import numpy as np
-
-from algotrade.services.read.context import ReadContext
+from algotrade.config.user import SITE_USER
+from algotrade.services.read.context import ReadContext, partition
 from algotrade.services.read.evaluation.edges import parsed_edges
-from algotrade.services.read.screens.runs import ScreenerRun, run_rows
+from algotrade.services.read.screens.runs import ScreenerRun
+from algotrade.services.read.values import Unknown
 
+TABLE = "results/edge_picks"
 COUNTS = "counts"
 PAUSED = "paused"
-NOT_QUALIFIED = "not_qualified"
-BELOW_TOP_K = "below_top_k"
-WITHHELD = "withheld"
+NOT_COUNTED = "not_counted"
+NOT_A_DECISION_DAY = "not_a_decision_day"
 UNJUDGED = "unjudged"
-CODES = (COUNTS, PAUSED, NOT_QUALIFIED, BELOW_TOP_K, WITHHELD, UNJUDGED)
-EVERY_SESSION = "every_session"
-LONG = "long"
-QUALIFIED = "QUALIFIED"
+NOT_STORED = "not_stored"
+WITHHELD = "withheld"
+CODES = (COUNTS, PAUSED, NOT_COUNTED, NOT_A_DECISION_DAY, UNJUDGED, NOT_STORED, WITHHELD)
+PICKED = "picked"  # the stored row's status when the edge decided (``edge_picks.night``)
+NOT_DECISION_DAY = "not_decision_day"
 HELD_BACK = "PAUSED"
 
 
 @dataclass(frozen=True)
 class PickEdge:
-    """One edge that lists the screener and what it does with one pick: ``counts`` and the
-    ``code`` that says why (``CODES``); ``top_k``: the edge's cut (None: every qualified name);
-    ``place``: the pick's place among the run's qualified rows (None: not qualified or not
-    judged)."""
+    """One edge that lists the screener and what it did with one pick: ``counts`` and the ``code``
+    that says why (``CODES``); ``top_k``: the edge's cut (None: every qualified name); ``place``:
+    the pick's place among the edge's own picks (None: not one of them)."""
 
     edge_id: str
     edge_name: str
@@ -48,40 +48,59 @@ class PickEdge:
     place: int | None
 
 
+def _stored(ctx: ReadContext, run: ScreenerRun) -> dict[tuple[str, str], tuple[str, list[str]]]:
+    """The served session's rows by (edge, screener): ``(status, pick ids)``; empty when the
+    session has none stored or ``run`` is another session's."""
+    if run.session != ctx.session.date:
+        return {}
+    found = partition(ctx, TABLE)
+    if isinstance(found, Unknown) or found.empty:
+        return {}
+    site = found[found["user_id"] == SITE_USER]
+    return {
+        (str(r.edge_id), str(r.screener)): (str(r.status), _ids(r.pick_ids))
+        for r in site.itertuples()
+    }
+
+
+def _ids(value: Any) -> list[str]:
+    """A stored list column's ids (a null list reads as none)."""
+    return [] if value is None or isinstance(value, float) else [str(i) for i in value]
+
+
 def _judge(
-    decision: str, rank: int | None, qualified: np.ndarray, top_k: int | None
+    stored: tuple[str, list[str]] | None, iid: str, decision: str, rank: int | None
 ) -> tuple[str, int | None]:
     if rank is None:
         return WITHHELD, None
-    if decision == HELD_BACK:
-        return PAUSED, None
-    if decision != QUALIFIED:
-        return NOT_QUALIFIED, None
-    place = int(np.searchsorted(qualified, rank, side="right"))
-    if top_k is not None and place > top_k:
-        return BELOW_TOP_K, place
-    return COUNTS, place
+    if stored is None:
+        return NOT_STORED, None
+    status, picks = stored
+    if status == NOT_DECISION_DAY:
+        return NOT_A_DECISION_DAY, None
+    if status != PICKED:  # unjudged, or skipped for missing data
+        return (UNJUDGED if status == UNJUDGED else NOT_STORED), None
+    if iid in picks:
+        return COUNTS, picks.index(iid) + 1
+    return (PAUSED if decision == HELD_BACK else NOT_COUNTED), None
 
 
 def load_pick_edges(
     ctx: ReadContext, run: ScreenerRun, picks: Sequence[tuple[str, str, int | None]]
-) -> dict[str, tuple[PickEdge, ...]]:
-    """For each ``(instrument id, decision, rank)`` of ``picks`` (rows of ``run``), the edges
-    that list ``run.config_id`` with what each does with it, edges by id; empty for a screener no
-    edge lists."""
+) -> Mapping[str, tuple[PickEdge, ...]]:
+    """For each ``(instrument id, decision, rank)`` of ``picks`` (rows of ``run``), the edges that
+    list ``run.config_id`` with what each did with it, edges by id; empty for a screener no edge
+    lists."""
     edges = [e for e in parsed_edges(ctx, ctx.user.user_id) if run.config_id in e.screeners]
     if not edges or not picks:
         return {}
-    rows = run_rows(ctx, run)
-    qualified = np.sort(rows.loc[rows["decision"] == QUALIFIED, "rank"].to_numpy(dtype=float))
+    stored = _stored(ctx, run)
     out: dict[str, tuple[PickEdge, ...]] = {}
     for iid, decision, rank in picks:
         found = []
         for e in sorted(edges, key=lambda x: x.id):
-            if e.schedule != EVERY_SESSION or e.outcome.side != LONG:
-                code, place = UNJUDGED, None
-            else:
-                code, place = _judge(decision, rank, qualified, e.top_k)
+            row = stored.get((e.id, run.config_id)) if e.owner == SITE_USER else None
+            code, place = _judge(row, iid, decision, rank)
             found.append(PickEdge(e.id, e.name, code == COUNTS, code, e.top_k, place))
         out[iid] = tuple(found)
     return out
