@@ -106,9 +106,7 @@ test('Ideas: the views and filter chips fit the screen and a tapped view narrows
   expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
 });
 
-test('Ideas: a phone row keeps the ticker, who picked it, decision and score', async ({
-  page,
-}) => {
+test('Ideas: a phone row keeps the ticker, who picked it, decision and score', async ({ page }) => {
   await page.goto('/ideas');
   const headers = page.getByRole('grid', { name: 'Top ideas' }).getByRole('columnheader');
   await expect(headers).toContainText(['Ticker', 'Picked by', 'Decision', 'Score']);
