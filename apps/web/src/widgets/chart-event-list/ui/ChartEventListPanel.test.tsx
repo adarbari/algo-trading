@@ -7,17 +7,11 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 import { ChartEventListPanel } from './ChartEventListPanel';
 
 const hooks = vi.hoisted(() => ({
-  useInstrumentEvents: vi.fn(),
-  useInstrumentEventStudy: vi.fn(),
+  useInstrumentEventList: vi.fn(),
 }));
 
-vi.mock('@/entities/instrument', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useInstrumentEvents: hooks.useInstrumentEvents,
-}));
-vi.mock('@/entities/event', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useInstrumentEventStudy: hooks.useInstrumentEventStudy,
+vi.mock('@/features/chart-events/api/eventList', () => ({
+  useInstrumentEventList: hooks.useInstrumentEventList,
 }));
 vi.mock('@/features/guide-help', () => ({ termHelp: () => null }));
 
@@ -30,6 +24,7 @@ const stored = (kind: string, date: string, values: object, sourceUrl: string | 
   ts: `${date}T00:00:00+00:00`,
   values,
   sourceUrl,
+  confirmed: sourceUrl !== null,
 });
 const filing = (filingDate: string, label: string, sourceUrl: string | null) => ({
   filingDate,
@@ -70,14 +65,16 @@ const study = {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
-  hooks.useInstrumentEvents.mockReturnValue(
-    fakeQuery([
-      stored('dividend', '2026-08-10', { cash_amount: 0.27 }),
-      stored('earnings', '2026-07-30', { reported: true, time: 'after_hours' }, SEC('69')),
-      stored('dividend', '2024-08-10', { cash_amount: 0.25 }),
-    ]),
+  hooks.useInstrumentEventList.mockReturnValue(
+    fakeQuery({
+      events: [
+        stored('dividend', '2026-08-10', { cash_amount: 0.27 }),
+        stored('earnings', '2026-07-30', { reported: true, time: 'after_hours' }, SEC('69')),
+        stored('dividend', '2024-08-10', { cash_amount: 0.25 }),
+      ],
+      eventStudy: study,
+    }),
   );
-  hooks.useInstrumentEventStudy.mockReturnValue(fakeQuery(study));
 });
 
 const rows = () =>
@@ -85,7 +82,7 @@ const rows = () =>
 
 describe('ChartEventListPanel', () => {
   it('lists one row per chart marker in the range, newest first', () => {
-    render(<ChartEventListPanel symbol="AAPL" range="1Y" />);
+    render(<ChartEventListPanel symbol="AAPL" from="2025-10-03" />);
     expect(rows().map((r) => r.textContent)).toEqual([
       expect.stringContaining('14 Aug 2026'),
       expect.stringContaining('12 Aug 2026'),
@@ -96,14 +93,14 @@ describe('ChartEventListPanel', () => {
   });
 
   it('follows the range: a longer one adds the older rows', () => {
-    const { rerender } = render(<ChartEventListPanel symbol="AAPL" range="3M" />);
+    const { rerender } = render(<ChartEventListPanel symbol="AAPL" from="2026-07-03" />);
     expect(rows()).toHaveLength(5);
-    rerender(<ChartEventListPanel symbol="AAPL" range="All" />);
+    rerender(<ChartEventListPanel symbol="AAPL" from="1990-01-01" />);
     expect(rows()).toHaveLength(7);
   });
 
   it('links the macro release, each same-day 8-K and the reported earnings; not what has no page', () => {
-    render(<ChartEventListPanel symbol="AAPL" range="1Y" />);
+    render(<ChartEventListPanel symbol="AAPL" from="2025-10-03" />);
     const [macro, ahead, dividend, filings, report] = rows() as [
       HTMLElement,
       HTMLElement,
@@ -123,7 +120,7 @@ describe('ChartEventListPanel', () => {
   });
 
   it('has a chip per kind with its count that hides the kind', async () => {
-    render(<ChartEventListPanel symbol="AAPL" range="1Y" />);
+    render(<ChartEventListPanel symbol="AAPL" from="2025-10-03" />);
     expect(screen.getByRole('button', { name: 'Filing 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Earnings 2' })).toBeInTheDocument();
     await userEvent
@@ -133,14 +130,15 @@ describe('ChartEventListPanel', () => {
   });
 
   it('says so when the ticker has no event in the range', () => {
-    hooks.useInstrumentEvents.mockReturnValue(fakeQuery([]));
-    hooks.useInstrumentEventStudy.mockReturnValue(fakeQuery({ ...study, ahead: [], filings: [] }));
-    render(<ChartEventListPanel symbol="AAPL" range="1Y" />);
+    hooks.useInstrumentEventList.mockReturnValue(
+      fakeQuery({ events: [], eventStudy: { ...study, ahead: [], filings: [] } }),
+    );
+    render(<ChartEventListPanel symbol="AAPL" from="2025-10-03" />);
     expect(screen.getByText('No events on the AAPL chart in this range.')).toBeInTheDocument();
   });
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<ChartEventListPanel symbol="AAPL" range="1Y" />);
+    const { container } = render(<ChartEventListPanel symbol="AAPL" from="2025-10-03" />);
     vi.useRealTimers();
     await expectNoA11yViolations(container);
   });

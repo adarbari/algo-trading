@@ -30,7 +30,6 @@ const InstrumentEventStudy = graphql(`
           source
           knownFrom
           expiry
-          sourceUrl
         }
         filings {
           accepted
@@ -39,7 +38,6 @@ const InstrumentEventStudy = graphql(`
           items
           label
           knownFrom
-          sourceUrl
         }
         ladder {
           expiry

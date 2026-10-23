@@ -3,21 +3,20 @@
  * over the chart's own range, with a chip per kind (counts, show / hide). A row links to its
  * source page where the server sent one (an 8-K's filing, a macro release's agency page).
  */
-import { ChartEventList, Panel, type ChartRange } from '@algotrade/ui';
+import { ChartEventList, Panel } from '@algotrade/ui';
 import { useMemo } from 'react';
 
-import { rangeFrom } from '@/entities/instrument';
-import { useChartEvents } from '@/features/chart-events';
+import { useChartEventRows } from '@/features/chart-events';
 import { termHelp } from '@/features/guide-help';
 
 export interface ChartEventListPanelProps {
   symbol: string;
-  /** The chart's range: the list follows it. */
-  range: ChartRange;
+  /** First day of the chart's range (ISO): the list follows the chart's range selector. */
+  from: string;
 }
 
-export function ChartEventListPanel({ symbol, range }: ChartEventListPanelProps) {
-  const found = useChartEvents(symbol, rangeFrom(range));
+export function ChartEventListPanel({ symbol, from }: ChartEventListPanelProps) {
+  const found = useChartEventRows(symbol, from);
   const newestFirst = useMemo(() => [...found.events].reverse(), [found.events]);
   return (
     <Panel title="Events on the chart" actions={termHelp('chart_events')}>

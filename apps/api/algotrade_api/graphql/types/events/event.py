@@ -14,7 +14,9 @@ from algotrade.services.read.events import stored as events
 @strawberry.type(
     description="A stored event: `table` events/<kind>, `date` the event date (UTC), "
     "`values` the row's other columns, `sourceUrl` the page the row came from (a report stored "
-    "from an 8-K: its sec.gov filing index; null when there is none)"
+    "from an 8-K: its sec.gov filing index; null when there is none), `confirmed` a report "
+    "stored from the company's own 8-K results release, which beats the exchange calendar's "
+    "row of the same report"
 )
 class Event:
     instrument_id: str
@@ -24,6 +26,7 @@ class Event:
     ts: dt.datetime
     values: JSON
     source_url: str | None
+    confirmed: bool
 
     @classmethod
     def of(cls, d: events.Event) -> Self:
@@ -35,4 +38,5 @@ class Event:
             ts=d.ts,
             values=JSON(d.values),
             source_url=d.source_url,
+            confirmed=d.confirmed,
         )

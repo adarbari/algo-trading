@@ -133,7 +133,6 @@ RELEASE_FIELDS: dict[str, frozenset[str]] = {
             "instrument.events",
             "instrument.events.date",
             "instrument.events.kind",
-            "instrument.events.sourceUrl",
             "instrument.events.table",
             "instrument.events.ts",
             "instrument.events.values",
@@ -262,6 +261,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "ComparePrices",
         "EventCalendar",
         "InstrumentEventStudy",
+        "InstrumentEventList",  # the chart's event list: events and study with source pages
         "TableView",
         "GuideField",
         "GuideHelpField",

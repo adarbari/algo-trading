@@ -84,7 +84,7 @@ detect = [{ call = "load_edge_verdict" }, { call = "load_verdict" }, { call = "j
 
 [[responsibility]]
 id = "event-source-link"
-description = "Where an event's own source page is, built server-side so the web app receives a ready URL and never assembles one (the Explore chart's event list, owner decision 2026-10-22): an 8-K or 8-K/A to its sec.gov filing index from the stored cik and accession (events/filing; a cik or accession that is not the plain digits SEC writes gives none), a report stored from an 8-K Item 2.02 release (source sec_8k) to the index of the same company's Item 2.02 filing accepted at that instant, else on that day (a Nasdaq-calendar-only report and an upcoming one have none), a macro release key to the agency page of config/site/events/links.toml; every other kind (dividends, splits) none; no new stored column"
+description = "Where an event's own source page is, built server-side so the web app receives a ready URL and never assembles one (the Explore chart's event list, owner decision 2026-10-22): an 8-K or 8-K/A to its sec.gov filing index from the stored cik and accession (events/filing; a cik or accession that is not the plain digits SEC writes gives none), a report stored from an 8-K Item 2.02 release (source sec_8k) to the index of the same company's Item 2.02 filing accepted at that instant (never another filing of the day; a Nasdaq-calendar-only report and an upcoming one have none), a macro release key to the agency page of config/site/events/links.toml; every other kind (dividends, splits) none; no new stored column"
 owner = ["src/algotrade/services/read/events/links.py"]
 allowed = [
     "src/algotrade/config/site/events/links.py",  # the typed loader of the agency pages, called only by the event reads

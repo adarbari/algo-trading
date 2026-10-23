@@ -65,7 +65,9 @@ class Event:
     """One stored event. ``table``: ``events/<kind>``; ``date``: the event date (UTC);
     ``values``: the row's other columns (point-in-time stamps dropped), JSON scalars;
     ``source_url``: the page the row came from (``links.source_link``: a report stored from an
-    8-K, its filing index; None for every other row)."""
+    8-K, its filing index; None for every other row); ``confirmed``: a report stored from the
+    company's own 8-K Item 2.02 release (source ``sec_8k``), which beats the exchange calendar's
+    row of the same report (ADR 0050 decision 3); False for every other row."""
 
     instrument_id: str
     table: str
@@ -74,6 +76,7 @@ class Event:
     ts: datetime
     values: dict[str, Scalar]
     source_url: str | None = None
+    confirmed: bool = False
 
 
 def event_tables(ctx: ReadContext, kinds: Sequence[str] | None = None) -> tuple[str, ...]:
@@ -182,9 +185,12 @@ def _read_events(
             iid = str(row["instrument_id"])
             values = stored_values(row, ("instrument_id", "ts"))
             kind = table.removeprefix(EVENTS_PREFIX)
-            event = Event(iid, table, kind, ts.date(), ts.to_pydatetime(), values)
+            from_filing = kind == "earnings" and row.get("source") == EARNINGS_8K_SOURCE
+            event = Event(
+                iid, table, kind, ts.date(), ts.to_pydatetime(), values, confirmed=from_filing
+            )
             found.setdefault(iid, []).append(event)
-            if kind == "earnings" and row.get("source") == EARNINGS_8K_SOURCE:
+            if from_filing:
                 from_8k.append(event)
     links = _links(ctx, from_8k)
     return {

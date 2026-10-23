@@ -17,7 +17,6 @@ const events: InstrumentEvent[] = [
     kind: 'dividend',
     date: '2026-08-10',
     ts: '2026-08-10T00:00:00+00:00',
-    sourceUrl: null,
     values: { cash_amount: 0.27, pay_date: '2026-08-13', distribution_type: 'recurring' },
   },
   {
@@ -25,7 +24,6 @@ const events: InstrumentEvent[] = [
     kind: 'earnings',
     date: '2026-10-29',
     ts: '2026-10-29T00:00:00+00:00',
-    sourceUrl: null,
     values: { fiscal_quarter: 'Sep/2026', time: 'post', eps_forecast: 1.98, reported: false },
   },
   {
@@ -33,7 +31,6 @@ const events: InstrumentEvent[] = [
     kind: 'split',
     date: '2024-06-10',
     ts: '2024-06-10T00:00:00+00:00',
-    sourceUrl: null,
     values: { split_from: 1, split_to: 10, adjustment_type: 'forward_split' },
   },
   {
@@ -41,7 +38,6 @@ const events: InstrumentEvent[] = [
     kind: 'reference_change',
     date: '2026-10-02',
     ts: '2026-10-02T00:00:00+00:00',
-    sourceUrl: null,
     values: { change: 'id_changed', old: 'EQ:NVDA', new: 'EQ:BBG000BBJQV0' },
   },
 ];
@@ -67,7 +63,6 @@ describe('instrument events', () => {
       kind: 'earnings',
       date: '2026-08-27',
       ts: '2026-08-27T00:00:00+00:00',
-      sourceUrl: null,
       values: { time: 'pre_market', reported: true },
     };
     expect(toTimeline([preMarket])[0]?.detail).toBe('before the open');
@@ -85,7 +80,6 @@ describe('instrument events', () => {
       kind: 'earnings',
       date: '2026-08-27',
       ts: '2026-08-27T00:00:00+00:00',
-      sourceUrl: null,
       values: {
         fiscal_quarter: 'Jul/2026',
         eps_forecast: 0.5,
@@ -114,27 +108,9 @@ describe('instrument events', () => {
 
   it('marks dividends, splits and earnings on the chart, oldest first', () => {
     expect(toChartEvents(events)).toEqual([
-      {
-        time: '2024-06-10',
-        kind: 'split',
-        detail: '10-for-1',
-        parts: [{ text: 'Split 10-for-1' }],
-      },
-      {
-        time: '2026-08-10',
-        kind: 'dividend',
-        detail: '$0.27',
-        parts: [{ text: 'Ex-dividend $0.27 cash · paid 13 Aug 2026' }],
-      },
-      {
-        time: '2026-10-29',
-        kind: 'earnings',
-        parts: [
-          {
-            text: 'Earnings, Quarter Sep/2026 · after the close · EPS forecast $1.98 · not reported yet',
-          },
-        ],
-      },
+      { time: '2024-06-10', kind: 'split', detail: '10-for-1' },
+      { time: '2026-08-10', kind: 'dividend', detail: '$0.27' },
+      { time: '2026-10-29', kind: 'earnings' },
     ]);
   });
 
@@ -144,29 +120,10 @@ describe('instrument events', () => {
       kind: 'earnings',
       date: '2026-10-29',
       ts: '2026-10-29T15:48:19+00:00',
-      sourceUrl: null,
       values: { time: 'intraday', reported: true },
     };
     const marks = toChartEvents([...events, eightK]).filter((e) => e.kind === 'earnings');
-    expect(marks.map((m) => [m.time, m.kind])).toEqual([['2026-10-29', 'earnings']]);
-  });
-
-  it('keeps the 8-K row of a day with its filing page, and a calendar-only day has none', () => {
-    const SEC =
-      'https://www.sec.gov/Archives/edgar/data/1/000000000126000001/0000000001-26-000001-index.htm';
-    const eightK: InstrumentEvent = {
-      table: 'events/earnings',
-      kind: 'earnings',
-      date: '2026-10-29',
-      ts: '2026-10-29T15:48:19+00:00',
-      sourceUrl: SEC,
-      values: { time: 'intraday', reported: true, eps_reported: 2.1 },
-    };
-    const marks = toChartEvents([...events, eightK]).filter((e) => e.kind === 'earnings');
-    expect(marks).toHaveLength(1);
-    expect(marks[0]?.parts).toEqual([{ text: 'Earnings, reported $2.10', href: SEC }]);
-    const calendarOnly = toChartEvents(events).filter((e) => e.kind === 'earnings');
-    expect(calendarOnly[0]?.parts?.every((p) => p.href === undefined)).toBe(true);
+    expect(marks).toEqual([{ time: '2026-10-29', kind: 'earnings' }]);
   });
 });
 

@@ -21,7 +21,6 @@ const ahead = (
   source,
   knownFrom: null,
   expiry,
-  sourceUrl: source === 'BLS' ? 'https://www.bls.gov/cpi/' : null,
 });
 
 export const STUDY_FIXTURE: Study = {
@@ -41,8 +40,6 @@ export const STUDY_FIXTURE: Study = {
       items: ['2.02', '9.01'],
       label: 'Results',
       knownFrom: '2026-07-30',
-      sourceUrl:
-        'https://www.sec.gov/Archives/edgar/data/320193/000032019326000070/0000320193-26-000070-index.htm',
     },
   ],
   ladder: [

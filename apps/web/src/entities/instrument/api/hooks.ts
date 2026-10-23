@@ -34,7 +34,6 @@ const InstrumentEvents = graphql(`
         date
         ts
         values
-        sourceUrl
       }
     }
   }

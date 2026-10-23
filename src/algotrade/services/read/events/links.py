@@ -4,7 +4,7 @@ never assembles one. Three kinds link, from what is already stored (no new colum
 - ``filing``: an 8-K or 8-K/A (``events/filing`` ``cik`` + ``accession``) to its sec.gov filing
   index;
 - ``earnings``: a report stored from the 8-K Item 2.02 release (source ``sec_8k``) to the index of
-  the same company's Item 2.02 filing accepted at that instant, else on that day; a report from
+  the same company's Item 2.02 filing accepted at that instant; a report from
   the Nasdaq calendar alone, and one still ahead, has no filing and so no link;
 - ``macro_release``: a release key to the agency page held in ``config/site/events/links.toml``.
 
@@ -49,11 +49,10 @@ def filing_url(cik: str, accession: str) -> str | None:
 
 def results_filing(at: datetime, filings: Sequence[FilingRef]) -> FilingRef | None:
     """The Item 2.02 filing a report stored at ``at`` (UTC) came from: the one accepted at that
-    instant, else the earliest accepted on the same UTC day, an 8-K before its amendment; None
-    when there is none."""
-    exact = [f for f in filings if abs(f.accepted - at) <= _SAME_INSTANT]
-    same_day = [f for f in filings if f.accepted.date() == at.date()]
-    found = exact or same_day
+    instant (a report row is made from an original 8-K at its acceptance instant, so a filing
+    of the same day at another instant is a different one: never matched); an 8-K before its
+    amendment when both match; None when none does."""
+    found = [f for f in filings if abs(f.accepted - at) <= _SAME_INSTANT]
     return min(found, key=lambda f: (f.form != "8-K", f.accepted)) if found else None
 
 

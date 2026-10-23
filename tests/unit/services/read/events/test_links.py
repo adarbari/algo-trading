@@ -67,14 +67,26 @@ def test_a_midnight_acceptance_stored_one_second_later_still_matches() -> None:
     assert source_link("earnings", source="sec_8k", at=at, filings=[RESULTS]) == INDEX
 
 
-def test_without_the_same_instant_the_same_day_matches_an_8k_before_its_amendment() -> None:
+def test_another_filing_of_the_same_day_is_never_matched() -> None:
+    """A report row is made from an original 8-K at its own instant: an Item 2.02 8-K or 8-K/A
+    accepted at another instant of the UTC day is a different filing (the day is UTC, the
+    earnings date New York's)."""
     amended = FilingRef("0000320193", "0000320193-26-000072", ACCEPTED.replace(hour=1), "8-K/A")
     at = datetime(2026, 8, 14, 0, 0, tzinfo=UTC)  # a calendar-style midnight row of the day
-    assert results_filing(at, [amended, RESULTS]) == RESULTS
-    assert results_filing(at, [amended]) == amended
+    assert results_filing(at, [amended, RESULTS]) is None
+    assert results_filing(ACCEPTED, [amended, RESULTS]) == RESULTS
 
 
-def test_no_filing_of_that_day_is_no_link() -> None:
+def test_two_original_8ks_with_item_202_on_one_day_each_link_to_its_own() -> None:
+    second = FilingRef("0000320193", "0000320193-26-000071", ACCEPTED.replace(hour=22), "8-K")
+    both = [RESULTS, second]
+    one = source_link("earnings", source="sec_8k", at=ACCEPTED, filings=both)
+    two = source_link("earnings", source="sec_8k", at=second.accepted, filings=both)
+    assert one == INDEX
+    assert two == INDEX.replace("000070", "000071")
+
+
+def test_no_filing_at_that_instant_is_no_link() -> None:
     later = FilingRef("0000320193", "0000320193-26-000073", ACCEPTED.replace(day=15), "8-K")
     assert source_link("earnings", source="sec_8k", at=ACCEPTED, filings=[later]) is None
     assert source_link("earnings", source="sec_8k", at=ACCEPTED) is None
@@ -142,6 +154,20 @@ def test_the_results_filings_are_the_item_202_ones_known_by_the_session() -> Non
     assert load_results_filings(ctx, []) == {}
 
 
+def test_a_results_filing_accepted_after_the_session_is_excluded() -> None:
+    def future(writer: StoreWriter) -> None:
+        row = {**filing_row("2026-10-02 19:00", "2.02", date(2026, 10, 2)),
+               "cik": "320193", "accession": "0000320193-26-000099"}  # fmt: skip
+        writer.write_table(FILING, D1, "future", stamped([row], D1, "future", source="sec"))
+
+    ctx = open_context(
+        store_with(_valid_filings, future), MemoryConfigStore({}), UserContext("local"), D1
+    )
+    accessions = [r.accession for r in load_results_filings(ctx, ["EQ:AAA"])["EQ:AAA"]]
+    assert "0000320193-26-000099" not in accessions  # accepted after D1 closed
+    assert "0000320193-26-000070" in accessions
+
+
 def test_a_report_row_stored_from_an_8k_has_the_link_and_a_calendar_row_none() -> None:
     reader = store_with(_valid_filings, _earnings)
     ctx = open_context(reader, MemoryConfigStore({}), UserContext("local"), D1)
@@ -150,6 +176,21 @@ def test_a_report_row_stored_from_an_8k_has_the_link_and_a_calendar_row_none() -
         date(2026, 4, 30): None,
         date(2026, 8, 14): INDEX,
     }
+    assert {e.date: e.confirmed for e in events} == {
+        date(2026, 4, 30): False,
+        date(2026, 8, 14): True,
+    }  # the company's own 8-K is the confirmed row, the calendar's is not
+
+
+def test_a_report_from_an_8k_with_no_matching_filing_is_still_confirmed() -> None:
+    def unmatched(writer: StoreWriter) -> None:
+        row = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp("2026-09-01 12:00", tz="UTC"),
+               "known_from": D1, "carried_from": None}  # fmt: skip
+        writer.write_table("events/earnings", D1, "u", stamped([row], D1, "u", source="sec_8k"))
+
+    ctx = open_context(store_with(unmatched), MemoryConfigStore({}), UserContext("local"), D1)
+    (event,) = load_events(ctx, ["EQ:AAA"], None, None, ("earnings",))["EQ:AAA"]
+    assert event.confirmed and event.source_url is None
 
 
 def test_a_macro_release_ahead_carries_the_agency_page() -> None:

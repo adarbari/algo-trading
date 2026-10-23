@@ -110,87 +110,33 @@ describe('gapLines', () => {
   });
 });
 
-const SEC =
-  'https://www.sec.gov/Archives/edgar/data/320193/000032019326000070/0000320193-26-000070-index.htm';
-
 describe('studyChartEvents', () => {
   it('marks filings, macro dates and own earnings the stored events do not already mark', () => {
     expect(studyChartEvents(STUDY_FIXTURE, new Set())).toEqual([
-      {
-        time: '2026-07-30',
-        kind: 'filing',
-        detail: '8-K Results',
-        parts: [{ text: '8-K Results', href: SEC }],
-      },
-      {
-        time: '2026-10-14',
-        kind: 'macro',
-        detail: 'CPI 08:30',
-        parts: [{ text: 'CPI 08:30', href: 'https://www.bls.gov/cpi/' }],
-      },
-      {
-        time: '2026-10-29',
-        kind: 'earnings',
-        detail: 'after the close',
-        parts: [{ text: 'Earnings, after the close' }],
-      },
+      { time: '2026-07-30', kind: 'filing', detail: '8-K Results' },
+      { time: '2026-10-14', kind: 'macro', detail: 'CPI 08:30' },
+      { time: '2026-10-29', kind: 'earnings', detail: 'after the close' },
     ]);
     expect(
       studyChartEvents(STUDY_FIXTURE, new Set(['2026-10-29'])).some((e) => e.kind === 'earnings'),
     ).toBe(false);
   });
-
-  it('links nothing the server sent no page for (a macro release or filing without one)', () => {
-    const study = {
-      ...STUDY_FIXTURE,
-      ahead: [{ ...AHEAD0, sourceUrl: null }],
-      filings: [{ ...FILING0, sourceUrl: null }],
-    };
-    const parts = studyChartEvents(study, new Set()).flatMap((e) => e.parts ?? []);
-    expect(parts).toEqual([{ text: '8-K Results' }, { text: 'CPI 08:30' }]);
-  });
 });
 
 describe('studyChartEvents, same-day filings', () => {
-  it('marks several filings of one day once, naming each and linking each', () => {
-    const other = SEC.replace('000070', '000071');
+  it('marks several filings of one day once, naming each', () => {
     const study = {
       ...STUDY_FIXTURE,
       ahead: [],
       filings: [
         { ...FILING0, filingDate: '2026-07-30', form: '8-K', label: 'Results' },
-        {
-          ...FILING0,
-          filingDate: '2026-07-30',
-          form: '8-K/A',
-          label: 'Exhibits',
-          sourceUrl: other,
-        },
-        {
-          ...FILING0,
-          filingDate: '2026-07-01',
-          form: '8-K',
-          label: 'Other events',
-          sourceUrl: null,
-        },
+        { ...FILING0, filingDate: '2026-07-30', form: '8-K/A', label: 'Exhibits' },
+        { ...FILING0, filingDate: '2026-07-01', form: '8-K', label: 'Other events' },
       ],
     };
     expect(studyChartEvents(study, new Set())).toEqual([
-      {
-        time: '2026-07-01',
-        kind: 'filing',
-        detail: '8-K Other events',
-        parts: [{ text: '8-K Other events' }],
-      },
-      {
-        time: '2026-07-30',
-        kind: 'filing',
-        detail: '8-K Results; 8-K/A Exhibits',
-        parts: [
-          { text: '8-K Results', href: SEC },
-          { text: '8-K/A Exhibits', href: other },
-        ],
-      },
+      { time: '2026-07-01', kind: 'filing', detail: '8-K Other events' },
+      { time: '2026-07-30', kind: 'filing', detail: '8-K Results; 8-K/A Exhibits' },
     ]);
   });
 });

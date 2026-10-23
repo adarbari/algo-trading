@@ -148,7 +148,7 @@ M is a macro release such as CPI. The chips above the list count each kind and h
 
 An 8-K row links to its filing index on SEC's EDGAR site. Several 8-Ks filed on one day are one marker
 and one row, with one link each. A reported earnings row links to the 8-K with Item 2.02 (the
-results release) that the app matched by its acceptance time, or else its day. An earnings date
+results release) that the app matched by its exact acceptance time. An earnings date
 still ahead, and a report known only from the exchange calendar, has no link because no filing
 exists. A macro release links to the agency's own page for that release, not to the day's figures.
 Dividends and splits have no link because the app stores no source page for them.

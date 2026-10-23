@@ -10,7 +10,6 @@ import {
   type CalendarDay,
   type CalendarName,
   type ChartEvent,
-  type ChartEventPart,
   type EventItem,
   type EventKind,
   type ExpiryRow,
@@ -105,16 +104,9 @@ export function gapLines(gaps: readonly StudyGap[]): string[] {
   return [...new Set(lines)];
 }
 
-/** A part of a description: linked only when the server sent the event's source page. */
-const part = (text: string, href: string | null | undefined): ChartEventPart =>
-  href ? { text, href } : { text };
-
 /**
  * Markers for the price chart from the same study: the own earnings and macro dates ahead and
  * the filings, oldest first. Earnings dates the stored events already mark are left to them.
- * Each marker also carries its description as parts for the event list under the chart: a
- * macro release links to its agency page and each 8-K of a day to its own sec.gov page, both
- * as the server sent them (an upcoming earnings date has no page).
  */
 export function studyChartEvents(
   study: Defined<Study>,
@@ -122,33 +114,22 @@ export function studyChartEvents(
 ): ChartEvent[] {
   const ahead = study.ahead.flatMap((e): ChartEvent[] => {
     if (e.kind === 'own_earnings' && !alreadyMarked.has(e.date)) {
-      const detail = timeText(e.time);
-      return [
-        {
-          time: e.date,
-          kind: 'earnings',
-          detail,
-          parts: [{ text: `Earnings, ${detail}` }],
-        },
-      ];
+      return [{ time: e.date, kind: 'earnings', detail: timeText(e.time) }];
     }
     if (e.kind === 'macro_release') {
-      const text = `${e.label} ${e.time}`;
-      return [{ time: e.date, kind: 'macro', detail: text, parts: [part(text, e.sourceUrl)] }];
+      return [{ time: e.date, kind: 'macro', detail: `${e.label} ${e.time}` }];
     }
     return [];
   });
   // One marker a day: several 8-Ks filed together would stack on the same point.
-  const byDay = new Map<string, ChartEventPart[]>();
+  const byDay = new Map<string, string[]>();
   for (const f of study.filings) {
-    const parts = byDay.get(f.filingDate) ?? [];
-    byDay.set(f.filingDate, [...parts, part(`${f.form} ${f.label}`, f.sourceUrl)]);
+    byDay.set(f.filingDate, [...(byDay.get(f.filingDate) ?? []), `${f.form} ${f.label}`]);
   }
-  const filings = [...byDay].map(([time, parts]): ChartEvent => ({
+  const filings = [...byDay].map(([time, details]): ChartEvent => ({
     time,
     kind: 'filing',
-    detail: parts.map((p) => p.text).join('; '),
-    parts,
+    detail: details.join('; '),
   }));
   return [...filings, ...ahead].sort((a, b) => a.time.localeCompare(b.time));
 }

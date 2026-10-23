@@ -1,5 +1,5 @@
 /**
- * Feature: the events a price chart marks, from the stored events and the event study, as one
- * list of markers the chart draws and the list under it shows row for row.
+ * Feature: the rows of the event list under a price chart, from the stored events and the event
+ * study, each with its source page.
  */
-export { useChartEvents } from './model/useChartEvents';
+export { useChartEventRows } from './model/useChartEventRows';

@@ -281,7 +281,7 @@ export type InstrumentEventStudyQueryVariables = Exact<{
 }>;
 
 
-export type InstrumentEventStudyQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, eventStudy: { session: string, days: number, months: number, ahead: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean, sourceUrl: string | null }>, filings: Array<{ accepted: string, filingDate: string, form: string, items: Array<string>, label: string, knownFrom: string, sourceUrl: string | null }>, ladder: Array<{ expiry: string, days: number, clear: boolean, marked: boolean, spans: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }> }>, reference: { instrumentId: string | null, symbol: string | null, kind: string, source: string | null, status: string } | null, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } }> } | null } | null };
+export type InstrumentEventStudyQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, eventStudy: { session: string, days: number, months: number, ahead: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }>, filings: Array<{ accepted: string, filingDate: string, form: string, items: Array<string>, label: string, knownFrom: string }>, ladder: Array<{ expiry: string, days: number, clear: boolean, marked: boolean, spans: Array<{ date: string, time: string, kind: string, label: string, name: string, subjectId: string | null, source: string, knownFrom: string | null, expiry: boolean }> }>, reference: { instrumentId: string | null, symbol: string | null, kind: string, source: string | null, status: string } | null, gaps: Array<{ instrumentId: string | null, part: string, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } }> } | null } | null };
 
 export type ComparePricesQueryVariables = Exact<{
   keys: Array<string> | string;
@@ -465,7 +465,7 @@ export type InstrumentEventsQueryVariables = Exact<{
 }>;
 
 
-export type InstrumentEventsQuery = { instrument: { instrumentId: string, events: Array<{ table: string, kind: string, date: string, ts: string, values: unknown, sourceUrl: string | null }> } | null };
+export type InstrumentEventsQuery = { instrument: { instrumentId: string, events: Array<{ table: string, kind: string, date: string, ts: string, values: unknown }> } | null };
 
 export type InstrumentPricesQueryVariables = Exact<{
   key: string;
@@ -663,6 +663,13 @@ export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type ViewerQuery = { viewer: { id: string, name: string, role: string, workspaces: Array<string> } };
+
+export type InstrumentEventListQueryVariables = Exact<{
+  key: string;
+}>;
+
+
+export type InstrumentEventListQuery = { instrument: { instrumentId: string, events: Array<{ table: string, kind: string, date: string, ts: string, values: unknown, sourceUrl: string | null, confirmed: boolean }>, eventStudy: { session: string, ahead: Array<{ date: string, time: string, kind: string, label: string, sourceUrl: string | null }>, filings: Array<{ filingDate: string, form: string, label: string, sourceUrl: string | null }> } | null } | null };
 
 export type GuideHelpFieldQueryVariables = Exact<{
   name: string;
@@ -1671,7 +1678,6 @@ export const InstrumentEventStudyDocument = new TypedDocumentString(`
         source
         knownFrom
         expiry
-        sourceUrl
       }
       filings {
         accepted
@@ -1680,7 +1686,6 @@ export const InstrumentEventStudyDocument = new TypedDocumentString(`
         items
         label
         knownFrom
-        sourceUrl
       }
       ladder {
         expiry
@@ -2962,7 +2967,6 @@ export const InstrumentEventsDocument = new TypedDocumentString(`
       date
       ts
       values
-      sourceUrl
     }
   }
 }
@@ -4243,6 +4247,38 @@ export const ViewerDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ViewerQuery, ViewerQueryVariables>;
+export const InstrumentEventListDocument = new TypedDocumentString(`
+    query InstrumentEventList($key: String!) {
+  instrument(key: $key) {
+    instrumentId
+    events {
+      table
+      kind
+      date
+      ts
+      values
+      sourceUrl
+      confirmed
+    }
+    eventStudy {
+      session
+      ahead {
+        date
+        time
+        kind
+        label
+        sourceUrl
+      }
+      filings {
+        filingDate
+        form
+        label
+        sourceUrl
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<InstrumentEventListQuery, InstrumentEventListQueryVariables>;
 export const GuideHelpFieldDocument = new TypedDocumentString(`
     query GuideHelpField($name: FeatureName!) {
   guideField(name: $name) {

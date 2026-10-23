@@ -9,7 +9,6 @@ import { Skeleton, Stack } from '@algotrade/ui';
 import { Suspense } from 'react';
 
 import { lazyPage } from '@/shared/lib/lazy';
-import { ChartEventListPanel } from '@/widgets/chart-event-list';
 import { HoldingsPanel } from '@/widgets/holdings-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
@@ -21,6 +20,7 @@ import { ExploreTabs } from './ExploreTabs';
 
 // The other tabs' widgets are one chunk, fetched when one of those tabs opens.
 // Its own chunk: loads only when the Financials tab opens.
+const Events = lazyPage(() => import('./ChartEventsSection'), 'ChartEventsSection');
 const FinancialsTab = lazyPage(() => import('./FinancialsTab'), 'FinancialsTab');
 const OtherTabs = lazyPage(() => import('./OtherTabs'), 'OtherTabs');
 
@@ -50,7 +50,9 @@ function Content(props: DetailTabsProps) {
               onSearchChange({ range });
             }}
           />
-          <ChartEventListPanel symbol={symbol} range={state.range} />
+          <Suspense>
+            <Events symbol={symbol} range={state.range} />
+          </Suspense>
         </Stack>
       );
     case 'overview':

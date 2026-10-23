@@ -5,7 +5,7 @@
  * server names as next or last; the dates themselves are catalogue features, never derived
  * here from the events).
  */
-import { formatValue, type ChartEvent, type ChartEventPart } from '@algotrade/ui';
+import { formatValue, type ChartEvent } from '@algotrade/ui';
 
 import type { gqlTypes } from '@/shared/api';
 
@@ -25,8 +25,6 @@ export interface TimelineEvent {
   /** The kind in words ("Earnings", "Ex-dividend", ...). */
   label: string;
   detail: string;
-  /** The page the event came from (a report stored from an 8-K: its sec.gov filing), as the server sent it. */
-  sourceUrl: string | null;
 }
 
 const KINDS: Readonly<Record<string, EventKind>> = {
@@ -146,7 +144,6 @@ export function toTimeline(events: readonly InstrumentEvent[]): TimelineEvent[] 
         kind,
         label: kind === 'other' ? event.kind.replace(/_/g, ' ') : LABELS[kind],
         detail: detailOf(kind, valuesOf(event)),
-        sourceUrl: event.sourceUrl ?? null,
       };
     })
     .sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
@@ -155,43 +152,24 @@ export function toTimeline(events: readonly InstrumentEvent[]): TimelineEvent[] 
 /**
  * Dividend, split and earnings markers for the price chart, oldest first: one per kind a day
  * (a report stored by two sources, the calendar's at midnight and the 8-K's at its acceptance
- * time, is two rows of one date but one marker; it keeps the 8-K's page when either has one).
- * Each marker also carries its description as parts for the event list under the chart; only a
- * report stored from an 8-K has a source page (no dividend or split has one).
+ * time, is two rows of one date but one marker).
  */
 export function toChartEvents(events: readonly InstrumentEvent[]): ChartEvent[] {
-  // One row per kind and date: the one with a source page (the 8-K's, which also says it
-  // reported) if there is one, else the first.
-  const chosen = new Map<string, TimelineEvent>();
-  for (const e of toTimeline(events)) {
-    const key = `${e.kind}|${e.date}`;
-    const held = chosen.get(key);
-    if (held === undefined || (held.sourceUrl === null && e.sourceUrl !== null)) chosen.set(key, e);
-  }
-  return [...chosen.values()]
+  const seen = new Set<string>();
+  return toTimeline(events)
+    .filter((e) => {
+      const key = `${e.kind}|${e.date}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .flatMap((e): ChartEvent[] => {
-      const href = e.sourceUrl;
-      const part = (text: string): ChartEventPart[] => [href ? { text, href } : { text }];
       if (e.kind === 'dividend') {
         const cash = e.detail.split(' cash')[0] ?? '';
-        return [
-          { time: e.date, kind: 'dividend', detail: cash, parts: part(`Ex-dividend ${e.detail}`) },
-        ];
+        return [{ time: e.date, kind: 'dividend', detail: cash }];
       }
-      if (e.kind === 'split') {
-        return [
-          { time: e.date, kind: 'split', detail: e.detail, parts: part(`Split ${e.detail}`) },
-        ];
-      }
-      if (e.kind === 'earnings') {
-        return [
-          {
-            time: e.date,
-            kind: 'earnings',
-            parts: part(e.detail ? `Earnings, ${e.detail}` : 'Earnings'),
-          },
-        ];
-      }
+      if (e.kind === 'split') return [{ time: e.date, kind: 'split', detail: e.detail }];
+      if (e.kind === 'earnings') return [{ time: e.date, kind: 'earnings' }];
       return [];
     })
     .reverse();

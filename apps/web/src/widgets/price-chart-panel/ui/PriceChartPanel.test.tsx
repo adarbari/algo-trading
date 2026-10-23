@@ -114,11 +114,11 @@ describe('PriceChartPanel', () => {
       { time: '2026-08-10', value: 229 },
     ]);
     expect(chart.volume).toHaveLength(2);
-    expect(chart.events?.map((e) => [e.time, e.kind, e.detail])).toEqual([
-      ['2026-08-07', 'filing', '8-K 2.02 results'],
-      ['2026-08-10', 'dividend', '$0.27'],
-      ['2026-08-10', 'macro', 'CPI 08:30'],
-      ['2026-08-12', 'earnings', 'after the close'],
+    expect(chart.events).toEqual([
+      { time: '2026-08-07', kind: 'filing', detail: '8-K 2.02 results' },
+      { time: '2026-08-10', kind: 'dividend', detail: '$0.27' },
+      { time: '2026-08-10', kind: 'macro', detail: 'CPI 08:30' },
+      { time: '2026-08-12', kind: 'earnings', detail: 'after the close' },
     ]);
     vi.useRealTimers();
     await expectNoA11yViolations(container);
