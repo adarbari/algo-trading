@@ -1,0 +1,15 @@
+/* FilterGroupButton: the accent border and the count badge mark a group that holds filters. */
+.root {
+  display: inline-flex;
+  flex: none;
+}
+
+.badge {
+  margin-inline-start: var(--space-1-5);
+  padding-inline: var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}

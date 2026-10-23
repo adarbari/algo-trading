@@ -4,12 +4,17 @@
  * description, unit and kind (the user's own features marked personal), and the chosen ones
  * as removable chips. Controlled: the caller keeps the list (in the URL).
  */
-import { Button, Chip, Combobox, Field, Popover, Stack, Text, type IconName } from '@algotrade/ui';
+import { Button, Chip, Field, Popover, Stack, Text, type IconName } from '@algotrade/ui';
 import { useMemo } from 'react';
 
-import { byName, featureLabel, featureMarks, useFeatureCatalogue } from '@/entities/feature';
-
-import { featureOptions } from '../model/options';
+import {
+  byName,
+  columnOptions,
+  FeatureCombobox,
+  featureLabel,
+  featureMarks,
+  useFeatureCatalogue,
+} from '@/entities/feature';
 
 export interface FeaturePickerProps {
   /** The trigger's text and the popover's name ("Columns", "Dimension"). */
@@ -23,7 +28,7 @@ export interface FeaturePickerProps {
 export function FeaturePicker({ label, icon = 'columns', chosen, onChange }: FeaturePickerProps) {
   const catalogue = useFeatureCatalogue();
   const features = useMemo(() => catalogue.data ?? [], [catalogue.data]);
-  const options = useMemo(() => featureOptions(features, chosen), [features, chosen]);
+  const options = useMemo(() => columnOptions(features, chosen), [features, chosen]);
   const known = useMemo(() => byName(features), [features]);
   return (
     <Popover
@@ -41,15 +46,13 @@ export function FeaturePicker({ label, icon = 'columns', chosen, onChange }: Fea
           label="Add from the feature catalogue"
           hint="Type a name, a unit or a word of the description."
         >
-          <Combobox
+          <FeatureCombobox
             options={options}
-            value={null}
-            onValueChange={(value) => {
-              if (value) onChange([...chosen, value]);
+            onPick={(name) => {
+              onChange([...chosen, name]);
             }}
             loading={catalogue.isPending}
-            {...(catalogue.isError ? { error: 'The feature catalogue failed to load.' } : {})}
-            emptyMessage="No feature matches"
+            failed={catalogue.isError}
             placeholder="iv30, market cap, earnings…"
             mono
           />

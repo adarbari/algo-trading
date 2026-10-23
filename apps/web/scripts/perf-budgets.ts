@@ -1,7 +1,7 @@
 /**
  * The web performance budgets file (perf-budgets.json): its shape, loading, and the one rule that
  * changes it. Budgets only shrink: `shrunk` keeps the old budget unless the measured value plus
- * the 1 % headroom is lower, so a script never raises a budget (raising one is a visible edit of the
+ * the headroom (HEADROOM_PERCENT) is lower, so a script never raises a budget (raising one is a visible edit of the
  * JSON in the PR). Shared by the bundle check and the Playwright request / DOM budgets.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -149,13 +149,21 @@ export function saveBudgets(budgets: Budgets, file: URL = BUDGETS_FILE): void {
 }
 
 /**
- * The budget after seeing `measured`: measured + 1 % headroom (CI measures a few hundred bytes more
- * than a laptop: gzip and build variance), rounded UP to `step` (100 B for sizes, 1 for counts) and
- * at least `measured + 1`; never above the old budget, so it only shrinks. With no old budget
- * (a new page or route) the headroom value is its first budget.
+ * Headroom over the measured value when a budget is set (owner decision 2026-10-23: 1 % left
+ * routes a few bytes from failing, so most web PRs went red and edited perf-budgets.json; 5 % lets
+ * ordinary changes through while budgets still only shrink).
+ */
+export const HEADROOM_PERCENT = 5;
+
+/**
+ * The budget after seeing `measured`: measured + HEADROOM_PERCENT (which also covers CI measuring
+ * a few hundred bytes more than a laptop: gzip and build variance), rounded UP to `step` (100 B for
+ * sizes, 1 for counts) and at least `measured + 1`; never above the old budget, so it only shrinks.
+ * With no old budget (a new page or route) the headroom value is its first budget.
  */
 export function withHeadroom(measured: number, step = 100): number {
-  const rounded = Math.ceil((measured * 101) / (100 * step)) * step; // integer maths: 1.01 is inexact
+  // integer maths: 1.05 is inexact
+  const rounded = Math.ceil((measured * (100 + HEADROOM_PERCENT)) / (100 * step)) * step;
   return Math.max(rounded, measured + 1);
 }
 

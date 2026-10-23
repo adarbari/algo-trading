@@ -247,6 +247,7 @@ Source: `design-system/components/Button`
 | `loading` | `boolean` | no | Busy: shows a spinner in place of the icon, sets aria-busy and ignores clicks. |
 | `disabled` | `boolean` | no |  |
 | `type` | `'button' \| 'submit' \| 'reset'` | no | Form role; `button` by default so it never submits by accident. |
+| `selected` | `boolean` | no | Drawn as in force (accent border and tint): a group button that holds filters. |
 | `fullWidth` | `boolean` | no | Stretch to the container's width (stacked forms on phones). |
 | `onClick` | `MouseEventHandler<HTMLButtonElement>` | no |  |
 | `ref` | `Ref<HTMLButtonElement>` | no |  |
@@ -366,6 +367,9 @@ Source: `design-system/components/Chip`
 | `variant` | `'default' \| 'dashed'` | no | `default` or `dashed` (add something). |
 | `icon` | `IconName` | no | A leading icon (`plus` on the add chip, `filter`). |
 | `disabled` | `boolean` | no |  |
+| `meta` | `string` | no | Text after the label, muted ("removes 12"); part of the button's accessible name. |
+| `struck` | `boolean` | no | The label struck through (a filter switched off but kept). |
+| `buttonRef` | `Ref<HTMLButtonElement>` | no | The chip's main button (to move focus to it). |
 
 ### Combobox
 
@@ -711,7 +715,7 @@ Source: `design-system/components/Field`
 
 ### FilterBar
 
-FilterBar: a table's filter bar (search, quick toggle chips, the many-valued filters in force, and a "more filters" panel) that uses a phone's space well. Wide, the search takes the row, under it the quick chips, the active chips and a "+ Filter" popover with the fields. Narrow (the bar's own width under `sm`), `sheet`: the search and one "Filters · N" button share a row, the button opens a side sheet with the quick chips and the fields, and the active chips scroll sideways under the row. Narrow, `scroll`: the search, then one row that scrolls sideways ("+ Filter" first, then the quick and the active chips). The two narrow forms are proposals; the owner picks one (ADR 0011).
+FilterBar: a table's filter bar (search, quick toggle chips, the many-valued filters in force, and a "more filters" panel) that uses a phone's space well. Wide, the search takes the row, under it the quick chips, the active chips and a "+ Filter" popover with the fields. Narrow (the bar's own width under `sm`), `sheet`: the search and one "Filters · N" button share a row, the button opens a side sheet with the quick chips and the fields, and the active chips scroll sideways under the row. Narrow, `scroll`: the search, then one row that scrolls sideways ("+ Filter" first, then the quick and the active chips). The two narrow forms are proposals; the owner picks one (ADR 0011). ADR 0082 adds: `groups` (`FilterGroupButton`s) on the toolbar row beside the search and the "More filters" trigger; below the chips a count line with `count` (an `aria-live=polite` region; narrow with the sheet open it is repeated in the sheet's footer: "12 of 340") and `actions` (Clear all, Save view); and, narrow, the sheet's footer button (`applyLabel` / `onApply`: "Show 12 results"). Without them the bar is as before.
 
 Source: `design-system/components/FilterBar`
 
@@ -726,19 +730,34 @@ Source: `design-system/components/FilterBar`
 | `narrow` | `'sheet' \| 'scroll'` | no | The narrow form: `sheet` (default) or `scroll`. |
 | `label` | `string` | no | Accessible name of the bar (default "Filters"). |
 | `defaultOpen` | `boolean` | no | The narrow filters sheet starts open (a story's open state). |
+| `groups` | `ReactNode` | no | One `FilterGroupButton` per group, on the toolbar row beside the search. |
+| `actions` | `ReactNode` | no | Buttons at the end of the count line (Clear all, Save view). |
+| `count` | `string` | no | The result count text ("12 of 340"), announced politely when it changes. |
+| `applyLabel` | `string` | no | Text of the narrow sheet's footer button ("Show 12 results"). |
+| `onApply` | `() => void` | no | Called when the footer button is pressed; the sheet closes after it. |
 
 ### FilterChips
 
-FilterChips: the filters of a table as chips. A filter in force is a removable chip ("Screener: VRP scanner", an × named "Remove Screener: VRP scanner"); one not in force is a dashed "+ Name" button that opens its values; "Clear filters" appears only while one is in force. The row wraps, so it fits a phone. The caller owns the values (usually search params) and what each filter means; this only shows and edits them.
+FilterChips: the filters of a table as chips. A filter in force is a removable chip ("Screener: VRP scanner", an × named "Remove Screener: VRP scanner"); one not in force is a dashed "+ Name" button that opens its values; "Clear filters" appears only while one is in force. The row wraps, so it fits a phone. The caller owns the values (usually search params) and what each filter means; this only shows and edits them. Structured form (`items`, ADR 0082): each applied filter is a toggle button ("Label value", `aria-pressed`, struck through and marked "off" while switched off) with its server-counted "removes N" and "N unknown", and a remove button; after a removal focus moves to the next chip. The two forms are one discriminated union: `items` selects the structured one.
 
 Source: `design-system/components/FilterChips`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `filters` | `readonly FilterDefinition[]` | yes |  |
-| `values` | `FilterValues` | yes |  |
-| `onChange` | `(id: string, value: string \| undefined) => void` | yes | Set a filter's value, or remove it (`undefined`). |
-| `onClear` | `() => void` | yes | Remove every filter in force. |
+
+### FilterGroupButton
+
+FilterGroupButton: one group of a filter bar ("Setup", "What changed") as a small button that opens a popover holding that group's controls (`OptionList`, `RangeFilter`, `WindowFilter`, `SegmentedControl`). While the group holds filters (`activeCount` above 0) the button is `selected` (the accent border and shows the count as a badge. Keyboard: Enter / Space opens, Escape closes and focus returns to the button; the popover is a dialog named by `label`.
+
+Source: `design-system/components/FilterGroupButton`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The group's name ("Setup"): the button text and the popover's accessible name. |
+| `activeCount` | `number` | no | How many filters of the group are in force (0 or absent: none). |
+| `activeLabel` | `string` | no | The word after the count in the accessible name ("active": "Setup, 2 active"). |
+| `children` | `ReactNode` | yes | The popover body: the group's filter controls. |
+| `defaultOpen` | `boolean` | no | The popover starts open (a story's open state). |
 
 ### FormulaPreview
 
@@ -1140,14 +1159,15 @@ Source: `design-system/components/OddsLine`
 
 ### OptionList
 
-OptionList: a scrolling list of choices, each a short name (optionally monospace, for field and symbol names) over a one-line description, one of them the current choice. A choice is a button; the current one carries `aria-current` and the accent tint, so colour is never the only signal (the selected row is also announced). Controlled: `value` in, `onSelect(id)` out. Taller than `maxHeight` it scrolls inside itself, so it never grows a page; loading shows placeholders, an empty list shows the empty message. For a choice made once and closed use Select; for many choices to filter use Combobox.
+OptionList: a scrolling list of choices, each a short name (optionally monospace, for field and symbol names) over a one-line description, one of them the current choice. A choice is a button; the current one carries `aria-current` and the accent tint, so colour is never the only signal (the selected row is also announced). Controlled: `value` in, `onSelect(id)` out. Taller than `maxHeight` it scrolls inside itself, so it never grows a page; loading shows placeholders, an empty list shows the empty message. For a choice made once and closed use Select; for many choices to filter use Combobox. With `values` it is a multi-select: each option is a toggle (`aria-pressed`, a check mark) and `count` shows how many rows hold it.
 
 Source: `design-system/components/OptionList`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `items` | `readonly OptionListItem[]` | yes |  |
-| `value` | `string \| null` | yes | The id of the current choice (null: none). |
+| `value` | `string \| null` | yes | The id of the current choice (null: none). Ignored when `values` is given. |
+| `values` | `readonly string[]` | no | Multi-select: the ids in force. Options become toggles; `onSelect` reports the id toggled. |
 | `onSelect` | `(id: string) => void` | yes |  |
 | `label` | `string` | yes | Accessible name of the list ("Fields in Volatility"). |
 | `mono` | `boolean` | no | Titles in the monospace face (catalogue names, symbols). |
@@ -1288,6 +1308,27 @@ Source: `design-system/components/ProseList`
 | `items` | `readonly ProseListItem[]` | yes |  |
 | `ordered` | `boolean` | no | Numbered instead of bulleted (a fixed order the reader follows). |
 | `'aria-label'` | `string` | no | Accessible name of the list, when the surrounding heading does not name it. |
+
+### RangeFilter
+
+RangeFilter: a numeric filter as a minimum and a maximum (two `NumberInput`s, either may be empty for an open end) with a unit, and optionally a histogram of the candidates (`bins`, drawn by `Distribution`, decorative: its counts are also given as text for screen readers). No slider. `unknownCount` says how many rows have no value, who never pass the filter. Controlled: `value` in, `onChange` out. All words are props.
+
+Source: `design-system/components/RangeFilter`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `RangeValue` | yes |  |
+| `onChange` | `(value: RangeValue) => void` | yes |  |
+| `label` | `string` | yes | Accessible name of the pair and the histogram ("DTE"). |
+| `minLabel` | `string` | no | Accessible name of the minimum (default "Min"). |
+| `maxLabel` | `string` | no | Accessible name of the maximum (default "Max"). |
+| `unit` | `string` | no | A unit shown after each number ("%", "days"). |
+| `step` | `number` | no | Arrow-key step (default 1). |
+| `bounds` | `{ min: number; max: number }` | no | The lowest and highest value either end accepts (clamped by the number fields). |
+| `bins` | `readonly DistributionBin[]` | no | Fixed-edge histogram of the candidates; counts also given as text. |
+| `unknownCount` | `number` | no | How many rows have no value (they never pass). |
+| `unknownLabel` | `string` | no | The word before the unknown count (default "Unknown"). |
+| `unknownHelp` | `ReactNode` | no | Beside the unknown count: the caller's `InfoButton` for its Guide term. |
 
 ### ScoreMeter
 
@@ -1768,6 +1809,21 @@ Source: `design-system/components/ViewChips`
 | `value` | `V` | yes | The view in use. |
 | `onValueChange` | `(value: V) => void` | yes |  |
 
+### WindowFilter
+
+WindowFilter: "within N days" or "within N sessions" as a number and a unit toggle. Controlled: `value` in, `onChange` out; an empty number means the filter is off. The unit choices and all words are props, so a screen passes its own labels. The number is a `NumberInput` (a spinbutton), the unit a `SegmentedControl` (a radio group).
+
+Source: `design-system/components/WindowFilter`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `WindowValue` | yes |  |
+| `onChange` | `(value: WindowValue) => void` | yes |  |
+| `units` | `readonly SegmentedOption[]` | yes | The units offered, e.g. days and sessions. |
+| `label` | `string` | yes | Accessible name of the number ("Within"). |
+| `unitLabel` | `string` | yes | Accessible name of the unit toggle ("Unit"). |
+| `max` | `number` | no | Largest number accepted. |
+
 ### WorkspaceSwitch
 
 WorkspaceSwitch: the top bar's switch between workspaces (Trader / Admin), a SegmentedControl named "Workspace". Selecting a workspace calls `onValueChange`; the app navigates (the design system knows no routes). Role gating stays in the app: pass only the workspaces the user may enter.
@@ -1780,3 +1836,18 @@ Source: `design-system/components/WorkspaceSwitch`
 | `value` | `V` | yes | The current workspace. |
 | `onValueChange` | `(value: V) => void` | yes | Called with the chosen workspace; the app navigates to its home. |
 | `label` | `string` | no | Accessible name of the switch; "Workspace" by default. |
+
+### ZeroResults
+
+ZeroResults: what a filtered list shows when nothing matches: an `EmptyState` with the best ways back as recovery chips ("Switch off Liquidity gives 31": one chip per filter, with the row count the server computed) and a clear-all button. Picking a chip reports its id. The chips are plain action buttons in a wrapping row (not `ActionGroup`, which collapses to icons on a phone: a chip's number must stay readable). All words are props.
+
+Source: `design-system/components/ZeroResults`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | What is missing ("No ideas match all 3 filters"). |
+| `items` | `readonly RecoveryItem[]` | yes | The loosening chips, best first. |
+| `onPick` | `(id: string) => void` | yes | A chip was picked. |
+| `onClearAll` | `() => void` | yes | Remove every filter. |
+| `givesLabel` | `string` | no | The word between a chip's label and its count (default "gives"). |
+| `clearLabel` | `string` | no | Text of the clear button (default "Clear all"). |

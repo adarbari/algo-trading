@@ -7,6 +7,10 @@
  * the active chips scroll sideways under the row. Narrow, `scroll`: the search, then one row
  * that scrolls sideways ("+ Filter" first, then the quick and the active chips). The two
  * narrow forms are proposals; the owner picks one (ADR 0011).
+ * ADR 0082 adds: `groups` (`FilterGroupButton`s) on the toolbar row beside the search and the
+ * "More filters" trigger; below the chips a count line with `count` (an `aria-live=polite`
+ * region; narrow with the sheet open it is repeated in the sheet's footer: "12 of 340") and `actions` (Clear all, Save view); and, narrow, the sheet's footer
+ * button (`applyLabel` / `onApply`: "Show 12 results"). Without them the bar is as before.
  */
 import { useState, type ReactNode } from 'react';
 
@@ -36,6 +40,16 @@ export interface FilterBarProps {
   label?: string;
   /** The narrow filters sheet starts open (a story's open state). */
   defaultOpen?: boolean;
+  /** One `FilterGroupButton` per group, on the toolbar row beside the search. */
+  groups?: ReactNode;
+  /** Buttons at the end of the count line (Clear all, Save view). */
+  actions?: ReactNode;
+  /** The result count text ("12 of 340"), announced politely when it changes. */
+  count?: string;
+  /** Text of the narrow sheet's footer button ("Show 12 results"). */
+  applyLabel?: string;
+  /** Called when the footer button is pressed; the sheet closes after it. */
+  onApply?: () => void;
 }
 
 export function FilterBar({
@@ -48,6 +62,11 @@ export function FilterBar({
   narrow: narrowForm = 'sheet',
   label = 'Filters',
   defaultOpen = false,
+  groups,
+  actions,
+  count,
+  applyLabel,
+  onApply,
 }: FilterBarProps) {
   const [ref, isNarrow] = useNarrow('sm');
   const [open, setOpen] = useState(defaultOpen);
@@ -68,7 +87,24 @@ export function FilterBar({
   ) : null;
 
   let body: ReactNode;
-  if (!isNarrow) {
+  const hasGroups = groups !== undefined && groups !== null;
+  if (!isNarrow && hasGroups) {
+    body = (
+      <Stack gap={2}>
+        <Stack direction="row" gap={2} align="center" wrap>
+          <div className={styles.grow}>{search}</div>
+          {groups}
+          {trigger}
+        </Stack>
+        {quick || hasActive ? (
+          <Stack direction="row" gap={1} align="center" wrap>
+            {quick}
+            {active}
+          </Stack>
+        ) : null}
+      </Stack>
+    );
+  } else if (!isNarrow) {
     body = (
       <Stack gap={2}>
         {search}
@@ -91,7 +127,7 @@ export function FilterBar({
       </Stack>
     );
   } else {
-    const count = activeCount !== undefined && activeCount > 0 ? ` · ${activeCount}` : '';
+    const badge = activeCount !== undefined && activeCount > 0 ? ` · ${activeCount}` : '';
     body = (
       <Stack gap={2}>
         <Stack direction="row" gap={2} align="center">
@@ -104,24 +140,78 @@ export function FilterBar({
               setOpen(true);
             }}
           >
-            {`Filters${count}`}
+            {`Filters${badge}`}
           </Button>
         </Stack>
         {hasActive ? <div className={styles.scrollRow}>{active}</div> : null}
-        <Drawer open={open} onOpenChange={setOpen} title="Filters" side="end" size="sm">
+        <Drawer
+          open={open}
+          onOpenChange={setOpen}
+          title="Filters"
+          side="end"
+          size="sm"
+          footer={
+            applyLabel !== undefined || count !== undefined ? (
+              <Stack gap={2}>
+                {count !== undefined && (
+                  <span className={styles.count} aria-live="polite" aria-atomic="true">
+                    {count}
+                  </span>
+                )}
+                {applyLabel !== undefined && (
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    onClick={() => {
+                      onApply?.();
+                      setOpen(false);
+                    }}
+                  >
+                    {applyLabel}
+                  </Button>
+                )}
+              </Stack>
+            ) : undefined
+          }
+        >
           <Stack gap={3}>
             <Stack direction="row" gap={1} align="center" wrap>
               {quick}
             </Stack>
+            {hasGroups ? (
+              <Stack direction="row" gap={1} align="center" wrap>
+                {groups}
+              </Stack>
+            ) : null}
             {more}
           </Stack>
         </Drawer>
       </Stack>
     );
   }
+  const hasCount = count !== undefined || (actions !== undefined && actions !== null);
   return (
     <div ref={ref} className={styles.root} role="group" aria-label={label}>
-      {body}
+      <Stack gap={2}>
+        {body}
+        {hasCount ? (
+          <Stack direction="row" gap={2} align="center" justify="between" wrap>
+            <span
+              className={styles.count}
+              aria-live={isNarrow && open ? undefined : 'polite'}
+              aria-hidden={isNarrow && open ? true : undefined}
+              aria-atomic="true"
+            >
+              {count}
+            </span>
+            {actions ? (
+              <Stack direction="row" gap={1} align="center">
+                {actions}
+              </Stack>
+            ) : null}
+          </Stack>
+        ) : null}
+      </Stack>
     </div>
   );
 }

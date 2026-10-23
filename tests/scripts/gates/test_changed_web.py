@@ -18,6 +18,8 @@ def cmds(*files: str, linux: bool = True) -> list[str]:
 
 def test_a_slice_file_maps_to_its_folder_and_the_type_gate() -> None:
     assert cmds("apps/web/src/entities/feature/columns.tsx") == [
+        "npx prettier --check --ignore-unknown src/entities/feature/columns.tsx",
+        "npm run ds:check",
         "npm run typecheck",
         "npx vitest run src/entities/feature",
     ]
@@ -47,8 +49,36 @@ def test_a_story_or_css_module_maps_to_the_component_screenshots() -> None:
     assert "npm run visual:docker -- --grep Banner" in off
 
 
-def test_other_files_map_to_nothing() -> None:
-    assert cmds("src/algotrade/x.py", "apps/web/package.json", "apps/web/COMPONENTS.md") == []
+def test_files_outside_the_web_app_map_to_nothing() -> None:
+    assert cmds("src/algotrade/x.py", "docs/ci.md") == []
+
+
+def test_other_web_files_get_only_the_static_gates() -> None:
+    assert cmds("apps/web/package.json") == [
+        "npx prettier --check --ignore-unknown package.json",
+        "npm run ds:check",
+    ]
+
+
+def test_a_design_system_stylesheet_is_stylelinted_alone() -> None:
+    got = cmds(
+        "apps/web/design-system/components/Banner/Banner.module.css",
+        "apps/web/src/pages/guide/GuidePage.tsx",
+    )
+    assert "npx stylelint design-system/components/Banner/Banner.module.css" in got
+    assert got.index("npm run ds:check") < got.index("npm run typecheck")
+
+
+def test_a_deleted_file_is_not_format_checked(tmp_path: Path) -> None:
+    (tmp_path / "src/widgets/kept/ui").mkdir(parents=True)
+    (tmp_path / "src/widgets/kept/ui/Kept.tsx").write_text("")
+    steps = changed_web.plan(
+        ["apps/web/src/widgets/gone/ui/Gone.tsx", "apps/web/src/widgets/kept/ui/Kept.tsx"],
+        True,
+        tmp_path,
+    )
+    fmt = " ".join(next(c for what, c in steps if what == "format"))
+    assert "Kept.tsx" in fmt and "Gone.tsx" not in fmt
 
 
 def test_a_deleted_folder_has_no_tests_to_run(tmp_path: Path) -> None:

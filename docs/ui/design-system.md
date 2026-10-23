@@ -273,6 +273,7 @@ macro circle) and a letter each (E, F, M).
 | `Toast` + `ToastProvider` + `useToast()` | Brief result of an action ("Screener saved", "Export failed") | Mount `ToastProvider` once in `src/app/providers`; `useToast().show({ tone, title, description, action, duration })`. Bottom-end, at most three, 5 s (negative: until dismissed), paused on hover / focus; status (negative: alert) |
 | `Banner` | A lasting condition on a page or panel | `info` / `warning` / `negative` tint + border + icon; `asOf` makes it the stale-data notice ("Stale data · as of 1 Oct 2026", warning); actions, dismiss |
 | `EmptyState` | Nothing to show yet | Title, one line, an action; `bordered` dashed placeholder, `compact` inside tables |
+| `FilterBar` family (ADR 0082) | `FilterBar` (search, `groups`, chips, `actions`, `count`, narrow sheet with `applyLabel`), `FilterGroupButton` (button + popover, count badge), `RangeFilter` (min / max, optional histogram), `WindowFilter` (number + unit), structured `FilterChips` (toggle, remove, "removes N"), `ZeroResults` (recovery chips) | Pick = `OptionList` with `values` + `count`; toggle = `SegmentedControl`; spec `docs/ui/filtering.md` |
 | `Skeleton` | Loading placeholders shaped like the content | `text` lines, `rect` (chart), `table` rows at the density row height; slow pulse, none under reduced motion; one busy status |
 | `ErrorState` | A section failed to load | Alert with message, mono detail, Retry (spinner while `retrying`) |
 

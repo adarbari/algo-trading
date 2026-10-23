@@ -119,11 +119,15 @@ export {
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
 export { FilterBar, type FilterBarProps } from './FilterBar';
+export { FilterGroupButton, type FilterGroupButtonProps } from './FilterGroupButton';
 export {
   FilterChips,
+  type FilterChipItem,
   type FilterChipsProps,
   type FilterDefinition,
   type FilterValues,
+  type LegacyFilterChipsProps,
+  type StructuredFilterChipsProps,
 } from './FilterChips';
 export {
   FormulaPreview,
@@ -189,6 +193,7 @@ export {
   type SearchDialogProps,
 } from './SearchDialog';
 export { SearchInput, type SearchInputProps } from './SearchInput';
+export { RangeFilter, type RangeFilterProps, type RangeValue } from './RangeFilter';
 export {
   SegmentedControl,
   type SegmentedControlProps,
@@ -277,3 +282,5 @@ export { WorkspaceSwitch, type WorkspaceSwitchProps } from './WorkspaceSwitch';
 export { LinkCard, type LinkCardProps } from './LinkCard';
 export { ProseList, type ProseListItem, type ProseListProps } from './ProseList';
 export { SourceList, type SourceListItem, type SourceListProps } from './SourceList';
+export { WindowFilter, type WindowFilterProps, type WindowValue } from './WindowFilter';
+export { ZeroResults, type RecoveryItem, type ZeroResultsProps } from './ZeroResults';

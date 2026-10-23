@@ -607,3 +607,11 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: an Opus agent measured the delta and proposed the raise (commit c2d30f6fb); Fable reviewed the evidence (the perf-budgets.json notes, the #773 waiver entry, CI job 120340124713 of run 39931132000: `196297 B gzip is over its budget of 196290 B`) and decided. Main's own CI run on f56e951 measured 196290 B, exactly the budget, so any PR touching the chunk graph trips it. The PR's web diff touches only the generated catalogue and the lazy financials-panel widget, nothing in the entry. The next raise past 196390 B needs the owner.
 - Reasoning: no honest trim exists: `SITE_FEATURES` is tree-shaken out of the entry (the catalogue names, `revisions_basis` included, ship only in the lazy FinancialsTab chunk), so the 7 B is chunk-graph and gzip noise, not code to remove; the waiver the owner gave on 2026-10-21 covers exactly this noise band.
+
+## 2026-10-23 | Web feedback loop (harness PR) | Bundle and e2e budget headroom from 1 % to 5 %
+- Question: web PRs averaged one or more red CI runs on `perf:bundle` because `update` set route budgets at measured + 1 %, a few bytes above the current size. Keep 1 %, raise it, or also loosen the shared entry budgets?
+- Options: 5 % headroom on `update`, route budgets reset to measured + 5 % with a dated reason, entry budgets untouched / the same plus a 5 % waiver on the two entry budgets / no change.
+- Decision: 5 % headroom (`HEADROOM_PERCENT` in `apps/web/scripts/perf-budgets.ts`); every route budget reset once to measured + 5 % with a `reasons` entry; the shared entry budgets and the shrink-only rule unchanged.
+- decided by: owner
+- status: final
+- Reasoning: 5 of 8 red web runs checked on 2026-10-23 failed the bundle check by tens of bytes; 5 % lets ordinary changes through while a real regression (a new dependency, a leaked lazy library) still fails.
