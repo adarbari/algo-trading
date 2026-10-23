@@ -10,7 +10,7 @@
  * Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the
  * caller's own `rowKeys` act on it); the active row can be controlled; horizontal
  * scrolling on narrow widths, with the checkbox column and the first column pinned at the start
- * (the row's key stays in view; `pinFirst`). Under the `sm` breakpoint (its own width: a phone,
+ * (the row's key stays in view). Under the `sm` breakpoint (its own width: a phone,
  * not a desktop's aside column) only the `essential` columns show by default (else the first
  * three) and the column picker appears so the user adds the rest back. `groupBy` puts the rows
  * under group headings in a declared order (the sort still orders the rows inside each group).
@@ -89,11 +89,8 @@ export interface DataTableProps<TRow> {
    * come sorted (and paged) by the caller; a header click only reports the sort it asks for.
    */
   sortMode?: 'client' | 'server';
-  /** Controlled hidden column ids (pair with `onHiddenColumnsChange`). */
-  hiddenColumns?: readonly string[];
-  /** Initially hidden column ids when uncontrolled. */
+  /** Column ids hidden at first (the picker shows them again). */
   defaultHiddenColumns?: readonly string[];
-  onHiddenColumnsChange?: (hidden: string[]) => void;
   /**
    * Controlled ids of the columns the user added back on a narrow table (pair with
    * `onNarrowColumnsChange`). A page backs it with the user's saved view or the URL so a phone
@@ -149,11 +146,6 @@ export interface DataTableProps<TRow> {
    * two sit in one row, so a narrow table does not spend a row on each.
    */
   toolbarEnd?: ReactNode;
-  /**
-   * Pin the checkbox column and the first column at the start while the table scrolls
-   * sideways (default true): pass false when the first column is not the row's key.
-   */
-  pinFirst?: boolean;
   /** Show the rows under group headings (see `DataTableGroupBy`); none: one flat list. */
   groupBy?: DataTableGroupBy<TRow>;
 }
@@ -177,9 +169,7 @@ export function DataTable<TRow extends RowData>({
   defaultSort = null,
   onSortChange,
   sortMode = 'client',
-  hiddenColumns,
   defaultHiddenColumns = EMPTY_IDS,
-  onHiddenColumnsChange,
   narrowColumns,
   onNarrowColumnsChange,
   columnPicker = false,
@@ -200,7 +190,6 @@ export function DataTable<TRow extends RowData>({
   rowLines = 1,
   toolbar,
   toolbarEnd,
-  pinFirst = true,
   groupBy,
 }: DataTableProps<TRow>) {
   const id = useId();
@@ -212,11 +201,10 @@ export function DataTable<TRow extends RowData>({
   const fitAll = visibleRowsProp === 'all' && !narrow;
   const visibleRows = visibleRowsProp === 'all' ? 12 : visibleRowsProp;
 
-  // Sort and hidden columns: controlled when the prop is given, otherwise owned here.
+  // Sort: controlled when the prop is given, otherwise owned here; hidden columns are owned here.
   const [ownSort, setOwnSort] = useState<DataTableSort | null>(defaultSort);
   const [ownHidden, setOwnHidden] = useState<readonly string[]>(defaultHiddenColumns);
   const activeSort = sort === undefined ? ownSort : sort;
-  const chosenHidden = hiddenColumns ?? ownHidden;
   // Narrow: the non-essential columns wait in the picker until the user adds them (controlled
   // by `narrowColumns`, else per table for the session); a column the user then hides goes into
   // the hidden set like on wide.
@@ -230,8 +218,8 @@ export function DataTable<TRow extends RowData>({
       .map((column) => column.id);
   }, [narrow, columns, narrowShown]);
   const hidden = useMemo(
-    () => [...new Set([...chosenHidden, ...narrowHidden])],
-    [chosenHidden, narrowHidden],
+    () => [...new Set([...ownHidden, ...narrowHidden])],
+    [ownHidden, narrowHidden],
   );
 
   const activatable = (row: TRow) => onRowActivate !== undefined && (canActivate?.(row) ?? true);
@@ -240,10 +228,6 @@ export function DataTable<TRow extends RowData>({
     if (sort === undefined) setOwnSort(next);
     onSortChange?.(next);
   };
-  const setHidden = (next: string[]) => {
-    if (hiddenColumns === undefined) setOwnHidden(next);
-    onHiddenColumnsChange?.(next);
-  };
   const setNarrowShown = (next: string[]) => {
     if (narrowColumns === undefined) setOwnNarrowShown(next);
     onNarrowColumnsChange?.(next);
@@ -251,9 +235,9 @@ export function DataTable<TRow extends RowData>({
   const toggleColumn = (columnId: string, visible: boolean) => {
     if (visible) {
       if (narrowHidden.includes(columnId)) setNarrowShown([...narrowShown, columnId]);
-      if (chosenHidden.includes(columnId)) setHidden(chosenHidden.filter((h) => h !== columnId));
-    } else if (!chosenHidden.includes(columnId)) {
-      setHidden([...chosenHidden, columnId]);
+      if (ownHidden.includes(columnId)) setOwnHidden(ownHidden.filter((h) => h !== columnId));
+    } else if (!ownHidden.includes(columnId)) {
+      setOwnHidden([...ownHidden, columnId]);
     }
   };
   const showPicker = columnPicker || narrowHidden.length > 0;
@@ -283,7 +267,7 @@ export function DataTable<TRow extends RowData>({
     onColumnVisibilityChange: (updater: Updater<Record<string, boolean>>) => {
       const next = resolve(updater, columnVisibility);
       const wanted = Object.keys(next).filter((columnId) => next[columnId] === false);
-      setHidden(wanted.filter((columnId) => !narrowHidden.includes(columnId)));
+      setOwnHidden(wanted.filter((columnId) => !narrowHidden.includes(columnId)));
     },
     onRowSelectionChange: (updater: Updater<RowSelectionState>) => {
       const next = resolve(updater, rowSelection);
@@ -449,17 +433,11 @@ export function DataTable<TRow extends RowData>({
   const colCount = visibleColumns.length + (selectable ? 1 : 0);
   const firstColumnId = visibleColumns[0]?.id;
   /** `data-pinned` of the checkbox cell, of a column's cells, or of a placeholder cell by index. */
-  const pinSelect = pinFirst && selectable ? ('select' as const) : undefined;
+  const pinSelect = selectable ? ('select' as const) : undefined;
   const pinColumn = (columnId: string) =>
-    pinFirst && columnId === firstColumnId ? ('first' as const) : undefined;
+    columnId === firstColumnId ? ('first' as const) : undefined;
   const pinCell = (index: number) =>
-    !pinFirst
-      ? undefined
-      : selectable && index === 0
-        ? 'select'
-        : index === (selectable ? 1 : 0)
-          ? 'first'
-          : undefined;
+    selectable && index === 0 ? 'select' : index === (selectable ? 1 : 0) ? 'first' : undefined;
 
   const pickerColumns = columns.map((column) => ({
     id: column.id,
@@ -500,7 +478,7 @@ export function DataTable<TRow extends RowData>({
       <div
         ref={scrollRef}
         className={styles.scroller}
-        data-fit={fitAll ? 'all' : undefined}
+        data-fit={fitAll || undefined}
         role="grid"
         aria-label={label}
         aria-rowcount={ready ? itemCount + 1 : -1}

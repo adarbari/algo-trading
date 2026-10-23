@@ -204,8 +204,7 @@ describe('DataTable', () => {
   });
 
   it('hides and shows columns from the picker, with descriptions', async () => {
-    const onHidden = vi.fn();
-    render(<Table columnPicker defaultHiddenColumns={['adv']} onHiddenColumnsChange={onHidden} />);
+    render(<Table columnPicker defaultHiddenColumns={['adv']} />);
     const user = userEvent.setup();
     expect(screen.queryByRole('columnheader', { name: 'ADV' })).toBeNull();
     const button = screen.getByRole('button', { name: /Columns/ });
@@ -216,10 +215,9 @@ describe('DataTable', () => {
     expect(iv).toHaveAccessibleDescription('Our 30-day implied volatility');
     expect(within(panel).getByRole('checkbox', { name: 'Ticker' })).toBeDisabled();
     await user.click(within(panel).getByRole('checkbox', { name: 'ADV' }));
-    expect(onHidden).toHaveBeenLastCalledWith([]);
     expect(screen.getByRole('columnheader', { name: 'ADV' })).toBeInTheDocument();
     await user.click(iv);
-    expect(onHidden).toHaveBeenLastCalledWith(['iv30']);
+    expect(screen.queryByRole('columnheader', { name: 'IV30' })).toBeNull();
     await user.keyboard('{Escape}');
     expect(panel).not.toBeVisible();
     expect(button).toHaveFocus();
@@ -281,7 +279,7 @@ describe('DataTable', () => {
 
   it('shows every row with visibleRows all: no inner scroll, the page scrolls', () => {
     render(<Table rows={makeUniverse(60)} visibleRows="all" />);
-    expect(screen.getByRole('grid')).toHaveAttribute('data-fit', 'all');
+    expect(screen.getByRole('grid')).toHaveAttribute('data-fit');
     expect(bodyRows()).toHaveLength(60);
   });
 
@@ -304,10 +302,9 @@ describe('DataTable', () => {
     expect(pins(firstRow)).toEqual(['select', 'first', null, null, null, null]);
   });
 
-  it('pins nothing with pinFirst false, and marks the grid scrolled sideways', () => {
-    render(<Table pinFirst={false} />);
+  it('marks the grid scrolled sideways', () => {
+    render(<Table />);
     const grid = screen.getByRole('grid');
-    expect(grid.querySelector('[data-pinned]')).toBeNull();
     grid.scrollLeft = 40;
     grid.dispatchEvent(new Event('scroll'));
     expect(grid).toHaveAttribute('data-scrolled-x');

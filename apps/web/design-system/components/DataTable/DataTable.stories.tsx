@@ -414,7 +414,7 @@ export const ShowAll: Story = {
   render: () => <TickerTable rows={smallUniverse} visibleRows="all" />,
   play: async ({ canvasElement }) => {
     const grid = within(canvasElement).getByRole('grid');
-    await expect(grid).toHaveAttribute('data-fit', 'all');
+    await expect(grid).toHaveAttribute('data-fit');
   },
 };
 
