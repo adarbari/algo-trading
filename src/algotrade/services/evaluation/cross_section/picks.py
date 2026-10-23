@@ -4,12 +4,13 @@ was known at the session, never an outcome (the harness joins those, ``harness.p
 ``screen_variant`` runs a resolved screener through ``services.screening.run.screen_session``
 and returns its rows best-first: a rule screen by its stored rank (score, tie-break, id), a
 Python screener by (score, id). ``eligible`` is the edge's universe at the session: the base
-rate and the decile spread are taken over it."""
+rate and the decile spread are taken over it. ``long_picks`` is the long leg's one rule."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
 
+from algotrade.config.edges.document import Edge
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
@@ -81,6 +82,15 @@ def screen_variant(reader: StoreReader, config: ResolvedConfig, session: date) -
         scores=scores,
         identity=_paths(screened.selected, [i for i, _ in ranked]),
     )
+
+
+def long_picks(edge: Edge, qualified: Sequence[str], pickable: frozenset[str]) -> list[str]:
+    """The long leg of ``edge`` at one session, place 1 first: the screener's qualified names (best
+    first) that are pickable (inside the edge's universe, and an event schedule's event names),
+    the first ``top_k`` of them (none: every one). The one rule the harness (``measuring``), the
+    paper record (``forward.signals``) and the stored picks (``edge_picks``, ADR 0081) share."""
+    chosen = [i for i in qualified if i in pickable]
+    return chosen if edge.top_k is None else chosen[: edge.top_k]
 
 
 def _paths(chosen: SelectionResult, ids: Sequence[str]) -> dict[str, int]:

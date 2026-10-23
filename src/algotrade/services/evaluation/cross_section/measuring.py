@@ -75,7 +75,7 @@ from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     decile_means,
 )
-from algotrade.services.evaluation.cross_section.picks import RankedRun
+from algotrade.services.evaluation.cross_section.picks import RankedRun, long_picks
 from algotrade.services.evaluation.cross_section.portfolio.overlays import apply_overlays
 from algotrade.services.evaluation.cross_section.portfolio.session import (
     cash_return,
@@ -246,7 +246,7 @@ def _stat(
     if side == LONG:
         in_universe = [i for i in run.qualified if i in eligible]
         chosen = [i for i in in_universe if i in pickable]
-        legs = [(LONG, chosen if edge.top_k is None else chosen[: edge.top_k])]
+        legs = [(LONG, long_picks(edge, chosen, pickable))]
         below = chosen[edge.top_k : hold] if hold is not None and edge.top_k else []
     else:  # a short leg is ranked by score: too few scores and there is no honest bottom
         if thin:  # fail closed: the session is not measured, as an incomplete screen is not

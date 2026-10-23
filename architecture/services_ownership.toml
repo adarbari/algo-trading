@@ -114,6 +114,17 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "run_night" }, { call = "settle_group" }, { call = "edge_signals" }, { string = "results/edge_paper" }]
 
 [[responsibility]]
+id = "edge-picks-decision"
+description = "What each site edge took at a session (ADR 0081): per edge and screener it lists, status picked (the edge decides: picks.long_picks over the screener's run, the edge's universe and an event schedule's names, best first, the first top_k), not_decision_day (its schedule does not fire: sessions.decision_sessions, forward.signals.legs_between), unjudged (a short, long-short or portfolio outcome) or skipped with the reason (data missing), one screen per config hash a session; framed as the stamped results/edge_picks rows; the ingestion edge-picks task publishes them and the read model reads them, nothing else decides a pick"
+owner = ["src/algotrade/services/evaluation/edge_picks/*"]
+allowed = [
+    "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_picks's one schema
+    "apps/ingestion/algotrade_ingestion/tasks/edges/picks.py",  # the task publishes the frames
+]
+section = "docs/adr/0081-stored-edge-picks.md#decision"
+detect = [{ call = "edge_night" }, { call = "edge_picks_frame" }]
+
+[[responsibility]]
 id = "edge-scorer-fit"
 description = "Fit a learned scorer for an edge (ADR 0053 amendment, ED7): the training frame (the edge's eligible names at each decision session D with the features its document declares under [scorer] read at D only, and the edge's hit at the entry session S as the label, only windows closing before frozen_from less one horizon: purged and embargoed, never the frozen period), the probit of the hit on the standardised features (quant/probit.py is the model), and the coefficients written as the TOML expression feature edge_score_<edge> in config/site/features/scores/edge_scores.toml with fitted_through; run by algotrade-backtest fit-edge-scorer through the edge-score-fit job; nightly scoring is the expression engine's ncdf over the file, with no label at score time"
 owner = ["src/algotrade/services/evaluation/training/*"]

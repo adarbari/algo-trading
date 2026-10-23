@@ -78,7 +78,7 @@ const result = (rank: number, symbol: string, decision: string, change: string |
       edgeId: 'drift',
       edgeName: 'Drift',
       counts: decision === 'QUALIFIED',
-      code: decision === 'QUALIFIED' ? 'counts' : 'not_qualified',
+      code: decision === 'QUALIFIED' ? 'counts' : 'not_counted',
       topK: 5,
       place: decision === 'QUALIFIED' ? rank : null,
     },

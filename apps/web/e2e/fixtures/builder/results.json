@@ -235,9 +235,9 @@
                 "edgeId": "earnings_drift",
                 "edgeName": "Earnings drift",
                 "counts": false,
-                "code": "below_top_k",
+                "code": "not_counted",
                 "topK": 2,
-                "place": 3
+                "place": null
               }
             ]
           },
@@ -289,7 +289,7 @@
                 "edgeId": "earnings_drift",
                 "edgeName": "Earnings drift",
                 "counts": false,
-                "code": "not_qualified",
+                "code": "not_counted",
                 "topK": 2,
                 "place": null
               }
@@ -343,7 +343,7 @@
                 "edgeId": "earnings_drift",
                 "edgeName": "Earnings drift",
                 "counts": false,
-                "code": "not_qualified",
+                "code": "not_counted",
                 "topK": 2,
                 "place": null
               }

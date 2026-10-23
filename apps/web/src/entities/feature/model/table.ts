@@ -53,7 +53,7 @@ export interface PickEdge {
   edgeId: string;
   edgeName: string;
   counts: boolean;
-  /** counts, paused, not_qualified, below_top_k or withheld. */
+  /** counts, paused, not_counted, not_a_decision_day, unjudged, not_stored or withheld. */
   code: string;
   topK?: number | null | undefined;
   /** The pick's place among the run's qualified rows. */

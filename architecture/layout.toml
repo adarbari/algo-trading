@@ -421,6 +421,10 @@ path = "src/algotrade/services/evaluation/discovery"
 purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): the session grid and the eligible names at each (grid.py), the winners from a stored outcome (labels.py, with the harness and the training frame the only importer of outcomes), the matched controls (controls.py), the features of both read at the grid session only (frame.py), the effects, sign stability, tell clusters and the gate against the permutation null (tells.py), the probit proposer (proposer.py), the typed result (results.py), its results/winners_study rows and run record (persist.py, atomic, one run) and the candidate edge draft written to var/edge_drafts only from a run that passed the gate (drafts.py); pure over frames except the reads and the two writers"
 
 [[dir]]
+path = "src/algotrade/services/evaluation/edge_picks"
+purpose = "what each site edge took at a session (ADR 0081): the decision by the harness's one pick rule over its screener's run, its universe and its schedule (night.py: picked / not_decision_day / unjudged / skipped with the reason) and the stamped results/edge_picks rows of it (frame.py); published by the edge-picks ingestion task, read only by services/read/evaluation/pick_edges.py"
+
+[[dir]]
 path = "src/algotrade/services/evaluation/forward"
 purpose = "the forward paper record (ADR 0053 amendment 2026-10-09): a followed edge's tonight picks by the harness's own picker (signals.py), the open trades a stored outcome closes (settle.py, with the harness and the training frame an importer of outcomes) and one night's rows and run record published atomically into results/edge_paper (results.py)"
 

@@ -73,6 +73,8 @@ EXEMPT = {
     "services/read/ops/ingestion.py": STORED_OPEN,
     "services/read/screens/runs.py": "run rows: names and decisions; values are gated in results",
     "services/read/screens/views.py": "saved views: configs, no values",
+    "services/read/evaluation/pick_edges.py": "stored pick ids (names, no value) of an edge, "
+    "and a row whose rank is withheld is not judged (ADR 0081)",
     "services/read/evaluation/runs.py": "run results carry their recorded licence (ADR 0064)",
     "services/read/ops/backtests.py": "backtest results of the user's own runs (ADR 0064)",
 }

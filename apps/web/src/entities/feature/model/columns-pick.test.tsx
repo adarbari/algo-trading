@@ -114,10 +114,11 @@ describe('the words of each reason', () => {
     for (const code of [
       'counts',
       'paused',
-      'not_qualified',
-      'below_top_k',
+      'not_counted',
+      'not_a_decision_day',
       'withheld',
       'unjudged',
+      'not_stored',
     ]) {
       expect(PICK_EDGE_TERM[code]).toMatch(/^edge_pick_/);
       expect(pickEdgeWords(edge(code))).not.toBe('');

@@ -27,7 +27,8 @@ FULL = (REPO_ROOT / "tests/fixtures/sources/sec/full_index_form_2011q3_hand_buil
 
 class FakeIndex:
     """Answers per day from a script: ``None`` (a 403) or a CIK; the quarter's full index
-    (``full_payload``, else a 403) is the recorded fixture, parsed by the real parser."""
+    (``full_payload``, else a 403) is a hand-built fixture
+    in the real layout, parsed by the real parser."""
 
     def __init__(
         self, script: dict[date, list[str | None]], full_payload: bytes | None = None
@@ -100,11 +101,24 @@ def test_days_with_no_daily_file_are_served_from_the_quarters_full_index_read_on
     assert filers.from_full_index == JULY
     assert filers.holidays == [date(2011, 7, 4)]
     assert index.full_calls == 1  # one quarter, one read
-    assert all(index.calls[d] == 1 + len(INDEX_RETRY_BACKOFF) for d in JULY)
+    assert index.calls[JULY[0]] == 1 + len(INDEX_RETRY_BACKOFF)  # the quarter's first gap retries
+    assert index.calls[JULY[1]] == index.calls[JULY[2]] == 1  # the loaded quarter answers
+    assert slept == list(INDEX_RETRY_BACKOFF)
+
+
+def test_a_loaded_quarter_skips_the_rereads_and_the_pauses_for_every_later_gap() -> None:
+    days = [date(2011, 7, 5), date(2011, 7, 6), date(2011, 7, 7)]  # the 7th is not in the index
+    index = FakeIndex({d: [None] for d in days}, FULL)
+    slept: list[float] = []
+    with pytest.raises(IndexGapError, match=r"2011-07-07"):
+        walk(index, days[0], days[-1], slept)
+    assert slept == list(INDEX_RETRY_BACKOFF)  # only the 5th paused
+    assert index.calls == {days[0]: 3, days[1]: 1, days[2]: 1}
+    assert index.full_calls == 1
 
 
 def test_a_day_absent_from_both_indexes_still_raises_the_gap() -> None:
     index = FakeIndex({date(2011, 7, 7): [None]}, FULL)  # no row for the 7th in the full index
-    with pytest.raises(IndexGapError, match=r"2011-07-07"):
+    with pytest.raises(IndexGapError, match=r"2011-07-07.*no 10-K / 10-Q form filed that day"):
         walk(index, date(2011, 7, 7), date(2011, 7, 7), [])
     assert index.full_calls == 1

@@ -1,6 +1,6 @@
 """What the analyst feature groups share: the population, the vendor's rows as of a session and
 the status of a name (``analyst_estimates@v2``, ``analyst_targets@v2``, ``analyst_ratings@v2``,
-``analyst_revisions@v2``; ADR 0068, ADR 0072, ADR 0080).
+``analyst_revisions@v3``; ADR 0068, ADR 0072, ADR 0080).
 
 The input is ``analyst/estimate_snapshots`` as a session sees it (``data.analyst.reading``: the
 latest version of each row published before the next open). One row per universe equity, so the
@@ -75,6 +75,10 @@ NEEDED = (  # the snapshot columns the groups read: a store without one reads it
     "hold",
     "sell",
     "strong_sell",
+    "eps_trend_current",  # Yahoo's epsTrend: now, and N days before the fetch
+    "eps_trend_30d_ago",
+    "eps_trend_60d_ago",
+    "eps_trend_90d_ago",
 )
 LOOKBACK = 70  # sessions of snapshots read: about 100 calendar days, well past the 21 of STALE
 # Sessions of snapshots the groups that compare with 90 days back read: the newest snapshot may be

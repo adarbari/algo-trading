@@ -54,7 +54,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "bars/1d",                   # instrument rollup group (a Features tab history reads them all; test_nightly.py). 176 MB
     "rollups/instrument/analyst_estimates@v2",
     "rollups/instrument/analyst_ratings@v2",
-    "rollups/instrument/analyst_revisions@v2",
+    "rollups/instrument/analyst_revisions@v3",
     "rollups/instrument/analyst_targets@v2",
     "rollups/instrument/anchored_vwap@v2",   # 68 MB
     "rollups/instrument/illiquidity@v1",   # about 10 MB a year (2 columns): measure before the first backfill

@@ -194,7 +194,8 @@ export const SECTIONS: readonly SectionSpec[] = [
       feature('rollup.analyst_targets@v2.targets_status'),
       feature('rollup.analyst_ratings@v2.ratings_status'),
       feature('rollup.analyst_ratings@v2.ratings_source'),
-      feature('rollup.analyst_revisions@v2.revisions_status'),
+      feature('rollup.analyst_revisions@v3.revisions_status'),
+      feature('rollup.analyst_revisions@v3.revisions_basis'),
     ],
     // Forward P/E and forward revenue growth are in the strip and not repeated. Order: the
     // targets, the ratings (the five counts, who rated, the score, its change, the month), the
@@ -250,37 +251,37 @@ export const SECTIONS: readonly SectionSpec[] = [
       f(
         'eps-rev-30',
         'EPS estimate revision, FY1 (30d)',
-        feature('rollup.analyst_revisions@v2.eps_fy1_revision_30d'),
+        feature('rollup.analyst_revisions@v3.eps_fy1_revision_30d'),
         true,
       ),
       f(
         'eps-rev-60',
         'EPS estimate revision, FY1 (60d)',
-        feature('rollup.analyst_revisions@v2.eps_fy1_revision_60d'),
+        feature('rollup.analyst_revisions@v3.eps_fy1_revision_60d'),
         true,
       ),
       f(
         'eps-rev-90',
         'EPS estimate revision, FY1 (90d)',
-        feature('rollup.analyst_revisions@v2.eps_fy1_revision_90d'),
+        feature('rollup.analyst_revisions@v3.eps_fy1_revision_90d'),
         true,
       ),
       f(
         'revenue-rev-30',
         'Revenue estimate revision, FY1 (30d)',
-        feature('rollup.analyst_revisions@v2.revenue_fy1_revision_30d'),
+        feature('rollup.analyst_revisions@v3.revenue_fy1_revision_30d'),
         true,
       ),
       f(
         'revenue-rev-90',
         'Revenue estimate revision, FY1 (90d)',
-        feature('rollup.analyst_revisions@v2.revenue_fy1_revision_90d'),
+        feature('rollup.analyst_revisions@v3.revenue_fy1_revision_90d'),
         true,
       ),
       f(
         'eps-analysts-90',
         'Analysts behind EPS, change (90d)',
-        feature('rollup.analyst_revisions@v2.eps_fy1_analysts_change_90d'),
+        feature('rollup.analyst_revisions@v3.eps_fy1_analysts_change_90d'),
         true,
       ),
     ],

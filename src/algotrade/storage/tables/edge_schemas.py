@@ -1,7 +1,7 @@
 """The schemas of the edge harness's result tables (ADR 0053, 0063, 0064): ``results/edge_eval``,
 ``results/edge_series``, ``results/winners_study``, ``results/edge_paper``,
-``results/edge_legs``, ``results/edge_trades`` and ``results/edge_verdict``. Declared here,
-registered in ``schemas.KNOWN``."""
+``results/edge_legs``, ``results/edge_trades``, ``results/edge_verdict`` and
+``results/edge_picks``. Declared here, registered in ``schemas.KNOWN``."""
 
 from algotrade.storage.tables.spec import fixed, floats, strings
 
@@ -312,4 +312,25 @@ EDGE_VERDICT = fixed(
     *floats("lift", "lift_pts"),
     runs="merge",
     key=("edge_id", "user_id", "judged_run_id", "fingerprint"),
+)  # fmt: skip
+
+# What each site edge took at a session (ADR 0081): one row per (user, edge, screener) in the
+# partition of the decision session D, written nightly by the ``edge-picks`` task and read only by
+# ``services/read/evaluation/pick_edges.py`` for the screener page's "counts toward". ``status``:
+# ``picked`` (the edge decides at D; ``pick_ids`` its picks, place 1 first, possibly none),
+# ``not_decision_day`` (its schedule does not fire at D), ``unjudged`` (its outcome is not a long
+# leg of the screener's picks; ``reason`` says why) or ``skipped`` (the data to decide was
+# missing; ``reason`` says what). ``top_k`` the edge's cut (null: every qualified name),
+# ``config_hash`` the screener's resolved config the picks came from. ``user_id`` is always
+# ``site``. Runs merge per key; ``knowledge_ts`` is the write instant, never back-dated.
+EDGE_PICKS = fixed(
+    "results/edge_picks",
+    "results",
+    ("user_id", "edge_id", "screener"),
+    *("user_id string!", "edge_id string!", "screener string!", "status string!"),
+    *strings("reason", "config_hash"),
+    "top_k int64",
+    "pick_ids string[]",
+    runs="merge",
+    key=("user_id", "edge_id", "screener"),
 )  # fmt: skip

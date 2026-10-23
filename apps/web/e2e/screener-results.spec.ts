@@ -232,7 +232,7 @@ test('the page says which edge the screener implements, why each pick matched an
   const aapl = grid(page).getByRole('row', { name: /AAPL/ });
   await expect(aapl).toContainText('61.0%');
   await expect(aapl).toContainText('Counts');
-  await expect(grid(page).getByRole('row', { name: /UVXY/ })).toContainText('below the cut');
+  await expect(grid(page).getByRole('row', { name: /UVXY/ })).toContainText('Not counted');
   // A pick the regime gate held back is shown as not counted.
   await expect(grid(page).getByRole('row', { name: /XOM/ })).toContainText('Held back');
   // The pick's detail lists what it counts toward.
