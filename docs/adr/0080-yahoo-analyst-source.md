@@ -198,3 +198,29 @@ gathers its inputs and asks).
   eight):** peak 325 event pulls a night, the ceiling saturated at the season's peak (mean 399 a
   night over 99 nights), worst gap since a name's last answer 19 days with a ceiling of 400
   (none past 21), 13 days with 600. Off season: about 70 event pulls and 300 baseline pulls.
+
+## Amendment 2026-10-24: ratings and revisions from Yahoo (PR1 built: the columns)
+
+Reverses two settled points: PR B said ratings stay Finnhub-only, and that the revision history is
+only what we store. One `quoteSummary` answer already carries both a rating history and an EPS
+consensus history; they are kept, labelled by where they come from.
+
+- **Stored (PR1, ingestion).** `analyst/estimate_snapshots` gains four nullable float64 columns,
+  `eps_trend_current`, `eps_trend_30d_ago`, `eps_trend_60d_ago`, `eps_trend_90d_ago`, from
+  `earningsTrend.trend[].epsTrend` (the 7-day value is not kept). Additive: older partitions and
+  FMP rows read null. The recommendation parse returns up to four rows, buckets `0m`, `-1m`, `-2m`,
+  `-3m`, `period` the first day of the session's month less k months (UTC); the table key is per
+  period, so all are stored. The schedule's fingerprint hashes only the newest month's counts, so a
+  month roll or the added months fire no false "new data" pull.
+- **Revisions (PR3, `analyst_revisions@v3`).** Taken in-series: `eps_trend_current` less
+  `eps_trend_Nd_ago`, never `eps_avg` less `NdaysAgo` (different restatements). `NdaysAgo` is
+  Yahoo's restatement as of the fetch day, so its `knowledge_ts` is the fetch day; a
+  `revisions_basis` column says `own_snapshots` (our history) or `vendor_trend`. Yahoo has no revenue
+  history: revenue revisions stay own-history.
+- **Ratings (PR2, `analyst_ratings@v2`).** A `ratings_source` column (`finnhub` / `yahoo`): Finnhub
+  first, then Yahoo; the mixed column carries licence `yahoo`. Yahoo's score change is the `0m`
+  score less the `-3m` score from the same snapshot, null when `-3m` is missing or a count is 0.
+  Buckets are calendar months, so the span is roughly 60 to 120 days. Yahoo ratings go stale at
+  `yahoo_stale_days = 60` (a name FMP answers is refreshed by Yahoo only every `standby_days` 45).
+- **No re-parse of raw.** A merge store would replace the original rows; the 14-day baseline
+  refreshes every name with the new columns soon enough.

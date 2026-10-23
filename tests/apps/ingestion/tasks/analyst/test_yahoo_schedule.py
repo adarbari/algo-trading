@@ -256,6 +256,17 @@ def test_the_fingerprint_is_stable_and_changes_with_the_numbers() -> None:
     assert len(ys.fingerprint({})) == 8
 
 
+def test_the_fingerprint_hashes_only_the_newest_month_of_the_recommendation() -> None:
+    one = answer()
+    several = answer()
+    older = one["recommendation"].assign(period=pd.Timestamp("2026-07-01"), strong_buy=9)
+    several["recommendation"] = pd.concat([one["recommendation"], older], ignore_index=True)
+    assert ys.fingerprint(several) == ys.fingerprint(one)  # added months are no news
+    moved = answer()
+    moved["recommendation"] = one["recommendation"].assign(buy=3)
+    assert ys.fingerprint(moved) != ys.fingerprint(one)  # the newest month's counts are
+
+
 def test_the_epstrend_fields_and_bucket_roll_of_a_payload_are_ignored() -> None:
     def found(seven: float, month: str) -> dict:  # type: ignore[type-arg]
         trend = {
