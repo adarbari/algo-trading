@@ -101,8 +101,18 @@ payloads, 4 GB and 121k files) and `staging/` (transient, 124k files) are not co
 the read path (`services/read`, the API) opens them, so the clone has about 1.14M files instead
 of 1.38M. The list is explicit in the wrapper (`copy_entries`) and tested with a fixture store.
 **Cost:** the clone shares every block with the store (APFS `cp -c`), so near-zero disk; the copy
-runs at low I/O priority (`taskpolicy -b`, `nice` where there is none) so it does not slow the
-live site: the effect on the copy time is to be measured on the first night. The clone is renamed
+runs at low CPU priority only (`nice -n 10`, override `PERF_LOWPRI`; the trash delete the same).
+**Not `taskpolicy -b`:** it throttles disk I/O, and the first real run (2026-10-23) was killed at the
+600 s cap because of it. Measured on the owner's machine, 257,061 files of `rollups/market`, CoW
+`cp -cR`:
+
+| priority | copy time |
+|---|---|
+| normal | 42 s |
+| `taskpolicy -b` | 170 s (4.0x slower) |
+| `nice -n 10` | 42 s |
+
+so the whole clone (1.1M files, about 6k files/s) takes about 3-4 minutes. The clone is renamed
 to a sibling `data.trash.<date>` at the end (instant) and deleted afterwards, detached, at low
 priority; a leftover trash of an earlier run is deleted first, in the background, never blocking
 the start (a free-disk refusal then says the trash is still being deleted). Only a sibling
@@ -124,7 +134,10 @@ child's command from `ps`). No child, or only `sleep` children, is parked: the g
 `run.log` records `ignored parked driver ... pid <pid> <command>`. It **fails closed**: a driver whose
 children cannot be listed (`pgrep` fails or is missing), a child whose command cannot be read, or a
 non-numeric pid counts as a writer. The gate itself and `fast_bench` never match.
-A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
+**Writers are also checked while the copy runs**, every 10 s (`PERF_POLL_S`), with the same rules:
+one that appears kills the copy's process group, the clone is renamed away and deleted in the
+background, and the run exits 3 busy naming the writer (retries continue). `python -m
+algotrade_ingestion` counts like `algotrade-ingest`. A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
 discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
 continue. After the copy **every** outcome is a finished day (one notification, never a re-copy
 at the next retry): `ok`, `over-the-bar`, `integrity` (an integrity failure: its own notice lists the failures, not "0 views over"), `over-time`, `refused` (the bench refused) and
@@ -165,9 +178,12 @@ measured for the whole store, 9m41s under load), the bench at most 5 minutes by
 its budget (typically 2.5), the cleanup an instant rename: about 6-9 minutes wall, worst case
 10-11. The bench is hard-capped: a watchdog runs it in its own process group and at 300 s kills
 the whole group (the bench and its API child), marks the run over-time (exit 4; a finished day,
-so no retry loop; nothing is recorded) and the clone is renamed away. The copy has its own cap:
-over 10 minutes it is killed, the partial clone discarded the same way (outcome
-`snapshot-over-time`, exit 4, one notification, a finished day). Every run appends
+so no retry loop; nothing is recorded) and the clone is renamed away. The copy has its own cap, a safety net and not the
+expectation (the target is 5-10 minutes wall in total; the copy is about 3-4): over 15 minutes
+(`PERF_SNAPSHOT_LIMIT_S`, default 900) it is killed, the partial clone discarded the same way (outcome
+`snapshot-over-time`, exit 4, one notification, a finished day). Whenever the copy is stopped (the cap,
+or a writer) `snapshot.json` records how far it got: `copy_stopped`, `copy_s`, `entry` (the top-level
+entry being copied), `files_so_far` and `kb_so_far` (each count capped at 5 s, else `unknown`). Every run appends
 `wait_s snapshot_s bench_s cleanup_s total_s` (and `over_time=`) to `var/logs/perf_gate.status`;
 `cleanup_s` is the rename, and `trash_delete_s` is added to `status.json` (and
 `trash_delete_s.txt`) when the background delete finishes. The history line carries `wait_s` and

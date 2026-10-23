@@ -50,10 +50,10 @@ today=${PERF_NOW_DATE:-$(date +%Y-%m-%d)}
 hm=${PERF_NOW_HM:-$(date +%H%M)}
 min_disk_gb=12
 max_load=4
-markers='algotrade-ingest|algotrade-backtest|var/logs/'
+markers='algotrade-ingest|algotrade_ingestion|algotrade-backtest|var/logs/'
 # a real writer: an ingest or backtest command (rollups, nightly and compaction run through them). Any
 # other marker match is a driver script (var/logs/...): a writer only while it has a live child that is not `sleep`
-real_writer='algotrade-ingest|algotrade-backtest|rollups|nightly|compaction'
+real_writer='algotrade-ingest|algotrade_ingestion|algotrade-backtest|rollups|nightly|compaction'
 
 # the bench starts an API on a spare port of ALGOTRADE_PORT_BASE + 8..19: a fixed block outside the
 # worktrees' (10000-14990) and the live API's 8000, so the nightly never collides with either
@@ -61,7 +61,7 @@ export ALGOTRADE_PORT_BASE=${PERF_PORT_BASE:-15990}
 t_start=$(date +%s)
 bench_limit=${PERF_BENCH_LIMIT_S:-300}
 total_limit=${PERF_TOTAL_LIMIT_S:-720}
-snapshot_limit=${PERF_SNAPSHOT_LIMIT_S:-600}
+snapshot_limit=${PERF_SNAPSHOT_LIMIT_S:-900}  # a safety net: the copy is expected at 3-4 min
 # what the API and the bench read: tables, runs and serving (locks are created empty). raw/ (vendor
 # payloads the API never opens) and staging/ (transient) are NOT copied: ~245k files and 7 GB less
 copy_entries="tables runs serving"
@@ -216,10 +216,9 @@ except subprocess.TimeoutExpired:
     sys.exit(124)
 PY
 }
-# low I/O priority for the copy and the delete (the live site shares the disk); macOS has no ionice
-if [ -z "${PERF_LOWPRI+x}" ]; then
-  if command -v taskpolicy >/dev/null 2>&1; then PERF_LOWPRI="taskpolicy -b"; else PERF_LOWPRI="nice -n 19"; fi
-fi
+# CPU priority only for the copy and the delete. NOT `taskpolicy -b`: it throttles disk I/O and made the
+# CoW copy 4.0x slower (measured 2026-10-23: 42 s normal, 170 s under -b, 42 s under nice -n 10).
+: "${PERF_LOWPRI=nice -n 10}"
 trash_dir=
 trash_ok() {  # only a sibling data.trash.* of the clone is ever deleted
   case "$1" in */perf-clone/data.trash.*) [ "$(dirname "$1")" = "$(dirname "$clone")" ] ;; *) return 1 ;; esac
@@ -267,7 +266,7 @@ driver_busy() {  # $1 = pid; returns 0 (busy) unless it has no child or only sle
   for c in $kids; do
     cargs=$(ps -o args= -p "$c" 2>/dev/null)
     [ -n "$cargs" ] || return 0               # the child vanished or is unreadable: cannot tell
-    set -- $cargs; cmd=${1##*/}
+    cmd=${cargs%%[[:space:]]*}; cmd=${cmd##*/}   # no word splitting: a glob in the args must not expand
     [ "$cmd" = sleep ] || return 0
   done
   return 1
@@ -311,13 +310,37 @@ clone_made=1
 mkdir -p "$clone"
 # the real nightly copies with cp -c (APFS clonefile: shared blocks); PERF_COPY_CMD replaces it
 # where cp has no -c (the tests, Linux). One watchdog caps the whole copy.
-SRC=$src CLONE=$clone ENTRIES=$copy_entries COPY="$PERF_LOWPRI ${PERF_COPY_CMD:-cp -cR}" \
-  watchdog "$snapshot_limit" sh -c 'set -e; for e in $ENTRIES; do [ -e "$SRC/$e" ] || continue; $COPY "$SRC/$e" "$CLONE/$e"; done; mkdir -p "$CLONE/locks"' &
+progress_file=$rundir/copy-entry.txt
+SRC=$src CLONE=$clone ENTRIES=$copy_entries PROG=$progress_file COPY="$PERF_LOWPRI ${PERF_COPY_CMD:-cp -cR}" \
+  watchdog "$snapshot_limit" sh -c 'set -e; for e in $ENTRIES; do [ -e "$SRC/$e" ] || continue; echo "$e" >"$PROG"; $COPY "$SRC/$e" "$CLONE/$e"; done; echo done >"$PROG"; mkdir -p "$CLONE/locks"' &
 wd_pid=$!
+# how far the copy got, written when it is killed (the files and kB counts are capped at 5 s each)
+capped() { ( watchdog 5 sh -c "$1" _ "$clone" 2>/dev/null ); }
+write_progress() {  # $1 = why the copy stopped
+  local n kb entry
+  n=$(capped 'find "$1" -type f | wc -l' | tr -d ' '); kb=$(capped 'du -sk "$1" | cut -f1' | tr -d ' ')
+  entry=$(cat "$progress_file" 2>/dev/null)
+  printf '{"copy_stopped": "%s", "copy_s": %s, "limit_s": %s, "entry": "%s", "files_so_far": "%s", "kb_so_far": "%s", "free_gb_before": %s, "free_gb_after": %s}\n' \
+    "$1" "$(( $(date +%s) - t_ready ))" "$snapshot_limit" "${entry:-none}" "${n:-unknown}" "${kb:-unknown}" "${free_before:-null}" "$(free_now)" >"$rundir/snapshot.json"
+}
+# a writer that appears while the copy runs makes the snapshot torn: stop the copy, discard, retry later
+poll=${PERF_POLL_S:-10}; tick=0; writer_mid=
+while kill -0 "$wd_pid" 2>/dev/null; do
+  sleep 1; tick=$((tick + 1))
+  if [ $((tick % poll)) -eq 0 ] && w=$(busy_writer) && [ -n "$w" ]; then
+    writer_mid=$w; kill -TERM "$wd_pid" 2>/dev/null; break
+  fi
+done
 wait "$wd_pid"
 copy_code=$?
 wd_pid=
+if [ -n "$writer_mid" ]; then
+  snapshot_s=$(( $(date +%s) - t_ready )); wait_s=$((t_ready - t_start))
+  write_progress writer-during-copy
+  discard_clone; busy "a writer started during the copy (copy stopped): $writer_mid"
+fi
 if [ "$copy_code" -eq 124 ]; then
+  write_progress over-time
   discard_clone
   t_now=$(date +%s); snapshot_s=$((t_now - t_ready)); wait_s=$((t_ready - t_start)); total_s=$((t_now - t_start))
   sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
