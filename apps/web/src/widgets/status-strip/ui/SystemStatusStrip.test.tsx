@@ -8,7 +8,11 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 import { SystemStatusStrip } from './SystemStatusStrip';
 
 const hooks = vi.hoisted(() => ({ useSystemIssues: vi.fn() }));
-vi.mock('@/entities/system-status', () => ({ useSystemIssues: hooks.useSystemIssues }));
+vi.mock('@/entities/system-status', () => ({
+  useSystemIssues: hooks.useSystemIssues,
+  useDataStatus: () => null,
+  DATA_STATE_TONE: {},
+}));
 vi.mock('@/features/guide-help', () => ({ GuideHelp: () => null }));
 
 const ISSUES: SystemIssue[] = [

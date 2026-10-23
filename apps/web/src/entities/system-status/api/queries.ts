@@ -34,7 +34,6 @@ const StatusStrip = graphql(`
           status
           share
           unavailable {
-            kindText
             cause @include(if: $admin) {
               links {
                 level

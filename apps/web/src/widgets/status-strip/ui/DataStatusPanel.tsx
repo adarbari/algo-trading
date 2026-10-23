@@ -54,11 +54,6 @@ export function DataStatusPanel({ data, admin }: DataStatusPanelProps) {
                 </StatusBadge>
               </Stack>
             </Stack>
-            {dataset.gap !== null && (
-              <Text size="sm" tone="muted">
-                {dataset.gap}
-              </Text>
-            )}
             <GapCauses gaps={dataset.gaps} />
           </Stack>
         ))}

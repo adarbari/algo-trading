@@ -14,11 +14,7 @@ const BASE = {
         name: 'FUNDAMENTALS' as const,
         status: 'UNKNOWN' as const,
         share: null,
-        unavailable: [
-          {
-            kindText: 'Not available yet',
-          },
-        ],
+        unavailable: [{}],
       },
     ],
     affectedScreeners: 2,
@@ -30,7 +26,7 @@ describe('dataStatusOf', () => {
   it('passes the server figures through without deriving any', () => {
     const view = dataStatusOf(BASE);
     expect(view.state).toBe('COMPLETE');
-    expect(view.datasets[0]).toMatchObject({ share: 0.99, gap: null, gaps: [] });
+    expect(view.datasets[0]).toMatchObject({ share: 0.99, gaps: [] });
     expect([view.affectedScreeners, view.totalScreeners]).toEqual([2, 7]);
     expect(view.newerDate).toBeNull();
   });
@@ -38,7 +34,6 @@ describe('dataStatusOf', () => {
   it('keeps an unknown dataset without a share and its gap as served', () => {
     const unknown = dataStatusOf(BASE).datasets[1] as DatasetView;
     expect(unknown.share).toBeNull();
-    expect(unknown.gap).toBe('Not available yet');
     expect(unknown.gaps).toHaveLength(1);
   });
 

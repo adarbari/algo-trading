@@ -18,10 +18,8 @@ export interface DatasetView {
   status: DatasetState;
   /** Share of the expected names present, 0 to 1 (the server's; null: no record). */
   share: number | null;
-  /** The public kind of a gap, in the server's words (UNKNOWN only). */
-  gap: string | null;
   /** The gaps as served: an admin's carry the cause chain (the server sends it to admins only). */
-  gaps: ReadonlyArray<Pick<ServedUnavailable, 'kindText' | 'cause'>>;
+  gaps: ReadonlyArray<Pick<ServedUnavailable, 'cause'>>;
 }
 
 export interface DataStatusView {
@@ -75,7 +73,7 @@ interface SessionData {
       name: DatasetName;
       status: DatasetState;
       share?: number | null;
-      unavailable: Array<Pick<ServedUnavailable, 'kindText' | 'cause'>>;
+      unavailable: Array<Pick<ServedUnavailable, 'cause'>>;
     }>;
     affectedScreeners: number;
     totalScreeners: number;
@@ -92,7 +90,6 @@ export function dataStatusOf({ date, newer, dataStatus }: SessionData): DataStat
       name: d.name,
       status: d.status,
       share: d.share ?? null,
-      gap: d.unavailable[0]?.kindText ?? null,
       gaps: d.unavailable,
     })),
     affectedScreeners: dataStatus.affectedScreeners,

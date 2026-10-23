@@ -23,16 +23,14 @@ const BASE: DataStatusView = {
   state: 'COMPLETE',
   knowledgeTs: '2026-10-22T21:05:00+00:00',
   datasets: [
-    { name: 'PRICES', status: 'COMPLETE', share: 0.99, gap: null, gaps: [] },
-    { name: 'OPTIONS_CHAINS', status: 'PARTIAL', share: 0.62, gap: null, gaps: [] },
+    { name: 'PRICES', status: 'COMPLETE', share: 0.99, gaps: [] },
+    { name: 'OPTIONS_CHAINS', status: 'PARTIAL', share: 0.62, gaps: [] },
     {
       name: 'FUNDAMENTALS',
       status: 'UNKNOWN',
       share: null,
-      gap: 'Not available yet',
       gaps: [
         {
-          kindText: 'Not available yet',
           cause: {
             links: [{ level: 'STEP', subject: 'sec-facts', status: 'FAILED', message: 'timeout' }],
           },
@@ -87,7 +85,6 @@ describe('DataStatusPill', () => {
     expect(screen.getByText('Options chains')).toBeInTheDocument();
     expect(screen.getByText('99% of names')).toBeInTheDocument();
     expect(screen.getByText('62% of names')).toBeInTheDocument();
-    expect(screen.getByText('Not available yet')).toBeInTheDocument();
     expect(screen.getByText('Affects 2 of your 7 screeners')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Guide' })).toHaveAttribute(
       'href',
