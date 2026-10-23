@@ -64,15 +64,12 @@ def load_stored_summary(ctx: Stores, edge: Edge) -> EdgeSummary | None:
     run = runs.load_canonical_run(ctx, edge).run  # memoised per request
     if run is None or run.oos_hidden:
         return None  # the live path answers "no run" cheaply
-    settings = load_verdict(ctx.configs)
-    wanted = (
-        edge.id,
-        SITE_USER,
-        run.run_id,
-        fingerprint(judge_call(edge, run, True), run, settings),
-    )
-    try:
-        row = run_day_rows(ctx, TABLE, run.range_to, KEY).get(wanted)
+    try:  # anything that can raise (the digest, the hash, the read, the decode) is a miss
+        settings = load_verdict(ctx.configs)
+        print_ = fingerprint(judge_call(edge, run, True), run, settings)
+        row = run_day_rows(ctx, TABLE, run.range_to, KEY).get(
+            (edge.id, SITE_USER, run.run_id, print_)
+        )
         return None if row is None else _summary(edge.id, row)
     except Exception:  # a cache that cannot be read is a miss, never an error
         log.warning("stored verdict of %s unreadable; judging live", edge.id, exc_info=True)

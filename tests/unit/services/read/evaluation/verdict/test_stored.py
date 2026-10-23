@@ -350,3 +350,31 @@ def test_a_viewer_sees_the_same_stored_headline_as_any_other() -> None:
     b, _ = stored_for(backend, user="you")
     assert a is not None and a == b
     assert isinstance(a, EdgeSummary)
+
+
+def test_a_failing_digest_or_hash_judges_live(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = MemoryBackend()
+    write_run(backend, "official", FROZEN, **scenario())
+    publish_row(backend)
+    ctx = stores(backend)
+    edge = site_edge(ctx)
+    live = load_edge_summary(ctx, edge)
+
+    def broken() -> str:
+        raise OSError("source not available")
+
+    monkeypatch.setattr(fingerprint, "judge_digest", broken)
+    assert load_stored_summary(ctx, edge) is None
+    monkeypatch.setattr(fingerprint, "canonical_json", lambda _: (_ for _ in ()).throw(TypeError()))
+    assert load_stored_summary(ctx, edge) is None
+    assert live.verdict == PROMISING
+
+
+def test_the_memo_of_a_day_is_per_key_columns() -> None:
+    backend = MemoryBackend()
+    write_run(backend, "official", FROZEN, **scenario())
+    publish_row(backend)
+    ctx = stores(backend)
+    by_four = run_day_rows(ctx, TABLE, END, stored_module.KEY)
+    by_edge = run_day_rows(ctx, TABLE, END, ("edge_id",))
+    assert {len(k) for k in by_four} == {4} and {len(k) for k in by_edge} == {1}

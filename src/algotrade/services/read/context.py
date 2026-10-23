@@ -533,7 +533,7 @@ def run_day_rows(
         rows = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
         return {tuple(r[c] for c in key): r for r in rows}
 
-    memo_key = ("run-day-rows", table, day, ctx.reader.version(), ctx.reader.runs_generation())
+    memo_key = ("run-day-rows", table, day, key, ctx.reader.version(), ctx.reader.runs_generation())
     return once_per_request(ctx, memo_key, read)
 
 
