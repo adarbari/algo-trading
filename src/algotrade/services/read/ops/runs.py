@@ -13,7 +13,7 @@ the nightly report groups them."""
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from algotrade.services.read.context import Stores
@@ -22,15 +22,20 @@ from algotrade.services.run_items import failed_items, status_code
 from algotrade.storage.runs import RunRecord
 
 EXAMPLES = 10
+# Statuses of a step that began (an estimate of its start is meaningful); a held, skipped or
+# waived step never started.
+RAN = frozenset({"SUCCEEDED", "COMPLETE", "FAILED", "PARTIAL", "WAITING"})
 
 
 @dataclass(frozen=True)
 class RunStep:
     """One step of a nightly run: ``counts`` are its result counts as recorded. A step an
     earlier attempt of the session already did is reused, not run again: ``origin`` is that
-    attempt's run id (None: it ran in this attempt) and ``origin_started_at`` /
-    ``origin_duration_s`` when it started and how long the step took there (None: that
-    attempt's record is gone)."""
+    attempt's run id (None: it ran in this attempt) and ``origin_duration_s`` how long the
+    step took there (None: that attempt's record is gone). ``started_at`` is when the step
+    itself began (a reused step: in the attempt that did it; None: it never started).
+    ``needs`` / ``reruns_after`` are the step's edges as the attempt defined them (None: a
+    run from before they were recorded)."""
 
     name: str
     status: str
@@ -39,8 +44,10 @@ class RunStep:
     error: str | None
     counts: dict[str, Any]
     origin: str | None = None
-    origin_started_at: datetime | None = None
     origin_duration_s: float | None = None
+    started_at: datetime | None = None
+    needs: tuple[str, ...] | None = None
+    reruns_after: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -107,13 +114,48 @@ def _steps(run: RunRecord, attempts: Mapping[str, RunRecord]) -> tuple[RunStep, 
     stored = run.stats.get("steps")
     if not isinstance(stored, dict):  # a run that failed before recording its steps
         return tuple(RunStep(n, s, None, None, None, {}) for n, s in run.items.items())
-    return tuple(_step(str(name), step, attempts) for name, step in stored.items())
+    begun = _starts(run)
+    return tuple(_step(str(name), step, attempts, begun) for name, step in stored.items())
 
 
-def _step(name: str, step: Mapping[str, Any], attempts: Mapping[str, RunRecord]) -> RunStep:
+def _starts(run: RunRecord) -> dict[str, datetime | None]:
+    """When each step of an attempt began: the recorded ``started_at``, else (a run from before
+    it was recorded) estimated from the attempt's start and the durations of the steps it ran
+    before, which run one after another; a reused step has none here."""
+    stored = run.stats.get("steps")
+    out: dict[str, datetime | None] = {}
+    if not isinstance(stored, dict):
+        return out
+    cursor = run.started_at
+    for name, step in stored.items():
+        if step.get("started_at"):
+            out[str(name)] = datetime.fromisoformat(step["started_at"])
+        elif step.get("origin") or str(step.get("status")) not in RAN:
+            out[str(name)] = None
+        else:
+            out[str(name)] = cursor
+        if not step.get("origin"):
+            cursor += timedelta(seconds=float(step.get("duration_s") or 0))
+    return out
+
+
+def _step(
+    name: str,
+    step: Mapping[str, Any],
+    attempts: Mapping[str, RunRecord],
+    begun: Mapping[str, datetime | None],
+) -> RunStep:
     origin = step.get("origin")
     attempt = attempts.get(str(origin)) if origin else None
     there = ((attempt.stats.get("steps") or {}).get(name) or {}) if attempt else {}
+    started = begun.get(name)
+    if origin and attempt is not None:  # the attempt that did it knows when
+        started = (
+            datetime.fromisoformat(step["started_at"])
+            if step.get("started_at")
+            else (_starts(attempt).get(name))
+        )
+    needs = step.get("needs")
     return RunStep(
         name=name,
         status=str(step.get("status", "")),
@@ -122,8 +164,10 @@ def _step(name: str, step: Mapping[str, Any], attempts: Mapping[str, RunRecord])
         error=step.get("error"),
         counts=dict(step.get("result") or {}),
         origin=str(origin) if origin else None,
-        origin_started_at=attempt.started_at if attempt else None,
         origin_duration_s=there.get("duration_s"),
+        started_at=started,
+        needs=tuple(str(n) for n in needs) if isinstance(needs, list) else None,
+        reruns_after=tuple(str(n) for n in step.get("reruns_after") or ()),
     )
 
 

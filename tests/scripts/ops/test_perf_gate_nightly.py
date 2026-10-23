@@ -915,3 +915,25 @@ def test_the_trash_delete_runs_in_its_own_session_and_survives_the_wrappers_grou
         time.sleep(0.1)
     assert int(pgid_file.read_text()) != proc.pid  # its own group
     assert _wait_gone(old, 30)  # and it ran to the end
+
+
+def test_a_slow_total_notification_names_the_snapshot_time(rig: Rig) -> None:
+    rig.run(PERF_TOTAL_LIMIT_S="0")
+    assert "snapshot " in (rig.tmp / "notified").read_text()
+
+
+def test_a_pause_during_the_bench_does_not_hide_an_integrity_failure(rig: Rig) -> None:
+    rig.bench_body = (
+        "sleep 5\necho 'INTEGRITY operations that answered null'\n"
+        "echo '1 views over 1.0 s'\nexit 1\n"
+    )
+    jump = rig.tmp / "slept"
+    env = rig.env(PERF_SAMPLE_S="1", **_date_stub(rig, jump, 600))
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    time.sleep(2.5)
+    jump.write_text("")
+    proc.communicate(timeout=60)
+    assert "outcome=integrity" in rig.status.read_text()
+    assert "INTEGRITY FAILURE" in (rig.tmp / "notified").read_text()

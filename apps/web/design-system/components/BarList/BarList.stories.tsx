@@ -78,3 +78,39 @@ export const Dense: Story = {
     })),
   },
 };
+
+/** Selectable rows against the selected one: what it follows (accent), what follows it (amber), the rest dimmed; a hollow row was never measured. */
+export const Selectable: Story = {
+  args: {
+    label: 'Steps of a run',
+    onSelect: () => undefined,
+    items: [
+      {
+        id: 'a',
+        label: 'bars',
+        value: 90,
+        display: '1m 30s',
+        tone: 'warning',
+        emphasis: 'upstream',
+      },
+      {
+        id: 'b',
+        label: 'rollups',
+        value: 0,
+        display: 'not run',
+        hollow: true,
+        emphasis: 'selected',
+      },
+      {
+        id: 'c',
+        label: 'screens',
+        value: 0,
+        display: 'not run',
+        hollow: true,
+        emphasis: 'downstream',
+      },
+      { id: 'd', label: 'chains', value: 1479, display: '24m 39s', emphasis: 'dimmed' },
+      { id: 'e', label: 'macro', value: 106, display: 'reused', tone: 'muted', emphasis: 'dimmed' },
+    ],
+  },
+};
