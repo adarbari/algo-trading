@@ -47,7 +47,6 @@ export const TRADER: Workspace = {
       path: '/calendar',
       label: 'Calendar',
     },
-    { path: '/backtests', label: 'Backtests', summary: 'Run backtests and compare their results.' },
   ],
 };
 
