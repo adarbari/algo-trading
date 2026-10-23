@@ -5,7 +5,7 @@
  * (`OtherTabs`). A ticker named inside a panel (a holding, a peer, a row of the comparison)
  * opens in a tab of its own.
  */
-import { Skeleton } from '@algotrade/ui';
+import { Skeleton, Stack } from '@algotrade/ui';
 import { Suspense } from 'react';
 
 import { lazyPage } from '@/shared/lib/lazy';
@@ -20,6 +20,7 @@ import { ExploreTabs } from './ExploreTabs';
 
 // The other tabs' widgets are one chunk, fetched when one of those tabs opens.
 // Its own chunk: loads only when the Financials tab opens.
+const Events = lazyPage(() => import('./ChartEventsSection'), 'ChartEventsSection');
 const FinancialsTab = lazyPage(() => import('./FinancialsTab'), 'FinancialsTab');
 const OtherTabs = lazyPage(() => import('./OtherTabs'), 'OtherTabs');
 
@@ -41,13 +42,18 @@ function Content(props: DetailTabsProps) {
   switch (state.tab) {
     case 'chart':
       return (
-        <PriceChartPanel
-          symbol={symbol}
-          range={state.range}
-          onRangeChange={(range) => {
-            onSearchChange({ range });
-          }}
-        />
+        <Stack gap={4}>
+          <PriceChartPanel
+            symbol={symbol}
+            range={state.range}
+            onRangeChange={(range) => {
+              onSearchChange({ range });
+            }}
+          />
+          <Suspense>
+            <Events symbol={symbol} range={state.range} />
+          </Suspense>
+        </Stack>
       );
     case 'overview':
       return (

@@ -20,7 +20,8 @@ from algotrade_api.graphql.types.instruments.feature import Unknown
     "structure day; `label` short, `name` in words; `subjectId` whose event (the "
     "instrument, the fund's reference, the MACRO: release; null for a market-structure day); "
     "`knownFrom` the first session the stored row was known on (null: a catalogue value or "
-    "a calendar rule); `expiry` a monthly or quarterly option expiry day"
+    "a calendar rule); `expiry` a monthly or quarterly option expiry day; `sourceUrl` the "
+    "agency page of a macro release (null for every other kind)"
 )
 class AheadEvent:
     date: dt.date
@@ -32,6 +33,7 @@ class AheadEvent:
     source: str
     known_from: dt.date | None
     expiry: bool
+    source_url: str | None
 
     @classmethod
     def of(cls, d: ahead.AheadEvent) -> Self:
@@ -45,6 +47,7 @@ class AheadEvent:
             source=d.source,
             known_from=d.known_from,
             expiry=d.expiry,
+            source_url=d.source_url,
         )
 
 
@@ -65,7 +68,8 @@ class EventGap:
 
 @strawberry.type(
     description="An 8-K or 8-K/A: `accepted` the SEC acceptance instant (UTC), `items` as "
-    "SEC lists them, `label` the first item in words, `knownFrom` the session it was public on"
+    "SEC lists them, `label` the first item in words, `knownFrom` the session it was public on, "
+    "`sourceUrl` its sec.gov filing index (null when the stored ids are not the digits SEC writes)"
 )
 class Filing:
     accepted: dt.datetime
@@ -74,6 +78,7 @@ class Filing:
     items: list[str]
     label: str
     known_from: dt.date
+    source_url: str | None
 
     @classmethod
     def of(cls, d: filings.Filing) -> Self:
@@ -84,6 +89,7 @@ class Filing:
             items=list(d.items),
             label=d.label,
             known_from=d.known_from,
+            source_url=d.source_url,
         )
 
 

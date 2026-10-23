@@ -15,6 +15,7 @@ export {
   type ChartBandTone,
   type ChartEvent,
   type ChartEventKind,
+  type ChartEventPart,
   type ChartLane,
   type ChartLaneSegment,
   type ChartPoint,
@@ -83,6 +84,7 @@ export {
 export { EvidenceMeter, type EvidenceMeterProps, type EvidenceMilestone } from './EvidenceMeter';
 export { EventTimeline, type EventTimelineProps } from './EventTimeline';
 export { ExpiryLadder, type ExpiryLadderProps, type ExpiryRow } from './ExpiryLadder';
+export { ChartEventList, type ChartEventListProps } from './ChartEventList';
 export { ExternalLink, type ExternalLinkProps } from './ExternalLink';
 export { ErrorState, type ErrorStateProps } from './ErrorState';
 export { Field, type FieldProps } from './Field';
