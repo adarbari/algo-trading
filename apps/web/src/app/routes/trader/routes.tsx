@@ -1,11 +1,8 @@
 /**
- * TRADER workspace (the default): Ideas (home), Screeners, Edges, Explore, Regime, Calendar, Backtests,
+ * TRADER workspace (the default): Ideas (home), Screeners, Edges, Explore, Regime, Calendar.
  * A pathless layout route, so its sections sit at the top level (`/ideas`, `/explore`, ...). The
  * Guide has its own group (routes/guide/).
  */
-import { TRADER } from '../../workspaces';
-import { placeholderRoute } from '../section-route';
-
 import { calendarRoute } from './calendar-route';
 import { edgesBuilderRoutes, edgesRoute } from './edges-route';
 import { exploreRoute } from './explore-route';
@@ -24,5 +21,4 @@ export const traderRoutes = traderRoute.addChildren([
   exploreRoute,
   regimeRoute,
   calendarRoute,
-  placeholderRoute(traderRoute, TRADER, '/backtests', 'backtests'),
 ]);

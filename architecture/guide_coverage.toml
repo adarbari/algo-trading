@@ -360,10 +360,6 @@ path = "/admin/feature-requests"
 start = "start:read_feature_requests"
 
 [[section]]
-path = "/backtests"
-exempt = "placeholder page, not built yet"
-
-[[section]]
 path = "/admin/screener-runs"
 exempt = "placeholder page, not built yet"
 

@@ -18,7 +18,7 @@ afterEach(() => {
 describe('AdminHarnessRunsPage', () => {
   it('lays out the list and the detail and passes the chosen run down', () => {
     render(<AdminHarnessRunsPage selected="r1" onSelect={vi.fn()} onClear={vi.fn()} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Harness runs' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Edge runs' })).toBeInTheDocument();
     expect(document.body).toHaveTextContent('[list r1]');
     expect(document.body).toHaveTextContent('[detail r1]');
   });

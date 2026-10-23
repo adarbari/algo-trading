@@ -1,5 +1,5 @@
 /**
- * Admin > Harness runs: every edge evaluation run, newest first, with what it measured and left
+ * Admin > Edge runs: every edge evaluation run, newest first, with what it measured and left
  * out, beside the chosen run's stored rows (a sheet on a phone). The chosen run comes from the
  * route (shareable); the page only lays the widgets out.
  */
@@ -23,7 +23,7 @@ export function AdminHarnessRunsPage({
 }: AdminHarnessRunsPageProps) {
   return (
     <Stack gap={4}>
-      <Heading level={1}>Harness runs</Heading>
+      <Heading level={1}>Edge runs</Heading>
       <MasterDetail
         columns="main-aside"
         collapse="lg"

@@ -1,5 +1,5 @@
 /**
- * Admin > Harness runs end to end against a mocked API: the runs list with what each measured and
+ * Admin > Edge runs end to end against a mocked API: the runs list with what each measured and
  * left out (an unrecorded figure stays empty, an exploratory split is labelled), a run's rows
  * beside it (the choice lives in the URL), accessible in dark and light; a failed read shows its
  * error.
@@ -103,8 +103,8 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate((t) => {
       document.documentElement.setAttribute('data-theme', t);
     }, theme);
-    await expect(page.getByRole('heading', { level: 1, name: 'Harness runs' })).toBeVisible();
-    const list = page.getByRole('grid', { name: 'Harness runs' });
+    await expect(page.getByRole('heading', { level: 1, name: 'Edge runs' })).toBeVisible();
+    const list = page.getByRole('grid', { name: 'Edge runs' });
     await expect(list).toContainText('run-a');
     await expect(list).toContainText('EXPLORATORY');
     await expect(page.getByRole('grid', { name: 'Run rows' })).toContainText('58.0%');
@@ -124,5 +124,5 @@ test('a run opens its rows and the choice is in the URL', async ({ page }) => {
 test('a failed read shows its error with a retry', async ({ page }) => {
   await open(page, { harnessRuns: FAIL });
   await page.goto('/admin/harness-runs');
-  await expect(page.getByText('The harness runs failed to load.').first()).toBeVisible();
+  await expect(page.getByText('The edge runs failed to load.').first()).toBeVisible();
 });

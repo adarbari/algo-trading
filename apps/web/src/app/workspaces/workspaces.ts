@@ -47,7 +47,6 @@ export const TRADER: Workspace = {
       path: '/calendar',
       label: 'Calendar',
     },
-    { path: '/backtests', label: 'Backtests', summary: 'Run backtests and compare their results.' },
   ],
 };
 
@@ -65,7 +64,7 @@ export const ADMIN: Workspace = {
     },
     {
       path: '/admin/harness-runs',
-      label: 'Harness runs',
+      label: 'Edge runs',
     },
     {
       path: '/admin/feature-requests',
