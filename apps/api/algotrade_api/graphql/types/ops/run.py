@@ -13,8 +13,11 @@ from algotrade.services.read.ops import runs
 @strawberry.type(
     description="One step of a nightly run: `counts` its result counts as recorded; `origin` the "
     "earlier attempt of the session that already did a reused step (null: it ran in this "
-    "attempt), `originStartedAt` when that attempt started and `originDurationS` how long the "
-    "step took there (null: that attempt's record is gone)"
+    "attempt) and `originDurationS` how long the step took there (null: that attempt's record "
+    "is gone); `startedAt` when the step itself began (a reused step: in the attempt that did "
+    "it; null: it never started; an estimate for a run from before it was recorded); `needs` "
+    "the steps it waits for and `rerunsAfter` those whose success re-runs it, as the attempt "
+    "defined them (needs null: a run from before they were recorded)"
 )
 class RunStep:
     name: str
@@ -24,8 +27,10 @@ class RunStep:
     error: str | None
     counts: JSON
     origin: str | None
-    origin_started_at: dt.datetime | None
     origin_duration_s: float | None
+    started_at: dt.datetime | None
+    needs: list[str] | None
+    reruns_after: list[str]
 
     @classmethod
     def of(cls, d: runs.RunStep) -> Self:
@@ -37,8 +42,10 @@ class RunStep:
             error=d.error,
             counts=JSON(d.counts),
             origin=d.origin,
-            origin_started_at=d.origin_started_at,
             origin_duration_s=d.origin_duration_s,
+            started_at=d.started_at,
+            needs=None if d.needs is None else list(d.needs),
+            reruns_after=list(d.reruns_after),
         )
 
 

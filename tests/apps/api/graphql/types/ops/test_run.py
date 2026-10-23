@@ -7,7 +7,9 @@ from tests.apps.api.graphql.conftest import Graph
 
 NIGHTLY = """query N($limit: Int!) { nightlyRuns(limit: $limit) {
   runId session status startedAt finishedAt durationS problems
-  steps { name status durationS reason error counts origin originStartedAt originDurationS }
+  steps {
+    name status durationS reason error counts origin originDurationS startedAt needs rerunsAfter
+  }
 } }"""
 RUN = """query R($id: String!) {
   run(runId: $id) {

@@ -40,7 +40,7 @@ from algotrade_ingestion.workflows.nightly.notify import Notice
 from algotrade_ingestion.workflows.nightly.sessions import Plan, last_done, plan_sessions
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus, from_record, judge
 from tests.conftest import REPO_ROOT
-from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.ingest_fakes import task_ctx, without_edges
 from tests.helpers.stored_frames import (
     chain_status_rows,
     seed_chain_screen,
@@ -159,7 +159,7 @@ def test_a_failed_critical_step_holds_back_its_dependents_only(
     # Independent market data still runs (chains can be fetched only today) ...
     assert [statuses(summary)[s] for s in ("bars", "rates", "chains")] == ["SUCCEEDED"] * 3
     # ... but nothing that needs earnings runs on missing input.
-    assert steps["rollups"] == {
+    assert without_edges(steps["rollups"]) == {
         "status": "NOT_RUN",
         "critical": True,
         "duration_s": 0.0,

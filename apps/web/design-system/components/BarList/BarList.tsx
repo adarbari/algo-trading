@@ -4,7 +4,10 @@
  * sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the
  * bar (long labels, narrow panels). `diverging` takes signed values: bars grow right of a zero
  * axis when positive and left when negative (a return by decile), scaled to the largest
- * magnitude. Bars are decorative: each row reads as "label value".
+ * magnitude. Bars are decorative: each row reads as "label value". With `onSelect` each row is
+ * a toggle button, and an item's `emphasis` marks it against the selected row (the selected row,
+ * what it follows, what follows it, or neither: dimmed); a `hollow` item has a dashed empty track
+ * (nothing was measured for it).
  */
 import type { CSSProperties, ReactNode } from 'react';
 
@@ -21,6 +24,10 @@ export interface BarListItem {
   display?: ReactNode;
   /** Bar colour (default: the list's tone). */
   tone?: DataTone;
+  /** This row against the selected one: itself, what it follows, what follows it, or neither. */
+  emphasis?: 'selected' | 'upstream' | 'downstream' | 'dimmed';
+  /** No bar at all: a dashed, empty track (the item was never measured). */
+  hollow?: boolean;
 }
 
 export interface BarListProps {
@@ -41,6 +48,8 @@ export interface BarListProps {
   /** Replaces the rows with this message. */
   error?: ReactNode;
   emptyMessage?: ReactNode;
+  /** Makes each row a toggle button that reports its id; `aria-pressed` follows `emphasis`. */
+  onSelect?: (id: string) => void;
 }
 
 export function BarList({
@@ -54,6 +63,7 @@ export function BarList({
   loading = false,
   error,
   emptyMessage = 'No data',
+  onSelect,
 }: BarListProps) {
   if (error !== undefined && error !== null && error !== false) {
     return (
@@ -69,6 +79,7 @@ export function BarList({
       className={styles.list}
       data-layout={layout}
       data-diverging={diverging || undefined}
+      data-selectable={onSelect !== undefined || undefined}
       aria-label={label}
       aria-busy={loading || undefined}
     >
@@ -79,11 +90,15 @@ export function BarList({
         const width = size > 0 ? Math.max(share, 0.01) / (diverging ? 2 : 1) : 0;
         const sign = item.value < 0 ? 'negative' : 'positive';
         const fill = item.tone ?? tone ?? (diverging ? sign : 'accent');
-        return (
-          <li key={item.id} className={styles.row}>
+        const content = (
+          <>
             <span className={styles.label}>{item.label}</span>
-            <span className={styles.track} aria-hidden="true">
-              {!loading && (
+            <span
+              className={styles.track}
+              data-hollow={item.hollow || undefined}
+              aria-hidden="true"
+            >
+              {!loading && !item.hollow && (
                 <span
                   className={`${styles.fill} ${toneStyles.tone}`}
                   data-tone={fill}
@@ -95,6 +110,24 @@ export function BarList({
             <span className={styles.value}>
               {loading ? null : (item.display ?? formatValue(item.value, format).text)}
             </span>
+          </>
+        );
+        return (
+          <li key={item.id} className={styles.row} data-emphasis={item.emphasis}>
+            {onSelect === undefined ? (
+              content
+            ) : (
+              <button
+                type="button"
+                className={styles.press}
+                aria-pressed={item.emphasis === 'selected'}
+                onClick={() => {
+                  onSelect(item.id);
+                }}
+              >
+                {content}
+              </button>
+            )}
           </li>
         );
       })}

@@ -68,9 +68,13 @@ const step = (name: string, status: string, durationS: number) => ({
   status,
   durationS,
   counts: {},
+  reason: null,
+  error: null,
   origin: null,
-  originStartedAt: null,
   originDurationS: null,
+  startedAt: '2026-10-03T11:02:00Z',
+  needs: [] as string[] | null,
+  rerunsAfter: [],
 });
 const run = (runId: string, startedAt: string, durationS: number, chains: number) => ({
   runId,
@@ -107,12 +111,12 @@ describe('RecentRunsPanel', () => {
     expect(screen.queryByRole('list', { name: /started 2026-10-03 13:26 UTC/ })).toBeNull();
   });
 
-  it('marks the steps a resumed attempt reused, with where and how long they took', async () => {
+  it('marks the steps a resumed attempt reused, with when and how long they took', async () => {
     const reusedStep = {
       ...step('macro', 'SUCCEEDED', 0),
       origin: 'nightly-first',
-      originStartedAt: '2026-10-03T03:46:00Z',
       originDurationS: 125,
+      startedAt: '2026-10-03T03:46:12Z',
     };
     serve({
       nightlyRuns: [
@@ -127,6 +131,52 @@ describe('RecentRunsPanel', () => {
     expect(screen.getByRole('list', { name: 'Step bar colours' })).toHaveTextContent(
       'Reused from earlier1',
     );
+  });
+
+  it('tells a step waiting on its source from one held by it, and marks what it needs', async () => {
+    const held = (name: string, needs: string[]) => ({
+      ...step(name, 'NOT_RUN', 0),
+      reason: `needs ${needs.join(', ')} (WAITING)`,
+      startedAt: null,
+      needs,
+    });
+    serve({
+      nightlyRuns: [
+        {
+          ...run('n2', '2026-10-03T13:26:00Z', 60, 30),
+          steps: [
+            { ...step('bars', 'WAITING', 90), reason: 'not published yet' },
+            held('rollups', ['bars']),
+            held('screens', ['rollups']),
+            step('macro', 'SUCCEEDED', 5),
+          ],
+        },
+      ],
+    });
+    renderWith(<RecentRunsPanel />);
+    expect(await screen.findByText('waiting · 1m 30s · 11:02 UTC')).toBeInTheDocument();
+    expect(screen.getAllByText('not run')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: /rollups/ }));
+    expect(screen.getByText('Needs: bars · Holds back: screens')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /bars/ })).not.toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /rollups/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('says a run from before dependencies were recorded has none to show', async () => {
+    serve({
+      nightlyRuns: [
+        {
+          ...run('n2', '2026-10-03T13:26:00Z', 60, 30),
+          steps: [{ ...step('bars', 'SUCCEEDED', 5), needs: null }],
+        },
+      ],
+    });
+    renderWith(<RecentRunsPanel />);
+    await userEvent.click(await screen.findByRole('button', { name: /bars/ }));
+    expect(screen.getByText('This run did not record its dependencies.')).toBeInTheDocument();
   });
 
   it('says when there are no runs', async () => {

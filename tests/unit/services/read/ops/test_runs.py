@@ -1,7 +1,7 @@
 """Run records for the Admin pages: nightly runs step by step, one run's detail with its
 failures grouped by reason, its items; ``None`` for a run that is not there."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -139,7 +139,6 @@ def test_a_reused_step_cites_the_attempt_that_did_it_and_what_it_took_there() ->
     [latest, _] = load_nightly_runs(_stores(backend), 5)
     steps = {s.name: s for s in latest.steps}
     assert (steps["macro"].origin, steps["macro"].origin_duration_s) == (first.run_id, 12.5)
-    assert steps["macro"].origin_started_at == first.started_at
     assert (steps["rollups"].origin, steps["rollups"].origin_duration_s) == (None, None)
 
 
@@ -152,4 +151,63 @@ def test_a_reused_step_whose_attempt_record_is_gone_still_says_it_was_reused() -
     backend.runs.save(run)
     [shown] = load_nightly_runs(_stores(backend), 5)
     [step] = shown.steps
-    assert (step.origin, step.origin_started_at, step.origin_duration_s) == ("x", None, None)
+    assert (step.origin, step.origin_duration_s) == ("x", None)
+
+
+def test_a_step_says_when_it_began_and_what_it_needs_as_recorded() -> None:
+    backend = MemoryBackend()
+    run = start_run("nightly", date(2026, 10, 2), NOW)
+    run.finish(
+        NOW.replace(hour=3),
+        stats={
+            "steps": {
+                "bars": {
+                    "status": "SUCCEEDED",
+                    "duration_s": 5.0,
+                    "started_at": "2026-10-03T02:00:07+00:00",
+                    "needs": [],
+                    "reruns_after": [],
+                },
+                "rollups": {
+                    "status": "SUCCEEDED",
+                    "duration_s": 9.0,
+                    "started_at": "2026-10-03T02:00:12+00:00",
+                    "needs": ["bars"],
+                    "reruns_after": ["ibkr-iv"],
+                },
+            }
+        },
+    )
+    backend.runs.save(run)
+    [shown] = load_nightly_runs(_stores(backend), 5)
+    bars, rollups = shown.steps
+    assert bars.started_at == datetime(2026, 10, 3, 2, 0, 7, tzinfo=UTC) and bars.needs == ()
+    assert (rollups.needs, rollups.reruns_after) == (("bars",), ("ibkr-iv",))
+
+
+def test_a_run_from_before_starts_were_recorded_places_steps_one_after_another() -> None:
+    backend = MemoryBackend()
+    first = start_run("nightly", date(2026, 10, 2), NOW)
+    first.finish(
+        NOW.replace(hour=3),
+        stats={"steps": {"macro": {"status": "SUCCEEDED", "duration_s": 60.0}}},
+    )
+    second = start_run("nightly", date(2026, 10, 2), NOW.replace(hour=4))
+    second.finish(
+        NOW.replace(hour=5),
+        stats={
+            "steps": {
+                "macro": {"status": "SUCCEEDED", "duration_s": 0.0, "origin": first.run_id},
+                "bars": {"status": "WAITING", "duration_s": 30.0},
+                "rollups": {"status": "NOT_RUN", "duration_s": 0.0},
+            }
+        },
+    )
+    backend.runs.save(first)
+    backend.runs.save(second)
+    [latest, _] = load_nightly_runs(_stores(backend), 5)
+    steps = {s.name: s for s in latest.steps}
+    assert steps["macro"].started_at == first.started_at  # the attempt that did it
+    assert steps["bars"].started_at == second.started_at  # the first step this attempt ran
+    assert steps["rollups"].started_at == second.started_at + timedelta(seconds=30)
+    assert steps["bars"].needs is None  # the edges were not recorded

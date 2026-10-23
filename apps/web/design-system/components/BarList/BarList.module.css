@@ -110,3 +110,69 @@
   align-self: end;
   font-weight: var(--font-weight-medium);
 }
+
+/* Selectable rows: the button is the row (the item only carries its emphasis). */
+.list[data-selectable] .row {
+  display: contents;
+}
+
+.press {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  margin: 0;
+  padding: var(--space-0-5) var(--space-1);
+  border: var(--border-width-thin) solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.press:hover {
+  background: var(--color-row);
+}
+
+.press:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.list[data-layout='stacked'] .press {
+  grid-template-areas:
+    'label value'
+    'track value';
+  row-gap: var(--space-0-5);
+}
+
+.row[data-emphasis='selected'] .press {
+  border-color: var(--color-border);
+  background: var(--color-row);
+}
+
+.row[data-emphasis='upstream'] .press {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
+.row[data-emphasis='downstream'] .press {
+  border-color: var(--color-warning-border);
+  background: var(--color-row);
+}
+
+.row[data-emphasis='dimmed'] .press {
+  color: var(--color-text-2);
+}
+
+.row[data-emphasis='dimmed'] .fill {
+  background: var(--color-muted);
+}
+
+/* A hollow track: nothing was measured, so the track is dashed and empty. */
+.track[data-hollow] {
+  border: var(--border-width-thin) dashed var(--color-border);
+  background: none;
+}

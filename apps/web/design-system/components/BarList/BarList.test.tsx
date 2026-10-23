@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
 import { BarList } from './BarList';
@@ -70,8 +71,43 @@ describe('BarList', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Failed');
   });
 
+  it('makes each row a toggle button that reports its id, pressed on the selected one', async () => {
+    const onSelect = vi.fn();
+    render(
+      <BarList
+        label="Steps"
+        onSelect={onSelect}
+        items={[
+          { id: 'a', label: 'bars', value: 1, emphasis: 'selected' },
+          { id: 'b', label: 'rollups', value: 0, hollow: true, emphasis: 'downstream' },
+        ]}
+      />,
+    );
+    const rows = screen.getAllByRole('button');
+    expect(rows[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(rows[1]).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(rows[1] as HTMLElement);
+    expect(onSelect).toHaveBeenCalledWith('b');
+    expect(screen.getByRole('list', { name: 'Steps' })).toHaveAttribute('data-selectable', 'true');
+  });
+
+  it('draws a hollow item with a dashed empty track and no fill', () => {
+    const { container } = render(
+      <BarList label="Steps" items={[{ id: 'a', label: 'screens', value: 0, hollow: true }]} />,
+    );
+    expect(container.querySelector('[data-hollow]')).not.toBeNull();
+    expect(container.querySelector('[data-tone]')).toBeNull();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<BarList label="Funnel" layout="stacked" items={items} />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no accessibility violations when selectable', async () => {
+    const { container } = render(
+      <BarList label="Steps" onSelect={() => undefined} items={items} />,
+    );
     await expectNoA11yViolations(container);
   });
 });

@@ -213,7 +213,7 @@ Source: `design-system/components/Banner`
 
 ### BarList
 
-BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the bar (long labels, narrow panels). `diverging` takes signed values: bars grow right of a zero axis when positive and left when negative (a return by decile), scaled to the largest magnitude. Bars are decorative: each row reads as "label value".
+BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the bar (long labels, narrow panels). `diverging` takes signed values: bars grow right of a zero axis when positive and left when negative (a return by decile), scaled to the largest magnitude. Bars are decorative: each row reads as "label value". With `onSelect` each row is a toggle button, and an item's `emphasis` marks it against the selected row (the selected row, what it follows, what follows it, or neither: dimmed); a `hollow` item has a dashed empty track (nothing was measured for it).
 
 Source: `design-system/components/BarList`
 
@@ -229,6 +229,7 @@ Source: `design-system/components/BarList`
 | `loading` | `boolean` | no |  |
 | `error` | `ReactNode` | no | Replaces the rows with this message. |
 | `emptyMessage` | `ReactNode` | no |  |
+| `onSelect` | `(id: string) => void` | no | Makes each row a toggle button that reports its id; `aria-pressed` follows `emphasis`. |
 
 ### Button
 

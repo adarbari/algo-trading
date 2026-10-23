@@ -28,7 +28,7 @@ from algotrade_ingestion.workflows.nightly.report import build_report
 from algotrade_ingestion.workflows.nightly.sessions import Plan
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
-from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.ingest_fakes import task_ctx, without_edges
 from tests.helpers.stored_frames import stamped, universe_rows
 
 D, BEFORE = date(2026, 10, 2), date(2026, 10, 1)
@@ -80,7 +80,7 @@ def test_disabled_ibkr_skips_verify_and_the_night_stays_complete() -> None:
     for name in IBKR_STEPS:
         first, last = (r["steps"][name] for r in summary["runs"])
         assert first["status"] == "SKIPPED" and "latest closed session" in first["reason"]
-        assert last == {
+        assert without_edges(last) == {
             "status": "SKIPPED",
             "critical": False,
             "duration_s": 0.0,

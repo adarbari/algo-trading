@@ -3166,7 +3166,7 @@ type RunItem {
 }
 
 """
-One step of a nightly run: `counts` its result counts as recorded; `origin` the earlier attempt of the session that already did a reused step (null: it ran in this attempt), `originStartedAt` when that attempt started and `originDurationS` how long the step took there (null: that attempt's record is gone)
+One step of a nightly run: `counts` its result counts as recorded; `origin` the earlier attempt of the session that already did a reused step (null: it ran in this attempt) and `originDurationS` how long the step took there (null: that attempt's record is gone); `startedAt` when the step itself began (a reused step: in the attempt that did it; null: it never started; an estimate for a run from before it was recorded); `needs` the steps it waits for and `rerunsAfter` those whose success re-runs it, as the attempt defined them (needs null: a run from before they were recorded)
 """
 type RunStep {
   name: String!
@@ -3176,8 +3176,10 @@ type RunStep {
   error: String
   counts: JSON!
   origin: String
-  originStartedAt: DateTime
   originDurationS: Float
+  startedAt: DateTime
+  needs: [String!]
+  rerunsAfter: [String!]!
 }
 
 """A display column of a screen: its name and catalogue field"""
