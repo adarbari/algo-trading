@@ -471,7 +471,9 @@ jobs:
 
   # The one web check branch protection requires (its name is the protected context; the four
   # jobs above can change without touching the repo settings). Passes when every web job
-  # passed or was skipped (a python-only or docs-only change); fails on any failure.
+  # passed or was skipped (a python-only or docs-only change); fails on any failure. On a
+  # failure it names each failed web step and the local command that reruns it, in its log (so
+  # `gh run view --log-failed` shows it) and the job summary (docs/ci.md "Reading a red web run").
   web:
     name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
     needs: [web-static, web-e2e, web-storybook, web-screenshots, web-perf]
@@ -480,6 +482,31 @@ jobs:
     steps:
       - env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "web jobs: $RESULTS"
-          case " $RESULTS " in *" failure "* | *" cancelled "*) exit 1 ;; esac
+          case " $RESULTS " in *" failure "* | *" cancelled "*) ;; *) exit 0 ;; esac
+          {
+            echo "### Failed web steps"
+            echo "| Job | Step | Rerun locally (in apps/web) |"
+            echo "|---|---|---|"
+            gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" --paginate \
+              --jq '.jobs[] | select(.name | startswith("Web ")) | .name as $j | .steps[] | select(.conclusion == "failure") | [$j, .name] | @tsv' |
+            while IFS=$'\t' read -r job step; do
+              case "$step" in
+                *generated:check*) fix="npm run generated:check (regenerate: npm run tokens / components:md / api:generate)" ;;
+                *ds:check*) fix="npm run ds:check" ;;
+                *"npm run lint"*) fix="npx prettier --write <files> && npx eslint --fix <files>" ;;
+                *"npm run typecheck"*) fix="npm run typecheck" ;;
+                *"npm run test"*) fix="npx vitest run <folder>" ;;
+                *"Bundle budgets"*) fix="npm run perf:bundle (budgets: perf-budgets.json, docs/ci.md)" ;;
+                *"DOM budgets"*) fix="npm run perf:e2e" ;;
+                *Screenshots*) fix="npm run visual:docker -- --grep <Component>, or the update-screenshots label" ;;
+                *e2e*) fix="npx playwright test e2e/<spec>.spec.ts" ;;
+                *advisories* | *signatures*) fix="npm run audit:check" ;;
+                *) fix="see the job log" ;;
+              esac
+              echo "| $job | $step | \`$fix\` |"
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit 1

@@ -4,7 +4,7 @@
  * grow past theirs, or when a lazy-loaded library (the chart engine) leaks into the entry's static
  * imports. Sizes are gzip bytes of the emitted files, so the check is deterministic (no timing).
  * `tsx scripts/check-bundle-budgets.ts` checks; `... update` shrinks the budgets to the current
- * sizes + 1 % (never raises one; a new page gets its first budget). Prints a size table, also
+ * sizes + 5 % (never raises one; a new page gets its first budget). Prints a size table, also
  * into the GitHub job summary. Budgets: perf-budgets.json (scripts/perf-budgets.ts).
  * Locally, with the Supabase `VITE_*` variables unset, it first rebuilds with CI's placeholder
  * values: an unset build tree-shakes ~22 kB of auth-js away, so a branch passed here and failed CI
@@ -224,7 +224,7 @@ function main(): number {
   if (summary !== undefined) appendFileSync(summary, `${text}\n\n`);
   if (process.argv[2] === 'update') {
     saveBudgets(updated(sizes, budgets));
-    console.log('perf-budgets.json: bundle budgets shrunk to the current sizes + 1 %');
+    console.log('perf-budgets.json: bundle budgets shrunk to the current sizes + 5 %');
     return 0;
   }
   const notes = nearBudgetNotes(

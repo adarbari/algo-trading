@@ -54,3 +54,34 @@ jobs:
           n=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
           if [ -n "$n" ]; then gh issue comment "$n" --body "Still failing: $url"
           else gh issue create --title "$title" --body "The nightly Python 3.13 run failed: $url"; fi
+
+  # The web dependency audit every night, not only when a package file changes (CI's
+  # `web_deps`): a new advisory against an unchanged lockfile turned main red on 2026-10-23
+  # (#899) and blocked every branch. Here it opens (or comments on) an issue instead.
+  web-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: "24" }
+      - run: npm ci --no-fund --no-audit
+      - name: No high or critical advisories in shipped dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: No high or critical advisories outside the reviewed allow-list
+        run: npm run audit:check
+      - name: Open an issue when a new advisory appeared
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Nightly: new npm advisory in apps/web"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "Still failing: $url"
+          else gh issue create --title "$title" --body "The nightly web audit failed (fix or allow-list it, docs/ci.md \"Dependency audit\"): $url"; fi
