@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.storage import runs as runs_module
+from algotrade.storage.backends import local
 from algotrade.storage.backends.local import LocalBackend, LocalRuns, safe
 from algotrade.storage.backends.runs import run_listing
 from algotrade.storage.runs import RunRecord, job_of_name, run_session, start_run
@@ -140,7 +142,11 @@ def test_find_decodes_no_job_name_per_call(tmp_path: Path, monkeypatch: pytest.M
         runs.save(start_run(f"j{n % 40}", D1 + timedelta(n % 5), T0 + timedelta(n)))
     calls = []
     real = job_of_name
-    monkeypatch.setattr(run_listing, "job_of_name", lambda s: calls.append(s) or real(s))
+    counting = lambda s: calls.append(s) or real(s)  # noqa: E731
+    # every place a name may be decoded: the listing, the backend module, the definition
+    monkeypatch.setattr(run_listing, "job_of_name", counting)
+    monkeypatch.setattr(local, "job_of_name", counting, raising=False)
+    monkeypatch.setattr(runs_module, "job_of_name", counting)
     runs.find("j1")  # the listing is built: one decode per undated stem
     built = len(calls)
     assert built == 300
