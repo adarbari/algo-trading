@@ -130,6 +130,8 @@ def _imports(package: Path) -> set[str]:
     an imported module such as ``runs.MAIN``)."""
     found: set[str] = set()
     for file in package.glob("*.py"):
+        if file.name in fp.READER_MODULES:
+            continue  # the stored-headline reader judges nothing
         tree = ast.parse(file.read_text())
         modules: dict[str, str] = {}
         for node in ast.walk(tree):
@@ -498,3 +500,18 @@ def test_a_hidden_and_a_revealed_copy_of_one_run_fingerprint_differently() -> No
     call = judge_call(_edge(), run, True)
     shown = fingerprint(call, replace(run, oos_hidden=False), VerdictSettings())
     assert shown != fingerprint(call, replace(run, oos_hidden=True), VerdictSettings())
+
+
+def test_no_judging_module_imports_a_reader_module() -> None:
+    """``READER_MODULES`` are outside the digest: judging code must never depend on them."""
+    readers = {Path(m).stem for m in fp.READER_MODULES}
+    for file in PACKAGE.glob("*.py"):
+        if file.name in fp.READER_MODULES or file.name == "__init__.py":
+            continue
+        for node in ast.walk(ast.parse(file.read_text())):
+            names: list[str] = []
+            if isinstance(node, ast.ImportFrom):
+                names = [node.module or "", *(f"{node.module}.{a.name}" for a in node.names)]
+            elif isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            assert not [n for n in names if n.split(".")[-1] in readers], file.name
