@@ -112,7 +112,7 @@ runs at low CPU priority only (`nice -n 10`, override `PERF_LOWPRI`; the trash d
 | `taskpolicy -b` | 170 s (4.0x slower) |
 | `nice -n 10` | 42 s |
 
-so the whole clone (1.1M files, about 6k files/s) takes about 3-4 minutes [I] (measured: 42 s for the 257k files of `rollups/market`; the whole folder is inferred). The clone is renamed
+so the whole clone (1.1M files, about 6k files/s) takes about 3-4 minutes. The clone is renamed
 to a sibling `data.trash.<date>` at the end (instant) and deleted afterwards, detached, at low
 priority; a leftover trash of an earlier run is deleted first, in the background, never blocking
 the start (a free-disk refusal then says the trash is still being deleted). Only a sibling
@@ -137,7 +137,48 @@ non-numeric pid counts as a writer. The gate itself and `fast_bench` never match
 **Writers are also checked while the copy runs**, every 10 s (`PERF_POLL_S`), with the same rules:
 one that appears kills the copy's process group, the clone is renamed away and deleted in the
 background, and the run exits 3 busy naming the writer (retries continue). `python -m
-algotrade_ingestion` counts like `algotrade-ingest`. A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
+algotrade_ingestion` counts like `algotrade-ingest`. **A running delete is a guard too.** Deleting a CoW clone of about 1M files is slow: observed on the
+real clone (2026-10-23 hand run) about 400 files/s at 80% CPU, up to ~40 minutes in the background
+(`nice -n 10`) [M]. The scratch measure is much faster because it is smaller and cleaner: 15k files/s
+(`find -delete`, 6-7 s per 100k CoW files on a scratch tree with no other load); the two differ because
+the scratch tree is 100k files and idle, the real clone is 1M files beside the live volume's FSEvents
+and Finder work. The 40 minutes is the observed figure, the 100k one only ranks the methods. `cp` and
+`rm` of that many files on one APFS volume also contend (copy at 2k files/s instead of 6k beside the
+delete), so a running `rm` / `find` on a sibling `data.trash.*` of the clone (matched by the guard's own
+path) makes the gate exit 3 `busy: trash delete running (pid N)`, and a leftover trash or clone found at
+the start only STARTS its delete and exits 3 for this tick: the copy never overlaps a delete. Methods,
+on 100k scratch files: `rm -rf` 10 s, `find -delete` 6-7 s, 4-way parallel `rm -rf` of the
+subdirectories 8 s; the wrapper uses `find -delete` (a test pins it).
+**The first complete hand run's 2561 s copy was mostly a PAUSE, not contention.** Its `load.csv` has
+three sampler gaps of 956, 911 and 367 s (2234 s of the 2561 s): the Mac or its I/O was paused or
+stalled, and the old monotonic 900 s cap never fired, which points to SLEEP (a monotonic timer does not
+advance while the Mac sleeps). The concurrent delete was real but the smaller part. Hence: the run holds
+the machine awake (`caffeinate -i -w <pid>`; a lid close on battery cannot be prevented), and a gap over
+60 s between the copy's one-second ticks is a PAUSE: the copy is stopped, the clone discarded, the run
+logs `machine paused N s` and exits 3, so retries continue (it is not a finished `snapshot-over-time`
+day). A copy that is genuinely slow still hits the 900 s cap. **Retry budget:** at most 3 pause-aborts per
+local day (each appends `date=<day> pause_abort=N finished=no` to `perf_gate.status`); the third
+finishes the day (`outcome=repeated-pauses`, exit 4, one notification). **A pause during the bench** is
+not detected by the copy's loop: the sampler's `late_s` (over 60 s from the bench's start) marks the run
+`outcome=paused`: noisy, not recorded (the history line the bench appended is cut back), no verdict, and
+the notice says so. The trash delete runs in its own session (python `start_new_session`; macOS has no
+`setsid`), writes `var/logs/perf_gate/trash-delete.pid` (`pid trash start`) while it runs, and tests
+kill the wrapper's group to prove it survives.
+**The snapshot cap is wall clock** (`date +%s` in the poll loop, once a second), and a pause is logged in `run.log`
+(`machine paused or stalled for N s`). `snapshot.json` also holds `entry_s`, the seconds of every
+copied entry (`tables/<dataset>`), so a slow one shows. `load.csv` columns are `epoch` (taken before
+the commands), `load1`, `free_gb`, `late_s` (the tick was late: the machine paused or the loop was not
+scheduled) and `took_s`; `uptime` / `df` run under a 5 s cap in their own job and a sample is skipped
+(marked `skipped`) while the last still runs, so an I/O stall never leaves a gap. The expected
+breakdown: the copy about 3-4 minutes [I] when alone; the delete up to ~40 minutes in the background.
+**EdgeCompare** is asked about the viewer's own edge: the page renders it only for an edge the viewer
+owns (a site edge answers `compare: null` by design, which failed integrity on 2026-10-23), so the
+bench writes a copy of the capture's edge for its viewer into its config copy (`fast_bench.py`
+`point_at_own_edge`) and asks about that. **Limitation:** the copy has no run, so `load_compare` stops
+at "You have not run this edge yet": the expensive path (`load_run_rows` twice, `basis_of`) is not timed,
+yet EdgeCompare is recorded as passing. `ops.json` marks it `"fidelity": "own copy, not run"`.
+Follow-up (roadmap): time a copy that has a run (a run record of the viewer on the clone).
+A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
 discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
 continue. After the copy **every** outcome is a finished day (one notification, never a re-copy
 at the next retry): `ok`, `over-the-bar`, `integrity` (an integrity failure: its own notice lists the failures, not "0 views over"), `over-time`, `refused` (the bench refused) and
@@ -176,7 +217,7 @@ fails the gate. Expired exceptions and an expired list are reported at run time,
 separate step. Expected breakdown: the copy about 3.5-4 minutes [I] on a quiet machine (inferred: fewer files than the 4m17s-5m07s
 measured for the whole store, 9m41s under load), the bench at most 5 minutes by
 its budget (typically 2.5), the cleanup an instant rename: about 6-9 minutes wall, worst case
-about 20 (the 900 s copy cap + the 300 s bench cap + the cleanup). The bench is hard-capped: a watchdog runs it in its own process group and at 300 s kills
+10-11. The bench is hard-capped: a watchdog runs it in its own process group and at 300 s kills
 the whole group (the bench and its API child), marks the run over-time (exit 4; a finished day,
 so no retry loop; nothing is recorded) and the clone is renamed away. The copy has its own cap, a safety net and not the
 expectation (the target is 5-10 minutes wall in total; the copy is about 3-4): over 15 minutes
@@ -212,7 +253,10 @@ the nightly's, `docs/hosting.md`): label `com.algotrade.perf-gate`, `ProgramArgu
 `Hour=3 Minute=0` plus `StartInterval` 900 (launchd also fires after wake or login), and
 `EnvironmentVariables` `ALGOTRADE_PORT_BASE` 15990 (the wrapper exports it itself: a block outside
 the worktrees' 10000-14990 and the live API's 8000), and `StandardOutPath` /
-`StandardErrorPath` under `var/logs/`. The wrapper copies with `cp -cR` (APFS clonefile);
+`StandardErrorPath` under `var/logs/`, and `AbandonProcessGroup` = `true`: launchd otherwise kills every
+process of the wrapper's group when it exits, and the background delete of the clone would die at once
+(the delete also starts in its own session, so it survives either way; the key keeps the bench's API
+child from being reaped mid-way too). The wrapper copies with `cp -cR` (APFS clonefile);
 `PERF_COPY_CMD` replaces it where cp has no `-c` (the tests). Retries every 15 minutes cost nothing
 once the day is done: the script exits at the first check.
 

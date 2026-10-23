@@ -179,6 +179,11 @@ const setup = () => {
   return { onOpen, onEdit, onOpenEdge, ...view };
 };
 
+const rowOf = (text: string) =>
+  within(screen.getByRole('table', { name: 'Screeners' }))
+    .getAllByRole('row')
+    .find((r) => r.textContent.includes(text)) as HTMLElement;
+
 describe('ScreenerList', () => {
   it('lists mine and presets with kind pills, last run, evidence and picks', async () => {
     const { container } = setup();
@@ -233,7 +238,7 @@ describe('ScreenerList', () => {
   it('narrows by segment and by search', async () => {
     setup();
     await userEvent.click(screen.getByRole('radio', { name: 'Presets' }));
-    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
     await userEvent.click(screen.getByRole('radio', { name: 'All' }));
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'vrp');
     expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
@@ -241,41 +246,49 @@ describe('ScreenerList', () => {
     expect(screen.getByText('No screener matches')).toBeInTheDocument();
   });
 
-  it('links the picks to the screener and the pencil edits one of yours', async () => {
-    const { onOpen, onEdit } = setup();
+  it('opens the screener from the picks link, or "Not run" when there is no run, for every screener', async () => {
+    const { onOpen } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'Open Name of my-vrp: 3 picks' }));
-    expect(onOpen).toHaveBeenCalledWith('my-vrp');
-    await userEvent.click(screen.getByRole('button', { name: 'Edit Name of my-vrp' }));
-    expect(onEdit).toHaveBeenCalledWith('my-vrp');
+    expect(onOpen).toHaveBeenLastCalledWith('my-vrp');
+    // A preset, a Python preset and a screener with no run are all reachable; there is no View action.
+    await userEvent.click(within(rowOf('short_premium')).getByRole('button', { name: /not run$/ }));
+    expect(onOpen).toHaveBeenLastCalledWith('short_premium');
+    await userEvent.click(within(rowOf('idea')).getByRole('button', { name: /not run$/ }));
+    expect(onOpen).toHaveBeenLastCalledWith('idea');
+    expect(screen.queryByRole('button', { name: 'View' })).toBeNull();
   });
 
-  it('duplicates one of yours and opens the copy to edit', async () => {
+  it('offers Edit criteria, Duplicate and Delete on one of yours, labelled', async () => {
     const { onEdit } = setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Duplicate Name of my-vrp' }));
+    const mine = within(rowOf('Name of my-vrp'));
+    expect(mine.getByRole('group', { name: 'Actions of Name of my-vrp' })).toBeInTheDocument();
+    await userEvent.click(mine.getByRole('button', { name: 'Edit criteria' }));
+    expect(onEdit).toHaveBeenCalledWith('my-vrp');
+    await userEvent.click(mine.getByRole('button', { name: 'Duplicate' }));
     await userEvent.click(screen.getByRole('button', { name: 'finish duplicate of my-vrp' }));
     expect(onEdit).toHaveBeenCalledWith('copy-of-my-vrp');
-  });
-
-  it('asks before deleting one of yours', async () => {
-    setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete Name of my-vrp' }));
+    await userEvent.click(mine.getByRole('button', { name: 'Delete' }));
     await userEvent.click(screen.getByRole('button', { name: 'confirm delete of my-vrp' }));
     expect(screen.queryByRole('button', { name: /confirm delete/ })).toBeNull();
   });
 
-  it('copies a preset first, with the pencil, and never offers Delete on one', async () => {
+  it('offers Duplicate to edit and nothing else on a preset', async () => {
     const { onEdit } = setup();
-    expect(screen.queryByRole('button', { name: /^Delete .*vrp_scanner/ })).toBeNull();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Duplicate Name of vrp_scanner to edit' }),
-    );
+    const preset = within(rowOf('Name of vrp_scanner'));
+    expect(preset.queryByRole('button', { name: /Edit criteria|Delete/ })).toBeNull();
+    expect(preset.getAllByRole('button', { name: /Duplicate/ })).toHaveLength(1);
+    await userEvent.click(preset.getByRole('button', { name: 'Duplicate to edit' }));
     await userEvent.click(screen.getByRole('button', { name: 'finish copy of vrp_scanner' }));
     expect(onEdit).toHaveBeenCalledWith('copy-of-vrp_scanner');
   });
 
-  it('gives a Python preset no pencil', () => {
+  it('gives a Python preset its evidence and the picks link, with no actions', () => {
     setup();
-    expect(screen.queryByRole('button', { name: /short_premium to edit/ })).toBeNull();
+    const python = within(rowOf('short_premium'));
+    expect(python.getByRole('button', { name: 'Win of short_premium' })).toBeInTheDocument();
+    expect(python.getByText('Built in code')).toBeInTheDocument();
+    expect(python.queryByRole('group')).toBeNull();
+    expect(python.queryByRole('button', { name: /Duplicate|Edit|Delete/ })).toBeNull();
   });
 
   it('says when the list failed to load', () => {

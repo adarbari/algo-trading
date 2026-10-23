@@ -1,9 +1,11 @@
 """`scripts/ops/perf_gate_nightly.sh`: the path guards, the busy guards (exit 3), and the
 per-date idempotence (before 03:00, done today, next day), with a fake bench and no real store."""
 
+import contextlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -429,16 +431,39 @@ def test_the_clone_is_renamed_at_once_and_deleted_detached_with_the_time_logged(
     assert json.loads((_evidence(rig) / "status.json").read_text())["trash_delete_s"] >= 3
 
 
-def test_leftover_trash_is_deleted_in_the_background_and_nothing_else_is(rig: Rig) -> None:
+def test_leftover_trash_is_deleted_in_the_background_and_the_run_is_busy_not_overlapping(
+    rig: Rig,
+) -> None:
     old = rig.root / "data.trash.2026-10-20"
     (old / "tables").mkdir(parents=True)
     (old / "tables" / "z.txt").write_text("z")
     keep = [rig.root / "other", rig.root / "data.keep", rig.root / "data.trashy"]
     for k in keep:
         k.mkdir()
-    assert rig.run().returncode == 1  # the run was not blocked by the leftover
+    res = rig.run()
+    # the copy never overlaps a delete: this tick starts the delete and is busy, the next one runs
+    assert res.returncode == 3 and "leftover" in res.stderr and not rig.status.exists()
+    assert not (rig.root / "data").exists()
     assert _wait_gone(old)
     assert all(k.exists() for k in keep)  # the guard: only perf-clone/data.trash.* goes
+    assert rig.run().returncode == 1  # nothing left: the bench ran
+
+
+@pytest.mark.parametrize("cmd", ["rm -rf {t}", "find {t} -delete", "/usr/bin/find {t} -delete"])
+def test_a_running_trash_delete_is_busy_and_nothing_is_copied_or_started(
+    rig: Rig, cmd: str
+) -> None:
+    trash = rig.root / "data.trash.2026-10-22"
+    (trash / "tables").mkdir(parents=True)
+    rig.ps.write_text(QUIET_PS + f"  9 {cmd.format(t=trash)}\n")
+    res = rig.run()
+    assert res.returncode == 3 and "trash delete running (pid 9)" in res.stderr
+    assert trash.exists() and not (rig.root / "data").exists() and not rig.status.exists()
+
+
+def test_a_delete_elsewhere_is_not_a_trash_delete(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + f"  9 rm -rf {rig.tmp}/elsewhere/data.trash.2026-10-22\n")
+    assert rig.run().returncode == 1  # not our sibling: the bench ran
 
 
 def test_a_copy_over_ten_minutes_is_killed_and_the_day_finishes_with_an_error(rig: Rig) -> None:
@@ -698,20 +723,195 @@ def test_python_dash_m_ingestion_is_a_real_writer(rig: Rig) -> None:
     assert rig.run(**_stubs(rig, {9: ""}, {})).returncode == 3
 
 
-def test_copy_seconds_are_taken_before_the_progress_counts(rig: Rig) -> None:
-    """A probe killed at 2 s reported 13: the capped counts (up to 10 s) were added."""
-    d = rig.tmp / "slowdu"
-    d.mkdir()
-    (d / "du").write_text("#!/bin/sh\nsleep 4\necho 0\n")
-    (d / "du").chmod(0o755)
-    (rig.tmp / "var" / "data" / "tables").mkdir()
-    slow = _script(rig, "slowcp4.sh", "sleep 30\n")
-    rig.run(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S="2", PATH=f"{d}:{os.environ['PATH']}")
+def _date_stub(rig: Rig, jump_file: Path, jump: int) -> dict[str, str]:
+    """`date +%s` jumps forward by ``jump`` s once ``jump_file`` exists (the Mac slept)."""
+    d = rig.tmp / "datestub"
+    d.mkdir(exist_ok=True)
+    real = shutil.which("date")
+    (d / "date").write_text(
+        "#!/bin/sh\n"
+        f'if [ "$1" = +%s ] && [ -f {jump_file} ]; then echo $(( $({real} +%s) + {jump} ));\n'
+        f'else exec {real} "$@"; fi\n'
+    )
+    (d / "date").chmod(0o755)
+    return {"PATH": f"{d}:{os.environ['PATH']}"}
+
+
+def _run_with_jump(rig: Rig, jump_s: int, limit: str) -> tuple[int, str]:
+    (rig.tmp / "var" / "data" / "tables").mkdir(exist_ok=True)
+    jump = rig.tmp / "slept"
+    slow = _script(rig, "slowcp5.sh", "sleep 60\n")
+    env = rig.env(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S=limit, **_date_stub(rig, jump, jump_s))
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    time.sleep(2.5)
+    jump.write_text("")
+    _, err = proc.communicate(timeout=40)
+    return proc.returncode, err
+
+
+def test_the_snapshot_cap_is_wall_clock_not_a_monotonic_timeout(rig: Rig) -> None:
+    """A jump of the clock under the pause threshold still counts toward the cap."""
+    code, err = _run_with_jump(rig, 30, "20")
+    assert code == 4 and "snapshot over-time" in err
     snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
-    assert 2 <= snap["copy_s"] <= 3
-    assert "snapshot_s=2 " in rig.status.read_text() or "snapshot_s=3 " in rig.status.read_text()
+    assert snap["copy_stopped"] == "over-time" and snap["copy_s"] >= 20
 
 
-def test_a_slow_total_notification_names_the_snapshot_time(rig: Rig) -> None:
-    rig.run(PERF_TOTAL_LIMIT_S="0")
-    assert "snapshot " in (rig.tmp / "notified").read_text()
+def test_a_pause_during_the_copy_stops_it_and_retries_instead_of_finishing_the_day(
+    rig: Rig,
+) -> None:
+    """A Mac that slept mid-copy is no slow copy: log it, drop the clone, exit 3 (retries go on)."""
+    code, err = _run_with_jump(rig, 600, "500")
+    assert code == 3 and "machine paused 60" in err
+    assert "machine paused or stalled for" in (_evidence(rig) / "run.log").read_text()
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert snap["copy_stopped"] == "machine-paused"
+    line = rig.status.read_text()
+    assert "pause_abort=1 finished=no" in line and "finished=yes" not in line  # retries go on
+    assert not (rig.root / "data").exists()
+
+
+def test_the_run_holds_the_machine_awake_with_caffeinate_for_its_own_pid(rig: Rig) -> None:
+    d = rig.tmp / "caf"
+    d.mkdir()
+    log = rig.tmp / "caf.log"
+    (d / "caffeinate").write_text(f"#!/bin/sh\necho $* >> {log}\n")
+    (d / "caffeinate").chmod(0o755)
+    rig.run(PATH=f"{d}:{os.environ['PATH']}")
+    args = log.read_text().split()
+    assert args[:2] == ["-i", "-w"] and args[2].isdigit()
+
+
+def test_the_trash_delete_guard_refuses_a_path_that_is_not_a_sibling_trash(rig: Rig) -> None:
+    """Mutation guard: `delete_trash` (the wrapper's own function, extracted) deletes only a
+    sibling `data.trash.*` of the clone: removing `trash_ok` from it deletes the others."""
+    funcs = subprocess.run(
+        ["sed", "-n", "/^trash_ok()/,/^}/p;/^delete_trash()/,/^}/p", str(SCRIPT)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    sibling = rig.root / "data.trash.2026-10-01"
+    elsewhere = rig.tmp / "elsewhere" / "perf-clone" / "data.trash.2026-10-01"
+    clone_itself = rig.root / "data"
+    for d in (sibling, elsewhere, clone_itself, rig.root / "data.keep"):
+        d.mkdir(parents=True)
+        (d / "f").write_text("x")
+    script = f"clone={clone_itself}; logs={rig.tmp}/logs; PERF_LOWPRI=\n{funcs}\n" + "".join(
+        f"delete_trash {d}\n" for d in (elsewhere, clone_itself, rig.root / "data.keep", sibling)
+    )
+    subprocess.run(["bash", "-c", script], check=True)
+    assert _wait_gone(sibling)  # only the sibling trash goes
+    assert (elsewhere / "f").exists() and (clone_itself / "f").exists()
+    assert (rig.root / "data.keep" / "f").exists()
+
+
+def test_the_trash_is_deleted_with_find_delete_not_rm(rig: Rig) -> None:
+    """Mutation guard: `find -delete` measured 6-7 s per 100k files against 10 s for `rm -rf`."""
+    d = rig.tmp / "tools"
+    d.mkdir()
+    log = rig.tmp / "tools.log"
+    for n in ("rm", "find"):
+        real = shutil.which(n)
+        (d / n).write_text(f'#!/bin/sh\necho {n} $* >> {log}\nexec {real} "$@"\n')
+        (d / n).chmod(0o755)
+    old = rig.root / "data.trash.2026-10-20"
+    old.mkdir(parents=True)
+    (old / "f").write_text("x")
+    rig.run(PATH=f"{d}:{os.environ['PATH']}")
+    assert _wait_gone(old)
+    calls = log.read_text().splitlines()
+    assert any(
+        c.startswith("find ") and "-delete" in c and "data.trash.2026-10-20" in c for c in calls
+    )
+    assert not any(c.startswith("rm ") and "data.trash" in c for c in calls)
+
+
+def test_snapshot_json_has_the_seconds_of_every_copied_entry(rig: Rig) -> None:
+    for name in ("alpha", "beta"):
+        (rig.tmp / "var" / "data" / "tables" / name).mkdir(parents=True)
+        (rig.tmp / "var" / "data" / "tables" / name / "f.txt").write_text(name)
+    assert rig.run().returncode == 1
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert set(snap["entry_s"]) == {"tables/alpha", "tables/beta"}
+    assert (rig.root / "data").exists() is False  # renamed to trash after the run
+    assert all(isinstance(v, int) for v in snap["entry_s"].values())
+
+
+def test_a_hung_uptime_does_not_block_the_load_sampler_and_late_samples_are_marked(
+    rig: Rig,
+) -> None:
+    d = rig.tmp / "hang"
+    d.mkdir()
+    (d / "uptime").write_text("#!/bin/sh\nsleep 30\n")
+    (d / "uptime").chmod(0o755)
+    rig.bench_body = "sleep 9\necho 3 views over 1.0 s\nexit 1\n"
+    rig.run(PERF_SAMPLE_S="1", PATH=f"{d}:{os.environ['PATH']}")
+    rows = (_evidence(rig) / "load.csv").read_text().splitlines()
+    assert rows[0] == "epoch,load1,free_gb,late_s,took_s"
+    assert len(rows) >= 6  # one tick a second although every uptime hangs
+    assert any(r.endswith(",skipped") for r in rows[1:])  # one sample at a time, the rest marked
+    assert any(r.split(",")[-1].isdigit() and int(r.split(",")[-1]) >= 4 for r in rows[1:])
+
+
+def test_the_third_pause_abort_of_a_day_finishes_it_with_one_notification(rig: Rig) -> None:
+    rig.status.parent.mkdir(parents=True, exist_ok=True)
+    rig.status.write_text(
+        "date=2026-10-23 pause_abort=1 finished=no\ndate=2026-10-23 pause_abort=2 finished=no\n"
+    )
+    code, err = _run_with_jump(rig, 600, "500")
+    assert code == 4 and "repeated pauses" in err
+    lines = rig.status.read_text().splitlines()
+    assert "pause_abort=3 finished=no" in lines[2]
+    assert "outcome=repeated-pauses" in lines[3] and "finished=yes" in lines[3]
+    assert (rig.tmp / "notified").read_text().count("\n") == 1
+    assert rig.run().returncode == 0  # a finished day: the next retry is a no-op
+
+
+def test_a_pause_during_the_bench_is_paused_noisy_and_not_recorded(rig: Rig) -> None:
+    hist = rig.tmp / "logs" / "perf_gate" / "history.jsonl"
+    hist.parent.mkdir(parents=True, exist_ok=True)
+    hist.write_text('{"old": 1}\n')
+    rig.bench_body = f"sleep 5\necho '{{\"new\": 2}}' >> {hist}\necho '{rig.bench_out}'\nexit 1\n"
+    jump = rig.tmp / "slept"
+    env = rig.env(PERF_SAMPLE_S="1", **_date_stub(rig, jump, 600))
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    time.sleep(2.5)
+    jump.write_text("")
+    _, err = proc.communicate(timeout=60)
+    assert "paused or stalled during the bench" in err
+    assert "outcome=paused" in rig.status.read_text()
+    assert hist.read_text() == '{"old": 1}\n'  # the run is not recorded
+    assert "NOT recorded" in (rig.tmp / "notified").read_text()
+
+
+def test_the_trash_delete_runs_in_its_own_session_and_survives_the_wrappers_group_kill(
+    rig: Rig,
+) -> None:
+    """Under launchd the wrapper's whole group is killed when it exits: a delete in it died."""
+    old = rig.root / "data.trash.2026-10-20"
+    (old / "tables").mkdir(parents=True)
+    (old / "tables" / "z.txt").write_text("z")
+    pgid_file = rig.tmp / "delete.pgid"
+    slow = _script(rig, "slowdel.sh", f'ps -o pgid= -p $$ > {pgid_file}\nsleep 3\nexec "$@"\n')
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)],
+        env=rig.env(PERF_LOWPRI=slow),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,  # the wrapper leads its own group, as under launchd
+    )
+    proc.communicate(timeout=30)
+    with contextlib.suppress(ProcessLookupError):  # what launchd does when the wrapper exits
+        os.killpg(proc.pid, signal.SIGKILL)
+    end = time.time() + 10
+    while not pgid_file.exists() or not pgid_file.read_text().strip():
+        assert time.time() < end
+        time.sleep(0.1)
+    assert int(pgid_file.read_text()) != proc.pid  # its own group
+    assert _wait_gone(old, 30)  # and it ran to the end
