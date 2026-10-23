@@ -9,7 +9,7 @@ import json
 import threading
 from pathlib import Path
 
-from algotrade.storage.backends.local_index import atomic_write, safe
+from algotrade.storage.backends.runs.local_index import atomic_write, safe
 
 
 class LocalTextCache:

@@ -5,10 +5,11 @@ vendor refused as ``NOT_COVERED``; a trader reads both as "not covered", and the
 exempts both (``tasks/maintenance/coverage.py``, else most names would grade as gaps). That hides
 the names the nightly rotation has not reached, so this check measures them: of the names the
 ``analyst-snapshot`` task is meant to ask (``snapshot.scope_names``), the share with no FMP row
-and no FMP coverage marker other than FAILED in the last ``retry_days`` (four refresh windows; a
+and no FMP coverage marker other than FAILED in the last ``[fmp] refused_hold_days`` (90; a
 refused name is held that long before it is asked again, so its marker, or its rows, keep it out
-of the backlog). A name whose every attempt FAILED (a symbol the vendor rejects) was not reached:
-it stays in the backlog, as the features show it NOT_FETCHED.
+of the backlog; an answered name is refreshed every ``refresh_days``, well inside it). A name
+whose every attempt FAILED (a symbol the vendor rejects) was not reached: it stays in the
+backlog, as the features show it NOT_FETCHED.
 
 WARN only, above ``[quality] max_analyst_backlog``: the step is optional, and a backlog means
 the ``[fmp] daily_budget`` is smaller than the names due, not that data is wrong. Nothing without
@@ -40,19 +41,19 @@ EXAMPLES = 10  # names listed in the check's data
 
 def check_analyst_backlog(ctx: TaskContext, session: date) -> list[Check]:
     """WARN when over ``max_analyst_backlog`` of the in-scope names were not asked of FMP in the
-    last ``retry_days`` (four refresh windows); PASS otherwise; nothing without a finished run."""
-    return _backlog(ctx, session, VENDOR, CHECK, ctx.settings.fmp_refresh_days)
+    last ``refused_hold_days``; PASS otherwise; nothing without a finished run."""
+    return _backlog(ctx, session, VENDOR, CHECK, ctx.settings.fmp_refused_hold_days)
 
 
 def check_finnhub_backlog(ctx: TaskContext, session: date) -> list[Check]:
     """The same for Finnhub's recommendation trend and its own refresh cadence; a WARN naming the
     reason when the finished run skipped Finnhub."""
-    return _backlog(ctx, session, FINNHUB, FINNHUB_CHECK, ctx.settings.finnhub_refresh_days)
+    return _backlog(
+        ctx, session, FINNHUB, FINNHUB_CHECK, retry_days(ctx.settings.finnhub_refresh_days)
+    )
 
 
-def _backlog(
-    ctx: TaskContext, session: date, vendor: str, check: str, refresh_days: int
-) -> list[Check]:
+def _backlog(ctx: TaskContext, session: date, vendor: str, check: str, days: int) -> list[Check]:
     done = [r for r in ctx.reader.runs(TASK) if r.status in PUBLISHED and r.session_date == session]
     skipped = [
         str(r.stats[vendor]["skipped"]) for r in done if "skipped" in r.stats.get(vendor, {})
@@ -62,7 +63,6 @@ def _backlog(
     names = scope_names(ctx.reader, ctx, session) if done else []
     if not names:
         return []
-    days = retry_days(refresh_days)
     since = session - timedelta(days=days)
     ids = sorted({n.instrument_id for n in names})
     rows = stored_snapshots(ctx.reader, None, KINDS, ids, since=since, through=session)

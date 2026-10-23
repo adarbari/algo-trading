@@ -3,7 +3,8 @@
 #   role  "admin" (TRADER and ADMIN workspaces, ops reads, waivers) or "trader" (TRADER only)
 #   name  display name (optional)
 #   licences  data licences held beyond "open" (ADR 0064): ["personal"] (IBKR-derived per-name
-#         values, ADR 0028) is the owner's alone; everyone else sees those values as LICENCE
+#         values, ADR 0028) and "yahoo" (Yahoo-derived analyst values, ADR 0080) are the owner's
+#         alone; everyone else sees those values as LICENCE
 # Without this file the install is single-user: `local` and `site` as admins. How a user logs
 # in is the API's concern (ADR 0040): no credentials and no emails live here (a user's sign-in
 # email is in their git-ignored config/users/<id>/identity.toml).
@@ -12,7 +13,7 @@
 id = "local"
 role = "admin"
 name = "Local user"
-licences = ["personal"]
+licences = ["personal", "yahoo"]
 
 [[user]]
 id = "site"

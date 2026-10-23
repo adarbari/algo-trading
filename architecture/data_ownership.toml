@@ -128,12 +128,13 @@ detect = [{ import = "fcntl" }, { call = "flock" }]
 
 [[responsibility]]
 id = "macro-series-reads"
-description = "Read macro series and index levels (macro/series, ADR 0048) point in time by vintage: each observation's latest vintage on or before a session (data.macro.series) and the pit = lag vintage rule (data.macro.vintages); consumers and feature groups read the table only through data.macro and data.feature_inputs"
+description = "Read macro series and index levels (macro/series, ADR 0048) point in time by vintage: each observation's latest vintage on or before a session (data.macro.series) and the pit = lag vintage rule (data.macro.vintages), each series' earliest ALFRED vintage (first_alfred_vintages, the feature input macro/first_vintages); consumers and feature groups read the table only through data.macro and data.feature_inputs"
 owner = ["src/algotrade/data/macro/*"]
 allowed = [
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/features/rollups/market/macro.py",  # names its input; read through data.feature_inputs (ADR 0048)
     "src/algotrade/features/rollups/bridges/etf_macro.py",  # names its input; read through data.feature_inputs (EB E5)
+    "src/algotrade/features/rollups/market/macro_asof.py",  # names its input; read through data.feature_inputs (provenance of the regime cards' series)
 ]
 section = "docs/adr/0048-macro-series-with-vintages.md#decision"
 detect = [{ string = "macro/series" }]
@@ -199,7 +200,7 @@ detect = [{ call = "raw.put" }]
 [[responsibility]]
 id = "run-compaction"
 description = "Replace one merge partition's runs by the rows that matter, value-exact at every as_of and pinned sequence (scheme E2, ADR 0078): the pure plan and its verification (run_compaction.py), then a compare-and-swap of the partition's index that is never a commit and never writes seq (Commits.swap_runs, TableStore.compact_runs); superseded files are left for sweep_orphans after a grace (SWAP_GRACE_S, 30 s); a journal another process wrote is re-read when it changes, and a swap naming a missing file is refused"
-owner = ["src/algotrade/storage/backends/run_compaction.py", "src/algotrade/storage/backends/local_index.py"]
+owner = ["src/algotrade/storage/backends/runs/run_compaction.py", "src/algotrade/storage/backends/runs/local_index.py"]
 allowed = [
     "src/algotrade/storage/backends/local.py",  # LocalTables.compact_runs: writes the kept rows, verifies, swaps
     "src/algotrade/storage/backends/memory.py",  # MemoryTables.compact_runs: the same under its one lock
@@ -236,12 +237,12 @@ detect = [{ call = "RunRecord" }, { call = "new_run_id" }, { attr = "RunStatus.P
 [[responsibility]]
 id = "run-selection"
 description = "Which runs of a partition a read at as_of sees, per the table's run mode (TableSpec.runs): snapshot = the latest run; merge (events) = the union from the latest restating run on, the latest run's row per table key; for a whole_per_group table (each run holds its group's whole result) the newest run per group (newest_run_per_group, keep_newest_runs: TableStore.read_latest_runs)"
-owner = ["src/algotrade/storage/backends/run_selection.py"]
+owner = ["src/algotrade/storage/backends/runs/run_selection.py"]
 allowed = [
     "src/algotrade/storage/backends/local.py",  # applies the selection to its _runs.json index
-    "src/algotrade/storage/backends/local_index.py",  # parses _runs.json entries into RunEntry
+    "src/algotrade/storage/backends/runs/local_index.py",  # parses _runs.json entries into RunEntry
     "src/algotrade/storage/backends/memory.py",  # applies the selection to its in-memory runs
-    "src/algotrade/storage/backends/run_compaction.py",  # verifies a compaction with the owner's select_runs / merge_rows (ADR 0078)
+    "src/algotrade/storage/backends/runs/run_compaction.py",  # verifies a compaction with the owner's select_runs / merge_rows (ADR 0078)
 ]
 section = "docs/adr/0007-point-in-time-data.md#how-runs-combine"
 detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }, { call = "newest_run_per_group" }, { call = "keep_newest_runs" }]

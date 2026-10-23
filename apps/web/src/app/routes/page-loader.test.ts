@@ -13,12 +13,12 @@ vi.mock('@/shared/api', async (importOriginal) => {
   return { ...actual, gql: vi.fn(() => new Promise(() => undefined)) };
 });
 
-type Loader = (a: unknown) => Promise<void>;
+type Loader = (a: { context: unknown; deps?: unknown }) => Promise<void>;
 
 /** The query names a route's loader starts (the cache's `['gql', name, ...]` keys). */
-async function started(route: AnyRoute): Promise<string[]> {
+async function started(route: AnyRoute, deps?: unknown): Promise<string[]> {
   const queryClient = new QueryClient();
-  await (route.options.loader as Loader)({ context: { queryClient } });
+  await (route.options.loader as Loader)({ context: { queryClient }, deps });
   return queryClient
     .getQueryCache()
     .getAll()
@@ -77,6 +77,8 @@ describe('the reads each page starts with its chunk', () => {
     ['/regime', ['RegimeEpisodes', 'RegimeSignals']],
     ['/calendar', ['EventCalendar', 'ScreenerConfigs']],
     ['/edges', ['EdgeDesk', 'EdgesPage']],
+    // an edge named by the URL reads that one edge in full, not the list
+    ['/edges?edge=x', ['EdgeDesk', 'EdgeDetail']],
     [
       '/admin/ingestion',
       [
@@ -93,7 +95,9 @@ describe('the reads each page starts with its chunk', () => {
     ['/guide', ['FeatureCatalogue', 'GuideIndex']],
   ];
   it.each(cases)('%s', async (id, names) => {
-    expect(await started(find(tree, id))).toEqual(names);
+    const [path, query] = id.split('?');
+    const deps = query ? { edge: new URLSearchParams(query).get('edge') } : { edge: null };
+    expect(await started(find(tree, path ?? id), deps)).toEqual(names);
     expect(vi.mocked(gql)).toHaveBeenCalled();
   });
 });

@@ -72,31 +72,52 @@ const facts = (
   fact(IDEA_FACTS.ret1d, -0.0123, 'PERCENT'),
   fact(IDEA_FACTS.sectorEtf, 'XLK', 'NUMBER'),
 ];
+/** An idea as the server serves it: its first pick is the best one, every pick is in `pickedBy`. */
 const item = (
   rank: number,
   symbol: string,
   picks: ReturnType<typeof pick>[],
   features: ReturnType<typeof facts>,
-): Item => ({
-  rank,
-  instrumentId: `id-${symbol}`,
-  regime: null,
-  sizeMultiplier: null,
-  instrument: { symbol, name: `${symbol} Inc`, features },
-  picks,
-});
+  watchOut: string[] = [],
+): Item => {
+  const best = picks[0] as ReturnType<typeof pick>;
+  return {
+    rank,
+    instrumentId: `id-${symbol}`,
+    score: 1,
+    regime: null,
+    sizeMultiplier: null,
+    watchOut,
+    instrument: { symbol, name: `${symbol} Inc`, features },
+    best: {
+      configId: best.configId,
+      decision: best.decision,
+      score: best.score,
+      reasons: best.reasons,
+      criteria: best.criteria.map(({ id, outcome }) => ({ id, outcome })),
+    },
+    pickedBy: picks.map((p, index) => ({
+      configId: p.configId,
+      own: false,
+      position: index + 1,
+      score: 1 / (index + 1),
+      decision: p.decision,
+    })),
+    metrics: best.columns,
+  };
+};
 const screener = (id: string, name: string) => ({
   screener: { id, name, owner: 'abhinav', version: 1 },
   run: { runId: `run-${id}`, configVersion: 1, paused: 0 },
   notRun: null,
   picked: 3,
+  withheld: false,
   top: [],
 });
 
 const response: IdeasResponse = {
   ideas: {
     session: '2026-10-02',
-    priority: ['vrp', 'liq'],
     total: 4,
     hasMore: false,
     nextCursor: null,
@@ -126,13 +147,11 @@ const response: IdeasResponse = {
           pick('liq', 'QUALIFIED', 91),
         ],
         facts('2026-10-29', 19, 36, true, 0.31),
+        ['earnings_before_expiry'],
       ),
-      item(
-        2,
-        'KO',
-        [{ ...pick('liq', 'WATCH', 66), flags: ['leveraged_inverse'] }],
-        facts('2026-10-08', 4, 8, false),
-      ),
+      item(2, 'KO', [pick('liq', 'WATCH', 66)], facts('2026-10-08', 4, 8, false), [
+        'leveraged_inverse',
+      ]),
       item(3, 'SPY', [pick('liq', 'QUALIFIED', 88)], facts(null, null, null, null)),
       item(
         4,
@@ -201,13 +220,32 @@ describe('TopIdeas', () => {
       'IV rank high, spread tight',
     );
     expect(within(aapl).getByRole('link', { name: 'VRP scanner' })).toBeInTheDocument();
-    expect(within(aapl).getByRole('link', { name: 'Liquidity' })).toBeInTheDocument();
+    expect(within(aapl).getByRole('link', { name: /^Liquidity/ })).toBeInTheDocument();
     expect(within(aapl).getByText('200.50')).toBeInTheDocument();
     expect(within(aapl).getByText('−1.2%')).toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
-    expect(within(ko).getByRole('link', { name: 'Liquidity' })).toBeInTheDocument();
+    expect(within(ko).getByRole('link', { name: /^Liquidity/ })).toBeInTheDocument();
     expect(within(ko).queryByRole('link', { name: 'VRP scanner' })).not.toBeInTheDocument();
     expect(within(ko).queryByText(/more/)).not.toBeInTheDocument();
+  });
+
+  it('lists the screeners that picked an idea with their place, the best first', () => {
+    const { grid } = setup();
+    const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
+    expect(aapl).toHaveTextContent(/VRP scanner.*Liquidity #2/);
+  });
+
+  it('names a withheld screener beside the table, with its help', () => {
+    const none = setup();
+    expect(none.container).not.toHaveTextContent('Withheld');
+    none.unmount();
+    const hidden = {
+      ...data,
+      screeners: data.screeners.map((s) => (s.id === 'liq' ? { ...s, withheld: true } : s)),
+    };
+    hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(hidden));
+    const { container } = setup();
+    expect(container).toHaveTextContent('Withheld: Liquidity');
   });
 
   it('gives every row three lines, so the screener names can wrap under the reasons', () => {
@@ -215,12 +253,18 @@ describe('TopIdeas', () => {
     expect(grid()).toHaveAttribute('data-lines', '3');
   });
 
-  it('draws one labelled square per criterion of the best pick', () => {
+  it('draws one labelled square per criterion of the best pick, under the decision', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
     expect(within(aapl).getByRole('img', { name: /^Criteria:/ })).toHaveAccessibleName(
       'Criteria: Trend up: Passed, Iv rank: Near miss, Spread: Missed, Gap: No value',
     );
+  });
+
+  it('shows the near-miss reasons under the watch-out badges, with the full text in the title', () => {
+    const { grid } = setup();
+    const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
+    expect(within(aapl).getByTitle('IV rank high, spread tight')).toBeInTheDocument();
   });
 
   it('keeps the column set in the search params and shows the options set', async () => {
@@ -231,13 +275,13 @@ describe('TopIdeas', () => {
         .getAllByRole('columnheader')
         .map((h) => h.textContent)
         .join(' | ');
-    expect(headers()).toMatch(/Why it's here/);
-    expect(headers()).not.toMatch(/IV30/);
+    expect(headers()).toMatch(/Picked by.*Decision.*Score/);
+    expect(headers()).not.toMatch(/IV30|Why it's here|Criteria/);
     await user.click(screen.getByRole('radio', { name: 'Options columns' }));
     expect(headers()).toMatch(/IV30.*HV30/);
     expect(headers()).not.toMatch(/Why it's here|Criteria|Price/);
     await user.click(screen.getByRole('radio', { name: 'Stocks columns' }));
-    expect(headers()).toMatch(/Why it's here/);
+    expect(headers()).toMatch(/Price.*Watch out/);
   });
 
   it("links every screener name in a row to that screener's results, not to the ticker", async () => {
@@ -247,7 +291,7 @@ describe('TopIdeas', () => {
       'href',
       '/screeners/vrp',
     );
-    const liquidity = within(aapl).getByRole('link', { name: 'Liquidity' });
+    const liquidity = within(aapl).getByRole('link', { name: /^Liquidity/ });
     expect(liquidity).toHaveAttribute('href', '/screeners/liq');
     await userEvent.click(liquidity);
     expect(onOpen).not.toHaveBeenCalled();
@@ -450,7 +494,7 @@ describe('TopIdeas', () => {
 });
 
 describe('TopIdeas field headers', () => {
-  it('puts the Guide help button in the catalogue field headers, not in the rest', async () => {
+  it('puts the Guide help button in the field headers and every Ideas column, not in the rank or ticker', async () => {
     vi.mocked(gql).mockResolvedValue({ guideField: null });
     const { grid } = setup({ columns: 'options' });
     const help = (name: RegExp) =>
@@ -460,10 +504,13 @@ describe('TopIdeas field headers', () => {
           name: /^What is .*\?$/,
         },
       );
-    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(2);
+    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(7);
     expect(help(/Expiry DTE/)).toBeVisible();
     expect(help(/IV30/)).toBeVisible();
-    expect(help(/Score/)).toBeNull();
-    expect(help(/Decision/)).toBeNull();
+    expect(help(/Score/)).toBeVisible();
+    expect(help(/Decision/)).toBeVisible();
+    expect(help(/Picked by/)).toBeVisible();
+    expect(help(/Watch out/)).toBeVisible();
+    expect(help(/Ticker/)).toBeNull();
   });
 });

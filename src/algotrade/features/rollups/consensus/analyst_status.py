@@ -1,6 +1,6 @@
 """What the analyst feature groups share: the population, the vendor's rows as of a session and
-the status of a name (``analyst_estimates@v1``, ``analyst_targets@v1``, ``analyst_ratings@v1``,
-``analyst_revisions@v1``; ADR 0068, ADR 0072).
+the status of a name (``analyst_estimates@v2``, ``analyst_targets@v2``, ``analyst_ratings@v1``,
+``analyst_revisions@v2``; ADR 0068, ADR 0072, ADR 0080).
 
 The input is ``analyst/estimate_snapshots`` as a session sees it (``data.analyst.reading``: the
 latest version of each row published before the next open). One row per universe equity, so the
@@ -24,11 +24,23 @@ A trader reads both of the last two as "not covered"; the stored status tells th
 
 The status helpers take the vendor (``source``) whose rows and markers they read: FMP by default,
 Finnhub for the recommendation trend (``analyst_ratings@v1``), each with its own markers.
+
+**One vendor per (name, kind)** (ADR 0080; estimates, targets and revisions only: ratings stay
+Finnhub's). ``choose_vendor`` resolves a name for FMP and for Yahoo from the frame the session sees
+and takes FMP's when its status is OK or STALE, else Yahoo's when Yahoo has a row or a marker that
+is not FAILED (status not NOT_FETCHED), else FMP's. ``effective_snapshots`` keeps, per name, only
+the chosen vendor's rows of the kind AND its coverage markers and relabels them ``fmp``, so
+``vendor_rows``, ``resolve`` and ``history_rows`` read as before and the other vendor's markers
+never mix in. The choice reads one name's own rows: a name Yahoo has not reached stays what FMP
+says (NOT_COVERED), no name is judged by another. ``history_of_chosen`` restricts the history a
+revision compares with to the vendor the estimates chose, so after a flip the new vendor's
+revisions are null (BUILDING / NO_PRIOR) until its own snapshots span the windows (90 days).
 """
 
 from dataclasses import dataclass
 from datetime import date
 
+import numpy as np
 import pandas as pd
 
 from algotrade.features.rollups.market.breadth import MEMBER_CLASS
@@ -41,6 +53,8 @@ ESTIMATES, TARGET, COVERAGE = "estimates_annual", "price_target", "coverage"
 RECOMMENDATION = "recommendation"  # Finnhub's monthly analyst counts
 VENDOR = "fmp"  # the source column of the rows most of these groups read
 FINNHUB = "finnhub"  # the source of the recommendation rows
+YAHOO = "yahoo"  # the other source of estimates and targets (ADR 0080), used when FMP has none
+SOURCES = (VENDOR, YAHOO)  # in order of preference
 OK, STALE, NOT_COVERED, NOT_FETCHED = "OK", "STALE", "NOT_COVERED", "NOT_FETCHED"
 STATUSES = (OK, STALE, NOT_COVERED, NOT_FETCHED)
 UNCOVERED = (NOT_COVERED, NOT_FETCHED)  # ``Feature.uncovered_statuses`` (ADR 0072)
@@ -169,3 +183,45 @@ def resolve(
         else:
             out.append((iid, NOT_COVERED if mark else NOT_FETCHED, None))
     return pd.DataFrame(out, columns=["instrument_id", "status", "age_days"])
+
+
+def choose_vendor(
+    snapshots: pd.DataFrame | None, ids: list[str], kind: str, session: date, p: AnalystParams
+) -> pd.Series:
+    """``instrument_id`` -> ``fmp`` / ``yahoo``: the vendor whose ``kind`` rows and markers the
+    group reads for the name (the module doc): FMP when OK or STALE, else Yahoo when it has a row
+    or a marker that is not FAILED, else FMP."""
+    status = {}
+    for vendor in SOURCES:
+        rows = vendor_rows(snapshots, kind, vendor)
+        found = resolve(ids, rows, snapshots, session, p, vendor)
+        status[vendor] = found.set_index("instrument_id")["status"]
+    fmp, yahoo = status[VENDOR], status[YAHOO]
+    use_yahoo = ~fmp.isin([OK, STALE]) & (yahoo != NOT_FETCHED)
+    return pd.Series(np.where(use_yahoo, YAHOO, VENDOR), index=fmp.index, dtype=object)
+
+
+def effective_snapshots(
+    snapshots: pd.DataFrame | None, chosen: pd.Series, kind: str
+) -> pd.DataFrame | None:
+    """``snapshots`` reduced to each name's chosen vendor: its rows of ``kind`` and its coverage
+    markers, labelled ``fmp``; nothing of the other vendor and no other kind (``chosen`` from
+    ``choose_vendor``). ``None`` and an empty frame pass through."""
+    if snapshots is None or snapshots.empty:
+        return snapshots
+    own = snapshots["instrument_id"].astype(str).map(chosen)
+    keep = snapshots["kind"].isin([kind, COVERAGE]) & (snapshots["source"] == own)
+    return snapshots[keep].assign(source=VENDOR)
+
+
+def history_of_chosen(
+    snapshots: pd.DataFrame | None, kind: str, chosen: pd.Series, session: date
+) -> pd.DataFrame:
+    """``history_rows`` of ``kind`` over the vendors, only each name's chosen vendor's rows
+    (``chosen``: the estimates' source per name), labelled ``fmp``."""
+    both = [history_rows(snapshots, kind, vendor, session) for vendor in SOURCES]
+    rows = pd.concat(both, ignore_index=True)
+    if "source" not in rows.columns:  # no snapshot table: no history
+        return rows
+    own = rows["instrument_id"].map(chosen)
+    return rows[rows["source"] == own].assign(source=VENDOR).reset_index(drop=True)

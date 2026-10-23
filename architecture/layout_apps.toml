@@ -202,6 +202,11 @@ purpose = "derived-data tasks: the rollups task (every registered rollup, per se
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/edges"
+purpose = "edge result tasks: the edge-verdicts task that judges site edges' canonical runs into results/edge_verdict (the headline the edges list reads) when the judge, its settings or an edge document changed, and backfills runs stored before the table (ADR 0053 amendment 2026-10-22)"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/events"
 purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows) and the filing-text task (10-K / 10-Q Item sections into events/filing_text, edge build D10) and the insider task (Form 4 transactions into events/insider_transaction, EB D6) and the ipo-lockups task (IPO facts and lock-up expiry dates from 424B4 prospectuses into events/ipo_lockup, with the date rules of the expiry)"
 kind = "task-domain"
@@ -257,7 +262,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/screens"
-purpose = "screen tasks: the screen-runs-backfill job that frames ScreenRun and ScreenPick rows (results/screen_runs, results/screen_picks) for the rule-screen runs stored before those tables existed (ADR 0077 amendment (c))"
+purpose = "screen tasks: the screen-runs-backfill job that frames ScreenRun and ScreenPick rows (results/screen_runs, results/screen_picks) for the rule-screen runs stored before those tables existed (ADR 0077 amendment (c)), and the screen-values-recluster job that rewrites older rule_screen / rule_screen_values files sorted by instrument id"
 kind = "task-domain"
 
 [[dir]]

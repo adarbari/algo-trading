@@ -111,12 +111,22 @@ def _in_sample_words(text: str) -> str:
     return text.replace("Out-of-sample", "In-sample").replace("out-of-sample", "in-sample")
 
 
-def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
+def load_summary(ctx: Stores, edge: Edge) -> verdict.EdgeSummary:
+    """The headline of ``edge``'s verdict (what the list shows): the same judge, run and
+    hidden-copy wording as ``load_verdict``, without the pieces the list never reads. A site
+    edge's stored headline is used when its fingerprint matches (``verdict.stored``), else the
+    live judge answers."""
+    return verdict.load_stored_summary(ctx, edge) or verdict.summary_of(
+        load_verdict(ctx, edge, headline=True)
+    )
+
+
+def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.EdgeVerdict:
     """The verdict of ``edge``: a site edge's official result (``verdict.load_edge_verdict``);
     a user's own edge from the user's latest run of it, judged on in-sample figures only while
-    its out-of-sample result is hidden."""
+    its out-of-sample result is hidden. ``headline``: the label, result and figures only."""
     if not edge.mine:
-        return verdict.load_edge_verdict(ctx, edge)
+        return verdict.load_edge_verdict(ctx, edge, headline)
     settings = load_verdict_settings(ctx.configs)
     run = own_run(ctx, edge)
     if run is None:
@@ -142,6 +152,7 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
             neutral=verdict.is_factor_neutral(edge),
             base=edge.base,
         ),
+        headline=headline,
     )
     if not hidden or found.verdict in (verdict.WAITING, verdict.DIAGNOSTIC):
         return found

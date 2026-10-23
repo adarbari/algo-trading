@@ -112,6 +112,10 @@ FEEDBACK_FEATURE_REQUESTS = fixed(
     key=("user", "ref", "session_date"),
 )
 
+CLUSTER_ROWS = (
+    8_192  # rows per row group of a clustered rule-screen file (``TableSpec.cluster_by``)
+)
+
 # Rule screens (ADR 0029): one fixed schema for every rule-screen config, so pages and Ideas
 # query across screens. Many configs and users share a session's partition, so runs merge
 # on (user, config, instrument): readers take a config's rows of its latest run (``run_id``
@@ -135,6 +139,8 @@ RULE_SCREEN = fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
     whole_per_group=True,  # a run's file is its config's whole result (ADR 0029 amendment)
+    cluster_by=("instrument_id",),
+    row_group_rows=CLUSTER_ROWS,
 )
 
 # One row per (instrument, criterion), per display column (``mode = "column"``, ``outcome =
@@ -185,6 +191,8 @@ RULE_SCREEN_VALUES = fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
     whole_per_group=True,
+    cluster_by=("instrument_id",),  # a page reads a few instruments: its row groups skip the rest
+    row_group_rows=CLUSTER_ROWS,
 )
 
 # A screener run as a business object (ADR 0077 amendment (c); owner decision 2026-10-22): one row

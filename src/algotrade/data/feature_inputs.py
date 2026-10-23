@@ -160,6 +160,10 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        by vintage, ADR 0048), dated within ``lookback`` sessions, plus each
                        series' latest known observation however old; sorted by id and
                        observation; ``None`` when no vintage is known by the session
+- ``macro/first_vintages``
+                       each series' (``Input.ids``) earliest ALFRED vintage on or before the
+                       session: rows ``instrument_id``, ``first_vintage``; ``None`` when none
+                       (read from ``macro/series``: no table of its own)
 - ``rollups/instrument/<name>@v<N>``, ``rollups/market/<name>@v<N>``
                        another group's stored output (``rollups.rollup_rows``) for the session
                        plus ``lookback`` earlier sessions; ``None`` when the session has no
@@ -200,7 +204,7 @@ from algotrade.data.insiders.reading import TABLE as INSIDERS
 from algotrade.data.insiders.reading import buyer_histories
 from algotrade.data.listings.etf_launches import etf_launches
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
-from algotrade.data.macro.series import known_window, stored_vintages
+from algotrade.data.macro.series import first_alfred_vintages, known_window, stored_vintages
 from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows
@@ -444,6 +448,7 @@ class _EverySession:
 # runner does not require its ``session_date`` to be on or before the session. Shrink-only:
 # adding a table needs an ADR (``tests/unit/data/test_feature_inputs.py``).
 UNBOUNDED_INPUTS = frozenset({"filings/read"})
+MACRO_FIRST_VINTAGES = "macro/first_vintages"  # a view of ``macro/series``: no table of its own
 
 
 def _filing_reads(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
@@ -504,6 +509,27 @@ def _macro_series(
     frame = stored_vintages(reader, ids)
     days = _days(frame["vintage_date"]) if len(frame) else np.array([], "datetime64[D]")
     return _Vintages(frame, days)
+
+
+@dataclass(frozen=True)
+class _FirstVintages:
+    """Each series' earliest ALFRED vintage (``macro.series.first_alfred_vintages``), read once;
+    ``at`` is the rows (``instrument_id``, ``first_vintage``) whose date is on or before the
+    session, the earliest the session knew; ``None`` when none."""
+
+    frame: pd.DataFrame
+
+    def at(self, session: date, lookback: int) -> pd.DataFrame | None:
+        known = self.frame[self.frame["first_vintage"] <= session]
+        return known.reset_index(drop=True) if len(known) else None
+
+
+def _macro_first_vintages(
+    reader: StoreReader, sessions: Sequence[date], lookback: int, ids: Sequence[str]
+) -> Loaded:
+    first = first_alfred_vintages(stored_vintages(reader, ids))
+    frame = pd.DataFrame({"instrument_id": list(first), "first_vintage": list(first.values())})
+    return _FirstVintages(frame)
 
 
 @dataclass(frozen=True)
@@ -706,7 +732,10 @@ INPUTS: Mapping[str, Loader] = {
 }
 
 
-ID_INPUTS: Mapping[str, IdLoader] = {MACRO_SERIES: _macro_series}
+ID_INPUTS: Mapping[str, IdLoader] = {
+    MACRO_SERIES: _macro_series,
+    MACRO_FIRST_VINTAGES: _macro_first_vintages,
+}
 
 # Tables that also serve fixed windows (``Input.windows``) rather than a trailing lookback.
 type WindowLoader = Callable[[StoreReader, Sequence[date], Sequence[DateWindow]], Loaded]

@@ -50,6 +50,7 @@ from algotrade.storage.backends.arrow_memory import limit_threads, release_unuse
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.interfaces import PartitionStats, RowFilter
 
 __all__ = [
     "ConfigStore",
@@ -68,7 +69,9 @@ __all__ = [
     "open_stores",
     "partition",
     "partition_on",
+    "partition_stats_on",
     "previous_session",
+    "run_day_rows",
     "run_partition",
     "run_rows_of",
     "served_session",
@@ -501,13 +504,37 @@ def _run_file_rows(
     columns: Sequence[str] | None,
     instruments: Sequence[str] | None,
     why: str,
+    where: Sequence[RowFilter] = (),
 ) -> pd.DataFrame | None:
     """One run's own rows of the session-grain ``table`` on ``day`` (``read_run``: only that run's
     file, ADR 0064); ``None``: it has none. ``ValueError`` for a table that is not session grain."""
     grain = grain_of(table)
     if grain is not Grain.SESSION:
         raise ValueError(f"{table} is {grain} grain: {why}")
-    return ctx.reader.read_run(table, day, run_id, columns, instruments)
+    return ctx.reader.read_run(table, day, run_id, columns, instruments, where)
+
+
+def run_day_rows(
+    ctx: Stores, table: str, day: date, key: tuple[str, ...]
+) -> dict[tuple[Any, ...], dict[str, Any]]:
+    """The merged rows of the run-keyed ``results/*`` ``table`` on ``day``, a run's end session,
+    each as a dict under its ``key`` columns' values (runs are read by run, not by session,
+    ADR 0036): once per request. Empty when the partition is absent. The caller looks up the
+    exact key it computed, so a row of another run, another fingerprint or another user is never
+    returned for it. ``ValueError`` for a table that is not session grain."""
+    grain = grain_of(table)
+    if grain is not Grain.SESSION:
+        raise ValueError(f"{table} is {grain} grain: a run's results are session grain")
+
+    def read() -> dict[tuple[Any, ...], dict[str, Any]]:
+        frame = ctx.reader.table(table, day)
+        if frame is None or frame.empty:
+            return {}
+        rows = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
+        return {tuple(r[c] for c in key): r for r in rows}
+
+    memo_key = ("run-day-rows", table, day, key, ctx.reader.version(), ctx.reader.runs_generation())
+    return once_per_request(ctx, memo_key, read)
 
 
 def run_rows_of(
@@ -527,14 +554,26 @@ def run_rows_of(
 
 
 def run_partition(
-    ctx: Stores, table: str, run: RunRecord, columns: Sequence[str] | None = None
+    ctx: Stores,
+    table: str,
+    run: RunRecord,
+    columns: Sequence[str] | None = None,
+    where: Sequence[RowFilter] = (),
 ) -> pd.DataFrame | None:
     """The rows ``run`` wrote to the session-grain ``table`` (a ``results/*`` table it
     publishes to its own end session), read as the run left them whatever later run shares
     the partition (``read_run``: only that run's file, ADR 0064). ``None``: nothing
-    stored for it. ``ValueError`` for a table that is not session grain."""
+    stored for it. ``where``: only rows passing those filters, the row groups that cannot hold
+    one never decoded (``RowFilter``). ``ValueError`` for a table that is not session grain."""
     return _run_file_rows(
-        ctx, table, run.session_date, run.run_id, columns, None, "a run's results are session grain"
+        ctx,
+        table,
+        run.session_date,
+        run.run_id,
+        columns,
+        None,
+        "a run's results are session grain",
+        where,
     )
 
 
@@ -570,6 +609,14 @@ def partition_on(ctx: Stores, table: str, day: date) -> pd.DataFrame | None:
     """``table``'s partition for exactly ``day``, whatever its grain (``None``: none stored):
     an ops loader counting what is stored on each session of a window it names."""
     return ctx.reader.table(table, day)
+
+
+def partition_stats_on(
+    ctx: Stores, table: str, day: date, column: str | None = None
+) -> PartitionStats | None:
+    """What ``partition_on`` would hold, counted from the store's metadata, not decoded: rows,
+    run ids and (``column``) one column's values; ``None``: no partition stored."""
+    return ctx.reader.partition_stats(table, day, column)
 
 
 def snapshot_on(ctx: Stores, table: str, day: date) -> Snapshot | None:

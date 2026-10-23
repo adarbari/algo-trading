@@ -42,6 +42,13 @@ export interface ChartSeries {
 
 export type ChartEventKind = 'dividend' | 'split' | 'earnings' | 'filing' | 'macro';
 
+/** One piece of an event's description: its words and, when the event has one, its source page. */
+export interface ChartEventPart {
+  text: string;
+  /** The source page (an absolute https URL): makes the part an external link in the event list. */
+  href?: string;
+}
+
 export interface ChartEvent {
   time: string;
   kind: ChartEventKind;
@@ -50,6 +57,12 @@ export interface ChartEvent {
    * ("after close"), or for a filing or a macro release what it is ("8-K 2.02 results", "CPI 08:30").
    */
   detail?: string;
+  /**
+   * The marker as the row of `ChartEventList` describes it: the words, each part a link when it
+   * has a source page (several 8-Ks of one day are one marker and several parts). The chart
+   * itself ignores it; absent, the list shows `detail` (or the kind's name).
+   */
+  parts?: readonly ChartEventPart[];
 }
 
 /** The tones a band, lane segment or reference line takes: the StatusBadge tones. */

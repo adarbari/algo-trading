@@ -400,14 +400,19 @@ def run_withheld(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     stored ones and every one the run recorded, ``audit["field_licences"]``: the tie-break and
     flag fields too) is gated by ``hidden_stored``: the run's record and the site catalogue's
     current licence, never the viewer's own names. A run with rows but no readable values and no
-    record is withheld whole."""
+    record is withheld whole.
+
+    A run that recorded its fields is read from that record alone: the run path records every
+    field it stores a value for (a contract test over ``run_screener``), so its values file is
+    not read (it was the whole of this function's cost). A run with no record (before ADR 0069's
+    ``field_licences``) still reads the file and fails closed as above."""
     if set(ctx.licences) >= ALL_LICENCES:
         return frozenset()
     at_run = run.audit.get("licences")
     within = isinstance(at_run, list | tuple) and set(at_run) <= set(ctx.licences)
     recorded = run.audit.get("field_licences")
     known: Mapping[str, str] = recorded if isinstance(recorded, Mapping) else {}
-    stored = _run_fields(ctx, run)
+    stored = frozenset(known) if known else _run_fields(ctx, run)
     fields = stored | frozenset(known)
     if within:
         # evaluated under licences the viewer holds: what it read is open to them as recorded

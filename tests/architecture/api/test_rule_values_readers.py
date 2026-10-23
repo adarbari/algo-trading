@@ -13,6 +13,8 @@ EXEMPT = (
     "src/algotrade/storage/tables/schemas/registry.py",  # registers the spec; reads no rows
     "src/algotrade/services/screening/rule_results.py",  # the writer
     "src/algotrade/services/screening/run.py",  # publishes the writer's frames; reads none
+    "apps/ingestion/algotrade_ingestion/tasks/screens/screen_values_recluster.py",  # as stored
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # names the task's tables
 )
 TOUCHES = ("is_display_column", "rule_screen_values", "RULE_SCREEN_VALUES", "DISPLAY_COLUMN_MODE")
 SAFE = ("is_group_row", "is_criterion_row")

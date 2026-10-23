@@ -5,7 +5,7 @@ cites as evidence, its sources and how it is defined in words (``EdgeDefinition`
 
 Configs, not results: an edge is listed whether or not it has been evaluated."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -312,8 +312,8 @@ def parsed_edges(ctx: Stores, user: str) -> tuple[document.Edge, ...]:
     )
 
 
-def load_edges(ctx: Stores) -> tuple[Edge, ...]:
-    """Every edge ``ctx.user`` sees, by id; none without documents."""
+def load_edges(ctx: Stores, ids: Sequence[str] | None = None) -> tuple[Edge, ...]:
+    """Every edge ``ctx.user`` sees, by id; none without documents. ``ids``: only those."""
     site = set(ctx.configs.names(loading.SITE, loading.KIND))
     user = ctx.user.user_id
     found = parsed_edges(ctx, user)
@@ -324,6 +324,7 @@ def load_edges(ctx: Stores) -> tuple[Edge, ...]:
             own=None if e.id in site else ctx.configs.load(user, loading.KIND, e.id),
         )
         for e in found
+        if ids is None or e.id in ids
     )
 
 

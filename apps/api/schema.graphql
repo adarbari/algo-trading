@@ -32,7 +32,7 @@ enum Adjustment {
 }
 
 """
-A dated event ahead: `kind` own_earnings | reference_earnings | macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown for a report, the release time for a macro release (08:30 ET), close for a market-structure day; `label` short, `name` in words; `subjectId` whose event (the instrument, the fund's reference, the MACRO: release; null for a market-structure day); `knownFrom` the first session the stored row was known on (null: a catalogue value or a calendar rule); `expiry` a monthly or quarterly option expiry day
+A dated event ahead: `kind` own_earnings | reference_earnings | macro_release | market_structure; `time` pre_market | intraday | after_hours | unknown for a report, the release time for a macro release (08:30 ET), close for a market-structure day; `label` short, `name` in words; `subjectId` whose event (the instrument, the fund's reference, the MACRO: release; null for a market-structure day); `knownFrom` the first session the stored row was known on (null: a catalogue value or a calendar rule); `expiry` a monthly or quarterly option expiry day; `sourceUrl` the agency page of a macro release (null for every other kind)
 """
 type AheadEvent {
   date: Date!
@@ -44,6 +44,7 @@ type AheadEvent {
   source: String!
   knownFrom: Date
   expiry: Boolean!
+  sourceUrl: String
 }
 
 """
@@ -434,9 +435,19 @@ type Edge {
   runs: [EdgeRun!]!
 
   """
+  The most variants any run of the edge recorded as tried (the multiple-testing disclosure the builder shows); 0: none. Reads this edge's run records only
+  """
+  variantsTried: Int!
+
+  """
   The verdict on the official result (a site edge: the canonical run; the user's own edge: their latest run, judged on in-sample figures while `oosHidden`): Works, Promising, Not working, Not enough data or Waiting on data, with the reason, the figures it rests on and its criteria (ED8)
   """
   verdict: EdgeVerdict!
+
+  """
+  The headline of `verdict` (label, result, trades, lift, basis) for a list: always equal to those fields of `verdict`, read without the pieces a list never shows
+  """
+  summary: EdgeSummary!
 
   """
   The user's own edge against the edge it extends and its baselines, in-sample only while `oosHidden`; null for a site edge
@@ -834,6 +845,19 @@ type EdgeSource {
 }
 
 """
+The headline of an edge's verdict, what the edges list shows: the same `verdict`, `result`, `basis`, `trades` and `lift` as `Edge.verdict` (the one judge, the same run), without the haircut, decay, robustness, years, columns or evidence the list never reads, so it is read at a fraction of the cost; `oosTrades`, `liftPts`: the out-of-sample session count and the win rate over the base rate in points
+"""
+type EdgeSummary {
+  verdict: String!
+  result: String!
+  basis: String
+  trades: Int
+  oosTrades: Int
+  lift: Float
+  liftPts: Float
+}
+
+"""
 One page of the trades of the edge's verdict basis (`basis`: its screen and holding period, never chosen again). `unknown`: why there is no ledger (NOT_RUN: no official run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); `oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the trial licence of the rows; `symbolsSnapshot`: the newest reference snapshot a ticker on the page was read from
 """
 type EdgeTradePage {
@@ -978,7 +1002,7 @@ type EquityPoint {
 }
 
 """
-A stored event: `table` events/<kind>, `date` the event date (UTC), `values` the row's other columns
+A stored event: `table` events/<kind>, `date` the event date (UTC), `values` the row's other columns, `sourceUrl` the page the row came from (a report stored from an 8-K: its sec.gov filing index; null when there is none), `confirmed` a report stored from the company's own 8-K results release, which beats the exchange calendar's row of the same report
 """
 type Event {
   instrumentId: String!
@@ -987,6 +1011,8 @@ type Event {
   date: Date!
   ts: DateTime!
   values: JSON!
+  sourceUrl: String
+  confirmed: Boolean!
 }
 
 """
@@ -1189,7 +1215,7 @@ type FieldGuide {
 }
 
 """
-An 8-K or 8-K/A: `accepted` the SEC acceptance instant (UTC), `items` as SEC lists them, `label` the first item in words, `knownFrom` the session it was public on
+An 8-K or 8-K/A: `accepted` the SEC acceptance instant (UTC), `items` as SEC lists them, `label` the first item in words, `knownFrom` the session it was public on, `sourceUrl` its sec.gov filing index (null when the stored ids are not the digits SEC writes)
 """
 type Filing {
   accepted: DateTime!
@@ -1198,6 +1224,7 @@ type Filing {
   items: [String!]!
   label: String!
   knownFrom: Date!
+  sourceUrl: String
 }
 
 """One simulated fill"""
@@ -1978,34 +2005,46 @@ type HorizonRow {
 }
 
 """
-A ticker some screener picked: its picks, best screener first. `regime` and `sizeMultiplier`: the session's label and the size of its best pick, as the run stamped them (null: gate off, regime unknown, or a run before the stamp)
+A ticker some screener picked, served from its `best` pick only. `score`: that pick's, the idea's place in the list; `pickedBy`: every screener that picked it, the best first; `metrics` and `watchOut` (ids: flags, `liquidity_risk`, `earnings_before_expiry`) are the best pick's; `regime` and `sizeMultiplier`: the session's label and the size of the best pick, as the run stamped them (null: gate off, regime unknown, or a run before the stamp)
 """
 type Idea {
   rank: Int!
   instrumentId: String!
   instrument: Instrument
-  picks: [ScreenResult!]!
+  score: Float!
+  best: ScreenResult!
+  pickedBy: [PickedBy!]!
   regime: String
   sizeMultiplier: Float
+  metrics: [IdeaMetric!]!
+  watchOut: [String!]!
 }
 
 """
-One of the user's screeners on the Ideas page: its run for the session (else `notRun`: NOT_RUN), how many tickers it picked and its best picks, over the run
+A stored display value of an idea's best pick: a screener column or a criterion's value, by name
+"""
+type IdeaMetric {
+  name: String!
+  value: JSON!
+}
+
+"""
+One of the user's screeners on the Ideas page: its run for the session (else `notRun`: NOT_RUN), how many tickers it picked over the run, its first picks that count towards the ideas (`top`) and `withheld`: its run's order follows values the viewer's data licences do not cover, so it contributes no idea and lists no pick
 """
 type IdeaScreener {
   screener: Screener!
   run: ScreenerRun
   notRun: Unknown
   picked: Int!
-  top: [ScreenResult!]!
+  top: [TopPick!]!
+  withheld: Boolean!
 }
 
 """
-The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` one page of the `total` picked tickers (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
+The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
 """
 type Ideas {
   session: Date!
-  priority: [String!]!
   screeners: [IdeaScreener!]!
   total: Int!
   items: [Idea!]!
@@ -2431,6 +2470,18 @@ type PickIds {
 }
 
 """
+One screener's pick of an idea: its `position` in the screener's run, the `score` it earns under the Ideas rule (weight over position: a site screener's first pick is 1, the viewer's own screener weighs 3) and the `decision` it gave
+"""
+type PickedBy {
+  configId: String!
+  owner: String!
+  own: Boolean!
+  position: Int!
+  score: Float!
+  decision: String!
+}
+
+"""
 The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
 """
 type PresetPin {
@@ -2551,7 +2602,7 @@ type Query {
   ): EventCalendar
 
   """
-  The tickers the user's screeners picked in the session, ranked by their screener priority then score (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
+  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
   """
   ideas(
     first: Int! = 50
@@ -2713,9 +2764,9 @@ type Query {
   backtests: [Backtest!]!
 
   """
-  Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data
+  Every edge the user sees (ADR 0053), by id: status, thesis, the screeners that implement it and its evaluation runs; not session data. `ids`: only those edges
   """
-  edges: [Edge!]!
+  edges(ids: [String!] = null): [Edge!]!
 
   """
   The user's own edge files `edges` leaves out (or reads only in part), by id, with the reason; empty: every file of theirs loads
@@ -3408,6 +3459,16 @@ type TableView {
 type TextPart {
   text: String!
   url: String
+}
+
+"""
+One of a screener's first picks: who it is, its `position` in the screener's run and the `score` the run stored for it (null: none stored)
+"""
+type TopPick {
+  instrumentId: String!
+  instrument: Instrument
+  position: Int!
+  score: Float
 }
 
 """

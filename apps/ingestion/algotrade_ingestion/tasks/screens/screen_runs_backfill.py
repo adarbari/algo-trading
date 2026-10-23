@@ -23,7 +23,6 @@ changes are counted against is the live one (``services/screening/previous.previ
   rows and picked counts equal ``rule_screen``'s; a session that fails it is listed.
 """
 
-from collections import Counter
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -44,6 +43,7 @@ from algotrade.services.screening.run import run_job_name
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import result_table
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.screens.windowed_pass import WindowedPass
 
 TASK = "screen_runs_backfill"
 SHOWN = 20  # mismatches and unframed sessions listed in the run's stats
@@ -168,12 +168,11 @@ def _acceptance(reader: StoreReader, day: date, latest: pd.DataFrame) -> str | N
     return None if not differ else f"{len(differ)} of {len(wanted)} runs, first {differ[0]}"
 
 
-class _Pass:
+class _Pass(WindowedPass):
     """One backfill run's state: what each run did, and what to report."""
 
     def __init__(self, run: IngestRun, limit: int | None) -> None:
-        self.run, self.limit = run, limit
-        self.counts: Counter[str] = Counter()
+        super().__init__(run, limit)
         self.mismatches: list[str] = []
         self.unknown_version: list[str] = []
         self.unframed: list[str] = []
@@ -208,31 +207,29 @@ class _Pass:
             self.unknown_version.append(f"{key}: {why}")
         return self._note(key, "OK" if why is None else "OK: version unknown", "framed")
 
-    def _note(self, key: str, status: str, count: str) -> None:
-        self.run.record_item(key, status)
-        self.counts[count] += 1
-
     def finish(self, days: list[date], start: date | None, end: date | None) -> None:
-        run, counts = self.run, self.counts
-        run.stats.update(counts)
-        run.stats.update(
-            window=[start and start.isoformat(), end and end.isoformat()],
-            first=days[0].isoformat() if days else None,
-            last=days[-1].isoformat() if days else None,
-            sessions=len(days),
-            limit=self.limit,
-            mismatches=self.mismatches[:SHOWN],
-            version_unknown=self.unknown_version[:SHOWN],
-            version_unknown_count=len(self.unknown_version),
-            unframed=self.unframed[:SHOWN],
-            unframed_count=len(self.unframed),
+        super().finish_window(
+            days,
+            start,
+            end,
+            extra={
+                "mismatches": self.mismatches[:SHOWN],
+                "version_unknown": self.unknown_version[:SHOWN],
+                "version_unknown_count": len(self.unknown_version),
+                "unframed": self.unframed[:SHOWN],
+                "unframed_count": len(self.unframed),
+            },
+            before_limit=(
+                [f"{len(self.mismatches)} runs disagree with rule_screen (not written)"]
+                if self.mismatches
+                else []
+            ),
+            after_limit=(
+                [f"{len(self.unframed)} sessions fail the counts check against rule_screen"]
+                if self.unframed
+                else []
+            ),
         )
-        if self.mismatches:
-            run.partial(f"{len(self.mismatches)} runs disagree with rule_screen (not written)")
-        if counts["not_reached"]:
-            run.partial(f"{counts['not_reached']} runs left by --limit: run it again to continue")
-        if self.unframed:
-            run.partial(f"{len(self.unframed)} sessions fail the counts check against rule_screen")
 
 
 def backfill_screen_runs(

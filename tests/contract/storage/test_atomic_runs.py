@@ -10,10 +10,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from algotrade.storage.backends import local, local_index
+from algotrade.storage.backends import local
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.backends.run_selection import OPTIMISTIC_TRIES
+from algotrade.storage.backends.runs import local_index
+from algotrade.storage.backends.runs.run_selection import OPTIMISTIC_TRIES
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.storage.tables.schemas import SCREEN_PICKS, SCREEN_RUNS

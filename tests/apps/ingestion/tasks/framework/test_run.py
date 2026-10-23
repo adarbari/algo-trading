@@ -7,9 +7,9 @@ import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
-from algotrade.storage.backends import local_index
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.backends.runs import local_index
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import (

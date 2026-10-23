@@ -28,7 +28,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from algotrade.storage.backends.arrow import concat, table_spec
-from algotrade.storage.backends.run_selection import (
+from algotrade.storage.backends.runs.run_selection import (
     RunEntry,
     StaleSnapshotError,
     merge_rows,

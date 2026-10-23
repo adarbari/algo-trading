@@ -74,7 +74,7 @@ purpose = "research-study settings, one <name>.toml per study: winners.toml, the
 
 [[config_dir]]
 path = "config/site/events"
-purpose = "event-sensitivity track settings: the scope list of names the event study runs for and the registry of macro releases it calendars (ADR 0050)"
+purpose = "event-sensitivity track settings: the scope list of names the event study runs for and the registry of macro releases it calendars and the links.toml of each release's agency page (ADR 0050)"
 
 [[config_dir]]
 path = "config/site/guide"

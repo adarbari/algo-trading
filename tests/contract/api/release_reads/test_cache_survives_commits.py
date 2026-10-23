@@ -21,7 +21,7 @@ from algotrade.services.read.context import Held, ResultCache
 from algotrade.services.serving.build import build_release
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.backends.release.memory import MemoryReleaseStore
-from algotrade.storage.backends.run_selection import StaleSnapshotError
+from algotrade.storage.backends.runs.run_selection import StaleSnapshotError
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade_api.deps import ApiSettings
 from algotrade_api.graphql.context import RequestContext

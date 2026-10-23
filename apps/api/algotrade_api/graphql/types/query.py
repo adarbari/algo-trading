@@ -221,10 +221,11 @@ class Query:
         return EventCalendar.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The tickers the user's screeners picked in the session, ranked by their "
-        "screener priority then score (`first` of them from the `after` cursor, `nextCursor` "
-        "the next page's); a screener with no run for the session is listed NOT_RUN. Null: "
-        "nothing stored",
+        description="The tickers the user's screeners picked in the session, ranked by the "
+        "Ideas rule (a screener's first picks, weighted by position and by whose screener it "
+        "is; each idea is served from its best pick) (`first` of them from the `after` "
+        "cursor, `nextCursor` the next page's); a screener with no run for the session is "
+        "listed NOT_RUN. Null: nothing stored",
         extensions=[MaxItems("first", MAX_IDEAS_PAGE)],
     )
     async def ideas(
@@ -479,11 +480,11 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every edge the user sees (ADR 0053), by id: status, thesis, the screeners "
-        "that implement it and its evaluation runs; not session data"
+        "that implement it and its evaluation runs; not session data. `ids`: only those edges"
     )
-    def edges(self, info: Ctx) -> list[Edge]:
+    def edges(self, info: Ctx, ids: list[str] | None = None) -> list[Edge]:
         ctx = info.context.stores()
-        found = edge_reads.load_edges(ctx) if ctx is not None else ()
+        found = edge_reads.load_edges(ctx, ids) if ctx is not None else ()
         return [Edge.of(e, ctx) for e in found] if ctx is not None else []
 
     @strawberry.field(  # type: ignore[untyped-decorator]

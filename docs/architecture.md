@@ -453,7 +453,7 @@ src/algotrade/
     strategy/     schema.py, resolve.py, catalog.py           configs and selections
   storage/        runs.py, locks.py, factory.py
     tables/       interfaces, readers, writers, schemas, result_writer
-    backends/     local, memory, arrow, run_selection, run_compaction   the only Parquet / Arrow code
+    backends/     local, memory, arrow, runs/ (selection, compaction) the only Parquet / Arrow code
     configs/      store.py (ConfigStore), files.py            config documents only
   quant/          black_scholes, implied_vol, realized_vol, rates,  pure numerics (numpy)
                   covariance, turning_points
@@ -635,7 +635,7 @@ web (apps/web) ──HTTP/JSON─────▶ routes/<area>.py ──one call
 | instruments | GraphQL since read-model PR 6 (ADR 0037): `instrument(key, date) { events(start, end) chain { expiries { date days } strikes status quotes(expiry) } holdings(top) prices(start, end, adjustment) series(names, start, end) }` ([api/read-model.md](api/read-model.md)) |
 | chains | `/chains/{underlying_id}/live?expiry&strikes=` (repeatable; default the `live_strikes` nearest the underlying): live IBKR quotes through `services/live/` ([ADR 0028](adr/0028-ibkr-enrichment-source.md#live-option-quotes-in-the-api)), cached 60 s, recorded to `live/option_quotes`; when the gateway cannot answer, the stored chain with `source = stored` and a `status` (DISABLED, UNAVAILABLE, ERROR), never an error |
 | GraphQL (`POST /graphql`, ADR 0037; [api/read-model.md](api/read-model.md)) | the session, an instrument and its features by catalogue name, the catalogue (`catalogue`), a feature across instruments (`distribution(name, date)`: count, nulls, quantiles, histogram or categories, UNKNOWN when not stored for the session), configs (`configs(kind)`), saved backtests (`backtests`, `backtest(runId)`: metrics, selection, data versions, rebalances, equity curve, fills) and the user's rule screens (`myScreens`, `screenDetail(screenerId)`: draft, versions, preset pin, working copy; `screenVersions`) |
-| ideas | GraphQL since read-model PR 5 (ADR 0037): `ideas(date)` (one row per ticker over the user's rule screens' runs for exactly the session, `NOT_RUN` without one; ranked by the user's `ideas.priority` in `config/users/<u>/preferences.toml`, then score) |
+| ideas | GraphQL since read-model PR 5 (ADR 0037): `ideas(date)` (one row per ticker over the user's rule screens' runs for exactly the session, `NOT_RUN` without one; ranked by the Ideas rule of `services/ideas/rule.py`, parameters `config/site/ranking/ideas.toml`: a site screener's first 5 and the user's own first 20, a pick scoring weight / position, an idea its best pick's score; each idea is served from that pick alone; a run withheld by a data licence adds nothing; `ideas.priority` is retired) |
 | table views | read: GraphQL `view(scope, name)` (read-model PR 8); write: `PUT /preferences/views/{scope}/view?name` and `DELETE ?name=` (a user's added catalogue columns, sort and shown decisions for one table, `scope` `screener:<id>` for a screener's results: the default view, in `views.<scope>.view` of `preferences.toml`, and any named ones, `views.<scope>.views.<name>`; a view saved before PR 8 under `screeners.<id>` is read there until the user's next preferences write moves it; never part of a screener version or hash; ADR 0032) |
 | user edges | read: GraphQL `edge` / `edges` (`state`, `mine`, `extends`, `labels`, `oosHidden`, `compare`; a copy's out-of-sample result is withheld server side until shown), `publishedEdgeDocument` (admin: the layered TOML to land in `config/site/edges/` by PR); write: `POST /edges/{id}/copy`, `PUT /edges/{id}`, `DELETE /edges/{id}`, `PUT /edges/{id}/state` (`config/users/<u>/edges/` only, never the site's; ADR 0053 amendment 2026-10-09) |
 | screen run | `POST /screens/{config_id}/run?date&user` (run a screener on request for the latest session with data, unless this version has results for it: `ready`, else the nightly's `screen` job, without waiting for ingestion, 202) (poll it at `GET /jobs/{job_id}`; ADR 0033) |
@@ -694,7 +694,7 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | site settings: `config/site/*.toml` → typed objects | `config/site/settings.py` (the store only reads files) |
 | environment variables and `.env` | `config/env.py` (the storage factory receives the URL) |
 | table schemas: required columns, declared types, validation, how a table's runs combine (`TableSpec.runs`) | `storage/tables/schemas.py` |
-| which runs of a partition a read sees (`snapshot` / `merge`, restating runs; ADR 0007) | `storage/backends/run_selection.py` |
+| which runs of a partition a read sees (`snapshot` / `merge`, restating runs; ADR 0007) | `storage/backends/runs/run_selection.py` |
 | Parquet / Arrow I/O (casting to declared types, schema version, row groups) | `storage/backends/` (`arrow.py` shared by every backend) |
 | HTTP: routers, response schemas, CORS, error mapping, the ASGI server (ADR 0024) | `apps/api/algotrade_api/` |
 | the Builder's dry runs (preview POSTs) | `services/preview/` |

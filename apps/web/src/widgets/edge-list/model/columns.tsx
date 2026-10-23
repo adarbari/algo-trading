@@ -14,12 +14,12 @@ import {
   statusTone,
   verdictLabel,
   verdictTone,
-  type Edge,
+  type EdgeRow,
   type LiveState,
 } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
 
-const screensOf = (e: Edge): string => {
+const screensOf = (e: EdgeRow): string => {
   const screens =
     e.screeners.length === 0
       ? 'no screen yet'
@@ -28,7 +28,7 @@ const screensOf = (e: Edge): string => {
 };
 
 /** `live`: each recorded edge's live state by edge id (an edge without one shows nothing). */
-export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColumn<Edge>[] {
+export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColumn<EdgeRow>[] {
   return [
     {
       id: 'name',
@@ -52,11 +52,11 @@ export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColu
       id: 'verdict',
       header: 'Verdict',
       headerAction: termHelp('verdict'),
-      value: (e) => verdictLabel(e.verdict.verdict),
+      value: (e) => verdictLabel(e.summary.verdict),
       essential: true,
       cell: ({ row }) => (
-        <StatusBadge tone={verdictTone(row.verdict.verdict)}>
-          {verdictLabel(row.verdict.verdict)}
+        <StatusBadge tone={verdictTone(row.summary.verdict)}>
+          {verdictLabel(row.summary.verdict)}
         </StatusBadge>
       ),
     },
@@ -64,7 +64,7 @@ export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColu
       id: 'result',
       header: 'Out-of-sample result',
       headerAction: termHelp('out_of_sample'),
-      value: (e) => e.verdict.result,
+      value: (e) => e.summary.result,
       grow: true,
       tone: 'secondary',
     },
@@ -72,7 +72,7 @@ export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColu
       id: 'trades',
       header: 'Trades',
       headerAction: termHelp('trades'),
-      value: (e) => e.verdict.trades ?? null,
+      value: (e) => e.summary.trades ?? null,
       format: { kind: 'number' },
       align: 'end',
     },

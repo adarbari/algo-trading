@@ -74,6 +74,10 @@ name = "ResultColumn.value"
 reason = "the value of a display column"
 
 [[fact]]
+name = "IdeaMetric.value"
+reason = "the value of a display column or a criterion of an idea's best pick (a number or a short label)"
+
+[[fact]]
 name = "FeatureTable.rows"
 reason = "stored values of the table columns; an absent one is null with `unknown` saying why"
 

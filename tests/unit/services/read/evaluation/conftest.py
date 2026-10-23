@@ -88,6 +88,7 @@ def write_run(
     whole: dict[str, Any] | None = None,
     edge: str = "drift",
     trials_counted: int = 1,
+    oos: dict[str, Any] | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T; ``trades``: its ledger (``results/edge_trades``, its
@@ -99,7 +100,14 @@ def write_run(
     rows = [
         row("momo", "all", 0.3, split, user_id=owner, edge_id=edge, **(whole or {})),
         row(
-            "momo", kind, hit_rate, split, user_id=owner, exploratory=split != FROZEN, edge_id=edge
+            "momo",
+            kind,
+            hit_rate,
+            split,
+            user_id=owner,
+            exploratory=split != FROZEN,
+            edge_id=edge,
+            **(oos or {}),
         ),
         *(extra or []),
     ]

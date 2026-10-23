@@ -311,6 +311,21 @@ Source: `design-system/components/Chart`
 | `onRetry` | `() => void` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when no series has points in the window. |
 
+### ChartEventList
+
+ChartEventList: the events a price chart marks (its `ChartEvent`s), as a dated list under it: one row per marker, in the order given, each a date, the kind's letter (the chart's own: E earnings, F filing, D ex-dividend, S split, M macro release) and a description. A description is one or more parts: a part with an address is an external link (the source page, opens in a new tab), one without is plain text, so several 8-Ks of one day stay separate links inside one row. Under the list's width of a phone the row folds to the date and the letter on one line and the description below. Kind chips above toggle which kinds show, each with how many rows it has; all show at first. Loading, empty and error states.
+
+Source: `design-system/components/ChartEventList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What the list is ("AAPL events on the chart"): its accessible name. |
+| `events` | `readonly ChartEvent[]` | yes | The markers, already in display order (newest first). |
+| `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` or `error`. |
+| `errorMessage` | `ReactNode` | no |  |
+| `onRetry` | `() => void` | no |  |
+| `emptyMessage` | `ReactNode` | no | Shown when there is no row at all. |
+
 ### Checkbox
 
 Checkbox: an on / off choice with its label (or a row-selection box whose label is for screen readers only: `hideLabel`). Supports the mixed state (`indeterminate`) for "select all" over a partial selection. The native checkbox in the accent colour: Space toggles it. A `description` is announced as the box's description, not as part of its name.

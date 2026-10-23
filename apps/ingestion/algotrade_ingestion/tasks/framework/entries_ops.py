@@ -3,6 +3,7 @@
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import history_copy
+from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
 from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
 from algotrade_ingestion.tasks.framework.run import TaskContext
@@ -23,7 +24,7 @@ from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     ibkr_contracts,
 )
-from algotrade_ingestion.tasks.screens import screen_runs_backfill
+from algotrade_ingestion.tasks.screens import screen_runs_backfill, screen_values_recluster
 from algotrade_ingestion.tasks.shorting import restamp
 from algotrade_ingestion.tasks.verification import verify
 from algotrade_sources.framework.base import (
@@ -106,12 +107,33 @@ def run_history_copy(ctx: TaskContext, p: Params) -> RunRecord:
     return history_copy.build_copies(ctx, session_of(p))
 
 
+def run_edge_verdicts(ctx: TaskContext, p: Params) -> RunRecord:
+    """The window is ``--from`` / ``--to`` on a run's range end, or ``--date D`` for [D, D]; no
+    flag is every site edge. The post-session step passes ``all_edges``: its ``session`` is not a
+    window (an edge not evaluated tonight still has its canonical run)."""
+    start, end = p.get("start"), p.get("end")
+    if p.get("session") and not (start or end or p.get("all_edges")):
+        start = end = p["session"]
+    options = edge_verdicts.Options(
+        start, end, p.get("limit"), bool(p.get("dry_run")), bool(p.get("verify"))
+    )
+    return edge_verdicts.rejudge_edges(ctx, options, p.get("edge"))
+
+
 def run_screen_runs_backfill(ctx: TaskContext, p: Params) -> RunRecord:
     """``--date D`` is the window [D, D]; no flag at all is every stored session."""
     start, end = p.get("start"), p.get("end")
     if p.get("session") and not (start or end):
         start = end = p["session"]
     return screen_runs_backfill.backfill_screen_runs(ctx, start, end, p.get("limit"))
+
+
+def run_screen_values_recluster(ctx: TaskContext, p: Params) -> RunRecord:
+    """``--date D`` is the window [D, D]; no flag at all is every stored session."""
+    start, end = p.get("start"), p.get("end")
+    if p.get("session") and not (start or end):
+        start = end = p["session"]
+    return screen_values_recluster.recluster_screen_values(ctx, start, end, p.get("limit"))
 
 
 def run_purge(ctx: TaskContext, p: Params) -> RunRecord:

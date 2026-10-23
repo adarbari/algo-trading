@@ -124,6 +124,9 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"fmp": {"daily_budget": -1}}, r"\[fmp\] daily_budget: expected an integer >= 0"),
         ({"fmp": {"licence": "free"}}, r"\[fmp\] licence"),
         ({"finnhub": {"licence": "free"}}, r"\[finnhub\] licence"),
+        ({"yahoo": {"licence": "free"}}, r"\[yahoo\] licence"),
+        ({"yahoo": {"per_night": -1}}, r"\[yahoo\] per_night: expected an integer >= 0"),
+        ({"yahoo": {"run_budget_s": 0}}, r"\[yahoo\] run_budget_s: expected an integer >= 1"),
         ({"ssga": {"etf_files": "no"}}, r"\[ssga\] etf_files: expected true or false"),
         ({"etf_holdings": {"refresh": 7}}, r"\[etf_holdings\]: unknown keys \['refresh'\]"),
     ],
@@ -517,6 +520,18 @@ def test_the_analyst_vendors_are_personal_licence_with_fmp_s_daily_budget() -> N
     assert SourcesSettings().fmp_daily_budget == 200  # the default is the site value (ADR 0068)
 
 
+def test_yahoo_is_owner_only_with_its_own_caps_and_cache() -> None:
+    site_value = SourcesSettings.from_document(tomllib.loads((SITE / "sources.toml").read_text()))
+    assert site_value.yahoo == SourcesSettings().yahoo  # the default is the site value (ADR 0080)
+    y = site_value.yahoo
+    assert (y.licence, y.per_night, y.refresh_days, y.run_budget_s) == ("yahoo", 60, 14, 600)
+    assert y.cache_dir == "var/cache/yahoo"
+    assert site_value.vendor("yahoo").min_interval_s == 1.0
+    assert site_value.vendor("yahoo").raw_retention_days == 365  # Yahoo cannot replay a day
+    changed = SourcesSettings.from_document({"yahoo": {"per_night": 5, "cache_dir": "x/y"}})
+    assert (changed.yahoo.per_night, changed.yahoo.cache_dir) == (5, "x/y")
+
+
 def test_every_vendor_section_sets_each_of_its_keys_explicitly() -> None:
     """A vendor key the site file does not set falls back to its code default silently: the
     Power-plan edit (#405) folded ``monthly_symbol_budget`` and ``licence`` into a comment line,
@@ -536,6 +551,7 @@ def test_analyst_snapshot_settings_default_and_validate() -> None:
     settings = SourcesSettings.from_document(site("sources"))
     assert (settings.fmp_refresh_days, settings.finnhub_per_night) == (7, 300)
     assert settings.max_analyst_failed == 0.20 and settings.finnhub_refresh_days == 7
+    assert settings.fmp_refused_hold_days == 90
     assert settings.max_analyst_backlog == 0.25
     assert settings.fmp_run_budget_s == 1500
     document = {

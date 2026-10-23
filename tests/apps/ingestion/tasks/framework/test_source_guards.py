@@ -33,8 +33,9 @@ def test_analyst_snapshot_skips_with_the_reasons_when_no_vendor_key_is_set() -> 
     assert "no ALGOTRADE_FMP_API_KEY" in skip and "no key" in skip
 
 
-def test_analyst_snapshot_runs_when_either_vendor_is_built() -> None:
-    fmp = {n: object() for n in source_guards.ANALYST_SOURCES[:3]}
+def test_analyst_snapshot_runs_when_any_vendor_is_built() -> None:
+    fmp = {n: object() for n in source_guards.FMP_SOURCES}
     assert source_guards.no_analyst_source(_ctx(fmp)) is None
     assert source_guards.no_analyst_source(_ctx({"finnhub_recommendations": object()})) is None
+    assert source_guards.no_analyst_source(_ctx({"yahoo_analyst": object()})) is None
     assert source_guards.no_analyst_source(_ctx({"fmp_targets": object()})) is not None  # one of 3

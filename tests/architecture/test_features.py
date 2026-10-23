@@ -418,10 +418,16 @@ def test_personal_series_are_read_only_through_licensed_features() -> None:
 
 
 def _screened_fields() -> dict[str, str]:
-    """Every field a site preset screener's criteria, tie-break or flags name -> where."""
+    """Every field the LATEST version of each site preset screener's criteria, tie-break or flags
+    name -> where (an older version stays immutable and may name a superseded field)."""
     found: dict[str, str] = {}
     presets = REPO_ROOT / "config" / "site" / "presets" / "screeners"
-    for path in sorted(presets.glob("*/v*.toml")):
+    latest = [
+        max(folder.glob("v*.toml"), key=lambda p: int(p.stem[1:]))
+        for folder in sorted(presets.iterdir())
+        if folder.is_dir()
+    ]
+    for path in latest:
         doc = tomllib.loads(path.read_text())
         where = f"{path.parent.name}/{path.name}"
         for c in (doc.get("criteria") or {}).values():
@@ -490,11 +496,19 @@ def test_an_expression_over_an_optional_source_still_has_a_value_without_it(name
     )
 
 
+GROUPS_VERSION = {
+    "analyst_estimates": 2,
+    "analyst_targets": 2,
+    "analyst_ratings": 1,
+    "analyst_revisions": 2,
+}
+
+
 def test_sole_source_groups_are_optional_and_name_their_adr() -> None:
     analyst = {"analyst_estimates", "analyst_targets", "analyst_ratings", "analyst_revisions"}
     assert analyst == SOLE_SOURCE  # a new one is a decision
     assert SOLE_SOURCE <= OPTIONAL
-    assert all("ADR " in GROUPS[f"{n}@v1"].sole_source for n in SOLE_SOURCE)
+    assert all("ADR " in GROUPS[f"{n}@v{GROUPS_VERSION[n]}"].sole_source for n in SOLE_SOURCE)
     # the checks see through expressions: the forward features read the sole sources, the
     # IBKR formulas an optional group that still needs its fallback
     assert {"analyst_estimates", "analyst_targets"} <= {
@@ -520,3 +534,17 @@ def test_no_site_hard_criterion_reads_an_optional_source_directly() -> None:
                 # no fallback exists for a sole-source group: its expressions are optional fields
                 bad.append(f"{path.parent.name}/{path.name} criteria.{cid} (sole source)")
     assert not bad, f"HARD criteria on an optional source's field: {bad}"
+
+
+def test_every_analyst_group_reads_its_vendor_through_the_one_chooser() -> None:
+    """ADR 0080: estimates and targets read FMP's and Yahoo's rows only through
+    ``choose_vendor`` + ``effective_snapshots``, revisions only through ``history_of_chosen``
+    (the vendor the estimates chose); ratings are Finnhub's alone and read neither."""
+    folder = REPO_ROOT / "src/algotrade/features/rollups/consensus"
+    text = {n: (folder / f"analyst_{n}.py").read_text() for n in ("estimates", "targets")}
+    for name, source in text.items():
+        assert "choose_vendor(" in source and "effective_snapshots(" in source, name
+    revisions = (folder / "analyst_revisions.py").read_text()
+    assert "history_of_chosen(" in revisions and "history_rows(" not in revisions
+    ratings = (folder / "analyst_ratings.py").read_text()
+    assert "choose_vendor" not in ratings and "YAHOO" not in ratings

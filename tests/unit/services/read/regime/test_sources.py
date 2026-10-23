@@ -15,6 +15,8 @@ from algotrade.data.macro.series import stored_vintages
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input
 from algotrade.features.framework.feature import Feature
+from algotrade.features.framework.runner import compute_one
+from algotrade.features.rollups.market import macro_asof
 from algotrade.services.features import catalogue
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime import sources
@@ -28,6 +30,7 @@ from algotrade.services.read.regime.sources import (
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.conftest import REPO_ROOT
+from tests.helpers.rollup_store import write_rows
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 from tests.unit.services.read.regime.conftest import _never
@@ -229,3 +232,82 @@ def test_the_sources_without_provenance_plus_the_provenance_part_equal_the_compo
     }
     assert filled == composed
     assert lazy["UNRATE"].first_vintage == date(1964, 6, 1)
+
+
+def _every_series(writer: StoreWriter) -> None:
+    _macro(writer)
+    rows = [
+        _row(iid, date(2026, 9, 30), date(2026, 10, 1), kind)
+        for iid, kind in (
+            ("MACRO:T10Y3M", "lagged"), ("IDX:SPX", "lagged"), ("IDX:VIX", "lagged"),
+            ("IDX:VIX3M", "lagged"), ("MACRO:NFCI", "alfred"),
+        )
+    ]  # fmt: skip
+    rows.append(_row("MACRO:NFCI", date(2026, 9, 22), date(2026, 9, 23), "alfred"))
+    writer.write_table("macro/series", D1, "macro-2", stamped(rows, D1, "macro-2"))
+
+
+def _asof(day: date):  # type: ignore[no-untyped-def]
+    """A writer that stores ``macro_asof@v1``'s row for ``day``, computed from what is stored."""
+
+    def write(writer: StoreWriter) -> None:
+        frame = compute_one(store_with(_every_series), macro_asof.GROUP, day).frame
+        assert frame is not None
+        write_rows(writer, macro_asof.GROUP.table, day, frame.to_dict("records"))
+
+    return write
+
+
+def _provenance(day: date, *writes):  # type: ignore[no-untyped-def]
+    ctx = replace(context(store_with(_every_series, *writes), day), features=SITE)
+    lineage = {c.key: (c.feature, c.feature + "_on") for c in CARDS.cards}
+    return sources.load_provenance(ctx, lineage, MACRO, CARDS.sources)
+
+
+def test_the_stored_provenance_equals_the_stored_vintage_computation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Golden equivalence: for the session the group has a row for, the catalogue features
+    give exactly what the one read of the vintages gives (a later revision unseen, the first
+    ALFRED vintage, a lagged personal series) and read no vintage at all."""
+    recomputed = _provenance(D1)
+    assert recomputed["UNRATE"].first_vintage == date(1964, 6, 1)
+    assert recomputed["BAMLH0A0HYM2"].vintage_kind == "lagged"
+    assert all(p.last_observation is not None for p in recomputed.values())
+
+    def never(*_: object) -> None:
+        raise AssertionError("the vintages were read")
+
+    monkeypatch.setattr(f"{sources.__name__}.stored_vintages", never)
+    assert _provenance(D1, _asof(D1)) == recomputed
+
+
+def test_a_session_with_no_stored_row_falls_back_to_the_vintages() -> None:
+    """Older sessions before a backfill give today's value, never UNKNOWN: the row is for D1,
+    the session read is D0 (before a vintage that D1 knew)."""
+    plain = _provenance(D0)
+    assert _provenance(D0, _asof(D1)) == plain
+    assert plain["UNRATE"].last_observation == date(2026, 8, 1)
+
+
+def test_a_series_the_row_holds_no_observation_for_is_recomputed() -> None:
+    """A row whose series column is null (stale before a macro backfill, or no observation)
+    is read from the vintages, so what the row lacks is never reported as unknown."""
+
+    def stale(writer: StoreWriter) -> None:
+        frame = compute_one(store_with(_every_series), macro_asof.GROUP, D1).frame
+        assert frame is not None
+        rows = frame.astype(object).where(frame.notna(), None).to_dict("records")
+        rows[0].update({f"nfci_{f}": None for f in sources._PROVENANCE_COLUMNS})
+        write_rows(writer, macro_asof.GROUP.table, D1, rows)
+
+    found = _provenance(D1, stale)
+    assert found["NFCI"] == _provenance(D1)["NFCI"] and found["NFCI"].last_observation
+    assert found == _provenance(D1)
+
+
+def test_the_provenance_features_exist_in_the_catalogue_for_every_series_of_the_cards() -> None:
+    known = SITE.field_types("market")
+    for key in macro_asof.SERIES:
+        for field in sources._PROVENANCE_COLUMNS:
+            assert f"{sources.MACRO_ASOF}{key.lower()}_{field}" in known

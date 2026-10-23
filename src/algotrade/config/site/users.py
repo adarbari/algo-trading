@@ -11,8 +11,9 @@ optionally ``subject``: the Supabase user id a token's ``sub`` must then equal),
 ``with_identities``. ``settings.load_users`` reads the files, this module does no I/O.
 
 ``licences`` lists the data licences a user holds beyond the open one (ADR 0064 decision 10,
-ADR 0028): ``personal`` is the owner's alone today. Only a holder is served per-name values
-derived from a personal-licence feature; everyone else sees them as ``LICENCE``.
+ADR 0028): ``personal`` and ``yahoo`` (Yahoo-derived analyst values, ADR 0080) are the owner's
+alone today. Only a holder is served per-name values derived from a feature under that licence;
+everyone else sees them as ``LICENCE``.
 """
 
 import uuid
@@ -22,7 +23,7 @@ from enum import StrEnum
 from typing import Any
 
 from algotrade.config.site.fields import Table
-from algotrade.config.site.macro import LICENCES
+from algotrade.config.site.macro import HELD_LICENCES
 from algotrade.config.user import DEFAULT_USER, SITE_USER, validate_id
 from algotrade.core.model.errors import ConfigurationError
 
@@ -55,9 +56,14 @@ class UserRecord:
 
     def __post_init__(self) -> None:
         validate_id("user", self.user_id)
-        unknown = sorted(set(self.licences) - set(LICENCES))
+        unknown = sorted(set(self.licences) - set(HELD_LICENCES))
         if unknown:
             raise ConfigurationError(f"user '{self.user_id}' licences: unknown {unknown}")
+        if "yahoo" in self.licences and "personal" not in self.licences:
+            # a column's licence is the strictest of what it reads (``yahoo`` over ``personal``),
+            # and the gate asks for that exact licence: a holder of ``yahoo`` alone would be
+            # served an expression over an IBKR (``personal``) and an analyst feature (ADR 0080)
+            raise ConfigurationError(f"user '{self.user_id}' licences: yahoo needs personal")
         if self.subject is not None:
             object.__setattr__(self, "subject", _subject(self.subject, f"user '{self.user_id}'"))
         if self.email is None and self.subject is None:
@@ -73,7 +79,7 @@ class UserRecord:
 
 
 DEFAULT_USERS: tuple[UserRecord, ...] = (
-    UserRecord(DEFAULT_USER, Role.ADMIN, "Local user", licences=("personal",)),  # the owner
+    UserRecord(DEFAULT_USER, Role.ADMIN, "Local user", licences=("personal", "yahoo")),  # the owner
     UserRecord(SITE_USER, Role.ADMIN, "Scheduled site screens"),
 )
 

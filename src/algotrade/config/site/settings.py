@@ -64,6 +64,7 @@ from algotrade.config.site.universe.etf_category import EtfCategoryRules, etf_ov
 from algotrade.config.site.users import IDENTITY, identity
 from algotrade.config.site.users import UsersSettings as UsersSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.vendors import sec_pace
+from algotrade.config.site.vendors.yahoo import YAHOO_KEYS, YahooSettings, parse_yahoo
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
@@ -158,8 +159,9 @@ VENDOR_EXTRAS = {
     "finra": ("short_interest_lookback_days", "short_volume_lookback_days"),
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
-    "fmp": ("licence", "daily_budget", "refresh_days", "run_budget_s"),
+    "fmp": ("licence", "daily_budget", "refresh_days", "refused_hold_days", "run_budget_s"),
     "finnhub": ("licence", "per_night", "refresh_days"),
+    "yahoo": YAHOO_KEYS,
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
     "ibkr": (
@@ -242,18 +244,16 @@ class SourcesSettings:
     finra_short_volume_lookback_days: int = 10  # [finra]: nightly window of trade dates
     fred_base_url: str = "https://api.stlouisfed.org/fred"  # [fred] base_url (ADR 0048)
     tiingo_licence: str = "personal"  # [tiingo] licence: what its bars are licensed for (ADR 0028)
-    tiingo_monthly_symbol_budget: int = (
-        450  # [tiingo] monthly_symbol_budget: distinct tickers a month
-    )
+    tiingo_monthly_symbol_budget: int = 450  # [tiingo] monthly_symbol_budget: tickers a month
     fmp_licence: str = "personal"  # [fmp] licence: what its analyst data is licensed for (ADR 0068)
-    fmp_daily_budget: int = (
-        200  # [fmp] daily_budget: FMP calls a UTC day the analyst tasks may spend
-    )
+    fmp_daily_budget: int = 200  # [fmp] daily_budget: FMP calls a UTC day
     fmp_refresh_days: int = 7  # [fmp] refresh_days: refetch cadence of a name
+    fmp_refused_hold_days: int = 90  # [fmp] refused_hold_days: wait after a 402
     fmp_run_budget_s: int = 1500  # [fmp] run_budget_s: analyst-snapshot stops calling after this
     finnhub_licence: str = "personal"  # [finnhub] licence (ADR 0068)
     finnhub_per_night: int = 300  # [finnhub] per_night: names read a night
     finnhub_refresh_days: int = 7  # [finnhub] refresh_days: refetch cadence of a name
+    yahoo: YahooSettings = field(default_factory=YahooSettings)  # [yahoo] (ADR 0080)
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -343,6 +343,7 @@ class SourcesSettings:
             for name in sections
             if name not in ("http", "quality")
         }
+        fmp, hub = _extra(vendors, "fmp"), _extra(vendors, "finnhub")
         window = vendors.get("massive", Table(None, f"{where} [massive]")).integers(
             "corporate_actions_window", d.actions_window, length=2
         )
@@ -406,19 +407,15 @@ class SourcesSettings:
             tiingo_monthly_symbol_budget=_extra(vendors, "tiingo").integer(
                 "monthly_symbol_budget", d.tiingo_monthly_symbol_budget, 0
             ),
-            fmp_licence=_extra(vendors, "fmp").choice("licence", d.fmp_licence, LICENCES),
-            fmp_daily_budget=_extra(vendors, "fmp").integer("daily_budget", d.fmp_daily_budget, 0),
-            fmp_refresh_days=_extra(vendors, "fmp").integer("refresh_days", d.fmp_refresh_days, 1),
-            fmp_run_budget_s=_extra(vendors, "fmp").integer("run_budget_s", d.fmp_run_budget_s, 1),
-            finnhub_per_night=_extra(vendors, "finnhub").integer(
-                "per_night", d.finnhub_per_night, 0
-            ),
-            finnhub_refresh_days=_extra(vendors, "finnhub").integer(
-                "refresh_days", d.finnhub_refresh_days, 1
-            ),
-            finnhub_licence=_extra(vendors, "finnhub").choice(
-                "licence", d.finnhub_licence, LICENCES
-            ),
+            fmp_licence=fmp.choice("licence", d.fmp_licence, LICENCES),
+            fmp_daily_budget=fmp.integer("daily_budget", d.fmp_daily_budget, 0),
+            fmp_refresh_days=fmp.integer("refresh_days", d.fmp_refresh_days, 1),
+            fmp_refused_hold_days=fmp.integer("refused_hold_days", d.fmp_refused_hold_days, 1),
+            fmp_run_budget_s=fmp.integer("run_budget_s", d.fmp_run_budget_s, 1),
+            finnhub_per_night=hub.integer("per_night", d.finnhub_per_night, 0),
+            finnhub_refresh_days=hub.integer("refresh_days", d.finnhub_refresh_days, 1),
+            finnhub_licence=hub.choice("licence", d.finnhub_licence, LICENCES),
+            yahoo=parse_yahoo(_extra(vendors, "yahoo")),
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),
             limits_dir=http.text("limits_dir", d.limits_dir),

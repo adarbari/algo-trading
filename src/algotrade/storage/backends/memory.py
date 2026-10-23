@@ -22,8 +22,9 @@ from algotrade.storage.backends.arrow import (
     to_arrow,
     to_frame,
 )
-from algotrade.storage.backends.local_index import safe
-from algotrade.storage.backends.run_compaction import (
+from algotrade.storage.backends.partial_reads import filter_frame
+from algotrade.storage.backends.runs.local_index import safe
+from algotrade.storage.backends.runs.run_compaction import (
     OVER_BUDGET,
     Budget,
     CompactionOverBudgetError,
@@ -31,7 +32,7 @@ from algotrade.storage.backends.run_compaction import (
     plan_compaction,
     verify_plan,
 )
-from algotrade.storage.backends.run_selection import (
+from algotrade.storage.backends.runs.run_selection import (
     RunEntry,
     chain,
     chain_needed,
@@ -47,11 +48,17 @@ from algotrade.storage.backends.run_selection import (
     select_instruments,
     select_runs,
     seq_at,
+    trimmed,
     visible_entries,
 )
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, job_of_name, run_session
-from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
+from algotrade.storage.tables.interfaces import (
+    CompactionReport,
+    PartitionBusyError,
+    PartitionStats,
+    RowFilter,
+)
 from algotrade.storage.tables.schemas import require_retention
 
 Key = tuple[str, date]  # (table, session_date)
@@ -217,6 +224,17 @@ class MemoryTables:
             upto,
         )
 
+    def partition_stats(
+        self,
+        table: str,
+        session_date: date,
+        own_run: str | None = None,
+        column: str | None = None,
+        upto: int | None = None,
+    ) -> PartitionStats | None:
+        frame = self.read(table, session_date, None, None, own_run, upto)
+        return None if frame is None else PartitionStats.of(frame, column)
+
     def read_latest_runs(
         self,
         table: str,
@@ -269,6 +287,7 @@ class MemoryTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
         upto: int | None = None,
     ) -> pd.DataFrame | None:
         def at(seq: int) -> pd.DataFrame | None:
@@ -279,6 +298,7 @@ class MemoryTables:
             mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame.copy()
             if instruments is not None:
                 mine = select_instruments(mine, instruments)
+            mine = filter_frame(mine, where)
             if mine.empty:
                 return None
             if columns is not None:
@@ -368,6 +388,32 @@ class MemoryTables:
         with self._index_lock:
             entries = self._partitions.get((table, session_date), {})
             return sorted(entries, key=lambda r: (entries[r].seq or -1, r))
+
+    def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
+        return dict.fromkeys(self.partition_runs(table, session_date), True)  # no files
+
+    def run_visible_from(self, table: str, session_date: date) -> dict[str, datetime]:
+        with self._index_lock:
+            entries = self._partitions.get((table, session_date), {})
+            return {r: e.visible_from.to_pydatetime() for r, e in entries.items()}
+
+    def trim_superseded(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        key = (table, session_date)
+        with self._index_lock:
+            if any(key in writes for writes in self._pending.values()):
+                raise PartitionBusyError(f"{table} {session_date}")
+            entries, done = self._partitions.get(key, {}), 0
+            for run in dict.fromkeys(runs):  # no files, so no grace: a read on an old one retries
+                old = entries.get(run)
+                new = None if old is None else trimmed(old, self._pins.values())
+                if old is not None and new is not None:
+                    for version in list(chain(old))[1:]:
+                        if version.ref == old.ref:
+                            continue
+                        self._frames.pop((key, run, version.ref), None)
+                    entries[run] = new
+                    done += 1
+            return done
 
     def sweep_orphans(self, table: str, session_date: date) -> int:
         with self._index_lock:

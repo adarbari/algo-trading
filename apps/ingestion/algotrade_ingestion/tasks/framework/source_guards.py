@@ -45,19 +45,18 @@ def no_description_source(ctx: TaskContext) -> str | None:
     return f"skipped: {'; '.join(reasons)}"
 
 
-ANALYST_SOURCES = (
-    "fmp_targets",
-    "fmp_ratings",
-    "fmp_estimates",
-    "finnhub_recommendations",
-)  # every source `analyst-snapshot` may read: FMP's three calls and Finnhub's one
+FMP_SOURCES = ("fmp_targets", "fmp_ratings", "fmp_estimates")  # one vendor, three calls a name
+FINNHUB_SOURCE = "finnhub_recommendations"
+YAHOO_SOURCE = "yahoo_analyst"
+ANALYST_SOURCES = (*FMP_SOURCES, FINNHUB_SOURCE, YAHOO_SOURCE)
+# every source `analyst-snapshot` may read: FMP's three calls, Finnhub's one and Yahoo's one
 
 
 def no_analyst_source(ctx: TaskContext) -> str | None:
-    """Workflows skip ``analyst-snapshot`` when no vendor key is set (FMP's three sources are
-    one vendor, Finnhub's one another): the step runs when either vendor is built."""
-    fmp = all(n in ctx.sources for n in ANALYST_SOURCES[:3])
-    if fmp or ANALYST_SOURCES[3] in ctx.sources:
+    """Workflows skip ``analyst-snapshot`` when no vendor is built (FMP's three sources are one
+    vendor, Finnhub's one, Yahoo's one): the step runs when any of the three is."""
+    fmp = all(n in ctx.sources for n in FMP_SOURCES)
+    if fmp or FINNHUB_SOURCE in ctx.sources or YAHOO_SOURCE in ctx.sources:
         return None
     reasons = sorted({ctx.unavailable.get(n, f"{n} is not configured") for n in ANALYST_SOURCES})
     return f"skipped: {'; '.join(reasons)}"
@@ -75,3 +74,8 @@ def gateway_down(ctx: TaskContext) -> str | None:
     source = ctx.sources.get("ibkr")
     reason = source.probe() if isinstance(source, SessionSource) else None
     return f"skipped: WARN: {reason}" if reason else None
+
+
+def no_config_store(ctx: TaskContext) -> str | None:
+    """Workflows skip a task over the site's documents (``edge-verdicts``) with no config store."""
+    return None if ctx.configs is not None else "skipped: no config store to read the edges from"

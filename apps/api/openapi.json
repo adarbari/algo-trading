@@ -1304,39 +1304,6 @@
         "title": "Health",
         "type": "object"
       },
-      "IdeasPriority": {
-        "properties": {
-          "priority": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Priority",
-            "type": "array"
-          }
-        },
-        "required": [
-          "priority"
-        ],
-        "title": "IdeasPriority",
-        "type": "object"
-      },
-      "IdeasPriorityBody": {
-        "properties": {
-          "priority": {
-            "description": "screener ids, highest priority first",
-            "items": {
-              "type": "string"
-            },
-            "title": "Priority",
-            "type": "array"
-          }
-        },
-        "required": [
-          "priority"
-        ],
-        "title": "IdeasPriorityBody",
-        "type": "object"
-      },
       "JobStatus": {
         "properties": {
           "error": {
@@ -3903,67 +3870,6 @@
         "summary": "Job Status",
         "tags": [
           "jobs"
-        ]
-      }
-    },
-    "/preferences/ideas": {
-      "put": {
-        "operationId": "save_ideas_priority_preferences_ideas_put",
-        "parameters": [
-          {
-            "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "header",
-            "name": "X-Act-For",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "X-Act-For"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/IdeasPriorityBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IdeasPriority"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Save Ideas Priority",
-        "tags": [
-          "ideas"
         ]
       }
     },

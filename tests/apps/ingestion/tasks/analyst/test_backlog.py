@@ -51,7 +51,7 @@ def test_a_name_asked_long_ago_is_back_in_the_backlog() -> None:
     writer = StoreWriter(MemoryBackend())
     seed(writer)
     run(context(writer, D1, []), {"session": D1})
-    later = D1 + timedelta(days=4 * 7 + 1)  # past four refresh windows (7 days)
+    later = D1 + timedelta(days=91)  # past [fmp] refused_hold_days (90)
     ctx = context(writer, later, [], budget=0)  # a night with no FMP budget asks nobody
     run(ctx, {"session": later})
     (check,) = check_analyst_backlog(limit(ctx, 0.5), later)
@@ -123,10 +123,10 @@ def test_finnhub_warns_with_the_reason_when_the_run_skipped_it() -> None:
 # The groups that declare NOT_FETCHED, and the step and check that grade the names they hide (the
 # vendor the group reads: FMP for the estimates and targets, Finnhub for the ratings).
 DECLARING = {
-    "analyst_estimates@v1": ("analyst-snapshot", check_analyst_backlog),
-    "analyst_targets@v1": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_estimates@v2": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_targets@v2": ("analyst-snapshot", check_analyst_backlog),
     "analyst_ratings@v1": ("analyst-snapshot", check_finnhub_backlog),
-    "analyst_revisions@v1": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_revisions@v2": ("analyst-snapshot", check_analyst_backlog),
 }
 
 
@@ -141,3 +141,19 @@ def test_not_fetched_is_declared_only_by_groups_whose_step_runs_the_backlog_chec
     steps = {s.name: s for s in NIGHTLY}
     for step, check in DECLARING.values():
         assert check in steps[step].accept_with
+
+
+def test_a_refused_name_inside_the_hold_counts_as_asked_and_after_it_does_not() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer, ("CHWY",))
+    run(context(writer, D1, []), {"session": D1})  # refused: a NOT_COVERED marker, no rows
+    inside = D1 + timedelta(days=89)
+    ctx = context(writer, inside, [], budget=0)
+    run(ctx, {"session": inside})
+    (check,) = check_analyst_backlog(ctx, inside)
+    assert check.status == "PASS" and check.data["not_asked"] == 0
+    after = D1 + timedelta(days=91)
+    ctx = context(writer, after, [], budget=0)
+    run(ctx, {"session": after})
+    (check,) = check_analyst_backlog(limit(ctx, 0.5), after)
+    assert check.status == "WARN" and check.data["not_asked"] == 1

@@ -637,7 +637,7 @@ def test_post_session_runs_after_the_nightly_then_is_a_quiet_no_op(
     assert call(capsys, "nightly", "--workers", "1")[0] == 0
     code, post = call(capsys, "post-session")
     assert code == 0 and post["status"] == "SUCCEEDED" and post["session"] == DAY
-    assert set(post["steps"]) == {"descriptions", "verify", "edge-eval"}
+    assert set(post["steps"]) == {"descriptions", "verify", "edge-eval", "edge-verdicts"}
     assert post["steps"]["verify"]["status"] == "SKIPPED"  # [ibkr] is off here
     assert post["steps"]["edge-eval"]["status"] == "SKIPPED"
     records = open_backend(data_url()).runs.find("post-session")

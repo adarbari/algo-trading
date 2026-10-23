@@ -261,6 +261,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "ComparePrices",
         "EventCalendar",
         "InstrumentEventStudy",
+        "InstrumentEventList",  # the chart's event list: events and study with source pages
         "TableView",
         "GuideField",
         "GuideHelpField",
@@ -285,6 +286,8 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "ScreenerRuns",
         "ScreenerTrackRecords",
         "EdgesPage",
+        "EdgeDetail",  # one edge in full (verdict, runs, definition): the edge page
+        "EdgeDocument",  # one edge's document for the builder: no verdict, no runs
         "EdgeDesk",  # the paper record plus the official run it is judged against
         "EdgePaper",
         "EdgeCompare",  # the viewer's edge against its parent: evaluation run records

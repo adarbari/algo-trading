@@ -2,7 +2,7 @@
 
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.evidence import evidence_of
-from tests.unit.services.read.evaluation.test_verdict import result, verdict
+from tests.unit.services.read.evaluation.verdict.test_rule import result, verdict
 
 T = VerdictSettings()
 

@@ -10,14 +10,15 @@ scope = ["libs/sources/"]
 
 [[responsibility]]
 id = "analyst-vendor-sources"
-description = "Fetch and normalise analyst data from FMP (analyst estimates, price targets, the ratings summary) and Finnhub (recommendation trends), and their access probes (one request per endpoint); the FMP key is added to the query by the registry's transport and never held here; the nightly analyst-snapshot task stores what they return (ADR 0068)"
+description = "Fetch and normalise analyst data from FMP (analyst estimates, price targets, the ratings summary), Finnhub (recommendation trends) and Yahoo (targets, annual estimates and recommendation counts from one quoteSummary request, read through yfinance's own session imported lazily by yahoo/client.py), and their access probes (one request per endpoint); the FMP key is added to the query by the registry's transport and never held here; the nightly analyst-snapshot task stores what they return (ADR 0068, 0080)"
 owner = [
     "libs/sources/algotrade_sources/vendors/finnhub/*",
     "libs/sources/algotrade_sources/vendors/fmp/*",
+    "libs/sources/algotrade_sources/vendors/yahoo/*",
 ]
-allowed = ["libs/sources/algotrade_sources/framework/registry.py"]  # builds the sources, their key header / query parameter and refusal tests
+allowed = ["libs/sources/algotrade_sources/framework/registry.py"]  # builds the sources, their key header / query parameter, transport and refusal tests
 section = "docs/adr/0068-analyst-data-vendors.md#decision"
-detect = [{ string_prefix = "https://financialmodelingprep.com" }, { string_prefix = "https://finnhub.io" }]
+detect = [{ string_prefix = "https://financialmodelingprep.com" }, { string_prefix = "https://finnhub.io" }, { string_prefix = "https://query2.finance.yahoo.com" }]
 
 [[responsibility]]
 id = "broker-read-only"

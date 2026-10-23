@@ -183,10 +183,10 @@ const notCovered = (name: string) =>
 const licence = (name: string) =>
   gap(name, 'LICENCE', 'unavailable_licence', 'needs the data licence');
 const STATUSES = [
-  'rollup.analyst_estimates@v1.estimates_status',
-  'rollup.analyst_targets@v1.targets_status',
+  'rollup.analyst_estimates@v2.estimates_status',
+  'rollup.analyst_targets@v2.targets_status',
   'rollup.analyst_ratings@v1.ratings_status',
-  'rollup.analyst_revisions@v1.revisions_status',
+  'rollup.analyst_revisions@v2.revisions_status',
 ];
 const withAnalysts = (analysts: readonly (typeof stock.features)[number][]) =>
   fakeQuery({ session, instrument: { ...stock, features: [...stock.features, ...analysts] } });
@@ -195,7 +195,7 @@ describe('the analysts section', () => {
   it('shows a covered name row by row with its status badges', () => {
     serve(
       withAnalysts([
-        known('rollup.analyst_targets@v1.target_consensus', 210, 'CURRENCY', 'usd'),
+        known('rollup.analyst_targets@v2.target_consensus', 210, 'CURRENCY', 'usd'),
         known('feature.target_upside', 0.15, 'PERCENT', 'decimal'),
         known(STATUSES[0] ?? '', 'OK', 'TEXT'),
         known(STATUSES[1] ?? '', 'STALE', 'TEXT'),
@@ -294,7 +294,7 @@ describe('the ratings and revisions rows', () => {
         known('rollup.analyst_ratings@v1.rating_buy', 18, 'INTEGER'),
         known('rollup.analyst_ratings@v1.rating_score', 4.31, 'NUMBER', 'ratio'),
         known('rollup.analyst_ratings@v1.rating_score_change_90d', 0.12, 'NUMBER', 'ratio'),
-        known('rollup.analyst_revisions@v1.eps_fy1_revision_30d', 0.021, 'PERCENT', 'decimal'),
+        known('rollup.analyst_revisions@v2.eps_fy1_revision_30d', 0.021, 'PERCENT', 'decimal'),
         known(STATUSES[2] ?? '', 'OK', 'TEXT'),
         known(STATUSES[3] ?? '', 'BUILDING', 'TEXT'),
       ]),

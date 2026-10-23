@@ -27,6 +27,7 @@ from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext, at_session
 from algotrade.services.read.screens.runs import (
     RULE_SCREEN,
+    SCREEN_RUNS,
     LatestRun,
     RunKey,
     ScreenerRun,
@@ -92,20 +93,63 @@ def _counted(day: date, decisions: Mapping[str, int]) -> PickCount:
     return PickCount(day, picked, decisions.get(PAUSED, 0), None)
 
 
+def _frozen_counts(
+    ctx: ReadContext, days: Sequence[date]
+) -> dict[date, dict[RunKey, tuple[int, int]] | None]:
+    """For each of ``days`` with a ``results/screen_runs`` partition, every owner's frozen
+    ``(picked, paused)`` of their newest run (read once per session, one row per run, never a run
+    record); ``None``: the session has no such partition (written before the table). Only the
+    counts of every owner are held (a few hundred ints, as ``run_summaries`` holds every owner's
+    summary) and the caller reads its own keys; one cache entry per publish (ADR 0022)."""
+    key = ("pick_history_frozen", days[0], days[-1], ctx.reader.own_run, ctx.reader.version())
+
+    def build() -> dict[date, dict[RunKey, tuple[int, int]] | None]:
+        out: dict[date, dict[RunKey, tuple[int, int]] | None] = {}
+        for day in days:
+            rows = (
+                ctx.reader.read_latest_runs(SCREEN_RUNS, day, columns=("picked", "paused"))
+                if ctx.reader.has_partition(SCREEN_RUNS, day)
+                else None
+            )
+            if rows is None:
+                out[day] = None
+                continue
+            mine = {}
+            for user, config, picked, paused in zip(
+                rows["user_id"], rows["config_id"], rows["picked"], rows["paused"], strict=True
+            ):
+                mine[(str(user), str(config))] = (int(picked), int(paused))
+            out[day] = mine
+        return out
+
+    found: dict[date, dict[RunKey, tuple[int, int]] | None] = ctx.cache.get_or_compute(key, build)
+    return found
+
+
 def load_pick_histories(
     ctx: ReadContext, keys: Sequence[RunKey], sessions: int = DEFAULT_SESSIONS
 ) -> dict[RunKey, tuple[PickCount, ...]]:
     """For each ``(owner, config id)`` of ``keys`` its ``PickCount`` per session of the last
-    ``sessions`` (cut to ``1..MAX_SESSIONS``) ending at the request's session, oldest first."""
+    ``sessions`` (cut to ``1..MAX_SESSIONS``) ending at the request's session, oldest first.
+    A session with a ``screen_runs`` partition is counted from its frozen rows; a config with no
+    row there, and a session with no partition, from the run records (never a lost run)."""
     days = sessions_ending(ctx.session.date, min(max(sessions, 1), MAX_SESSIONS))
     today = load_latest_runs(ctx, keys) if days[-1] == ctx.session.date else {}
     jobs = {key: run_job_name(key[1], key[0]) for key in keys}
-    records = _records(ctx, frozenset(jobs.values()), days[0], days[-1]) if len(days) > 1 else []
+    earlier = [d for d in days if not (today and d == ctx.session.date)]
+    frozen = _frozen_counts(ctx, earlier) if earlier else {}
+    # a session with no partition, or a config with no row in one: its records, in ONE cached pass
+    need = {
+        d for d in earlier for key in keys if (found := frozen.get(d)) is None or key not in found
+    }
+    records = _records(ctx, frozenset(jobs.values()), min(need), max(need)) if need else []
     latest: dict[tuple[str, date], RunRecord] = {}
     for record in records:  # by start time: the session's latest record is the last
         latest[(record.job, record.session_date)] = record
     return {
-        key: tuple(_entry(ctx, key, job, day, today.get(key), latest) for day in days)
+        key: tuple(
+            _entry(ctx, key, job, day, today.get(key), latest, frozen.get(day)) for day in days
+        )
         for key, job in jobs.items()
     }
 
@@ -123,12 +167,15 @@ def _entry(
     day: date,
     todays: LatestRun | None,
     latest: Mapping[tuple[str, date], RunRecord],
+    counts: Mapping[RunKey, tuple[int, int]] | None = None,
 ) -> PickCount:
     """``key``'s entry for ``day``: the request's session is ``latestRun``; an earlier one its
     latest record's counts, or ``latestRun`` there when that record counted nothing (still
     running, failed: its rows are what ``latestRun`` shows); no record: ``NOT_RUN``."""
     if todays is not None and day == ctx.session.date:
         return _of_run(day, key[1], todays.run)
+    if counts is not None and key in counts:
+        return PickCount(day, counts[key][0], counts[key][1], None)
     record = latest.get((job, day))
     if record is None:
         return _not_run(key[1], day)

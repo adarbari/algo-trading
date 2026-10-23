@@ -23,12 +23,42 @@ class CompactionReport:
     skipped: str | None = None  # why nothing was changed (never an error)
 
 
+@dataclass(frozen=True)
+class RowFilter:
+    """A cut of a read on one column's text values (``TableStore.read_run``): the rows whose
+    ``column`` is in ``values`` (``keep``) or is not (a null is not in any set). A backend skips
+    the row groups whose footer statistics prove none of their rows qualify, then filters the
+    rest exactly: the rows are the same as filtering the whole read."""
+
+    column: str
+    values: frozenset[str]
+    keep: bool = True
+
+
+@dataclass(frozen=True)
+class PartitionStats:
+    """What a partition holds, counted without decoding its rows (``TableStore.partition_stats``):
+    ``rows``, the sorted ``run_ids`` its rows carry and, when a column was asked for and the
+    partition has it, ``values`` (that column as text, row order)."""
+
+    rows: int
+    run_ids: tuple[str, ...] = ()
+    values: tuple[str, ...] = ()
+
+    @classmethod
+    def of(cls, frame: pd.DataFrame, column: str | None = None) -> "PartitionStats":
+        """The stats of a frame read in full (the reference the footer-based ones must equal)."""
+        runs = tuple(sorted(map(str, frame["run_id"].unique())))
+        found = column is not None and column in frame
+        return cls(len(frame), runs, tuple(map(str, frame[column])) if found else ())
+
+
 class TableStore(Protocol):
     """Point-in-time tables partitioned by (table, session_date, run_id).
 
     Writing the same (table, date, run) again replaces it (idempotent). A different run for
     the same date is kept alongside. Which runs a read at ``as_of`` sees follows the table's
-    run mode (``TableSpec.runs``; ``storage/backends/run_selection.py``): a ``snapshot``
+    run mode (``TableSpec.runs``; ``storage/backends/runs/run_selection.py``): a ``snapshot``
     table gives the latest run known at ``as_of``; a ``merge`` table (events) the union of
     the runs known at ``as_of``, the latest run's row winning per table key, starting from
     the latest run written with ``restates=True`` (a rewrite of the whole partition).
@@ -136,6 +166,21 @@ class TableStore(Protocol):
         question). ``None``: a fresh one, retried as needed. Same for every read below."""
         ...
 
+    def partition_stats(
+        self,
+        table: str,
+        session_date: date,
+        own_run: str | None = None,
+        column: str | None = None,
+        upto: int | None = None,
+    ) -> PartitionStats | None:
+        """``PartitionStats.of(read(table, session_date, own_run=own_run, upto=upto), column)``
+        (``None`` where ``read`` is), without decoding the rows when the partition is one run's
+        file: the local backend counts from the Parquet footer and decodes only ``run_id`` (when
+        its statistics cannot name it) and ``column``; a partition that merges several runs is
+        read whole, as the merge decides its rows."""
+        ...
+
     def read_range(
         self,
         table: str,
@@ -187,6 +232,7 @@ class TableStore(Protocol):
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        where: Sequence[RowFilter] = (),
         upto: int | None = None,
     ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (those stamped with its ``run_id``),
@@ -194,8 +240,11 @@ class TableStore(Protocol):
         file (ADR 0064). ``None``: the run has no committed rows there (``own_run`` also
         sees that run's pending write). ``columns``: only those (plus ``read_range``'s key and
         point-in-time columns) are decoded; ``instruments``: only their rows (row groups that cannot
-        hold them are skipped; ``None`` when it matches none of the run's). Not point-in-time: a
-        run is read as it left them."""
+        hold them are skipped; ``None`` when it matches none of the run's). ``where``: only rows
+        passing every filter, same rows as filtering the whole read, the row groups the
+        statistics rule out never decoded (a table clustered by the column,
+        ``TableSpec.cluster_by``, skips most; an older file's mixed groups are read whole). Not
+        point-in-time: a run is read as it left them."""
         ...
 
     def build_history(self, table: str, years: Sequence[int]) -> list[int]:
@@ -269,6 +318,29 @@ class TableStore(Protocol):
         older one retries). Raises ``PartitionBusyError`` when a pending run has written to the
         partition (nothing is deleted: try again). -> runs deleted. An admin rewrite
         (``services/feedback/retention.py``), never part of a run."""
+        ...
+
+    def run_layouts(self, table: str, session_date: date) -> dict[str, bool]:
+        """Per run of one partition's index, whether its file is laid out as the table's spec
+        declares (``TableSpec.cluster_by``: sorted, in row groups of ``row_group_rows``), read
+        from the file's footer. A table that declares none, and a backend that keeps no files,
+        answer ``True``: there is nothing to cluster."""
+        ...
+
+    def run_visible_from(self, table: str, session_date: date) -> dict[str, datetime]:
+        """Per run of one partition's index, when a read pinned at ``as_of`` starts to see it (its
+        commit time, never before its rows' ``knowledge_ts``): what a rewrite that keeps the rows
+        (``screen-values-recluster``) commits at again, so the run is visible exactly as before."""
+        ...
+
+    def trim_superseded(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        """Forget the older version each of ``runs`` keeps (``prev``: what a commit of the same run
+        id left, e.g. a recluster's old file) once the run's newest file is ``SWAP_GRACE_S`` old (a
+        read that resolved the older one has finished), unless a pin (ADR 0077 release) may read it
+        (``chain_needed``: kept). The older file is then named by no index and goes with
+        ``sweep_orphans``. An index swap, not a commit: no sequence moves, no row changes; a read
+        still on the forgotten version retries. Idempotent. ``PartitionBusyError`` when a pending
+        run wrote to the partition. -> versions forgotten."""
         ...
 
     def sweep_orphans(self, table: str, session_date: date) -> int:

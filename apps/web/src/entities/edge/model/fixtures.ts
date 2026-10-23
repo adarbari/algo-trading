@@ -1,5 +1,5 @@
 /** Test builders for the edge entity (exported for widget tests): edges as the API answers them. */
-import type { Edge, EdgesResponse } from './edges';
+import type { Edge, EdgeRow, EdgesResponse } from './edges';
 import type { TrackRecordsResponse } from './track-records';
 
 const criterion = (id: string, label: string, status: string, level = 'promising') => ({
@@ -313,7 +313,7 @@ export const EDGES_FIXTURE = {
       rejectionReason: 'The effect vanished after 2005.',
     }),
   ],
-} as unknown as EdgesResponse;
+} as unknown as { edgeProblems: EdgesResponse['edgeProblems']; edges: Edge[] };
 
 const horizon = (sessions: number) => ({
   horizonSessions: 21,
@@ -499,3 +499,18 @@ export function edgeFixture(id: string): Edge {
   if (!found) throw new Error(`no edge ${id} in the fixture`);
   return found;
 }
+
+/** The list's read of {@link EDGES_FIXTURE} (test builder): each edge as a row, its verdict only the headline. */
+export const EDGE_ROWS_FIXTURE: { edgeProblems: EdgesResponse['edgeProblems']; edges: EdgeRow[] } =
+  {
+    edgeProblems: EDGES_FIXTURE.edgeProblems,
+    edges: EDGES_FIXTURE.edges.map((e) => ({
+      id: e.id,
+      name: e.name,
+      status: e.status,
+      state: e.state,
+      mine: e.mine,
+      screeners: e.screeners,
+      summary: { verdict: e.verdict.verdict, result: e.verdict.result, trades: e.verdict.trades },
+    })),
+  };

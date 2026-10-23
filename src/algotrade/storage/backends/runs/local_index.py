@@ -37,6 +37,7 @@ import shutil
 import tempfile
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -45,7 +46,13 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.storage.backends.run_selection import RunEntry, chain, chain_needed, committed
+from algotrade.storage.backends.runs.run_selection import (
+    RunEntry,
+    chain,
+    chain_needed,
+    committed,
+    trimmed,
+)
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.tables.interfaces import PartitionBusyError
 
@@ -128,12 +135,39 @@ def _value(entry: RunEntry) -> str | dict[str, Any]:
     return out["knowledge_ts"] if len(out) == 1 else out
 
 
+_PARSED_MAX = 1024  # partitions whose parsed index is kept (a page reads a few dozen)
+_PARSED: OrderedDict[str, tuple[tuple[int, int, int], dict[str, RunEntry]]] = OrderedDict()
+_PARSED_LOCK = threading.Lock()
+
+
 def read_index(directory: Path) -> dict[str, RunEntry]:
+    """The partition's index as a new dict (callers edit it before ``write_index``). The parsed
+    entries (frozen) are remembered by the file's identity, ``(inode, mtime_ns, size)``: every
+    write replaces the file by a rename (``atomic_write``), so a changed index is a new inode
+    and is parsed again; an unchanged one, read again and again by a page's reads, is not."""
     path = directory / INDEX
-    if not path.exists():
+    try:
+        status = path.stat()
+    except FileNotFoundError:
         return {}
-    loaded: dict[str, str | dict[str, Any]] = json.loads(path.read_text())
-    return {run: _entry(value) for run, value in loaded.items()}
+    identity = (status.st_ino, status.st_mtime_ns, status.st_size)
+    key = str(path)
+    with _PARSED_LOCK:
+        held = _PARSED.get(key)
+        if held is not None and held[0] == identity:
+            _PARSED.move_to_end(key)
+            return dict(held[1])
+    try:
+        loaded: dict[str, str | dict[str, Any]] = json.loads(path.read_text())
+    except FileNotFoundError:  # removed between the stat and the read
+        return {}
+    entries = {run: _entry(value) for run, value in loaded.items()}
+    with _PARSED_LOCK:
+        _PARSED[key] = (identity, entries)
+        _PARSED.move_to_end(key)
+        while len(_PARSED) > _PARSED_MAX:
+            _PARSED.popitem(last=False)
+    return dict(entries)
 
 
 def write_index(directory: Path, entries: dict[str, RunEntry]) -> None:
@@ -507,6 +541,42 @@ class Commits:
                 write_index(directory, replacement)
             return True
 
+    def trim_runs(
+        self,
+        directory: Path,
+        runs: Iterable[str],
+        grace_s: float = SWAP_GRACE_S,
+        clock: Callable[[], float] = time.time,
+    ) -> int:
+        """Forget the older version a run of one partition keeps (``TableStore.trim_superseded``),
+        once its newest file is ``grace_s`` old (a read that resolved the older one has finished)
+        and no pin may read it; the older file is then unnamed and ``sweep`` deletes it. An index
+        swap like ``swap_runs``, not a commit: the sequence never moves. ``PartitionBusyError``
+        when a pending run wrote to the partition. -> versions forgotten."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            if directory in busy:
+                raise PartitionBusyError(str(directory))
+            with held(index_lock(directory)):
+                entries = read_index(directory)
+                pins = self._read_pins().values()
+                cutoff = clock() - grace_s
+                done = 0
+                for run in dict.fromkeys(runs):
+                    entry = entries.get(run)
+                    new = None if entry is None else trimmed(entry, pins)
+                    if new is not None and _older(directory / run_file(run, new), cutoff):
+                        entries[run] = new
+                        done += 1
+                if done:
+                    write_index(directory, entries)
+            return done
+
     def _forget(self, run_id: str) -> None:
         with self._guard:
             self._journals.pop(run_id, None)
@@ -576,3 +646,29 @@ def drop_unreferenced(directory: Path, run_id: str) -> None:
     for path in candidates:
         if path.name not in keep:
             path.unlink(missing_ok=True)
+
+
+def stored_tables(root: Path) -> list[str]:
+    """Table paths (relative, posix) with an indexed partition, found by walking directories
+    only: a directory is a table when one of its ``date=*`` children holds an index, which
+    ends its scan (so the cost is the number of table directories, not of partitions or
+    files; was ``root.glob("**/date=*/_runs.json")``: 20 s on 54,000 partitions). A directory
+    with no indexed partition is searched below, apart from ``_txn`` at the root."""
+    found: list[str] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        below: list[str] = []
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if not entry.is_dir():
+                    continue
+                if entry.name.startswith("date="):
+                    if (Path(entry.path) / INDEX).exists():
+                        found.append(directory.relative_to(root).as_posix())
+                        below = []
+                        break
+                elif not (directory == root and entry.name == TXN):
+                    below.append(entry.path)
+        pending.extend(Path(p) for p in below)
+    return found

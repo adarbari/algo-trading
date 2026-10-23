@@ -14,6 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.edge_schemas import EDGE_VERDICT
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import (
@@ -24,6 +25,7 @@ from algotrade_ingestion.tasks.derived import (
     residual_returns,
     rollups,
 )
+from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
 from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
 from algotrade_ingestion.tasks.framework import (
     entries_market,
@@ -74,7 +76,7 @@ from algotrade_ingestion.tasks.reference import (
     universe_build,
     universe_import,
 )
-from algotrade_ingestion.tasks.screens import screen_runs_backfill
+from algotrade_ingestion.tasks.screens import screen_runs_backfill, screen_values_recluster
 from algotrade_ingestion.tasks.shorting import restamp, short_interest, short_volume
 from algotrade_ingestion.tasks.verification import verify
 
@@ -194,15 +196,19 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "analyst-snapshot",
-            "tonight's FMP and Finnhub analyst data of a rotating slice of names, appended to our "
-            "own point-in-time history (analyst/estimate_snapshots); within [fmp] daily_budget",
+            "tonight's FMP and Finnhub analyst data of a rotating slice of names, and Yahoo's for "
+            "the names FMP refuses, appended to our own point-in-time history "
+            "(analyst/estimate_snapshots); within [fmp] daily_budget and [yahoo] per_night",
             analyst_snapshot,
             ("analyst/estimate_snapshots",),
             analyst_snapshot.run,
             optional_sources=analyst_snapshot.SOURCES,
             skip=source_guards.no_analyst_source,
-            settings="sources.toml [fmp] [finnhub]; events/scope.toml",
-            params=(SESSION, Param("limit", ("--limit",), int, "ask at most N names of FMP")),
+            settings="sources.toml [fmp] [finnhub] [yahoo]; events/scope.toml",
+            params=(
+                SESSION,
+                Param("limit", ("--limit",), int, "ask at most N names of FMP and of Yahoo"),
+            ),
         ),
         Task(
             "index-membership",
@@ -813,6 +819,33 @@ TASKS: dict[str, Task] = {
             ),
         ),
         Task(
+            "edge-verdicts",
+            "store the headline of every site edge's canonical run in results/edge_verdict, the "
+            "backfill of runs stored before it and the re-judge after the judge, verdict.toml or "
+            "an edge document changed (idempotent, resumable: a run with a row under the current "
+            "fingerprint is skipped; --limit caps the rows written)",
+            edge_verdicts,
+            (EDGE_VERDICT.name,),
+            entries_ops.run_edge_verdicts,
+            skip=source_guards.no_config_store,
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "only runs ending this session"),
+                Param("edge", ("--edge",), str, "judge this one site edge only"),
+                FROM,
+                TO,
+                Param("limit", ("--limit",), int, "write at most N rows this run"),
+                Param(
+                    "dry_run", ("--dry-run",), None, "count what would be written; write nothing"
+                ),
+                Param(
+                    "verify",
+                    ("--verify",),
+                    None,
+                    "read-only check: judge current rows too, list differences, write nothing",
+                ),
+            ),
+        ),
+        Task(
             "screen-runs-backfill",
             "frame results/screen_runs and results/screen_picks for the rule-screen runs stored "
             "before them, from rule_screen and the run records (idempotent, resumable; --limit "
@@ -825,6 +858,21 @@ TASKS: dict[str, Task] = {
                 FROM,
                 TO,
                 Param("limit", ("--limit",), int, "frame at most N runs this run"),
+            ),
+        ),
+        Task(
+            "screen-values-recluster",
+            "rewrite the stored rule_screen and rule_screen_values files sorted by instrument_id "
+            "in 8,192-row row groups, as new runs are written (idempotent, resumable, same run "
+            "ids and knowledge_ts; --limit caps the runs rewritten)",
+            screen_values_recluster,
+            ("results/rule_screen", "results/rule_screen_values"),
+            entries_ops.run_screen_values_recluster,
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "rewrite this one session only"),
+                FROM,
+                TO,
+                Param("limit", ("--limit",), int, "rewrite at most N runs this run"),
             ),
         ),
         Task(

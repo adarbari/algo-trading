@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EDGES_FIXTURE } from '@/entities/edge';
+import { EDGE_ROWS_FIXTURE } from '@/entities/edge';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { EdgeList } from './EdgeList';
@@ -29,8 +29,8 @@ vi.mock('@/features/guide-help', async () => {
 stubElementSize();
 
 beforeEach(() => {
-  hooks.useEdges.mockReturnValue(fakeQuery(EDGES_FIXTURE.edges));
-  hooks.useEdgeProblems.mockReturnValue(fakeQuery(EDGES_FIXTURE.edgeProblems));
+  hooks.useEdges.mockReturnValue(fakeQuery(EDGE_ROWS_FIXTURE.edges));
+  hooks.useEdgeProblems.mockReturnValue(fakeQuery(EDGE_ROWS_FIXTURE.edgeProblems));
   hooks.useEdgeLiveStates.mockReturnValue(
     fakeQuery([
       {

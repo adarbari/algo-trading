@@ -180,7 +180,8 @@ licence = "personal"             # FMP's free terms: personal use; features deri
 daily_budget = 200               # FMP calls a UTC day the analyst tasks may spend (the plan allows ~250; the rest is
                                  # headroom for a hand run); `analyst-probe` and `analyst-snapshot` count their own
 refresh_days = 7                 # analyst-snapshot: each name's FMP data (3 calls) is refetched this often, stalest first;
-                                 # a name FMP refused (402: not on the free plan) waits 4x this before it is asked again
+refused_hold_days = 90           # a name FMP refused (402: not on the free plan; a refusal costs a call) waits this many days
+                                 # before it is asked again (the plan gates by symbol and rarely changes)
 run_budget_s = 1500              # analyst-snapshot (FMP and Finnhub calls): after this many seconds no further call is made and
                                  # the names not yet asked are recorded OVER_BUDGET (a normal night takes ~9 min); the next
                                  # night continues, stalest first. A vendor that stalls can then not hold the ingest lock
@@ -191,6 +192,17 @@ min_interval_s = 1.0             # free tier: 60 calls a minute
 licence = "personal"             # Finnhub's free terms: personal use; features derived from it inherit it
 per_night = 300                  # analyst-snapshot: names whose recommendation trend a night reads (1 call each, stalest first)
 refresh_days = 7                 # analyst-snapshot: each name's recommendation trend is re-read this often (its own cadence, not [fmp]'s)
+
+[yahoo]                          # Yahoo Finance analyst data via the yfinance package (ADR 0080): the names FMP refuses; no key
+enabled = true                   # unofficial, no published limit (30 requests in a row answered 200, 2026-10-22), terms forbid scraping
+min_interval_s = 1.0             # one request a name; yfinance's hidden crumb requests bypass the limiter, so a floor of 1 s
+licence = "yahoo"                # owner only: never served to another viewer, no redistribution; features derived from it inherit it
+per_night = 60                   # analyst-snapshot: names a night (1 call each), only names FMP refuses, largest market cap first
+refresh_days = 14                # an answered name is asked again after this many days; a refused one (404) after 4 x this
+run_budget_s = 600               # its own time cap (the step runs last, so [fmp] run_budget_s cannot starve it); after it no further
+                                 # call is made and the names left are recorded OVER_BUDGET
+cache_dir = "var/cache/yahoo"    # yfinance's cookie and timezone caches (git-ignored), never ~/Library/Caches
+raw_retention_days = 365         # Yahoo cannot re-serve a past day (it restates), so its raw answers are kept long
 
 [sp500_history]                  # S&P 500 membership intervals since 1996 (fja05680/sp500, MIT licence, GitHub):
 enabled = true                   # the `index-membership` task (in no workflow until the owner runs it), one 28 KB file

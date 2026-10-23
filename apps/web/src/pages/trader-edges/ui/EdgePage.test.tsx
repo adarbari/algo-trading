@@ -8,11 +8,11 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { EdgePage } from './EdgePage';
 
-const hooks = vi.hoisted(() => ({ useEdges: vi.fn(), useEdgeLiveStates: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useEdge: vi.fn(), useEdgeLiveStates: vi.fn() }));
 
 vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useEdges: hooks.useEdges,
+  useEdge: hooks.useEdge,
   useEdgeLiveStates: hooks.useEdgeLiveStates,
 }));
 vi.mock('@/widgets/edge-detail', async () => {
@@ -60,7 +60,9 @@ vi.mock('@/widgets/edge-performance', async () => {
 const live = (state: string, edgeId = 'momentum_12_1') => ({ edgeId, state });
 
 beforeEach(() => {
-  hooks.useEdges.mockReturnValue(fakeQuery(EDGES_FIXTURE.edges));
+  hooks.useEdge.mockImplementation((id: string) =>
+    fakeQuery(EDGES_FIXTURE.edges.find((e) => e.id === id) ?? null),
+  );
   hooks.useEdgeLiveStates.mockReturnValue(fakeQuery([live('on_track')]));
 });
 
@@ -126,14 +128,19 @@ describe('EdgePage', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
+  it('reads only the chosen edge, never the list', () => {
+    page();
+    expect(hooks.useEdge).toHaveBeenCalledWith('momentum_12_1');
+  });
+
   it('says when the chosen edge does not exist, and shows loading and error with a retry', async () => {
     const { rerender } = page('nope');
     expect(screen.getByText('No edge nope')).toBeInTheDocument();
-    hooks.useEdges.mockReturnValue(fakeQuery(undefined));
+    hooks.useEdge.mockReturnValue(fakeQuery(undefined));
     rerender(<EdgePage id="momentum_12_1" onBack={vi.fn()} onEdit={vi.fn()} />);
     expect(screen.getByText('Loading edge')).toBeInTheDocument();
     const failed = fakeQuery(undefined, { isError: true });
-    hooks.useEdges.mockReturnValue(failed);
+    hooks.useEdge.mockReturnValue(failed);
     rerender(<EdgePage id="momentum_12_1" onBack={vi.fn()} onEdit={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(failed.refetch).toHaveBeenCalled();

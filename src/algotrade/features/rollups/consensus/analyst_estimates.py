@@ -1,11 +1,17 @@
-"""``analyst_estimates@v1``: what analysts expect for the current and the next fiscal year.
+"""``analyst_estimates@v2``: what analysts expect for the current and the next fiscal year.
 
 Inputs: ``analyst/estimate_snapshots`` as the session sees it (our own nightly history of FMP's
-annual estimates: ``data.analyst.reading``), the session's ``universe`` (one row per equity) and
-``financials@v3`` for the last fiscal year end known. Annual estimates only (``kind =
-estimates_annual``), FMP only; the rows are the vendor's newest snapshot of the name, so the
-fiscal years are the ones listed in ONE fetch. Every feature is derived from a personal-use
-source: ``licence = "personal"`` (ADR 0068, ADR 0069).
+and Yahoo's annual estimates: ``data.analyst.reading``), the session's ``universe`` (one row per
+equity) and ``financials@v3`` for the last fiscal year end known. Annual estimates only (``kind =
+estimates_annual``). One vendor per name (``analyst_status.choose_vendor``, ADR 0080): FMP's when
+its status is OK or STALE, else Yahoo's, else FMP's; ``estimates_source`` says which. The rows are
+the vendor's newest snapshot of the name, so the fiscal years are the ones listed in ONE fetch.
+Every feature is derived from sources the owner alone may use, and a column cannot carry the
+licence of the vendor it happens to hold for a name, so each carries the stricter of the two:
+``licence = "yahoo"`` (ADR 0068, 0069, 0080). v2 (v1: FMP only, ``personal``) adds
+``estimates_source`` and the Yahoo fallback; every v1 column is unchanged. Yahoo's EPS and
+FMP's can be on different bases (which earnings an analyst reports): a name that flips vendor
+changes basis, and nothing here differences across the flip.
 
     fy1_period_end, fy2_period_end   the fiscal year ends of the first and second estimate year
     eps_fy1, eps_fy2                 the consensus (average) EPS of each, USD per share
@@ -13,6 +19,8 @@ source: ``licence = "personal"`` (ADR 0068, ADR 0069).
     eps_fy1_analysts                 analysts behind the EPS of FY1 (revenue likewise)
     estimates_age_days               days from the snapshot's session to this one
     estimates_status                 OK / STALE / NOT_COVERED / NOT_FETCHED (``analyst_status``)
+    estimates_source                 fmp / yahoo: the vendor the row above reads (fmp for a name
+                                     neither has reached)
 
 FY1 is the first estimate year ending MORE THAN ``fy_slack_days`` (60, under 85) after the later of
 the last fiscal year end of an annual report known at the session (``financials@v3``'s
@@ -25,8 +33,9 @@ annual report or quarter FY1 is the first estimate year ending after the session
 once, on the session the filing is public: it is a change of the year, not of the estimate.
 
 A STALE snapshot (more than ``stale_days``, 21) serves no values: they read as not stored, the
-age and status stay. Not a unit of currency: a foreign filer's estimates are in the vendor's
-reporting currency (the formulas that divide them by a USD price handle ADRs, later).
+age and status stay. Yahoo's estimates are stored only in USD (the task drops another currency);
+FMP's are in the vendor's reporting currency (the formulas that divide them by a USD price handle
+ADRs, later).
 """
 
 from dataclasses import dataclass
@@ -41,19 +50,22 @@ from algotrade.features.rollups.consensus.analyst_status import (
     LOOKBACK,
     OK,
     SNAPSHOTS,
+    SOURCES,
     STATUSES,
     UNCOVERED,
     UNIVERSE,
     AnalystParams,
+    choose_vendor,
+    effective_snapshots,
     population,
     resolve,
     vendor_rows,
 )
 
 NAME = "analyst_estimates"
-VERSION = 1
+VERSION = 2
 FINANCIALS = "rollups/instrument/financials@v3"
-_P: Licence = "personal"
+_P: Licence = "yahoo"  # the stricter of the two vendors (ADR 0080)
 _SNAP = f"{SNAPSHOTS}."
 _WHY = (
     "analyst_status is STALE (the newest snapshot is older than stale_days), NOT_COVERED (the "
@@ -62,6 +74,7 @@ _WHY = (
     "known, so no year is served); or the snapshot lists no year ending after the last report"
 )
 _STATUS = "estimates_status"
+_SOURCE = "estimates_source"
 SLACK_LIMIT = 85  # days: under a quarter, so a quarter end plus the slack stays before the next
 
 
@@ -138,6 +151,12 @@ FEATURES = (
         "NOT_COVERED: the vendor has no estimates for the name; NOT_FETCHED: never asked",
         "never", "label", categories=STATUSES, inputs=(f"{_SNAP}kind",), licence=_P,
     ),
+    Feature(
+        _SOURCE, "str", "category",
+        "fmp: the estimates are FMP's; yahoo: Yahoo's, used when FMP has none for the name (its "
+        "EPS may be on another basis)",
+        "never", "label", categories=SOURCES, inputs=(f"{_SNAP}source",), licence=_P,
+    ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
 _VALUES = ("eps_avg", "revenue_avg", "num_analysts_eps", "num_analysts_revenue")
@@ -186,12 +205,15 @@ def _column(out: pd.DataFrame, years: pd.DataFrame, n: int, name: str, source: s
 
 
 def compute(inputs: Inputs, session: date, p: EstimatesParams) -> pd.DataFrame:
-    snapshots = inputs.get(SNAPSHOTS)
-    ids = population(inputs[UNIVERSE], snapshots)
+    both = inputs.get(SNAPSHOTS)
+    ids = population(inputs[UNIVERSE], both)
+    chosen = choose_vendor(both, ids, ESTIMATES, session, p)
+    snapshots = effective_snapshots(both, chosen, ESTIMATES)
     rows = vendor_rows(snapshots, ESTIMATES)
     status = resolve(ids, rows, snapshots, session, p)
     out = pd.DataFrame({"instrument_id": status["instrument_id"]})
     out[_STATUS] = status["status"]
+    out[_SOURCE] = out["instrument_id"].map(chosen)
     out["estimates_age_days"] = pd.to_numeric(status["age_days"])
     financials = inputs.get(FINANCIALS)
     # without financials@v3 for the session no year end is known: FY1 would silently mean the
@@ -220,7 +242,7 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Analysts' consensus EPS and revenue for the current and next fiscal year (FMP annual "
-    "estimates, our own point-in-time snapshots; personal-use licence)",
+    "estimates, else Yahoo's; our own point-in-time snapshots; owner-only licence)",
     (
         Input(UNIVERSE),
         Input(SNAPSHOTS, lookback=LOOKBACK, required=False),
@@ -229,8 +251,9 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     EstimatesParams(),
-    # The vendor's free plan covers few names and its key may be absent: a screen reading it
+    # The vendors' free plans cover few names and a key may be absent: a screen reading it
     # without the table warns, never PARTIAL (ADR 0055, ADR 0068).
     optional=True,
-    sole_source="single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068",
+    sole_source="two free vendors, FMP first then Yahoo, no further fallback: ADR 0055 "
+    "amendment, ADR 0068, ADR 0080",
 )

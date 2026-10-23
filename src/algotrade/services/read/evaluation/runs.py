@@ -31,6 +31,7 @@ from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.data import StoreReader
+from algotrade.features.framework.feature import LICENCES, strictest
 from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, once_per_request, run_partition
@@ -38,6 +39,7 @@ from algotrade.services.read.evaluation.edges import Edge, load_edges, parsed_ed
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.tables.interfaces import RowFilter
 from algotrade.storage.tables.schemas import result_table
 
 EDGE_EVAL = "edge_eval"
@@ -142,6 +144,7 @@ class EdgeRow:
     reference_rate: float | None = None
     touch_rate: float | None = None
     side: str = "long"  # the outcome's side (ADR 0053 amendment); a run before sides is long
+    licence: str | None = None  # the trial's licence (ADR 0028); None: a run from before it
 
 
 @dataclass(frozen=True)
@@ -212,10 +215,23 @@ def _day(value: Any) -> date | None:
 def _run(
     ctx: Stores, record: RunRecord, edge: Edge, owner: str, legacy_owner: str | None = None
 ) -> EdgeRun:
+    session = ctx.session.date if isinstance(ctx, ReadContext) else None
+    return run_of_record(record, edge, owner, legacy_owner, session)
+
+
+def run_of_record(
+    record: RunRecord,
+    edge: Edge,
+    owner: str,
+    legacy_owner: str | None = None,
+    session: date | None = None,
+) -> EdgeRun:
+    """The ``EdgeRun`` of a run record, with no store read: what the reader builds for a
+    committed run and a writer builds for the run it is publishing (the one decoding of a run
+    record). ``session``: the request's session, for ``after_session`` (None: always False)."""
     stats = record.stats
     frozen_from = edge.frozen_from
     committed = record.finished_at or record.started_at
-    session = ctx.session.date if isinstance(ctx, ReadContext) else None
     split = _day(stats.get("split_from"))
     start = (stats.get("range") or [None])[0]
     exploratory = _exploratory(stats, frozen_from)
@@ -301,6 +317,12 @@ def load_edge_runs(ctx: Stores, edge: Edge) -> tuple[EdgeRun, ...]:
             if r.run_id not in runs or r.legacy_owner is not None:
                 runs[r.run_id] = r
     return tuple(sorted(runs.values(), key=lambda r: r.knowledge_ts, reverse=True))
+
+
+def load_edge_variants_tried(ctx: Stores, edge: Edge) -> int:
+    """The variants tried on ``edge``: the most ``trials_counted`` any run it shows recorded (0:
+    none), read from this edge's own run records only (never the site's trials)."""
+    return max((r.trials_counted or 0 for r in load_edge_runs(ctx, edge)), default=0)
 
 
 def load_runs_of(ctx: Stores, edge_id: str) -> tuple[EdgeRun, ...]:
@@ -417,6 +439,7 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         reference_rate=_float(row.get("reference_rate")),
         touch_rate=_float(row.get("touch_rate")),
         side=str(to_scalar(row.get("side")) or "long"),
+        licence=_text(row.get("licence")),
     )
 
 
@@ -465,15 +488,29 @@ def _stored(
     slice_kinds: Collection[str] | None = None,
 ) -> tuple[EdgeRow, ...]:
     """The rows of the run's partition that are (``random``) or are not random-pick draws, only
-    of ``slice_kinds`` when given. The cut is made on the frame, before any row is decoded: the
-    draws are most of the partition and every consumer drops them (or all else) afterwards."""
-    frame = run_partition(ctx, result_table(EDGE_EVAL), record)
+    of ``slice_kinds`` when given. The cut is the storage read's (``where``: the row groups the
+    footer statistics rule out are never decoded, and a file written without clustering reads
+    whole and is cut exactly), before any row is decoded: the draws are most of the partition and
+    every consumer drops them (or all else) afterwards."""
+    cut = [RowFilter("role", frozenset({RANDOM}), keep=random)]
+    if slice_kinds is not None:
+        cut.append(RowFilter("slice_kind", frozenset(slice_kinds)))
+    frame = run_partition(ctx, result_table(EDGE_EVAL), record, where=cut)
     if frame is None:
         return ()
-    keep = (frame["role"].astype(str) == RANDOM) == random
-    if slice_kinds is not None:
-        keep &= frame["slice_kind"].astype(str).isin(set(slice_kinds))
-    return tuple(_row({str(k): v for k, v in r.items()}) for r in frame[keep].to_dict("records"))
+    return _rows_of(frame)
+
+
+def _rows_of(frame: pd.DataFrame) -> tuple[EdgeRow, ...]:
+    return tuple(_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records"))
+
+
+def rows_of_frame(frame: pd.DataFrame) -> tuple[tuple[EdgeRow, ...], tuple[Draw, ...]]:
+    """``(rows, draws)`` of an ``edge_eval`` frame as the reader parses a stored run's: the
+    screener and baseline rows, and the random-pick draws apart (the one parse: a writer judging
+    the frame it is publishing reads it exactly as the reader reads it back)."""
+    drawn = frame["role"] == RANDOM
+    return _rows_of(frame[~drawn]), _draws_of(frame[drawn])
 
 
 def rows_of_record(
@@ -491,10 +528,14 @@ def draws_of_record(ctx: Stores, record: RunRecord) -> tuple[Draw, ...]:
     each the ``lift`` of one draw of names chosen with no information, in stored order. Built
     straight from the columns: no ``EdgeRow`` per draw (a null ``lift`` or ``edge_variant`` reads
     as ``_row`` reads it: None, ``main``)."""
-    frame = run_partition(ctx, result_table(EDGE_EVAL), record)
-    if frame is None:
-        return ()
-    found = frame[frame["role"].astype(str) == RANDOM]
+    found = run_partition(
+        ctx, result_table(EDGE_EVAL), record, where=[RowFilter("role", frozenset({RANDOM}))]
+    )
+    return () if found is None else _draws_of(found)
+
+
+def _draws_of(found: pd.DataFrame) -> tuple[Draw, ...]:
+    """The draws of the random-pick rows ``found``, straight from the columns."""
     if found.empty:
         return ()
     variant = (
@@ -605,7 +646,7 @@ def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], i
 
 # ---------------------------------------------------------------------------- the trade ledger
 LEDGER = "edge_trades"
-PERSONAL = "personal"
+OPEN = "open"
 # The per-name columns each recorded column licence covers (ADR 0064 decision 10).
 LICENSED: Final = {
     "value_licence": ("value", "gross_value", "reference", "touch"),
@@ -723,15 +764,20 @@ def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
     )
 
 
-def _redacted(row: Mapping[str, Any], holder: bool, table: str) -> dict[str, Unknown]:
-    """The per-name columns of ``row`` the viewer may not see: those whose recorded licence is
-    personal, unless the viewer holds it (decided by the recorded licence, never by name)."""
-    if holder:
-        return {}
+def _covered(licence: Any, held: Collection[str]) -> bool:
+    """Whether a recorded column licence lets the viewer read: none recorded, ``open`` or held
+    (any licence, never only ``personal``: ``yahoo`` columns are redacted the same way)."""
+    return licence is None or licence in (OPEN, "") or licence in held
+
+
+def _redacted(row: Mapping[str, Any], held: Collection[str], table: str) -> dict[str, Unknown]:
+    """The per-name columns of ``row`` the viewer may not see: those whose recorded licence the
+    viewer does not hold (decided by the recorded licence, never by name)."""
     out: dict[str, Unknown] = {}
     for licence_column, columns in LICENSED.items():
-        if to_scalar(row.get(licence_column)) == PERSONAL:
-            why = table_cause(table, f"{licence_column} is personal", "LICENCE")
+        licence = to_scalar(row.get(licence_column))
+        if not _covered(licence, held):
+            why = table_cause(table, f"{licence_column} is {licence}", "LICENCE")
             out.update(dict.fromkeys(columns, Unknown(UnknownCode.LICENCE, why)))
     return out
 
@@ -774,24 +820,25 @@ def load_run_trades(
         keep &= frame["variant"] == variant
     if horizon is not None:
         keep &= frame["horizon_sessions"] == horizon
-    holder = load_users(ctx.configs).holds(ctx.user.user_id, PERSONAL)
+    users, me = load_users(ctx.configs), ctx.user.user_id
+    held = [x for x in LICENCES if users.holds(me, x)]  # what the registry says: never a role
     found = frame[keep].sort_values(LEDGER_ORDER, kind="stable")
     if sort in SORTABLE:
         column = "adv_usd_20d" if sort == "adv_usd" else sort  # the stored column of the field
         key = found[column]
         for licence_column, columns in LICENSED.items():
-            if column in columns and not holder and licence_column in found:
-                key = key.where(found[licence_column] != PERSONAL)
+            if column in columns and licence_column in found:
+                key = key.where(found[licence_column].map(lambda v: _covered(to_scalar(v), held)))
         found = found.assign(_key=key).sort_values(
             "_key", ascending=not descending, na_position="last", kind="stable"
         )
     page = found.iloc[offset : None if limit is None else offset + limit]
     rows = tuple(
-        _trade(r, _redacted(r, holder, table))
+        _trade(r, _redacted(r, held, table))
         for r in ({str(k): v for k, v in row.items()} for row in page.to_dict("records"))
     )
     licences = {str(v) for v in found["licence"].dropna()} if "licence" in found else set()
-    licence = PERSONAL if PERSONAL in licences else (licences.pop() if licences else None)
+    licence = strictest(licences) if licences else None
     return RunTrades(None, rows, len(found), licence)
 
 

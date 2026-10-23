@@ -92,7 +92,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/events"
-purpose = "L3 event-sensitivity settings: the names in the event-study scope and the macro releases it calendars (config/site/events/{scope,releases}.toml, ADR 0050), typed and validated (split from config/site, at its module cap)"
+purpose = "L3 event-sensitivity settings: the names in the event-study scope and the macro releases it calendars and the agency page of each (config/site/events/{scope,releases,links}.toml, ADR 0050), typed and validated (split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
@@ -527,6 +527,11 @@ purpose = "read objects over the edge evaluation (ADR 0053): the edge documents 
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/evaluation/verdict"
+purpose = "an edge's verdict (ED8, ADR 0053, 0065) split by kind, the package keeps the public names: model.py (status words, records, candidates), criteria.py (each test of Promising and Works), level.py (a candidate's level and columns), basis.py (the basis choice on in-sample figures) and rule.py (the rule: judge and load_edge_verdict); split from evaluation, at its module and file-length caps"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/events"
 purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -616,6 +621,11 @@ contracts = ["Parquet / Arrow I/O lives only in storage backends"]
 [[dir]]
 path = "src/algotrade/storage/backends/release"
 purpose = "the serving release store (ADR 0077): manifest, shared rules, local and memory stores of the derived per-session snapshots and their atomic CURRENT"
+contracts = ["Parquet / Arrow I/O lives only in storage backends"]
+
+[[dir]]
+path = "src/algotrade/storage/backends/runs"
+purpose = "run records of the table backends: which runs a read sees (run_selection), the partition index files (local_index), compaction of a partition's runs (run_compaction), the cached directory listing (run_listing)"
 contracts = ["Parquet / Arrow I/O lives only in storage backends"]
 
 [[dir]]

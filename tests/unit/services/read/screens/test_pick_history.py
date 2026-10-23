@@ -1,5 +1,9 @@
 from collections import Counter
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
+
+import pandas as pd
+import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.core.time.calendar import sessions_ending
@@ -14,6 +18,7 @@ from algotrade.services.read.screens.pick_history import (
 )
 from algotrade.services.read.screens.runs import latest_run
 from algotrade.services.read.values import UnknownCode
+from algotrade.services.screening.rule_results import PAUSED, is_picked
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -163,3 +168,107 @@ def test_a_record_saved_without_a_publish_is_seen_by_the_next_read(
     assert ctx.reader.visible_seq() == seq
     after = load_pick_histories(ctx, [DELTA], 2)[DELTA][0]
     assert after.picked == 3 and after.not_run is None
+
+
+# ---------------------------------------------------------------- frozen counts
+# The counts come from each session's ``results/screen_runs`` rows (frozen at write); only a
+# session without that partition, or a config with no row in one, reads run records.
+
+GAMMA = ("me", "gamma")
+ALPHA = ("site", "alpha")
+
+
+def _freeze(backend: MemoryBackend, day: date, run_id: str, config: str, rows: Rows) -> None:
+    counts = Counter(decision for _, decision, _, _ in rows)
+    picked = sum(n for d, n in counts.items() if is_picked(d))
+    frame = pd.DataFrame(
+        [
+            {
+                "user_id": "me", "config_id": config, "config_hash": "h", "config_version": 1,
+                "rows": len(rows), "passed": picked, "picked": picked,
+                "paused": counts.get(PAUSED, 0), "decision_names": sorted(counts),
+                "decision_counts": [counts[d] for d in sorted(counts)], "regime": None,
+                "size_multiplier": 1.0, "previous_run_id": None, "previous_session": None,
+                "previous_version": None, "new_picks": None, "dropped": None,
+            }
+        ]
+    )  # fmt: skip
+    for name in ("config_version", "previous_version", "new_picks", "dropped"):
+        frame[name] = frame[name].astype("Int64")
+    frame["session_date"] = day
+    frame["knowledge_ts"] = pd.Timestamp(T0 + timedelta(hours=1))
+    frame["source"] = "test"
+    frame["run_id"] = run_id
+    StoreWriter(backend).write_result("screen_runs", day, run_id, frame)
+
+
+def _window(backend: MemoryBackend, framed: bool) -> list[date]:
+    """s0 unframed (a run), s1 framed (delta superseded, gamma with no row but a record, alpha
+    never ran), s2 framed with no run of delta, then the request session D1."""
+    s0, s1, s2, _ = sessions_ending(D1, 4)
+    _screen(backend, s0, "a", ROWS, 0)
+    _screen(backend, s1, "b", ROWS, 1)
+    _screen(backend, s1, "c", GATED, 2)  # supersedes b
+    _screen(backend, s1, "g", ROWS[:1], 3, config="gamma")
+    _screen(backend, D1, "d", ROWS[:2], 24)
+    if framed:
+        _freeze(backend, s1, "c", "delta", GATED)  # gamma: no row, its record is the fallback
+        _freeze(backend, s2, "z", "other", ROWS)  # a partition with none of the asked configs
+    return [s0, s1, s2, D1]
+
+
+def test_frozen_counts_equal_the_record_counts(reader_of: Callable[[bool], StoreReader]) -> None:
+    keys = [DELTA, GAMMA, ALPHA]
+    old = load_pick_histories(_on(reader_of(False), D1), keys, 4)
+    new = load_pick_histories(_on(reader_of(True), D1), keys, 4)
+    assert new == old
+    assert [(p.picked, p.paused) for p in new[DELTA]] == [(2, 0), (1, 2), (None, None), (2, 0)]
+    assert [p.picked for p in new[GAMMA]] == [None, 1, None, None]  # the no-row fallback
+    assert all(p.not_run is not None for p in new[ALPHA])
+
+
+@pytest.fixture
+def reader_of() -> Callable[[bool], StoreReader]:
+    def build(framed: bool) -> StoreReader:
+        backend = MemoryBackend()
+        _window(backend, framed)
+        return StoreReader(backend)
+
+    return build
+
+
+def test_a_framed_session_reads_one_screen_runs_partition_and_no_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = MemoryBackend()
+    s0, s1, s2, _ = sessions_ending(D1, 4)
+    for day, run in ((s0, "a"), (s1, "b"), (s2, "c")):
+        _screen(backend, day, run, ROWS, 0)
+        _freeze(backend, day, run, "delta", ROWS)
+    _screen(backend, D1, "d", ROWS, 24)
+    reader = StoreReader(backend)
+    ctx = _on(reader, D1)
+    reads: list[tuple[str, date]] = []
+    real = reader.read_latest_runs
+    monkeypatch.setattr(
+        reader, "read_latest_runs",
+        lambda t, d, **kw: (reads.append((t, d)), real(t, d, **kw))[1],
+    )  # fmt: skip
+    scanned: list[date] = []
+    real_runs = reader.runs
+    monkeypatch.setattr(
+        reader, "runs", lambda j, d=None, *a, **k: (scanned.append(d), real_runs(j, d, *a, **k))[1]
+    )
+    fetched: list[object] = []
+    real_of = reader.runs_of
+    monkeypatch.setattr(reader, "runs_of", lambda *a, **k: (fetched.append(a), real_of(*a, **k))[1])
+    never = ("me", "never")  # no row in any framed session: one cached pass, never a scan each
+    both = load_pick_histories(ctx, [DELTA, never], 4)
+    found = both[DELTA]
+    assert [p.picked for p in found] == [2, 2, 2, 2]
+    assert all(p.not_run is not None for p in both[never])
+    assert len(fetched) == 1
+    assert set(scanned) <= {D1}  # the request session's own lookup, never one per earlier day
+    frozen_reads = [r for r in reads if r[0].endswith("screen_runs") and r[1] != D1]
+    assert sorted(frozen_reads) == sorted({(t, d) for t, d in frozen_reads})  # once per session
+    assert {d for _, d in frozen_reads} == {s0, s1, s2}

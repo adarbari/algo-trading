@@ -49,7 +49,7 @@ note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Fi
 [[table]]
 name = "analyst/estimate_snapshots"
 owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"
-note = "ADR 0068: our own point-in-time history of FMP and Finnhub analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session"
+note = "ADR 0068, 0080: our own point-in-time history of FMP, Finnhub and Yahoo analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session; the rows of source `yahoo` carry licence `yahoo` (owner only, ADR 0080) and the estimates, targets and revisions groups read them when FMP has none (v2, ADR 0080); `currency` (nullable, Yahoo's estimates) is additive: older partitions read null"
 
 [[table]]
 name = "instruments/index_membership"
@@ -207,14 +207,14 @@ name = "rollups/instrument/earnings_reaction@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
-name = "rollups/instrument/analyst_estimates@v1"
+name = "rollups/instrument/analyst_estimates@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "ADR 0068: FY1 / FY2 consensus EPS and revenue from our own analyst snapshots (analyst/estimate_snapshots); personal licence, optional"
+note = "ADR 0068, 0080: FY1 / FY2 consensus EPS and revenue from our own analyst snapshots (analyst/estimate_snapshots), FMP first then Yahoo per name (estimates_source); licence yahoo (owner only, the stricter of the two vendors), optional"
 
 [[table]]
-name = "rollups/instrument/analyst_targets@v1"
+name = "rollups/instrument/analyst_targets@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "ADR 0068: price-target consensus, median, high and low from our own analyst snapshots; personal licence, optional"
+note = "ADR 0068, 0080: price-target consensus, median, high and low from our own analyst snapshots, FMP first then Yahoo per name (targets_source); licence yahoo (owner only), optional"
 
 [[table]]
 name = "rollups/instrument/analyst_ratings@v1"
@@ -222,9 +222,9 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0068: analysts' strong buy to strong sell counts, mean rating and its 90-day change from our own Finnhub snapshots; personal licence, optional"
 
 [[table]]
-name = "rollups/instrument/analyst_revisions@v1"
+name = "rollups/instrument/analyst_revisions@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "ADR 0068: revisions of the FY1 consensus EPS and revenue over 30, 60 and 90 days, matched on the fiscal year end, from our own FMP snapshots; personal licence, optional"
+note = "ADR 0068: revisions of the FY1 consensus EPS and revenue over 30, 60 and 90 days, matched on the fiscal year end, from our own snapshots of the vendor the estimates chose (revisions_source), never across vendors; licence yahoo (owner only), optional"
 
 [[table]]
 name = "rollups/instrument/earnings_revisions@v1"
@@ -560,6 +560,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "v1 (RG3a) was never materialised; v2 added ebp, ebp_recession_prob, ofr_fsi and epu; v3 let the unemployment windows tolerate a missing month (v2 rows on the owner's store are superseded and read by nothing, deleted by hand once v3 is backfilled)"
 
 [[table]]
+name = "rollups/market/macro_asof@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "per regime-card macro series, its latest known observation, that vintage's date and kind and its first ALFRED vintage (provenance, personal licence on the personal series); read by services/read/regime/sources.py instead of the 2.9 M stored vintages, which it recomputes for a session with no row"
+
+[[table]]
 name = "rollups/market/market_triggers@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "ADR 0075: the VIX spike trigger of the on_market time-series edges, from FRED VIXCLS and VXVCLS (personal licence)"
@@ -581,12 +586,14 @@ note = "none produced yet (phase 6); rollups are computed only by the rollups ta
 [[table]]
 name = "results/rule_screen"
 owner = "src/algotrade/storage/tables/result_writer.py"
-note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_results.py, written by services/screening/run.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/screens/screen_values_recluster.py"]
+note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_results.py, written by services/screening/run.py; files sorted by instrument_id in 8,192-row row groups (TableSpec.cluster_by, storage.md), older ones until screen-values-recluster (which then trims and sweeps the old file once its grace has passed)"
 
 [[table]]
 name = "results/rule_screen_values"
 owner = "src/algotrade/storage/tables/result_writer.py"
-note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row)"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/screens/screen_values_recluster.py"]
+note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row); files sorted by instrument_id in 8,192-row row groups (TableSpec.cluster_by, storage.md), older ones until screen-values-recluster (which then trims and sweeps the old file once its grace has passed); licence columns unchanged"
 
 [[table]]
 name = "results/screen_runs"
@@ -623,6 +630,13 @@ name = "results/edge_trades"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
 note = "the edge trade ledger (ADR 0064): one row per pick of the main edge variant's implementation screeners at every horizon, excluded picks with a public reason; partition = the run's range end, runs merge per key, read by run_id; framed only by services/evaluation/cross_section/detail/ from the run's v2 legs and written in the run's one publish, read only by services/read/evaluation/runs.py; kept 45 days but for the canonical, latest and cited runs (the purge-raw task, runs.ledger_keep)"
+
+[[table]]
+name = "results/edge_verdict"
+owner = "src/algotrade/storage/tables/result_writer.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/edges/verdicts.py"]
+per_session = false
+note = "the stored headline of a site edge's verdict (ADR 0053 amendment 2026-10-22): one row per (edge, judged run, fingerprint) with the label, one-line result, basis, trades and lift of the canonical run, no haircut; partition = the judged run's range end, runs merge per key, knowledge_ts = the write instant; framed only by services/evaluation/cross_section/detail/verdict.py from the one judge and written in the edge-eval run's publish (and by the edge-verdicts task), read only by services/read/evaluation/verdict/stored.py, which uses a row only when its fingerprint matches and judges live otherwise; ML never writes it"
 
 [[table]]
 name = "results/edge_paper"

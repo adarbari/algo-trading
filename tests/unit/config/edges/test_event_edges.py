@@ -197,7 +197,8 @@ def test_a_sparse_score_edge_gates_its_universe_on_the_score(edge_id: str) -> No
     is scored (a short leg is then not measured): the universe requires the score."""
     edge = {e.id: e for e in load_edges(STORE)}[edge_id]
     assert edge.base == "universe" and len(edge.screeners) == 1
-    path = REPO_ROOT / f"config/site/presets/screeners/{edge.screeners[0]}/v1.toml"
+    folder = REPO_ROOT / "config/site/presets/screeners" / edge.screeners[0]
+    path = max(folder.glob("v*.toml"), key=lambda p: int(p.stem[1:]))  # the version the edge runs
     field = tomllib.loads(path.read_text())["rank"]["tie_break"]
     gated = [r for r in edge.universe.where.rules() if r.field == field]  # type: ignore[union-attr]
     assert gated and gated[0].op == "gte", f"{edge_id}: gate the universe on {field}"

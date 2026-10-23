@@ -1,10 +1,11 @@
 /**
- * The edges pages' one read (ADR 0037 / 0053, ED8): `Query.edges` (and the user's own files that
- * did not load, `Query.edgeProblems`), each edge document with the user's state about it; the
- * verdict (judged by the read model on the official result, the canonical run: the sentence, the
- * figures, the criteria, the year rows, the in-sample decile means and the lift among random-pick
- * backtests), whether it is the user's own, how it is defined, its sources, and every run the
- * user sees so exploratory ones can be listed and labelled. The cache holds the response.
+ * The edges pages' reads (ADR 0037 / 0053, ED8). The list (`EdgesPage`): `Query.edges` with each
+ * edge's row and `summary` (the headline of its verdict: label, result, trades) and the user's own
+ * files that did not load (`Query.edgeProblems`); no verdict is judged in full for it. One edge
+ * (`EdgeDetail`): the edge in full, the verdict (judged by the read model on the official result,
+ * the canonical run: the sentence, the figures, the criteria, the year rows, the in-sample decile
+ * means and the lift among random-pick backtests), how it is defined, its sources, and every run
+ * the user sees so exploratory ones can be listed and labelled. The cache holds the responses.
  */
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
@@ -17,6 +18,28 @@ const EdgesPage = graphql(`
       reason
     }
     edges {
+      id
+      name
+      status
+      state
+      mine
+      screeners
+      summary {
+        verdict
+        result
+        trades
+      }
+    }
+  }
+`);
+
+/**
+ * One edge in full (`?edge=X`): the whole verdict, the definition and every run the user sees,
+ * for ONE edge, so the server judges one verdict, not every edge's.
+ */
+const EdgeDetail = graphql(`
+  query EdgeDetail($ids: [String!]!) {
+    edges(ids: $ids) {
       id
       name
       status
@@ -206,9 +229,72 @@ const EdgesPage = graphql(`
   }
 `);
 
-/** Every edge the user sees (empty: none declared). */
+/**
+ * One edge's document, for the builder (`/edges/:id/edit`): what it needs to start a draft and
+ * nothing the harness judges: no verdict, no runs, so the server reads neither.
+ */
+const EdgeDocument = graphql(`
+  query EdgeDocument($ids: [String!]!) {
+    edges(ids: $ids) {
+      id
+      variantsTried
+      name
+      state
+      mine
+      extends
+      thesis
+      mechanism
+      persistence
+      horizons
+      screeners
+      baselines
+      sources {
+        title
+        url
+      }
+      definition {
+        picks
+        trade
+        compare
+        test
+      }
+    }
+  }
+`);
+
+/** One edge's document (null id: nothing is read; `data` is then the empty list's `undefined`). */
+export function useEdgeDocument(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeDocument', { ids: [id ?? ''] }),
+    queryFn: ({ queryKey }) => gql(EdgeDocument, { ids: [id ?? ''] }, queryKey),
+    enabled: id !== null,
+    select: (data) => data.edges[0] ?? null,
+  });
+}
+
+/** Every edge the user sees as a list row, with its headline verdict only (empty: none declared). */
 export function useEdges() {
   return useQuery({ ...edgesQuery(), select: (data) => data.edges });
+}
+
+/** One edge in full (null id: nothing is read); `data` is the edge, or null when it is not seen. */
+export function useEdge(id: string | null) {
+  return useQuery({
+    ...edgeQuery(id ?? ''),
+    enabled: id !== null,
+    select: (d) => d.edges[0] ?? null,
+  });
+}
+
+const edgeQuery = (id: string) =>
+  queryOptions({
+    queryKey: queryKeys.gql('EdgeDetail', { ids: [id] }),
+    queryFn: ({ queryKey }) => gql(EdgeDetail, { ids: [id] }, queryKey),
+  });
+
+/** Start reading one edge before its page opens (the URL names it): a no-op while fresh. */
+export function prefetchEdge(client: QueryClient, id: string): void {
+  void client.query(edgeQuery(id)).catch(() => undefined);
 }
 
 /** The user's own edge files that did not load, each with its reason (empty: all load). */
@@ -229,5 +315,9 @@ export function prefetchEdges(client: QueryClient): void {
 
 /** Read the edges (and their runs) again, after an evaluation finished. */
 export function refreshEdges(client: QueryClient): Promise<void> {
-  return client.invalidateQueries({ queryKey: queryKeys.gqlAll('EdgesPage') });
+  return Promise.all(
+    ['EdgeDocument', 'EdgeDetail', 'EdgesPage'].map((name) =>
+      client.invalidateQueries({ queryKey: queryKeys.gqlAll(name) }),
+    ),
+  ).then(() => undefined);
 }
