@@ -191,7 +191,10 @@ allowed_importers = ["algotrade.services.evaluation"]
 name = "Only the edge-eval publish frames a stored verdict: ML never judges (ADR 0053 decision 8, amendment 2026-10-22)"
 type = "protected"
 protected_modules = ["algotrade.services.evaluation.cross_section.detail.verdict"]
-allowed_importers = ["algotrade.services.evaluation.cross_section.results"]  # the edge-verdicts task joins it with its own PR
+allowed_importers = [
+    "algotrade.services.evaluation.cross_section.results",
+    "algotrade_ingestion.tasks.edges",  # the edge-verdicts task re-judges committed runs
+]
 
 [[tool.importlinter.contracts]]
 name = "Time-series evaluation reads outcomes only through its harness seam (ADR 0073)"

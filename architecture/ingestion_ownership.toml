@@ -67,6 +67,17 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
+id = "edge-verdicts"
+description = "Store the headline of every site edge's canonical run in results/edge_verdict (ADR 0053 amendment 2026-10-22), the backfill of runs stored before the table and the re-judge after the judge's code, verdict.toml or an edge document changed, in one task: per site edge, the canonical run (never a user's edge, a hidden copy or an exploratory run) judged from its committed rows through the one framer the edge-eval publish uses (services/evaluation/cross_section/detail/verdict.py), skipped when a row under the current fingerprint exists (idempotent, resumable by the store), every new row in one publish under the task's run id and the write instant as knowledge_ts, one edge's failure counted and never stopping the rest, stored rows checked against the live judge on request (--verify); owner-run once after deploy, then the post-session workflow's last step; never judges anything itself (ADR 0053 decision 8)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/edges/*"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_ops.py",  # the task's entry
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-22-the-stored-verdict-headline"
+detect = [{ call = "rejudge_edges" }]
+
+[[responsibility]]
 id = "etf-holdings"
 description = "What each ETF holds (ADR 0035): the etf-holdings task reads the issuers' daily files and SEC N-PORT through HoldingsSource adapters (first issuer that lists a fund wins), ranks and trims each fund's lines, links tickers to instruments through SymbolResolver and writes holdings/etf; consumers read it only through data.funds.holdings (latest rows per fund) and the read model's Holdings behind Instrument.holdings (services/read/instruments/holdings.py)"
 owner = [

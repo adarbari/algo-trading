@@ -11,7 +11,7 @@ exploratory. Anything else gets none, and the reader judges live. The headline o
 moves with the site's trials, so it is never stored. Written by the edge-eval publish (and the
 edge-verdicts task, through ``verdict_frame``); ML never frames it (ADR 0053 decision 8)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
@@ -32,6 +32,7 @@ from algotrade.storage.tables.edge_schemas import EDGE_VERDICT
 
 RESULT = EDGE_VERDICT.name.removeprefix("results/")
 SOURCE = "edge-eval"  # the writer when the run's own publish frames it
+REJUDGE_SOURCE = "edge-verdicts"  # the writer when the task judges a committed run
 
 
 def canonical_kind(edge: Edge, run: EdgeRun) -> bool:
@@ -100,6 +101,33 @@ def verdict_frame(
     return frame
 
 
+def _judged(
+    edge: Edge,
+    run: EdgeRun,
+    rows: tuple[EdgeRow, ...],
+    draws: runs.Draws,
+    settings: VerdictSettings,
+    *,
+    run_id: str,
+    source: str,
+    now: datetime,
+) -> pd.DataFrame:
+    """The one judgement and framing both writers share: the headline of ``edge`` on ``run``'s
+    ``rows`` through the reader's own judge call, as a ``results/edge_verdict`` row."""
+    call = judge_call(edge, run, True)
+    verdict = judge(rows=rows, draws=draws, t=settings, headline=True, **call.kwargs())
+    return verdict_frame(
+        summary_of(verdict),
+        run,
+        fingerprint=stamp.fingerprint(call, run, settings),
+        settings=settings,
+        licence=_licence(rows),
+        run_id=run_id,
+        source=source,
+        now=now,
+    )
+
+
 def edge_verdict_frame(
     stores: Stores, edge_id: str, record: RunRecord, frame: pd.DataFrame, now: datetime
 ) -> pd.DataFrame | None:
@@ -115,17 +143,59 @@ def edge_verdict_frame(
     run = runs.run_of_record(record, edge, str(record.stats.get("owner") or SITE_USER))
     if not canonical_kind(edge, run):
         return None
-    settings = load_verdict(stores.configs)
     rows, draws = runs.rows_of_frame(frame)
-    call = judge_call(edge, run, True)
-    verdict = judge(rows=rows, draws=draws, t=settings, headline=True, **call.kwargs())
-    return verdict_frame(
-        summary_of(verdict),
-        run,
-        fingerprint=stamp.fingerprint(call, run, settings),
-        settings=settings,
-        licence=_licence(rows),
-        run_id=record.run_id,
-        source=SOURCE,
-        now=now,
-    )
+    return _judged(
+        edge, run, rows, draws, load_verdict(stores.configs),
+        run_id=record.run_id, source=SOURCE, now=now,
+    )  # fmt: skip
+
+
+def rejudged_frame(
+    stores: Stores, edge: Edge, run: EdgeRun, *, run_id: str, now: datetime
+) -> pd.DataFrame | None:
+    """The row of ``edge``'s canonical ``run`` judged from its COMMITTED rows (the edge-verdicts
+    task: a backfill, or a re-judge after the judge, its settings or the edge's document changed),
+    written under the task's ``run_id`` and stamped ``now``; None for a run that is not the
+    canonical kind (never stored). The same judgement as the edge-eval publish's."""
+    if not canonical_kind(edge, run):
+        return None
+    return _judged(
+        edge, run, runs.load_run_rows(stores, run), runs.load_run_draws(stores, run),
+        load_verdict(stores.configs), run_id=run_id, source=REJUDGE_SOURCE, now=now,
+    )  # fmt: skip
+
+
+def _whole(value: Any) -> int | None:
+    return None if pd.isna(value) else int(value)
+
+
+def _real(value: Any) -> float | None:
+    return None if pd.isna(value) else float(value)
+
+
+def run_fingerprint(stores: Stores, edge: Edge, run: EdgeRun) -> str:
+    """The fingerprint a row of ``edge``'s headline on ``run`` carries now: what the edge-verdicts
+    task compares the stored rows' with (the reader's own, built from the one judge call)."""
+    return stamp.fingerprint(judge_call(edge, run, True), run, load_verdict(stores.configs))
+
+
+def summaries_of(table: pd.DataFrame | None) -> dict[tuple[str, str, str], EdgeSummary]:
+    """The site's headline rows of ``table`` by (edge, judged run, fingerprint); nulls stay None."""
+    found: dict[tuple[str, str, str], EdgeSummary] = {}
+    if table is None:
+        return found
+    for r in table.to_dict("records"):
+        if r["user_id"] != SITE_USER:
+            continue
+        found[(r["edge_id"], r["judged_run_id"], r["fingerprint"])] = EdgeSummary(
+            r["edge_id"], r["verdict"], r["result"],
+            None if pd.isna(r["basis"]) else r["basis"],
+            _whole(r["trades"]), _whole(r["oos_trades"]), _real(r["lift"]), _real(r["lift_pts"]),
+        )  # fmt: skip
+    return found
+
+
+def stored_summaries(stores: Stores, day: date) -> dict[tuple[str, str, str], EdgeSummary]:
+    """The headline rows stored on ``day`` (a run's range end), by (edge, judged run, fingerprint):
+    what the edge-verdicts task checks a run against before judging it again."""
+    return summaries_of(stores.reader.table(EDGE_VERDICT.name, day))

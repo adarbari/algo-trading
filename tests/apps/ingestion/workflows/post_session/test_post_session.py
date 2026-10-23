@@ -31,6 +31,7 @@ from algotrade_ingestion.workflows.post_session import post_session as post_modu
 from algotrade_ingestion.workflows.post_session.post_session import (
     BUSY,
     EDGE_EVAL,
+    EDGE_VERDICTS,
     LOCKED,
     POST_SESSION,
     pending_session,
@@ -46,12 +47,15 @@ D1, D = date(2026, 10, 1), date(2026, 10, 2)
 START = datetime(2026, 10, 2, 22, tzinfo=UTC)
 
 
-def test_the_steps_are_the_three_that_do_not_decide_the_session_all_optional() -> None:
+def test_the_steps_are_the_four_that_do_not_decide_the_session_all_optional() -> None:
     assert (
-        [s.name for s in POST_SESSION] == list(POST_STEPS) == ["descriptions", "verify", EDGE_EVAL]
+        [s.name for s in POST_SESSION]
+        == list(POST_STEPS)
+        == ["descriptions", "verify", EDGE_EVAL, EDGE_VERDICTS]
     )
     assert not any(s.critical for s in POST_SESSION)
     assert LOCKED == ("descriptions", "verify")  # the tasks that write tables
+    assert EDGE_VERDICTS in registry.TASKS and EDGE_VERDICTS not in LOCKED  # after edge-eval
     assert EDGE_EVAL not in registry.TASKS  # a job step, claimed per owner, not the ingest lock
 
 
@@ -80,7 +84,7 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Callable[..., list[str]]:
     def install(fail: tuple[str, ...] = (), only: tuple[str, ...] = LOCKED) -> list[str]:
         events: list[str] = []
         calls = Calls(events, fail)
-        for name in only:
+        for name in (*only, EDGE_VERDICTS):  # the last step always runs, as a fake
             fake_spec = replace(registry.TASKS[name], run=calls.task(name), sources=(), skip=None)
             monkeypatch.setitem(registry.TASKS, name, fake_spec)
         steps = tuple(replace(s, accept=()) for s in POST_SESSION)
@@ -122,7 +126,7 @@ def test_locked_steps_run_under_the_hold_and_edge_eval_after_it_is_released(
         events.append("unlock")
 
     summary = run_post_session(task_ctx(writer), D, NightlySettings(), FakeEvals(events), hold=hold)
-    assert events == ["lock", "descriptions", "verify", "unlock", EDGE_EVAL]
+    assert events == ["lock", "descriptions", "verify", "unlock", EDGE_EVAL, EDGE_VERDICTS]
     assert summary["status"] == "SUCCEEDED" and list(summary["steps"]) == [
         s.name for s in POST_SESSION
     ]
@@ -139,7 +143,7 @@ def test_the_run_leaves_a_published_record_and_is_then_a_no_op(
     record = writer.load_run(summary["run_id"])
     assert record is not None and record.job == "post-session" and record.session_date == D
     assert record.status is RunStatus.COMPLETE and set(record.stats["steps"]) == {
-        "descriptions", "verify", EDGE_EVAL
+        "descriptions", "verify", EDGE_EVAL, EDGE_VERDICTS
     }  # fmt: skip
     assert post_done(writer, D) and pending_session(writer) is None  # nothing left to do
 
@@ -199,6 +203,20 @@ def test_a_failed_step_is_a_warning_and_the_record_is_still_published(
     assert record is not None and record.items["verify"] == "WARN: FAILED (optional step)"
 
 
+def test_edge_verdicts_runs_after_edge_eval_and_its_failure_is_only_a_warning(
+    fake: Callable[..., list[str]],
+) -> None:
+    events = fake(fail=(EDGE_VERDICTS,))
+    writer = writer_with_nightly(D)
+    summary = run_post_session(task_ctx(writer), D, evals=FakeEvals(events))
+    assert events.index(EDGE_EVAL) < events.index(EDGE_VERDICTS)
+    assert summary["steps"][EDGE_VERDICTS]["status"] == "FAILED"
+    assert summary["steps"][EDGE_EVAL]["status"] == "SUCCEEDED"
+    assert [w["check"] for w in summary["warnings"]] == ["optional_step"]
+    assert "edge-verdicts: RuntimeError" in summary["warnings"][0]["detail"]
+    assert post_done(writer, D)  # an optional step never makes the watchdog retry
+
+
 def test_a_taken_ingest_lock_is_busy_and_nothing_ran_nor_was_recorded(
     fake: Callable[..., list[str]],
 ) -> None:
@@ -242,7 +260,12 @@ def test_the_report_gets_a_post_session_section_from_the_stored_record(
     assert post is not None and post["status"] == "SUCCEEDED"
     report = build_report(nightly, {}, post=post, max_post_duration_s=3600.0)
     assert report.post_status == "SUCCEEDED"
-    assert [s.step for s in report.post_steps] == ["descriptions", "verify", EDGE_EVAL]
+    assert [s.step for s in report.post_steps] == [
+        "descriptions",
+        "verify",
+        EDGE_EVAL,
+        EDGE_VERDICTS,
+    ]
     text, html = render_text(report), render_html(report)
     assert "POST-SESSION: SUCCEEDED" in text and "edge-eval" in text
     assert "Post-session: SUCCEEDED" in html
@@ -261,7 +284,7 @@ def test_disabled_ibkr_skips_verify_and_descriptions_run_on(
     steps = run_post_session(ctx, D, evals=FakeEvals([]))["steps"]
     assert steps["verify"]["status"] == "SKIPPED"
     assert steps["verify"]["reason"] == "skipped: [ibkr] is disabled in sources.toml"
-    assert events == ["descriptions"]
+    assert events == ["descriptions", EDGE_VERDICTS]
 
 
 @pytest.mark.allow_localhost

@@ -81,9 +81,10 @@ allowed = [
     "src/algotrade/services/evaluation/cross_section/results.py",  # the caller: writes the frames in the run's publish block
     "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: the facts come from its plan's blocks; each trial's licences ride its result
     "src/algotrade/services/read/evaluation/runs.py",  # the one reader of a run's stored series and ledger
+    "apps/ingestion/algotrade_ingestion/tasks/edges/verdicts.py",  # the edge-verdicts task: judges committed runs through the framer
 ]
 section = "docs/adr/0064-edge-evidence-series-and-trade-ledger.md#decision"
-detect = [{ call = "edge_series_frame" }, { call = "next_exits" }, { string = "results/edge_series" }, { string = "edge_series" }, { string = "results/edge_trades" }, { call = "trades_frame" }, { call = "trial_licences" }, { string = "results/edge_verdict" }, { call = "edge_verdict_frame" }]
+detect = [{ call = "edge_series_frame" }, { call = "next_exits" }, { string = "results/edge_series" }, { string = "edge_series" }, { string = "results/edge_trades" }, { call = "trades_frame" }, { call = "trial_licences" }, { string = "results/edge_verdict" }, { call = "edge_verdict_frame" }, { call = "rejudged_frame" }, { call = "stored_summaries" }, { call = "run_fingerprint" }]
 
 [[responsibility]]
 id = "edge-leg-reuse"

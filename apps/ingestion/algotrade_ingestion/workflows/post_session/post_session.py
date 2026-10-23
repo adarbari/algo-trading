@@ -17,6 +17,8 @@ Locks: ``descriptions`` and ``verify`` write tables, so they run under the inges
 outside it, under the owner's evaluation claim (``screens.edge_eval_jobs``); the whole run holds
 the named lock ``post-session`` (taken by the CLI) so two never overlap. ``edge-eval`` is SKIPPED
 with its reason when the session's ``outcomes`` step did not succeed in the nightly.
+``edge-verdicts`` (ADR 0053 amendment 2026-10-22) runs last, also outside the ingest lock: it
+publishes only rows no one else writes (keyed by edge, judged run and fingerprint), in one commit.
 """
 
 from collections.abc import Callable, Mapping
@@ -57,6 +59,7 @@ from algotrade_ingestion.workflows.nightly.steps import (
 )
 
 EDGE_EVAL = POST_STEPS[2]  # not an ingestion task: one `edge-eval` job per open edge
+EDGE_VERDICTS = POST_STEPS[3]  # a registry task, run after edge-eval, outside the ingest lock
 POST_LOCK = "post-session"  # the named lock one post-session run holds (a second one: busy)
 BUSY = "BUSY"  # the ingest lock was taken: nothing ran, a later start retries
 POST_SESSION: tuple[Step, ...] = (
@@ -68,6 +71,10 @@ POST_SESSION: tuple[Step, ...] = (
     # The evaluation of every open edge (ADR 0063): one job per edge as its owner; the weekly
     # audit when due (``screens.audit_due``), else incremental.
     Step(EDGE_EVAL, critical=False),
+    # The stored verdict headline of every site edge's canonical run (ADR 0053 amendment
+    # 2026-10-22): usually a no-op, as every run edge-eval just wrote carries its row; it judges
+    # the runs that have none (before the table) or whose judge, settings or document changed.
+    Step(EDGE_VERDICTS, critical=False, params={"all_edges": True}),
 )
 LOCKED = ("descriptions", "verify")  # the steps that run under the ingest lock
 
@@ -142,8 +149,10 @@ def run_post_session(
         return {"session": session.isoformat(), "status": BUSY, "reason": str(busy)}
     with IngestRun(ctx, POST_SESSION_RUN, session) as run:
         for step in POST_SESSION:
-            if step.name not in LOCKED:
+            if step.name == EDGE_EVAL:
                 done[step.name] = _edge_eval(step, ctx, session, evals)
+            elif step.name not in LOCKED:
+                done[step.name] = _registry_step(step, ctx, session)
         for name, result in done.items():
             run.record_item(name, step_item(result))
         steps = {name: r.as_dict() for name, r in done.items()}
