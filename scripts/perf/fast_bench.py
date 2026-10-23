@@ -763,7 +763,12 @@ def report_sets(distinct: dict, view_ops: dict, skipped: dict, subset: bool) -> 
         f"{len(view_ops)} views, {len(skipped)} not measured, {len(distinct)} distinct ops",
         flush=True,
     )
-    drift = {} if subset else vc.web_ops_not_measured(distinct)
+    drift: dict = {}
+    if not subset:
+        try:
+            drift = vc.web_ops_not_measured(distinct)
+        except Exception as err:  # a flag must never take the night down
+            print(f"COVERAGE unavailable: {err}", flush=True)
     if drift:
         print(vc.drift_line(drift), flush=True)
     return drift

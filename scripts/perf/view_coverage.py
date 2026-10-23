@@ -80,11 +80,25 @@ def problems(found: dict, baseline: dict[str, dict[str, str]]) -> list[str]:
     return out
 
 
+def pin_problems(baseline_file: Path = GAPS_FILE) -> list[str]:
+    """The exception lists only shrink: each one's size equals its ``[baseline] max_*`` pin, which
+    a PR only lowers (adding an entry fails here; raising the pin shows in review)."""
+    doc = tomllib.loads(baseline_file.read_text())
+    out: list[str] = []
+    for kind in ("operation", "view"):
+        size, pin = len(doc.get(kind, [])), doc.get("baseline", {}).get(f"max_{kind}", 0)
+        if size > pin:
+            out.append(f"[{kind}] list grew to {size} (pin {pin}): cover it, never add to the list")
+        elif size < pin:
+            out.append(f"[{kind}] list shrank to {size}: set max_{kind} = {size}")
+    return out
+
+
 def web_ops_not_measured(distinct: dict, src: Path = WEB_SRC) -> dict:
     """The nightly's drift flag: ``{"all": [...], "new": [...]}`` (``new``: not in the exception
     list), or ``{}`` when every web operation is measured. Never part of the verdict."""
     missing = sorted(wpo.all_query_ops(src) - {d["name"] for d in distinct.values()})
-    new = [o for o in missing if o not in load_gaps()["operation"]]
+    new = [o for o in missing if o not in load_gaps(GAPS_FILE)["operation"]]
     return {"all": missing, "new": new} if missing else {}
 
 

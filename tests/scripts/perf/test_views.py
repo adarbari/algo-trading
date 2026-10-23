@@ -796,3 +796,27 @@ def test_the_nightly_drift_flag_counts_uncovered_operations_and_those_not_listed
     assert (
         cov.web_ops_not_measured({n: {"name": n} for n in ("Seen", "Fresh", "Old")}, tmp_path) == {}
     )
+
+
+def test_the_exception_lists_only_shrink(tmp_path: Path) -> None:
+    assert cov.pin_problems() == []  # the committed pins equal the committed lists
+    f = tmp_path / "x.toml"
+    f.write_text(
+        '[baseline]\nmax_operation = 1\nmax_view = 0\n[[operation]]\nname="A"\n[[operation]]\nname="B"\n'
+    )
+    assert "grew to 2" in cov.pin_problems(f)[0]
+    f.write_text("[baseline]\nmax_operation = 1\nmax_view = 0\n")
+    assert "shrank to 0" in cov.pin_problems(f)[0]
+
+
+def test_a_broken_exception_file_or_web_walk_cannot_crash_or_change_the_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fb = _load("fast_bench", "fast_bench.py")
+    bad = tmp_path / "bad.toml"
+    bad.write_text("not [valid toml")
+    monkeypatch.setattr(cov, "GAPS_FILE", bad)
+    assert fb.report_sets({"a#1": {"name": "Viewer"}}, {"/": ["a#1"]}, {}, False) == {}
+    assert "COVERAGE unavailable" in capsys.readouterr().out
+    monkeypatch.setattr(cov.wpo, "all_query_ops", lambda *_: 1 / 0)
+    assert fb.report_sets({}, {}, {}, False) == {}
