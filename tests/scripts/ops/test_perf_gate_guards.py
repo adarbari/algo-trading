@@ -534,3 +534,58 @@ def test_the_release_trees_head_moving_during_the_bench_is_not_recorded(rig: Rig
     assert "outcome=code-changed" in rig.status.read_text()
     assert hist.read_text() == '{"old": 1}\n'
     assert "NOT recorded" in (rig.tmp / "notified").read_text()
+
+
+def test_a_bench_killed_at_its_cap_leaves_a_report_a_timeline_and_the_cause_in_the_notice(
+    rig: Rig,
+) -> None:
+    rig.bench_body = "sleep 30\n"
+    res = rig.run(PERF_BENCH_LIMIT_S="3", PERF_SAMPLE_S="1")
+    assert res.returncode == 4
+    ev = _evidence(rig)
+    report = json.loads((ev / "kill-report.json").read_text())
+    assert report["phase"] == "bench" and report["reason"] == "over-time" and report["cap_s"] == 3
+    assert report["likely_cause"] and "timeline_tail" in report and "last_requests" in report
+    assert "likely cause:" in (rig.tmp / "notified").read_text()
+    summary = (rig.tmp / "logs" / "perf_gate" / "summary.csv").read_text()
+    assert "over-time | likely cause:" in summary
+    rows = (ev / "timeline.csv").read_text().splitlines()
+    assert rows[0].startswith("epoch,phase,load1,free_gb,cpu_indexing,cpu_gate,cpu_other,top5")
+    assert any(",bench," in r for r in rows[1:]) and (ev / "README.txt").is_file()
+    assert (ev / "bench-head.txt").is_file()
+    status = json.loads((ev / "status.json").read_text())
+    assert {"wait", "copy", "bench"} <= set(status["phases"]) and "top_cpu" in status
+
+
+def test_a_copy_killed_at_its_cap_leaves_a_report_naming_the_entry(rig: Rig) -> None:
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    slow = _script(rig, "slowcp8.sh", "sleep 30\n")
+    assert rig.run(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S="2").returncode == 4
+    report = json.loads((_evidence(rig) / "kill-report.json").read_text())
+    assert report["phase"] == "copy" and report["in_flight"]["copy_entry"] == "tables"
+    assert "likely cause:" in (rig.tmp / "notified").read_text()
+
+
+def test_a_guard_exit_also_leaves_a_kill_report(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + "  9 .venv/bin/algotrade-ingest rollups --from 2013-01-01\n")
+    assert rig.run().returncode == 3
+    report = json.loads((_evidence(rig) / "kill-report.json").read_text())
+    assert report["reason"].startswith("guard: a writer runs")
+
+
+def test_the_prekill_sample_is_taken_at_seventy_percent_of_the_bench_cap(rig: Rig) -> None:
+    rig.bench_body = "sleep 12\necho x\nexit 1\n"
+    rig.run(PERF_BENCH_LIMIT_S="10", PERF_SAMPLE_S="1")
+    assert (_evidence(rig) / "prekill" / "ps-top15-bench.txt").is_file()
+
+
+def test_a_hung_probe_never_delays_the_run_and_is_recorded(rig: Rig) -> None:
+    d = rig.tmp / "hangio"
+    d.mkdir()
+    (d / "iostat").write_text("#!/bin/sh\nsleep 40\n")
+    (d / "iostat").chmod(0o755)
+    rig.bench_body = "sleep 6\necho x\nexit 1\n"
+    t0 = time.time()
+    rig.run(PERF_SAMPLE_S="1", PATH=f"{d}:{os.environ['PATH']}")
+    assert time.time() - t0 < 25
+    assert "iostat=probe-timeout" in (_evidence(rig) / "timeline.csv").read_text()

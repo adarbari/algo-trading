@@ -609,3 +609,19 @@ def test_time_ops_marks_edge_compare_as_an_own_copy_not_run_and_no_other_op(
     done, _ = fb.time_ops(ops, "file:///c", 1, 4.0)
     assert done["EdgeCompare#1"]["fidelity"] == "own copy, not run"
     assert "fidelity" not in done["EdgePaper#1"]
+
+
+def test_a_request_stream_leaves_every_request_and_the_progress_after_a_kill(
+    tmp_path: Path,
+) -> None:
+    rs = fb.RequestStream(tmp_path)
+    rs.begin("IdeasPage", 2, 1)
+    rs.end("IdeasPage", "IdeasPage#1", 2, 1790.0, 1234, 200, 5.7)
+    rs.begin("RegimeSignals", 2, 1)  # killed here: no close, no flush call
+    lines = [json.loads(x) for x in (tmp_path / "ops-stream.jsonl").read_text().splitlines()]
+    assert lines[0]["op"] == "IdeasPage" and lines[0]["ms"] == 1790.0 and lines[0]["load1"] == 5.7
+    assert lines[0]["bytes"] == 1234 and lines[0]["status"] == 200 and lines[0]["pass"] == 2
+    progress = json.loads((tmp_path / "bench-progress.json").read_text())
+    assert progress["op"] == "RegimeSignals" and progress["passes_done"] == 1
+    assert progress["requests"] == 1
+    rs.close()

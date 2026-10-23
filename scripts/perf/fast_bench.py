@@ -528,6 +528,45 @@ def _post(api: al.Api, query: str, variables: dict) -> dict:
     return r.json()["data"]
 
 
+class RequestStream:
+    """Every request as it completes: a flushed ``ops-stream.jsonl`` line (op, signature, pass, ms,
+    bytes, status, load1) and a rewritten ``bench-progress.json`` (the pass and op in flight, the
+    passes done, the elapsed): what a killed run leaves (the flight recorder, kill-report.json)."""
+
+    def __init__(self, folder: Path, clock: Callable[[], float] = time.monotonic) -> None:
+        self.folder, self.clock, self.t0, self.requests = folder, clock, clock(), 0
+        self.stream = (folder / "ops-stream.jsonl").open("a", buffering=1)
+        self.progress = folder / "bench-progress.json"
+
+    def _write(self, op: str | None, pass_no: int, done: int) -> None:
+        state = {"pass": pass_no, "op": op, "passes_done": done, "requests": self.requests}
+        state["elapsed_s"] = round(self.clock() - self.t0, 1)
+        tmp = self.progress.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state))
+        tmp.replace(self.progress)
+
+    def close(self) -> None:
+        self.stream.close()
+
+    def begin(self, op: str, pass_no: int, done: int) -> None:
+        self._write(op, pass_no, done)
+
+    def end(
+        self, op: str, sig: str, pass_no: int, ms: float, size: int, status: int, load: float
+    ) -> None:
+        self.requests += 1
+        row = {
+            "t": round(time.time(), 1),
+            "op": op,
+            "sig": sig,
+            "pass": pass_no,
+            "ms": round(ms, 1),
+        }
+        row |= {"bytes": size, "status": status, "load1": load}
+        self.stream.write(json.dumps(row) + "\n")
+        self.stream.flush()
+
+
 def time_ops(
     distinct: dict[str, dict],
     data_url: str,
@@ -536,12 +575,17 @@ def time_ops(
     partial: Path | None = None,
     budget_s: float = BUDGET_S,
     clock: Callable[[], float] = time.monotonic,
+    stream: Path | None = None,
 ) -> tuple[dict[str, dict], dict]:
     """Time every distinct op, up to ``reps`` passes within ``budget_s``, caches emptied before
     each timing. Returns (per-operation results, {passes, budget_s, elapsed_s, low_confidence}).
 
     ``partial``: a file rewritten after every pass with the samples so far (an aborted run
-    keeps them)."""
+    keeps them).
+
+    ``stream``: a directory that gets, per request and flushed, a line of ``ops-stream.jsonl`` and a
+    rewritten ``bench-progress.json`` (a kill leaves the evidence up to the last request), and the
+    API process's ``api.log``."""
     al.LAUNCH = CLEAR_PATCH
     al.MODES["empty"] = "9"
     cfg = al.uncached_config(al.REPO / "config", Path(tempfile.mkdtemp()) / "config")
@@ -550,7 +594,14 @@ def time_ops(
     last: dict[str, dict] = {}
     unresolved: list[str] = []
     point_at_own_edge(distinct, cfg)
-    api = al.Api("empty", data_url=data_url, config_dir=cfg, user=BENCH_USER)
+    api = al.Api(
+        "empty",
+        data_url=data_url,
+        config_dir=cfg,
+        user=BENCH_USER,
+        log=stream / "api.log" if stream else None,
+    )
+    recorder = RequestStream(stream, clock) if stream else None
     try:
         unresolved = resolve_variables(lambda q, v: _post(api, q, v), distinct)
         t0, done = clock(), 0
@@ -562,9 +613,13 @@ def time_ops(
                     continue
                 al.guard()
                 loads[sig].append(wait_quiet(OP_WAIT_S, load_max))
+                if recorder:
+                    recorder.begin(d["name"], p + 1, done)
                 api.client.get(f"{api.url}/__bench_clear")
                 ms, status, size, _ = api.call({"query": d["query"], "variables": d["variables"]})
                 samples[sig].append(round(ms, 1))
+                if recorder:
+                    recorder.end(d["name"], sig, p + 1, ms, size, status, loads[sig][-1])
                 prev = last.get(sig, {})
                 last[sig] = {
                     "status": status,
@@ -579,6 +634,8 @@ def time_ops(
             done += 1
     finally:
         api.close()
+        if recorder:
+            recorder.close()
     meta = {
         "passes": done,
         "budget_s": budget_s,
@@ -811,7 +868,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     load_before = load1()
     partial = out_dir / "samples-partial.json" if out_dir else None
-    ops, meta = time_ops(distinct, data_url, args.reps, args.load_max, partial, args.budget_s)
+    ops, meta = time_ops(
+        distinct, data_url, args.reps, args.load_max, partial, args.budget_s, stream=out_dir
+    )
     load_after = load1()
     views = per_view(ops, view_ops)
     by_name = avg_by_name(ops)

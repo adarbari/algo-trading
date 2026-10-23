@@ -252,7 +252,7 @@ entry being copied), `files_so_far` and `kb_so_far` (each count capped at 5 s, e
 minutes, the snapshot is killed, or any view is over the bar.
 
 **Reading a run.** Each run leaves `var/logs/perf_gate/YYYY-MM-DD/` (the last 14 kept; nothing is
-written outside `var/logs`) and one line in `var/logs/perf_gate/summary.csv` (date, sha, total_s,
+written outside `var/logs`; a typical run folder is under 1 MB: `ops-stream.jsonl` about 250 KB, `timeline.csv` about 20 KB, the older files about 150 KB; the worst case adds `api.log` 2 MB and `prekill/` 5 MB, about 8 MB, 14 days about 110 MB at most) and one line in `var/logs/perf_gate/summary.csv` (date, sha, total_s,
 snapshot_s, bench_s, passes, views_over_bar, seconds_above, noisy, notes: the trend is that one
 file). Which file answers which question:
 
@@ -263,6 +263,13 @@ file). Which file answers which question:
 | why was the run noisy | `procs-start.txt` and `procs-end.txt` (top 10 processes by CPU at the start of the snapshot and the end of the bench), `load.csv` |
 | which view or operation is slow, and is it stable | `views.json`, `ops.json`, `samples-partial.json` (every operation's time per pass), `run-meta.json` (passes, budget) |
 | why is an operation over the bar | `profiles.md` (`page_profile.py`: cProfile buckets, files opened, top functions, for the 3 slowest operations over the bar, 60 s at most; written only when something is over) |
+| what was the machine doing, every 10 s, in every phase | `timeline.csv`: epoch, phase (wait / copy / bench / cleanup), load1, free_gb, CPU% of the indexing family (mds, mds_stores, mdworker, fseventsd), of the gate's own tree and of everything else, the top 5 processes (`name:pct`), free memory %, swap used, disk KB/t and tps, `late_s` (the sampler was not scheduled: the machine paused), notes (`probe=probe-timeout`: each probe has a hard 3 s cap, so a stuck one is a note, never a stall) |
+| which request was running when the bench was killed, and how long had the last ones taken | `ops-stream.jsonl` (one flushed line per request: op, pass, ms, bytes, status, load1) and `bench-progress.json` (the pass and op in flight, passes done, elapsed), per request, so a kill keeps them |
+| why was the run stopped (any kill, over-time, pause or guard exit) | `kill-report.json`: phase, elapsed and cap, what was in flight (current op and pass, current copy entry), the last 20 requests, the timeline's last 6 rows, the top CPU consumers over the phase, deploys / ingests / deletes running, and a one-line likely cause by simple rules (indexing CPU over 150% = Spotlight/FSEvents indexing contended; load1 over 2x the CPU count = machine overloaded; copy under 1k files/s = slow filesystem; a gap over 60 s = machine paused; else unknown). The cause and the top 3 consumers are in the notification and in the `notes` column of `summary.csv` |
+| what was the bench doing just before the cap | `prekill/`: at 70% of the bench cap (and of the snapshot cap), if still running, a 3 s `sample` of the busiest python processes of the gate's tree (the bench client and its API) and a `ps` top 15 (5 MB at most; skipped silently where `sample` is missing) |
+| what did the bench API print, and the bench's own first output | `api.log` (the API process's stdout and stderr, last 2 MB), `bench-head.txt` (first 200 lines of the bench's output) |
+| who used the CPU over the run, and when did each phase start and end | `status.json` `top_cpu` (the three consumers) and `phases` (start and end epoch per phase) |
+| which file is which | `README.txt` in every run folder |
 
 The desktop notification names the directory. The file count of the snapshot is skipped by
 default (counting 750k files costs more than it tells; `PERF_COUNT_FILES=1` counts).
