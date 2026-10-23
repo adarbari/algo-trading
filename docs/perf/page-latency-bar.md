@@ -112,7 +112,7 @@ runs at low CPU priority only (`nice -n 10`, override `PERF_LOWPRI`; the trash d
 | `taskpolicy -b` | 170 s (4.0x slower) |
 | `nice -n 10` | 42 s |
 
-so the whole clone (1.1M files, about 6k files/s) takes about 3-4 minutes. The clone is renamed
+so the whole clone (1.1M files, about 6k files/s) takes about 3-4 minutes [I] (measured: 42 s for the 257k files of `rollups/market`; the whole folder is inferred). The clone is renamed
 to a sibling `data.trash.<date>` at the end (instant) and deleted afterwards, detached, at low
 priority; a leftover trash of an earlier run is deleted first, in the background, never blocking
 the start (a free-disk refusal then says the trash is still being deleted). Only a sibling
@@ -217,7 +217,7 @@ fails the gate. Expired exceptions and an expired list are reported at run time,
 separate step. Expected breakdown: the copy about 3.5-4 minutes [I] on a quiet machine (inferred: fewer files than the 4m17s-5m07s
 measured for the whole store, 9m41s under load), the bench at most 5 minutes by
 its budget (typically 2.5), the cleanup an instant rename: about 6-9 minutes wall, worst case
-10-11. The bench is hard-capped: a watchdog runs it in its own process group and at 300 s kills
+about 20 (the 900 s copy cap + the 300 s bench cap + the cleanup). The bench is hard-capped: a watchdog runs it in its own process group and at 300 s kills
 the whole group (the bench and its API child), marks the run over-time (exit 4; a finished day,
 so no retry loop; nothing is recorded) and the clone is renamed away. The copy has its own cap, a safety net and not the
 expectation (the target is 5-10 minutes wall in total; the copy is about 3-4): over 15 minutes
