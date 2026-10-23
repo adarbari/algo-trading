@@ -44,7 +44,9 @@ def test_the_url_query_becomes_params_and_the_body_is_returned() -> None:
     base, params, _ = fake.requests[0]
     assert base == "https://query2.finance.yahoo.com/v10/finance/quoteSummary/ARX"
     assert params == {
-        "modules": "financialData,earningsTrend,recommendationTrend",
+        "modules": (
+            "financialData,earningsTrend,recommendationTrend,calendarEvents,upgradeDowngradeHistory"
+        ),
         "formatted": "false",
     }
     get(url("ARX"))

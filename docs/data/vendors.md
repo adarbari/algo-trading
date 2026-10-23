@@ -340,9 +340,9 @@ No key, no published API terms, and Yahoo's terms forbid scraping, so everything
 personal use of the owner only (licence tag `yahoo`: never served to another viewer, never
 redistributed). Read through the `yfinance` package's cookie and crumb session
 (`vendors/yahoo/client.py`, imported lazily; caches under `[yahoo] cache_dir`, `var/cache/yahoo`),
-ONE request a name: `quoteSummary/<SYM>?modules=financialData,earningsTrend,recommendationTrend`
+ONE request a name: `quoteSummary/<SYM>?modules=financialData,earningsTrend,recommendationTrend,calendarEvents,upgradeDowngradeHistory`
 gives the target mean / median / high / low, the `0y` and `+1y` consensus EPS and revenue with their
-`endDate` and currency, and the current recommendation counts. Spike 2026-10-22: 30 requests
+`endDate` and currency, the current recommendation counts, and (item status only, ADR 0080 amendment 2026-10-23c) the next report date and the newest analyst action date. Spike 2026-10-22: 30 requests
 (10 at 0.5 s, 20 unpaced) all 200; an unknown symbol 404 after three requests (the crumb dance, which
 bypasses the limiter, so `[yahoo] min_interval_s = 1.0`); an ETF 404 `No fundamentals data`. Community
 reports say Yahoo answers 429 per IP under heavy use, so the step is capped (`[yahoo] per_night = 60`),

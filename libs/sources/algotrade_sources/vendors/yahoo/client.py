@@ -25,7 +25,7 @@ from algotrade_sources.framework.http import HttpError, Transport, parse_retry_a
 
 SOURCE = "yahoo"
 HOST = "https://query2.finance.yahoo.com/v10/finance/quoteSummary"
-MODULES = "financialData,earningsTrend,recommendationTrend"
+MODULES = "financialData,earningsTrend,recommendationTrend,calendarEvents,upgradeDowngradeHistory"
 TIMEOUT_S = 30
 
 
