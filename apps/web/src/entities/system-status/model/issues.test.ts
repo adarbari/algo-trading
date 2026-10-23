@@ -19,7 +19,15 @@ const run = (over: Partial<NightlyRun>): NightlyRun => ({
   ...over,
 });
 
-const ran = { origin: null, originStartedAt: null, originDurationS: null };
+const ran = {
+  reason: null,
+  error: null,
+  origin: null,
+  originDurationS: null,
+  startedAt: null,
+  needs: null,
+  rerunsAfter: [],
+};
 
 const screens = (missing: string[], total = 5): ScreenerStates => ({
   session: '2026-10-08',

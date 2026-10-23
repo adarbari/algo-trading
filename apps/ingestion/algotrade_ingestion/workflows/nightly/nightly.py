@@ -425,6 +425,7 @@ def _carry(step: Step, stored: Mapping[str, Any], why: str) -> StepResult:
     """The stored result reused, citing the attempt that produced it."""
     result = _held(step, StepStatus(str(stored["status"])), why)
     result.origin = str(stored["run_id"])
+    result.started_at = stored.get("started_at")
     result.task_run = stored.get("task_run")
     return result
 
@@ -633,6 +634,9 @@ def run_session(
             run.failed(f"critical steps not done: {'; '.join(failed)}")
         elif status is Status.WAITING:  # not done either: the next run resumes it (ADR 0043)
             run.waiting(f"waiting for publication: {'; '.join(failed)}")
+        for step in NIGHTLY:
+            done[step.name].needs = step.needs
+            done[step.name].reruns_after = step.reruns_after
         steps = {name: r.as_dict() for name, r in done.items()}
         run.stats["steps"] = steps
     return {"session": session.isoformat(), "status": status.value, "steps": steps}

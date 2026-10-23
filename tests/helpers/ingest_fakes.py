@@ -4,6 +4,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -64,3 +65,9 @@ def use_source(monkeypatch: pytest.MonkeyPatch, name: str, source: Source) -> No
     section enabled, credential set — still apply)."""
     spec = registry.SOURCES[name]
     monkeypatch.setitem(registry.SOURCES, name, replace(spec, build=lambda http: source))
+
+
+def without_edges(step: dict[str, Any]) -> dict[str, Any]:
+    """A recorded nightly step minus the graph edges it carries (``needs`` / ``reruns_after``),
+    for a test that pins the rest of the record."""
+    return {k: v for k, v in step.items() if k not in ("needs", "reruns_after")}

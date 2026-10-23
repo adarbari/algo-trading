@@ -116,6 +116,11 @@ class StepResult:
     arrival: dict[str, Any] | None = None  # ``observed`` + minutes_after_close, latest session
     task_run: str | None = None  # the registry task's run id (its staging, for a resume)
     origin: str | None = None  # the nightly attempt that produced a reused result
+    started_at: str | None = None  # when the step began (UTC ISO; a reused step keeps its own)
+    # The step's graph edges as defined when the attempt ran, recorded so a read can show what
+    # a step needs and what it holds back without importing the app (None: not recorded).
+    needs: tuple[str, ...] | None = None
+    reruns_after: tuple[str, ...] = ()
 
     @property
     def tables(self) -> tuple[str, ...]:
@@ -135,6 +140,11 @@ class StepResult:
         for key in ("result", "reason", "error", "task_run", "origin"):
             if getattr(self, key) is not None:
                 out[key] = getattr(self, key)
+        if self.started_at is not None:
+            out["started_at"] = self.started_at
+        if self.needs is not None:
+            out["needs"] = list(self.needs)
+            out["reruns_after"] = list(self.reruns_after)
         if self.checks:
             out["checks"] = self.checks
         if self.held_by_wait:
@@ -265,6 +275,7 @@ def run_isolated(
             task_run=outcome.task_run,
         )
     result.duration_s = round((clock() - started).total_seconds(), 3)
+    result.started_at = started.isoformat(timespec="seconds")
     return result
 
 
