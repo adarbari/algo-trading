@@ -186,7 +186,8 @@ const STATUSES = [
   'rollup.analyst_estimates@v2.estimates_status',
   'rollup.analyst_targets@v2.targets_status',
   'rollup.analyst_ratings@v1.ratings_status',
-  'rollup.analyst_revisions@v2.revisions_status',
+  'rollup.analyst_revisions@v3.revisions_status',
+  'rollup.analyst_revisions@v3.revisions_basis',
 ];
 const withAnalysts = (analysts: readonly (typeof stock.features)[number][]) =>
   fakeQuery({ session, instrument: { ...stock, features: [...stock.features, ...analysts] } });
@@ -294,9 +295,10 @@ describe('the ratings and revisions rows', () => {
         known('rollup.analyst_ratings@v1.rating_buy', 18, 'INTEGER'),
         known('rollup.analyst_ratings@v1.rating_score', 4.31, 'NUMBER', 'ratio'),
         known('rollup.analyst_ratings@v1.rating_score_change_90d', 0.12, 'NUMBER', 'ratio'),
-        known('rollup.analyst_revisions@v2.eps_fy1_revision_30d', 0.021, 'PERCENT', 'decimal'),
+        known('rollup.analyst_revisions@v3.eps_fy1_revision_30d', 0.021, 'PERCENT', 'decimal'),
         known(STATUSES[2] ?? '', 'OK', 'TEXT'),
         known(STATUSES[3] ?? '', 'BUILDING', 'TEXT'),
+        known(STATUSES[4] ?? '', 'vendor_trend', 'TEXT'),
       ]),
     );
     render(<FinancialsPanel symbol="KO" />);
@@ -318,6 +320,7 @@ describe('the ratings and revisions rows', () => {
     // the growth section's OK and the ratings OK
     expect(screen.getAllByText('OK')).toHaveLength(2);
     expect(screen.getByText('BUILDING')).toBeInTheDocument();
+    expect(screen.getByText('vendor_trend')).toBeInTheDocument(); // where the revisions come from
   });
 
   it('collapses to the one row when the new rows and every other row share a kind', () => {

@@ -198,7 +198,7 @@ Sources: Finnhub analyst recommendation trends, stored nightly in analyst/estima
 
 Sources: Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_revisions@v2.eps_fy1_revision_30d`
+### `rollup.analyst_revisions@v3.eps_fy1_revision_30d`
 
 **How to read it.** How much the consensus EPS for the current fiscal year moved in 30 days, in percent of the old estimate, for the same year. A value of +5 means analysts raised it by 5%. -10 means a 10% cut.
 
@@ -206,11 +206,11 @@ Sources: Finnhub analyst recommendation trends, stored nightly in analyst/estima
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| analysts raising this year's EPS estimate | `gte 2` | hard | - | with rollup.analyst_revisions@v2.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5 |
+| analysts raising this year's EPS estimate | `gte 2` | hard | - | with rollup.analyst_revisions@v3.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5 |
 
 **When the reading lies**
 
-- Our history starts on 2026-10-19, so this is null until about 2026-11-18. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.
+- Our own history starts on 2026-10-19, so for a name on FMP this is null until about 2026-11-18. A name on Yahoo reads Yahoo's own estimate trend from the first day. Read rollup.analyst_revisions@v3.revisions_basis and revisions_status for which.
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v2.eps_fy1.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.
@@ -219,7 +219,7 @@ Sources: Finnhub analyst recommendation trends, stored nightly in analyst/estima
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_revisions@v2.eps_fy1_revision_60d`
+### `rollup.analyst_revisions@v3.eps_fy1_revision_60d`
 
 **How to read it.** How much the consensus EPS for the current fiscal year moved in 60 days, in percent of the old estimate, for the same year. A value of +5 means analysts raised it by 5%. -10 means a 10% cut.
 
@@ -227,11 +227,11 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| analysts raising this year's EPS estimate | `gte 3` | hard | - | with rollup.analyst_revisions@v2.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5 |
+| analysts raising this year's EPS estimate | `gte 3` | hard | - | with rollup.analyst_revisions@v3.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5 |
 
 **When the reading lies**
 
-- Our history starts on 2026-10-19, so this is null until about 2026-12-18. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.
+- Our own history starts on 2026-10-19, so for a name on FMP this is null until about 2026-12-18. A name on Yahoo reads Yahoo's own estimate trend from the first day. Read rollup.analyst_revisions@v3.revisions_basis and revisions_status for which.
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v2.eps_fy1.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.
@@ -240,7 +240,7 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_revisions@v2.eps_fy1_revision_90d`
+### `rollup.analyst_revisions@v3.eps_fy1_revision_90d`
 
 **How to read it.** How much the consensus EPS for the current fiscal year moved in 90 days, in percent of the old estimate, for the same year. A value of +5 means analysts raised it by 5%. -10 means a 10% cut.
 
@@ -248,11 +248,11 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| analysts raising this year's EPS estimate | `gte 5` | hard | - | with rollup.analyst_revisions@v2.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5 |
+| analysts raising this year's EPS estimate | `gte 5` | hard | - | with rollup.analyst_revisions@v3.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5 |
 
 **When the reading lies**
 
-- Our history starts on 2026-10-19, so this is null until about 2027-01-17. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.
+- Our own history starts on 2026-10-19, so for a name on FMP this is null until about 2027-01-17. A name on Yahoo reads Yahoo's own estimate trend from the first day. Read rollup.analyst_revisions@v3.revisions_basis and revisions_status for which.
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v2.eps_fy1.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.
@@ -261,7 +261,7 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_revisions@v2.revenue_fy1_revision_30d`
+### `rollup.analyst_revisions@v3.revenue_fy1_revision_30d`
 
 **How to read it.** How much the consensus revenue for the current fiscal year moved in 30 days, in percent of the old estimate, for the same year. Revenue moves less than EPS, so +2 is already a clear raise.
 
@@ -269,11 +269,11 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| analysts raising this year's revenue estimate | `gte 1` | hard | - | with rollup.analyst_revisions@v2.revisions_status eq OK |
+| analysts raising this year's revenue estimate | `gte 1` | hard | - | with rollup.analyst_revisions@v3.revisions_status eq OK |
 
 **When the reading lies**
 
-- Our history starts on 2026-10-19, so this is null until about 2026-11-18. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.
+- Our history starts on 2026-10-19, so this is null until about 2026-11-18. Yahoo has no revenue history, so a name on Yahoo waits for our own. Read rollup.analyst_revisions@v3.revisions_status for whether the windows exist yet.
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - Revenue is in the vendor's reporting currency, so an ADR's figure moves with the exchange rate as well as the forecast.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.
@@ -282,7 +282,7 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_revisions@v2.revenue_fy1_revision_90d`
+### `rollup.analyst_revisions@v3.revenue_fy1_revision_90d`
 
 **How to read it.** How much the consensus revenue for the current fiscal year moved in 90 days, in percent of the old estimate, for the same year. Revenue moves less than EPS, so +2 is already a clear raise.
 
@@ -290,11 +290,11 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| analysts raising this year's revenue estimate | `gte 3` | hard | - | with rollup.analyst_revisions@v2.revisions_status eq OK |
+| analysts raising this year's revenue estimate | `gte 3` | hard | - | with rollup.analyst_revisions@v3.revisions_status eq OK |
 
 **When the reading lies**
 
-- Our history starts on 2026-10-19, so this is null until about 2027-01-17. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.
+- Our history starts on 2026-10-19, so this is null until about 2027-01-17. Yahoo has no revenue history, so a name on Yahoo waits for our own. Read rollup.analyst_revisions@v3.revisions_status for whether the windows exist yet.
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - Revenue is in the vendor's reporting currency, so an ADR's figure moves with the exchange rate as well as the forecast.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.
@@ -303,7 +303,7 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_revisions@v2.eps_fy1_analysts_change_90d`
+### `rollup.analyst_revisions@v3.eps_fy1_analysts_change_90d`
 
 **How to read it.** How many more (positive) or fewer (negative) analysts' estimates the current year's EPS averages than 90 days ago, for the same fiscal year. A value of +3 is three more analysts publishing.
 
@@ -311,11 +311,11 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| more analysts covering the name | `gte 1` | hard | - | with rollup.analyst_revisions@v2.revisions_status eq OK |
+| more analysts covering the name | `gte 1` | hard | - | with rollup.analyst_revisions@v3.revisions_status eq OK |
 
 **When the reading lies**
 
-- Our history starts on 2026-10-19, so this is null until about 2027-01-17. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.
+- Our history starts on 2026-10-19, so this is null until about 2027-01-17. Yahoo gives no analyst-count history, so a name on Yahoo waits for our own. Read rollup.analyst_revisions@v3.revisions_status for whether the windows exist yet.
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - Coverage grows as a report nears, so a rise is the normal course. Compare names with the same year end.
 - Null when either snapshot gave no count.
@@ -324,7 +324,7 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 Sources: Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
-### `rollup.analyst_revisions@v2.revisions_status`
+### `rollup.analyst_revisions@v3.revisions_status`
 
 **How to read it.** Whether the estimate revisions of the name can be measured. OK: a snapshot of the same fiscal year exists for 30, 60 and 90 days back. BUILDING: an earlier one exists, but not for every window. NO_PRIOR: none holds this year. STALE, NOT_COVERED and NOT_FETCHED are the estimates' own status.
 
@@ -337,6 +337,7 @@ Sources: Financial Modeling Prep analyst estimates, stored nightly in analyst/es
 
 **When the reading lies**
 
+- For revisions_basis vendor_trend, OK means Yahoo's trend has the current value and all three earlier ones. BUILDING means a window is missing in the trend.
 - OK says the comparisons exist, not that the estimate moved: most names read a revision near 0. Read the revision fields for the size.
 - BUILDING lasts until 2027-01-17 for every name, since our history starts on 2026-10-19. A night the rotation missed can also hold a covered name there.
 - NO_PRIOR also covers a year that the older snapshots never listed, as at the fiscal year roll, and a name whose first estimate year is unknown.
@@ -496,7 +497,7 @@ Sources: Financial Modeling Prep and Yahoo Finance, stored nightly in analyst/es
 
 Sources: Financial Modeling Prep and Yahoo Finance, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md)
 
-### `rollup.analyst_revisions@v2.revisions_source`
+### `rollup.analyst_revisions@v3.revisions_source`
 
 **How to read it.** Which data vendor the revisions of the name come from: fmp (Financial Modeling Prep) or yahoo (Yahoo Finance, used when FMP has none for the name). A name neither has reached reads fmp with a status of NOT_COVERED or NOT_FETCHED.
 
@@ -513,6 +514,25 @@ Sources: Financial Modeling Prep and Yahoo Finance, stored nightly in analyst/es
 - A name Yahoo has not reached yet stays not covered; no name is judged by another.
 
 Sources: Financial Modeling Prep and Yahoo Finance, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md)
+
+### `rollup.analyst_revisions@v3.revisions_basis`
+
+**How to read it.** Where the EPS revisions of the name come from. own_snapshots: our own nightly snapshots, compared 30, 60 and 90 days apart. vendor_trend: Yahoo's own record of its EPS consensus. It gives the value now and as it stood 30, 60 and 90 days before we asked. We use it for a name on Yahoo whose own history is still short.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| only revisions from our own snapshots | `eq "own_snapshots"` | hard | - | - |
+
+**When the reading lies**
+
+- Yahoo's earlier values are its restatement as of the day we asked, not what was known on the earlier day. They enter on the day we fetched them. They are never back-dated, so an earlier session has no trend.
+- The trend windows are exactly 30, 60 and 90 days. Our own snapshots' windows are 30 to 37, 60 to 67 and 90 to 97 days. The two bases are close, not identical.
+- Only the EPS revisions switch basis. The revenue revisions and the analyst-count change are always our own snapshots, because Yahoo has no revenue history. They stay null for a name on Yahoo until our history spans the window.
+- A name on FMP is always own_snapshots, and a name that is not covered reads own_snapshots with no values. Yahoo's trend is never compared with FMP's estimate.
+
+Sources: Yahoo Finance earnings trend, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md, amendment 2026-10-24)
 
 ### `rollup.earnings_date_shift@v1.earnings_shift_known_date`
 

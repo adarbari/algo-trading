@@ -126,7 +126,7 @@ DECLARING = {
     "analyst_estimates@v2": ("analyst-snapshot", check_analyst_backlog),
     "analyst_targets@v2": ("analyst-snapshot", check_analyst_backlog),
     "analyst_ratings@v1": ("analyst-snapshot", check_finnhub_backlog),
-    "analyst_revisions@v2": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_revisions@v3": ("analyst-snapshot", check_analyst_backlog),
 }
 
 

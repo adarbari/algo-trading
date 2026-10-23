@@ -212,11 +212,11 @@ value = "STALE"
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.eps_fy1_revision_30d"
+name = "rollup.analyst_revisions@v3.eps_fy1_revision_30d"
 theme = "analyst"
 reads = "How much the consensus EPS for the current fiscal year moved in 30 days, in percent of the old estimate, for the same year. A value of +5 means analysts raised it by 5%. -10 means a 10% cut."
 caveats = [
-  "Our history starts on 2026-10-19, so this is null until about 2026-11-18. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.",
+  "Our own history starts on 2026-10-19, so for a name on FMP this is null until about 2026-11-18. A name on Yahoo reads Yahoo's own estimate trend from the first day. Read rollup.analyst_revisions@v3.revisions_basis and revisions_status for which.",
   "The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.",
   "A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v2.eps_fy1.",
   "One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.",
@@ -233,14 +233,14 @@ for = "analysts raising this year's EPS estimate"
 op = "gte"
 value = 2
 mode = "hard"
-note = "with rollup.analyst_revisions@v2.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5"
+note = "with rollup.analyst_revisions@v3.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.eps_fy1_revision_60d"
+name = "rollup.analyst_revisions@v3.eps_fy1_revision_60d"
 theme = "analyst"
 reads = "How much the consensus EPS for the current fiscal year moved in 60 days, in percent of the old estimate, for the same year. A value of +5 means analysts raised it by 5%. -10 means a 10% cut."
 caveats = [
-  "Our history starts on 2026-10-19, so this is null until about 2026-12-18. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.",
+  "Our own history starts on 2026-10-19, so for a name on FMP this is null until about 2026-12-18. A name on Yahoo reads Yahoo's own estimate trend from the first day. Read rollup.analyst_revisions@v3.revisions_basis and revisions_status for which.",
   "The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.",
   "A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v2.eps_fy1.",
   "One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.",
@@ -257,14 +257,14 @@ for = "analysts raising this year's EPS estimate"
 op = "gte"
 value = 3
 mode = "hard"
-note = "with rollup.analyst_revisions@v2.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5"
+note = "with rollup.analyst_revisions@v3.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.eps_fy1_revision_90d"
+name = "rollup.analyst_revisions@v3.eps_fy1_revision_90d"
 theme = "analyst"
 reads = "How much the consensus EPS for the current fiscal year moved in 90 days, in percent of the old estimate, for the same year. A value of +5 means analysts raised it by 5%. -10 means a 10% cut."
 caveats = [
-  "Our history starts on 2026-10-19, so this is null until about 2027-01-17. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.",
+  "Our own history starts on 2026-10-19, so for a name on FMP this is null until about 2027-01-17. A name on Yahoo reads Yahoo's own estimate trend from the first day. Read rollup.analyst_revisions@v3.revisions_basis and revisions_status for which.",
   "The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.",
   "A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v2.eps_fy1.",
   "One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.",
@@ -281,14 +281,14 @@ for = "analysts raising this year's EPS estimate"
 op = "gte"
 value = 5
 mode = "hard"
-note = "with rollup.analyst_revisions@v2.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5"
+note = "with rollup.analyst_revisions@v3.revisions_status eq OK and rollup.analyst_estimates@v2.eps_fy1_analysts gte 5"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.revenue_fy1_revision_30d"
+name = "rollup.analyst_revisions@v3.revenue_fy1_revision_30d"
 theme = "analyst"
 reads = "How much the consensus revenue for the current fiscal year moved in 30 days, in percent of the old estimate, for the same year. Revenue moves less than EPS, so +2 is already a clear raise."
 caveats = [
-  "Our history starts on 2026-10-19, so this is null until about 2026-11-18. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.",
+  "Our history starts on 2026-10-19, so this is null until about 2026-11-18. Yahoo has no revenue history, so a name on Yahoo waits for our own. Read rollup.analyst_revisions@v3.revisions_status for whether the windows exist yet.",
   "The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.",
   "Revenue is in the vendor's reporting currency, so an ADR's figure moves with the exchange rate as well as the forecast.",
   "One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.",
@@ -305,14 +305,14 @@ for = "analysts raising this year's revenue estimate"
 op = "gte"
 value = 1
 mode = "hard"
-note = "with rollup.analyst_revisions@v2.revisions_status eq OK"
+note = "with rollup.analyst_revisions@v3.revisions_status eq OK"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.revenue_fy1_revision_90d"
+name = "rollup.analyst_revisions@v3.revenue_fy1_revision_90d"
 theme = "analyst"
 reads = "How much the consensus revenue for the current fiscal year moved in 90 days, in percent of the old estimate, for the same year. Revenue moves less than EPS, so +2 is already a clear raise."
 caveats = [
-  "Our history starts on 2026-10-19, so this is null until about 2027-01-17. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.",
+  "Our history starts on 2026-10-19, so this is null until about 2027-01-17. Yahoo has no revenue history, so a name on Yahoo waits for our own. Read rollup.analyst_revisions@v3.revisions_status for whether the windows exist yet.",
   "The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.",
   "Revenue is in the vendor's reporting currency, so an ADR's figure moves with the exchange rate as well as the forecast.",
   "One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v2.eps_fy1_analysts, and prefer 5 or more.",
@@ -329,14 +329,14 @@ for = "analysts raising this year's revenue estimate"
 op = "gte"
 value = 3
 mode = "hard"
-note = "with rollup.analyst_revisions@v2.revisions_status eq OK"
+note = "with rollup.analyst_revisions@v3.revisions_status eq OK"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.eps_fy1_analysts_change_90d"
+name = "rollup.analyst_revisions@v3.eps_fy1_analysts_change_90d"
 theme = "analyst"
 reads = "How many more (positive) or fewer (negative) analysts' estimates the current year's EPS averages than 90 days ago, for the same fiscal year. A value of +3 is three more analysts publishing."
 caveats = [
-  "Our history starts on 2026-10-19, so this is null until about 2027-01-17. Read rollup.analyst_revisions@v2.revisions_status for whether the windows exist yet.",
+  "Our history starts on 2026-10-19, so this is null until about 2027-01-17. Yahoo gives no analyst-count history, so a name on Yahoo waits for our own. Read rollup.analyst_revisions@v3.revisions_status for whether the windows exist yet.",
   "The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.",
   "Coverage grows as a report nears, so a rise is the normal course. Compare names with the same year end.",
   "Null when either snapshot gave no count.",
@@ -351,13 +351,14 @@ for = "more analysts covering the name"
 op = "gte"
 value = 1
 mode = "hard"
-note = "with rollup.analyst_revisions@v2.revisions_status eq OK"
+note = "with rollup.analyst_revisions@v3.revisions_status eq OK"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.revisions_status"
+name = "rollup.analyst_revisions@v3.revisions_status"
 theme = "analyst"
 reads = "Whether the estimate revisions of the name can be measured. OK: a snapshot of the same fiscal year exists for 30, 60 and 90 days back. BUILDING: an earlier one exists, but not for every window. NO_PRIOR: none holds this year. STALE, NOT_COVERED and NOT_FETCHED are the estimates' own status."
 caveats = [
+  "For revisions_basis vendor_trend, OK means Yahoo's trend has the current value and all three earlier ones. BUILDING means a window is missing in the trend.",
   "OK says the comparisons exist, not that the estimate moved: most names read a revision near 0. Read the revision fields for the size.",
   "BUILDING lasts until 2027-01-17 for every name, since our history starts on 2026-10-19. A night the rotation missed can also hold a covered name there.",
   "NO_PRIOR also covers a year that the older snapshots never listed, as at the fiscal year roll, and a name whose first estimate year is unknown.",

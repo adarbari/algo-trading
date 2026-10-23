@@ -500,7 +500,7 @@ GROUPS_VERSION = {
     "analyst_estimates": 2,
     "analyst_targets": 2,
     "analyst_ratings": 1,
-    "analyst_revisions": 2,
+    "analyst_revisions": 3,
 }
 
 

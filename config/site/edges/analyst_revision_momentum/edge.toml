@@ -1,5 +1,5 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Screener: eps_revision_up (new, EB E3b; analyst_revisions@v2,
+# src/algotrade/config/edges/document.py. Screener: eps_revision_up (new, EB E3b; analyst_revisions@v3,
 # personal licence). Idea page: docs/edge-ideas/events.md (analyst_revision_momentum). Same pattern as
 # etf_flow_pressure: the history starts after frozen_from, so the verdict accrues over months.
 id = "analyst_revision_momentum"
@@ -42,7 +42,8 @@ all = [
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
-  { field = "rollup.analyst_revisions@v2.eps_fy1_revision_30d", op = "gte", value = -10000 },
+  { field = "rollup.analyst_revisions@v3.eps_fy1_revision_30d", op = "gte", value = -10000 },
+  { field = "rollup.analyst_revisions@v3.revisions_basis", op = "eq", value = "own_snapshots" },
 ]
 
 [outcome]
@@ -66,12 +67,12 @@ side = "long_short"
 outcome = """Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision),
 net of 10 bps a round trip: a long hold of the 10 names with the largest upward revision of the current-year EPS estimate over
 the last 30 days."""
-trigger_timing = """A revision is read from our own snapshots: the newest snapshot a session sees against the one 30 days earlier
+trigger_timing = """Only names on the own_snapshots basis (analyst_revisions@v3 revisions_basis) are in the universe: a revision is read from our own snapshots, never from Yahoo's epsTrend, which is a restatement as of the fetch day and so not point in time at an earlier session. The newest snapshot a session sees against the one 30 days earlier
 for the same fiscal year, each snapshot counting from the session that stored it (the reader hides one taken after the
 next open), never from the vendor's date; the revision is read at D (a month end) and the entry session is S = D + 1
 (start_offset_sessions = 1)."""
 replication = """Chan, Jegadeesh and Lakonishok's REV6: the sum of six months of consensus changes over price, deciles, held 6 to 12
-months. Here: the 30-day percent change of the current fiscal year's EPS estimate (analyst_revisions@v2), the 10 largest
+months. Here: the 30-day percent change of the current fiscal year's EPS estimate (analyst_revisions@v3), the 10 largest
 upward among the covered liquid stocks, held 20 and 60 sessions. The paper's decile spread is from memory, so nothing is filed
 under [published]."""
 expected_size = """About 7 to 8 percent over 12 months for the REV6 decile spread (Chan and co-authors 1996, from memory, not verified);
