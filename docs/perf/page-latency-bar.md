@@ -115,6 +115,15 @@ volumes): the wrapper refuses, exit 2, when the device ids differ.
 lock (a symlink to the holder's pid, `var/logs/perf_gate/lock`; a dead pid, an empty or garbage target or a pid with another process start time (a reused pid) is stale and taken over under a guard; released
 on every exit including TERM / INT, which also kill the bench's process group and drop the clone)
 makes a second instance (the 900 s retry) exit 3 "busy" without touching the first one's clone.
+**What counts as a writer.** A process whose command line matches `algotrade-ingest`,
+`algotrade-backtest` or `var/logs/` (the markers `make status` uses). A match that is itself an
+ingest, backtest, rollups, nightly or compaction command always blocks, with no exception. Any other
+match is a driver script (for example `var/logs/ops/eb_tail.sh`): a **parked driver** is not a
+writer, so it blocks only while it has a living child that is not `sleep` (`pgrep -P <pid>`, the
+child's command from `ps`). No child, or only `sleep` children, is parked: the gate proceeds and
+`run.log` records `ignored parked driver ... pid <pid> <command>`. It **fails closed**: a driver whose
+children cannot be listed (`pgrep` fails or is missing), a child whose command cannot be read, or a
+non-numeric pid counts as a writer. The gate itself and `fast_bench` never match.
 A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
 discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
 continue. After the copy **every** outcome is a finished day (one notification, never a re-copy
