@@ -631,3 +631,68 @@ def test_the_gate_itself_and_the_bench_are_never_a_driver_match(rig: Rig) -> Non
     own += "  6 python scripts/perf/fast_bench.py var/logs/y\n"
     rig.ps.write_text(QUIET_PS + own)
     assert rig.run(**_stubs(rig, {}, {})).returncode == 1
+
+
+def test_the_default_low_priority_is_nice_not_taskpolicy_b(rig: Rig) -> None:
+    """taskpolicy -b throttled the disk I/O and made the CoW copy 4x slower (2026-10-23)."""
+    d = rig.tmp / "prio"
+    d.mkdir()
+    log = rig.tmp / "prio.log"
+    (d / "taskpolicy").write_text(f'#!/bin/sh\necho taskpolicy $* >> {log}\nexec "$@"\n')
+    (d / "nice").write_text(f'#!/bin/sh\necho nice $* >> {log}\nshift 2\nexec "$@"\n')
+    for n in ("taskpolicy", "nice"):
+        (d / n).chmod(0o755)
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    rig.run(PATH=f"{d}:{os.environ['PATH']}")
+    seen = log.read_text()
+    assert "nice -n 10" in seen and "taskpolicy" not in seen
+    assert "-b" not in seen
+    text = SCRIPT.read_text()
+    assert 'taskpolicy -b"' not in text and 'PERF_LOWPRI="taskpolicy' not in text
+
+
+def test_a_killed_copy_leaves_snapshot_json_with_how_far_it_got(rig: Rig) -> None:
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    slow = _script(rig, "slowcp2.sh", 'mkdir -p "$2"; echo x > "$2/part"; sleep 30\n')
+    res = rig.run(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S="2")
+    assert res.returncode == 4
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert snap["copy_stopped"] == "over-time" and snap["entry"] == "tables"
+    assert snap["files_so_far"] == "1" and snap["copy_s"] >= 2 and snap["limit_s"] == 2
+
+
+def test_a_writer_that_appears_mid_copy_stops_the_copy_and_is_busy(rig: Rig) -> None:
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    slow = _script(rig, "slowcp3.sh", "sleep 60\n")
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)],
+        env=rig.env(PERF_COPY_CMD=slow, PERF_POLL_S="1"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    time.sleep(2)
+    rig.ps.write_text(QUIET_PS + "  9 .venv/bin/algotrade-ingest rollups --from 2013-01-01\n")
+    _, err = proc.communicate(timeout=40)
+    assert proc.returncode == 3 and "a writer started during the copy (copy stopped)" in err
+    assert "algotrade-ingest rollups" in err
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert snap["copy_stopped"] == "writer-during-copy" and snap["entry"] == "tables"
+    assert not (rig.root / "data").exists() and not rig.status.exists()
+
+
+def test_a_glob_in_a_childs_args_is_not_expanded_into_a_sleep(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + DRIVER)
+    cwd = rig.tmp / "cwd"
+    cwd.mkdir()
+    (cwd / "sleep").write_text("")  # an expanded `*` would make the child's first word `sleep`
+    env = rig.env(**_stubs(rig, {7: "8"}, {8: "* 60"}))
+    res = subprocess.run(
+        ["bash", str(SCRIPT)], env=env, cwd=cwd, capture_output=True, text=True, check=False
+    )
+    assert res.returncode == 3 and "a writer runs" in res.stderr
+
+
+def test_python_dash_m_ingestion_is_a_real_writer(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + "  9 /x/python -m algotrade_ingestion run rollups\n")
+    assert rig.run(**_stubs(rig, {9: ""}, {})).returncode == 3
