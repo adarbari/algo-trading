@@ -19,12 +19,14 @@ user's edge, a hidden copy, an exploratory run or an older run (the list reads n
   A failure of one edge is counted (the run is PARTIAL) and never stops the others.
 - Point in time: ``knowledge_ts`` is the run's clock at the write, never back-dated (a verdict
   under today's judge was not known when the run ended).
-- Takes no lock of its own (the post-session lock or the CLI's ingest lock). Owner-run once after
+- Takes no lock of its own: it runs under the CLI's ingest lock, or the post-session workflow's
+  second locked block (it saves a RUNNING record and publishes pending rows). Owner-run once after
   the table's release, then it is the post-session workflow's last step; never against a store an
   agent does not own.
 """
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -48,7 +50,8 @@ SHOWN = 20  # mismatches and failures listed in the run's stats
 @dataclass(frozen=True)
 class Options:
     """What one run was asked: the window on a run's range end, ``limit`` (rows written at most),
-    ``dry_run`` (count only) and ``verify`` (also check the current rows against the live judge)."""
+    ``dry_run`` (count only) and ``verify`` (a read-only check: judge the current
+    rows too, list those that differ, write nothing)."""
 
     start: date | None = None
     end: date | None = None
@@ -60,8 +63,11 @@ class Options:
 class _Pass:
     """One run's state: what each edge did, the rows to publish and what to report."""
 
-    def __init__(self, run: IngestRun, stores: StoreContext, now: datetime, opt: Options) -> None:
-        self.run, self.stores, self.now, self.opt = run, stores, now, opt
+    def __init__(
+        self, run: IngestRun, stores: StoreContext, clock: Callable[[], datetime], opt: Options
+    ) -> None:
+        self.run, self.stores, self.opt = run, stores, opt
+        self.clock = clock
         self.counts: Counter[str] = Counter(dict.fromkeys(COUNTS, 0))  # every count is in the stats
         self.mismatches: list[str] = []
         self.failed: list[str] = []
@@ -107,12 +113,12 @@ class _Pass:
         if current is None and opt.limit is not None and self.counts["written"] >= opt.limit:
             return self._note(edge.id, "NOT_REACHED", "not_reached")
         run_id = self.run.run_id
-        frame = framer.rejudged_frame(self.stores, edge, found, run_id=run_id, now=self.now)
+        frame = framer.rejudged_frame(self.stores, edge, found, run_id=run_id, now=self.clock())
         if frame is None:  # filtered above by the same test: a bug if it happens
             raise ConfigurationError(f"{edge.id}: the canonical run was not judged")
         if current is not None:  # --verify: the stored row against the live judge
             return self._verified(edge.id, current, frame)
-        if opt.dry_run:
+        if opt.dry_run or opt.verify:  # a check never writes
             return self._note(edge.id, "DRY_RUN", "would_write")
         self._note(edge.id, "WRITTEN", "written")
         self.new.setdefault(day, []).append(frame)
@@ -126,9 +132,9 @@ class _Pass:
 
     def publish(self) -> None:
         """Every new row, all partitions, in one commit (or none)."""
-        if not self.new or self.opt.dry_run:
+        if not self.new or self.opt.dry_run or self.opt.verify:
             return
-        with self.run.writer.publishing(self.run.run_id, self.now):
+        with self.run.writer.publishing(self.run.run_id, self.clock()):
             for day, frames in sorted(self.new.items()):
                 self.run.writer.write_result(
                     framer.RESULT, day, self.run.run_id, pd.concat(frames, ignore_index=True),
@@ -148,6 +154,8 @@ class _Pass:
             mismatch_count=len(self.mismatches),
             failures=self.failed[:SHOWN],
         )
+        if edges_seen and self.counts["failed"] == edges_seen:
+            run.failed(f"every edge failed ({edges_seen}): {self.failed[0]}")
         if self.counts["not_reached"]:
             run.partial(f"{self.counts['not_reached']} edges left by --limit: run it again")
         if self.mismatches:
@@ -169,7 +177,7 @@ def rejudge_edges(
             raise ConfigurationError(f"{edge_id!r} is not a site edge")
     now = ctx.clock()
     with IngestRun(ctx, TASK, now.date()) as run:
-        work = _Pass(run, stores, now, options or Options())
+        work = _Pass(run, stores, ctx.clock, options or Options())
         for edge in site:
             work.edge(edge)
         work.publish()

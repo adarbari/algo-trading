@@ -276,3 +276,33 @@ def test_without_a_config_store_a_workflow_skips_the_task_saying_so(evaluated: W
     bare = task_ctx(evaluated.writer, evaluated.reader)
     assert "no config store" in (skip_reason("edge-verdicts", bare) or "")
     assert skip_reason("edge-verdicts", replace(bare, configs=configs())) is None
+
+
+def test_each_row_is_stamped_when_its_edge_is_judged_not_when_the_task_started(
+    evaluated: World,
+) -> None:
+    ticks = itertools.count()
+    start = NOW.replace(hour=20)
+    clock = lambda: start + timedelta(minutes=next(ticks))  # noqa: E731
+    ctx = replace(task_ctx(evaluated.writer, evaluated.reader, clock=clock), configs=configs())
+    task.rejudge_edges(ctx)
+    stamps = sorted(rows(evaluated)["knowledge_ts"])
+    assert stamps[0] > pd.Timestamp(start) and stamps[0] < stamps[1]
+
+
+def test_every_edge_failing_fails_the_run(
+    evaluated: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_: object, **__: object) -> None:
+        raise ValueError("broken judge")
+
+    monkeypatch.setattr(framer, "rejudged_frame", broken)
+    record = run(evaluated, configs())
+    assert record.status is RunStatus.FAILED and record.stats["failed"] == 2
+    assert rows(evaluated).empty
+
+
+def test_verify_is_read_only_even_for_a_missing_row(evaluated: World) -> None:
+    record = run(evaluated, configs(), verify=True)
+    assert record.stats["written"] == 0 and record.stats["would_write"] == 2
+    assert rows(evaluated).empty

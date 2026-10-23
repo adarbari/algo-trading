@@ -837,7 +837,7 @@ TASKS: dict[str, Task] = {
                     "verify",
                     ("--verify",),
                     None,
-                    "also judge the rows that are current and list those that differ",
+                    "read-only check: judge current rows too, list differences, write nothing",
                 ),
             ),
         ),

@@ -126,7 +126,9 @@ def test_locked_steps_run_under_the_hold_and_edge_eval_after_it_is_released(
         events.append("unlock")
 
     summary = run_post_session(task_ctx(writer), D, NightlySettings(), FakeEvals(events), hold=hold)
-    assert events == ["lock", "descriptions", "verify", "unlock", EDGE_EVAL, EDGE_VERDICTS]
+    assert events == [
+        "lock", "descriptions", "verify", "unlock", EDGE_EVAL, "lock", EDGE_VERDICTS, "unlock",
+    ]  # fmt: skip
     assert summary["status"] == "SUCCEEDED" and list(summary["steps"]) == [
         s.name for s in POST_SESSION
     ]
@@ -215,6 +217,42 @@ def test_edge_verdicts_runs_after_edge_eval_and_its_failure_is_only_a_warning(
     assert [w["check"] for w in summary["warnings"]] == ["optional_step"]
     assert "edge-verdicts: RuntimeError" in summary["warnings"][0]["detail"]
     assert post_done(writer, D)  # an optional step never makes the watchdog retry
+
+
+def test_edge_verdicts_runs_under_the_ingest_lock_and_is_skipped_when_it_is_taken(
+    fake: Callable[..., list[str]],
+) -> None:
+    events = fake()
+    writer = writer_with_nightly(D)
+    entered = []
+
+    @contextmanager
+    def hold() -> Iterator[None]:
+        entered.append(1)
+        if len(entered) > 1:  # another ingest took the lock after the first block
+            raise RunLockedError("another ingest run is using this data store")
+        yield
+
+    summary = run_post_session(task_ctx(writer), D, NightlySettings(), FakeEvals(events), hold=hold)
+    step = summary["steps"][EDGE_VERDICTS]
+    assert step["status"] == "SKIPPED" and "another ingest run" in step["reason"]
+    assert EDGE_VERDICTS not in events  # nothing ran, so nothing was published unlocked
+    assert summary["status"] == "SUCCEEDED" and not summary["warnings"]
+
+
+def test_edge_verdicts_holds_the_lock_while_it_runs(fake: Callable[..., list[str]]) -> None:
+    events = fake()
+
+    @contextmanager
+    def hold() -> Iterator[None]:
+        events.append("lock")
+        yield
+        events.append("unlock")
+
+    run_post_session(
+        task_ctx(writer_with_nightly(D)), D, NightlySettings(), FakeEvals(events), hold=hold
+    )
+    assert events[-3:] == ["lock", EDGE_VERDICTS, "unlock"]
 
 
 def test_a_taken_ingest_lock_is_busy_and_nothing_ran_nor_was_recorded(
