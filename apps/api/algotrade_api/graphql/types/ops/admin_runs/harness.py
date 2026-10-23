@@ -8,7 +8,7 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
-from algotrade.services.read.ops import harness_runs
+from algotrade.services.read.ops.admin_runs import harness_runs
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.evaluation.edge import EdgeRow
 
