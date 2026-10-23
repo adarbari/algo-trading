@@ -354,12 +354,76 @@ def web_fallback(name: str, edge: str | None) -> dict | None:
     if query is None or edge is None:
         return None
     required = pdocs.required_variables(query)
-    if not required <= set(EDGE_VARS) | set(FIRST_RENDER):
+    resolved = set(VARIABLE_RESOLVERS.get(name, {}))  # filled at run time from the clone
+    if not required <= set(EDGE_VARS) | set(FIRST_RENDER) | resolved:
         return None
     declared = pdocs.declared_variables(query)
     variables = {v: edge for v in declared if v in EDGE_VARS}
     variables |= {v: x for v, x in FIRST_RENDER.items() if v in declared}
     return {"query": query, "variables": variables}
+
+
+# Variables the capture cannot hold (a harness run id that goes away, a guide key the crawler had
+# no document for) are resolved at run time from the clone: operation -> {variable: (source
+# operation, its variables, a function of the source's `data`)}.
+def _first_feature(d: dict) -> str:
+    rows = d["catalogue"]
+    return next((r["name"] for r in rows if r.get("guide")), rows[0]["name"])
+
+
+_FEATURE = ("FeatureCatalogue", {}, _first_feature)
+_SCREENER = ("GuideIndex", {}, lambda d: d["guideIndex"]["families"][0]["screeners"][0]["id"])
+VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object]]]] = {
+    "HarnessRun": {"runId": ("HarnessRuns", {"limit": 1}, lambda d: d["harnessRuns"][0]["runId"])},
+    "GuideField": {"name": _FEATURE},
+    "GuideHelpField": {"name": _FEATURE},
+    "GuideSituation": {
+        "slug": ("GuideIndex", {}, lambda d: d["guideIndex"]["situations"][0]["slug"])
+    },
+    "GuideScreener": {"id": _SCREENER},
+    "GuideScreenerEdges": {"id": _SCREENER},
+    "GuideScreenerCategory": {
+        "id": (
+            "GuideScreenerIndex",
+            {},
+            lambda d: d["guideScreenerIndex"]["categories"][0]["id"],
+        )
+    },
+}
+
+
+def resolve_variables(post: Callable[[str, dict], dict], distinct: dict[str, dict]) -> list[str]:
+    """Fill the ``VARIABLE_RESOLVERS`` variables from the clone (``post(query, variables)`` ->
+    the GraphQL ``data``). Returns the operations that could not be resolved: the gate fails on
+    them (a template with no real id is not skipped)."""
+    docs = pdocs.web_documents()
+    unresolved: list[str] = []
+    for d in distinct.values():
+        rules = VARIABLE_RESOLVERS.get(d["name"])
+        if not rules:
+            continue
+        try:
+            found = {
+                var: pick(post(docs[source], variables))
+                for var, (source, variables, pick) in rules.items()
+            }
+        except (KeyError, IndexError, TypeError):
+            unresolved.append(d["name"])
+            continue
+        d["variables"] = {**d["variables"], **found}
+    return unresolved
+
+
+def extend_known(
+    known: dict[str, dict], recorded: dict[str, dict], doc: dict, edge: str | None
+) -> None:
+    """Give every static operation a document: a recorded one, else the web's own."""
+    for view in doc["views"].values():
+        for name in view.get("ops", []):
+            if name not in known:
+                found = recorded.get(name) or web_fallback(name, edge)
+                if found is not None:
+                    known[name] = found
 
 
 def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, str]]:
@@ -375,6 +439,7 @@ def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, 
     view_ops: dict[str, list[str]] = {}
     skipped: dict[str, str] = {}
     edge = edge_id_of(doc)
+    extend_known(known, global_ops, doc, edge)
     for vid in ids:
         try:
             ops, by = vw.view_operations(doc, [vid], known)
@@ -422,6 +487,12 @@ def keep_going(done: int, reps: int, elapsed_s: float, budget_s: float) -> bool:
     return elapsed_s + elapsed_s / done <= budget_s
 
 
+def _post(api: al.Api, query: str, variables: dict) -> dict:
+    """The ``data`` of one GraphQL call on the benchmark API."""
+    r = api.client.post(f"{api.url}/graphql", json={"query": query, "variables": variables})
+    return r.json()["data"]
+
+
 def time_ops(
     distinct: dict[str, dict],
     data_url: str,
@@ -442,8 +513,10 @@ def time_ops(
     samples = {s: [] for s in distinct}
     loads = {s: [] for s in distinct}
     last: dict[str, dict] = {}
+    unresolved: list[str] = []
     api = al.Api("empty", data_url=data_url, config_dir=cfg)
     try:
+        unresolved = resolve_variables(lambda q, v: _post(api, q, v), distinct)
         t0, done = clock(), 0
         while keep_going(done, reps, clock() - t0, budget_s):
             p = done
@@ -476,6 +549,7 @@ def time_ops(
         "elapsed_s": round(clock() - t0, 1),
         "low_confidence": done < CONFIDENT_PASSES,
         "stop_reason": "reps" if done >= reps else "budget",
+        "unresolved": unresolved,
     }
     return {
         s: {
@@ -530,6 +604,7 @@ def integrity_failures(
     bar: dict,
     subset: bool,
     today: date | None = None,
+    unresolved: list[str] | None = None,
 ) -> list[str]:
     """What makes the run no pass whatever the times: a stale capture must not pass silently.
 
@@ -558,10 +633,15 @@ def integrity_failures(
             out.append(
                 f"shell operations not measured (the shell budget is unknown): {', '.join(miss)}"
             )
+    if unresolved:
+        out.append(f"no real id on the clone for: {', '.join(sorted(set(unresolved)))}")
     failed = sorted({n for v in views.values() for n in v["failed"]})
     if failed:
         out.append(f"operations that failed (a fast failure is no pass): {', '.join(failed)}")
     ok = set(bar.get("empty_ok", []))
+    if ok and date.fromisoformat(bar["empty_ok_expiry"]) < today:
+        out.append(f"empty_ok expired on {bar['empty_ok_expiry']}: renew or remove")
+        ok = set()
     empty = sorted({n for v in views.values() for n in v["empty"]} - ok)
     if empty:
         out.append(f"operations that answered null or empty (a stale capture?): {', '.join(empty)}")
@@ -705,7 +785,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.ratio_mode:
         print(f"ratio mode: times divided by {scale:.2f} (shell {shell_s} s now vs the last run)")
     print(render_table(result, bar))
-    integrity = integrity_failures(views, view_ops, skipped, by_name, bar, bool(names))
+    integrity = integrity_failures(
+        views, view_ops, skipped, by_name, bar, bool(names), None, meta.get("unresolved")
+    )
     result["failures"] += integrity
     for line in integrity:
         print(f"INTEGRITY {line}")

@@ -11,7 +11,7 @@
 #     12 GB, or 1-minute load over 4 -> exit 3 "busy, retry" (a start refused by a guard is not
 #     a finished run, so launchd's retries continue);
 #   - removes the old clone (only a path ending in /perf-clone/data that is not the real store),
-#     `cp -cR var/data` into it, and re-checks that no ingest started during the copy (if one
+#     `cp -cR var/data` into it (APFS clonefile; PERF_COPY_CMD overrides, for tests), and re-checks that no ingest started during the copy (if one
 #     did: the clone is discarded, exit 3);
 #   - runs scripts/perf/fast_bench.py --data-url file://<clone> --record with the default guards
 #     (never lowered), appends a line to var/logs/perf_gate.status, deletes the clone, and
@@ -38,7 +38,7 @@
 # history is var/logs/perf_gate/history.jsonl; the repo's benchmarks/critical_path_history.jsonl
 # is only ever changed by a PR (docs/perf/page-latency-bar.md). Env (tests): PERF_CLONE_ROOT, PERF_SRC, PERF_STATUS, PERF_NOW_DATE, PERF_NOW_HM,
 # PERF_PS_FILE, PERF_FREE_GB, PERF_LOAD, PERF_BENCH_CMD, PERF_NOTIFY, PERF_BENCH_LIMIT_S,
-# PERF_TOTAL_LIMIT_S.
+# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE.
 set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -51,6 +51,9 @@ min_disk_gb=12
 max_load=4
 markers='algotrade-ingest|var/logs/'
 
+# the bench starts an API on a spare port of ALGOTRADE_PORT_BASE + 8..19: a fixed block outside the
+# worktrees' (10000-14990) and the live API's 8000, so the nightly never collides with either
+export ALGOTRADE_PORT_BASE=${PERF_PORT_BASE:-15990}
 t_start=$(date +%s)
 bench_limit=${PERF_BENCH_LIMIT_S:-300}
 total_limit=${PERF_TOTAL_LIMIT_S:-900}
@@ -75,21 +78,29 @@ case "$real_src/" in "$real_clone"/*) say "refusing: the real store is inside th
 [ -d "$src" ] || { say "refusing: no store at $src"; exit 2; }
 
 # one instance at a time: an atomic mkdir lock with a pid file; a lock whose pid is dead is stale
-lockdir=$logs/perf_gate/lock.d
+lockdir=$logs/perf_gate/lock   # a symlink whose target is the holder's pid: created atomically
+guard=$lockdir.takeover
 mkdir -p "$logs/perf_gate"
 lock_held=0
+alive() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; kill -0 "$1" 2>/dev/null; }
+holder_of() { readlink "$1" 2>/dev/null || true; }  # empty or garbage = no live holder
 take_lock() {
-  if mkdir "$lockdir" 2>/dev/null; then echo $$ >"$lockdir/pid"; lock_held=1; return 0; fi
-  holder=$(cat "$lockdir/pid" 2>/dev/null || true)
-  if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then return 1; fi
-  # stale: its owner is gone. Takeovers are serialised by a guard directory, and the holder is
-  # read again under it, so two instances never both take over (or take a live lock).
-  mkdir "$lockdir.takeover" 2>/dev/null || return 1
-  holder=$(cat "$lockdir/pid" 2>/dev/null || true)
-  if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then rmdir "$lockdir.takeover"; return 1; fi
+  # (never `ln -s` onto a real directory: it would link inside it; a leftover directory is stale)
+  if { [ ! -d "$lockdir" ] || [ -L "$lockdir" ]; } && ln -s "$$" "$lockdir" 2>/dev/null; then
+    lock_held=1; return 0
+  fi
+  alive "$(holder_of "$lockdir")" && return 1
+  # stale (a dead pid, an empty or garbage target, or a leftover directory). Takeovers are
+  # serialised by a guard that is itself a pid symlink (a dead one is cleaned), and the holder is
+  # read again under it, so two instances never both take over, nor take a live lock.
+  if ! ln -s "$$" "$guard" 2>/dev/null; then
+    alive "$(holder_of "$guard")" && return 1
+    rm -rf "$guard"; ln -s "$$" "$guard" 2>/dev/null || return 1
+  fi
+  if alive "$(holder_of "$lockdir")"; then rm -f "$guard"; return 1; fi
   rm -rf "$lockdir"
-  if mkdir "$lockdir" 2>/dev/null; then echo $$ >"$lockdir/pid"; lock_held=1; fi
-  rmdir "$lockdir.takeover"
+  if ln -s "$$" "$lockdir" 2>/dev/null; then lock_held=1; fi
+  rm -f "$guard"
   [ "$lock_held" = 1 ]
 }
 if ! take_lock; then say "busy, retry: another perf gate run holds $lockdir"; exit 3; fi
@@ -97,7 +108,7 @@ wd_pid=
 clone_made=0
 cleanup() {
   [ -n "${sampler_pid:-}" ] && kill "$sampler_pid" 2>/dev/null
-  [ "$lock_held" = 1 ] && rm -rf "$lockdir"
+  [ "$lock_held" = 1 ] && [ "$(holder_of "$lockdir")" = "$$" ] && rm -f "$lockdir"
   return 0
 }
 abort() {  # TERM / INT: stop the bench's whole process group, drop the clone, release the lock
@@ -186,7 +197,9 @@ mkdir -p "$(dirname "$clone")"
 top_procs >"$rundir/procs-start.txt"
 free_before=$free_gb
 clone_made=1
-if ! cp -cR "$src" "$clone"; then drop_clone; busy "the copy failed"; fi
+# the real nightly copies with cp -c (APFS clonefile: shared blocks); PERF_COPY_CMD replaces it
+# where cp has no -c (the tests, Linux)
+if ! ${PERF_COPY_CMD:-cp -cR} "$src" "$clone"; then drop_clone; busy "the copy failed"; fi
 t_copied=$(date +%s)
 snapshot_s=$((t_copied - t_ready)); wait_s=$((t_ready - t_start))
 ingest_during=false

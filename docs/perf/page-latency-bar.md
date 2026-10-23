@@ -103,7 +103,7 @@ copy of 64 GB, 3-15 minutes for the run. The wrapper removes only a path ending 
 
 **Idempotent per local date, one instance at a time.** Before 03:00, or when
 `var/logs/perf_gate.status` already holds a finished run for today, it exits 0 at once. An atomic
-lock directory with a pid file (`var/logs/perf_gate/lock.d`, a dead pid is a stale lock, released
+lock (a symlink to the holder's pid, `var/logs/perf_gate/lock`; a dead, empty or garbage pid is stale and taken over under a guard; released
 on every exit including TERM / INT, which also kill the bench's process group and drop the clone)
 makes a second instance (the 900 s retry) exit 3 "busy" without touching the first one's clone.
 A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
@@ -128,10 +128,15 @@ low-confidence, `--only` or integrity-failing run is not recorded at all.
 or an operation with no document, views with no operations, an operation that failed or answered
 null / empty (a stale capture), and a shell operation that was not measured (its budget is then
 unknown). `perf_bar.toml` lists, with an expiry, the views the capture cannot cover
-(`unmeasured_views`, the 8 parametrised guide routes with no captured id; approval pending) and, if
-ever needed, the operations that are empty by design (`empty_ok`, none today: add one only after a
-run on a clone shows it empty, with reason and expiry); both need the owner's approval like an
-exception. Operations the capture never recorded are resolved from the web's own documents
+(`unmeasured_views`: none; the 8 parametrised guide routes are measured with ids picked from the
+clone at run time) and the operations that are empty by design (`empty_ok = ["MyScreens"]`: the
+benchmark viewer owns no screens; approved by the owner 2026-10-23, expires 2026-12-22); an entry
+needs the owner's approval like an exception. Variables the capture cannot hold (a harness run id,
+a guide key) are resolved from the clone at run time (`VARIABLE_RESOLVERS` in `fast_bench.py`:
+HarnessRun, GuideField, GuideHelpField, GuideSituation, GuideScreener, GuideScreenerEdges,
+GuideScreenerCategory); one that finds no real id fails the gate. Other captured values that can
+go stale and are not resolved yet: session dates (`date`, `start`, `end`), the option `expiry`,
+the instrument `AAPL`, the screener `amihud_illiquid` (a stale one answers empty and fails). Operations the capture never recorded are resolved from the web's own documents
 (generated `gql.ts`, or typed by hand in the source: `page_docs.hand_written_documents`) with the
 capture's edge id and the first-render values of the trades ledger; one that cannot be resolved
 fails the gate. Expired exceptions and an expired list are reported at run time, not in CI.
@@ -167,7 +172,10 @@ default (counting 750k files costs more than it tells; `PERF_COUNT_FILES=1` coun
 the nightly's, `docs/hosting.md`): label `com.algotrade.perf-gate`, `ProgramArguments`
 `/Users/adarbari/workspace/algo-trading/scripts/ops/perf_gate_nightly.sh`, `StartCalendarInterval`
 `Hour=3 Minute=0` plus `StartInterval` 900 (launchd also fires after wake or login), and
-`StandardOutPath` / `StandardErrorPath` under `var/logs/`. Retries every 15 minutes cost nothing
+`EnvironmentVariables` `ALGOTRADE_PORT_BASE` 15990 (the wrapper exports it itself: a block outside
+the worktrees' 10000-14990 and the live API's 8000), and `StandardOutPath` /
+`StandardErrorPath` under `var/logs/`. The wrapper copies with `cp -cR` (APFS clonefile);
+`PERF_COPY_CMD` replaces it where cp has no `-c` (the tests). Retries every 15 minutes cost nothing
 once the day is done: the script exits at the first check.
 
 ## An exception
@@ -175,8 +183,8 @@ once the day is done: the script exits at the first check.
 A view may exceed 1 s only through an `[[exception]]` in `benchmarks/perf_bar.toml` naming the
 slowest operation, with: the owner's approval (recorded in `docs/decisions/log.md`, linked in the
 reason), the **reason** (the named fix and why it is not done), the **date** granted and an
-**expiry** date after which the entry fails `test_fast_bench.py` until it is removed or renewed by
-the owner. An agent never adds, renews or widens one. There are none today.
+**expiry** date after which the entry no longer counts and the gate says so when it runs (CI
+never depends on the date) until it is removed or renewed by the owner. An agent never adds, renews or widens one. There are none today.
 
 ## How every view stays under 1 s
 

@@ -48,6 +48,7 @@ class Rig:
             "PERF_LOAD": "1.5",
             "PERF_BENCH_CMD": str(bench),
             "PERF_NOTIFY": str(notify),
+            "PERF_COPY_CMD": "cp -R",  # the real nightly uses cp -c (APFS); not on Linux CI
             **over,
         }
         return env
@@ -247,15 +248,45 @@ def test_a_second_instance_is_busy_and_leaves_the_first_ones_clone_alone(rig: Ri
     finally:
         first.communicate(timeout=60)
     assert first.returncode == 0
-    assert not (rig.tmp / "logs" / "perf_gate" / "lock.d").exists()  # released on exit
+    assert not (rig.tmp / "logs" / "perf_gate" / "lock").exists()  # released on exit
     assert not (rig.root / "data").exists()
 
 
 def test_a_stale_lock_of_a_dead_process_is_taken_over(rig: Rig) -> None:
-    lock = rig.tmp / "logs" / "perf_gate" / "lock.d"
-    lock.mkdir(parents=True)
-    (lock / "pid").write_text("999999")
-    assert rig.run().returncode == 1 and not lock.exists()
+    lock = rig.tmp / "logs" / "perf_gate" / "lock"
+    lock.parent.mkdir(parents=True)
+    lock.symlink_to("999999")
+    assert rig.run().returncode == 1 and not lock.is_symlink()
+
+
+@pytest.mark.parametrize("target", ["", "garbage", "12x"])
+def test_an_empty_or_garbage_lock_is_stale_not_a_silent_busy_forever(rig: Rig, target: str) -> None:
+    lock = rig.tmp / "logs" / "perf_gate" / "lock"
+    lock.parent.mkdir(parents=True)
+    if target:
+        lock.symlink_to(target)
+    else:
+        lock.mkdir()  # a leftover directory (no readable pid)
+    assert rig.run().returncode == 1  # ran (the fake bench is over the bar), not busy
+    assert not lock.exists() and not lock.is_symlink()
+
+
+def test_a_leftover_takeover_marker_of_a_dead_process_is_cleaned(rig: Rig) -> None:
+    base = rig.tmp / "logs" / "perf_gate"
+    base.mkdir(parents=True)
+    (base / "lock").symlink_to("999999")
+    (base / "lock.takeover").symlink_to("999998")
+    assert rig.run().returncode == 1
+    assert not (base / "lock.takeover").is_symlink()
+
+
+def test_a_live_holder_keeps_the_lock_and_the_second_run_is_busy(rig: Rig) -> None:
+    base = rig.tmp / "logs" / "perf_gate"
+    base.mkdir(parents=True)
+    (base / "lock").symlink_to(str(os.getpid()))  # this test process is alive
+    res = rig.run()
+    assert res.returncode == 3 and "holds" in res.stderr
+    assert (base / "lock").is_symlink()
 
 
 def test_term_kills_the_bench_group_drops_the_clone_and_releases_the_lock(rig: Rig) -> None:
@@ -272,7 +303,7 @@ def test_term_kills_the_bench_group_drops_the_clone_and_releases_the_lock(rig: R
     proc.communicate(timeout=30)
     assert proc.returncode == 143
     assert not (rig.root / "data").exists()
-    assert not (rig.tmp / "logs" / "perf_gate" / "lock.d").exists()
+    assert not (rig.tmp / "logs" / "perf_gate" / "lock").exists()
     with pytest.raises(ProcessLookupError):
         os.kill(int(pidfile.read_text()), 0)
 
@@ -322,9 +353,9 @@ def test_an_integrity_failure_has_its_own_outcome_and_notice_listing_the_failure
 
 
 def test_two_instances_racing_for_a_stale_lock_never_both_run(rig: Rig) -> None:
-    lock = rig.tmp / "logs" / "perf_gate" / "lock.d"
-    lock.mkdir(parents=True)
-    (lock / "pid").write_text("999999")
+    lock = rig.tmp / "logs" / "perf_gate" / "lock"
+    lock.parent.mkdir(parents=True)
+    lock.symlink_to("999999")
     rig.bench_body = (
         "sleep 3\necho '0 views over 1.0 s on the critical path (0.0 s above the bar)'\nexit 0\n"
     )
@@ -337,3 +368,15 @@ def test_two_instances_racing_for_a_stale_lock_never_both_run(rig: Rig) -> None:
     ]
     codes = sorted(p.communicate(timeout=60) and p.returncode for p in procs)
     assert codes == [0, 3, 3]
+
+
+def test_the_bench_gets_a_fixed_port_block_outside_the_worktrees_and_the_live_api(rig: Rig) -> None:
+    rig.bench_body = f'echo "$ALGOTRADE_PORT_BASE" > {rig.tmp}/port\nexit 0\n'
+    rig.run()
+    base = int((rig.tmp / "port").read_text())
+    assert (
+        base == 15990 and base > 14990 + 19 and not 8000 <= base <= 8100
+    )  # worktrees: 10000-14990
+    rig.status.unlink()
+    rig.run(PERF_PORT_BASE="16500")
+    assert (rig.tmp / "port").read_text().strip() == "16500"

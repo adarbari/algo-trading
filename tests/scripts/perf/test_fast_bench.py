@@ -56,7 +56,6 @@ def test_bar_file_is_valid_and_every_exception_has_reason_and_date() -> None:
         assert e["operation"] and e["reason"].strip() and e["approval"].strip()
         assert date.fromisoformat(e["date"]) <= date.fromisoformat(e["expiry"])
         assert date.fromisoformat(e["date"]) <= today  # never dated in the future
-    date.fromisoformat(bar["unmeasured_expiry"])
 
 
 def test_an_expired_exception_no_longer_excuses_a_view() -> None:
@@ -351,7 +350,7 @@ def test_empty_views_missing_shell_failed_and_empty_answers_all_fail() -> None:
     failed = {"/a": {"failed": ["Boom"], "empty": []}}
     assert "failed" in _failures(views=failed)[0] and "Boom" in _failures(views=failed)[0]
     empty = {"/a": {"failed": [], "empty": ["Hollow", "MyScreens"]}}
-    bar = {**CLEAN, "empty_ok": ["MyScreens"]}
+    bar = {**CLEAN, "empty_ok": ["MyScreens"], "empty_ok_expiry": "2999-01-01"}
     out = _failures(views=empty, bar=bar)
     assert len(out) == 1 and "Hollow" in out[0] and "MyScreens" not in out[0]
 
@@ -399,15 +398,88 @@ def test_an_expired_exception_or_unmeasured_list_is_reported_loudly_at_run_time(
     assert "exception for Old expired on 2020-01-01" in _failures(bar=bar)[0]
 
 
-def test_the_committed_capture_resolves_every_operation_except_the_listed_views() -> None:
+def test_the_committed_capture_resolves_every_operation_and_skips_nothing() -> None:
     """Fitness: the gate must not fail its integrity check on day one, nor skip an operation
-    silently: whatever op_set cannot resolve is on the bar's unmeasured_views list."""
+    silently: op_set resolves everything, the parametrised guide routes included."""
     distinct, view_ops, skipped = fb.op_set(fb.vw.load_views(fb.CAPTURED_FILE))
-    listed = set(fb.load_bar()["unmeasured_views"])
-    assert set(skipped) <= listed, sorted(set(skipped) - listed)
-    assert all(view_ops.values()) and {"EdgeCompare", "EdgePaper", "GuideEdge"} <= {
-        d["name"] for d in distinct.values()
-    }
+    assert skipped == {} and all(view_ops.values())
+    names = {d["name"] for d in distinct.values()}
+    assert {"EdgeCompare", "EdgePaper", "GuideEdge", "GuideField", "GuideSituation"} <= names
+    assert {"GuideScreener", "GuideScreenerCategory", "FeatureCatalogueDetail"} <= names
+    assert "/guide/fields/:name" in view_ops and "/guide/situations/:slug" in view_ops
+
+
+def _fake_post(data: dict[str, dict]):
+    def post(query: str, variables: dict) -> dict:
+        for name, payload in data.items():
+            if f"query {name}" in query:
+                return payload
+        raise KeyError(query)
+
+    return post
+
+
+GUIDE_FIXTURE = {
+    "FeatureCatalogue": {
+        "catalogue": [{"name": "a", "guide": None}, {"name": "b", "guide": {"theme": "t"}}]
+    },
+    "GuideIndex": {
+        "guideIndex": {
+            "situations": [{"slug": "sit-1"}],
+            "families": [{"screeners": [{"id": "scr-1"}]}],
+        }
+    },
+    "GuideScreenerIndex": {"guideScreenerIndex": {"categories": [{"id": "cat-1"}]}},
+    "HarnessRuns": {"harnessRuns": [{"runId": "run-9"}]},
+}
+
+
+def _op_dicts(*names: str) -> dict[str, dict]:
+    return {f"{n}#1": {"name": n, "query": "q", "variables": {"old": 1}} for n in names}
+
+
+def test_resolvers_pick_a_real_id_for_every_template_from_the_clone() -> None:
+    ops = _op_dicts(
+        "GuideField",
+        "GuideHelpField",
+        "GuideSituation",
+        "GuideScreener",
+        "GuideScreenerEdges",
+        "GuideScreenerCategory",
+        "HarnessRun",
+    )
+    assert fb.resolve_variables(_fake_post(GUIDE_FIXTURE), ops) == []
+    got = {d["name"]: d["variables"] for d in ops.values()}
+    assert got["GuideField"]["name"] == "b" and got["GuideHelpField"]["name"] == "b"  # has a guide
+    assert got["GuideSituation"]["slug"] == "sit-1" and got["GuideScreener"]["id"] == "scr-1"
+    assert got["GuideScreenerEdges"]["id"] == "scr-1"
+    assert got["GuideScreenerCategory"]["id"] == "cat-1"
+    assert got["HarnessRun"] == {"old": 1, "runId": "run-9"}  # a stale captured id is replaced
+
+
+def test_a_template_with_no_resolvable_id_fails_the_gate_not_skipped() -> None:
+    empty = {**GUIDE_FIXTURE, "GuideIndex": {"guideIndex": {"situations": [], "families": []}}}
+    ops = _op_dicts("GuideSituation", "GuideField")
+    assert fb.resolve_variables(_fake_post(empty), ops) == ["GuideSituation"]
+    out = _failures(unresolved=["GuideSituation"])
+    assert "no real id" in out[0] and "GuideSituation" in out[0]
+
+
+def test_first_render_defaults_equal_what_the_webs_edge_trades_sends() -> None:
+    src = (ROOT / "apps/web/src/widgets/edge-trades/ui/EdgeTrades.tsx").read_text()
+    period = re.search(r"useState<TradePeriod>\('(\w+)'\)", src)
+    page = re.search(r"const \[page, setPage\] = useState\((\d+)\)", src)
+    column = re.search(r"columnId: '(\w+)',\s*direction: '(\w+)'", src)
+    assert period and page and column
+    columns = (ROOT / "apps/web/src/widgets/edge-trades/model/columns.tsx").read_text()
+    sort = re.search(rf"\b{column.group(1)}: '(\w+)'", columns)
+    assert sort
+    assert {
+        "period": period.group(1),
+        "page": int(page.group(1)),
+        "sort": sort.group(1),
+        "descending": column.group(2) == "desc",
+    } == fb.FIRST_RENDER
 
 
 def test_hand_written_web_documents_are_found_with_their_constants_filled() -> None:

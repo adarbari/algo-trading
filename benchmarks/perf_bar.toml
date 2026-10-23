@@ -26,22 +26,13 @@ shell_operations = ["Viewer", "SessionDate", "Regime", "StatusStrip", "EdgeDesk"
 # date = "2026-10-22"
 # expiry = "2026-11-22"
 
-# Views the committed capture has no document for (the crawler needs a real id), so they are
-# listed as not measured: any OTHER view or operation that is not measured fails the gate. The
-# list expires; refresh the capture, or the owner renews it (docs/perf/page-latency-bar.md).
-# Reason: the 8 parametrised guide routes have no captured id. Approval: owner, pending.
-unmeasured_expiry = "2026-11-22"
-unmeasured_views = [
-    "/guide/fields/:name",
-    "/guide/glossary/:id",
-    "/guide/regime/episodes/:key",
-    "/guide/regime/indicators/:key",
-    "/guide/screeners/:id",
-    "/guide/screeners/c/:category",
-    "/guide/situations/:slug",
-    "/guide/start/:id",
-]
+# Views the capture cannot cover: NONE. The parametrised guide routes are measured with ids picked
+# from the clone at run time (VARIABLE_RESOLVERS in scripts/perf/fast_bench.py); any view or
+# operation that cannot be measured fails the gate.
+# (`unmeasured_views = [...]` with `unmeasured_expiry` is still honoured, owner approval needed.)
 
-# Operations whose answer may be empty by design: NONE. An operation answering null or empty fails
-# the gate (a stale capture). `empty_ok = ["Op"]` may be added only after one run on a clone shows
-# it empty, with a reason and an expiry per entry (follow-up: MyScreens may need it).
+# Operations whose answer may be empty by design: every other operation that answers null or
+# empty fails the gate (a stale capture). MyScreens: the benchmark viewer owns no screens, so []
+# is the right answer. Approved by the owner 2026-10-23.
+empty_ok_expiry = "2026-12-22"
+empty_ok = ["MyScreens"]
