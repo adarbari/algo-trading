@@ -22,10 +22,12 @@ On a **clone** of the store only (`--data-url` is required and the real store is
 
 One API process (warmer off, `release_reads=false`), a patched endpoint empties every cache before
 each timing, each distinct operation is timed 5 times and averaged (3 when over 10 s), the 1-minute
-load is gated at 4. A run takes at most 5 minutes (below). The views and their documents come from
-`benchmarks/api_latency_views.json`; its `captured` entries are filled by
-`make api-latency-views-capture` on the clone (re-crawl when `make api-latency-docs` says the
-documents drifted); a view with no captured document is listed as not measured.
+load is gated at 4. A run takes at most 5 minutes (below). The views and their documents come from the committed capture
+`benchmarks/api_latency_views.captured.json`: a generated data file (the crawler's output with the
+browser's real documents and variables, ids substituted), never hand-edited, like
+`benchmarks/baseline.json`. Without it the tool falls back to the static list
+`benchmarks/api_latency_views.json` and warns loudly: that list has no variables, so it is not
+the real load. A view with no captured document is listed as not measured.
 `--ratio-mode` divides every time by the shell's slowdown against the last recorded run (the shell
 is untouched by the work judged), never below 1: use it when `uptime` shows the machine busy.
 
@@ -37,6 +39,21 @@ keeps it, flagged). Exit codes: 0 every view and the shell within the bar or a n
 1 something over, or an operation that failed (a fast failure is no pass); 2 refused (no clone).
 Do not point it at `var/`, the real store, launchd or the live API, and never export
 `ALGOTRADE_DATA_URL`.
+
+## Refresh the capture
+
+Refresh it when the gate reports an operation that returns an error or null, when
+`make api-latency-docs` says the documents drifted, when the catalogue renames fields, or when a
+page's reads change (the committed-capture tests name the first two). On the clone, about 22 minutes:
+
+    make api-latency-views-capture ARGS="--data-url file://<clone>/data --max-views 200 \
+        --views-file benchmarks/api_latency_views.captured.json"
+
+(copy `benchmarks/api_latency_views.json` there first when the file is missing; stop the crawl
+once `captured` is set on every static view), then run the gate. The gate **fails loudly** on an
+operation that errors (HTTP error or a GraphQL error: "operations that failed (a fast failure is
+no pass)", exit 1), so a stale capture cannot pass silently; two tests fail CI when the capture
+names an operation the web no longer has or a feature the catalogue no longer has.
 
 ## The time budget
 

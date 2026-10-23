@@ -3,6 +3,7 @@ judges critical paths, exceptions and the shell, and the tool refuses the real s
 
 import importlib.util
 import json
+import re
 import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -11,6 +12,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "perf"))
+import web_page_ops as wpo  # noqa: E402 (needs scripts/perf on the path)
+
 _spec = importlib.util.spec_from_file_location(
     "perf_fast_bench", ROOT / "scripts" / "perf" / "fast_bench.py"
 )
@@ -245,3 +248,48 @@ def test_keep_going_never_exceeds_reps_and_predicts_with_the_mean() -> None:
     assert not fb.keep_going(5, 5, 1.0, 270)
     assert fb.keep_going(1, 5, 999.0, 270)  # the minimum
     assert fb.keep_going(3, 5, 150.0, 270) and not fb.keep_going(3, 5, 210.0, 270)
+
+
+CAPTURE = ROOT / "benchmarks" / "api_latency_views.captured.json"
+NOT_CATALOGUE = {"regime@v3", "regime_indicators@v1"}  # table / group names, not features
+
+
+def _captured_requests() -> list[dict]:
+    views = json.loads(CAPTURE.read_text())["views"]
+    return [r for v in views.values() for r in (v.get("captured") or {}).get("requests", [])]
+
+
+def test_the_committed_capture_parses_and_every_operation_in_it_still_exists() -> None:
+    """Fitness: a renamed or removed web operation fails here, not in the nightly gate.
+
+    Fix: refresh the capture (docs/perf/page-latency-bar.md, "Refresh the capture")."""
+    requests = _captured_requests()
+    assert requests and all(r["query"] and isinstance(r["variables"], dict) for r in requests)
+    pages = json.loads((ROOT / "benchmarks" / "api_latency_pages.json").read_text())["pages"]
+    known = {c["op"] for calls in pages.values() for c in calls if c["kind"] == "graphql"}
+    known |= wpo.all_query_ops(ROOT / "apps" / "web" / "src")
+    assert {r["op"] for r in requests} <= known, sorted({r["op"] for r in requests} - known)
+
+
+def test_the_committed_capture_names_only_features_the_catalogue_has() -> None:
+    """Fitness: a feature renamed or removed (analyst_*@v1 -> @v2) fails here, not as a 200 with
+    an error in the gate."""
+    catalogue = set(
+        re.findall(r"^## `([^`]+@v\d+)`", (ROOT / "docs/data/features.md").read_text(), re.M)
+    )
+    named = {
+        t
+        for r in _captured_requests()
+        for t in re.findall(r"[a-z][a-z0-9_]*@v\d+", json.dumps(r["variables"]))
+    }
+    assert any(n.startswith("analyst_") for n in named)
+    assert not named - catalogue - NOT_CATALOGUE, sorted(named - catalogue - NOT_CATALOGUE)
+
+
+def test_the_gate_measures_the_capture_by_default_and_warns_on_the_static_list(
+    tmp_path: Path,
+) -> None:
+    assert fb.resolve_views_file(None) == (fb.CAPTURED_FILE, "")
+    assert fb.resolve_views_file("x.json") == (Path("x.json"), "")
+    path, warning = fb.resolve_views_file(None, tmp_path / "missing.json")
+    assert path == fb.vw.VIEWS_FILE and "no captured variables" in warning
