@@ -65,6 +65,7 @@ SITE_FOLDERS = {
     "events": "events",
     "studies": "studies",
     "ranking": "ranking",
+    "filters": "filters",
     "guide": "guide",
     "guide_screeners": "guide/screeners",
     "guide_mechanisms": "guide/mechanisms",
@@ -80,7 +81,7 @@ NESTED = (
 )  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
     "defaults", "settings", "field_guide", "regime", "events", "studies", "ranking",
-    "guide",
+    "filters", "guide",
     "guide_screeners", "guide_glossary", "guide_glossary_edges", "guide_mechanisms", "guide_ideas",
 )  # fmt: skip
 DRAFT = "draft.toml"

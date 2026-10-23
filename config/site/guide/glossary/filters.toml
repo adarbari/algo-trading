@@ -1,0 +1,185 @@
+# L3 site setting: the Guide glossary, the shared filter bar (ADR 0051, ADR 0082, docs/ui/guide.md section 3, "Glossary"). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+# The filters of a surface point here through `guide = "term:filter_<id>"` in config/site/filters/.
+
+[[term]]
+id = "filter_decision"
+term = "Decision filter"
+short = "Keeps the ideas whose best pick has the decisions you tick."
+body = """
+Each idea comes from its best pick, and that pick has a decision: Qualified, Watch, and the rest. Tick one or more and the list keeps the ideas with one of them. The number beside each decision counts the ideas that have it among the ideas that pass your other filters.
+"""
+next = "Start with Qualified to see the names that met every rule; add Watch to include the ones that missed one."
+see_also = ["selection", "watch", "unknown"]
+
+[[term]]
+id = "filter_screener"
+term = "Screener filter"
+short = "Keeps the ideas that a screener you tick picked."
+body = """
+Several screeners can pick the same idea. Tick a screener and the list keeps every idea it picked, whether or not it was the best pick. The number beside a screener counts the ideas it picked among those that pass your other filters.
+"""
+next = "Use it to see one screener's picks next to the others."
+see_also = ["screener", "picked_by", "filter_agreeing"]
+
+[[term]]
+id = "filter_agreeing"
+term = "Agreeing screeners filter"
+short = "Keeps the ideas that at least, or at most, a number of screeners picked."
+body = """
+The number is how many screeners in the Ideas pool, site presets and yours, count the idea among their first picks in this session. Two or more means independent rules arrived at the same name, which is a stronger reason to look than one pick. The bars show how many ideas sit at each count among those that pass your other filters.
+"""
+next = "Set the minimum to 2 to see only the names more than one screener agrees on."
+see_also = ["filter_screener", "picked_by", "filter_range"]
+
+[[term]]
+id = "filter_option_tier"
+term = "Option liquidity class filter"
+short = "Keeps the ideas whose options trade well enough for a short put or call."
+body = """
+The class is the worse of the short put's and the short call's tier. A is the easiest to trade and C the hardest that still passes; D means no usable options, including a name the options data did not list. An idea with no class for the session, because the options data was not pulled or failed, never passes this filter and is counted as unknown.
+"""
+next = "Tick A and B for options you can open and close without giving up much to the spread."
+see_also = ["filter_spread", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_spread"
+term = "Option spread filter"
+short = "Keeps the ideas whose option quote is within a range of bid-ask spread."
+body = """
+The spread is the gap between the ask and the bid at the short put's strike, as a share of the middle price. 5% means the gap is one twentieth of the price. A wide spread costs you that gap each time you trade. It is the stored quote of the session, not a live one, so judge a trade on a live quote. An idea with no put quote that day is unknown. It never passes.
+"""
+next = "Set the maximum to 10% to leave out options that are expensive to trade."
+see_also = ["filter_option_tier", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_dollar_volume"
+term = "Dollar volume filter"
+short = "Keeps the ideas whose shares traded within a range of dollars on the session."
+body = """
+Dollar volume is the closing price times the shares traded that day: how much money changed hands. It says how much you can trade in the shares, whatever the price. It is one day's figure, so a quiet day understates a normally busy name.
+"""
+next = "Set a minimum to leave out thinly traded names."
+see_also = ["filter_range", "liquidity_risk"]
+
+[[term]]
+id = "filter_earnings"
+term = "Earnings window filter"
+short = "Keeps the ideas that report earnings within a number of trading sessions."
+body = """
+The number counts exchange sessions after the session you are reading, so 0 is a report today and 5 is a report within the next five sessions. It uses the report dates known by that session. An idea with no known report date ahead is unknown and never passes, even when you only set an upper limit.
+"""
+next = "Use it to avoid, or to look for, names with a report coming."
+see_also = ["filter_window", "filter_unknown_rows", "event_risk"]
+
+[[term]]
+id = "filter_ex_dividend"
+term = "Ex-dividend window filter"
+short = "Keeps the ideas whose next ex-dividend date is within a number of calendar days."
+body = """
+The number counts calendar days from the session you are reading to the next ex-dividend date known by then. A date is known only once the dividend is declared. An idea with none is unknown, which is not the same as paying no dividend, and it never passes this filter.
+"""
+next = "Use it to see which short calls risk early assignment around the date."
+see_also = ["filter_window", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_group_setup"
+term = "Setup"
+short = "The filters that say how an idea was found: its decision and which screeners picked it."
+body = """
+A group button opens the filters it holds and shows how many are in use. Setup holds the decision, the screener and how many screeners agree.
+"""
+see_also = ["filter_decision", "filter_screener", "filter_agreeing"]
+
+[[term]]
+id = "filter_group_changed"
+term = "What changed"
+short = "The filters that compare the session with the one before it."
+body = """
+A group button opens the filters it holds and shows how many are in use. What changed will hold what is new since the previous run and what moved up the ranking; a list offers it once it stores that comparison.
+"""
+see_also = ["filter_group_setup"]
+
+[[term]]
+id = "filter_group_tradeable"
+term = "Tradeable"
+short = "The filters that say how well the shares and their options trade."
+body = """
+A group button opens the filters it holds and shows how many are in use. Tradeable holds the option liquidity class, the option spread and the dollar volume.
+"""
+see_also = ["filter_option_tier", "filter_spread", "filter_dollar_volume"]
+
+[[term]]
+id = "filter_group_coming_up"
+term = "Coming up"
+short = "The filters on dated events ahead: earnings and the ex-dividend date."
+body = """
+A group button opens the filters it holds and shows how many are in use. Coming up holds the earnings window and the ex-dividend window.
+"""
+see_also = ["filter_earnings", "filter_ex_dividend"]
+
+[[term]]
+id = "filter_group_more"
+term = "More filters"
+short = "Any other field of the catalogue, found by typing its name."
+body = """
+More filters opens a search over the catalogue's fields. A field you pick becomes a filter on the list, shown with the others.
+"""
+see_also = ["filter_group_setup"]
+
+[[term]]
+id = "filter_removes"
+term = "Removes"
+short = "How many rows a filter takes out of the list, given your other filters."
+body = """
+Each applied filter shows a number: the rows that would come back if you switched that filter off, with every other filter unchanged. Two filters that cut the same rows each show a small number even though together they cut many. When a search finds nothing, the filters with the largest numbers are the ones to loosen first.
+"""
+next = "Click a filter to switch it off and see the list grow by that many rows."
+see_also = ["filter_switched_off"]
+
+[[term]]
+id = "filter_switched_off"
+term = "Switched-off filter"
+short = "A filter you keep on the bar without applying it."
+body = """
+Clicking an applied filter switches it off: it stays on the bar, struck through, and takes no rows out. Click it again to apply it with the same values. Remove it with the cross when you no longer want it.
+"""
+see_also = ["filter_removes"]
+
+[[term]]
+id = "filter_unknown_rows"
+term = "Unknown rows"
+short = "Rows whose value for a filter is not known, which a filter never lets through."
+body = """
+When a value is not stored for the session, the app does not guess. The row is unknown for that filter and does not pass it, so a range from 0 up does not keep it either. The control says how many rows are unknown, so you can tell a row that failed the filter from one that was never measured.
+"""
+next = "Switch the filter off to see those rows again."
+see_also = ["unknown"]
+
+[[term]]
+id = "filter_range"
+term = "Range filter"
+short = "Keeps the rows whose value lies between a minimum and a maximum."
+body = """
+Leave one end empty for no limit. The bars show how many of the rows that pass your other filters sit in each band. The bands are fixed, so they do not move as you change the others.
+"""
+see_also = ["filter_unknown_rows"]
+
+[[term]]
+id = "filter_window"
+term = "Window filter"
+short = "Keeps the rows whose dated event is within a number of days or sessions."
+body = """
+A session is a trading day, a day is a calendar day: a window of five sessions reaches about a week ahead. The unit is fixed by the filter. A row with no date for the event is unknown and does not pass.
+"""
+see_also = ["filter_unknown_rows"]
+
+[[term]]
+id = "filter_toggle"
+term = "Yes, no or either"
+short = "A filter on a yes or no fact: yes keeps the rows where it is true, no where it is false, either applies nothing."
+body = """
+A row where the fact is not known passes neither yes nor no; only either lets it through.
+"""
+see_also = ["filter_unknown_rows"]

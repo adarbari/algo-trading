@@ -24,6 +24,7 @@ KINDS = (
     "events",
     "studies",
     "ranking",
+    "filters",
     "edges",
     "screeners",
     "preferences",
@@ -43,8 +44,9 @@ class ConfigStore(Protocol):
         site-only);
         ``studies`` the site's research-study settings (``site/studies/<name>.toml``, ADR 0053,
         site-only); ``ranking`` the site's ranking parameters (``site/ranking/ideas.toml``, the
-        Ideas rule, site-only); ``guide`` the Guide's own files (``site/guide/sections.toml``,
-        ADR 0051, site-only);
+        Ideas rule, site-only); ``filters`` the site's table, list and feed filter definitions
+        (``site/filters/<surface>.toml``, ADR 0082, site-only);
+        ``guide`` the Guide's own files (``site/guide/sections.toml``, ADR 0051, site-only);
         ``guide_screeners`` its screener prose (``site/guide/screeners/<family>/<id>.toml``);
         ``guide_glossary`` its glossary terms (``site/guide/glossary/<theme>.toml``),
         ``guide_glossary_edges`` the edge ones (``site/guide/glossary/edges/<theme>.toml``),
