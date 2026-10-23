@@ -32,11 +32,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// no-screenshot: baselines are made by `npm run visual:update` in Docker, which was not available
-export const Default: Story = { tags: ['no-screenshot'] };
+export const Default: Story = {};
 
 export const Short: Story = {
-  tags: ['no-screenshot'],
   args: {
     children: (
       <Text as="p" size="sm" tone="secondary">
@@ -46,4 +44,4 @@ export const Short: Story = {
   },
 };
 
-export const Narrow: Story = { decorators: [narrow], tags: ['no-screenshot'] };
+export const Narrow: Story = { decorators: [narrow] };
