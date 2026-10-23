@@ -159,6 +159,7 @@ def test_the_shipped_guide_is_complete() -> None:
         "allocation",
         "analyst",
         "analyst-2",
+        "cohort",
         "events",
         "events-2",
         "fundamentals",

@@ -267,6 +267,11 @@ purpose = "bridging feature groups: a series that is not a bar (a macro series, 
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/cohort"
+purpose = "feature groups that rank a stored feature of another group among the instrument's cohort (the universe's stocks, its sector, its industry): one module per kind of source, its documented FEATURES, a pure compute and its GROUP declaration, plus members.py, the cohorts and parameters they share"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/consensus"
 purpose = "feature groups from analysts' consensus: as the earnings calendar stores it (the surprise of the last reports against their forecast, the revision of the next report's forecast across the nightly snapshots) and from our own analyst snapshots (FY1 / FY2 estimates, price targets: ADR 0068): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus analyst_status.py, the population and status rules the two analyst groups share"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
@@ -333,7 +338,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/quant"
-purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, the edge statistics in edges/"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, cohort percentile ranks (cross_section.py), the edge statistics in edges/"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
