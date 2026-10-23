@@ -15,7 +15,7 @@ from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from algotrade_ingestion.workflows.post_session.post_session import POST_SESSION
 
-POST_ONLY = {"edge-eval", "descriptions", "verify"}
+POST_ONLY = {"edge-eval", "edge-verdicts", "descriptions", "verify"}
 SESSION_BOUND = {Grain.SESSION, Grain.SNAPSHOT, Grain.EVENT, Grain.ISSUER_DATED}
 # Job steps (no registry task, so no declared tables here): they write ``results/*`` (session
 # grain: the screener runs, ADR 0033) and the paper record read as of ``knowledge_ts <= cutoff``.

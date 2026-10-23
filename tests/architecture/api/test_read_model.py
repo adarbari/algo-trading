@@ -53,6 +53,10 @@ PARTITION_READERS = {
     SERVICES / "feedback/retention.py": "the owner-run retain / erase commands (ADR 0066): list "
     "the partition dates of the two feedback tables to rewrite their personal text; an admin "
     "rewrite over every date, never a page read",
+    SERVICES / "evaluation/cross_section/detail/verdict.py": "the stored verdict headline's "
+    "writer side (ADR 0053 amendment 2026-10-22): one read of results/edge_verdict on a run's "
+    "range end, so the edge-verdicts task skips a run that has its row; never a page read (the "
+    "page's reader is read/evaluation/verdict/stored.py)",
     SERVICES / "evaluation/cross_section/legs/reuse.py": "the edge harness's reuse of its stored "
     "legs (ADR 0063): lists the partition dates a session's reads log recorded to see whether "
     "they still are the same; never a page read",
