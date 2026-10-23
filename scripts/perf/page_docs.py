@@ -48,6 +48,28 @@ def web_documents() -> dict[str, str]:
     return load.parse_documents(GQL_TS.read_text())
 
 
+_TEMPLATE_DOC = re.compile(r"`\s*(query\s+(\w+)[^`]*)`")
+_CONST = re.compile(r"const\s+(\w+)\s*=\s*'([^']*)'\s*;")
+
+
+def hand_written_documents(src: Path = WEB_SRC) -> dict[str, str]:
+    """Operation name -> the document of a query typed by hand in the web source (a
+    TypedDocumentString template, `${CONST}` filled from a same-file string constant); the
+    generated `gql.ts` has none of these. A document with another interpolation is left out."""
+    found: dict[str, str] = {}
+    for f in src.rglob("*.ts"):
+        rel = f.relative_to(src).as_posix()
+        if ".test." in rel or "/generated/" in rel or ".stories." in rel:
+            continue
+        text = f.read_text()
+        consts = dict(_CONST.findall(text))
+        for body, name in _TEMPLATE_DOC.findall(text):
+            doc = re.sub(r"\$\{(\w+)\}", lambda m, c=consts: c.get(m.group(1), m.group(0)), body)
+            if "${" not in doc:
+                found.setdefault(name, doc)
+    return found
+
+
 def drift(
     pages: dict[str, list[dict]], docs: dict[str, str], hand_written: set[str] = frozenset()
 ) -> list[str]:

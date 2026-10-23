@@ -1,6 +1,7 @@
-"""``analyst_ratings@v1``: Finnhub's recommendation counts and score (5 = strong buy), the 90-day
+"""``analyst_ratings@v2``: Finnhub's recommendation counts and score (5 = strong buy), the 90-day
 change of the score from our own snapshots only, STALE after 45 days, NOT_COVERED and NOT_FETCHED
-told apart, the personal licence."""
+told apart; Yahoo's rows for a name Finnhub does not answer (the change inside one snapshot, 0m
+less -3m, STALE after 60 days), ``ratings_source``, the ``yahoo`` licence."""
 
 from datetime import date, timedelta
 
@@ -174,18 +175,137 @@ def test_a_store_without_the_table_reads_every_name_as_never_asked() -> None:
     assert set(got["ratings_status"]) == {NOT_FETCHED} and got["rating_score"].isna().all()
 
 
-def test_the_output_conforms_and_every_feature_is_personal_and_optional() -> None:
+def test_the_output_conforms_and_every_feature_is_yahoo_licensed_and_optional() -> None:
     writer = store()
     finnhub(writer, OLD, recommendation(A, TREND))
     finnhub(writer, S, recommendation(A, TREND))
     conform("t", run(writer, ids=(A, B)).reset_index(), ar.COLUMNS)
-    assert all(f.licence == "personal" for f in ar.GROUP.features) and ar.GROUP.optional
-    values = [f for f in ar.GROUP.features if f.name != "ratings_status"]
+    assert all(f.licence == "yahoo" for f in ar.GROUP.features) and ar.GROUP.optional
+    values = [f for f in ar.GROUP.features if f.name not in ("ratings_status", "ratings_source")]
     assert all(f.null_status == "ratings_status" for f in values)
     assert all(f.uncovered_statuses == UNCOVERED for f in values)
 
 
 def test_stale_days_defaults_to_a_month_and_a_half_and_must_be_positive() -> None:
-    assert ar.RatingsParams().stale_days == 45
+    assert ar.RatingsParams().stale_days == 45 and ar.RatingsParams().yahoo_stale_days == 60
     with pytest.raises(ValueError, match="stale_days"):
         ar.RatingsParams(stale_days=0)
+    with pytest.raises(ValueError, match="yahoo_stale_days"):
+        ar.RatingsParams(yahoo_stale_days=0)
+
+
+# --- Yahoo: the vendor when Finnhub does not answer (ADR 0080) ---
+
+# ARX-like: four months in one snapshot (0m .. -3m), the analyst set shrinking 10 -> 6
+YAHOO = {
+    "2027-01-01": (2, 2, 2, 0, 0),  # 0m: 6 analysts, score (10 + 8 + 6) / 6 = 4.0
+    "2026-12-01": (2, 3, 3, 0, 0),
+    "2026-11-01": (2, 3, 4, 1, 0),
+    "2026-10-01": (1, 3, 5, 1, 0),  # -3m: 10 analysts, score (5 + 12 + 15 + 2) / 10 = 3.4
+}
+
+
+def yahoo(writer, session: date, rows: list[dict], **more) -> None:
+    put(writer, session, rows, source="yahoo", **more)
+
+
+def test_a_yahoo_only_name_reads_the_newest_month_and_the_change_inside_the_snapshot() -> None:
+    writer = store()
+    yahoo(writer, S, recommendation(A, YAHOO))
+    row = run(writer).loc[A]
+    assert row["ratings_source"] == "yahoo" and row["ratings_status"] == OK
+    assert [row[f"rating_{n}"] for n in ar.POINTS] == [2, 2, 2, 0, 0]
+    assert row["rating_count"] == 6 and row["rating_month"] == date(2027, 1, 1)
+    assert row["rating_score"] == pytest.approx(4.0)
+    assert row["rating_score_change_90d"] == pytest.approx(4.0 - 3.4)  # 0m less -3m
+
+
+def test_a_finnhub_name_is_unchanged_and_says_finnhub() -> None:
+    writer = store()
+    finnhub(writer, OLD, recommendation(A, {"2026-10-01": (2, 4, 10, 2, 2)}))
+    finnhub(writer, S, recommendation(A, TREND))
+    row = run(writer).loc[A]
+    assert row["ratings_source"] == "finnhub" and row["rating_score"] == pytest.approx(3.4)
+    assert row["rating_score_change_90d"] == pytest.approx(3.4 - 3.1)
+
+
+def test_a_name_with_both_vendors_reads_finnhub_and_never_mixes_the_two() -> None:
+    writer = store()
+    finnhub(writer, S, recommendation(A, TREND))
+    yahoo(writer, S, recommendation(A, YAHOO), run_id="y")
+    row = run(writer).loc[A]
+    assert row["ratings_source"] == "finnhub" and row["rating_count"] == 20
+    assert pd.isna(row["rating_score_change_90d"])  # not Yahoo's 0m less -3m
+
+
+def test_a_stale_finnhub_row_still_wins_over_yahoo_and_serves_nothing() -> None:
+    """The choice is by answer, not by age: a name Finnhub answered stays Finnhub's (STALE)."""
+    writer = store()
+    finnhub(writer, date(2026, 12, 1), recommendation(A, TREND))
+    yahoo(writer, S, recommendation(A, YAHOO), run_id="y")
+    row = run(writer, date(2027, 1, 18)).loc[A]
+    assert row["ratings_source"] == "finnhub" and row["ratings_status"] == STALE
+
+
+def test_yahoo_serves_for_60_days_where_finnhub_serves_for_45() -> None:
+    writer = store()
+    yahoo(writer, date(2026, 11, 16), recommendation(A, YAHOO))
+    assert run(writer, date(2027, 1, 15)).loc[A, "ratings_status"] == OK  # 60 days
+    stale = run(writer, date(2027, 1, 16)).loc[A]  # 61 days
+    assert stale["ratings_status"] == STALE and stale["ratings_source"] == "yahoo"
+    assert pd.isna(stale["rating_score"]) and pd.isna(stale["rating_month"])
+    finnhub(writer, date(2026, 11, 16), recommendation(B, TREND))
+    assert run(writer, date(2027, 1, 15), ids=(B,)).loc[B, "ratings_status"] == STALE  # 60 > 45
+
+
+def test_the_yahoo_change_needs_the_minus_three_month_row_and_never_takes_minus_two() -> None:
+    writer = store()
+    months = {k: v for k, v in YAHOO.items() if k != "2026-10-01"}  # -3m missing, -2m is there
+    yahoo(writer, S, recommendation(A, months))
+    row = run(writer).loc[A]
+    assert row["rating_score"] == pytest.approx(4.0) and pd.isna(row["rating_score_change_90d"])
+
+
+def test_the_yahoo_change_is_null_when_either_count_is_zero() -> None:
+    writer = store()
+    yahoo(writer, S, recommendation(A, {**YAHOO, "2026-10-01": (0, 0, 0, 0, 0)}))
+    yahoo(writer, S, recommendation(B, {**YAHOO, "2027-01-01": (0, 0, 0, 0, 0)}), run_id="b")
+    got = run(writer, ids=(A, B))
+    assert got.loc[A, "rating_score"] == pytest.approx(4.0)
+    assert pd.isna(got.loc[A, "rating_score_change_90d"])  # -3m has no analysts
+    assert pd.isna(got.loc[B, "rating_score"]) and pd.isna(got.loc[B, "rating_score_change_90d"])
+
+
+def test_the_yahoo_change_reads_the_newest_snapshot_never_an_older_one_for_minus_three_months() -> (
+    None
+):
+    """Both snapshots list the -3m month; the change uses the newest snapshot's own -3m row."""
+    writer = store()
+    yahoo(writer, date(2027, 1, 8), recommendation(A, {**YAHOO, "2026-10-01": (0, 0, 0, 0, 9)}))
+    yahoo(writer, S, recommendation(A, YAHOO), run_id="n")
+    assert run(writer).loc[A, "rating_score_change_90d"] == pytest.approx(4.0 - 3.4)
+
+
+def test_a_yahoo_marker_alone_makes_the_name_yahoos_and_not_covered() -> None:
+    writer = store()
+    yahoo(writer, S, [marker(A, "NOT_COVERED")])
+    got = run(writer, ids=(A, B))
+    assert got.loc[A, ["ratings_source", "ratings_status"]].tolist() == ["yahoo", NOT_COVERED]
+    assert got.loc[B, ["ratings_source", "ratings_status"]].tolist() == ["finnhub", NOT_FETCHED]
+
+
+def test_a_failed_yahoo_marker_leaves_the_name_with_finnhub() -> None:
+    writer = store()
+    yahoo(writer, S, [marker(A, "FAILED")])
+    assert run(writer).loc[A, "ratings_source"] == "finnhub"
+
+
+def test_a_mixed_universe_serves_each_name_from_its_own_vendor() -> None:
+    writer = store()
+    finnhub(writer, S, recommendation(A, TREND))
+    yahoo(writer, S, recommendation(B, YAHOO), run_id="y")
+    got = run(writer, ids=(A, B, C))
+    assert got["ratings_source"].to_dict() == {A: "finnhub", B: "yahoo", C: "finnhub"}
+    assert got["rating_count"].astype("float").to_dict()[A] == 20
+    assert got.loc[B, "rating_count"] == 6 and got.loc[C, "ratings_status"] == NOT_FETCHED
+    conform("t", got.reset_index(), ar.COLUMNS)

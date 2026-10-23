@@ -252,6 +252,9 @@ SUPERSEDED: dict[str, Superseded] = {
     "analyst_estimates@v1": Superseded("analyst_estimates@v2"),
     "analyst_targets@v1": Superseded("analyst_targets@v2"),
     "analyst_revisions@v1": Superseded("analyst_revisions@v2"),
+    # v2 reads Yahoo's rows when Finnhub has none for a name and adds ratings_source (ADR 0080);
+    # every v1 column is unchanged, the licence is now `yahoo`
+    "analyst_ratings@v1": Superseded("analyst_ratings@v2"),
     "growth_history@v1": Superseded("growth_history@v2"),
     "income_statement@v1": Superseded("income_statement@v2"),
     "cash_flow@v1": Superseded("cash_flow@v2"),
