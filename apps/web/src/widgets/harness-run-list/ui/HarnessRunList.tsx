@@ -29,16 +29,16 @@ export function HarnessRunList({ selected, onSelect }: HarnessRunListProps) {
           : 'ready';
   return (
     <Panel
-      title="Harness runs"
+      title="Edge runs"
       flush
       state={state}
-      loadingLabel="Loading harness runs…"
+      loadingLabel="Loading edge runs…"
       emptyMessage="No evaluation run is recorded."
-      errorMessage="The harness runs failed to load."
+      errorMessage="The edge runs failed to load."
       onRetry={() => void runs.refetch()}
     >
       <DataTable<HarnessRun>
-        label="Harness runs"
+        label="Edge runs"
         columns={columns}
         rows={rows}
         getRowId={(r) => r.runId}

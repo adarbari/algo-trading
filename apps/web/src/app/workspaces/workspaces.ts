@@ -64,7 +64,7 @@ export const ADMIN: Workspace = {
     },
     {
       path: '/admin/harness-runs',
-      label: 'Harness runs',
+      label: 'Edge runs',
     },
     {
       path: '/admin/feature-requests',

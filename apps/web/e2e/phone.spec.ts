@@ -397,7 +397,7 @@ test('Describe it: the review fits the screen and the formula dialog fills it', 
   expect(errors).toEqual([]);
 });
 
-test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) => {
+test('Edge runs: a tapped run opens its rows as a sheet', async ({ page }) => {
   await mockAdminApi(page, {
     harnessRuns: [
       {

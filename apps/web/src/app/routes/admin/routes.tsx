@@ -1,4 +1,4 @@
-/** ADMIN workspace under `/admin`: Ingestion, LLM usage & cost, Harness runs, Feature requests, Screener runs & sharing, Users & configs. */
+/** ADMIN workspace under `/admin`: Ingestion, LLM usage & cost, Edge runs, Feature requests, Screener runs & sharing, Users & configs. */
 import { createRoute } from '@tanstack/react-router';
 
 import { WorkspaceLayout } from '../../layouts';
