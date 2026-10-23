@@ -181,9 +181,9 @@ term = "Dataset status"
 short = "How much of one kind of data (prices, option chains, fundamentals) the shown day has."
 body = """
 Each dataset is the share of names with a good value against the names it applies to: closing prices, option chains, and company share counts for fundamentals.
-Complete means at least 98%. Partial means less than that, and some. Missing means the update ran
-and got none. Not measured means the update left no record for the day, so the share is unknown,
-which is different from 0%. Example: option chains at 90% of 3,000 names is partial, and the
+Complete means every group of names is within its expected coverage. Partial means a group fell
+short. Missing means the update ran and got none. Not measured means the update left no record for the day, so the share is unknown,
+which is different from 0%. Example: option chains at 90% of 3,000 names is partial (they need 98%), and the
 other 300 names read UNKNOWN on option fields. A high share can still hide the one name you hold.
 """
 next = "Check the instrument's own fields: an UNKNOWN there says whether this name is among the gaps."

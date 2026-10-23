@@ -6,9 +6,12 @@ cells (names covered of names applicable, by tier) of the ``coverage_price_stats
 ``coverage_fundamentals.shares_outstanding`` checks the nightly's ``rollups`` step stored (the
 newest record that holds them: a retry carries the step over without its checks); Options chains
 are the chains task's coverage of the session (``run_items.chain_coverage``, the admin read's
-function). Each is a ``DatasetStatus`` graded by ``share_status`` (the one rule the admin's
-completeness grid uses); a dataset whose record is missing is ``UNKNOWN`` with a ``NOT_RUN``
-``Unavailable``, never 0%. ``DataState`` is decided here, on the server, from the session
+function). Each is a ``DatasetStatus``: chains are graded by ``share_status`` (the admin
+completeness grid's rule), a coverage dataset by its rule's own verdict (every tier within its
+minimums and the check PASS: COMPLETE; a breach or a WARN / FAIL: PARTIAL; nothing covered:
+MISSING), since a tier's minimum is not 98% (fundamentals cover about 47%); a dataset whose
+record is missing is ``UNKNOWN`` with a ``NOT_RUN`` ``Unavailable``, never 0%. ``DataState`` is
+decided here, on the server, from the session
 (``Session.complete``, ``Session.newer``) and the datasets; ``affected_screeners`` counts the
 viewer's screeners whose run for the session is missing, PARTIAL or went without a required
 table (a gap in an optional table alone does not count). Describes exactly ``ctx.session.date``
@@ -59,7 +62,7 @@ class DatasetName(StrEnum):
 class DatasetState(StrEnum):
     """How much of a dataset the session has."""
 
-    COMPLETE = "COMPLETE"  # at least 98% of what was expected
+    COMPLETE = "COMPLETE"  # within its minimums (chains: at least 98% of what was expected)
     PARTIAL = "PARTIAL"  # less, and some
     MISSING = "MISSING"  # a record, and none of it
     UNKNOWN = "UNKNOWN"  # no record for the session: not measured, never 0%
@@ -128,23 +131,35 @@ def check_name(feature: str) -> str:
     return f"coverage_{feature}"
 
 
-def _cells_of(steps: Any, name: str) -> tuple[int, int] | None:
-    """-> (covered, applicable) summed over the cells of check ``name`` on the nightly's
-    ``rollups`` step; None: the step holds no such check (a retry carries the step over
-    without its checks)."""
+def _cells_of(steps: Any, name: str) -> tuple[DatasetState, int, int] | None:
+    """The dataset from check ``name`` on the nightly's ``rollups`` step: ``present`` of
+    ``expected`` for display, graded by the rule's own verdict (every cell ``ok`` and the check
+    PASS: COMPLETE; a breaching tier or a WARN / FAIL: PARTIAL; nothing covered: MISSING). None:
+    the step holds no such check (a retry carries the step over without its checks)."""
     step = steps.get(ROLLUPS_STEP) if isinstance(steps, Mapping) else None
     checks = step.get("checks") if isinstance(step, Mapping) else None
     covered = applicable = 0
-    found = False
+    found, whole = False, True
     for c in checks if isinstance(checks, list) else []:
         data = c.get("data") if isinstance(c, Mapping) else None
         if c.get("name") != name or not isinstance(data, Mapping):
             continue
+        whole = whole and c.get("status", "PASS") == "PASS"
         for cell in data.get("cells", []):
             covered += int(cell.get("covered", 0))
             applicable += int(cell.get("applicable", 0))
+            whole = whole and bool(cell.get("ok", True))
             found = True
-    return (covered, applicable) if found and applicable else None
+    if not found or not applicable:
+        return None
+    state = (
+        DatasetState.MISSING
+        if covered == 0
+        else DatasetState.COMPLETE
+        if whole
+        else DatasetState.PARTIAL
+    )
+    return state, covered, applicable
 
 
 def _from_coverage(ctx: ReadContext, name: DatasetName, feature: str) -> DatasetStatus:
@@ -152,9 +167,10 @@ def _from_coverage(ctx: ReadContext, name: DatasetName, feature: str) -> Dataset
     of the session whose ``rollups`` step holds it (per name, by tier)."""
     day = ctx.session.date
     for record in sorted(ctx.reader.runs(NIGHTLY, day), key=lambda r: r.started_at, reverse=True):
-        cells = _cells_of(record.stats.get("steps"), check_name(feature))
-        if cells is not None:
-            return _measured(name, cells[0], cells[1])
+        found = _cells_of(record.stats.get("steps"), check_name(feature))
+        if found is not None:
+            state, covered, applicable = found
+            return DatasetStatus(name, state, covered, applicable, covered / applicable)
     return _unknown(name, NIGHTLY, day)
 
 

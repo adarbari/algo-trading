@@ -80,8 +80,10 @@ tier; a `daily_bars` record is keyed by day, not name), Options chains (`run_ite
 the admin read's function) and Fundamentals (the cells of `coverage_fundamentals.shares_outstanding`,
 a new WARN rule in `sources.toml` measured on 2026-10-22: core 98.5%, rest 44.7%; UNKNOWN until a
 nightly has run with it). The newest nightly record whose `rollups` step holds the check answers (a
-retry carries the step over without its checks). Each graded by `share_status` (COMPLETE at 98% or more, PARTIAL, MISSING; the admin
-completeness grid's rule). A dataset with no record is UNKNOWN with a public NOT_RUN gap, never 0%.
+retry carries the step over without its checks). Option chains are graded by `share_status` (COMPLETE at 98% or more, PARTIAL, MISSING; the admin
+completeness grid's rule); Prices and Fundamentals by their coverage rule's own verdict (every tier
+within its minimums and the check PASS: COMPLETE; a breach, WARN or FAIL: PARTIAL; nothing covered:
+MISSING), because a tier's minimum is not 98% (fundamentals cover about 47%). A dataset with no record is UNKNOWN with a public NOT_RUN gap, never 0%.
 `DataState` is decided on the server: COMPLETE, PARTIAL, NEXT_PROCESSING (`Session.newer` is
 IN_PROGRESS or PUBLISHING) or NEXT_FAILED_SHOWING_PREVIOUS (FAILED_RETRYING); a newer session wins
 over the served session's own datasets. `affectedScreeners` counts the viewer's screeners with no

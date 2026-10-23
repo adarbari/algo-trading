@@ -33,22 +33,33 @@ DAY = date(2026, 10, 2)
 DONE = datetime(2026, 10, 3, 2, tzinfo=UTC)
 
 
-def _step(prices: tuple[int, int] = (1000, 1000), shares: tuple[int, int] = (999, 1000)) -> Any:
+def _step(
+    prices: tuple[int, int] = (1000, 1000),
+    shares: tuple[int, int] = (999, 1000),
+    rest_ok: bool = True,
+    shares_ok: bool = True,
+    status: str = "PASS",
+) -> Any:
     """A ``rollups`` step with the two coverage checks, as ``judge`` stores them: (covered,
-    applicable) split into a core and a rest cell."""
+    applicable) split into a core and a rest cell (``ok``: the rule's verdict on the cell)."""
 
-    def check(feature: str, covered: int, applicable: int) -> dict[str, Any]:
+    def check(feature: str, covered: int, applicable: int, ok: bool) -> dict[str, Any]:
         cells = [
-            {"tier": "core", "applicable": 100, "covered": min(covered, 100)},
-            {"tier": "rest", "applicable": applicable - 100, "covered": max(covered - 100, 0)},
+            {"tier": "core", "applicable": 100, "covered": min(covered, 100), "ok": True},
+            {
+                "tier": "rest",
+                "applicable": applicable - 100,
+                "covered": max(covered - 100, 0),
+                "ok": ok,
+            },
         ]
-        return {"name": check_name(feature), "status": "PASS", "data": {"cells": cells}}
+        return {"name": check_name(feature), "status": status, "data": {"cells": cells}}
 
     return {
         "rollups": {
             "checks": [
-                check(PRICES_FEATURE, *prices),
-                check(FUNDAMENTALS_FEATURE, *shares),
+                check(PRICES_FEATURE, *prices, rest_ok),
+                check(FUNDAMENTALS_FEATURE, *shares, shares_ok),
             ]
         }
     }
@@ -119,7 +130,7 @@ def test_a_missing_record_is_unknown_with_a_public_gap_not_zero(
 def test_the_datasets_are_graded_from_their_records(monkeypatch: pytest.MonkeyPatch) -> None:
     backend = _records(
         {"A": "OK", "B": "OK", "C": "STALE_DATA: old", "D": "OK"},
-        _step(prices=(500, 1000)),
+        _step(prices=(500, 1000), rest_ok=False),
     )
     prices, options, fundamentals = _status(backend, monkeypatch=monkeypatch).datasets
     assert (prices.name, prices.status, prices.present, prices.expected) == (
@@ -138,6 +149,24 @@ def test_the_datasets_are_graded_from_their_records(monkeypatch: pytest.MonkeyPa
         1000,
         DatasetState.COMPLETE,
     )
+
+
+def test_a_dataset_far_below_98_percent_that_passes_its_minimums_is_complete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fundamentals cover about 47% and the rule accepts it: the share is shown, the grade is
+    the rule's (a 98% cut would hold the pill at PARTIAL forever)."""
+    backend = _records({"A": "OK"}, _step(shares=(470, 1000)))
+    fundamentals = _status(backend, monkeypatch=monkeypatch).datasets[2]
+    assert (fundamentals.status, fundamentals.share) == (DatasetState.COMPLETE, 0.47)
+    assert _status(backend, monkeypatch=monkeypatch).state is DataState.COMPLETE
+
+
+def test_a_breaching_tier_or_a_warned_check_is_partial(monkeypatch: pytest.MonkeyPatch) -> None:
+    for step in (_step(rest_ok=False, shares_ok=False), _step(status="WARN")):
+        status = _status(_records({"A": "OK"}, step), monkeypatch=monkeypatch)
+        assert [d.status for d in status.datasets[::2]] == [DatasetState.PARTIAL] * 2
+        assert status.state is DataState.PARTIAL
 
 
 def test_a_retry_record_without_the_checks_does_not_hide_the_ones_before(
