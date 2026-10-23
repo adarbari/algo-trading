@@ -15,6 +15,7 @@ from pathlib import Path
 
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.edge_schemas import EDGE_VERDICT
+from algotrade_ingestion.tasks.analyst import backfill as analyst_backfill
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import (
@@ -208,6 +209,23 @@ TASKS: dict[str, Task] = {
             params=(
                 SESSION,
                 Param("limit", ("--limit",), int, "ask at most N names of FMP and of Yahoo"),
+            ),
+        ),
+        Task(
+            "analyst-backfill",
+            "Yahoo's analyst data of the whole stock population, one batch of [yahoo] "
+            "backfill_batch names a run (resumable; quiet until the last session's nightly is "
+            "complete; stops at the first 429); loop it with scripts/ops/yahoo_backfill.sh; in no "
+            "workflow (ADR 0080 amendment 2026-10-23b)",
+            analyst_backfill,
+            ("analyst/estimate_snapshots",),
+            analyst_backfill.run,
+            sources=analyst_backfill.SOURCES,
+            paced=analyst_backfill.paced,
+            settings="sources.toml [yahoo]",
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "ignored: the last closed one"),
+                Param("limit", ("--limit",), int, "ask at most N names this batch"),
             ),
         ),
         Task(

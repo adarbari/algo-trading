@@ -72,6 +72,8 @@ def task_sources(spec: Task, settings: SourcesSettings, params: Mapping[str, Any
     """An explicit run: every required source must be available, else a clear error.
     A fixture source reads the task's ``golden_dir`` parameter."""
     names = (*spec.sources, *spec.optional_sources)
+    if spec.paced is not None:
+        settings = spec.paced(settings)
     built = sources_for(names, settings, params.get("golden_dir"), spec.stepped)
     missing = [s for s in spec.sources if s not in built.sources]
     if missing:

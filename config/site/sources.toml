@@ -193,14 +193,18 @@ licence = "personal"             # Finnhub's free terms: personal use; features 
 per_night = 300                  # analyst-snapshot: names whose recommendation trend a night reads (1 call each, stalest first)
 refresh_days = 7                 # analyst-snapshot: each name's recommendation trend is re-read this often (its own cadence, not [fmp]'s)
 
-[yahoo]                          # Yahoo Finance analyst data via the yfinance package (ADR 0080): the names FMP refuses; no key
+[yahoo]                          # Yahoo Finance analyst data via the yfinance package (ADR 0080): no key; the whole stock population
 enabled = true                   # unofficial, no published limit (30 requests in a row answered 200, 2026-10-22), terms forbid scraping
 min_interval_s = 1.0             # one request a name; yfinance's hidden crumb requests bypass the limiter, so a floor of 1 s
 licence = "yahoo"                # owner only: never served to another viewer, no redistribution; features derived from it inherit it
-per_night = 60                   # analyst-snapshot: names a night (1 call each), only names FMP refuses, largest market cap first
-refresh_days = 14                # an answered name is asked again after this many days; a refused one (404) after 4 x this
-run_budget_s = 600               # its own time cap (the step runs last, so [fmp] run_budget_s cannot starve it); after it no further
+per_night = 360                  # analyst-snapshot: names a night (1 call each), largest market cap first; the one-off backfill (analyst-backfill)
+                                 # leaves ~5,000 names due over refresh_days, so a night takes 360 (amendment 2026-10-23b)
+refresh_days = 14                # a name FMP does not answer is asked again after this many days (the reader goes stale at 21); a refused one (404) after 4 x this
+standby_days = 45                # a name FMP answers is asked this rarely (the reader prefers FMP; Yahoo's row is the standby)
+run_budget_s = 900               # its own time cap (the step runs last, so [fmp] run_budget_s cannot starve it); after it no further
                                  # call is made and the names left are recorded OVER_BUDGET
+backfill_batch = 500             # analyst-backfill: names one run asks, then it ends (the ingest lock is released between batches)
+backfill_min_interval_s = 0.3    # analyst-backfill: its pacing floor (the nightly keeps min_interval_s); doubles on errors up to 3 s, halves after 50 clean calls; a 429 stops the batch at once
 cache_dir = "var/cache/yahoo"    # yfinance's cookie and timezone caches (git-ignored), never ~/Library/Caches
 raw_retention_days = 365         # Yahoo cannot re-serve a past day (it restates), so its raw answers are kept long
 

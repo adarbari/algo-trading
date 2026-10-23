@@ -112,3 +112,40 @@ TSM loses valid USD targets; PR B should gate on the listing currency instead. T
 - **Holding `yahoo` requires holding `personal`** (`UserRecord` refuses otherwise). The ranking makes
   an expression over an IBKR (`personal`) and an analyst (`yahoo`) feature `yahoo`, and the gate
   asks for that exact licence, so a `yahoo`-only holder would otherwise read IBKR values.
+
+## Amendment 2026-10-23b: the whole stock population, a backfill, a wider nightly (PR1 built)
+Yahoo answers the small and mid caps FMP's free plan refuses, and no list of "names FMP refuses"
+reaches them: after FMP's 90-day hold and its 250-call budget only a few hundred names ever
+qualified. The owner wants Yahoo's data for every operating company.
+- **Reverses decision 5 ("never a name FMP answers").** The population is the reference snapshot's
+  `COMMON_STOCK` and `ADR` rows (`tasks/analyst/population.py`, about 5,600 names; ETFs and
+  closed-end funds have no consensus, Yahoo answers 404), not only the scope list or FMP's refusals.
+  The reader is unchanged: FMP first, and `effective_snapshots` drops Yahoo's rows for a name FMP
+  chose, so a standby row is never served and no licence exposure is added (the columns already
+  carry `yahoo`, decision "licence of a mixed column").
+- **Changes decision 4's numbers.** `[yahoo] per_night = 360` and `run_budget_s = 900`: after the
+  backfill about 5,000 names fall due over `refresh_days` (14), so a night takes 360. A name FMP
+  does not answer is asked every `refresh_days` (the reader goes stale at 21 days, so the baseline
+  stays at 14 or less); one FMP answers (Yahoo's row is a standby) every `standby_days = 45`. The
+  nightly's candidates are every name Yahoo has answered plus FMP's refusals. **A 429 stops the
+  step at once** (one, not three; three failed calls in a row still stop it), in the nightly and
+  the backfill alike.
+- **`analyst-backfill`** (a registry task in no workflow, `tasks/analyst/backfill.py`): one run is
+  one batch of `[yahoo] backfill_batch = 500` names, committed, the ingest lock released, so the
+  launchd nightly (which exits 3 while the lock is held) is never starved; paced at
+  `[yahoo] backfill_min_interval_s = 0.3` (the spike answered 30 requests, 20 of them unpaced in
+  0.9 s, all 200; the registry builds the source's shared limiter with that floor for this task
+  only, a ceiling of 3 s, doubling on errors and halving after 50 clean calls; the nightly keeps
+  its 1 s floor; sequential, no concurrent workers: the staging is not built for them); largest market cap first; resumable with no state of its own (an
+  answered name is not due: `snapshot.history` now reads the run records of both task names, the
+  200 days before the session, through `find_many`, not every run file). It does nothing, quietly
+  (a COMPLETE record, saved nowhere, exit 0), until the nightly of the last closed session is
+  complete. `scripts/ops/yahoo_backfill.sh` (the owner starts it, detached; README "Long runs")
+  loops it until `due_remaining` is 0. After a 429 the loop waits 60 s, 5 minutes, 30 minutes and gives up after
+  three in a row. Estimated cost: about 5,600 calls at 0.3 s plus latency (about 35 minutes) and
+  12 batches of start-up and pause (about 6 minutes).
+- **Not changed:** `check_analyst_backlog` and `check_finnhub_backlog` measure FMP's and Finnhub's
+  coverage of the scope list, which this does not touch; the nightly acceptance check
+  (`check_analyst_snapshot`) reads the `analyst-snapshot` run only.
+- **PR2 (not built):** a scheduler that runs the backfill batches between nightlies, so the owner
+  does not start the loop by hand.
