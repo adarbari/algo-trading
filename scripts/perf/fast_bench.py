@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import functools
 import hashlib
 import json
 import os
@@ -51,6 +52,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import api_latency as al
 import page_docs as pdocs
+import view_coverage as vc
 import views as vw
 
 REPO = Path(__file__).resolve().parents[2]
@@ -347,12 +349,17 @@ def edge_id_of(doc: dict) -> str | None:
     return None
 
 
+@functools.cache
+def _web_docs() -> dict[str, str]:
+    """Every document the web defines (read once: the source scan is the slow part)."""
+    return {**pdocs.hand_written_documents(), **pdocs.web_documents()}
+
+
 def web_fallback(name: str, edge: str | None) -> dict | None:
     """An operation the capture never recorded, from the web's own document (generated gql.ts, or
     typed by hand in the source) with the capture's edge id; None when a required variable has no
     known value (the operation then stays not measured, which fails the gate)."""
-    docs = {**pdocs.hand_written_documents(), **pdocs.web_documents()}
-    query = docs.get(name)
+    query = _web_docs().get(name)
     if query is None or edge is None:
         return None
     required = pdocs.required_variables(query)
@@ -749,6 +756,19 @@ def integrity_failures(
     return out
 
 
+def report_sets(distinct: dict, view_ops: dict, skipped: dict, subset: bool) -> dict:
+    """Print what the run measures and the coverage flag (web operations it does not measure; a
+    flag only, never part of the verdict or the timed passes); returns the flag."""
+    print(
+        f"{len(view_ops)} views, {len(skipped)} not measured, {len(distinct)} distinct ops",
+        flush=True,
+    )
+    drift = {} if subset else vc.web_ops_not_measured(distinct)
+    if drift:
+        print(vc.drift_line(drift), flush=True)
+    return drift
+
+
 def git_sha() -> str:
     """The short sha of the code measured."""
     done = subprocess.run(
@@ -869,10 +889,7 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = Path(args.out) if args.out else None
     if out_dir:
         out_dir.mkdir(parents=True, exist_ok=True)
-    print(
-        f"{len(view_ops)} views, {len(skipped)} not measured, {len(distinct)} distinct ops",
-        flush=True,
-    )
+    drift = report_sets(distinct, view_ops, skipped, bool(names))
     load_before = load1()
     partial = out_dir / "samples-partial.json" if out_dir else None
     ops, meta = time_ops(
@@ -898,7 +915,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"not measured: {vid}: {why}")
     noisy, may_record = report_run(ops, meta, args, bool(names))
     if out_dir:
-        write_outputs(out_dir, ops, views, skipped, {**meta, "noisy": noisy})
+        write_outputs(
+            out_dir, ops, views, skipped, {**meta, "uncovered_ops": drift, "noisy": noisy}
+        )
     may_record = may_record and not integrity  # a run with an integrity failure is never history
     if args.record and not may_record:
         print(

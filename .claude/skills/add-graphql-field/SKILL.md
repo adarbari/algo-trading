@@ -132,6 +132,8 @@ value's Guide entry (`values_from` the Python tuple that lists them), or exempt 
 `docs/api/read-model.md`: the object row if a field was added to it. If this PR retires a REST
 GET: remove its entry from `architecture/rest_allowlist.toml`, run `make rest-allowlist-update`,
 and enable any derivation entry the plan names for the PR. Then
+A new web operation is also declared for the 1 s page gate: `make api-latency-views`, commit
+`benchmarks/api_latency_views*.json` (CI fails otherwise; `docs/perf/page-latency-bar.md`, "Cover a new page").
 `make changed`, then push: CI is the full gate.
 
 ## Worked example: "Overview should show the next earnings date"

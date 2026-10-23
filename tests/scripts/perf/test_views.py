@@ -16,6 +16,7 @@ import pytest
 
 PERF = Path(__file__).resolve().parents[3] / "scripts" / "perf"
 sys.path.insert(0, str(PERF))
+import web_page_ops as wpo  # noqa: E402  (found through PERF on sys.path)
 
 
 def _load(name: str, file: str):  # type: ignore[no-untyped-def]
@@ -708,3 +709,90 @@ def test_crawl_is_bounded_and_resumable() -> None:
     assert out["result"]["visited"] == 2 and out["result"]["remaining"] >= 1
     captured = [k for k, v in out["doc"]["views"].items() if "captured" in v]
     assert len(captured) == 2
+
+
+# ---- the gate keeps up with the web (owner decision 2026-10-23) -----------------------------
+
+WEB_SRC = PERF.parents[1] / "apps" / "web" / "src"
+
+
+@pytest.fixture(scope="module")
+def gate_op_set() -> tuple[dict, dict]:
+    """What the nightly gate would time from the committed capture (static: no store, no server)."""
+    fb = _load("fast_bench", "fast_bench.py")
+    distinct, view_ops, skipped = fb.op_set(vw.load_views(fb.CAPTURED_FILE))
+    assert not skipped, (
+        f"the committed capture has views or operations it cannot measure: {skipped}"
+    )
+    return distinct, view_ops
+
+
+def test_every_web_view_and_operation_is_measured_or_listed(gate_op_set: tuple[dict, dict]) -> None:
+    """Fitness: each route / tab / panel with a read and each GraphQL operation the web sends is
+    measured by the 1 s page gate, or is in architecture/perf_view_coverage.toml (shrink-only).
+
+    Fix: `make api-latency-views`, commit the benchmarks files; the message says what else."""
+    distinct, view_ops = gate_op_set
+    found = cov.gaps(vw.enumerate_views(WEB_SRC), wpo.all_query_ops(WEB_SRC), distinct, view_ops)
+    assert not (msgs := cov.problems(found, cov.load_gaps())), "\n".join(msgs)
+
+
+GAPS = {"view": {"/old": "not yet captured"}, "operation": {"Old": "not yet captured"}}
+
+
+def test_a_new_view_or_operation_fails_with_the_one_line_fix() -> None:
+    found = {"views": ["/new?edge={edge}"], "stale": ["/gone"], "operations": ["NewOp", "Old"]}
+    msgs = cov.problems(found, GAPS)
+    text = "\n".join(msgs)
+    assert "view `/new?edge={edge}` is not measured by the 1 s page gate" in text
+    assert "operation `NewOp` is not measured" in text
+    assert "make api-latency-views" in text and "VARIABLE_RESOLVERS" in text
+    assert "view `/gone` that the web no longer has" in text
+    assert "`Old`" not in text  # listed, still a gap: fine
+    assert "view `/old`" in text and "delete the entry" in text  # listed, no longer a gap
+
+
+def test_an_exception_entry_needs_a_reason_and_covered_ones_must_go() -> None:
+    found = {"views": ["/old"], "stale": [], "operations": ["Old"]}
+    assert cov.problems(found, GAPS) == []
+    assert any("no reason" in m for m in cov.problems(found, {**GAPS, "operation": {"Old": " "}}))
+
+
+def test_the_committed_exception_list_parses_and_has_a_reason_each() -> None:
+    gaps = cov.load_gaps()
+    assert all(r.strip() for kind in gaps.values() for r in kind.values())
+
+
+def test_sync_adds_measurable_new_views_keeps_captures_and_skips_listed_ones() -> None:
+    old = {
+        "views": {
+            "/a": {"source": "static", "ops": ["A"], "captured": {"requests": []}},
+            "/found": {"source": "discovered", "ops": ["Z"]},
+        }
+    }
+    web = {
+        "/a": {"source": "static", "ops": ["A", "A2"]},
+        "/new": {"source": "static", "ops": ["N"]},
+        "/listed": {"source": "static", "ops": ["L"]},
+        "/noops": {"source": "static", "ops": []},
+    }
+    out = cov.sync_captured(old, web, {"/listed"})
+    assert set(out) == {"/a", "/new", "/found"}
+    assert out["/a"]["ops"] == ["A", "A2"] and "captured" in out["/a"]
+
+
+def test_the_nightly_drift_flag_counts_uncovered_operations_and_those_not_listed(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pages").mkdir()
+    (tmp_path / "pages" / "q.ts").write_text(
+        "const a = graphql(`query Seen { a }`);\nconst b = graphql(`query Fresh { b }`);\n"
+        "const c = graphql(`query Old { c }`);\n"
+    )
+    drift = cov.web_ops_not_measured({"s": {"name": "Seen"}}, tmp_path)
+    assert drift["all"] == ["Fresh", "Old"]
+    assert drift["new"] == ["Fresh", "Old"]  # neither is in the committed exception list
+    assert cov.drift_line(drift).startswith("COVERAGE 2 operations not covered by the gate (")
+    assert (
+        cov.web_ops_not_measured({n: {"name": n} for n in ("Seen", "Fresh", "Old")}, tmp_path) == {}
+    )
