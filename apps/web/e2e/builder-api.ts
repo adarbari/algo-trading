@@ -380,7 +380,12 @@ export async function mockBuilderApi(
       const preset = String(body()['preset']);
       mock.copies.push({ id, preset });
       own.add(id);
-      const draft = { id, extends: `${preset}@2` };
+      // the server seeds a copy with its preset's description
+      const draft = {
+        id,
+        extends: `${preset}@2`,
+        description: 'Rich option premium in calm names',
+      };
       details[id] = {
         ...structuredClone(DETAILS['vrp_scanner'] ?? {}),
         screenerId: id,

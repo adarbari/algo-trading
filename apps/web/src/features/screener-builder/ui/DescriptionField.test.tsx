@@ -15,7 +15,10 @@ describe('DescriptionField', () => {
     expect(screen.queryByText('On the Screeners list')).toBeNull();
     rerender(<DescriptionField name="my-vrp" value="Cheap names" onChange={vi.fn()} />);
     expect(screen.getByText('11 / 140')).toBeInTheDocument();
-    expect(screen.getByText('Cheap names', { selector: 'p' })).toHaveAttribute('data-clamp', '2');
+    expect(screen.getByText('Cheap names', { selector: 'p' }).parentElement).toHaveAttribute(
+      'title',
+      'Cheap names',
+    ); // the list row's LineClamp
     await expectNoA11yViolations(container);
   });
 
