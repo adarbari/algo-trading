@@ -559,7 +559,7 @@ rm -f "$rundir/sample-window-bench.json"
 set_phase bench; start_prekill bench "${PERF_BENCH_PREKILL_AFTER_S:-$(( bench_limit > 9 ? bench_limit - 8 : 1 ))}"
 head_before=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
 t_bench=$(date +%s)
-hist=$logs/perf_gate/history.jsonl; hist_size=$(wc -c <"$hist" 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
+hist=$logs/perf_gate/history.jsonl; hist_size=$({ wc -c <"$hist"; } 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
 # shellcheck disable=SC2086
 watchdog "$bench_limit" $cmd >"$out" 2>&1 &
 wd_pid=$!

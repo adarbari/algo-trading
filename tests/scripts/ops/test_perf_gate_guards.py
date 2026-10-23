@@ -472,7 +472,7 @@ def _during_copy(
 def test_a_deploy_during_the_copy_does_not_stop_it_and_the_bench_waits_for_it(
     rig: Rig, line: str
 ) -> None:
-    code, err = _during_copy(rig, line, gone_after=3.5, PERF_DEPLOY_WAIT_S="20")
+    code, err = _during_copy(rig, line, gone_after=9, PERF_DEPLOY_WAIT_S="40")
     assert code == 1 and "copy stopped" not in err  # the bench ran, after the deploy was gone
     assert "waiting" in err and "ignored deploy: pid 9 " in (_evidence(rig) / "run.log").read_text()
 
