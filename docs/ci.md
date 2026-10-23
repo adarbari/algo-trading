@@ -18,7 +18,7 @@ its code on that machine.
 | CI: web (the gate: passes when the five web jobs passed or were skipped) | every run |
 | CI: real app smoke (Vite dev server + the real API, empty and golden stores) | Python or web changes |
 | Auto-merge sweeps | after every CI run and every 30 minutes |
-| Nightly evaluation, and the whole suite on Python 3.13 (a failure opens an issue) | daily |
+| Nightly evaluation, the whole suite on Python 3.13, and the web dependency audit (a failure of either of the last two opens an issue) | daily |
 | Release | version tags |
 
 A pull request runs only what its changes can break; skipped jobs count as passed for
@@ -57,7 +57,9 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 ### Local fast path
 
 `make changed` runs the mirrored Python tests, then `tests/architecture` and `tests/unit/config` in full (`-n auto`: layout caps, registries, docs and harness tests that CI otherwise catches a push late), then the web checks `scripts/changed_web.py`
-maps from the changed `apps/web` files (slice or component folder -> vitest; page or route ->
+maps from the changed `apps/web` files (first the static gates CI's web-static job fails on most,
+in seconds: Prettier and Stylelint over the changed files and `ds:check`; ESLint stays in CI, its
+type-aware rules load the whole project, 66-215 s cold on the Mac; then slice or component folder -> vitest; page or route ->
 the e2e spec named after it, else `smoke`; story or CSS module -> that component's screenshots,
 printed as a Docker command off Linux; any `.ts` / `.tsx` -> `npm run typecheck`), then the
 fast gates. Then push: CI is the full gate (owner decision 2026-10-08: the machine never
@@ -220,14 +222,22 @@ check); both gates print the reason of a raised budget once a route is within 5 
 CI measures after merging `main`, so set a route budget from CI's numbers, not the laptop's. An entry
 budget is never raised: lazy-load the code instead of raising a budget.
 
-Otherwise budgets only shrink. The `update` commands write the measured value + 1 % headroom (CI measures a few hundred
-bytes more than a laptop: gzip and build variance), rounded up (bytes to the next 100 B, requests and DOM
+Otherwise budgets only shrink. The `update` commands write the measured value + 5 % headroom
+(`HEADROOM_PERCENT`, owner decision 2026-10-23: at 1 % routes sat a few bytes from failing and most
+web PRs went red on the bundle check; 5 % also covers CI measuring a few hundred bytes more than a
+laptop), rounded up (bytes to the next 100 B, requests and DOM
 nodes to the next integer, at least +1), and never a value above the current budget: new =
 min(current, measured with headroom). The check itself passes when measured <= budget. After an improvement run
 `npm run perf:bundle -- update` and `PERF_UPDATE=1 npm run perf:e2e` to lower them (they never
 raise one); a new page needs its first budget the same way. Raising a route budget is a hand edit of the
 JSON with a `reasons` entry, as above. A heavy new dependency belongs behind a
 dynamic import (as the chart engine is), not in the entry.
+
+## Reading a red web run
+
+The `Web (...)` gate job prints a table of each failed web step and the local command that reruns
+it, in its log (`gh run view <id> --log-failed`) and the job summary: read that before any job's
+full log, rerun the one command, fix, push.
 
 ## Watching CI from an orchestrating session
 
