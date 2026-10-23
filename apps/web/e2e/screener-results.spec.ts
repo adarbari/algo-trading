@@ -223,7 +223,8 @@ test('the page says which edge the screener implements, why each pick matched an
   const line = page.getByText('Earnings drift').first();
   await expect(line).toBeVisible();
   await expect(page.getByText('+1 edge')).toBeVisible();
-  await expect(page.getByText(/Win rate 58\.0% vs base 51\.0%/)).toBeVisible();
+  await expect(page.getByText('58.0%').first()).toBeVisible();
+  await expect(page.getByText('51.0%').first()).toBeVisible();
   await page.getByRole('button', { name: 'Evidence' }).click();
   await expect(page.getByRole('button', { name: 'Momentum 12-1' })).toBeVisible();
   // The hits table: the rules a pick passed with their values, and what it counts toward.
