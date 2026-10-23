@@ -564,3 +564,11 @@ follow-up PR).
 - status: final
 - Note: approved in chat 2026-10-22 (results/edge_verdict approved by the owner 2026-10-22 in chat); build plan in four PRs, PR 1 is the shared judge call and fingerprint with no behaviour change.
 - Reasoning: stale is never an option, slow is: a fingerprint over everything the judge reads makes a stale verdict impossible by construction, and the headline reads less than the full verdict, so the table stays a flat row.
+## 2026-10-23 | CI merge policy | Up-to-date merging not required (GitHub setting left off)
+- Question: should PRs merge only when up to date with main, so cap and layout checks run on the merged result?
+- Options: strict required checks with automatic branch update; a merge queue; leave as is
+- Decision: leave as is (`required_status_checks.strict` stays false, no merge queue). When main is red, fix forward at once with a PR; before adding a module to a folder at cap-1, run `make layout` against current origin/main.
+- decided by: owner
+- status: final
+- Note: owner, chat 2026-10-23: "I see this happen very few times but will add extra CI time for every push." Incident 2026-10-22: #855 and #856 each added a module to a folder one below its cap; main was red 20:57-21:54 UTC, #857 and #858 were blocked, about three agent cycles lost, no data or live-site effect. Policy text in `docs/ci.md`.
+- Reasoning: the failure is rare and its cost small and recoverable, while strict checks re-run CI on every push of every PR.

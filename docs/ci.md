@@ -270,10 +270,7 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
 
 ## Merging on the merged result
 
-Not enforced yet: `required_status_checks.strict` is false, so a PR can merge on checks that ran
-before main moved. #855 and #856 each added a module to a folder one below its cap and main went
-red. The owner decides strict checks plus branch update, or a merge queue (a GitHub repository
-setting; the repo does not set it).
+Not enforced, by owner decision 2026-10-23 (rare; adds CI time to every push). Two PRs can each pass and break main together (2026-10-22: #855 and #856 each added a module to a folder one below its cap, main was red for about an hour); when main is red, fix forward at once with a PR, and before adding a module to a folder at cap-1 run `make layout` against current origin/main.
 
 ## Running the checks locally before pushing
 
