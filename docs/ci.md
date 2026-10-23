@@ -268,6 +268,10 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
   phase `finished` and `document.fonts.ready`; a story that still settles later must wait for
   its own ready state inside `play`, or go in the list.
 
+## Merging on the merged result
+
+Not enforced, by owner decision 2026-10-23 (rare; adds CI time to every push). Two PRs can each pass and break main together (2026-10-22: #855 and #856 each added a module to a folder one below its cap, main was red for about an hour); when main is red, fix forward at once with a PR, and before adding a module to a folder at cap-1 run `make layout` against current origin/main.
+
 ## Running the checks locally before pushing
 
 `make check` runs every CI step (tests in parallel, one worker per CPU; `make test

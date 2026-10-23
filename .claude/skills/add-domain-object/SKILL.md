@@ -88,6 +88,9 @@ partition -> `NO_PARTITION` (the loader must NOT return an older partition: put 
 partition in the store and assert it is ignored); a missing row; the snapshot / as-of disclosure
 if the grain has one. Run `.venv/bin/python -m pytest tests/unit/services/read -q -x`.
 
+A read touching stored partitions also gets a files-opened budget test and real-context memo tests
+(`add-graphql-field`, Step 3).
+
 ## Step 6: registries and docs
 
 - `architecture/*_ownership.toml`: extend the `domain-read-model` description with the object

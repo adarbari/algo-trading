@@ -154,3 +154,8 @@ checks about 8,400 days of `fund_nav` (one `stat` each once digests are held; th
 process reads each day's `_runs.json`, about 1 to 2 s cold). A per-year digest from a persisted
 per-table dates index removes it (follow-up, not part of this amendment); the copy already removes
 the per-file Parquet opens that dominate warm.
+
+## Changing the signature or format
+
+A change to the manifest signature or the copy's format ships its rebuild in the same PR (or the read self-heals), with a
+fitness test over an old-format store (`.claude/skills/add-dataset`, "Changing a derived store").
