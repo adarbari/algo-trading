@@ -373,14 +373,9 @@ export function DataTable<TRow extends RowData>({
     if (!row) return;
     setActiveId(row.id);
     onActiveRowChange?.(row.original);
-    if (fitAll) {
-      // The page scrolls, not the table: bring the row into the window once it renders.
-      requestAnimationFrame(() => {
-        document.getElementById(rowIdFor(row.id))?.scrollIntoView({ block: 'nearest' });
-      });
-    } else {
-      virtualizer.scrollToIndex(rowItem[next] ?? next, { align: 'auto' });
-    }
+    // Every row is rendered with `all`: the page scrolls to it, not the table.
+    if (fitAll) document.getElementById(rowIdFor(row.id))?.scrollIntoView({ block: 'nearest' });
+    else virtualizer.scrollToIndex(rowItem[next] ?? next, { align: 'auto' });
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
