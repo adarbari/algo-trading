@@ -40,7 +40,7 @@
 # history is var/logs/perf_gate/history.jsonl; the repo's benchmarks/critical_path_history.jsonl
 # is only ever changed by a PR (docs/perf/page-latency-bar.md). Env (tests): PERF_CLONE_ROOT, PERF_SRC, PERF_STATUS, PERF_NOW_DATE, PERF_NOW_HM,
 # PERF_PS_FILE, PERF_FREE_GB, PERF_LOAD, PERF_BENCH_CMD, PERF_NOTIFY, PERF_BENCH_LIMIT_S,
-# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE, PERF_SNAPSHOT_LIMIT_S, PERF_LOWPRI, PERF_POLL_S.
+# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_TREE, PERF_DEPLOY_WAIT_S, PERF_DEPLOY_POLL_S, PERF_PORT_BASE, PERF_SNAPSHOT_LIMIT_S, PERF_LOWPRI, PERF_POLL_S.
 set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -55,13 +55,18 @@ max_pause_aborts=3  # a day with this many copies stopped by a paused machine fi
 markers='algotrade-ingest|algotrade_ingestion|algotrade-backtest|var/logs/'
 # a real writer: an ingest or backtest command (rollups, nightly and compaction run through them). Any
 # other marker match is a driver script (var/logs/...): a writer only while it has a live child that is not `sleep`
-# An auto-deploy (`algotrade-ingest deploy-hold --deploy-only -- bash deploy.sh --slot S --apply ...`) is
-# not a writer: it takes the store's `deploy` lock alone (a file under locks/, not copied) and does a git
-# checkout in the release tree, uv sync, the web build, an API restart and verify: no table of
-# tables/ runs/ serving/ (scripts/ops/deploy.sh, apps/ingestion/.../ops/hold.py: "writes nothing to the
-# store"). Exactly this command line is exempt; deploy-hold without --deploy-only (it holds the ingest
-# lock) and every other algotrade-ingest command stay writers.
-deploy_re='^([^ ]*python[^ ]* +)?([^ ]*/)?algotrade-ingest deploy-hold --deploy-only -- bash [^ ]*deploy\.sh --slot [^ ]+ --apply( |$)'
+# An auto-deploy (`algotrade-ingest deploy-hold --deploy-only -- bash <tree>/scripts/ops/deploy.sh --slot S
+# --apply ...`, and its follow-up `deploy-hold -- bash <tree>/scripts/ops/deploy.sh --slot S --ingest-apply
+# ...`) writes no store table: it takes the store's `deploy` lock (a file under locks/, not copied) and does a
+# git checkout in the release tree, uv sync, the web build, an API restart and verify
+# (scripts/ops/deploy.sh, apps/ingestion/.../ops/hold.py: "writes nothing to the store"). So it does NOT stop
+# the COPY (hand run 5 lost its copy to one at 223 s). But it changes the CODE the bench runs (checkout, uv sync
+# in the same tree and venv): the bench never starts while one runs (a bounded wait, then busy), and a run whose
+# release tree HEAD moved during the bench is not recorded. Exactly these two command lines; every other
+# algotrade-ingest command (deploy-hold with neither flag included) stays a writer.
+deploy_apply_re='^([^ ]*python[^ ]* +)?([^ ]*/)?algotrade-ingest deploy-hold --deploy-only -- bash [^ ]*/scripts/ops/deploy\.sh --slot [^ ]+ --apply( |$)'
+deploy_ingest_re='^([^ ]*python[^ ]* +)?([^ ]*/)?algotrade-ingest deploy-hold -- bash [^ ]*/scripts/ops/deploy\.sh --slot [^ ]+ --ingest-apply( |$)'
+deploy_re="$deploy_apply_re|$deploy_ingest_re"
 real_writer='algotrade-ingest|algotrade_ingestion|algotrade-backtest|rollups|nightly|compaction'
 
 # the bench starts an API on a spare port of ALGOTRADE_PORT_BASE + 8..19: a fixed block outside the
@@ -326,11 +331,23 @@ driver_busy() {  # $1 = pid; returns 0 (busy) unless it has no child or only sle
   done
   return 1
 }
-busy_writer() {
+# a running deploy (one of the two exact command lines): "pid args", empty when none
+deploy_running() { ps_lines | sed 's/^ *[0-9]* *//' | grep -E "$deploy_re" | head -1; }
+# wait up to PERF_DEPLOY_WAIT_S (600) for a running deploy to finish, polling every PERF_DEPLOY_POLL_S (10)
+wait_deploy_done() {
+  local waited=0 limit=${PERF_DEPLOY_WAIT_S:-600} every=${PERF_DEPLOY_POLL_S:-10}
+  while [ -n "$(deploy_running)" ]; do
+    [ "$waited" -ge "$limit" ] && return 1
+    [ "$waited" = 0 ] && say "a deploy runs: waiting up to ${limit}s for it before going on"
+    sleep "$every"; waited=$((waited + every))
+  done
+  return 0
+}
+busy_writer() {  # $1 = copy: a deploy is no writer while the copy runs (it is for everything else)
   local pid args
   ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench" | {
     while read -r pid args; do
-      if printf '%s' "$args" | grep -qE "$deploy_re"; then  # an auto-deploy writes no store table (see above)
+      if [ "${1:-}" = copy ] && printf '%s' "$args" | grep -qE "$deploy_re"; then  # no store table (see above)
         [ "$rundir_made" = 1 ] && ! grep -q "ignored deploy: pid $pid " "$rundir/run.log" 2>/dev/null &&
           echo "perf_gate: ignored deploy: pid $pid $args" >>"$rundir/run.log"
         continue
@@ -345,6 +362,7 @@ busy_writer() {
   }
 }
 if d=$(trash_delete_running) && [ -n "$d" ]; then busy "trash delete running (pid $(printf '%s' "$d" | awk '{print $1}')): $d"; fi
+wait_deploy_done || busy "a deploy is still running after ${PERF_DEPLOY_WAIT_S:-600}s: $(deploy_running)"
 if w=$(busy_writer) && [ -n "$w" ]; then busy "a writer runs: $w"; fi
 
 # a leftover clone or trash of an earlier run (no delete runs, checked above): start its delete in the
@@ -436,7 +454,7 @@ while kill -0 "$wd_pid" 2>/dev/null; do
   fi
   last_t=$now
   if [ $((now - t_ready)) -ge "$snapshot_limit" ]; then cap_hit=1; kill -TERM "$wd_pid" 2>/dev/null; break; fi
-  if [ $((tick % poll)) -eq 0 ] && w=$(busy_writer) && [ -n "$w" ]; then
+  if [ $((tick % poll)) -eq 0 ] && w=$(busy_writer copy) && [ -n "$w" ]; then
     writer_mid=$w; kill -TERM "$wd_pid" 2>/dev/null; break
   fi
 done
@@ -485,6 +503,11 @@ if [ "$copy_code" -ne 0 ]; then discard_clone; busy "the copy failed"; fi
 t_copied=$(date +%s)
 snapshot_s=$((t_copied - t_ready)); wait_s=$((t_ready - t_start))
 ingest_during=false
+# the bench never starts beside a deploy (it changes the code the bench runs); the wait is not copy time
+if ! wait_deploy_done; then
+  write_progress deploy-running-after-copy; discard_clone
+  busy "a deploy is still running after ${PERF_DEPLOY_WAIT_S:-600}s (the clone is discarded): $(deploy_running)"
+fi
 if w=$(busy_writer) && [ -n "$w" ]; then ingest_during=true; fi
 files="skipped: counting every file is slower than the copy's value (PERF_COUNT_FILES=1 counts)"
 [ "${PERF_COUNT_FILES:-0}" = 1 ] && files=$(find "$clone" -type f | wc -l | tr -d ' ')
@@ -497,6 +520,7 @@ out=$(mktemp)
 py=${PERF_PY:-$repo/.venv/bin/python}
 cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
 
+head_before=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
 t_bench=$(date +%s)
 hist=$logs/perf_gate/history.jsonl; hist_size=$(wc -c <"$hist" 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
 # shellcheck disable=SC2086
@@ -527,6 +551,14 @@ if [ "${paused_bench:-0}" -gt 0 ] && [ "$outcome" != crashed ] && [ "$outcome" !
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "the machine paused or stalled during the bench ($paused_bench late samples): not recorded"
 fi
+# the release tree's HEAD moved during the bench (a deploy checked out other code): not recorded
+head_after=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
+if [ "$head_after" != "$head_before" ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ] \
+   && [ "$outcome" != integrity ] && [ "$outcome" != paused ]; then
+  outcome=code-changed
+  [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
+  say "code changed during the bench (${head_before:0:9} -> ${head_after:0:9}): not recorded"
+fi
 cat "$out" >>"$rundir/run.log"
 out_copy=$rundir/run.log
 cp "$out" "$logs/perf_gate.last.log"
@@ -553,15 +585,16 @@ echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?}
 reason=""; [ "$overtime" = yes ] && reason=over-time
 [ "$outcome" = integrity ] && reason=integrity
 [ "$outcome" = refused ] && reason=refused; [ "$outcome" = crashed ] && reason=crashed
-[ "$outcome" = paused ] && reason=paused
+[ "$outcome" = paused ] && reason=paused; [ "$outcome" = code-changed ] && reason=code-changed
 finish_evidence "$reason"
 
-if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
+if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); snapshot ${snapshot_s}s, bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
     msg="1 s page gate INTEGRITY FAILURE (not a timing result): $why evidence in var/logs/perf_gate/$today/"
   fi
+  [ "$outcome" = code-changed ] && msg="1 s page gate: the code changed during the bench (a deploy; NOT recorded, no verdict): $msg"
   [ "$outcome" = paused ] && msg="1 s page gate: the machine paused or stalled during the bench (noisy, NOT recorded, no verdict): $msg"
   [ "$outcome" = crashed ] && msg="1 s page gate CRASHED (no result): $msg"
   [ "$outcome" = refused ] && msg="1 s page gate REFUSED by the bench (no result): $msg"

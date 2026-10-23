@@ -188,9 +188,16 @@ marker (any merged PR starts one within 5 minutes). Can a deploy write the store
 the store"), then does a git checkout and `uv sync` in the release tree, the web build under
 `var/release/`, an API restart (`launchctl kickstart`) and a verify; the API's own writes (ADR 0005)
 happen with or without a deploy, and its response cache is in memory. So exactly that command line
-(`deploy-hold --deploy-only -- bash ...deploy.sh --slot S --apply ...`) is exempt, logged in `run.log`
-as `ignored deploy: pid N ...`; `deploy-hold` without `--deploy-only` (it holds the ingest lock) and
-every other `algotrade-ingest` command stay writers.
+(`deploy-hold --deploy-only -- bash <tree>/scripts/ops/deploy.sh --slot S --apply ...`, and the
+follow-up `deploy-hold -- bash <tree>/scripts/ops/deploy.sh --slot S --ingest-apply ...`, anchored) is
+exempt **in the copy loop only**, logged in `run.log` as `ignored deploy: pid N ...`. A deploy changes
+the CODE the bench runs (checkout and `uv sync` in the same tree and venv), so at the start and before
+the bench a running deploy is waited for (up to `PERF_DEPLOY_WAIT_S`, 600 s, polling every 10 s), then
+the run exits 3 busy and the clone is discarded; the sha is read after the wait, and a run whose release
+tree HEAD moved during the bench is `outcome=code-changed`: not recorded (the history line is cut back),
+the notice says so. Code is not copied to a temp dir (editable `src` and the venv make that a full-tree
+copy). Any other `deploy-hold` (without `--deploy-only` or `--ingest-apply`), and every other
+`algotrade-ingest` command, stays a writer.
 A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
 discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
 continue. After the copy **every** outcome is a finished day (one notification, never a re-copy

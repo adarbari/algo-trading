@@ -439,41 +439,98 @@ AUTO_DEPLOY = (
     "  9 /x/.venv/bin/python /x/.venv/bin/algotrade-ingest deploy-hold --deploy-only -- "
     "bash /x/scripts/ops/deploy.sh --slot blue --apply auto 3f2b3ae00 sync web restart\n"
 )
-
-
-def test_an_auto_deploy_is_not_a_writer_and_is_logged(rig: Rig) -> None:
-    rig.ps.write_text(QUIET_PS + AUTO_DEPLOY)
-    assert rig.run().returncode == 1  # the bench ran: not refused
-    assert "ignored deploy: pid 9 " in (_evidence(rig) / "run.log").read_text()
-
-
-@pytest.mark.parametrize(
-    "line",
-    [
-        # holds the ingest lock too: a writer
-        "  9 .venv/bin/algotrade-ingest deploy-hold -- bash deploy.sh --slot blue --apply auto x\n",
-        "  9 .venv/bin/algotrade-ingest rollups --from 2013-01-01\n",
-        # an ingest smuggling the words after a deploy-looking prefix
-        "  9 .venv/bin/algotrade-ingest run x deploy-hold --deploy-only -- bash d.sh --slot b\n",
-        "  9 .venv/bin/algotrade-ingest deploy-hold --deploy-only -- bash rollups.sh\n",
-    ],
+INGEST_SYNC = (
+    "  9 /x/.venv/bin/algotrade-ingest deploy-hold -- "
+    "bash /x/scripts/ops/deploy.sh --slot blue --ingest-apply auto 3f2b3ae00\n"
 )
-def test_only_the_exact_auto_deploy_command_is_exempt(rig: Rig, line: str) -> None:
-    rig.ps.write_text(QUIET_PS + line)
-    assert rig.run().returncode == 3
+FAST_WAIT = {"PERF_DEPLOY_WAIT_S": "2", "PERF_DEPLOY_POLL_S": "1"}
 
 
-def test_a_deploy_appearing_mid_copy_does_not_stop_the_copy(rig: Rig) -> None:
-    (rig.tmp / "var" / "data" / "tables").mkdir()
-    slow = _script(rig, "slowcp6.sh", "sleep 5\n")
+def _during_copy(
+    rig: Rig, line: str, seconds: str = "4", gone_after: float | None = None, **env: str
+):
+    """Copy takes ``seconds``; ``line`` shows in ps after 2 s and goes after ``gone_after``."""
+    (rig.tmp / "var" / "data" / "tables").mkdir(exist_ok=True)
+    slow = _script(rig, "slowcp7.sh", f"sleep {seconds}\n")
     proc = subprocess.Popen(
         ["bash", str(SCRIPT)],
-        env=rig.env(PERF_COPY_CMD=slow, PERF_POLL_S="1"),
+        env=rig.env(PERF_COPY_CMD=slow, PERF_POLL_S="1", **env),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     time.sleep(2)
-    rig.ps.write_text(QUIET_PS + AUTO_DEPLOY)
-    _, err = proc.communicate(timeout=40)
-    assert proc.returncode == 1 and "copy stopped" not in err
+    rig.ps.write_text(QUIET_PS + line)
+    if gone_after is not None:
+        time.sleep(gone_after)
+        rig.ps.write_text(QUIET_PS)
+    _, err = proc.communicate(timeout=60)
+    return proc.returncode, err
+
+
+@pytest.mark.parametrize("line", [AUTO_DEPLOY, INGEST_SYNC])
+def test_a_deploy_during_the_copy_does_not_stop_it_and_the_bench_waits_for_it(
+    rig: Rig, line: str
+) -> None:
+    code, err = _during_copy(rig, line, gone_after=3.5, PERF_DEPLOY_WAIT_S="20")
+    assert code == 1 and "copy stopped" not in err  # the bench ran, after the deploy was gone
+    assert "waiting" in err and "ignored deploy: pid 9 " in (_evidence(rig) / "run.log").read_text()
+
+
+@pytest.mark.parametrize("line", [AUTO_DEPLOY, INGEST_SYNC])
+def test_a_deploy_still_running_after_the_copy_is_busy_for_the_bench_and_the_clone_goes(
+    rig: Rig, line: str
+) -> None:
+    code, err = _during_copy(rig, line, **FAST_WAIT)
+    assert code == 3 and "a deploy is still running" in err
+    assert not rig.status.exists() and not (rig.root / "data").exists()
+
+
+@pytest.mark.parametrize("line", [AUTO_DEPLOY, INGEST_SYNC])
+def test_a_deploy_at_the_start_is_waited_for_then_busy(rig: Rig, line: str) -> None:
+    rig.ps.write_text(QUIET_PS + line)
+    res = rig.run(**FAST_WAIT)
+    assert res.returncode == 3 and "a deploy is still running" in res.stderr
+    assert not (rig.root / "data").exists()
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        # junk before the command (the `^` anchor)
+        "  9 /bin/sh -c rollups; algotrade-ingest deploy-hold --deploy-only -- "
+        "bash /x/scripts/ops/deploy.sh --slot b --apply\n",
+        # no --slot / --apply, a script that is not the tree's deploy.sh, no mode flag
+        "  9 algotrade-ingest deploy-hold --deploy-only -- bash /x/scripts/ops/deploy.sh\n",
+        "  9 algotrade-ingest deploy-hold --deploy-only -- bash /x/deploy.sh --slot b --apply\n",
+        "  9 algotrade-ingest deploy-hold -- bash /x/scripts/ops/deploy.sh --slot b --apply\n",
+        "  9 algotrade-ingest deploy-hold --deploy-only -- bash /x/ops/other.sh --slot b --apply\n",
+        "  9 algotrade-ingest rollups --from 2013-01-01\n",
+    ],
+)
+def test_only_the_two_exact_deploy_command_lines_are_exempt_in_the_copy(
+    rig: Rig, line: str
+) -> None:
+    code, err = _during_copy(rig, line, seconds="20")
+    assert code == 3 and "a writer started during the copy (copy stopped)" in err
+
+
+def test_the_release_trees_head_moving_during_the_bench_is_not_recorded(rig: Rig) -> None:
+    tree = rig.tmp / "tree"
+    tree.mkdir()
+    git = ["git", "-C", str(tree), "-c", "user.email=a@b", "-c", "user.name=n"]
+    for args in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "one"]):
+        subprocess.run([*git, *args], check=True, capture_output=True)
+    hist = rig.tmp / "logs" / "perf_gate" / "history.jsonl"
+    hist.parent.mkdir(parents=True, exist_ok=True)
+    hist.write_text('{"old": 1}\n')
+    rig.bench_body = (
+        f"echo '{{\"new\": 2}}' >> {hist}\n"
+        f"{' '.join(git)} commit -q --allow-empty -m two\n"
+        f"echo '{rig.bench_out}'\nexit 1\n"
+    )
+    res = rig.run(PERF_TREE=str(tree))
+    assert "code changed during the bench" in res.stderr
+    assert "outcome=code-changed" in rig.status.read_text()
+    assert hist.read_text() == '{"old": 1}\n'
+    assert "NOT recorded" in (rig.tmp / "notified").read_text()
