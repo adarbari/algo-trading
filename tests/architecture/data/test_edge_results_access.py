@@ -7,8 +7,8 @@
   schema's spec and the run reader's keep list, never by name.
 - ``results/edge_verdict`` (ADR 0053 amendment 2026-10-22) is named only by that same ``detail/``
   (the one framer: the edge-eval publish and the edge-verdicts task reach it through it, and ML
-  never does, ADR 0053 decision 8) and the schema that declares it; its one reader joins in the
-  PR that adds it."""
+  never does, ADR 0053 decision 8), its one reader ``services/read/evaluation/verdict/stored.py``
+  (a row only on a matching fingerprint, else the live judge) and the schema that declares it."""
 
 import ast
 from pathlib import Path
@@ -20,10 +20,11 @@ from tests.conftest import REPO_ROOT
 DETAIL = "src/algotrade/services/evaluation/cross_section/detail/"
 SCHEMA = "src/algotrade/storage/tables/edge_schemas.py"
 RUNS = "src/algotrade/services/read/evaluation/runs.py"
+STORED = "src/algotrade/services/read/evaluation/verdict/stored.py"
 # table -> (the name of its run reader file, the modules allowed to name it)
 TABLES = {
     "edge_trades": (RUNS, (DETAIL, RUNS, SCHEMA)),
-    "edge_verdict": (SCHEMA, (DETAIL, SCHEMA)),
+    "edge_verdict": (STORED, (DETAIL, STORED, SCHEMA)),
 }
 SCANNED = ("src/algotrade", "apps/api", "apps/backtest", "apps/ingestion", "libs")
 
