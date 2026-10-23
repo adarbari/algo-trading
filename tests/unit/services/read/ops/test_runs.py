@@ -117,3 +117,39 @@ def test_post_session_runs_are_read_like_nightly_runs_and_apart_from_them() -> N
         ("verify", "SKIPPED", "skipped: x")
     ]
     assert [s.name for s in load_nightly_runs(stores, 5)[0].steps] == ["bars"]
+
+
+def test_a_reused_step_cites_the_attempt_that_did_it_and_what_it_took_there() -> None:
+    backend = MemoryBackend()
+    day = date(2026, 10, 2)
+    first = start_run("nightly", day, NOW)
+    first.finish(NOW, stats={"steps": {"macro": {"status": "SUCCEEDED", "duration_s": 12.5}}})
+    second = start_run("nightly", day, NOW.replace(hour=4))
+    second.finish(
+        NOW.replace(hour=5),
+        stats={
+            "steps": {
+                "macro": {"status": "SUCCEEDED", "duration_s": 0.0, "origin": first.run_id},
+                "rollups": {"status": "SUCCEEDED", "duration_s": 30.0},
+            }
+        },
+    )
+    backend.runs.save(first)
+    backend.runs.save(second)
+    [latest, _] = load_nightly_runs(_stores(backend), 5)
+    steps = {s.name: s for s in latest.steps}
+    assert (steps["macro"].origin, steps["macro"].origin_duration_s) == (first.run_id, 12.5)
+    assert steps["macro"].origin_started_at == first.started_at
+    assert (steps["rollups"].origin, steps["rollups"].origin_duration_s) == (None, None)
+
+
+def test_a_reused_step_whose_attempt_record_is_gone_still_says_it_was_reused() -> None:
+    backend = MemoryBackend()
+    run = start_run("nightly", date(2026, 10, 2), NOW)
+    run.finish(
+        NOW, stats={"steps": {"macro": {"status": "SUCCEEDED", "duration_s": 0.0, "origin": "x"}}}
+    )
+    backend.runs.save(run)
+    [shown] = load_nightly_runs(_stores(backend), 5)
+    [step] = shown.steps
+    assert (step.origin, step.origin_started_at, step.origin_duration_s) == ("x", None, None)

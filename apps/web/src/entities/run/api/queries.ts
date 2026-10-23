@@ -27,6 +27,9 @@ const NightlyRuns = graphql(`
         durationS
         reason
         error
+        origin
+        originStartedAt
+        originDurationS
       }
     }
   }

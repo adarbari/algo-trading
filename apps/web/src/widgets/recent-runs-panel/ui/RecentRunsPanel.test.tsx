@@ -70,6 +70,9 @@ const step = (name: string, status: string, durationS: number) => ({
   reason: null,
   error: null,
   counts: {},
+  origin: null,
+  originStartedAt: null,
+  originDurationS: null,
 });
 const run = (runId: string, startedAt: string, durationS: number, chains: number) => ({
   runId,
@@ -105,6 +108,28 @@ describe('RecentRunsPanel', () => {
       await screen.findByRole('list', { name: /started 2026-10-03 11:01 UTC/ }),
     ).toHaveTextContent('19s');
     expect(screen.queryByRole('list', { name: /started 2026-10-03 13:26 UTC/ })).toBeNull();
+  });
+
+  it('marks the steps a resumed attempt reused, with where and how long they took', async () => {
+    const reusedStep = {
+      ...step('macro', 'SUCCEEDED', 0),
+      origin: 'nightly-first',
+      originStartedAt: '2026-10-03T03:46:00Z',
+      originDurationS: 125,
+    };
+    serve({
+      nightlyRuns: [
+        {
+          ...run('n2', '2026-10-03T13:26:00Z', 60, 30),
+          steps: [step('rollups', 'SUCCEEDED', 60), reusedStep],
+        },
+      ],
+    });
+    renderWith(<RecentRunsPanel />);
+    expect(await screen.findByText('reused · 03:46 UTC · 2m 5s')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Step bar colours' })).toHaveTextContent(
+      'Reused from earlier1',
+    );
   });
 
   it('says when there are no runs', async () => {

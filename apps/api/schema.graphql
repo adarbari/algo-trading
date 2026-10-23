@@ -3153,7 +3153,9 @@ type RunItem {
   status: String!
 }
 
-"""One step of a nightly run: `counts` its result counts as recorded"""
+"""
+One step of a nightly run: `counts` its result counts as recorded; `origin` the earlier attempt of the session that already did a reused step (null: it ran in this attempt), `originStartedAt` when that attempt started and `originDurationS` how long the step took there (null: that attempt's record is gone)
+"""
 type RunStep {
   name: String!
   status: String!
@@ -3161,6 +3163,9 @@ type RunStep {
   reason: String
   error: String
   counts: JSON!
+  origin: String
+  originStartedAt: DateTime
+  originDurationS: Float
 }
 
 """A display column of a screen: its name and catalogue field"""

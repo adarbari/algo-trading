@@ -11,6 +11,7 @@ per-item statuses (``items``: key -> status, a status may carry a detail after a
 the nightly report groups them."""
 
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -25,7 +26,11 @@ EXAMPLES = 10
 
 @dataclass(frozen=True)
 class RunStep:
-    """One step of a nightly run: ``counts`` are its result counts as recorded."""
+    """One step of a nightly run: ``counts`` are its result counts as recorded. A step an
+    earlier attempt of the session already did is reused, not run again: ``origin`` is that
+    attempt's run id (None: it ran in this attempt) and ``origin_started_at`` /
+    ``origin_duration_s`` when it started and how long the step took there (None: that
+    attempt's record is gone)."""
 
     name: str
     status: str
@@ -33,6 +38,9 @@ class RunStep:
     reason: str | None
     error: str | None
     counts: dict[str, Any]
+    origin: str | None = None
+    origin_started_at: datetime | None = None
+    origin_duration_s: float | None = None
 
 
 @dataclass(frozen=True)
@@ -95,20 +103,27 @@ def _duration(run: RunRecord) -> float | None:
     return round((run.finished_at - run.started_at).total_seconds(), 3)
 
 
-def _steps(run: RunRecord) -> tuple[RunStep, ...]:
+def _steps(run: RunRecord, attempts: Mapping[str, RunRecord]) -> tuple[RunStep, ...]:
     stored = run.stats.get("steps")
     if not isinstance(stored, dict):  # a run that failed before recording its steps
         return tuple(RunStep(n, s, None, None, None, {}) for n, s in run.items.items())
-    return tuple(
-        RunStep(
-            name=str(name),
-            status=str(step.get("status", "")),
-            duration_s=step.get("duration_s"),
-            reason=step.get("reason"),
-            error=step.get("error"),
-            counts=dict(step.get("result") or {}),
-        )
-        for name, step in stored.items()
+    return tuple(_step(str(name), step, attempts) for name, step in stored.items())
+
+
+def _step(name: str, step: Mapping[str, Any], attempts: Mapping[str, RunRecord]) -> RunStep:
+    origin = step.get("origin")
+    attempt = attempts.get(str(origin)) if origin else None
+    there = ((attempt.stats.get("steps") or {}).get(name) or {}) if attempt else {}
+    return RunStep(
+        name=name,
+        status=str(step.get("status", "")),
+        duration_s=step.get("duration_s"),
+        reason=step.get("reason"),
+        error=step.get("error"),
+        counts=dict(step.get("result") or {}),
+        origin=str(origin) if origin else None,
+        origin_started_at=attempt.started_at if attempt else None,
+        origin_duration_s=there.get("duration_s"),
     )
 
 
@@ -124,7 +139,9 @@ def load_post_session_runs(ctx: Stores, limit: int = 10) -> tuple[NightlyRun, ..
 
 
 def _workflow_runs(ctx: Stores, job: str, limit: int) -> tuple[NightlyRun, ...]:
-    runs = ctx.reader.runs(job)[-max(limit, 1) :]
+    every = ctx.reader.runs(job)
+    attempts = {r.run_id: r for r in every}  # a reused step cites its producing attempt
+    runs = every[-max(limit, 1) :]
     return tuple(
         NightlyRun(
             run_id=r.run_id,
@@ -133,7 +150,7 @@ def _workflow_runs(ctx: Stores, job: str, limit: int) -> tuple[NightlyRun, ...]:
             started_at=r.started_at,
             finished_at=r.finished_at,
             duration_s=_duration(r),
-            steps=_steps(r),
+            steps=_steps(r, attempts),
             problems=tuple(str(p) for key in ("partial", "failed") for p in r.stats.get(key) or []),
         )
         for r in reversed(runs)

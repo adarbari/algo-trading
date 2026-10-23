@@ -14,11 +14,13 @@ const run = (over: Partial<NightlyRun>): NightlyRun => ({
   durationS: null,
   problems: ['steps not complete: ibkr-iv'],
   steps: [
-    { name: 'chains', status: 'SUCCEEDED', durationS: 1, reason: null, error: null },
-    { name: 'ibkr-iv', status: 'FAILED', durationS: 1, reason: null, error: 'x' },
+    { name: 'chains', status: 'SUCCEEDED', durationS: 1, reason: null, error: null, ...ran },
+    { name: 'ibkr-iv', status: 'FAILED', durationS: 1, reason: null, error: 'x', ...ran },
   ],
   ...over,
 });
+
+const ran = { origin: null, originStartedAt: null, originDurationS: null };
 
 const screens = (missing: string[], total = 5): ScreenerStates => ({
   session: '2026-10-08',
