@@ -31,6 +31,7 @@ export {
   useEdgeVariants,
 } from './api/edge-result';
 export { prefetchEdgeDesk, useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
+export { useScreenerEdges } from './api/screener-edges';
 export { prefetchTrackRecords, useTrackRecords } from './api/track-records';
 export {
   EDGE_VIEWS,
@@ -119,6 +120,7 @@ export {
   type PaperRecord,
   type PaperTrade,
 } from './model/paper';
+export { screenerEdges, type ScreenerEdge } from './model/screener-edges';
 export {
   oddsEntry,
   recordFigures,

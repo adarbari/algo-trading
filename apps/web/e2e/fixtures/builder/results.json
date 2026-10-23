@@ -121,6 +121,16 @@
                 "name": "spread",
                 "value": 0.11
               }
+            ],
+            "countsToward": [
+              {
+                "edgeId": "earnings_drift",
+                "edgeName": "Earnings drift",
+                "counts": true,
+                "code": "counts",
+                "topK": 2,
+                "place": 1
+              }
             ]
           },
           {
@@ -164,6 +174,16 @@
               {
                 "name": "spread",
                 "value": 0.04
+              }
+            ],
+            "countsToward": [
+              {
+                "edgeId": "earnings_drift",
+                "edgeName": "Earnings drift",
+                "counts": true,
+                "code": "counts",
+                "topK": 2,
+                "place": 2
               }
             ]
           },
@@ -209,6 +229,16 @@
                 "name": "spread",
                 "value": 0.33
               }
+            ],
+            "countsToward": [
+              {
+                "edgeId": "earnings_drift",
+                "edgeName": "Earnings drift",
+                "counts": false,
+                "code": "below_top_k",
+                "topK": 2,
+                "place": 3
+              }
             ]
           },
           {
@@ -252,6 +282,16 @@
               {
                 "name": "spread",
                 "value": 0.12
+              }
+            ],
+            "countsToward": [
+              {
+                "edgeId": "earnings_drift",
+                "edgeName": "Earnings drift",
+                "counts": false,
+                "code": "not_qualified",
+                "topK": 2,
+                "place": null
               }
             ]
           },
@@ -297,6 +337,16 @@
                 "name": "spread",
                 "value": 0.21
               }
+            ],
+            "countsToward": [
+              {
+                "edgeId": "earnings_drift",
+                "edgeName": "Earnings drift",
+                "counts": false,
+                "code": "not_qualified",
+                "topK": 2,
+                "place": null
+              }
             ]
           },
           {
@@ -340,6 +390,16 @@
               {
                 "name": "spread",
                 "value": 0.04
+              }
+            ],
+            "countsToward": [
+              {
+                "edgeId": "earnings_drift",
+                "edgeName": "Earnings drift",
+                "counts": false,
+                "code": "paused",
+                "topK": 2,
+                "place": null
               }
             ]
           }

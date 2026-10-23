@@ -9,9 +9,11 @@
 import {
   catalogueColumn,
   changeColumn,
+  countsTowardColumn,
   criterionColumn,
   decisionColumn,
   flagsColumn,
+  matchedColumn,
   rankColumn,
   reasonsColumn,
   scoreColumn,
@@ -42,7 +44,7 @@ export interface ResultsPlanInput {
   catalogue: ReadonlyMap<string, ColumnInfo>;
   /** Tickers the unsaved criteria would drop from the picks. */
   leaving?: ReadonlySet<string> | undefined;
-  /** A stored run: the change since the previous run gets a column. */
+  /** A stored run: the change since the previous run gets a column, and so do why each pick matched and what it counts toward. */
   changes?: boolean | undefined;
   /** A criterion's label in a score breakdown (the preview's scores open one). */
   labelOf?: ((criterionId: string, field: string) => string) | undefined;
@@ -63,7 +65,9 @@ export function resultsPlan({
     rankColumn(),
     tickerColumn(),
     decisionColumn(leaving),
+    ...(changes ? [matchedColumn(shown, catalogue)] : []),
     scoreColumn(labelOf),
+    ...(changes ? [countsTowardColumn()] : []),
     ...shown.map((c) => criterionColumn(c, catalogue.get(c.field))),
     ...displayColumns
       .filter((c) => !judged.has(c.field))

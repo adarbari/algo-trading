@@ -143,4 +143,36 @@ describe('PickDetail', () => {
     expect(screen.getByText(/The regime gate held this pick back/)).toBeVisible();
     expect(screen.getByText('regime=STRESS: vrp_scanner pauses in STRESS')).toBeVisible();
   });
+
+  it('lists what the pick counts toward, per edge, a held-back pick as not counted', () => {
+    setup({
+      row: {
+        ...ROW,
+        countsToward: [
+          { edgeId: 'drift', edgeName: 'Drift', counts: true, code: 'counts', topK: 5, place: 2 },
+          {
+            edgeId: 'quiet',
+            edgeName: 'Quiet',
+            counts: false,
+            code: 'paused',
+            topK: null,
+            place: null,
+          },
+        ],
+      },
+    });
+    const list = screen.getByLabelText('Counts toward');
+    expect(list).toHaveTextContent('Counts');
+    expect(list).toHaveTextContent('Drift');
+    expect(list).toHaveTextContent('place 2 of the top 5');
+    expect(list).toHaveTextContent('Held back by the regime gate');
+    expect(list).toHaveTextContent('Quiet');
+    expect(screen.getByRole('button', { name: 'Help: edge_pick_paused' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Help: counts_toward' })).toBeInTheDocument();
+  });
+
+  it('shows no counts-toward section for a screener no edge lists', () => {
+    setup({ row: { ...ROW, countsToward: [] } });
+    expect(screen.queryByLabelText('Counts toward')).toBeNull();
+  });
 });
