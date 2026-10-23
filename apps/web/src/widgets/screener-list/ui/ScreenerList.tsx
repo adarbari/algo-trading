@@ -1,23 +1,25 @@
 /**
  * The screeners as one list: your own (finalized and draft-only) and the site presets, narrowed
  * by a segment (All / Mine / Presets) and a search. A row is not expandable as a whole: it shows
- * the screener (kind, last run), its evidence (the strongest edge's record, opening in place to
- * one block per edge, one row at a time), today's picks (a link to the screener) and an edit
- * button (a preset is copied first). Python screeners are listed but built in code. Deleting asks first.
+ * the screener (kind, last run), its evidence (the strongest edge's name first, opening in place
+ * whenever it has edges to one block per edge, one row at a time), today's picks (a link to the
+ * screener, "Not run" without a run: the one way into the screener page, for presets and Python
+ * screeners too) and labelled actions: Edit criteria, Duplicate and Delete for yours, only
+ * "Duplicate to edit" for a preset. Deleting asks first.
  */
 import {
   Banner,
-  Button,
   EmptyState,
+  ActionGroup,
   ExpandableTable,
-  IconButton,
+  LinkButton,
   Panel,
   SearchInput,
   SegmentedControl,
   Stack,
   StatusBadge,
   Text,
-  VisuallyHidden,
+  type ActionItem,
   type ExpandableTableColumn,
   type ExpandableTableRow,
 } from '@algotrade/ui';
@@ -71,7 +73,7 @@ const COLUMNS: readonly ExpandableTableColumn[] = [
     narrow: true,
   },
   { id: 'picks', label: withHelp('Picks today', 'screener_picks'), grow: 1.1, narrow: true },
-  { id: 'actions', label: <VisuallyHidden>Actions</VisuallyHidden>, grow: 0.9, narrow: true },
+  { id: 'actions', label: withHelp('Actions', 'screener_actions'), grow: 2.2, narrow: true },
 ];
 
 export function ScreenerList({ onOpen, onEdit, onOpenEdge }: ScreenerListProps) {
@@ -178,7 +180,7 @@ interface RowActions {
   onDuplicate: (row: ListRow) => void;
 }
 
-/** One row: the screener, its evidence, today's picks and the edit button; the evidence opens under it. */
+/** One row: the screener, its evidence, today's picks link and the actions; the evidence opens under it. */
 function toTableRow(
   row: ListRow,
   summary: ScreenerRunSummary | undefined,
@@ -248,27 +250,26 @@ function toTableRow(
           ) : run ? (
             <Text size="xs" tone="muted">{`Last run ${run.session}`}</Text>
           ) : null}
+          {!row.rules && (
+            <Text size="xs" tone="muted">
+              Built in code
+            </Text>
+          )}
         </>
       ),
-      evidence: row.rules ? (
+      evidence: (
         <ScreenerEvidenceCell screenerId={row.id} open={open} onOpenChange={onOpenChange} />
-      ) : (
-        <Text size="sm" tone="muted">
-          Built in code
-        </Text>
       ),
       picks: run ? (
         <>
-          <Button
-            size="sm"
-            variant="ghost"
+          <LinkButton
             aria-label={`Open ${name}: ${String(run.picked)} picks`}
             onClick={() => {
               onOpen(row.id);
             }}
           >
             {`${String(run.picked)} ${run.picked === 1 ? 'pick' : 'picks'}`}
-          </Button>
+          </LinkButton>
           {changes && (
             <Text size="xs">
               <Text as="span" size="xs" tone="up">{`+${String(changes.added)}`}</Text>
@@ -279,38 +280,86 @@ function toTableRow(
           {run.paused > 0 && <Text size="xs" tone="muted">{`${String(run.paused)} paused`}</Text>}
         </>
       ) : (
-        '—'
+        <LinkButton
+          aria-label={`Open ${name}: not run`}
+          onClick={() => {
+            onOpen(row.id);
+          }}
+        >
+          Not run
+        </LinkButton>
       ),
-      actions: row.rules ? (
-        <Stack direction="row" gap={1} align="center">
-          <IconButton
-            icon="pencil"
-            label={row.kind === 'mine' ? `Edit ${name}` : `Duplicate ${name} to edit`}
-            onClick={() => {
-              if (row.kind === 'mine') onEdit(row.id);
-              else onDuplicate(row);
-            }}
-          />
-          {row.kind === 'mine' && (
-            <>
-              <IconButton
-                icon="copy"
-                label={`Duplicate ${name}`}
-                onClick={() => {
-                  onDuplicate(row);
-                }}
-              />
-              <IconButton
-                icon="trash"
-                label={`Delete ${name}`}
-                onClick={() => {
-                  onDelete(row.id);
-                }}
-              />
-            </>
-          )}
-        </Stack>
-      ) : null,
+      actions: (
+        <RowActionGroup
+          name={name}
+          row={row}
+          onEdit={onEdit}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+        />
+      ),
     },
   };
+}
+
+/**
+ * The row's actions, labelled: yours get Edit criteria, Duplicate and Delete; a preset is never
+ * changed in place, so it gets Duplicate to edit only; a screener built in code has none.
+ */
+function RowActionGroup({
+  name,
+  row,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  name: string;
+  row: ListRow;
+  onEdit: (id: string) => void;
+  onDuplicate: (row: ListRow) => void;
+  onDelete: (id: string) => void;
+}) {
+  const mine = row.kind === 'mine';
+  const actions: ActionItem[] = [
+    ...(mine && row.rules
+      ? [
+          {
+            id: 'edit',
+            label: 'Edit criteria',
+            icon: 'pencil' as const,
+            onClick: () => {
+              onEdit(row.id);
+            },
+          },
+        ]
+      : []),
+    ...(row.rules
+      ? [
+          {
+            id: 'duplicate',
+            label: mine ? 'Duplicate' : 'Duplicate to edit',
+            icon: 'copy' as const,
+            onClick: () => {
+              onDuplicate(row);
+            },
+          },
+        ]
+      : []),
+    ...(mine
+      ? [
+          {
+            id: 'delete',
+            label: 'Delete',
+            icon: 'trash' as const,
+            variant: 'ghost' as const,
+            onClick: () => {
+              onDelete(row.id);
+            },
+          },
+        ]
+      : []),
+  ];
+  return actions.length === 0 ? null : (
+    <ActionGroup label={`Actions of ${name}`} actions={actions} />
+  );
 }

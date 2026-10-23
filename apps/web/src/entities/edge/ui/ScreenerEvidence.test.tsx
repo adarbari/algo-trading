@@ -26,30 +26,33 @@ const cell = (open = false, onOpenChange = vi.fn()) =>
   );
 
 describe('ScreenerEvidenceCell', () => {
-  it('shows the strongest edge: win vs base, lift, trades, hold, edge, more edges, status', async () => {
+  it('leads with the strongest edge name, then status, more edges and its record', async () => {
     serve('momentum_12_1');
     const onOpenChange = vi.fn();
     const { container } = cell(false, onOpenChange);
-    const headline = screen.getByRole('button', { name: 'Win 58% vs 51% base' });
+    const headline = screen.getByRole('button', { name: 'Earnings drift' });
     expect(headline).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByText('+7 pts')).toBeInTheDocument();
-    expect(screen.getByText('80 trades · 21-session hold')).toBeInTheDocument();
-    expect(screen.getByText('Earnings drift')).toBeInTheDocument();
     expect(screen.getByText('+1 edge')).toBeInTheDocument();
     expect(screen.getByText('Evidenced')).toBeInTheDocument();
+    expect(screen.getByText('Win 58% vs 51% base')).toBeInTheDocument();
+    expect(screen.getByText('+7 pts')).toBeInTheDocument();
+    expect(
+      screen.getByText('80 trades · 21-session hold · Frozen since 1 May 2026'),
+    ).toBeInTheDocument();
     await userEvent.click(headline);
     expect(onOpenChange).toHaveBeenCalledWith(true);
     await expectNoA11yViolations(container);
   });
 
-  it('says "No record yet" with the server words when the edge has no frozen run', () => {
+  it('expands an edge-only screener: the edge name opens it though no record exists', async () => {
     serve('vrp_scanner');
-    cell();
-    expect(screen.getByText('No record yet')).toBeInTheDocument();
-    expect(screen.getByText('not run yet')).toBeInTheDocument();
-    expect(screen.getByText('VRP')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'No record yet' })).toBeNull();
+    const onOpenChange = vi.fn();
+    cell(false, onOpenChange);
+    await userEvent.click(screen.getByRole('button', { name: 'VRP' }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(screen.getByText('No record yet: not run yet')).toBeInTheDocument();
     expect(screen.queryByText(/%/)).toBeNull();
+    expect(screen.queryByText(/Win /)).toBeNull();
   });
 
   it('says how few trades there are under 20 since the freeze, never the bare rate', () => {
@@ -57,8 +60,10 @@ describe('ScreenerEvidenceCell', () => {
     const few = { ...e, horizons: [{ ...e?.horizons[0], sessions: 12 }] } as TrackEntry;
     hooks.useTrackRecords.mockReturnValue(fakeQuery([few]));
     cell();
-    expect(screen.getByText('No record yet')).toBeInTheDocument();
-    expect(screen.getByText(/Only 12 trades since the freeze; 20 are needed/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Earnings drift|Momentum/ })).toBeInTheDocument();
+    expect(
+      screen.getByText(/No record yet: only 12 trades since the freeze; 20 are needed/),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/58%/)).toBeNull();
   });
 
@@ -67,7 +72,7 @@ describe('ScreenerEvidenceCell', () => {
     const partial = { ...e, horizons: [{ ...e?.horizons[0], baseRate: null }] } as TrackEntry;
     hooks.useTrackRecords.mockReturnValue(fakeQuery([partial]));
     cell();
-    expect(screen.getByText(/The run is partial/)).toBeInTheDocument();
+    expect(screen.getByText(/the run is partial/)).toBeInTheDocument();
   });
 
   it('says a screener in no edge is not part of one, with nothing to open', () => {
@@ -124,6 +129,25 @@ describe('ScreenerEvidenceDetail', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show all' }));
     expect(screen.getAllByRole('listitem')).toHaveLength(5);
     expect(screen.queryByText(/more edges/)).toBeNull();
+  });
+
+  it('shows every edge on Show all, the ones with no record too', async () => {
+    const [base] = records.get('momentum_12_1') as TrackEntry[];
+    const none = { ...base, horizons: [], notRun: { kindText: 'not run yet', code: 'NOT_RUN' } };
+    const many = [
+      base,
+      ...Array.from({ length: 4 }, (_, i) => ({
+        ...none,
+        edgeId: `none_${String(i)}`,
+        edgeName: `No record ${String(i)}`,
+      })),
+    ] as unknown as TrackEntry[];
+    hooks.useTrackRecords.mockReturnValue(fakeQuery(many));
+    detail();
+    expect(screen.getAllByRole('listitem')).toHaveLength(EDGES_SHOWN);
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    expect(screen.getByText('No record 3')).toBeInTheDocument();
   });
 
   it('gives the reason of an edge with no record in its block', () => {

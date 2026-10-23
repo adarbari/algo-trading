@@ -963,6 +963,18 @@ Source: `design-system/components/Legend`
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
 
+### LinkButton
+
+LinkButton: a button that reads as a link and goes somewhere (a screener's pick count opening its screener): accent text, a chevron after it that nudges on hover, an underline on hover and the app's focus ring. It runs a callback; a link with an address is a TextLink, and a control that opens a block in place is an ExpandLink.
+
+Source: `design-system/components/LinkButton`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `string` | yes | The words ("12 picks"). |
+| `'aria-label'` | `string` | no | Where it goes, when the words alone do not say ("Open Breakout: 12 picks"). |
+| `onClick` | `MouseEventHandler<HTMLButtonElement>` | yes |  |
+
 ### LinkCard
 
 LinkCard: a tile that links to one page: a kicker (the question it answers), the title as the link (the whole tile is its click target), a description, an example line and a `footer` for a row of pills (counts, states). Tiles sit in a `Grid` with `collapse`. The link goes through the app's router link (`LinkProvider`), so the design system stays router-free.

@@ -1,7 +1,7 @@
 /**
- * A screener's evidence in the Screeners list (ADR 0053): the cell (the strongest edge's win rate
- * against its base rate, the lift, trades and holding period, that edge's name and status, and
- * how many more edges it is in) and the block that opens in place under the row, one record per
+ * A screener's evidence in the Screeners list (ADR 0053): the cell (the strongest edge's name first,
+ * its status and how many more edges the screener is in, then that edge's win rate against its base
+ * rate, the lift, trades, holding period and freeze date only when a record exists, else a quiet reason) and the block that opens in place under the row, one record per
  * edge with its freeze date and a link to the edge. Only the server's frozen-period record is
  * read, never an exploratory one; a bare hit rate is never shown, and a screener with no usable
  * record says "No record yet" with the server's reason. The cell opens the block through an
@@ -34,11 +34,12 @@ const since = (date: string) => formatValue(date, { kind: 'date' }).text;
 /** Why a record is not shown: the server's words, or how few trades there are. */
 function pendingReason(edge: EdgeRecord): string {
   if (edge.state === 'few' && edge.figures) {
-    return `Only ${trades(edge.figures.sessions)} since the freeze; ${String(MIN_TRADES)} are needed to read a win rate.`;
+    return `No record yet: only ${trades(edge.figures.sessions)} since the freeze; ${String(MIN_TRADES)} are needed to read a win rate.`;
   }
-  if (edge.state === 'partial')
-    return 'The run is partial: its win rate or base rate is not stored.';
-  return unknownText(edge.notRun);
+  if (edge.state === 'partial') {
+    return 'No record yet: the run is partial, its win rate or base rate is not stored.';
+  }
+  return `No record yet: ${unknownText(edge.notRun)}`;
 }
 
 function Lift({ figures }: { figures: RecordFigures }) {
@@ -82,52 +83,44 @@ export function ScreenerEvidenceCell({
     );
   }
   const more = evidence.edges.length - 1;
-  const lead = evidence.kind === 'record' ? evidence.edges[0] : evidence.why;
-  const chips = (
-    <>
-      {lead && <StatusBadge tone="neutral">{lead.edgeName}</StatusBadge>}
-      {more > 0 && (
-        <StatusBadge tone="neutral">{`+${String(more)} ${more === 1 ? 'edge' : 'edges'}`}</StatusBadge>
-      )}
-      <StatusChip status={lead?.edgeStatus ?? null} />
-    </>
-  );
-  if (evidence.kind === 'record') {
-    const first = evidence.headline;
-    return (
-      <Stack gap={1}>
-        <Stack direction="row" gap={2} align="center" wrap>
-          <ExpandLink open={open} onOpenChange={onOpenChange}>
-            {`Win ${percent(first.hitRate)} vs ${percent(first.baseRate)} base`}
-          </ExpandLink>
-          <Lift figures={first} />
-        </Stack>
-        <Text size="xs" tone="muted">
-          {`${trades(first.sessions)} · ${hold(first.horizonSessions)}`}
-        </Text>
-        <Stack direction="row" gap={1} align="center" wrap>
-          {chips}
-        </Stack>
-      </Stack>
-    );
-  }
+  const lead = evidence.edges[0];
   return (
     <Stack gap={1}>
-      {more > 0 ? (
+      <Stack direction="row" gap={2} align="center" wrap>
         <ExpandLink open={open} onOpenChange={onOpenChange}>
-          No record yet
+          {lead?.edgeName ?? ''}
         </ExpandLink>
-      ) : (
-        <Text size="sm" weight="medium">
-          No record yet
-        </Text>
-      )}
-      <Text size="xs" tone="muted">
-        {pendingReason(evidence.why)}
-      </Text>
-      <Stack direction="row" gap={1} align="center" wrap>
-        {chips}
+        {more > 0 && (
+          <StatusBadge tone="neutral">{`+${String(more)} ${more === 1 ? 'edge' : 'edges'}`}</StatusBadge>
+        )}
+        <StatusChip status={lead?.edgeStatus ?? null} />
       </Stack>
+      {evidence.kind === 'record' ? <HeadlineRecord figures={evidence.headline} /> : null}
+      {evidence.kind === 'pending' ? (
+        <Text size="xs" tone="muted">
+          {pendingReason(evidence.why)}
+        </Text>
+      ) : null}
+    </Stack>
+  );
+}
+
+/** The headline edge's record: win vs base, lift, trades, hold and the freeze date together. */
+function HeadlineRecord({ figures }: { figures: RecordFigures }) {
+  return (
+    <Stack gap={0}>
+      <Stack direction="row" gap={2} align="center" wrap>
+        <Text
+          size="sm"
+          weight="medium"
+        >{`Win ${percent(figures.hitRate)} vs ${percent(figures.baseRate)} base`}</Text>
+        <Lift figures={figures} />
+      </Stack>
+      <Text size="xs" tone="muted">
+        {`${trades(figures.sessions)} · ${hold(figures.horizonSessions)}${
+          figures.frozenFrom ? ` · Frozen since ${since(figures.frozenFrom)}` : ''
+        }`}
+      </Text>
     </Stack>
   );
 }
@@ -159,7 +152,7 @@ function EdgeBlock({
         </Stack>
       ) : (
         <Text size="xs" tone="muted">
-          {`No record yet: ${pendingReason(edge)}`}
+          {pendingReason(edge)}
         </Text>
       )}
       <Stack direction="row">

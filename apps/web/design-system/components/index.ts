@@ -56,6 +56,7 @@ export {
 export { Dialog, type DialogProps } from './Dialog';
 export { Disclosure, type DisclosureProps } from './Disclosure';
 export { ExpandLink, type ExpandLinkProps } from './ExpandLink';
+export { LinkButton, type LinkButtonProps } from './LinkButton';
 export { ExpandableRow, type ExpandableRowProps } from './ExpandableRow';
 export {
   ExpandableTable,
