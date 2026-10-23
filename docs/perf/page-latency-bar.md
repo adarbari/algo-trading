@@ -64,8 +64,8 @@ its first timing still gets 3 only. The output states the passes done and the bu
 view's critical path is the average of the passes done. A run of fewer than 3 passes is
 `LOW-CONFIDENCE` and, like a noisy run, is not recorded. The wait for the load gate ends after
 60 s: the pass runs and its operations are flagged noisy. With the process start and the op-set
-build the run ends under 300 s; the nightly wrapper's total, with its CoW snapshot (about 5
-minutes), is about 10 minutes.
+build the run ends under 300 s; the nightly wrapper's total, with its CoW snapshot (about 4
+minutes), is about 6-9 minutes.
 
 ## Read the table
 
@@ -94,12 +94,19 @@ lock, free disk under 12 GB, 1-minute load over 4, or the Mac was asleep).
 
 **Why a clone.** The gate empties every cache before each of about 300 timings: pointed at the
 live data or the live API it would load the live site, and the store changes under it (an ingest
-mid-copy gives a torn snapshot). It runs on a copy-on-write clone (`cp -cR var/data
-/Users/adarbari/perf-clone/data`) of a store no writer touches; the tool itself refuses the real
-store, by design. **Cost:** the clone shares every block with the store, so near-zero disk (a
-clone only grows by what the bench rewrites, and is deleted afterwards); about 5 minutes for the
-copy of 64 GB, 3-15 minutes for the run. The wrapper removes only a path ending in
-`/perf-clone/data` that is not the real store.
+mid-copy gives a torn snapshot). It runs on a copy-on-write clone of a store no writer
+touches; the tool itself refuses the real store, by design. **What is copied:** only what the API
+and the bench read: `tables/`, `runs/` and `serving/` (`locks/` is created empty). `raw/` (vendor
+payloads, 4 GB and 121k files) and `staging/` (transient, 124k files) are not copied: nothing in
+the read path (`services/read`, the API) opens them, so the clone has about 1.14M files instead
+of 1.38M. The list is explicit in the wrapper (`copy_entries`) and tested with a fixture store.
+**Cost:** the clone shares every block with the store (APFS `cp -c`), so near-zero disk; the copy
+runs at low I/O priority (`taskpolicy -b`, `nice` where there is none) so it does not slow the
+live site: the effect on the copy time is to be measured on the first night. The clone is renamed
+to a sibling `data.trash.<date>` at the end (instant) and deleted afterwards, detached, at low
+priority; a leftover trash of an earlier run is deleted first, in the background, never blocking
+the start (a free-disk refusal then says the trash is still being deleted). Only a path
+`<PERF_CLONE_ROOT>/../perf-clone/data.trash.*` is ever deleted.
 
 **Idempotent per local date, one instance at a time.** Before 03:00, or when
 `var/logs/perf_gate.status` already holds a finished run for today, it exits 0 at once. An atomic
@@ -142,15 +149,19 @@ capture's edge id and the first-render values of the trades ledger; one that can
 fails the gate. Expired exceptions and an expired list are reported at run time, not in CI.
 
 **Timing, and the 5-minute cap.** The cap applies to the benchmark phase; the snapshot is a
-separate step. Expected breakdown: the CoW snapshot takes 4-10 minutes depending on load
-(measured 4m17s and 5m07s on a quiet machine, 9m41s under load), the bench at most 5 minutes by
-its budget, so the night's total is about 10-16 minutes. The bench is hard-capped: a watchdog
-runs it in its own process group and at 300 s kills the whole group (the bench and its API
-child), marks the run over-time (exit 4; a finished day, so no retry loop; nothing is recorded)
-and the clone is deleted. Every run appends `wait_s snapshot_s bench_s cleanup_s total_s` (and
-`over_time=`) to `var/logs/perf_gate.status`; the history line carries `wait_s` and
-`snapshot_s` (`--timings`). The owner is notified when `bench_s` is over 300, `total_s` over 15
-minutes, or any view is over the bar.
+separate step. Expected breakdown: the copy about 3.5-4 minutes on a quiet machine (4m17s-5m07s
+measured for the whole store, 9m41s under load; fewer files now), the bench at most 5 minutes by
+its budget (typically 2.5), the cleanup an instant rename: about 6-9 minutes wall, worst case
+10-11. The bench is hard-capped: a watchdog runs it in its own process group and at 300 s kills
+the whole group (the bench and its API child), marks the run over-time (exit 4; a finished day,
+so no retry loop; nothing is recorded) and the clone is renamed away. The copy has its own cap:
+over 10 minutes it is killed, the partial clone discarded the same way (outcome
+`snapshot-over-time`, exit 4, one notification, a finished day). Every run appends
+`wait_s snapshot_s bench_s cleanup_s total_s` (and `over_time=`) to `var/logs/perf_gate.status`;
+`cleanup_s` is the rename, and `trash_delete_s` is added to `status.json` (and
+`trash_delete_s.txt`) when the background delete finishes. The history line carries `wait_s` and
+`snapshot_s` (`--timings`). The owner is notified when `bench_s` is over 300, `total_s` over 12
+minutes, the snapshot is killed, or any view is over the bar.
 
 **Reading a run.** Each run leaves `var/logs/perf_gate/YYYY-MM-DD/` (the last 14 kept; nothing is
 written outside `var/logs`) and one line in `var/logs/perf_gate/summary.csv` (date, sha, total_s,

@@ -11,7 +11,8 @@
 #     12 GB, or 1-minute load over 4 -> exit 3 "busy, retry" (a start refused by a guard is not
 #     a finished run, so launchd's retries continue);
 #   - removes the old clone (only a path ending in /perf-clone/data that is not the real store),
-#     `cp -cR var/data` into it (APFS clonefile; PERF_COPY_CMD overrides, for tests), and re-checks that no ingest started during the copy (if one
+#     `cp -cR` of tables/ runs/ serving/ only (APFS clonefile at low I/O priority; PERF_COPY_CMD
+#     overrides, for tests; raw/ and staging/ are not copied; the copy is killed at 10 min), and re-checks that no ingest started during the copy (if one
 #     did: the clone is discarded, exit 3);
 #   - runs scripts/perf/fast_bench.py --data-url file://<clone> --record with the default guards
 #     (never lowered), appends a line to var/logs/perf_gate.status, deletes the clone, and
@@ -28,7 +29,7 @@
 # process group (the bench and its API child), marks the run over-time (not recorded, a finished
 # day, so no retry loop) and the clone is deleted. Phase timings (wait_s, snapshot_s, bench_s,
 # cleanup_s, total_s) go to the status line; the owner is notified when bench_s > 300, total_s >
-# 900 or a view is over the bar. The 5-minute cap is the benchmark phase; the snapshot is separate.
+# 720 or a view is over the bar. The 5-minute cap is the benchmark phase; the snapshot is separate.
 #
 # Exit codes: 0 done (clean) or nothing to do today; 1 finished with a view over the bar without
 # a named exception, or an operation that failed; 2 refused (a path guard, or the bench refused);
@@ -38,7 +39,7 @@
 # history is var/logs/perf_gate/history.jsonl; the repo's benchmarks/critical_path_history.jsonl
 # is only ever changed by a PR (docs/perf/page-latency-bar.md). Env (tests): PERF_CLONE_ROOT, PERF_SRC, PERF_STATUS, PERF_NOW_DATE, PERF_NOW_HM,
 # PERF_PS_FILE, PERF_FREE_GB, PERF_LOAD, PERF_BENCH_CMD, PERF_NOTIFY, PERF_BENCH_LIMIT_S,
-# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE.
+# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE, PERF_SNAPSHOT_LIMIT_S, PERF_LOWPRI.
 set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -56,7 +57,11 @@ markers='algotrade-ingest|var/logs/'
 export ALGOTRADE_PORT_BASE=${PERF_PORT_BASE:-15990}
 t_start=$(date +%s)
 bench_limit=${PERF_BENCH_LIMIT_S:-300}
-total_limit=${PERF_TOTAL_LIMIT_S:-900}
+total_limit=${PERF_TOTAL_LIMIT_S:-720}
+snapshot_limit=${PERF_SNAPSHOT_LIMIT_S:-600}
+# what the API and the bench read: tables, runs and serving (locks are created empty). raw/ (vendor
+# payloads the API never opens) and staging/ (transient) are NOT copied: ~245k files and 7 GB less
+copy_entries="tables runs serving"
 logs=$(dirname "$status")
 rundir=$logs/perf_gate/$today
 keep_runs=14
@@ -114,7 +119,7 @@ cleanup() {
 abort() {  # TERM / INT: stop the bench's whole process group, drop the clone, release the lock
   [ -n "$wd_pid" ] && kill -TERM "$wd_pid" 2>/dev/null
   [ -n "$wd_pid" ] && wait "$wd_pid" 2>/dev/null
-  [ "$clone_made" = 1 ] && [ -d "$clone" ] && rm -rf "$clone"
+  [ "$clone_made" = 1 ] && discard_clone
   say "aborted by a signal"
   cleanup
   exit 143
@@ -178,43 +183,6 @@ busy() {  # a guard: record why, exit 3
   exit 3
 }
 
-ps_lines() { if [ -n "${PERF_PS_FILE:-}" ]; then cat "$PERF_PS_FILE"; else ps -eo pid,args; fi; }
-busy_writer() {
-  ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench" | head -1
-}
-if w=$(busy_writer) && [ -n "$w" ]; then busy "a writer runs: $w"; fi
-
-free_gb=${PERF_FREE_GB:-$(free_now)}
-if [ "${free_gb:-0}" -lt "$min_disk_gb" ]; then busy "${free_gb:-?} GB free, need $min_disk_gb"; fi
-load=${PERF_LOAD:-$(load_now)}
-if awk "BEGIN {exit !($load > $max_load)}"; then busy "load $load over $max_load"; fi
-
-t_ready=$(date +%s)
-drop_clone() { [ -d "$clone" ] && rm -rf "$clone"; return 0; }
-case "$clone" in */perf-clone/data) ;; *) exit 2 ;; esac
-drop_clone
-mkdir -p "$(dirname "$clone")"
-top_procs >"$rundir/procs-start.txt"
-free_before=$free_gb
-clone_made=1
-# the real nightly copies with cp -c (APFS clonefile: shared blocks); PERF_COPY_CMD replaces it
-# where cp has no -c (the tests, Linux)
-if ! ${PERF_COPY_CMD:-cp -cR} "$src" "$clone"; then drop_clone; busy "the copy failed"; fi
-t_copied=$(date +%s)
-snapshot_s=$((t_copied - t_ready)); wait_s=$((t_ready - t_start))
-ingest_during=false
-if w=$(busy_writer) && [ -n "$w" ]; then ingest_during=true; fi
-files="skipped: counting every file is slower than the copy's value (PERF_COUNT_FILES=1 counts)"
-[ "${PERF_COUNT_FILES:-0}" = 1 ] && files=$(find "$clone" -type f | wc -l | tr -d ' ')
-printf '{"copy_s": %s, "file_count": "%s", "free_gb_before": %s, "free_gb_after": %s, "ingest_started_during_copy": %s}\n' \
-  "$snapshot_s" "$files" "${free_before:-null}" "$(free_now)" "$ingest_during" >"$rundir/snapshot.json"
-if [ "$ingest_during" = true ]; then drop_clone; busy "a writer started during the copy: $w"; fi
-
-sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
-out=$(mktemp)
-py=${PERF_PY:-$repo/.venv/bin/python}
-cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
-
 # the watchdog: run a command in its own process group; at the limit kill the whole group (the
 # bench and its API child) and exit 124. macOS has no `timeout`. $1 = seconds. It `exec`s, so
 # call it only in a subshell or the background.
@@ -236,6 +204,103 @@ except subprocess.TimeoutExpired:
     sys.exit(124)
 PY
 }
+# low I/O priority for the copy and the delete (the live site shares the disk); macOS has no ionice
+if [ -z "${PERF_LOWPRI+x}" ]; then
+  if command -v taskpolicy >/dev/null 2>&1; then PERF_LOWPRI="taskpolicy -b"; else PERF_LOWPRI="nice -n 19"; fi
+fi
+trash_dir=
+trash_ok() {  # only a sibling data.trash.* of the clone is ever deleted
+  case "$1" in */perf-clone/data.trash.*) [ "$(dirname "$1")" = "$(dirname "$clone")" ] ;; *) return 1 ;; esac
+}
+rename_clone() {  # an instant rename on the same volume: the clone leaves the critical path
+  [ -d "$clone" ] || return 0
+  n=0; trash_dir=$clone.trash.$today
+  while [ -e "$trash_dir" ]; do n=$((n + 1)); trash_dir=$clone.trash.$today.$n; done
+  mv "$clone" "$trash_dir"
+}
+delete_trash() {  # detached, low priority, guarded; logs trash_delete_s when it finishes
+  trash_ok "$1" || return 0
+  (
+    trap - EXIT TERM INT
+    t0=$(date +%s)
+    $PERF_LOWPRI rm -rf "$1"
+    took=$(( $(date +%s) - t0 ))
+    echo "$took" >"$rundir/trash_delete_s.txt"
+    TOOK=$took RUNDIR=$rundir python3 - <<'PY'
+import json, os
+from pathlib import Path
+f = Path(os.environ["RUNDIR"]) / "status.json"
+if f.is_file():
+    d = json.loads(f.read_text())
+    d["trash_delete_s"] = int(os.environ["TOOK"])
+    f.write_text(json.dumps(d, indent=1) + "\n")
+PY
+  ) </dev/null >/dev/null 2>&1 &
+  disown 2>/dev/null
+  return 0
+}
+discard_clone() { rename_clone; [ -n "$trash_dir" ] && delete_trash "$trash_dir"; return 0; }
+
+ps_lines() { if [ -n "${PERF_PS_FILE:-}" ]; then cat "$PERF_PS_FILE"; else ps -eo pid,args; fi; }
+busy_writer() {
+  ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench" | head -1
+}
+if w=$(busy_writer) && [ -n "$w" ]; then busy "a writer runs: $w"; fi
+
+# a leftover clone or trash of an earlier run is deleted first, in the background (never blocking)
+leftover=0
+for t in "$clone".trash.*; do [ -e "$t" ] && { delete_trash "$t"; leftover=1; }; done
+[ -d "$clone" ] && { discard_clone; leftover=1; }
+free_gb=${PERF_FREE_GB:-$(free_now)}
+if [ "${free_gb:-0}" -lt "$min_disk_gb" ]; then
+  busy "${free_gb:-?} GB free, need $min_disk_gb$([ "$leftover" = 1 ] && echo ' (an earlier run'"'"'s trash is still being deleted)')"
+fi
+load=${PERF_LOAD:-$(load_now)}
+if awk "BEGIN {exit !($load > $max_load)}"; then busy "load $load over $max_load"; fi
+
+t_ready=$(date +%s)
+case "$clone" in */perf-clone/data) ;; *) exit 2 ;; esac
+mkdir -p "$(dirname "$clone")"
+top_procs >"$rundir/procs-start.txt"
+free_before=$free_gb
+clone_made=1
+mkdir -p "$clone"
+# the real nightly copies with cp -c (APFS clonefile: shared blocks); PERF_COPY_CMD replaces it
+# where cp has no -c (the tests, Linux). One watchdog caps the whole copy.
+SRC=$src CLONE=$clone ENTRIES=$copy_entries COPY="$PERF_LOWPRI ${PERF_COPY_CMD:-cp -cR}" \
+  watchdog "$snapshot_limit" sh -c 'set -e; for e in $ENTRIES; do [ -e "$SRC/$e" ] || continue; $COPY "$SRC/$e" "$CLONE/$e"; done; mkdir -p "$CLONE/locks"' &
+wd_pid=$!
+wait "$wd_pid"
+copy_code=$?
+wd_pid=
+if [ "$copy_code" -eq 124 ]; then
+  discard_clone
+  t_now=$(date +%s); snapshot_s=$((t_now - t_ready)); wait_s=$((t_ready - t_start)); total_s=$((t_now - t_start))
+  sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
+  say "snapshot over-time: the copy was killed at ${snapshot_limit}s"
+  echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=snapshot-over-time over_time=yes wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
+  code=4; bench_s=0; cleanup_s=0; finish_evidence snapshot-over-time
+  msg="1 s page gate: the snapshot copy was killed at ${snapshot_limit}s (no result); evidence in var/logs/perf_gate/$today/"
+  if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
+  else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
+  exit 4
+fi
+if [ "$copy_code" -ne 0 ]; then discard_clone; busy "the copy failed"; fi
+t_copied=$(date +%s)
+snapshot_s=$((t_copied - t_ready)); wait_s=$((t_ready - t_start))
+ingest_during=false
+if w=$(busy_writer) && [ -n "$w" ]; then ingest_during=true; fi
+files="skipped: counting every file is slower than the copy's value (PERF_COUNT_FILES=1 counts)"
+[ "${PERF_COUNT_FILES:-0}" = 1 ] && files=$(find "$clone" -type f | wc -l | tr -d ' ')
+printf '{"copy_s": %s, "file_count": "%s", "free_gb_before": %s, "free_gb_after": %s, "ingest_started_during_copy": %s}\n' \
+  "$snapshot_s" "$files" "${free_before:-null}" "$(free_now)" "$ingest_during" >"$rundir/snapshot.json"
+if [ "$ingest_during" = true ]; then discard_clone; busy "a writer started during the copy: $w"; fi
+
+sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
+out=$(mktemp)
+py=${PERF_PY:-$repo/.venv/bin/python}
+cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
+
 t_bench=$(date +%s)
 # shellcheck disable=SC2086
 watchdog "$bench_limit" $cmd >"$out" 2>&1 &
@@ -275,7 +340,7 @@ PY
   [ -n "$names" ] && { (watchdog 60 $pcmd $names) >>"$rundir/run.log" 2>&1 || say "profiles cut or failed"; }
 fi
 
-drop_clone
+rename_clone  # instant; the delete starts after the notification
 t_end=$(date +%s)
 cleanup_s=$((t_end - t_benched)); total_s=$((t_end - t_start))
 echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?} exit=$code finished=$finished outcome=$outcome over_time=$overtime wait_s=$wait_s snapshot_s=$snapshot_s bench_s=$bench_s cleanup_s=$cleanup_s total_s=$total_s" >>"$status"
@@ -296,4 +361,5 @@ if [ "$code" -ne 0 ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$
   if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
   else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
 fi
+[ -n "$trash_dir" ] && delete_trash "$trash_dir"
 exit "$code"

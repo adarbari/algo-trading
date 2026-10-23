@@ -380,3 +380,75 @@ def test_the_bench_gets_a_fixed_port_block_outside_the_worktrees_and_the_live_ap
     rig.status.unlink()
     rig.run(PERF_PORT_BASE="16500")
     assert (rig.tmp / "port").read_text().strip() == "16500"
+
+
+def _wait_gone(path: Path, seconds: float = 20) -> bool:
+    end = time.time() + seconds
+    while path.exists() and time.time() < end:
+        time.sleep(0.1)
+    return not path.exists()
+
+
+def _script(rig: Rig, name: str, body: str) -> str:
+    path = rig.tmp / name
+    path.write_text("#!/bin/sh\n" + body)
+    path.chmod(0o755)
+    return str(path)
+
+
+def test_only_the_entries_the_api_reads_are_copied_raw_and_staging_are_not(rig: Rig) -> None:
+    for d in ("tables/a", "runs/b", "serving/c", "raw/d", "staging/e", "locks/f"):
+        (rig.tmp / "var" / "data" / d).mkdir(parents=True)
+        (rig.tmp / "var" / "data" / d / "x.txt").write_text("x")
+    rig.bench_body = (
+        f"ls {rig.root}/data > {rig.tmp}/clone_ls\n"
+        f"find {rig.root}/data -type f | sed 's#.*/data/##' | sort > {rig.tmp}/clone_files\n"
+        "exit 0\n"
+    )
+    assert rig.run().returncode == 0
+    assert (rig.tmp / "clone_ls").read_text().split() == ["locks", "runs", "serving", "tables"]
+    files = (rig.tmp / "clone_files").read_text().split()
+    assert files == ["runs/b/x.txt", "serving/c/x.txt", "tables/a/x.txt"]  # locks: created empty
+    assert (rig.tmp / "var" / "data" / "raw" / "d" / "x.txt").exists()  # the store is untouched
+
+
+def test_the_clone_is_renamed_at_once_and_deleted_detached_with_the_time_logged(rig: Rig) -> None:
+    slow = _script(rig, "slowpri.sh", 'sleep 3\nexec "$@"\n')
+    res = rig.run(PERF_LOWPRI=slow)
+    assert res.returncode == 1
+    trash = rig.root / "data.trash.2026-10-23"
+    assert not (rig.root / "data").exists() and trash.exists()  # renamed; the delete is pending
+    status = json.loads((_evidence(rig) / "status.json").read_text())
+    assert status["cleanup_s"] <= 1 and "trash_delete_s" not in status
+    assert _wait_gone(trash)  # then deleted in the background
+    end = time.time() + 20
+    while "trash_delete_s" not in json.loads((_evidence(rig) / "status.json").read_text()):
+        assert time.time() < end
+        time.sleep(0.1)
+    assert json.loads((_evidence(rig) / "status.json").read_text())["trash_delete_s"] >= 3
+
+
+def test_leftover_trash_is_deleted_in_the_background_and_nothing_else_is(rig: Rig) -> None:
+    old = rig.root / "data.trash.2026-10-20"
+    (old / "tables").mkdir(parents=True)
+    (old / "tables" / "z.txt").write_text("z")
+    keep = [rig.root / "other", rig.root / "data.keep", rig.root / "data.trashy"]
+    for k in keep:
+        k.mkdir()
+    assert rig.run().returncode == 1  # the run was not blocked by the leftover
+    assert _wait_gone(old)
+    assert all(k.exists() for k in keep)  # the guard: only perf-clone/data.trash.* goes
+
+
+def test_a_copy_over_ten_minutes_is_killed_and_the_day_finishes_with_an_error(rig: Rig) -> None:
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    slow_cp = _script(rig, "slowcp.sh", "sleep 30\n")
+    res = rig.run(PERF_COPY_CMD=slow_cp, PERF_SNAPSHOT_LIMIT_S="1")
+    assert res.returncode == 4 and "snapshot over-time" in res.stderr
+    line = rig.status.read_text()
+    assert "outcome=snapshot-over-time" in line and "finished=yes" in line
+    assert "snapshot copy was killed" in (rig.tmp / "notified").read_text()
+    assert not (rig.root / "data").exists()
+    assert _wait_gone(rig.root / "data.trash.2026-10-23")
+    assert not (rig.tmp / "logs" / "perf_gate" / "lock").is_symlink()
+    assert rig.run().returncode == 0  # a finished day: no retry loop, no re-copy
