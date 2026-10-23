@@ -69,7 +69,9 @@ class Screener:
     config's display name, else its id; ``version``: the config's current version;
     ``criteria`` and ``display_columns``: the current config's, in spec order;
     ``regime_enabled`` / ``pause_in``: its resolved ``[regime]`` gate (ADR 0049): whether it is
-    on for this screener and the labels, calmest first, in which its picks are PAUSED."""
+    on for this screener and the labels, calmest first, in which its picks are PAUSED;
+    ``description``: the one line saying what it finds (``None``: not written, never invented;
+    not part of ``hash``)."""
 
     id: str
     owner: str
@@ -82,6 +84,7 @@ class Screener:
     groups: tuple[ScreenGroup, ...] = ()
     regime_enabled: bool = False
     pause_in: tuple[str, ...] = ()
+    description: str | None = None
 
 
 def _groups(spec: ScreenSpec) -> tuple[ScreenGroup, ...]:
@@ -113,6 +116,7 @@ def _screener(config: ResolvedConfig) -> Screener:
         groups=_groups(spec),
         regime_enabled=regime.enabled,
         pause_in=tuple(label for label in REGIME_LABELS if label in config.gate_pauses),
+        description=config.config.description,
     )
 
 

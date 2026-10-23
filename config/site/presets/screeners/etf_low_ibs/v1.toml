@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "ETFs closing near the day's low"
+description = "Unleveraged ETFs that closed in the bottom fifth of the day's range."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

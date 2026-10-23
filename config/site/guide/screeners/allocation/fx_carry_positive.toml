@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "fx_carry_positive"
 version = 1  # the preset version this prose was written for
-line = "Currency funds whose currency pays higher short-term interest than the dollar."
 summary = "Lists currency ETFs whose currency pays more than the dollar on a 3-month rate, the largest carry first. It is the carry leg of the currency edge."
 hit = "An unleveraged currency fund whose 3-month interbank rate is above the US rate. Only the yen, Australian dollar, Canadian dollar and Swiss franc have a fresh series; the rest are absent."
 not_checked = "It does not test trend, the fund's deposit yield or the forward discount. The euro and pound funds have no rate in the registry yet."

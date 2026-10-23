@@ -8,6 +8,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Rising call IV"
+description = "Stocks whose call option prices rose most over the last month."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1 for stocks, so the screens compare on one universe)

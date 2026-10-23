@@ -14,6 +14,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Breakout"
+description = "Shares closing above their one-month high on strong volume and momentum."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # no liquidity_class: it bundles option liquidity, and these are stock-chart screens)

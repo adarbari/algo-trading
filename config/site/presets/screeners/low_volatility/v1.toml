@@ -8,6 +8,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Low volatility"
+description = "Stocks and funds with the smallest recent price swings, calmest first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1, so the variants compare on one universe)

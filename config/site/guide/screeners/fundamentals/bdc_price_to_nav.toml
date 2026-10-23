@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "bdc_price_to_nav"
 version = 1  # the preset version this prose was written for
-line = "Business development companies trading at the deepest discount to their reported assets."
 summary = "Ranks the listed business development companies (BDCs) by price to net asset value, the deepest discount first. BDC prices drift away from a net asset value that is published only quarterly, and the discount tends to narrow.[^1][^2] A candidate edge under test."
 hit = "The name is on the hand list of listed BDCs, an active common stock that trades at least $1M a day, with a positive price to book. The lowest price to book, the deepest discount to the last reported net assets, ranks first."
 not_checked = "It does not check whether the net asset value is falling (a deep discount is often a credit loss in progress), the dividend and its coverage, or the interest-rate exposure of floating-rate loans. The net asset value is the latest quarterly report, up to four months old."

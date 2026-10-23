@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "option_stock_volume"
 version = 1  # the preset version this prose was written for
-line = "Stocks with few option trades compared with share trades, lowest first."
 summary = "Ranks every liquid optionable stock by the option-to-stock volume ratio, the share volume its options control over the shares traded, lowest first. The literature finds a high ratio, bad news traded in options, followed by lower stock returns.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and has option and stock volume for the session. Every such name qualifies; the lowest ratio ranks first, the highest last."
 not_checked = "It does not know whether option trades open or close positions, who is buying, or whether volume is a hedge.[^2] Johnson and So found the effect mostly in the high-ratio names."

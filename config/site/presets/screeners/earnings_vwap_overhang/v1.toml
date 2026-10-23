@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Earnings-VWAP overhang (proxy)"
+description = "Stocks ranked by how far the close sits above the average price since earnings."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

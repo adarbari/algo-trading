@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "volatility_scaled_momentum"
 version = 1  # the preset version this prose was written for
-line = "Last year's winners ranked by gain per unit of recent price swing."
 summary = "Ranks every tradeable name by its 12-1 return per unit of recent volatility, so a calm 20% outranks a wild 20%. It is a ranking stand-in for risk-managed momentum,[^1] a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, and it has a 12-1 momentum value and a 60-session volatility. Every such name qualifies; the most return per unit of risk comes first."
 not_checked = "It does not do what Barroso and Santa-Clara do, which is to scale the whole momentum portfolio's exposure down when its own volatility is high; that is a timing overlay a one-day ranking cannot show. The harness measures whether the order pays."

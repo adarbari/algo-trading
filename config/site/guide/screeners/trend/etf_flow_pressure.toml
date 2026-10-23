@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/income/vrp_scanner.toml.
 id = "etf_flow_pressure"
 version = 1  # the preset version this prose was written for
-line = "Unleveraged iShares ETFs ranked by their one-month change in shares outstanding."
 summary = "Lists unleveraged iShares ETFs with a share count 21 sessions apart, ordered so the funds that took in the most money come last. It is the screen of a candidate edge under test, and it only exists for iShares funds."
 hit = "An unleveraged ETF closing above $5 on at least $20M of 20-day dollar volume, with an iShares share count now and 21 sessions ago. The heaviest net redemption ranks first, the heaviest creation last."
 not_checked = "It does not check why shares were created: a rising price draws money in. It does not read the fund's size, its holdings or its issuer beyond iShares, and it needs a month of stored counts before a fund appears."

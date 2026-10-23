@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "cp_iv_spread_rise"
 version = 1  # the preset version this prose was written for
-line = "Stocks where the call-put price gap widened most over five sessions."
 summary = "Ranks every liquid optionable stock by how much its call-put implied volatility spread rose over the last 5 sessions. It is the screen of the pre-earnings call-put spread edge: a climbing spread before a report is read as informed buying in the calls.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and has a call-put IV spread now and five sessions ago. Every such name qualifies; the largest rise ranks first."
 not_checked = "It does not check the spread's level, the option volume behind the move, or whether the move is only the report approaching. The edge harness restricts it to names with a report expected, and is still testing it."

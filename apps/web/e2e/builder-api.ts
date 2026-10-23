@@ -151,6 +151,7 @@ export async function mockBuilderApi(
           {
             id: 'vrp_scanner',
             name: 'vrp_scanner',
+            description: 'Rich option premium in calm names',
             criteria,
             pickHistory,
             notRun: null,
@@ -159,6 +160,7 @@ export async function mockBuilderApi(
           ...[...own, 'idea-draft'].map((id) => ({
             id,
             name: id,
+            description: null,
             criteria,
             pickHistory,
             notRun,

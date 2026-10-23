@@ -26,6 +26,7 @@ import { useMemo, useState } from 'react';
 import { ScreenerEvidenceCell, ScreenerEvidenceDetail } from '@/entities/edge';
 import {
   DecisionBadge,
+  ScreenerDescription,
   useMyScreeners,
   useScreenerRuns,
   useScreeners,
@@ -57,7 +58,12 @@ const withHelp = (label: string, term: string) => (
 
 /** The four columns; all stay on a phone, where each row is a card. */
 const COLUMNS: readonly ExpandableTableColumn[] = [
-  { id: 'screener', label: withHelp('Screener', 'screener_column'), grow: 2, narrow: true },
+  {
+    id: 'screener',
+    label: withHelp('Screener and what it finds', 'screener_column'),
+    grow: 2,
+    narrow: true,
+  },
   {
     id: 'evidence',
     label: withHelp('Evidence and edges', 'screener_track_record'),
@@ -219,6 +225,19 @@ function toTableRow(
               </>
             )}
           </Text>
+          {summary?.description ? (
+            <ScreenerDescription description={summary.description} />
+          ) : row.kind === 'mine' && row.rules && summary && !runsPending ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                onEdit(row.id);
+              }}
+            >
+              Add a description
+            </Button>
+          ) : null}
           {noRun ? (
             <StatusBadge tone="warning">No run today</StatusBadge>
           ) : paused ? (

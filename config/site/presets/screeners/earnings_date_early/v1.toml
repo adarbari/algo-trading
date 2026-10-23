@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Earnings date moved earlier"
+description = "Stocks whose next earnings report is scheduled a week or more before last year's."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

@@ -113,9 +113,14 @@ const own = (screenerId: string, patch: Partial<ScreenerListItem> = {}): Screene
   presetId: null,
   ...patch,
 });
-const summary = (id: string, picked: number | null): ScreenerRunSummary => ({
+const summary = (
+  id: string,
+  picked: number | null,
+  description: string | null = null,
+): ScreenerRunSummary => ({
   id,
   name: `Name of ${id}`,
+  description,
   criteria: [{ id: 'iv', field: 'iv_rank', mode: 'hard', op: 'gte', value: 50 }],
   pickHistory: [
     { session: '2026-10-06', picked: 1 },
@@ -160,7 +165,7 @@ beforeEach(() => {
       session: '2026-10-07',
       byId: new Map([
         ['vrp_scanner', summary('vrp_scanner', 12)],
-        ['my-vrp', summary('my-vrp', 3)],
+        ['my-vrp', summary('my-vrp', 3, 'Rich premium in calm names')],
         ['broken', summary('broken', null)],
       ]),
     }),
@@ -187,7 +192,7 @@ describe('ScreenerList', () => {
       within(table)
         .getAllByRole('columnheader')
         .map((h) => h.textContent),
-    ).toEqual(['Screener', 'Evidence and edges', 'Picks today', 'Actions']);
+    ).toEqual(['Screener and what it finds', 'Evidence and edges', 'Picks today', 'Actions']);
     expect(within(table).getByText('Name of my-vrp')).toBeInTheDocument();
     expect(screen.getAllByText('Mine').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Preset').length).toBeGreaterThan(0);
@@ -206,6 +211,15 @@ describe('ScreenerList', () => {
     expect(screen.queryByText('Decisions')).toBeNull();
     expect(screen.queryByText('30d picks')).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it('shows the description under the name, clamped, and an add link only on your own without one', async () => {
+    const { onEdit } = setup();
+    expect(screen.getByText('Rich premium in calm names')).toHaveAttribute('data-clamp', '2');
+    // Only `broken` is yours, resolved and without a description; presets and the draft-only idea get none.
+    expect(screen.getAllByRole('button', { name: 'Add a description' })).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Add a description' }));
+    expect(onEdit).toHaveBeenCalledWith('broken');
   });
 
   it('does not expand as a whole: only the evidence headline opens the edges', async () => {

@@ -13,6 +13,11 @@ describe('Text', () => {
     expect(node).toHaveAttribute('data-tone', 'default');
   });
 
+  it('clamps to two lines through a data hook', () => {
+    render(<Text clamp={2}>A long description</Text>);
+    expect(screen.getByText('A long description')).toHaveAttribute('data-clamp', '2');
+  });
+
   it('lets the caller pick the semantic element', () => {
     render(<Text as="p">A paragraph</Text>);
     expect(screen.getByText('A paragraph').tagName).toBe('P');

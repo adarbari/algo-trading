@@ -24,12 +24,13 @@ from algotrade.storage.configs.files import SCREENERS
 @dataclass(frozen=True)
 class SiteScreener:
     """A site preset as the Guide reads it: ``family`` (a ``sections.toml`` family id;
-    ``None``: no family lists it) and its ``spec``."""
+    ``None``: no family lists it), its ``spec`` and its one-line ``description``."""
 
     id: str
     name: str
     family: str | None
     spec: ScreenSpec
+    description: str | None = None
 
 
 def site_screeners(ctx: Stores) -> tuple[SiteScreener, ...]:
@@ -58,7 +59,7 @@ def _screener(ctx: Stores, preset: str, family: str | None) -> SiteScreener | No
     if config.kind != SCREENER or config.impl not in RULE_IMPLS:
         return None
     name = (config.name or "").strip() or preset
-    return SiteScreener(preset, name, family, resolved.screen_spec)
+    return SiteScreener(preset, name, family, resolved.screen_spec, config.description)
 
 
 DEFAULT_ON_MISS = next(f.default for f in fields(Criterion) if f.name == "on_miss")

@@ -1,7 +1,7 @@
 import { Text } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ScreenerResultsPage } from './ScreenerResultsPage';
 
@@ -14,7 +14,54 @@ vi.mock('@/widgets/screener-edge-line', () => ({
 vi.mock('@/widgets/pick-detail', () => ({ PickDetail: () => null }));
 vi.mock('@/widgets/price-chart-panel', () => ({ PriceChartPanel: () => null }));
 
+const hooks = vi.hoisted(() => ({ runs: vi.fn(), mine: vi.fn() }));
+vi.mock('@/entities/screen', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useScreenerRuns: hooks.runs,
+  useMyScreeners: hooks.mine,
+}));
+
+const renderPage = (onEdit = vi.fn()) =>
+  render(
+    <ScreenerResultsPage
+      id="my-vrp"
+      onEdit={onEdit}
+      onOpenTicker={vi.fn()}
+      onCompare={vi.fn()}
+      onOpenEdge={vi.fn()}
+    />,
+  );
+const served = (description: string | null, mine: boolean) => {
+  hooks.runs.mockReturnValue({
+    data: { session: null, byId: new Map([['my-vrp', { id: 'my-vrp', description }]]) },
+  });
+  hooks.mine.mockReturnValue({ data: mine ? [{ screenerId: 'my-vrp' }] : [] });
+};
+
 describe('ScreenerResultsPage', () => {
+  beforeEach(() => {
+    served(null, false);
+  });
+
+  it('shows the description under the name', () => {
+    served('Rich premium in calm names', true);
+    renderPage();
+    expect(screen.getByText('Rich premium in calm names')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add a description' })).toBeNull();
+  });
+
+  it('offers "Add a description" to the owner of a screener without one, not for a preset', async () => {
+    const onEdit = vi.fn();
+    served(null, true);
+    const view = renderPage(onEdit);
+    await userEvent.click(screen.getByRole('button', { name: 'Add a description' }));
+    expect(onEdit).toHaveBeenCalledOnce();
+    view.unmount();
+    served(null, false);
+    renderPage();
+    expect(screen.queryByRole('button', { name: 'Add a description' })).toBeNull();
+  });
+
   it('Edit criteria goes straight to the Builder, with no drawer first', async () => {
     const onEdit = vi.fn();
     render(

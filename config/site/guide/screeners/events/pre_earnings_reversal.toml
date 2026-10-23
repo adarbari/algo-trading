@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "pre_earnings_reversal"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by 3-session return, biggest losers first, used for names about to report."
 summary = "Ranks liquid stocks by their return over the last 3 sessions, the biggest losers first. The edge applies it to names about to report: the literature finds the losers into an earnings date beat the winners over the report window.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day with a 3-session return. Every such name qualifies; the lowest return ranks first. The edge keeps only names with a report two sessions away."
 not_checked = "It does not check the report date itself (the edge does), the size quintile the paper uses, or news behind the fall. It reads the 3 sessions to the decision close, one session older than the paper's entry."

@@ -101,11 +101,11 @@ ALPHA_V2 = preset(
     columns={"close": CLOSE, "adv": ADV},
     rank={"tie_break": PULLBACK},
     version=2,
+    description="Dips in a rising share.",
 )  # fmt: skip
 ALPHA_PROSE = {
     "id": "alpha",
     "version": 2,
-    "line": "Dips in a rising share.",
     "summary": f"Finds dips; read {PULLBACK} first.[^1]",
     "hit": "Near the average.",
     "not_checked": "News.",

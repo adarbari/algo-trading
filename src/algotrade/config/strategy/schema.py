@@ -95,6 +95,10 @@ class StrategyConfig:
     settings: Mapping[str, Any] = field(default_factory=dict)  # [screening] / [backtest] / [regime]
     rules: Mapping[str, Any] = field(default_factory=dict)  # RULE_SCREEN_KEYS, impl "rules" only
     name: str | None = None  # display name for pages (not part of the hash); the id when None
+    description: str | None = None  # one line; not hashed (ADR 0029 amend.)
+
+
+DESCRIPTION_MAX = 140  # the longest one-line description a screener carries
 
 
 def _fail(path: str, message: str) -> ConfigurationError:
@@ -196,6 +200,7 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         "regime",
         "extends",
         "name",
+        "description",
         *RULE_SCREEN_KEYS,
     }
     unknown = set(raw) - allowed
@@ -205,6 +210,12 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
     name = raw.get("name")
     if name is not None and (not isinstance(name, str) or not name.strip()):
         raise _fail(f"{path}.name", "expected a non-empty display name")
+    description = raw.get("description")
+    if description is not None:
+        if not isinstance(description, str):
+            raise _fail(f"{path}.description", "expected a one-line description")
+        if "\n" in description or len(description) > DESCRIPTION_MAX:
+            raise _fail(f"{path}.description", f"one line of at most {DESCRIPTION_MAX} characters")
     if raw.get("kind") not in KINDS:
         raise _fail(f"{path}.kind", f"must be one of {sorted(KINDS)}")
     if not isinstance(raw.get("impl"), str):
@@ -240,4 +251,5 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         settings=settings,
         rules=rules,
         name=name,
+        description=(description or "").strip() or None,  # blank: not written
     )

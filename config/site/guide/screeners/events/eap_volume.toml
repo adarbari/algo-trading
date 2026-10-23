@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "eap_volume"
 version = 1  # the preset version this prose was written for
-line = "Stocks with an expected report whose past reports drew at least twice normal volume."
 summary = "Lists the stocks with an expected earnings report whose past reports drew at least twice the normal volume, the busiest first: Frazzini and Lamont's finding that the earnings announcement premium is largest where announcements draw the most volume.[^1] It is a candidate edge under test."
 hit = "The name meets the earnings announcement premium list (liquid, report date expected) and also has an earnings volume ratio of at least 2 (its last four reports drew at least twice the normal volume). The usually busiest report ranks first."
 not_checked = "It does not know whether this report will draw the usual volume, that the date is confirmed, or whether the premium exists: the harness measures that. Names with fewer than four past reports are left out."

@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "fifty_two_week_high"
 version = 1  # the preset version this prose was written for
-line = "Stocks and funds closest to their highest price of the last year."
 summary = "Ranks every tradeable name by how close its close is to its 52-week high, closest first. George and Hwang find traders anchor on the high, so names near it keep rising.[^1] It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, with a 52-week high on record. Every such name qualifies; the one at or nearest its high ranks first."
 not_checked = "It does not check when the high was set, volume, or the market's direction. Names with fewer than 240 bars in the last 252 sessions are left out."

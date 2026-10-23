@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "net_share_issuance"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by change in share count, biggest buybacks first."
 summary = "Ranks every tradeable stock by how much its share count changed over the past year, from the biggest net buybacks down to the heaviest issuers. Companies that shrink their share count have beaten those that issue in the research;[^1][^2] the issuers at the bottom are the avoid list. A candidate edge under test."
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a year-over-year share count change. Every such name qualifies; the order is the point, the biggest net buyer of its own shares first."
 not_checked = "It does not know why the count moved: an acquisition paid in shares looks like an issue, a spin-off or a split not yet adjusted can look like either, and option dilution beyond the reported count is missed. It does not check price or quality."

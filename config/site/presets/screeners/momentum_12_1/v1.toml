@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "12-1 momentum"
+description = "Stocks ranked by 12-month return, leaving out the latest month."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as trend_continuation, so the two compare on one universe)

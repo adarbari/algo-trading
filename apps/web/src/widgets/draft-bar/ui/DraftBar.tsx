@@ -12,8 +12,14 @@
  */
 import { Banner, Button, Heading, Mono, Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
 
+import { useState } from 'react';
+
 import { screenerPath } from '@/entities/guide';
-import { useScreenerBuilder } from '@/features/screener-builder';
+import {
+  DESCRIPTION_REQUIRED,
+  DescriptionField,
+  useScreenerBuilder,
+} from '@/features/screener-builder';
 import { DeleteScreenerButton } from '@/features/screener-delete';
 import { GuideHelp } from '@/features/guide-help';
 import { FinaliseButton, RebaseBanner } from '@/features/screener-finalise';
@@ -44,6 +50,12 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
       ? { id: pin.presetId, version: pin.pinned }
       : null;
   const formulaPending = builder.pendingFormulas.length > 0;
+  // Finalize needs a description; the error shows once it was tried (or the server refused).
+  const [triedFinalise, setTriedFinalise] = useState(false);
+  const [refused, setRefused] = useState(false);
+  const noDescription = builder.description.trim() === '';
+  const descriptionError =
+    (triedFinalise && noDescription) || refused ? DESCRIPTION_REQUIRED : undefined;
   const version = (v: number | null) => (v === null ? '' : ` v${String(v)}`);
 
   return (
@@ -109,6 +121,14 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
             screenerId={builder.id}
             version={builder.nextVersion}
             prepare={builder.save}
+            validate={() => {
+              setTriedFinalise(true);
+              setRefused(false);
+              return !noDescription;
+            }}
+            onRefused={(message) => {
+              if (/description/i.test(message)) setRefused(true);
+            }}
             draftSessionId={builder.draftSessionId}
             choices={builder.choices}
             onFinalised={() => {
@@ -120,6 +140,17 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
           />
         </Stack>
       </Stack>
+      {!untouched && (
+        <DescriptionField
+          name={builder.id}
+          value={builder.description}
+          onChange={(text) => {
+            setRefused(false);
+            builder.setDescription(text);
+          }}
+          error={descriptionError}
+        />
+      )}
       {formulaPending && (
         <Stack direction="row" gap={2} align="center" justify="end" wrap>
           <StatusBadge tone="warning">Formula pending</StatusBadge>

@@ -8,8 +8,8 @@ What is searched, per kind (``guide_entries``, the one list of the Guide's entri
 - a field (every catalogue field of the caller): its name; its theme and intents (the field
   guide's); its prose (how to read it, the caveats, the catalogue description);
 - a screener category (a family of ``sections.toml``): its id and title; its purpose and intro;
-- a screener: its id and name; its prose (line, summary, hit, not checked, before acting, asks;
-  source markers left out);
+- a screener: its id and name; its description and prose (summary, hit, not checked, before
+  acting, asks; source markers left out);
 - a situation: its slug and name; its signs and what to do;
 - a regime indicator: its key and field, its plain and technical names; the card's prose;
 - an episode: its key and name; its cause and notes;
@@ -242,9 +242,12 @@ def _guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
     for p in screeners_of(ctx):
         written = prose.get(p.id)
         texts = (
-            (written.line, *map(plain, written.texts), *(a for _, a in written.asks))
-            if written is not None
-            else ()
+            *((p.description,) if p.description else ()),
+            *(
+                (*map(plain, written.texts), *(a for _, a in written.asks))
+                if written is not None
+                else ()
+            ),
         )
         lead = plain(written.summary) if written is not None else ""
         screeners.append(

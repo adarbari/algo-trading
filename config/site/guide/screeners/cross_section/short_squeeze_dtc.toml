@@ -4,7 +4,6 @@
 # Keys as in tender_offer_filed.toml; typed by src/algotrade/config/site/guide/screeners.py.
 id = "short_squeeze_dtc"
 version = 1  # the preset version this prose was written for
-line = "Stocks with many shares sold short and several days of trading to cover."
 summary = "Finds liquid stocks with a crowded short: 5% or more of the shares sold short and three or more days of volume to cover. Studies find these names lag the market.[^1][^2] It is a candidate edge under test."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day, with 5% or more of its shares outstanding short and FINRA's days to cover at 3 or more. The highest days to cover ranks last."
 not_checked = "It does not know the borrow cost or whether shares can be borrowed, the float, or a catalyst. It does not see a squeeze already under way, and the figure is about two weeks old."

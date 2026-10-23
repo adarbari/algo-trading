@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "country_cape_cheapest"
 version = 1  # the preset version this prose was written for
-line = "Country funds ranked by how cheap their market is against ten-year earnings."
 summary = "Lists country ETFs that have a CAPE, the cheapest first.[^1] It is the value leg of the country rotation edges."
 hit = "An unleveraged ETF with a country cyclically adjusted price to earnings ratio above zero. The lowest ratio ranks first. A fund with no country series, such as EWM or FXI, is absent."
 not_checked = "It does not test trend, liquidity or the size of the discount. It ranks every fund with a ratio, so the edge's top-k decides how many are held."

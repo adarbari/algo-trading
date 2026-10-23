@@ -8,6 +8,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Lottery stocks (MAX), highest first"
+description = "Stocks with the biggest single-day jump last month, ranked to avoid."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1 for stocks, so the screens compare on one universe)

@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "target_upside_high"
 version = 1  # the preset version this prose was written for
-line = "Stocks whose analyst price target sits furthest above the current price."
 summary = "Ranks stocks by how far the analysts' average price target sits above the close, the highest first. Da and Schaumburg find the highest implied return does best.[^1] It is a candidate edge under test."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day, with an analyst consensus target. The highest upside to the average target ranks first."
 not_checked = "It does not check the date of the target, how many analysts set it or the industry: the paper compares within an industry and this is the raw figure. The free data covers few names."

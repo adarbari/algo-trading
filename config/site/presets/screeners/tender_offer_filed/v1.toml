@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Tender offers past their minimum period"
+description = "Stocks with a tender offer filed at least 20 sessions ago."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

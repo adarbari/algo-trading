@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "bond_curve_trend_2y"
 version = 1  # the preset version this prose was written for
-line = "Treasury funds that rose over a year while long yields exceed 2-year yields."
 summary = "Lists IEF and TLT while the 10-year minus 2-year Treasury slope is above zero and the fund's 12-month return is positive, the best trend first."
 hit = "An unleveraged Treasury fund, IEF or TLT, with an upward-sloping curve (2-year slope above 0) and a close above its close 252 sessions ago. Other funds carry no slope and are absent."
 not_checked = "It does not measure roll-down, coupon, duration or the level of yields. The slope stands in for carry and the return is price only."

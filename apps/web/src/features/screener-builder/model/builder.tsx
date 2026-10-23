@@ -7,6 +7,8 @@ import { createContext, useContext, useMemo, useRef, useState, type ReactNode } 
 
 import {
   criteriaOf,
+  descriptionOf,
+  withDescription,
   criterionOfError,
   criterionIds,
   eitherWithPrevious,
@@ -83,6 +85,10 @@ export interface ScreenerBuilder {
   /** The newest version: finalising saves version `nextVersion`. */
   nextVersion: number;
   tieBreak: { field: string | null; order: 'asc' | 'desc' };
+  /** The one-line description (what it finds), as typed; '' when none yet. */
+  description: string;
+  /** Set it (one line, cut to 140 characters): an unsaved edit like any other. */
+  setDescription: (text: string) => void;
   /** The criterion the preview's error names, if any. */
   errorCriterion: string | null;
   preview: PreviewState;
@@ -317,6 +323,10 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     dirty: edited !== null,
     nextVersion: (detail.data?.latest ?? 0) + 1,
     tieBreak: tieBreakOf(base, document),
+    description: descriptionOf(base, document),
+    setDescription: (text) => {
+      editWith((cur) => withDescription(cur, text));
+    },
     errorCriterion: criterionOfError(previewError),
     preview: {
       data: preview.data,

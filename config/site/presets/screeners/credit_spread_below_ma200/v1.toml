@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Credit spread tighter than its 200-day mean"
+description = "Corporate bond funds while borrowing-cost premiums are below their 200-day average."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

@@ -8,6 +8,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Sector-neutral reversal"
+description = "Stocks ranked by their 20-session return against their sector fund, worst first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1, so the variants compare on one universe)

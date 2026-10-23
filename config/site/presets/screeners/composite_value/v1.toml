@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Cheap and cash-profitable"
+description = "Cheap stocks that also earn a cash operating profit, cheapest first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates)
 [criteria.security_type]

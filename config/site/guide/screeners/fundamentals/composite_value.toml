@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "composite_value"
 version = 1  # the preset version this prose was written for
-line = "Cheap stocks that also earn a cash operating profit, cheapest first."
 summary = "Finds cheap stocks that are also profitable in cash terms: positive cash-based operating profitability and a positive value yield (the mean of the operating earnings yield and the free cash flow yield), the cheapest first.[^1] Value only pays alongside profitability in the catalogue's reading of the research; this is a candidate edge under test."
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, whose cash-based operating profitability is above zero and whose composite value yield is above zero. The highest yield, the cheapest, ranks first."
 not_checked = "It does not check quality beyond positive cash profit, momentum, size or sector, and cheap names cluster in cyclical sectors. The value yield has no book to market or growth part. It is the composite value variant inside the cash-based operating profitability edge."

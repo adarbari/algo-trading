@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "distress_ohlson"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by risk of financial distress, safest first."
 summary = "Ranks every tradeable stock by financial distress risk, the safest first and the most distressed last, using a simplified Ohlson O-score from the stored statements.[^1] Distressed stocks have earned low returns in the research;[^2] the most distressed at the bottom are the avoid list. A candidate edge under test."
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has an O-score. Every such name qualifies; the order is the point, the lowest distress score first."
 not_checked = "It does not use market terms (volatility, price, size against the market), which the stronger distress models do, and the O-score here omits two terms and the price-index deflator, so its level is not comparable with the paper's. Banks have no score."

@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "trend_positive_3m"
 version = 1  # the preset version this prose was written for
-line = "Funds that gained over the last 3 months, best first."
 summary = "Lists unleveraged ETFs whose 3-month return is above zero, best first. It is the trend rule of the ETF allocation edges, which hold these funds and keep cash for the rest.[^1][^2]"
 hit = "An unleveraged ETF whose close is above its close 60 sessions ago. The largest 3-month gain ranks first. A fund with a shorter history has no value and is absent."
 not_checked = "It does not compare the return with the Treasury bill rate, add dividends or check liquidity. The edge's own list of funds is what limits the names."

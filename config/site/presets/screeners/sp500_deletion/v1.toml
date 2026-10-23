@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "S&P 500 deletions"
+description = "Stocks removed from the S&P 500 in the last month."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

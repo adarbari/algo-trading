@@ -3,7 +3,6 @@
 # amendment 2026-10-18): a yardstick, not a trade idea. Keys as size_small.toml.
 id = "amihud_illiquid"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by price move per dollar traded, most thinly traded first."
 summary = "Ranks every tradeable stock by Amihud illiquidity, most illiquid first: the average price move per dollar traded over a quarter.[^1] It is a yardstick, not a trade idea: an edge whose picks are thinly traded names must do better than simply buying them."
 hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and it has an Amihud value. Every such name qualifies; the order is the point, most illiquid first."
 not_checked = "It does not check whether the illiquidity premium survives the spread you would pay, nor trend, quality or valuation. It is a decoy of the edge harness's battery, not a trade signal."

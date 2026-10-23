@@ -35,6 +35,8 @@ export interface TextProps {
   numeric?: boolean;
   /** Single line with an ellipsis when too long. */
   truncate?: boolean;
+  /** At most this many lines with an ellipsis (a description under a name). */
+  clamp?: 2;
   /** The semantic element (`p` for paragraphs; `span` default). */
   as?: TextElement;
   /** Tooltip / full value for truncated text or abbreviations. */
@@ -49,6 +51,7 @@ export function Text({
   mono = false,
   numeric = false,
   truncate = false,
+  clamp,
   as: Element = 'span',
   title,
   children,
@@ -62,6 +65,7 @@ export function Text({
       data-mono={mono || undefined}
       data-numeric={numeric || undefined}
       data-truncate={truncate || undefined}
+      data-clamp={clamp}
       title={title}
     >
       {children}

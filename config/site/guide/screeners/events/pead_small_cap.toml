@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "pead_small_cap"
 version = 1  # the preset version this prose was written for
-line = "Small Nasdaq stocks that beat the market by 5% or more on earnings."
 summary = "Finds small Nasdaq stocks that jumped on their latest earnings report by at least 5% more than the market, biggest jump first: post-earnings drift, the finding that small stocks keep moving the same way for weeks after a report.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a Nasdaq-listed common stock under $2B of market value, closing above $3, that traded at least $2M a day before its report, and whose close after the report beat SPY's by 5% or more measured from the close before it. The biggest reaction ranks first."
 not_checked = "It does not know whether the report beat estimates (only how the price reacted), why it moved (a takeover bid or an offering looks the same), or how old the reaction is. It is the screen of the small-cap earnings drift edge, which the harness is still testing."

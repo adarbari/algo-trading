@@ -12,6 +12,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Dual-class cheap leg"
+description = "The cheaper of a company's two share classes when the gap is unusually wide."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

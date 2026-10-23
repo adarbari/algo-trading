@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "december_losers"
 version = 1  # the preset version this prose was written for
-line = "Liquid stocks that fell 30% or more over the past year."
 summary = "Finds liquid stocks that fell 30% or more over the last year: the names year-end tax-loss selling falls on, and the long side of the December losers edge.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day and whose 252-session return is -30% or lower. The biggest loser ranks first."
 not_checked = "It does not know why the stock fell, whether a bid or a bankruptcy is pending, or whether the selling is tax-driven. The edge holds it for 10 sessions across the turn of the year only; the screen itself has no season."

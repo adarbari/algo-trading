@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "momentum_pullback_entry"
 version = 1  # the preset version this prose was written for
-line = "Past-year winners in an uptrend that dipped slightly below their 20-day average."
 summary = "Finds past-year winners in a stacked uptrend that have dipped one to two ATRs under their 20-day average, ranked by 12-1 momentum.[^1] It tests whether a dip is a better entry into momentum than the month-end ranking alone."
 hit = "The name closes above $5, trades at least $50M a day, has positive 12-1 momentum, sits in an UPTREND with the EMAs stacked BULL, and its close is between 1 and 2 ATRs below its 20-day average."
 not_checked = "It does not check why the name dipped, earnings dates or market breadth, and it does not confirm that the dip has ended. It is momentum with an entry timing rule, not a new signal.[^2]"

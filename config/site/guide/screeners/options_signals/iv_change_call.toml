@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "iv_change_call"
 version = 1  # the preset version this prose was written for
-line = "Stocks whose call option prices rose most over the last month."
 summary = "Ranks every liquid optionable stock by how much its at-the-money call implied volatility rose over the last 21 sessions. The option literature reads a rise in call IV as demand for upside that the stock has not yet priced.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and has an at-the-money call IV now and 21 sessions ago. Every such name qualifies; the largest rise ranks first."
 not_checked = "It does not read the put side (a rise in put IV is the opposite signal in the paper), and it does not exclude windows that contain an earnings report, where IV ramps for a known reason."

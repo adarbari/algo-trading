@@ -3,7 +3,6 @@
 # amendment 2026-10-18): a yardstick, not a trade idea. Keys as size_small.toml.
 id = "beta_low"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by market beta, lowest first, as a yardstick for other screens."
 summary = "Ranks every tradeable stock by its market beta, lowest first (the low-beta anomaly).[^1][^2] It is a yardstick, not a trade idea: an edge whose picks are defensive names must do better than simply buying the lowest-beta stocks."
 hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and the four-factor regression ran for it. Every such name qualifies; the order is the point, lowest beta first."
 not_checked = "It does not check downside behaviour, quality or valuation. It is a decoy of the edge harness's battery, not a trade signal."

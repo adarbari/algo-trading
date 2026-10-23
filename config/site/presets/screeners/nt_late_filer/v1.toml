@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Late filers"
+description = "Stocks that filed a late-report notice in the last month."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

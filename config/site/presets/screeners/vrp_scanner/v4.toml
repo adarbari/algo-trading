@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 4
 name = "VRP"
+description = "Optionable shares with rich option premiums, near a one-year high or low."
 
 # ------------------------------------------------ who is screened (HARD; the snapshot's names)
 [criteria.security_type]

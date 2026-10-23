@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "December losers"
+description = "Liquid stocks that fell 30% or more over the past year."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

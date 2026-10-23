@@ -140,6 +140,7 @@ Source: `design-system/primitives/Text`
 | `mono` | `boolean` | no | Monospace (symbols, codes, ids). |
 | `numeric` | `boolean` | no | A number in a column: right-aligned, tabular figures. |
 | `truncate` | `boolean` | no | Single line with an ellipsis when too long. |
+| `clamp` | `2` | no | At most this many lines with an ellipsis (a description under a name). |
 | `as` | `TextElement` | no | The semantic element (`p` for paragraphs; `span` default). |
 | `title` | `string` | no | Tooltip / full value for truncated text or abbreviations. |
 | `children` | `ReactNode` | no |  |

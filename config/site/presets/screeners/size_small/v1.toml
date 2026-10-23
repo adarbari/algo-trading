@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Size (small first)"
+description = "Stocks ranked by market value, smallest first, as a baseline for other screens."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # stocks only: an ETF has no market cap of its own)

@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "cef_discount_zscore"
 version = 1  # the preset version this prose was written for
-line = "Closed-end funds whose discount to asset value is unusually wide for them."
 summary = "Ranks closed-end funds by how wide their discount to net asset value is against the fund's own past year, the widest first. Their prices follow sentiment, not the value of the assets,[^1] and a wide discount tends to narrow.[^2] A candidate edge under test."
 hit = "The name is an active closed-end fund closing above $3 that trades at least $500k a day, with a recent net asset value and a year of discounts. The most negative discount z-score, the widest against its own year, ranks first."
 not_checked = "It does not check whether the discount is fair (fees, borrowing and a high payout all widen it), the fund's category, or whether the payout is covered by what the fund earns."

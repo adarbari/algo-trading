@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "low_volatility"
 version = 1  # the preset version this prose was written for
-line = "Stocks and funds with the smallest recent price swings, calmest first."
 summary = "Ranks every tradeable name by its recent realised volatility, the calmest first. Blitz and van Vliet find the calmest stocks earn about as much as the wildest with far less risk.[^1] It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, with a 60-session realised volatility. Every such name qualifies; the calmest ranks first."
 not_checked = "It does not use the paper's three-year volatility (60 sessions is the longest window stored), nor check beta, quality or the sector. A name calm for a quarter can still be a risky one."

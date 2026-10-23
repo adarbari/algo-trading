@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "earnings_neutral_reversal"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by 20-session return excluding earnings-report days, biggest losers first."
 summary = "Ranks liquid stocks by their return over the last 20 sessions leaving out the days an earnings report moved the price, the biggest losers first. It isolates the month's move that earnings did not make.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day with a 20-session return known to exclude earnings days. Every such name qualifies; the lowest return ranks first."
 not_checked = "It does not read 8-K news or press: only earnings reaction windows are left out. It is unknown for a name with no earnings report on file."

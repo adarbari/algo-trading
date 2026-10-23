@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "12-1 momentum winners in a squeeze"
+description = "Past-year winners in an uptrend whose price bands are the narrowest in a year."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1, so the variants compare on one universe)
