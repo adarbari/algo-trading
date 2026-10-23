@@ -470,7 +470,11 @@ def test_a_reused_pid_with_another_start_time_is_a_stale_lock(rig: Rig) -> None:
 
 def test_the_lock_tag_with_the_real_start_time_is_a_live_holder(rig: Rig) -> None:
     start = subprocess.run(
-        ["ps", "-o", "lstart=", "-p", str(os.getpid())], capture_output=True, text=True, check=False
+        ["ps", "-o", "lstart=", "-p", str(os.getpid())],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "LC_ALL": "C", "TZ": "UTC"},
     ).stdout.split()
     lock = rig.tmp / "logs" / "perf_gate" / "lock"
     lock.parent.mkdir(parents=True)
@@ -496,3 +500,26 @@ def test_a_leftover_trash_delete_is_logged_to_its_own_days_record(rig: Rig) -> N
         != json.loads((old_day / "status.json").read_text())["trash_delete_s"]
         or "trash_delete_s" in today
     )  # the old day's file got its own value; today's is its own
+
+
+def test_the_lock_start_time_is_read_in_the_c_locale_whatever_the_callers_locale(rig: Rig) -> None:
+    bin_dir = rig.tmp / "bin"
+    bin_dir.mkdir()
+    stub = bin_dir / "ps"
+    stub.write_text(
+        "#!/bin/sh\n"
+        'case "$*" in *lstart=*)\n'
+        '  if [ "$LC_ALL" = C ] && [ "$TZ" = UTC ]; then echo "Fri Oct 23 03:00:00 2026"\n'
+        '  else echo "ven. 23 oct. 03:00:00 2026"; fi; exit 0;;\n'
+        "esac\n"
+        'exec /bin/ps "$@"\n'
+    )
+    stub.chmod(0o755)
+    lock = rig.tmp / "logs" / "perf_gate" / "lock"
+    lock.parent.mkdir(parents=True)
+    lock.symlink_to(
+        f"{os.getpid()}:Fri_Oct_23_03:00:00_2026"
+    )  # as a launchd (C locale) run wrote it
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "LC_ALL": "fr_FR.UTF-8", "TZ": "Europe/Paris"}
+    res = rig.run(**env)
+    assert res.returncode == 3 and "holds" in res.stderr  # a live holder, not a stale lock

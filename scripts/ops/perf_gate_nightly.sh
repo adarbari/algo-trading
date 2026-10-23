@@ -87,7 +87,8 @@ lockdir=$logs/perf_gate/lock   # a symlink whose target is the holder's pid: cre
 guard=$lockdir.takeover
 mkdir -p "$logs/perf_gate"
 lock_held=0
-start_of() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' '_' | sed 's/^_//; s/_$//'; }
+# lstart is locale and TZ dependent: always read it as C / UTC, whoever started the run
+start_of() { LC_ALL=C TZ=UTC ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' '_' | sed 's/^_//; s/_$//'; }
 mytag="$$:$(start_of $$)"  # pid and process start time: a reused pid has another start time
 alive() {  # a holder tag is pid or pid:start; a dead pid, a garbage tag or another start = stale
   local pid=${1%%:*} start=
