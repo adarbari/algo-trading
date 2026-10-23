@@ -73,6 +73,16 @@ const result = (rank: number, symbol: string, decision: string, change: string |
     },
   ],
   columns: [{ name: 'spread', value: 0.05 }],
+  countsToward: [
+    {
+      edgeId: 'drift',
+      edgeName: 'Drift',
+      counts: decision === 'QUALIFIED',
+      code: decision === 'QUALIFIED' ? 'counts' : 'not_qualified',
+      topK: 5,
+      place: decision === 'QUALIFIED' ? rank : null,
+    },
+  ],
 });
 
 function served(total = 2) {
@@ -201,18 +211,28 @@ describe('ScreenerResults', () => {
     for (const header of [
       'Ticker',
       'Decision',
+      'Why it matched',
       'Score',
+      'Counts toward',
       'IV30',
       'Spread',
       'Close',
       'Change',
       'Why',
     ])
-      expect(within(grid).getByRole('columnheader', { name: new RegExp(header) })).toBeTruthy();
+      expect(
+        within(grid).getByRole('columnheader', {
+          name: new RegExp(header === 'Why' ? '^Why(?! it matched)' : `^${header}`),
+        }),
+      ).toBeTruthy();
     expect(within(grid).queryByRole('columnheader', { name: /Optionable/ })).toBeNull();
     const aapl = screen.getByRole('row', { name: /AAPL/ });
     expect(aapl).toHaveTextContent('$71.50');
     expect(aapl).toHaveTextContent('New');
+    // Why it matched: the rule it passed with its value; Counts toward: the server's verdict per edge.
+    expect(aapl).toHaveTextContent('IV30 60.0%');
+    expect(aapl).toHaveTextContent('Counts');
+    expect(aapl).toHaveTextContent('Drift');
     expect(screen.getByRole('row', { name: /KO/ })).toHaveTextContent('Unknown');
     expect(screen.getByText('2 shown · 4,003 in the run')).toBeInTheDocument();
     await expectNoA11yViolations(container);

@@ -302,6 +302,15 @@ function trackRecords() {
   return { edges: RECORDS.data.edges.slice(0, 1), screeners };
 }
 
+/** `ScreenerEdges`: a VRP screener belongs to two edges (a candidate and an evidenced one); every other screener to none. */
+function screenerEdges(id: string) {
+  const first = RECORDS.data.screeners[0];
+  const records = VRP_IDS.includes(id)
+    ? (first?.trackRecords ?? []).map((r) => ({ ...r, screenerId: id, splitFrom: '2026-04-01' }))
+    : [];
+  return { edges: RECORDS.data.edges, screener: { id, trackRecords: records } };
+}
+
 export interface EdgesMock {
   /** The documents the builder saved, in order, by edge id. */
   saves: { id: string; document: Record<string, unknown> }[];
@@ -363,7 +372,7 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as {
       query?: string;
-      variables?: { ids?: string[] };
+      variables?: { ids?: string[]; id?: string };
     } | null;
     const query = body?.query ?? '';
     if (/query\s+EdgeDocument\b/.test(query)) {
@@ -418,6 +427,8 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
     } else if (SECTIONS.some(([name]) => name.test(query))) {
       const [, data] = SECTIONS.find(([name]) => name.test(query)) ?? [];
       await route.fulfill({ json: { data } });
+    } else if (/query\s+ScreenerEdges\b/.test(query)) {
+      await route.fulfill({ json: { data: screenerEdges(body?.variables?.id ?? '') } });
     } else if (/query\s+ScreenerTrackRecords\b/.test(query)) {
       await route.fulfill({ json: { data: trackRecords() } });
     } else {
