@@ -609,3 +609,102 @@ def test_a_run_that_was_sampled_is_not_recorded(rig: Rig) -> None:
     assert "outcome=sampled" in rig.status.read_text()
     assert hist.read_text() == '{"old": 1}\n'
     assert "NOT recorded" in (rig.tmp / "notified").read_text()
+
+
+def _own_tree_ps(rig: Rig, root_file: Path) -> dict[str, str]:
+    """A `ps -eo pid,args` of only the wrapper and its descendants (real ones), so the real timeline
+    is seen by the busy check without the machine's other processes."""
+    d = rig.tmp / "realps"
+    d.mkdir(exist_ok=True)
+    real = shutil.which("ps")
+    awk = (
+        '{ pid=$1; par[pid]=$2; $1=""; $2=""; a[pid]=$0 }'
+        ' END { for (p in par) { x=p; for (i=0;i<60&&x!=""&&x!=0;i++) {'
+        " if (x==root) { print p a[p]; break }; x=par[x] } } }"
+    )
+    (d / "ps").write_text(
+        '#!/bin/sh\nif [ "$1" = -eo ] && [ "$2" = pid,args ]; then\n'
+        f"  cat {root_file}.extra 2>/dev/null\n"
+        f'  root=$(cat {root_file} 2>/dev/null); [ -n "$root" ] || exit 0\n'
+        f"  {real} -Ao pid=,ppid=,args= | awk -v root=$root '{awk}'\n"
+        f'else exec {real} "$@"; fi\n'
+    )
+    (d / "ps").chmod(0o755)
+    (d / "iostat").write_text("#!/bin/sh\nsleep 2\n")  # the timeline always has a live probe child
+    (d / "iostat").chmod(0o755)
+    return {"PATH": f"{d}:{os.environ['PATH']}"}
+
+
+def test_the_gates_own_flight_recorder_is_never_a_writer_during_the_copy(rig: Rig) -> None:
+    """Hand run 7b: the timeline's args hold var/logs/ and its probes are live: it was busy."""
+    (rig.tmp / "var" / "data" / "tables").mkdir(exist_ok=True)
+    root_file = rig.tmp / "root.pid"
+    slow = _script(rig, "slowcp9.sh", "sleep 5\n")
+    status = (
+        rig.tmp / "var" / "logs" / "perf_gate.status"
+    )  # the run folder is under var/logs/, as live
+    env = rig.env(PERF_COPY_CMD=slow, PERF_POLL_S="1", PERF_SAMPLE_S="1", PERF_STATUS=str(status),
+                  **_own_tree_ps(rig, root_file))  # fmt: skip
+    env.pop("PERF_PS_FILE")  # the real ps, filtered to the wrapper's own tree
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    root_file.write_text(str(proc.pid))
+    _, err = proc.communicate(timeout=60)
+    assert "copy stopped" not in err and "a writer" not in err
+    assert proc.returncode == 1  # the bench ran
+
+
+def test_a_missing_clone_parent_is_created_not_called_busy(rig: Rig) -> None:
+    assert not rig.root.exists()
+    res = rig.run(PERF_FREE_GB="")  # measured, not given
+    assert res.returncode == 1 and "GB free" not in res.stderr
+
+
+def _own_tree_run(rig: Rig, copy_body: str, extra: str = "", copy_name: str = "slowcp10.sh"):
+    (rig.tmp / "var" / "data" / "tables").mkdir(exist_ok=True)
+    root_file = rig.tmp / "root.pid"
+    root_file.with_name("root.pid.extra").write_text(extra)
+    logs = rig.tmp / "var" / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    stub = logs / copy_name  # the path itself carries the var/logs/ marker
+    stub.write_text("#!/bin/sh\n" + copy_body)
+    stub.chmod(0o755)
+    env = rig.env(
+        PERF_COPY_CMD=str(stub), PERF_POLL_S="1", PERF_STATUS=str(logs / "perf_gate.status"),
+        **_own_tree_ps(rig, root_file),
+    )  # fmt: skip
+    env.pop("PERF_PS_FILE")
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    root_file.write_text(str(proc.pid))
+    _, err = proc.communicate(timeout=60)
+    return proc.returncode, err
+
+
+def test_a_marker_matching_descendant_not_named_flight_recorder_is_the_gates_own(rig: Rig) -> None:
+    # the copy stub's path holds var/logs/ and it has a live non-sleep child: a "writer" unless own
+    code, err = _own_tree_run(rig, "python3 -c 'import time; time.sleep(5)'\n")
+    assert code == 1 and "a writer" not in err and "copy stopped" not in err
+
+
+def test_a_non_descendant_writer_is_still_busy_beside_the_own_tree_rule(rig: Rig) -> None:
+    pytest_pid = os.getpid()  # alive, and not a descendant of the wrapper
+    code, err = _own_tree_run(
+        rig, "sleep 1\n", extra=f"  {pytest_pid} .venv/bin/algotrade-ingest x\n"
+    )
+    assert code == 3 and f"a writer runs: {pytest_pid} " in err
+
+
+def test_with_a_fake_ps_file_no_pid_is_the_gates_own_not_even_the_wrappers(rig: Rig) -> None:
+    (rig.tmp / "var" / "data" / "tables").mkdir(exist_ok=True)
+    slow = _script(rig, "slowcp11.sh", "sleep 8\n")
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=rig.env(PERF_COPY_CMD=slow, PERF_POLL_S="1"),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )  # fmt: skip
+    time.sleep(2)  # a fake writer that carries the wrapper's own pid is still a writer
+    rig.ps.write_text(QUIET_PS + f"  {proc.pid} .venv/bin/algotrade-ingest rollups\n")
+    _, err = proc.communicate(timeout=60)
+    assert proc.returncode == 3 and "copy stopped" in err
