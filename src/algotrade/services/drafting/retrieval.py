@@ -12,8 +12,9 @@ budget caps the whole slice (``select_slice(budget=...)``). Pure: reads nothing,
 import math
 import re
 from collections import Counter
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass
+from functools import cache, lru_cache
 
 from algotrade.config.site.field_guide import FieldGuideSettings
 from algotrade.config.site.llm import Phrase
@@ -131,6 +132,7 @@ _VERSION = re.compile(r"^v\d+$")
 FIELD_REF = re.compile(r"[a-z_]+\.[A-Za-z0-9_@.]*[A-Za-z0-9_]")
 
 
+@cache
 def stem(word: str) -> str:
     """A crude stem: plural, ``ing``, ``ed`` and ``ly`` endings off a word of 5+ letters."""
     for ending in ("ing", "ies", "ed", "es", "ly", "s"):
@@ -267,30 +269,41 @@ def _within_budget(
     return Slice(tuple(sorted(chosen)), frozenset(set(chosen) - upgraded), matched)
 
 
+@lru_cache(maxsize=8)
+def _word_index(
+    rows: tuple[tuple[str, str], ...], intents: tuple[tuple[str, str], ...]
+) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, float]]:
+    """The sentence-independent part of ``_ranked``, built once per catalogue and guide: each
+    field's words in its name and in its description or guide intents, and every word's weight
+    (a word that is in few fields counts more)."""
+    in_name = {n: name_words(n) for n, _ in rows}
+    by_intent = dict(intents)
+    in_text = {
+        n: content_words(f"{description} {by_intent.get(n, '')}") - in_name[n]
+        for n, description in rows
+    }
+    df = Counter(w for n in in_name for w in in_name[n] | in_text[n])
+    total = len(in_name)
+    return in_name, in_text, {w: math.log(1 + total / df[w]) for w in df}
+
+
 def _ranked(
     sentence: str, infos: Sequence[FeatureInfo], guide: FieldGuideSettings | None
 ) -> list[str]:
     """Field names by how well the sentence's words match them, best first (ties by name):
     a word in the name counts double; a word in the description or a guide intent once; a word
     that is in few fields counts more."""
-    infos = [i for i in infos if i.scope == "site"]  # the caller's own are always in full
-    by_name = {i.name: i for i in infos}
-    in_name = {n: name_words(n) for n in by_name}
+    # the caller's own features are always in full, so only the site's are ranked
+    rows = tuple((i.name, i.description) for i in infos if i.scope == "site")
+    intents: tuple[tuple[str, str], ...] = ()
+    if guide is not None:
+        intents = tuple((e.name, " ".join(u.intent for u in e.uses)) for e in guide.fields)
+    in_name, in_text, weight = _word_index(rows, intents)
     wanted = content_words(sentence, set().union(*in_name.values()))
     if not wanted:
         return []
-    intents: Mapping[str, str] = {}
-    if guide is not None:
-        intents = {e.name: " ".join(u.intent for u in e.uses) for e in guide.fields}
-    in_text = {
-        n: content_words(f"{i.description} {intents.get(n, '')}") - in_name[n]
-        for n, i in by_name.items()
-    }
-    df = Counter(w for n in by_name for w in in_name[n] | in_text[n])
-    total = len(by_name)
-    weight = {w: math.log(1 + total / df[w]) for w in df}
     scored = []
-    for n in by_name:
+    for n in in_name:
         score = sum(2 * weight[w] for w in wanted & in_name[n]) + sum(
             weight[w] for w in wanted & in_text[n]
         )
