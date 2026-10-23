@@ -118,3 +118,12 @@ def test_the_task_is_skipped_with_no_config_store(world: World) -> None:  # noqa
     ctx = replace(task_ctx(world.writer, world.reader), configs=None)
     assert skip_reason("edge-picks", ctx) is not None
     assert entries_ops.run_edge_picks  # the registered entry
+
+
+def test_a_skipped_row_is_decided_again_by_the_next_run() -> None:
+    w = build_world(no_features=[DAYS[3]])
+    run(w, configs(), session=DAYS[3])
+    assert set(rows(w, DAYS[3])["status"]) == {"skipped"}
+    w.write_features(DAYS[3])  # the data arrives late
+    again = run(w, configs(), session=DAYS[3])
+    assert again.stats["written"] == 2 and set(rows(w, DAYS[3])["status"]) == {"picked"}

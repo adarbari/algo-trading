@@ -1,6 +1,8 @@
 """What a site edge takes at a session (ADR 0081): the harness's pick rule over the harness's own
 screen and universe, and why a session has none."""
 
+from datetime import date
+
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.edge_picks.night import (
@@ -95,3 +97,12 @@ def test_one_screen_serves_every_edge_that_lists_it(world: World) -> None:
     edge_night(n, edge(top_k=2))
     edge_night(n, edge(universe=NO_N18))
     assert len(n.runs) == 1
+
+
+def test_a_month_end_is_a_decision_day_whatever_the_horizon_and_the_month_before(
+    world: World,
+) -> None:
+    for horizon in (2, 21, 60):
+        monthly = edge(schedule="month_end", outcome={**_outcome(), "horizon_sessions": [horizon]})
+        assert fires(monthly, date(2026, 2, 27)) and fires(monthly, date(2026, 1, 30))
+        assert not fires(monthly, date(2026, 2, 26))

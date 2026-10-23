@@ -76,7 +76,10 @@ def fires(edge: Edge, session: date) -> bool:
     around = sessions_between(
         session - timedelta(days=AROUND_DAYS), session + timedelta(days=AROUND_DAYS)
     )
-    return session in decision_sessions(edge.schedule, around, edge.outcome.horizon_sessions[0])
+    # A month end is a decision day whatever the spacing (no earlier month end is read); a window
+    # needs its own horizon.
+    horizon = 1 if edge.schedule == "month_end" else edge.outcome.horizon_sessions[0]
+    return session in decision_sessions(edge.schedule, around, horizon)
 
 
 @dataclass

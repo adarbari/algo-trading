@@ -51,7 +51,9 @@ class PickEdge:
 def _stored(ctx: ReadContext, run: ScreenerRun) -> dict[tuple[str, str], tuple[str, list[str]]]:
     """The served session's rows by (edge, screener): ``(status, pick ids)``; empty when the
     session has none stored or ``run`` is another session's."""
-    if run.session != ctx.session.date:
+    if (
+        run.session != ctx.session.date or run.owner != SITE_USER
+    ):  # a viewer's own run: not the site's
         return {}
     found = partition(ctx, TABLE)
     if isinstance(found, Unknown) or found.empty:

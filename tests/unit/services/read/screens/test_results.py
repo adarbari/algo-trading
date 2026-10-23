@@ -634,24 +634,19 @@ def _codes(found: dict[str, tuple[PickEdge, ...]]) -> dict[str, list[tuple[str, 
 def test_a_pick_counts_where_the_edges_own_stored_picks_put_it(
     backend: MemoryBackend, reader: StoreReader
 ) -> None:
-    """The run ranks BBB 1st and DDD 2nd, but the edge's universe leaves BBB out: DDD is its
-    first pick (the rank of the run is not the edge's place)."""
-    _store(backend, PICKED, ["DDD"])
-    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "me", "beta")
-    assert _codes(found) == {
-        "EQ:BBB": [(NOT_COUNTED, None)],
-        "EQ:DDD": [(COUNTS, 1)],
-        "EQ:AAA": [(NOT_COUNTED, None)],
-    }
-    (ddd,) = found["EQ:DDD"]
-    assert (ddd.edge_id, ddd.edge_name, ddd.counts, ddd.top_k) == ("drift", "Drift", True, 2)
+    """The edge's stored list is the truth, whatever the run's own rank was."""
+    _store(backend, PICKED, ["CCC"])
+    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "site", "beta")
+    assert _codes(found) == {"EQ:CCC": [(COUNTS, 1)]}
+    (ccc,) = found["EQ:CCC"]
+    assert (ccc.edge_id, ccc.edge_name, ccc.counts, ccc.top_k) == ("drift", "Drift", True, 2)
 
 
 def test_a_session_with_no_stored_picks_says_not_stored_never_an_older_night(
     backend: MemoryBackend, reader: StoreReader
 ) -> None:
-    _store(backend, PICKED, ["BBB"], day=D0)  # an older session's picks are not this one's
-    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "me", "beta")
+    _store(backend, PICKED, ["CCC"], day=D0)  # an older session's picks are not this one's
+    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "site", "beta")
     assert {e.code for edges in found.values() for e in edges} == {NOT_STORED}
     assert not any(e.counts for edges in found.values() for e in edges)
 
@@ -659,10 +654,10 @@ def test_a_session_with_no_stored_picks_says_not_stored_never_an_older_night(
 def test_an_edge_with_no_row_is_not_stored_while_another_has_its_picks(
     backend: MemoryBackend, reader: StoreReader
 ) -> None:
-    _store(backend, PICKED, ["BBB"], edge_id="alpha")
+    _store(backend, PICKED, ["CCC"], edge_id="alpha")
     ctx = context(reader, {**_edge("alpha", "beta", 2), **_edge("zeta", "beta", 2)})
-    found = _toward(ctx, "me", "beta")
-    assert [(e.edge_id, e.code) for e in found["EQ:BBB"]] == [
+    found = _toward(ctx, "site", "beta")
+    assert [(e.edge_id, e.code) for e in found["EQ:CCC"]] == [
         ("alpha", COUNTS),
         ("zeta", NOT_STORED),
     ]
@@ -683,7 +678,7 @@ def test_a_pick_the_regime_gate_held_back_is_never_counted(
 
 
 def test_a_screener_no_edge_lists_has_none(reader: StoreReader) -> None:
-    assert _toward(context(reader), "me", "beta")["EQ:BBB"] == ()
+    assert _toward(context(reader), "site", "beta")["EQ:CCC"] == ()
 
 
 def test_a_session_the_schedule_does_not_decide_and_an_unjudged_edge_count_nothing(
@@ -700,7 +695,7 @@ def test_a_session_the_schedule_does_not_decide_and_an_unjudged_edge_count_nothi
             **_edge("gap", "beta", 5),
         },
     )
-    for edges in _toward(ctx, "me", "beta").values():
+    for edges in _toward(ctx, "site", "beta").values():
         assert [(e.edge_id, e.code, e.counts, e.place) for e in edges] == [
             ("gap", NOT_STORED, False, None),
             ("monthly", NOT_A_DECISION_DAY, False, None),
@@ -713,5 +708,13 @@ def test_a_users_own_edge_is_not_stored_whatever_a_row_says(
 ) -> None:
     _store(backend, PICKED, ["BBB"], edge_id="mine")
     own = {("me", "edges", "mine"): _edge("mine", "beta", 2)[("site", "edges", "mine")]}
-    found = _toward(context(reader, own), "me", "beta")
-    assert [(e.edge_id, e.code) for e in found["EQ:BBB"]] == [("mine", NOT_STORED)]
+    found = _toward(context(reader, own), "site", "beta")
+    assert [(e.edge_id, e.code) for e in found["EQ:CCC"]] == [("mine", NOT_STORED)]
+
+
+def test_a_viewers_own_run_is_not_judged_by_the_sites_picks(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    _store(backend, PICKED, ["BBB"])
+    found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "me", "beta")  # me's beta
+    assert {e.code for edges in found.values() for e in edges} == {NOT_STORED}

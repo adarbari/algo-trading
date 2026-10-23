@@ -50,7 +50,7 @@ a page read.
    `forward.signals.legs_between` (the harness's own legs, event names read at D). Any other
    session is `not_decision_day`: a row, so the page can tell it from a session never stored.
 6. **Resumable, idempotent, accepted.** The task `edge-picks` (`--date`, `--from/--to`,
-   `--edge`) skips the (edge, screener, session) keys already stored, writes every new row of a
+   `--edge`) skips the (edge, screener, session) keys already decided (a `skipped` gap is decided again and its row replaces it; an edge document edited after a session was stored does not rewrite that session: re-run with `--edge` after deleting nothing is not supported, the stored row is what the edge took then), writes every new row of a
    session in one publish, counts one edge's failure (a `skipped` row with the reason, the run
    PARTIAL) and never stops the others. It is a nightly step after `screens`, optional
    (ADR 0039/0055: a gap warns, never holds the session), run for every session of a catch-up.

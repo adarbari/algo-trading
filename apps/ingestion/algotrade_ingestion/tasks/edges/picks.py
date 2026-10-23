@@ -54,11 +54,13 @@ class Options:
 
 
 def stored_keys(reader: StoreReader, session: date) -> set[tuple[str, str]]:
-    """The (edge, screener) pairs with a row stored for ``session``."""
+    """The (edge, screener) pairs with a decided row stored for ``session`` (a ``skipped`` row
+    is a gap: the next run decides it again and its row replaces it; a changed edge document does
+    not re-decide a session already stored)."""
     part = reader.table(TABLE, session)
     if part is None or part.empty:
         return set()
-    site = part[part["user_id"] == SITE_USER]
+    site = part[(part["user_id"] == SITE_USER) & (part["status"] != SKIPPED)]  # a gap is retried
     return set(zip(site["edge_id"], site["screener"], strict=True))
 
 
@@ -91,6 +93,7 @@ def store_picks(ctx: TaskContext, session: date, options: Options | None = None)
     edges = sorted(
         (e for e in load_edges(ctx.configs, SITE_USER) if e.screeners), key=lambda e: e.id
     )
+    pairs = sum(len(e.screeners) for e in edges)
     if opt.edge is not None:
         edges = [e for e in edges if e.id == opt.edge]
         if not edges:
@@ -115,7 +118,7 @@ def store_picks(ctx: TaskContext, session: date, options: Options | None = None)
         gaps = [f"{r.edge_id}/{r.screener}: {r.reason}" for r in every if r.status == SKIPPED]
         run.stats.update(
             edges=len(edges),
-            pairs=sum(len(e.screeners) for e in edges),
+            pairs=pairs,
             sessions=[d.isoformat() for d in days],
             written=len(every),
             by_status=dict(Counter(r.status for r in every)),
@@ -135,9 +138,9 @@ def check_edge_picks(reader: StoreReader, session: date, s: SourcesSettings) -> 
     runs = [r for r in reader.runs(TASK, session) if r.status == RunStatus.COMPLETE]
     if not runs:
         return [Check("edge_picks", "FAIL", f"no complete edge-picks run for {session}")]
-    stored = stored_keys(reader, session)
     pairs = int(runs[-1].stats.get("pairs", 0))
     part = reader.table(TABLE, session)
+    stored = [] if part is None else list(part.loc[part["user_id"] == SITE_USER, "edge_id"])
     skipped = 0 if part is None else int((part["status"] == SKIPPED).sum())
     if len(stored) < pairs:
         return [
