@@ -374,10 +374,21 @@ wait_deploy_done() {
   done
   return 0
 }
+# the pids of this run's own process tree (the wrapper and every descendant: the flight recorder's timeline
+# and its ps / iostat probes, the watchdog, the bench, the copy): never a writer, whatever their args say
+# (hand run 7b: the timeline's `--rundir .../var/logs/...` matched the marker and its probe child was "live")
+own_tree() {
+  ps -Ao pid=,ppid= 2>/dev/null | awk -v root=$$ '
+    { parent[$1] = $2 }
+    END { for (p in parent) { x = p; for (i = 0; i < 60 && x != "" && x != 0; i++) {
+            if (x == root) { print p; break }; x = parent[x] } } }'
+}
 busy_writer() {  # $1 = copy: a deploy is no writer while the copy runs (it is for everything else)
-  local pid args
-  ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench" | {
+  local pid args own
+  own=" $(own_tree | tr '\n' ' ') $$ "
+  ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench|flight_recorder" | {
     while read -r pid args; do
+      case "$own" in *" $pid "*) continue ;; esac
       if [ "${1:-}" = copy ] && printf '%s' "$args" | grep -qE "$deploy_re"; then  # no store table (see above)
         [ "$rundir_made" = 1 ] && ! grep -q "ignored deploy: pid $pid " "$rundir/run.log" 2>/dev/null &&
           echo "perf_gate: ignored deploy: pid $pid $args" >>"$rundir/run.log"
@@ -403,6 +414,7 @@ leftover=0
 for t in "$clone".trash.*; do [ -e "$t" ] && { delete_trash "$t"; leftover=1; }; done
 [ -d "$clone" ] && { discard_clone; leftover=1; }
 if [ "$leftover" = 1 ]; then busy "a leftover clone or trash of an earlier run: its delete is started, retry once it is gone"; fi
+mkdir -p "$(dirname "$clone")"  # a missing parent made the free-space probe empty: "? GB free", busy
 free_gb=${PERF_FREE_GB:-$(free_now)}
 if [ "${free_gb:-0}" -lt "$min_disk_gb" ]; then
   busy "${free_gb:-?} GB free, need $min_disk_gb"
