@@ -505,7 +505,8 @@ fi
 # a sleep or stall DURING the bench (the sampler's late_s over 60 s, from the bench's start) makes its
 # times worthless: the run is `paused` (noisy), not recorded in the history, and the notice says so
 paused_bench=$(awk -F, -v t="$t_bench" 'NR > 1 && $1 >= t - 10 && $4 + 0 > 60 {n++} END {print n + 0}' "$rundir/load.csv" 2>/dev/null)
-if [ "${paused_bench:-0}" -gt 0 ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ]; then
+if [ "${paused_bench:-0}" -gt 0 ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ] \
+   && [ "$outcome" != integrity ]; then  # an integrity failure stays one: not a no-verdict pause
   outcome=paused
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "the machine paused or stalled during the bench ($paused_bench late samples): not recorded"
@@ -540,7 +541,7 @@ reason=""; [ "$overtime" = yes ] && reason=over-time
 finish_evidence "$reason"
 
 if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
-  msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
+  msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); snapshot ${snapshot_s}s, bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
     msg="1 s page gate INTEGRITY FAILURE (not a timing result): $why evidence in var/logs/perf_gate/$today/"
