@@ -564,3 +564,12 @@ follow-up PR).
 - status: final
 - Note: approved in chat 2026-10-22 (results/edge_verdict approved by the owner 2026-10-22 in chat); build plan in four PRs, PR 1 is the shared judge call and fingerprint with no behaviour change.
 - Reasoning: stale is never an option, slow is: a fingerprint over everything the judge reads makes a stale verdict impossible by construction, and the headline reads less than the full verdict, so the table stays a flat row.
+
+## 2026-10-22 | Ideas SQLite index deferred; built in a separate session (data architecture v2) | Defer, revisit on measured triggers
+- Question: build the per-viewer prestored Ideas SQLite index now, or defer it after the cheaper read fixes?
+- Options: build now / defer on measured triggers.
+- Decision: defer (owner, in chat 2026-10-22: "On Ideas SQLite index let us defer. I will start a different session on SQLite separately."). Triggers to revisit: IdeasPage over 1 s cold again after the cheaper steps; run-file count or payload growth past the plan's thresholds; a second feature needing the same prestored shape. Re-measure with the nightly gate first. The ADR 0006 amendment of 2026-10-22 and the decision "Ideas ranking rule, store and licence (confirmed)" stand unchanged.
+- decided by: owner
+- status: final
+- Note: the owner starts the SQLite work in a separate session; the hand-off note is outside the repo.
+- Reasoning: IdeasPage is 0.91 s cold on a quiet machine (0.85 s for a trader without the personal licence) after #860 (skip the values-file read) and #861 (light IdeaScreener.top), against a 1 s bar. The architect's profile showed run-file reads (about 65% of load_ideas) were the cost, and an index would save only about 0.1-0.3 s; the batched run-file read (#863) was closed after measuring 0.018 s against an estimated 0.15-0.2 s.
