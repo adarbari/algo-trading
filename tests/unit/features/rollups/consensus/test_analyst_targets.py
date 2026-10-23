@@ -1,4 +1,4 @@
-"""``analyst_targets@v1``: the price-target consensus of our own FMP snapshots, STALE after 21
+"""``analyst_targets@v2``: the price-target consensus of our own FMP snapshots, STALE after 21
 days, the shared statuses, the personal licence."""
 
 from datetime import date
@@ -70,12 +70,12 @@ def test_a_store_without_the_table_reads_every_name_as_never_asked() -> None:
     assert set(got["targets_status"]) == {NOT_FETCHED} and got["target_consensus"].isna().all()
 
 
-def test_the_output_conforms_and_every_feature_is_personal_and_optional() -> None:
+def test_the_output_conforms_and_every_feature_is_yahoo_licensed_and_optional() -> None:
     writer = store()
     put(writer, S, [target(A, 100.0)])
     conform("t", run(writer, ids=(A, B)).reset_index(), at.COLUMNS)
-    assert all(f.licence == "personal" for f in at.GROUP.features) and at.GROUP.optional
-    values = [f for f in at.GROUP.features if f.name != "targets_status"]
+    assert all(f.licence == "yahoo" for f in at.GROUP.features) and at.GROUP.optional
+    values = [f for f in at.GROUP.features if f.name not in ("targets_status", "targets_source")]
     assert all(f.null_status == "targets_status" for f in values)
     assert all(f.uncovered_statuses == UNCOVERED for f in values)
 

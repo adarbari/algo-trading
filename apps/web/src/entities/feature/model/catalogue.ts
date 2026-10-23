@@ -87,11 +87,11 @@ export function isOwn(feature: Pick<CatalogueFeature, 'scope'>): boolean {
 }
 
 /**
- * Derived from personal-use licensed market data (IBKR; ADR 0028): its values are shown to
- * the owner only, never shared or published.
+ * Derived from personal-use licensed data (IBKR, ADR 0028; Yahoo, ADR 0080: any licence but
+ * open): its values are shown to the owner only, never shared or published.
  */
 export function isPersonal(feature: Pick<CatalogueFeature, 'licence'>): boolean {
-  return feature.licence === 'personal';
+  return feature.licence !== 'open';
 }
 
 /** The marks a feature carries in lists: "yours", "personal licence". */

@@ -1,12 +1,18 @@
-"""``analyst_revisions@v1``: how the consensus for the current fiscal year has moved.
+"""``analyst_revisions@v2``: how the consensus for the current fiscal year has moved.
 
-Inputs: ``analyst_estimates@v1`` for the session (required: FY1 as the session knows it, its year
-end, EPS, revenue and analyst count) and ``analyst/estimate_snapshots`` as the session sees it
-(our own nightly history of FMP's annual estimates: ``data.analyst.reading``). One row per
-estimates row, so a name reads as ``analyst_estimates@v1`` reads it: its ``estimates_status``
-STALE, NOT_COVERED or NOT_FETCHED passes through to ``revisions_status`` with null values (ADR
-0072: the two uncovered statuses read as "not covered", STALE as old data). ``licence =
-"personal"`` on every feature (ADR 0068, ADR 0069).
+Inputs: ``analyst_estimates@v2`` for the session (required: FY1 as the session knows it, its year
+end, EPS, revenue, analyst count and the vendor it came from) and ``analyst/estimate_snapshots``
+as the session sees it (our own nightly history of FMP's and Yahoo's annual estimates:
+``data.analyst.reading``). One row per estimates row, so a name reads as ``analyst_estimates@v2``
+reads it: its ``estimates_status`` STALE, NOT_COVERED or NOT_FETCHED passes through to
+``revisions_status`` with null values (ADR 0072: the two uncovered statuses read as "not
+covered", STALE as old data), and ``revisions_source`` is its ``estimates_source``. The history a
+revision compares with is ONLY that vendor's snapshots of the name (``history_of_chosen``): after
+a name flips vendor (FMP's estimates lapse, or return) its revisions are BUILDING / NO_PRIOR
+until the new vendor's own snapshots span the windows (90 days), never a difference across
+vendors (their EPS bases differ; ADR 0080). A column cannot carry the licence of the vendor it
+holds for a name, so every feature carries the stricter: ``licence = "yahoo"`` (ADR 0068, 0069,
+0080). v2 (v1: FMP only) adds ``revisions_source``; every v1 column is unchanged.
 
     eps_fy1_revision_30d, _60d, _90d      (EPS of FY1 now - EPS of the same year N days ago) /
                                           |EPS then|, in percent
@@ -14,8 +20,9 @@ STALE, NOT_COVERED or NOT_FETCHED passes through to ``revisions_status`` with nu
     eps_fy1_analysts_change_90d           analysts behind the EPS now less 90 days ago
     revisions_status                      OK / BUILDING / NO_PRIOR, or STALE / NOT_COVERED /
                                           NOT_FETCHED as ``estimates_status`` says
+    revisions_source                      fmp / yahoo: ``estimates_source``, the vendor compared
 
-"Now" is the newest snapshot (the one ``analyst_estimates@v1`` serves) and "N days ago" is
+"Now" is the newest snapshot (the one ``analyst_estimates@v2`` serves) and "N days ago" is
 measured from ITS day, not from the session: a past value is the same fiscal YEAR in an earlier
 snapshot, the estimate row whose year end is within ``PERIOD_SLACK`` (10) days of FY1's year end,
 in the latest snapshot for a session from ``N + SNAPSHOT_SLACK`` (7) to ``N`` days before the
@@ -53,29 +60,30 @@ from algotrade.features.rollups.consensus.analyst_status import (
     NOT_FETCHED,
     OK,
     SNAPSHOTS,
+    SOURCES,
     STALE,
     UNCOVERED,
-    VENDOR,
     days_back,
-    history_rows,
+    history_of_chosen,
 )
 from algotrade.features.rollups.consensus.earnings_surprise import MIN_BASE, change_pct
 
 NAME = "analyst_revisions"
-VERSION = 1
-ESTIMATES_TABLE = "rollups/instrument/analyst_estimates@v1"
+VERSION = 2
+ESTIMATES_TABLE = "rollups/instrument/analyst_estimates@v2"
 BUILDING, NO_PRIOR = "BUILDING", "NO_PRIOR"
 STATUSES = (OK, BUILDING, NO_PRIOR, STALE, NOT_COVERED, NOT_FETCHED)
 WINDOWS = (30, 60, 90)  # calendar days back
 PERIOD_SLACK = 10  # days: a year end this close to FY1's is the same fiscal year
-_P: Licence = "personal"
+_P: Licence = "yahoo"  # the stricter of the two vendors (ADR 0080)
 _SNAP = f"{SNAPSHOTS}."
 _EST = "analyst_estimates."
+_SOURCE = "revisions_source"
 _PCT = (-10000.0, 10000.0)  # percent: a small base makes huge revisions, kept and flagged
 _FROM = "2026-10-19"  # our first snapshot at the earliest
 _WHY = (
     "revisions_status is STALE, NOT_COVERED or NOT_FETCHED (as estimates_status of "
-    "analyst_estimates@v1 says); or no snapshot of ours holds the same fiscal year {days} days "
+    "analyst_estimates@v2 says); or no snapshot of ours holds the same fiscal year {days} days "
     "before the newest one (our history starts " + _FROM + "); or {base}"
 )
 _BASE = f"the old value is missing or below {MIN_BASE}"
@@ -90,7 +98,7 @@ def _revision(name: str, days: int, what: str, now: str, then: str) -> Feature:
         f"Change of the first estimate year's {what} over {days} days, in percent of the old "
         f"value: 5 is an estimate 5% higher than {days} days ago, same fiscal year",
         _WHY.format(days=days, base=base), valid_range=_PCT,
-        inputs=(f"{_EST}{now}@v1", f"{_EST}fy1_period_end@v1", f"{_SNAP}{then}", f"{_SNAP}period"),
+        inputs=(f"{_EST}{now}@v2", f"{_EST}fy1_period_end@v2", f"{_SNAP}{then}", f"{_SNAP}period"),
         licence=_P, null_status=_STATUS, uncovered_statuses=UNCOVERED,
     )  # fmt: skip
 
@@ -107,8 +115,8 @@ FEATURES = (
         "the same fiscal year: positive is more analysts covering",
         _WHY.format(days=90, base="either snapshot gave no count"), valid_range=(-1000, 1000),
         inputs=(
-            f"{_EST}eps_fy1_analysts@v1",
-            f"{_EST}fy1_period_end@v1",
+            f"{_EST}eps_fy1_analysts@v2",
+            f"{_EST}fy1_period_end@v2",
             f"{_SNAP}num_analysts_eps",
             f"{_SNAP}period",
         ),
@@ -120,8 +128,15 @@ FEATURES = (
         "BUILDING: an earlier snapshot exists, not for every window; NO_PRIOR: no earlier "
         "snapshot of this fiscal year; STALE, NOT_COVERED, NOT_FETCHED: as the estimates' status",
         "never", "label", categories=STATUSES,
-        inputs=(f"{_EST}estimates_status@v1", f"{_EST}fy1_period_end@v1", f"{_SNAP}period"),
+        inputs=(f"{_EST}estimates_status@v2", f"{_EST}fy1_period_end@v2", f"{_SNAP}period"),
         licence=_P,
+    ),
+    Feature(
+        _SOURCE, "str", "category",
+        "fmp or yahoo: the vendor the estimates (and so the revisions) come from; the history "
+        "compared is that vendor's alone",
+        "never", "label", categories=SOURCES,
+        inputs=(f"{_EST}estimates_source@v2", f"{_SNAP}source"), licence=_P,
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
@@ -194,7 +209,8 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     estimates = inputs[ESTIMATES_TABLE]
     assert estimates is not None  # required input
     status = estimates["estimates_status"].astype(object)
-    history = history_rows(inputs.get(SNAPSHOTS), ESTIMATES, VENDOR, session)
+    chosen = estimates.set_index(estimates["instrument_id"].astype(str))["estimates_source"]
+    history = history_of_chosen(inputs.get(SNAPSHOTS), ESTIMATES, chosen, session)
     measured = _measured(estimates[status == OK], history, session)
     passed = estimates[status != OK]
     rest = pd.DataFrame(
@@ -204,6 +220,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         }
     )
     out = pd.concat([measured, rest], ignore_index=True)
+    out[_SOURCE] = out["instrument_id"].map(chosen)
     return out.reindex(columns=["instrument_id", *COLUMNS])
 
 
@@ -211,7 +228,8 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     "How the consensus EPS and revenue of the current fiscal year have been revised over 30, 60 "
-    "and 90 days (FMP annual estimates, our own point-in-time snapshots; personal-use licence)",
+    "and 90 days (FMP annual estimates, else Yahoo's; our own point-in-time snapshots; "
+    "owner-only licence)",
     (
         Input(ESTIMATES_TABLE),
         Input(SNAPSHOTS, lookback=HISTORY_LOOKBACK, required=False),
@@ -219,5 +237,6 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     optional=True,  # a screen without the table warns, never PARTIAL (ADR 0055, ADR 0068)
-    sole_source="single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068",
+    sole_source="two free vendors, FMP first then Yahoo, no further fallback: ADR 0055 "
+    "amendment, ADR 0068, ADR 0080",
 )

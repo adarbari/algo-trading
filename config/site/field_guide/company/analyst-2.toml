@@ -5,10 +5,10 @@ name = "feature.target_upside"
 theme = "analyst"
 reads = "The average analyst price target divided by the close, minus 1: 0.15 means the average analyst puts the price 15% above today's close. Negative means the close is above the target."
 caveats = [
-  "Targets are the vendor's current ones on the day it was asked and carry no date of their own: check rollup.analyst_targets@v1.targets_age_days.",
+  "Targets are the vendor's current ones on the day it was asked and carry no date of their own: check rollup.analyst_targets@v2.targets_age_days.",
   "Targets usually look twelve months ahead and move after the price does, so a large upside is often a recent fall. It is not a forecast of the price.",
   "Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, so a hard criterion keeps only a covered subset.",
-  "A wide gap between the highest and the lowest target means analysts disagree: check rollup.analyst_targets@v1.target_high and rollup.analyst_targets@v1.target_low.",
+  "A wide gap between the highest and the lowest target means analysts disagree: check rollup.analyst_targets@v2.target_high and rollup.analyst_targets@v2.target_low.",
 ]
 sources = [
   "Brav and Lehavy (2003), An empirical analysis of analysts' target prices, Journal of Finance",
@@ -552,3 +552,57 @@ op = "eq"
 value = "OK"
 mode = "hard"
 note = "drops every name the text could not be compared for"
+
+[[field]]
+name = "rollup.analyst_estimates@v2.estimates_source"
+theme = "analyst"
+reads = "Which data vendor the estimates of the name come from: fmp (Financial Modeling Prep) or yahoo (Yahoo Finance, used when FMP has none for the name). A name neither has reached reads fmp with a status of NOT_COVERED or NOT_FETCHED."
+caveats = [
+  "Its EPS can be on another basis than FMP's, adjusted or reported. A name that changes source can then change its EPS with no change of opinion.",
+  "Both are free sources with personal-use terms: every value of this group is for the owner only, whichever vendor it came from.",
+  "A name Yahoo has not reached yet stays not covered; no name is judged by another.",
+]
+sources = [
+  "Financial Modeling Prep and Yahoo Finance, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md)",
+]
+[[field.use]]
+for = "only the first vendor's data"
+op = "eq"
+value = "fmp"
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_targets@v2.targets_source"
+theme = "analyst"
+reads = "Which data vendor the price targets of the name come from: fmp (Financial Modeling Prep) or yahoo (Yahoo Finance, used when FMP has none for the name). A name neither has reached reads fmp with a status of NOT_COVERED or NOT_FETCHED."
+caveats = [
+  "Yahoo gives targets only for names it reports in US dollars, so a foreign filer such as an ADR has no Yahoo target.",
+  "Both are free sources with personal-use terms: every value of this group is for the owner only, whichever vendor it came from.",
+  "A name Yahoo has not reached yet stays not covered; no name is judged by another.",
+]
+sources = [
+  "Financial Modeling Prep and Yahoo Finance, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md)",
+]
+[[field.use]]
+for = "only the first vendor's data"
+op = "eq"
+value = "fmp"
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_revisions@v2.revisions_source"
+theme = "analyst"
+reads = "Which data vendor the revisions of the name come from: fmp (Financial Modeling Prep) or yahoo (Yahoo Finance, used when FMP has none for the name). A name neither has reached reads fmp with a status of NOT_COVERED or NOT_FETCHED."
+caveats = [
+  "The revision compares only that vendor's own snapshots. After a name changes source its revisions are BUILDING or NO_PRIOR until the new source has about 90 days of history.",
+  "Both are free sources with personal-use terms: every value of this group is for the owner only, whichever vendor it came from.",
+  "A name Yahoo has not reached yet stays not covered; no name is judged by another.",
+]
+sources = [
+  "Financial Modeling Prep and Yahoo Finance, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md)",
+]
+[[field.use]]
+for = "only the first vendor's data"
+op = "eq"
+value = "fmp"
+mode = "hard"

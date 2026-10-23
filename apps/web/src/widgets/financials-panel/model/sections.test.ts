@@ -36,10 +36,10 @@ describe('the analysts section', () => {
 
   it('reads the targets, the ratings, the estimates and their revisions, with all four statuses', () => {
     expect(analysts?.rows.map((r) => r.name)).toEqual([
-      'rollup.analyst_targets@v1.target_consensus',
+      'rollup.analyst_targets@v2.target_consensus',
       'feature.target_upside',
-      'rollup.analyst_targets@v1.target_high',
-      'rollup.analyst_targets@v1.target_low',
+      'rollup.analyst_targets@v2.target_high',
+      'rollup.analyst_targets@v2.target_low',
       'rollup.analyst_ratings@v1.rating_strong_buy',
       'rollup.analyst_ratings@v1.rating_buy',
       'rollup.analyst_ratings@v1.rating_hold',
@@ -49,27 +49,27 @@ describe('the analysts section', () => {
       'rollup.analyst_ratings@v1.rating_score',
       'rollup.analyst_ratings@v1.rating_score_change_90d',
       'rollup.analyst_ratings@v1.rating_month',
-      'rollup.analyst_estimates@v1.eps_fy1',
-      'rollup.analyst_estimates@v1.eps_fy2',
-      'rollup.analyst_estimates@v1.fy1_period_end',
+      'rollup.analyst_estimates@v2.eps_fy1',
+      'rollup.analyst_estimates@v2.eps_fy2',
+      'rollup.analyst_estimates@v2.fy1_period_end',
       'feature.forward_eps_growth',
       'feature.forward_pe_fy2',
-      'rollup.analyst_estimates@v1.revenue_fy1',
-      'rollup.analyst_estimates@v1.revenue_fy2',
-      'rollup.analyst_estimates@v1.eps_fy1_analysts',
-      'rollup.analyst_estimates@v1.revenue_fy1_analysts',
-      'rollup.analyst_revisions@v1.eps_fy1_revision_30d',
-      'rollup.analyst_revisions@v1.eps_fy1_revision_60d',
-      'rollup.analyst_revisions@v1.eps_fy1_revision_90d',
-      'rollup.analyst_revisions@v1.revenue_fy1_revision_30d',
-      'rollup.analyst_revisions@v1.revenue_fy1_revision_90d',
-      'rollup.analyst_revisions@v1.eps_fy1_analysts_change_90d',
+      'rollup.analyst_estimates@v2.revenue_fy1',
+      'rollup.analyst_estimates@v2.revenue_fy2',
+      'rollup.analyst_estimates@v2.eps_fy1_analysts',
+      'rollup.analyst_estimates@v2.revenue_fy1_analysts',
+      'rollup.analyst_revisions@v2.eps_fy1_revision_30d',
+      'rollup.analyst_revisions@v2.eps_fy1_revision_60d',
+      'rollup.analyst_revisions@v2.eps_fy1_revision_90d',
+      'rollup.analyst_revisions@v2.revenue_fy1_revision_30d',
+      'rollup.analyst_revisions@v2.revenue_fy1_revision_90d',
+      'rollup.analyst_revisions@v2.eps_fy1_analysts_change_90d',
     ]);
     expect(analysts?.statuses).toEqual([
-      'rollup.analyst_estimates@v1.estimates_status',
-      'rollup.analyst_targets@v1.targets_status',
+      'rollup.analyst_estimates@v2.estimates_status',
+      'rollup.analyst_targets@v2.targets_status',
       'rollup.analyst_ratings@v1.ratings_status',
-      'rollup.analyst_revisions@v1.revisions_status',
+      'rollup.analyst_revisions@v2.revisions_status',
     ]);
   });
 
@@ -107,9 +107,9 @@ describe('the names the panel sends', () => {
   });
 
   it('send the ratings and revisions names and no name twice', () => {
-    expect(FINANCIALS_NAMES).toContain('rollup.analyst_targets@v1.target_consensus');
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_targets@v2.target_consensus');
     expect(FINANCIALS_NAMES).toContain('rollup.analyst_ratings@v1.ratings_status');
-    expect(FINANCIALS_NAMES).toContain('rollup.analyst_revisions@v1.eps_fy1_revision_30d');
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_revisions@v2.eps_fy1_revision_30d');
     expect(new Set(FINANCIALS_NAMES).size).toBe(FINANCIALS_NAMES.length);
   });
 });

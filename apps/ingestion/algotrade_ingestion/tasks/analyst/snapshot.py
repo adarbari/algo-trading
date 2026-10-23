@@ -47,9 +47,9 @@ first), so a stalling vendor cannot hold the ingest lock. A hand run for a sessi
 closed one is refused: the vendors serve only today's values, which would land in an old partition.
 
 Rows are staged per item and published as one partition (atomic, ADR 0022); the step is optional,
-so a vendor outage only warns. Features over the history come later (track E): nothing reads the
-table yet, and its rows carry the vendors' licences (``stats["licence"]``: ``personal``, and
-Yahoo's ``yahoo``).
+so a vendor outage only warns. The groups ``analyst_estimates@v2``, ``analyst_targets@v2`` and
+``analyst_revisions@v2`` read the history (one vendor per name, ADR 0080), and its rows carry the
+vendors' licences (``stats["licence"]``: ``personal``, and Yahoo's ``yahoo``).
 """
 
 from collections.abc import Mapping, Sequence

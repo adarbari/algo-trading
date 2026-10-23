@@ -69,7 +69,7 @@ from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES, group_field,
 type Entity = Literal["instrument", "market"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
-type Licence = Literal["open", "personal"]
+type Licence = Literal["open", "personal", "yahoo"]
 type AppliesTo = Literal["any", "optionable", "operating_company", "leveraged_fund"]
 # A status field, the values of it that read ILLIQUID and those that read EXPLAINED, the stored
 # table of the feature declaring it (an EXPLAINED status covers a missing row there only) and
@@ -78,7 +78,7 @@ type StatusRule = tuple[str, frozenset[str], frozenset[str], str, frozenset[str]
 
 ENTITIES = frozenset({"instrument", "market"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
-LICENCES = ("open", "personal")  # least to most restrictive
+LICENCES = ("open", "personal", "yahoo")  # least to most restrictive (ADR 0080)
 APPLIES_TO = ("any", "optionable", "operating_company", "leveraged_fund")
 UNITS = frozenset(
     {
@@ -284,7 +284,7 @@ def not_applicable(
 def strictest(licences: Iterable[str]) -> Licence:
     """The most restrictive of ``licences`` (``open`` when there are none)."""
     found = [LICENCES.index(x) for x in licences if x in LICENCES]
-    return "personal" if found and max(found) == 1 else "open"
+    return LICENCES[max(found)] if found else "open"  # type: ignore[return-value]
 
 
 def in_range(feature: Feature, value: float) -> bool:

@@ -26,7 +26,8 @@ from algotrade.storage.tables.result_writer import ResultWriter
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.evaluation.conftest import DOCS, END, FROZEN, START, T, stores
 
-USERS = {"user": [{"id": "owner", "role": "admin", "licences": ["personal"]},
+USERS = {"user": [{"id": "owner", "role": "admin", "licences": ["personal", "yahoo"]},
+                  {"id": "partial", "role": "trader", "licences": ["personal"]},
                   {"id": "me", "role": "trader"}]}  # fmt: skip
 
 
@@ -116,6 +117,27 @@ def test_a_personal_value_is_licence_to_anyone_but_the_holder(backend: MemoryBac
     )
     assert first.value.value == 0.02 and first.adv_usd.value == 1e7  # their licences are open
     assert second.score.value == 3.0  # the recorded licence decides, row by row
+
+
+def test_a_yahoo_licensed_value_is_licence_to_a_personal_only_holder_and_never_leaks(
+    backend: MemoryBackend,
+) -> None:
+    """ADR 0080: the redaction is by any recorded licence the viewer does not hold, not only
+    ``personal`` (a ``yahoo`` column read by a viewer holding ``personal`` alone was served)."""
+    rows = [
+        trade(date(2026, 2, 2), "EQ:A", 1, True, score=9.0, score_licence="yahoo", licence="yahoo"),
+        trade(date(2026, 2, 2), "EQ:B", 2, True, score=1.0),
+    ]
+    write_ledger(backend, "r1", rows)
+    for user, sees in (("owner", True), ("partial", False), ("me", False)):
+        ctx = viewer(backend, user)
+        found = load_run_trades(ctx, canonical(ctx))
+        first = found.rows[0]
+        assert found.licence == "yahoo"
+        assert (first.score.value == 9.0) is sees, user
+        assert (first.score.unknown is None) is sees, user
+        by_score = load_run_trades(ctx, canonical(ctx), sort="score", descending=True)
+        assert (by_score.rows[0].instrument_id == "EQ:A") is sees, user  # the order leaks nothing
 
 
 def test_a_hidden_copys_ledger_is_its_rows_before_the_split(backend: MemoryBackend) -> None:

@@ -16,12 +16,12 @@ pick_hi = 0.40
 zone_lo = 0.15        # zone open interest / volume: zone_lo <= |delta| <= zone_hi
 zone_hi = 0.40
 
-["analyst_estimates@v1"]
+["analyst_estimates@v2"]
 stale_days = 21          # a snapshot older than this is STALE: its values are not served (nightly rotation refreshes in [fmp] refresh_days)
 fy_slack_days = 60       # FY1 is the first year ending this many days after the later of the last annual report's and last quarter's end (52/53-week years); under 85
 
-["analyst_targets@v1"]
-stale_days = 21          # as analyst_estimates@v1
+["analyst_targets@v2"]
+stale_days = 21          # as analyst_estimates@v2
 
 ["analyst_ratings@v1"]
 stale_days = 45          # Finnhub's trend is monthly: a snapshot older than this is STALE (values not served)

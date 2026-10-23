@@ -11,8 +11,8 @@ hit = "The name is a common stock closing above $5 that trades at least $5M a da
 not_checked = "It does not check the date of the target, how many analysts set it or the industry: the paper compares within an industry and this is the raw figure. The free data covers few names."
 before_acting = [
   "Analysts are optimistic: a high upside is common in some sectors, so compare feature.target_upside with the sector's usual figure.[^2]",
-  "A target has no date of its own: read rollup.analyst_targets@v1.targets_age_days before trusting an old one.",
-  "Beaten-down names show the highest upside, so the list is partly a bet on value and reversal. The data is for personal use under its licence.",
+  "A target has no date of its own: read rollup.analyst_targets@v2.targets_age_days before trusting an old one.",
+  "Beaten-down names show the highest upside, so the list is partly a bet on value and reversal. The data is for the owner's personal use under its licences (FMP's targets, else Yahoo's).",
 ]
 related = [
   { id = "eps_revision_up", reason = "the estimate revision instead of the price target" },

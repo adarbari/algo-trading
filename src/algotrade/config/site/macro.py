@@ -32,7 +32,11 @@ DAILY_MARGIN_DAYS = 3
 RUN_BUDGET_S = 900  # [macro] run_budget_s: the macro task stops fetching series after this long
 PITS = ("alfred", "lag")
 TRANSFORMS = ("level", "yoy", "diff")
-LICENCES = ("open", "personal")  # as a feature's licence (ADR 0028)
+LICENCES = ("open", "personal")  # as a macro series' licence (ADR 0028)
+HELD_LICENCES = (
+    *LICENCES,
+    "yahoo",
+)  # a vendor's or a user's: ``yahoo`` is the owner's alone (ADR 0080)
 FILE_KEYS = ("url", "date_column", "value_column", "parser")
 KEYS = (
     "key",

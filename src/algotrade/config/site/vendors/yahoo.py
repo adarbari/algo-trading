@@ -2,14 +2,13 @@
 
 Read by ``SourcesSettings.from_document`` (``config/site/settings.py``), the one loader; it lives
 in its own module to keep that file under the length limit. ``licence`` is the owner-only tag
-``yahoo`` (Yahoo's terms forbid scraping: personal use, never served to another viewer); the
-other tags are accepted so a PR that narrows it later changes only this tuple.
+``yahoo`` (Yahoo's terms forbid scraping: personal use, never served to another viewer).
 """
 
 from dataclasses import dataclass
 
 from algotrade.config.site.fields import Table
-from algotrade.config.site.macro import LICENCES
+from algotrade.config.site.macro import HELD_LICENCES
 
 LICENCE = "yahoo"
 YAHOO_KEYS = ("licence", "per_night", "refresh_days", "run_budget_s", "cache_dir")
@@ -28,7 +27,7 @@ def parse_yahoo(section: Table) -> YahooSettings:
     """The typed ``[yahoo]`` keys beyond the vendor keys (``enabled``, ``min_interval_s``, ...)."""
     d = YahooSettings()
     return YahooSettings(
-        licence=section.choice("licence", d.licence, (*LICENCES, LICENCE)),
+        licence=section.choice("licence", d.licence, HELD_LICENCES),
         per_night=section.integer("per_night", d.per_night, 0),
         refresh_days=section.integer("refresh_days", d.refresh_days, 1),
         run_budget_s=section.integer("run_budget_s", d.run_budget_s, 1),

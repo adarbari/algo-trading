@@ -56,7 +56,7 @@ CONFIGS: Docs = {
     ("site", "settings", "users"): {
         "user": [
             {"id": "admin", "role": "admin"},
-            {"id": "me", "role": "trader", "licences": ["personal"]},
+            {"id": "me", "role": "trader", "licences": ["personal", "yahoo"]},
             {"id": "trader", "role": "trader"},
         ]
     },

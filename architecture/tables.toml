@@ -49,7 +49,7 @@ note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Fi
 [[table]]
 name = "analyst/estimate_snapshots"
 owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"
-note = "ADR 0068, 0080: our own point-in-time history of FMP, Finnhub and Yahoo analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session; the rows of source `yahoo` carry licence `yahoo` (owner only, ADR 0080) and nothing reads them yet; `currency` (nullable, Yahoo's estimates) is additive: older partitions read null"
+note = "ADR 0068, 0080: our own point-in-time history of FMP, Finnhub and Yahoo analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session; the rows of source `yahoo` carry licence `yahoo` (owner only, ADR 0080) and the estimates, targets and revisions groups read them when FMP has none (v2, ADR 0080); `currency` (nullable, Yahoo's estimates) is additive: older partitions read null"
 
 [[table]]
 name = "instruments/index_membership"
@@ -207,14 +207,14 @@ name = "rollups/instrument/earnings_reaction@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
-name = "rollups/instrument/analyst_estimates@v1"
+name = "rollups/instrument/analyst_estimates@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "ADR 0068: FY1 / FY2 consensus EPS and revenue from our own analyst snapshots (analyst/estimate_snapshots); personal licence, optional"
+note = "ADR 0068, 0080: FY1 / FY2 consensus EPS and revenue from our own analyst snapshots (analyst/estimate_snapshots), FMP first then Yahoo per name (estimates_source); licence yahoo (owner only, the stricter of the two vendors), optional"
 
 [[table]]
-name = "rollups/instrument/analyst_targets@v1"
+name = "rollups/instrument/analyst_targets@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "ADR 0068: price-target consensus, median, high and low from our own analyst snapshots; personal licence, optional"
+note = "ADR 0068, 0080: price-target consensus, median, high and low from our own analyst snapshots, FMP first then Yahoo per name (targets_source); licence yahoo (owner only), optional"
 
 [[table]]
 name = "rollups/instrument/analyst_ratings@v1"
@@ -222,9 +222,9 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0068: analysts' strong buy to strong sell counts, mean rating and its 90-day change from our own Finnhub snapshots; personal licence, optional"
 
 [[table]]
-name = "rollups/instrument/analyst_revisions@v1"
+name = "rollups/instrument/analyst_revisions@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "ADR 0068: revisions of the FY1 consensus EPS and revenue over 30, 60 and 90 days, matched on the fiscal year end, from our own FMP snapshots; personal licence, optional"
+note = "ADR 0068: revisions of the FY1 consensus EPS and revenue over 30, 60 and 90 days, matched on the fiscal year end, from our own snapshots of the vendor the estimates chose (revisions_source), never across vendors; licence yahoo (owner only), optional"
 
 [[table]]
 name = "rollups/instrument/earnings_revisions@v1"

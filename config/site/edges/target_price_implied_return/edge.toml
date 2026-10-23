@@ -1,5 +1,5 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Screener: target_upside_high (new, EB E3b; analyst_targets@v1,
+# src/algotrade/config/edges/document.py. Screener: target_upside_high (new, EB E3b; analyst_targets@v2,
 # personal licence). Idea page: docs/edge-ideas/events.md (target_price_implied_return). Same pattern as
 # etf_flow_pressure: the history starts after frozen_from, so the verdict accrues over months.
 id = "target_price_implied_return"

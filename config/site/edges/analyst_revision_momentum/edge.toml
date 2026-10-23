@@ -1,5 +1,5 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Screener: eps_revision_up (new, EB E3b; analyst_revisions@v1,
+# src/algotrade/config/edges/document.py. Screener: eps_revision_up (new, EB E3b; analyst_revisions@v2,
 # personal licence). Idea page: docs/edge-ideas/events.md (analyst_revision_momentum). Same pattern as
 # etf_flow_pressure: the history starts after frozen_from, so the verdict accrues over months.
 id = "analyst_revision_momentum"
@@ -42,7 +42,7 @@ all = [
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
-  { field = "rollup.analyst_revisions@v1.eps_fy1_revision_30d", op = "gte", value = -10000 },
+  { field = "rollup.analyst_revisions@v2.eps_fy1_revision_30d", op = "gte", value = -10000 },
 ]
 
 [outcome]
@@ -71,7 +71,7 @@ for the same fiscal year, each snapshot counting from the session that stored it
 next open), never from the vendor's date; the revision is read at D (a month end) and the entry session is S = D + 1
 (start_offset_sessions = 1)."""
 replication = """Chan, Jegadeesh and Lakonishok's REV6: the sum of six months of consensus changes over price, deciles, held 6 to 12
-months. Here: the 30-day percent change of the current fiscal year's EPS estimate (analyst_revisions@v1), the 10 largest
+months. Here: the 30-day percent change of the current fiscal year's EPS estimate (analyst_revisions@v2), the 10 largest
 upward among the covered liquid stocks, held 20 and 60 sessions. The paper's decile spread is from memory, so nothing is filed
 under [published]."""
 expected_size = """About 7 to 8 percent over 12 months for the REV6 decile spread (Chan and co-authors 1996, from memory, not verified);
