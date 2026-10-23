@@ -55,6 +55,7 @@ from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
 from algotrade_ingestion.tasks.derived.option_outcomes import check_option_outcomes
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
 from algotrade_ingestion.tasks.derived.residual_returns import check_residual_returns
+from algotrade_ingestion.tasks.edges.picks import check_edge_picks
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
 from algotrade_ingestion.tasks.framework.run import (
     RETRYABLE,
@@ -306,6 +307,10 @@ NIGHTLY: tuple[Step, ...] = (
     # the same features); a trade whose outcome is not stored yet stays open. Optional: a
     # failure warns, never holds the session.
     Step(EDGE_SIGNALS, needs=(SCREENS,), critical=False, latest_only=FORWARD_RECORD),
+    # What each site edge took at the session, by the harness's own pick rule (ADR 0081): the
+    # screener page's "counts toward" reads it. Every session (it reads only stored features, as
+    # the screens do), optional: a gap shows as "not stored" on the page, never holds the session.
+    Step("edge-picks", needs=(SCREENS,), critical=False, accept=(check_edge_picks,)),
     # Our own point-in-time history of FMP / Finnhub analyst data (ADR 0068): a rotating slice of
     # names a night within [fmp] daily_budget, appended, never replaced. Optional: a vendor outage
     # or no key only warns. The vendors serve only today's value, so a catch-up session is SKIPPED.
