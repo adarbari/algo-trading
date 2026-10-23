@@ -13,7 +13,7 @@ export { formatDuration } from './model/duration';
 export { toRunDetail } from './model/run';
 export { itemsCsv, itemsFileName } from './model/items-csv';
 export { segmentTone, statusHint, statusTone } from './model/status';
-export { incompleteSteps, stepTimings, type StepTiming } from './model/timing';
+export { incompleteSteps, isReused, stepTimings, type StepTiming } from './model/timing';
 export type {
   FailureGroup,
   NightlyRun,

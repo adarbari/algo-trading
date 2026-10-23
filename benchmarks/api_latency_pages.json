@@ -644,7 +644,7 @@
     "variables": {
      "limit": 10
     },
-    "query": "\n  query NightlyRuns($limit: Int!) {\n    nightlyRuns(limit: $limit) {\n      runId\n      session\n      status\n      startedAt\n      finishedAt\n      durationS\n      problems\n      steps {\n        name\n        status\n        durationS\n        reason\n        error\n      }\n    }\n  }\n"
+    "query": "\n  query NightlyRuns($limit: Int!) {\n    nightlyRuns(limit: $limit) {\n      runId\n      session\n      status\n      startedAt\n      durationS\n      problems\n      steps {\n        name\n        status\n        durationS\n        origin\n        originStartedAt\n        originDurationS\n      }\n    }\n  }\n"
    },
    {
     "kind": "graphql",

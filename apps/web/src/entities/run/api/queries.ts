@@ -18,15 +18,15 @@ const NightlyRuns = graphql(`
       session
       status
       startedAt
-      finishedAt
       durationS
       problems
       steps {
         name
         status
         durationS
-        reason
-        error
+        origin
+        originStartedAt
+        originDurationS
       }
     }
   }

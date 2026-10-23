@@ -7,7 +7,7 @@ from tests.apps.api.graphql.conftest import Graph
 
 NIGHTLY = """query N($limit: Int!) { nightlyRuns(limit: $limit) {
   runId session status startedAt finishedAt durationS problems
-  steps { name status durationS reason error counts }
+  steps { name status durationS reason error counts origin originStartedAt originDurationS }
 } }"""
 RUN = """query R($id: String!) {
   run(runId: $id) {
@@ -25,6 +25,7 @@ def test_nightly_runs(graph: Graph) -> None:
     assert (run["session"], run["status"], run["durationS"]) == ("2022-11-23", "partial", 300.0)
     steps = {s["name"]: s for s in run["steps"]}
     assert steps["bars"]["counts"] == {"rows": 11}
+    assert steps["bars"]["origin"] is None  # ran in this attempt
     assert run["problems"] == ["steps not complete: chains"]
 
 

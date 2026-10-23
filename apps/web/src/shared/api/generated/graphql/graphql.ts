@@ -575,7 +575,7 @@ export type NightlyRunsQueryVariables = Exact<{
 }>;
 
 
-export type NightlyRunsQuery = { nightlyRuns: Array<{ runId: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, problems: Array<string>, steps: Array<{ name: string, status: string, durationS: number | null, reason: string | null, error: string | null }> }> };
+export type NightlyRunsQuery = { nightlyRuns: Array<{ runId: string, session: string, status: string, startedAt: string, durationS: number | null, problems: Array<string>, steps: Array<{ name: string, status: string, durationS: number | null, origin: string | null, originStartedAt: string | null, originDurationS: number | null }> }> };
 
 export type RunRecordQueryVariables = Exact<{
   runId: string;
@@ -3832,15 +3832,15 @@ export const NightlyRunsDocument = new TypedDocumentString(`
     session
     status
     startedAt
-    finishedAt
     durationS
     problems
     steps {
       name
       status
       durationS
-      reason
-      error
+      origin
+      originStartedAt
+      originDurationS
     }
   }
 }

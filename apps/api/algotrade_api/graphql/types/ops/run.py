@@ -10,7 +10,12 @@ from strawberry.scalars import JSON
 from algotrade.services.read.ops import runs
 
 
-@strawberry.type(description="One step of a nightly run: `counts` its result counts as recorded")
+@strawberry.type(
+    description="One step of a nightly run: `counts` its result counts as recorded; `origin` the "
+    "earlier attempt of the session that already did a reused step (null: it ran in this "
+    "attempt), `originStartedAt` when that attempt started and `originDurationS` how long the "
+    "step took there (null: that attempt's record is gone)"
+)
 class RunStep:
     name: str
     status: str
@@ -18,6 +23,9 @@ class RunStep:
     reason: str | None
     error: str | None
     counts: JSON
+    origin: str | None
+    origin_started_at: dt.datetime | None
+    origin_duration_s: float | None
 
     @classmethod
     def of(cls, d: runs.RunStep) -> Self:
@@ -28,6 +36,9 @@ class RunStep:
             reason=d.reason,
             error=d.error,
             counts=JSON(d.counts),
+            origin=d.origin,
+            origin_started_at=d.origin_started_at,
+            origin_duration_s=d.origin_duration_s,
         )
 
 
