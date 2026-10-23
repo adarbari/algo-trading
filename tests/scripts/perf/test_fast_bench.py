@@ -48,14 +48,16 @@ def test_bar_file_is_valid_and_every_exception_has_reason_and_date() -> None:
 
 def test_history_lines_parse_and_carry_the_required_keys() -> None:
     history = fb.read_history()
-    assert len(history) >= 2
+    assert len(history) >= 8  # rounds 1-8 are seeded
     for h in history:
         assert all(k in h for k in fb.HISTORY_KEYS)
         assert all(k in h["totals"] for k in fb.TOTAL_KEYS)
         assert h["views"]
         for v in h["views"].values():
             assert all(k in v for k in fb.VIEW_KEYS)
-    assert "machine 2x slower" in history[0]["machine"]
+    assert [h["sha"] for h in history][-1] == "fb7708269"  # round 8 is the last seeded run
+    assert any("machine 2x slower" in h["machine"] for h in history)
+    assert all(isinstance(h.get("noisy"), bool) for h in history)
     fb.render_history(history)  # renders
 
 
@@ -111,3 +113,57 @@ def test_history_record_round_trips_through_the_file(tmp_path: Path) -> None:
     fb.append_history(rec, path)
     assert [json.loads(x) for x in path.read_text().splitlines()] == fb.read_history(path)
     assert all(k in fb.read_history(path)[0] for k in fb.HISTORY_KEYS)
+
+
+def test_only_filter_keeps_named_operations_and_their_views() -> None:
+    distinct = {"A#1": {"name": "A"}, "B#1": {"name": "B"}, "C#1": {"name": "C"}}
+    view_ops = {"/x": ["A#1", "B#1"], "/y": ["C#1"]}
+    assert fb.restrict(distinct, view_ops, set()) == (distinct, view_ops)
+    keep, views = fb.restrict(distinct, view_ops, {"B"})
+    assert list(keep) == ["B#1"] and views == {"/x": ["B#1"]}
+    assert fb.only_names("A,B", "C") == {"A", "B"}
+    assert fb.only_names(None, "C,D") == {"C", "D"} and fb.only_names(None, None) == set()
+
+
+def test_noisy_flag_is_stored_in_the_history_record() -> None:
+    totals = {"views_over_1s": 0, "seconds_above_bar": 0, "shell_total_s": 0.3}
+    rec = fb.history_record({"/a": _view(0.4, "X")}, totals, "abc", 1.0, 2.0, "n", True)
+    assert rec["noisy"] is True
+
+
+def test_guard_defaults_are_the_page_profile_floors() -> None:
+    assert fb.DISK_FLOOR_GB == [fb.al.pp.MIN_FREE_DISK_GB]
+    assert fb.al.SWAP_FLOOR_MB[0] == fb.al.pp.MIN_FREE_SWAP_MB
+
+
+def test_time_ops_dumps_the_samples_after_every_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FakeClient:
+        def get(self, url: str) -> None:
+            return None
+
+    class FakeApi:
+        url = "http://x"
+        last_error = ""
+
+        def __init__(self, *a: object, **k: object) -> None:
+            self.client = FakeClient()
+
+        def call(self, body: dict) -> tuple[float, int, int, int]:
+            return 12.0, 200, 10, 1
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(fb.al, "Api", FakeApi)
+    monkeypatch.setattr(fb.al, "uncached_config", lambda src, dst: dst)
+    monkeypatch.setattr(fb.al, "guard", lambda: None)
+    monkeypatch.setattr(fb, "wait_quiet", lambda limit, load_max: 1.0)
+    partial = tmp_path / "samples-partial.json"
+    ops = fb.time_ops(
+        {"A#1": {"name": "A", "query": "q", "variables": {}}}, "file:///c", 2, 4.0, partial
+    )
+    dumped = json.loads(partial.read_text())
+    assert dumped["samples"] == {"A#1": [12.0, 12.0]} and dumped["names"] == {"A#1": "A"}
+    assert ops["A#1"]["avg"] == 12.0 and not ops["A#1"]["noisy"] and not ops["A#1"]["failed"]

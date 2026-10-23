@@ -17,8 +17,13 @@ api-latency-views-capture` on the clone; `--views-file` points at another copy).
 
 `--ratio-mode` (a busy machine): every time is divided by the shell's slowdown against the last
 recorded run (the shell operations are untouched by the work being judged), never below 1.
-`--record` appends the run to benchmarks/critical_path_history.jsonl (the only writer);
-`--history` prints the trend and measures nothing. Docs: docs/perf/page-latency-bar.md.
+`--record` appends the run to benchmarks/critical_path_history.jsonl (the only writer; refused for
+a run with a noisy operation or an `--only` subset, unless `--record-noisy`); `--history` prints
+the trend and measures nothing. `--only Op1,Op2` (or env BENCH_ONLY) times just those operations
+(a re-measure of one fix); with `--out` every pass dumps `samples-partial.json`, so an aborted run
+keeps what it timed. The guards stay at their defaults (free swap, free disk of the clone's
+volume): `--min-free-swap-mb` and `--min-free-disk-gb` are parameters, never lowered by the tool.
+Docs: docs/perf/page-latency-bar.md.
 """
 
 from __future__ import annotations
@@ -175,6 +180,7 @@ def history_record(
     load_before: float,
     load_after: float,
     machine: str,
+    noisy: bool = False,
 ) -> dict:
     """One history line for a run (critical path, sum and slowest op per view, plus totals)."""
     return {
@@ -184,6 +190,7 @@ def history_record(
         "load_after": load_after,
         "machine": machine,
         "mode": "empty-cache first request, 5 reps averaged",
+        "noisy": noisy,
         "views": {
             k: {"crit_s": v["crit_s"], "sum_s": v["sum_s"], "slowest_op": v["slowest_op"]}
             for k, v in views.items()
@@ -221,19 +228,23 @@ def render_history(history: list[dict]) -> str:
 # ---- measurement ----------------------------------------------------------------------------
 
 
+DISK_FLOOR_GB = [al.pp.MIN_FREE_DISK_GB]  # --min-free-disk-gb overrides it for the run
+
+
 def guard_waiting() -> None:
-    """The swap guard, but on this shared machine wait (up to 3 min) for free swap, not abort."""
+    """The swap and disk guard, but on this shared machine wait (up to 3 min), not abort."""
     end = time.time() + 180
     while True:
         try:
-            return _GUARD()
+            return al.pp.swap_guard(
+                al.SWAP_FLOOR_MB[0], disk_path=al.GUARD_PATH[0], min_disk_gb=DISK_FLOOR_GB[0]
+            )
         except al.pp.SwapLowError:
             if time.time() > end:
                 raise
             time.sleep(5)
 
 
-_GUARD = al.guard
 al.guard = guard_waiting
 
 
@@ -254,6 +265,22 @@ def wait_quiet(limit: float, load_max: float) -> float:
         time.sleep(3)
         load = load1()
     return load
+
+
+def only_names(arg: str | None, env: str | None) -> set[str]:
+    """The operation names to time: ``--only`` first, else BENCH_ONLY; empty means all."""
+    return {n for n in (arg or env or "").split(",") if n}
+
+
+def restrict(
+    distinct: dict[str, dict], view_ops: dict[str, list[str]], names: set[str]
+) -> tuple[dict[str, dict], dict[str, list[str]]]:
+    """Keep only the operations named (all when ``names`` is empty) and the views that use them."""
+    if not names:
+        return distinct, view_ops
+    keep = {s: d for s, d in distinct.items() if d["name"] in names}
+    views = {v: [s for s in ss if s in keep] for v, ss in view_ops.items()}
+    return keep, {v: ss for v, ss in views.items() if ss}
 
 
 def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, str]]:
@@ -305,9 +332,16 @@ def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, 
 
 
 def time_ops(
-    distinct: dict[str, dict], data_url: str, reps: int, load_max: float
+    distinct: dict[str, dict],
+    data_url: str,
+    reps: int,
+    load_max: float,
+    partial: Path | None = None,
 ) -> dict[str, dict]:
-    """Time every distinct op ``reps`` times, caches emptied before each timing."""
+    """Time every distinct op ``reps`` times, caches emptied before each timing.
+
+    ``partial``: a file rewritten after every pass with the samples so far (an aborted run
+    keeps them)."""
     al.LAUNCH = CLEAR_PATCH
     al.MODES["empty"] = "9"
     cfg = al.uncached_config(al.REPO / "config", Path(tempfile.mkdtemp()) / "config")
@@ -327,6 +361,9 @@ def time_ops(
                 ms, status, size, _ = api.call({"query": d["query"], "variables": d["variables"]})
                 samples[sig].append(round(ms, 1))
                 last[sig] = {"status": status, "bytes": size, "err": api.last_error}
+            if partial is not None:
+                names = {s: distinct[s]["name"] for s in distinct}
+                partial.write_text(json.dumps({"samples": samples, "loads": loads, "names": names}))
     finally:
         api.close()
     return {
@@ -371,6 +408,12 @@ def git_sha() -> str:
 # ---- entry point ----------------------------------------------------------------------------
 
 
+def write_outputs(out: Path, ops: dict, views: dict, skipped: dict[str, str]) -> None:
+    """ops.json (per operation) and views.json (per view, and the views not measured)."""
+    (out / "ops.json").write_text(json.dumps(ops, indent=1))
+    (out / "views.json").write_text(json.dumps({"views": views, "not_measured": skipped}, indent=1))
+
+
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     p.add_argument("--data-url", help="the CLONE of the store to serve (required to measure)")
@@ -386,6 +429,13 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--views-file", default=str(vw.VIEWS_FILE))
     p.add_argument("--machine", default="", help="a note on the machine, stored with --record")
     p.add_argument("--out", help="a directory for ops.json and views.json")
+    p.add_argument("--only", help="comma-separated operation names to time (default: all)")
+    p.add_argument(
+        "--record-noisy",
+        action="store_true",
+        help="allow --record of a run with a noisy operation or an --only subset (flagged)",
+    )
+    p.add_argument("--min-free-disk-gb", type=float, default=al.pp.MIN_FREE_DISK_GB)
     p.add_argument("--min-free-swap-mb", type=int, default=al.pp.MIN_FREE_SWAP_MB)
     return p.parse_args(argv)
 
@@ -407,14 +457,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"refused: {err}", file=sys.stderr)
         return 2
     al.SWAP_FLOOR_MB[0] = args.min_free_swap_mb
+    DISK_FLOOR_GB[0] = args.min_free_disk_gb
     al.GUARD_PATH[0] = al.store_path(data_url)
     distinct, view_ops, skipped = op_set(vw.load_views(Path(args.views_file)))
+    names = only_names(args.only, al.os.environ.get("BENCH_ONLY"))
+    distinct, view_ops = restrict(distinct, view_ops, names)
+    out_dir = Path(args.out) if args.out else None
+    if out_dir:
+        out_dir.mkdir(parents=True, exist_ok=True)
     print(
         f"{len(view_ops)} views, {len(skipped)} not measured, {len(distinct)} distinct ops",
         flush=True,
     )
     load_before = load1()
-    ops = time_ops(distinct, data_url, args.reps, args.load_max)
+    partial = out_dir / "samples-partial.json" if out_dir else None
+    ops = time_ops(distinct, data_url, args.reps, args.load_max, partial)
     load_after = load1()
     views = per_view(ops, view_ops)
     by_name: dict[str, list[float]] = {}
@@ -434,17 +491,17 @@ def main(argv: list[str] | None = None) -> int:
         )
     for vid, why in skipped.items():
         print(f"not measured: {vid}: {why}")
-    if args.out:
-        out = Path(args.out)
-        out.mkdir(parents=True, exist_ok=True)
-        (out / "ops.json").write_text(json.dumps(ops, indent=1))
-        (out / "views.json").write_text(
-            json.dumps({"views": views, "not_measured": skipped}, indent=1)
-        )
-    if args.record:
+    if out_dir:
+        write_outputs(out_dir, ops, views, skipped)
+    noisy = any(o["noisy"] for o in ops.values())
+    if noisy:
+        print("NOISY: an operation was timed above --load-max; the numbers are not a clean run")
+    if args.record and (noisy or names) and not args.record_noisy:
+        print("not recorded: a noisy or --only run (--record-noisy to keep it)", file=sys.stderr)
+    elif args.record:
         note = args.machine + ("; ratio mode" if args.ratio_mode else "")
         rec = history_record(
-            views, result["totals"], git_sha(), load_before, load_after, note.strip("; ")
+            views, result["totals"], git_sha(), load_before, load_after, note.strip("; "), noisy
         )
         append_history(rec)
         print(f"recorded in {HISTORY_FILE.relative_to(REPO)}")
