@@ -213,3 +213,35 @@ test('Edit criteria opens the Builder; an edit there shows who would enter or le
   await expect(page.getByText('+3 enter: KO, MSFT, XOM.')).toBeVisible();
   await expect(page.getByText('-4 leave: CHTR, RKT, SOXS, UVXY.')).toBeVisible();
 });
+
+test('the page says which edge the screener implements, why each pick matched and what it counts toward', async ({
+  page,
+}) => {
+  await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner');
+  // Fix for: the results page showed nothing about edges. The headline edge is the strongest by status.
+  const line = page.getByText('Earnings drift').first();
+  await expect(line).toBeVisible();
+  await expect(page.getByText('+1 edge')).toBeVisible();
+  await expect(page.getByText(/Win rate 58\.0% vs base 51\.0%/)).toBeVisible();
+  await page.getByRole('button', { name: 'Evidence' }).click();
+  await expect(page.getByRole('button', { name: 'Momentum 12-1' })).toBeVisible();
+  // The hits table: the rules a pick passed with their values, and what it counts toward.
+  await expect(grid(page).getByRole('columnheader', { name: /Why it matched/ })).toBeVisible();
+  const aapl = grid(page).getByRole('row', { name: /AAPL/ });
+  await expect(aapl).toContainText('61.0%');
+  await expect(aapl).toContainText('Counts');
+  await expect(grid(page).getByRole('row', { name: /UVXY/ })).toContainText('below the cut');
+  // A pick the regime gate held back is shown as not counted.
+  await expect(grid(page).getByRole('row', { name: /XOM/ })).toContainText('Held back');
+  // The pick's detail lists what it counts toward.
+  await aapl.click();
+  await expect(page.getByRole('heading', { level: 3, name: 'Counts toward' })).toBeVisible();
+  await expectAccessible(page);
+});
+
+test('a screener no edge lists says so', async ({ page }) => {
+  await mockBuilderApi(page);
+  await page.goto('/screeners/short-premium-liquidity');
+  await expect(page.getByText(/Not part of an edge/)).toBeVisible();
+});

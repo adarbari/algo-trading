@@ -52,6 +52,7 @@ export function resultRows(page: ResultsPage): TableRow[] {
       previousDecision: result.previousDecision ?? null,
       columns: Object.fromEntries(result.columns.map((c) => [c.name, c.value])),
       reasons: result.reasons,
+      countsToward: result.countsToward,
     };
   });
 }

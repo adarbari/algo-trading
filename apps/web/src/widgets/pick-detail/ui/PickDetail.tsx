@@ -4,15 +4,32 @@
  * its criteria scorecard (value, rule, outcome), and the review actions (open in Explore, add to the compare set,
  * dismiss) with their keys. The chart and anything else about the ticker is composed beside it.
  */
-import { ActionGroup, KeyHints, type KeyHint, Panel, Stack, Text } from '@algotrade/ui';
+import {
+  ActionGroup,
+  Heading,
+  KeyHints,
+  type KeyHint,
+  Panel,
+  Stack,
+  StatusBadge,
+  Text,
+} from '@algotrade/ui';
 
-import type { CriterionInfo, TableRow } from '@/entities/feature';
+import {
+  PICK_EDGE_TERM,
+  pickEdgeTone,
+  pickEdgeWords,
+  type CriterionInfo,
+  type PickEdge,
+  type TableRow,
+} from '@/entities/feature';
 import {
   CriteriaScorecard,
   DecisionBadge,
   decisionLabel,
   type ScorecardEntry,
 } from '@/entities/screen';
+import { termHelp } from '@/features/guide-help';
 import { lazy, Suspense } from 'react';
 
 const GateRow = lazy(() => import('./GateRow'));
@@ -39,6 +56,14 @@ const KEY_HINTS: readonly KeyHint[] = [
   { keys: ['x'], label: 'dismiss' },
   { keys: ['Enter'], label: 'open in Explore' },
 ];
+
+/** Where the pick stands under an edge: its place among the qualified rows against the edge's cut. */
+function placeText(edge: PickEdge): string | null {
+  if (edge.place === null || edge.place === undefined) return null;
+  return edge.topK
+    ? `place ${String(edge.place)} of the top ${String(edge.topK)}`
+    : `place ${String(edge.place)}, every qualified name counts`;
+}
 
 export function PickDetail({
   row,
@@ -100,6 +125,26 @@ export function PickDetail({
             </Suspense>
           )}
         />
+        {row.countsToward && row.countsToward.length > 0 ? (
+          <Stack gap={2} as="div" aria-label="Counts toward">
+            <Stack direction="row" gap={1} align="center">
+              <Heading level={3}>Counts toward</Heading>
+              {termHelp('counts_toward')}
+            </Stack>
+            {row.countsToward.map((edge) => (
+              <Stack key={edge.edgeId} direction="row" gap={2} align="center" wrap>
+                <StatusBadge tone={pickEdgeTone(edge)}>{pickEdgeWords(edge)}</StatusBadge>
+                <Text size="sm">{edge.edgeName}</Text>
+                {placeText(edge) ? (
+                  <Text size="sm" tone="muted">
+                    {placeText(edge)}
+                  </Text>
+                ) : null}
+                {termHelp(PICK_EDGE_TERM[edge.code] ?? 'counts_toward')}
+              </Stack>
+            ))}
+          </Stack>
+        ) : null}
         {showActions ? (
           <ActionGroup
             label="Pick actions"
