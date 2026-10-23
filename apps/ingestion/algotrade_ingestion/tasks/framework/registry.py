@@ -26,6 +26,7 @@ from algotrade_ingestion.tasks.derived import (
     residual_returns,
     rollups,
 )
+from algotrade_ingestion.tasks.edges import picks as edge_picks
 from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
 from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
 from algotrade_ingestion.tasks.framework import (
@@ -834,6 +835,22 @@ TASKS: dict[str, Task] = {
                     None,
                     "with --dry-run: also verify the plan (slow), as a live run does",
                 ),
+            ),
+        ),
+        Task(
+            "edge-picks",
+            "store what every site edge took at a session in results/edge_picks (ADR 0081), by the "
+            "harness's own pick rule (idempotent, resumable: a stored (edge, screener) is "
+            "skipped; --from/--to backfill a window of sessions)",
+            edge_picks,
+            edge_picks.TABLES,
+            entries_ops.run_edge_picks,
+            skip=source_guards.no_config_store,
+            params=(
+                SESSION,
+                FROM,
+                TO,
+                Param("edge", ("--edge",), str, "decide this one site edge only"),
             ),
         ),
         Task(

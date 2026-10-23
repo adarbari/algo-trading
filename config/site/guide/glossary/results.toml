@@ -262,22 +262,22 @@ see_also = ["counts_toward", "near_miss", "idea_decision"]
 [[term]]
 id = "counts_toward"
 term = "Counts toward"
-short = "Which edges take this pick into their record, and the reason when one does not."
+short = "Which edges took this pick at the session, from their own stored picks, and the reason when one did not."
 body = """
-An edge takes a screener's qualified picks in rank order, up to its own cut, and scores each against its outcome later. This column says, for each edge that lists the screener, whether this pick would be one of them. A pick the regime gate held back, one that failed a rule, or one ranked past the cut is not counted. Counting a pick says what the edge would take, not what it has earned: the outcome is not known until the holding period ends. The edge also applies its own universe and schedule, which this column does not check. A single pick is not a forecast; the edge's record is a statement about many picks.
+Each night, every edge that lists the screener stores the names it took, by its own rules. Those are the screener's qualified names inside the edge's own universe, best first, up to its cut. This column reads that store for the session you are viewing. A pick the edge took counts, with its place in the edge's list. A pick the regime gate held back, or one that is not in the edge's list (outside its universe, or past its cut), is not counted. Counting a pick says what the edge would take, not what it has earned: the outcome is not known until the holding period ends. When the edge decides only on some sessions, or its picks were not stored, the column says so instead of guessing. A single pick is not a forecast; the edge's record is a statement about many picks.
 """
 next = "Open the screener's edge line to see each edge's record, then Evidence for the figures."
-see_also = ["screener_edge_line", "edge_pick_counts", "edge_pick_paused", "edge_pick_below_top_k", "edge_pick_unjudged"]
+see_also = ["screener_edge_line", "edge_pick_counts", "edge_pick_paused", "edge_pick_not_counted", "edge_pick_not_a_decision_day", "edge_pick_unjudged", "edge_pick_not_stored"]
 
 [[term]]
 id = "edge_pick_counts"
 term = "Counts"
-short = "The pick is qualified and inside the edge's cut, so the edge would take it into its record."
+short = "The edge took this pick at the session, so it goes into the edge's record."
 body = """
-A pick counts when the screener qualified it and its place among the qualified names is within the edge's top N, or the edge takes every qualified name. It is scored against the edge's outcome when its holding period ends. For example, place 3 of the top 5 counts, and place 6 does not. Counting is not a signal to buy: the record is judged over many picks. The edge also applies its own universe and schedule, so a counted pick may still fall outside a session the edge measures.
+The edge's own list for the session, made by its rules, contains this name. Its place is its position in that list, best first. It is scored against the edge's outcome when its holding period ends. For example, place 3 of the top 5 counts. The place can differ from the screener's rank: the edge leaves out names outside its universe, so every later name moves up. Counting is not a signal to buy: the record is judged over many picks.
 """
 next = "Open the edge to see how its counted picks did."
-see_also = ["counts_toward", "edge_pick_below_top_k"]
+see_also = ["counts_toward", "edge_pick_not_counted"]
 
 [[term]]
 id = "edge_pick_paused"
@@ -290,41 +290,51 @@ next = "Open the pick's detail to read the rule that paused it."
 see_also = ["paused", "counts_toward"]
 
 [[term]]
-id = "edge_pick_not_qualified"
-term = "Not counted: not qualified"
-short = "The pick did not qualify, so the edge does not take it into its record."
+id = "edge_pick_not_counted"
+term = "Edge did not take it"
+short = "The edge decided at this session and did not take this pick."
 body = """
-Only qualified picks count toward an edge. A pick with another decision, such as watch, reject or event risk, missed or only nearly met a rule. For example, a pick short of one threshold by a small margin is a near miss and is not counted. A near miss is not a small qualifier.
+The edge's own list for the session does not contain this name. Common reasons: the name did not qualify, or it is outside the edge's universe, such as an ETF for an edge on common stocks. It may also rank past the edge's cut among the names the edge can take. The edge's record says nothing about it.
 """
-next = "Open the pick's detail to see which rule decided it."
-see_also = ["qualified", "near_miss", "counts_toward"]
+next = "Open the edge to see its universe and its cut."
+see_also = ["counts_toward", "edge_pick_counts", "qualified"]
 
 [[term]]
-id = "edge_pick_below_top_k"
-term = "Not counted: below the cut"
-short = "The pick qualified but ranks past the edge's top N, so the edge does not take it."
+id = "edge_pick_not_a_decision_day"
+term = "Not a decision day"
+short = "The edge's schedule does not decide at this session, so it took no picks."
 body = """
-Some edges take only the best N qualified picks of the run, in the screener's rank order. A qualified pick past that place is real but outside the edge's record. For example, with a top 5 cut, the sixth qualified name is not counted. The cut is part of the edge's definition, so the record says nothing about the names below it.
+Some edges decide only on certain sessions, such as the last session of a month, or around an event. On any other session the edge takes nothing, whatever the screener picked. For example, a month-end edge counts nothing on a mid-month session. Not a decision day is not a verdict on the pick.
 """
-next = "Open the edge to see its cut and how it is defined."
-see_also = ["counts_toward", "edge_pick_counts"]
+next = "Open the edge to read its schedule."
+see_also = ["counts_toward", "edge_pick_unjudged"]
 
 [[term]]
 id = "edge_pick_withheld"
 term = "Not judged"
-short = "The pick's rank is withheld from you, so it cannot be judged against the edge's cut."
+short = "The pick's rank is withheld from you, so it cannot be placed in the edge's list."
 body = """
-A run recorded under a data licence you do not hold shows names and decisions but not the score or rank behind them. The edge's cut depends on that rank, so the server does not say whether the pick counts. This is a limit of your access, not a verdict on the pick.
+A run recorded under a data licence you do not hold shows names and decisions but not the score or rank behind them. The edge's list is built from that rank, so the server does not say whether the pick counts. This is a limit of your access, not a verdict on the pick.
 """
 next = "Ask an admin whether the data licence can be added to your account."
 see_also = ["counts_toward"]
 
 [[term]]
 id = "edge_pick_unjudged"
-term = "Not judged: other schedule or side"
-short = "The edge does not take picks the way this column reads them, so it says nothing about this pick."
+term = "Not judged: other side"
+short = "The edge shorts, or holds a book, so the screener's picks are not its picks."
 body = """
-Some edges pick only on certain sessions, such as month-end or around an event. Others hold short or long-short books and rank names by their own score. For those, the screener's rank does not say which names the edge takes today, so the page does not guess. For example, a month-end edge counts nothing on a mid-month session. Not judged is not a verdict on the pick.
+An edge that shorts names, or holds a long-short or portfolio book, ranks names by its own score and liquidity rules, not by the screener's qualified list. The page does not say which of the screener's picks it takes. Not judged is not a verdict on the pick.
 """
-next = "Open the edge to read its schedule and how it picks."
+next = "Open the edge to read how it picks."
 see_also = ["counts_toward", "edge_pick_withheld"]
+
+[[term]]
+id = "edge_pick_not_stored"
+term = "Picks not stored"
+short = "The edge's picks for this session are not stored, so the page cannot say whether it took this one."
+body = """
+Each night the edge's picks are stored for the session. This one has none. The nightly step may not have run for the session yet, the edge may have been added after it, or the data it needed may have been missing. An edge of your own is never stored. The page never shows an older session's picks in its place. Picks not stored is not a verdict on the pick.
+"""
+next = "Check the session date, then look again after the next nightly run."
+see_also = ["counts_toward"]

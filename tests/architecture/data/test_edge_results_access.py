@@ -63,3 +63,23 @@ def test_the_table_is_registered_as_not_every_session(name: str) -> None:
     text = (REPO_ROOT / "architecture/tables.toml").read_text()
     block = text.split(f'name = "results/{name}"')[1].split("[[table]]")[0]
     assert "per_session = false" in block
+
+
+def test_only_the_decision_the_task_and_the_page_read_name_edge_picks() -> None:
+    """``results/edge_picks`` (ADR 0081, session grain): framed by ``evaluation/edge_picks/``,
+    published by the ``edge-picks`` task, read only by ``pick_edges.py`` for the served session."""
+    allowed = (
+        "src/algotrade/services/evaluation/edge_picks/",
+        "apps/ingestion/algotrade_ingestion/tasks/edges/picks.py",
+        "src/algotrade/services/read/evaluation/pick_edges.py",
+        SCHEMA,
+    )
+    offenders = []
+    for root in SCANNED:
+        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            if rel.startswith(allowed) or "node_modules" in rel:
+                continue
+            if {"results/edge_picks", "edge_picks"} & _names(path):
+                offenders.append(rel)
+    assert not offenders, f"only {allowed} may name results/edge_picks: {offenders}"

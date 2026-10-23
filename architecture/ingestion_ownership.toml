@@ -72,6 +72,18 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
+id = "edge-picks"
+description = "Store what every site edge took at a session in results/edge_picks (ADR 0081): per site edge and screener it lists, the picks the harness's one rule gave (services/evaluation/edge_picks/night.py over picks.long_picks, the edge's universe, schedule and top_k) or why none (not_decision_day, unjudged, skipped), one publish per run, resumable by the stored keys, an optional nightly step after the screens with its acceptance check; decides nothing itself (the rule is the harness's)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/edges/picks.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_ops.py",  # the task's entry
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/nightly.py",  # the step's acceptance check
+]
+section = "docs/adr/0081-stored-edge-picks.md#decision"
+detect = [{ call = "store_picks" }]
+
+[[responsibility]]
 id = "edge-verdicts"
 description = "Store the headline of every site edge's canonical run in results/edge_verdict (ADR 0053 amendment 2026-10-22), the backfill of runs stored before the table and the re-judge after the judge's code, verdict.toml or an edge document changed, in one task: per site edge, the canonical run (never a user's edge, a hidden copy or an exploratory run) judged from its committed rows through the one framer the edge-eval publish uses (services/evaluation/cross_section/detail/verdict.py), skipped when a row under the current fingerprint exists (idempotent, resumable by the store), every new row in one publish under the task's run id and the write instant as knowledge_ts, one edge's failure counted and never stopping the rest, stored rows checked against the live judge on request (--verify); owner-run once after deploy, then the post-session workflow's last step; never judges anything itself (ADR 0053 decision 8)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/edges/*"]
