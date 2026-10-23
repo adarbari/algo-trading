@@ -238,3 +238,93 @@ The date is the trading session the run read, not the day it was started. No run
 """
 next = "Check the date before you act on a screener's picks."
 see_also = ["paused", "not_run", "screener_picks"]
+
+[[term]]
+id = "screener_edge_line"
+term = "Screener edge line"
+short = "The edge this screener implements and how that edge's picks did in the past: its status, win rate against the base rate, trades and hold."
+body = """
+An edge is a stated reason a pattern should keep paying, tested out of sample. This screener is one way to pick names for it. The line shows the strongest edge that lists the screener, ranked by status and then by trades. A +N chip means more edges list it, and Evidence opens the record of each. The figures are the frozen-period record: the test whose start date was fixed before it was read, shown as the first session it covers. For example, 62% against a 55% base rate on 40 trades with a 20-session hold means the picks beat the field by 7 points. Not part of an edge means no test covers this screener, and No record yet means the test has not run. Neither says the screener is bad. Don't read the record as a forecast for today's picks: it counts past outcomes, not amounts.
+"""
+next = "Open Evidence to compare the record of each edge, then the edge page for its curve and verdict."
+see_also = ["screener_track_record", "win_rate", "base_rate", "lift", "trades"]
+
+[[term]]
+id = "why_it_matched"
+term = "Why it matched"
+short = "The rules this pick passed, each with the value it was judged on, in the field's own unit."
+body = """
+Each item is a rule of the screener the pick met, followed by its value in that run. For example, revisions +6.2% · 7 analysts · above 50d means three rules passed with those readings. A rule the pick missed or nearly met is not listed here: the Why column and the pick's detail show it. A pick that failed a rule can still list the rules it passed, so a long list is not a qualified pick. The value is the one the run stored, so it can differ from today's value in Explore.
+"""
+next = "Open the pick to see every rule with its threshold and outcome."
+see_also = ["counts_toward", "near_miss", "idea_decision"]
+
+[[term]]
+id = "counts_toward"
+term = "Counts toward"
+short = "Which edges take this pick into their record, and the reason when one does not."
+body = """
+An edge takes a screener's qualified picks in rank order, up to its own cut, and scores each against its outcome later. This column says, for each edge that lists the screener, whether this pick would be one of them. A pick the regime gate held back, one that failed a rule, or one ranked past the cut is not counted. Counting a pick says what the edge would take, not what it has earned: the outcome is not known until the holding period ends. The edge also applies its own universe and schedule, which this column does not check. A single pick is not a forecast; the edge's record is a statement about many picks.
+"""
+next = "Open the screener's edge line to see each edge's record, then Evidence for the figures."
+see_also = ["screener_edge_line", "edge_pick_counts", "edge_pick_paused", "edge_pick_below_top_k", "edge_pick_unjudged"]
+
+[[term]]
+id = "edge_pick_counts"
+term = "Counts"
+short = "The pick is qualified and inside the edge's cut, so the edge would take it into its record."
+body = """
+A pick counts when the screener qualified it and its place among the qualified names is within the edge's top N, or the edge takes every qualified name. It is scored against the edge's outcome when its holding period ends. For example, place 3 of the top 5 counts, and place 6 does not. Counting is not a signal to buy: the record is judged over many picks. The edge also applies its own universe and schedule, so a counted pick may still fall outside a session the edge measures.
+"""
+next = "Open the edge to see how its counted picks did."
+see_also = ["counts_toward", "edge_pick_below_top_k"]
+
+[[term]]
+id = "edge_pick_paused"
+term = "Held back by the regime gate"
+short = "The market regime stopped this pick for the session, so the edge does not count it."
+body = """
+The screener's regime gate pauses picks when the market state is one the screener should sit out. A paused pick keeps its rank and its reason, but it is not an idea for the session and no edge counts it. For example, a pick that passed every rule is still held back in a stress regime. A pause is not a rule failure.
+"""
+next = "Open the pick's detail to read the rule that paused it."
+see_also = ["paused", "counts_toward"]
+
+[[term]]
+id = "edge_pick_not_qualified"
+term = "Not counted: not qualified"
+short = "The pick did not qualify, so the edge does not take it into its record."
+body = """
+Only qualified picks count toward an edge. A pick with another decision, such as watch, reject or event risk, missed or only nearly met a rule. For example, a pick short of one threshold by a small margin is a near miss and is not counted. A near miss is not a small qualifier.
+"""
+next = "Open the pick's detail to see which rule decided it."
+see_also = ["qualified", "near_miss", "counts_toward"]
+
+[[term]]
+id = "edge_pick_below_top_k"
+term = "Not counted: below the cut"
+short = "The pick qualified but ranks past the edge's top N, so the edge does not take it."
+body = """
+Some edges take only the best N qualified picks of the run, in the screener's rank order. A qualified pick past that place is real but outside the edge's record. For example, with a top 5 cut, the sixth qualified name is not counted. The cut is part of the edge's definition, so the record says nothing about the names below it.
+"""
+next = "Open the edge to see its cut and how it is defined."
+see_also = ["counts_toward", "edge_pick_counts"]
+
+[[term]]
+id = "edge_pick_withheld"
+term = "Not judged"
+short = "The pick's rank is withheld from you, so it cannot be judged against the edge's cut."
+body = """
+A run recorded under a data licence you do not hold shows names and decisions but not the score or rank behind them. The edge's cut depends on that rank, so the server does not say whether the pick counts. This is a limit of your access, not a verdict on the pick.
+"""
+next = "Ask an admin whether the data licence can be added to your account."
+see_also = ["counts_toward"]
+
+[[term]]
+id = "edge_pick_unjudged"
+term = "Not judged: other schedule or side"
+short = "The edge does not take picks the way this column reads them, so it says nothing about this pick."
+body = """
+Some edges pick only on certain sessions, such as month-end or around an event. Others hold short or long-short books and rank names by their own score. For those, the screener's rank does not say which names the edge takes today, so the page does not guess. For example, a month-end edge counts nothing on a mid-month session. Not judged is not a verdict on the pick.
+"""
+next = "Open the edge to read its schedule and how it picks."
+see_also = ["counts_toward", "edge_pick_withheld"]

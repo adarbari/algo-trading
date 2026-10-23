@@ -53,6 +53,7 @@ function ScreenerResultsRoute() {
         const search = compareSearch(symbols);
         if (search) void navigate({ to: '/explore', search });
       }}
+      onOpenEdge={(edge) => void navigate({ to: '/edges', search: { edge } })}
     />
   );
 }

@@ -3,11 +3,14 @@
  * table with the row under review beside it (its decision, criteria and price chart), and
  * "Edit criteria" for the Builder. Reviewing comes first, editing is one click away. The
  * review is keyboard-first: j / k move, c adds the ticker to the compare set, x hides it for
- * now, Enter opens it in Explore. "Edit criteria" goes straight to the Builder page.
+ * now, Enter opens it in Explore. "Edit criteria" goes straight to the Builder page. Under the
+ * header an edge line says which edge this screener implements and its record, so a pick's
+ * evidence is on the page it is reviewed on.
  */
 import { Button, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
 import { useState } from 'react';
 
+import { ScreenerEdgeLine } from '@/widgets/screener-edge-line';
 import { ScreenerResults } from '@/widgets/feature-table';
 import { PickDetail } from '@/widgets/pick-detail';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
@@ -21,6 +24,8 @@ export interface ScreenerResultsPageProps {
   onOpenTicker: (symbol: string) => void;
   /** Open the tickers added to the compare set in Explore. */
   onCompare: (symbols: readonly string[]) => void;
+  /** Open an edge's page (its evidence). */
+  onOpenEdge: (edgeId: string) => void;
 }
 
 export function ScreenerResultsPage({
@@ -28,6 +33,7 @@ export function ScreenerResultsPage({
   onEdit,
   onOpenTicker,
   onCompare,
+  onOpenEdge,
 }: ScreenerResultsPageProps) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [compared, setCompared] = useState<readonly string[]>([]);
@@ -66,6 +72,7 @@ export function ScreenerResultsPage({
           </Button>
         </Stack>
       </Stack>
+      <ScreenerEdgeLine screenerId={id} onOpenEdge={onOpenEdge} />
       <ScreenerResults
         id={id}
         onOpen={onOpenTicker}

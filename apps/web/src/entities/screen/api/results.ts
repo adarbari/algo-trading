@@ -181,6 +181,14 @@ const ScreenerResults = graphql(`
               name
               value
             }
+            countsToward {
+              edgeId
+              edgeName
+              counts
+              code
+              topK
+              place
+            }
           }
         }
       }

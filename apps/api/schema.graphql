@@ -2462,6 +2462,18 @@ type PickCount {
 }
 
 """
+What one edge that lists the screener does with a pick of its run, decided by the server by the harness's own rule: `counts` the edge would take it, and the `code` that says why (counts; paused: the regime gate held it back; not_qualified: a rule failed or it was not picked; below_top_k: qualified but past the edge's `topK`; withheld: its rank is withheld from the viewer), `place` its place among the run's qualified rows. It does not read an outcome: it says what the edge would take, not what it has earned
+"""
+type PickEdge {
+  edgeId: String!
+  edgeName: String!
+  counts: Boolean!
+  code: String!
+  topK: Int
+  place: Int
+}
+
+"""
 The tickers a run picked, in rank order, without the rows behind them: `instrumentIds` (at most `size`) and `total`, the picks in all (the picks and the ones the regime gate held back)
 """
 type PickIds {
@@ -3240,6 +3252,11 @@ type ScreenResult {
   regime: String
   sizeMultiplier: Float
   groups: [ScreenGroup!]!
+
+  """
+  Each edge that lists the screener and whether it counts this row (empty: none does); filled on `ScreenerRun.results` only
+  """
+  countsToward: [PickEdge!]!
 }
 
 """

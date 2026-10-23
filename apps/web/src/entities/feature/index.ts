@@ -38,6 +38,14 @@ export {
   type ScreenColumnInfo,
 } from './model/columns';
 export {
+  PICK_EDGE_TERM,
+  countsTowardColumn,
+  matchedColumn,
+  matchedText,
+  pickEdgeTone,
+  pickEdgeWords,
+} from './model/columns-pick';
+export {
   tableVariables,
   toTableData,
   type ColumnInfo,
@@ -45,6 +53,7 @@ export {
   type FeatureTableQuery,
   type TableCell,
   type TableFilters,
+  type PickEdge,
   type TableRow,
 } from './model/table';
 export {

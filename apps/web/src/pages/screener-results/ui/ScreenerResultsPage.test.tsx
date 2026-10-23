@@ -6,6 +6,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ScreenerResultsPage } from './ScreenerResultsPage';
 
 vi.mock('@/widgets/feature-table', () => ({ ScreenerResults: () => <Text>results</Text> }));
+vi.mock('@/widgets/screener-edge-line', () => ({
+  ScreenerEdgeLine: ({ screenerId }: { screenerId: string }) => (
+    <Text>{`edge line of ${screenerId}`}</Text>
+  ),
+}));
 vi.mock('@/widgets/pick-detail', () => ({ PickDetail: () => null }));
 vi.mock('@/widgets/price-chart-panel', () => ({ PriceChartPanel: () => null }));
 
@@ -18,10 +23,12 @@ describe('ScreenerResultsPage', () => {
         onEdit={onEdit}
         onOpenTicker={vi.fn()}
         onCompare={vi.fn()}
+        onOpenEdge={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'my-vrp' })).toBeInTheDocument();
     expect(screen.getByText('results')).toBeInTheDocument();
+    expect(screen.getByText('edge line of my-vrp')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Edit criteria' }));
     expect(onEdit).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
