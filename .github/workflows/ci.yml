@@ -167,12 +167,19 @@ jobs:
           echo "splits=${part#*of}" >> "$GITHUB_OUTPUT"
       - name: Unit + architecture + property + integration + e2e, this shard (coverage data, no gate yet)
         if: needs.changes.outputs.python == 'true'
-        run: make test-shard SHARD=${{ steps.cell.outputs.shard }} GROUP=${{ steps.cell.outputs.group }} SPLITS=${{ steps.cell.outputs.splits }}
+        run: make test-shard SHARD=${{ steps.cell.outputs.shard }} GROUP=${{ steps.cell.outputs.group }} SPLITS=${{ steps.cell.outputs.splits }} SPLIT_FLAGS='--store-durations --durations-path=.durations-${{ matrix.cell }}.json'
       # A web-only or docs-only change still answers to the fitness tests: the web layout rules
       # (architecture/web_layout.toml [[web_dir]]), the ADR index, the roadmap cap, the links.
       - name: Architecture tests only (the change is web-only or docs-only)
         if: needs.changes.outputs.python != 'true' && steps.cell.outputs.shard == 'arch'
         run: .venv/bin/python -m pytest -q -n auto tests/architecture
+      - uses: actions/upload-artifact@v7
+        if: needs.changes.outputs.python == 'true'
+        with:
+          name: durations-${{ matrix.cell }}
+          path: .durations-${{ matrix.cell }}.json
+          include-hidden-files: true
+          retention-days: 1
       - uses: actions/upload-artifact@v7
         if: needs.changes.outputs.python == 'true'
         with:
