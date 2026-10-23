@@ -178,6 +178,19 @@ bench writes a copy of the capture's edge for its viewer into its config copy (`
 at "You have not run this edge yet": the expensive path (`load_run_rows` twice, `basis_of`) is not timed,
 yet EdgeCompare is recorded as passing. `ops.json` marks it `"fidelity": "own copy, not run"`.
 Follow-up (roadmap): time a copy that has a run (a run record of the viewer on the clone).
+**What is copied, and how.** `tables/` one timed `cp -cR` per dataset (about 17; `entry_s` shows a slow
+one), `runs/` and `serving/` whole, one `cp` each: a cp per child of `runs/` (29k files) ran at about
+100 files/s in hand run 5 (2026-10-23; `tables/` itself took 207 s, matching the 3-4 minutes).
+**An auto-deploy is not a writer.** Hand run 5 was stopped at 223 s by `algotrade-ingest deploy-hold
+--deploy-only -- bash deploy.sh --slot blue --apply auto <sha>`, which matches the `algotrade-ingest`
+marker (any merged PR starts one within 5 minutes). Can a deploy write the store? No: it takes the
+`deploy` lock alone (a file under `locks/`, which the clone does not copy; `hold.py`: "writes nothing to
+the store"), then does a git checkout and `uv sync` in the release tree, the web build under
+`var/release/`, an API restart (`launchctl kickstart`) and a verify; the API's own writes (ADR 0005)
+happen with or without a deploy, and its response cache is in memory. So exactly that command line
+(`deploy-hold --deploy-only -- bash ...deploy.sh --slot S --apply ...`) is exempt, logged in `run.log`
+as `ignored deploy: pid N ...`; `deploy-hold` without `--deploy-only` (it holds the ingest lock) and
+every other `algotrade-ingest` command stay writers.
 A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
 discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
 continue. After the copy **every** outcome is a finished day (one notification, never a re-copy

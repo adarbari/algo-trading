@@ -55,6 +55,13 @@ max_pause_aborts=3  # a day with this many copies stopped by a paused machine fi
 markers='algotrade-ingest|algotrade_ingestion|algotrade-backtest|var/logs/'
 # a real writer: an ingest or backtest command (rollups, nightly and compaction run through them). Any
 # other marker match is a driver script (var/logs/...): a writer only while it has a live child that is not `sleep`
+# An auto-deploy (`algotrade-ingest deploy-hold --deploy-only -- bash deploy.sh --slot S --apply ...`) is
+# not a writer: it takes the store's `deploy` lock alone (a file under locks/, not copied) and does a git
+# checkout in the release tree, uv sync, the web build, an API restart and verify: no table of
+# tables/ runs/ serving/ (scripts/ops/deploy.sh, apps/ingestion/.../ops/hold.py: "writes nothing to the
+# store"). Exactly this command line is exempt; deploy-hold without --deploy-only (it holds the ingest
+# lock) and every other algotrade-ingest command stay writers.
+deploy_re='^([^ ]*python[^ ]* +)?([^ ]*/)?algotrade-ingest deploy-hold --deploy-only -- bash [^ ]*deploy\.sh --slot [^ ]+ --apply( |$)'
 real_writer='algotrade-ingest|algotrade_ingestion|algotrade-backtest|rollups|nightly|compaction'
 
 # the bench starts an API on a spare port of ALGOTRADE_PORT_BASE + 8..19: a fixed block outside the
@@ -323,6 +330,11 @@ busy_writer() {
   local pid args
   ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench" | {
     while read -r pid args; do
+      if printf '%s' "$args" | grep -qE "$deploy_re"; then  # an auto-deploy writes no store table (see above)
+        [ "$rundir_made" = 1 ] && ! grep -q "ignored deploy: pid $pid " "$rundir/run.log" 2>/dev/null &&
+          echo "perf_gate: ignored deploy: pid $pid $args" >>"$rundir/run.log"
+        continue
+      fi
       if printf '%s' "$args" | grep -qE "$real_writer" || driver_busy "$pid"; then
         echo "$pid $args"; return 0
       fi
@@ -376,7 +388,11 @@ for e in $ENTRIES; do
   [ -e "$SRC/$e" ] || continue
   echo "$e" >"$PROG"
   kids=
-  if [ -d "$SRC/$e" ]; then for c in "$SRC/$e"/* "$SRC/$e"/.[!.]*; do [ -e "$c" ] && kids=1; done; fi
+  # one timed cp per dataset only for tables/ (about 17); runs/ (29k files) and serving/ go whole: a cp
+  # per child of runs/ took about 100 files/s (hand run 5, 2026-10-23)
+  if [ "$e" = tables ] && [ -d "$SRC/$e" ]; then
+    for c in "$SRC/$e"/* "$SRC/$e"/.[!.]*; do [ -e "$c" ] && kids=1; done
+  fi
   if [ -z "$kids" ]; then copy_one "$SRC/$e" "$CLONE/$e" "$e"; continue; fi
   mkdir -p "$CLONE/$e"
   for c in "$SRC/$e"/* "$SRC/$e"/.[!.]*; do
