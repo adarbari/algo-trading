@@ -499,7 +499,7 @@ def test_an_expression_over_an_optional_source_still_has_a_value_without_it(name
 GROUPS_VERSION = {
     "analyst_estimates": 2,
     "analyst_targets": 2,
-    "analyst_ratings": 1,
+    "analyst_ratings": 2,
     "analyst_revisions": 2,
 }
 
@@ -537,14 +537,19 @@ def test_no_site_hard_criterion_reads_an_optional_source_directly() -> None:
 
 
 def test_every_analyst_group_reads_its_vendor_through_the_one_chooser() -> None:
-    """ADR 0080: estimates and targets read FMP's and Yahoo's rows only through
-    ``choose_vendor`` + ``effective_snapshots``, revisions only through ``history_of_chosen``
-    (the vendor the estimates chose); ratings are Finnhub's alone and read neither."""
+    """ADR 0080: estimates, targets and ratings read the vendors' rows only through
+    ``choose_vendor`` + ``effective_snapshots`` (ratings with their own vendor order, Finnhub then
+    Yahoo), revisions only through ``history_of_chosen`` (the vendor the estimates chose)."""
     folder = REPO_ROOT / "src/algotrade/features/rollups/consensus"
-    text = {n: (folder / f"analyst_{n}.py").read_text() for n in ("estimates", "targets")}
+    names = ("estimates", "targets", "ratings")
+    text = {n: (folder / f"analyst_{n}.py").read_text() for n in names}
     for name, source in text.items():
         assert "choose_vendor(" in source and "effective_snapshots(" in source, name
+    assert (
+        "ORDER" in text["ratings"] and "choose_vendor(both, ids, RECOMMENDATION" in text["ratings"]
+    )
     revisions = (folder / "analyst_revisions.py").read_text()
     assert "history_of_chosen(" in revisions and "history_rows(" not in revisions
-    ratings = (folder / "analyst_ratings.py").read_text()
-    assert "choose_vendor" not in ratings and "YAHOO" not in ratings
+    # a vendor's rows never reach a group except through the chooser: no group reads them raw
+    for name, source in text.items():
+        assert 'snapshots[snapshots["source"]' not in source, name

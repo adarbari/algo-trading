@@ -606,3 +606,22 @@ for = "only the first vendor's data"
 op = "eq"
 value = "fmp"
 mode = "hard"
+
+[[field]]
+name = "rollup.analyst_ratings@v2.ratings_source"
+theme = "analyst"
+reads = "Which data vendor the ratings of the name come from: finnhub (Finnhub) or yahoo (Yahoo Finance, used when Finnhub has none for the name). A name neither has reached reads finnhub with a status of NOT_COVERED or NOT_FETCHED."
+caveats = [
+  "A name read from Yahoo has its score change from this month and the month three back, both inside one Yahoo snapshot. The span is roughly 60 to 120 days (calendar months), not our own 90-day history. The analyst set can change between the two (ARX went from 10 to 6).",
+  "Yahoo's ratings are refreshed about every 45 days for a name another vendor covers, so they go STALE after 60 days where Finnhub's go after 45.",
+  "Both are free sources with personal-use terms: every value of this group is for the owner only, whichever vendor it came from.",
+  "A name Yahoo has not reached yet stays not covered; no name is judged by another.",
+]
+sources = [
+  "Finnhub and Yahoo Finance, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md)",
+]
+[[field.use]]
+for = "only the first vendor's data"
+op = "eq"
+value = "finnhub"
+mode = "hard"

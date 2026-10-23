@@ -185,7 +185,7 @@ const licence = (name: string) =>
 const STATUSES = [
   'rollup.analyst_estimates@v2.estimates_status',
   'rollup.analyst_targets@v2.targets_status',
-  'rollup.analyst_ratings@v1.ratings_status',
+  'rollup.analyst_ratings@v2.ratings_status',
   'rollup.analyst_revisions@v2.revisions_status',
 ];
 const withAnalysts = (analysts: readonly (typeof stock.features)[number][]) =>
@@ -209,6 +209,17 @@ describe('the analysts section', () => {
     expect(section).toHaveTextContent('EPS estimate (FY1)');
     expect(screen.queryByText('Analyst figures')).not.toBeInTheDocument();
     expect(screen.getByText('STALE')).toBeInTheDocument();
+  });
+
+  it('names Yahoo as the ratings source in a badge, the word the server serves', () => {
+    serve(
+      withAnalysts([
+        known(STATUSES[2] ?? '', 'OK', 'TEXT'),
+        known('rollup.analyst_ratings@v2.ratings_source', 'yahoo', 'TEXT'),
+      ]),
+    );
+    render(<FinancialsPanel symbol="KO" />);
+    expect(screen.getByText('yahoo')).toBeInTheDocument();
   });
 
   it('says it once when the name is not covered, with the kind and its Guide term', async () => {
@@ -290,10 +301,10 @@ describe('the ratings and revisions rows', () => {
   it('shows the five counts, the score, its change and the month, then the revisions, as served', () => {
     serve(
       withAnalysts([
-        known('rollup.analyst_ratings@v1.rating_strong_buy', 12, 'INTEGER'),
-        known('rollup.analyst_ratings@v1.rating_buy', 18, 'INTEGER'),
-        known('rollup.analyst_ratings@v1.rating_score', 4.31, 'NUMBER', 'ratio'),
-        known('rollup.analyst_ratings@v1.rating_score_change_90d', 0.12, 'NUMBER', 'ratio'),
+        known('rollup.analyst_ratings@v2.rating_strong_buy', 12, 'INTEGER'),
+        known('rollup.analyst_ratings@v2.rating_buy', 18, 'INTEGER'),
+        known('rollup.analyst_ratings@v2.rating_score', 4.31, 'NUMBER', 'ratio'),
+        known('rollup.analyst_ratings@v2.rating_score_change_90d', 0.12, 'NUMBER', 'ratio'),
         known('rollup.analyst_revisions@v2.eps_fy1_revision_30d', 0.021, 'PERCENT', 'decimal'),
         known(STATUSES[2] ?? '', 'OK', 'TEXT'),
         known(STATUSES[3] ?? '', 'BUILDING', 'TEXT'),
@@ -309,7 +320,7 @@ describe('the ratings and revisions rows', () => {
     }
     expect(section).toHaveTextContent('Strong buy ratings');
     expect(section).toHaveTextContent('Rating score change (90d)');
-    expect(section).toHaveTextContent('field rollup.analyst_ratings@v1.rating_score');
+    expect(section).toHaveTextContent('field rollup.analyst_ratings@v2.rating_score');
     expect(text.indexOf('Strong buy ratings')).toBeLessThan(text.indexOf('Rating score (1 to 5)'));
     expect(text.indexOf('Ratings month')).toBeLessThan(text.indexOf('EPS estimate (FY1)'));
     expect(text.indexOf('Analysts behind revenue (FY1)')).toBeLessThan(
@@ -382,7 +393,7 @@ describe('the ratings and revisions rows', () => {
   it('has no accessibility violations with the rows shown', async () => {
     serve(
       withAnalysts([
-        known('rollup.analyst_ratings@v1.rating_score', 4.31, 'NUMBER', 'ratio'),
+        known('rollup.analyst_ratings@v2.rating_score', 4.31, 'NUMBER', 'ratio'),
         known(STATUSES[2] ?? '', 'STALE', 'TEXT'),
       ]),
     );

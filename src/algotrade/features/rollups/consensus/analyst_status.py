@@ -1,5 +1,5 @@
 """What the analyst feature groups share: the population, the vendor's rows as of a session and
-the status of a name (``analyst_estimates@v2``, ``analyst_targets@v2``, ``analyst_ratings@v1``,
+the status of a name (``analyst_estimates@v2``, ``analyst_targets@v2``, ``analyst_ratings@v2``,
 ``analyst_revisions@v2``; ADR 0068, ADR 0072, ADR 0080).
 
 The input is ``analyst/estimate_snapshots`` as a session sees it (``data.analyst.reading``: the
@@ -23,13 +23,15 @@ A trader reads both of the last two as "not covered"; the stored status tells th
 ``session_date`` (the session the fetch was for) to the session.
 
 The status helpers take the vendor (``source``) whose rows and markers they read: FMP by default,
-Finnhub for the recommendation trend (``analyst_ratings@v1``), each with its own markers.
+Finnhub for the recommendation trend (``analyst_ratings@v2``), each with its own markers.
 
-**One vendor per (name, kind)** (ADR 0080; estimates, targets and revisions only: ratings stay
-Finnhub's). ``choose_vendor`` resolves a name for FMP and for Yahoo from the frame the session sees
-and takes FMP's when its status is OK or STALE, else Yahoo's when Yahoo has a row or a marker that
-is not FAILED (status not NOT_FETCHED), else FMP's. ``effective_snapshots`` keeps, per name, only
-the chosen vendor's rows of the kind AND its coverage markers and relabels them ``fmp``, so
+**One vendor per (name, kind)** (ADR 0080). ``choose_vendor`` resolves a name for each vendor of
+``order`` from the frame the session sees and takes the first's when its status is OK or STALE,
+else the next one's that has a row or a marker that is not FAILED (status not NOT_FETCHED), else
+the first's. The order is FMP then Yahoo for estimates, targets and revisions, Finnhub then Yahoo
+for ratings (``analyst_ratings@v2``). ``effective_snapshots`` keeps, per name, only
+the chosen vendor's rows of the kind AND its coverage markers and relabels them (``fmp``, or the
+group's first vendor), so
 ``vendor_rows``, ``resolve`` and ``history_rows`` read as before and the other vendor's markers
 never mix in. The choice reads one name's own rows: a name Yahoo has not reached stays what FMP
 says (NOT_COVERED), no name is judged by another. ``history_of_chosen`` restricts the history a
@@ -40,7 +42,6 @@ revisions are null (BUILDING / NO_PRIOR) until its own snapshots span the window
 from dataclasses import dataclass
 from datetime import date
 
-import numpy as np
 import pandas as pd
 
 from algotrade.features.rollups.market.breadth import MEMBER_CLASS
@@ -186,42 +187,60 @@ def resolve(
 
 
 def choose_vendor(
-    snapshots: pd.DataFrame | None, ids: list[str], kind: str, session: date, p: AnalystParams
+    snapshots: pd.DataFrame | None,
+    ids: list[str],
+    kind: str,
+    session: date,
+    p: AnalystParams,
+    order: tuple[str, ...] = SOURCES,
 ) -> pd.Series:
-    """``instrument_id`` -> ``fmp`` / ``yahoo``: the vendor whose ``kind`` rows and markers the
-    group reads for the name (the module doc): FMP when OK or STALE, else Yahoo when it has a row
-    or a marker that is not FAILED, else FMP."""
+    """``instrument_id`` -> the vendor whose ``kind`` rows and markers the group reads for the name
+    (the module doc), from ``order`` (the vendors, most preferred first; FMP then Yahoo by
+    default, Finnhub then Yahoo for ratings): the first whose status is OK or STALE, else the
+    first of the others that has a row or a marker that is not FAILED, else the first of
+    ``order``."""
     status = {}
-    for vendor in SOURCES:
+    for vendor in order:
         rows = vendor_rows(snapshots, kind, vendor)
         found = resolve(ids, rows, snapshots, session, p, vendor)
         status[vendor] = found.set_index("instrument_id")["status"]
-    fmp, yahoo = status[VENDOR], status[YAHOO]
-    use_yahoo = ~fmp.isin([OK, STALE]) & (yahoo != NOT_FETCHED)
-    return pd.Series(np.where(use_yahoo, YAHOO, VENDOR), index=fmp.index, dtype=object)
+    first, *rest = order
+    chosen = pd.Series(first, index=status[first].index, dtype=object)
+    open_ = ~status[first].isin([OK, STALE])  # names still undecided
+    for vendor in rest:
+        take = open_ & (status[vendor] != NOT_FETCHED)
+        chosen[take] = vendor
+        open_ = open_ & ~take
+    return chosen
 
 
 def effective_snapshots(
-    snapshots: pd.DataFrame | None, chosen: pd.Series, kind: str
+    snapshots: pd.DataFrame | None, chosen: pd.Series, kind: str, label: str = VENDOR
 ) -> pd.DataFrame | None:
     """``snapshots`` reduced to each name's chosen vendor: its rows of ``kind`` and its coverage
-    markers, labelled ``fmp``; nothing of the other vendor and no other kind (``chosen`` from
-    ``choose_vendor``). ``None`` and an empty frame pass through."""
+    markers, labelled ``label`` (``fmp``, or the group's first vendor); nothing of the other
+    vendor and no other kind (``chosen`` from ``choose_vendor``). ``None`` and an empty frame
+    pass through."""
     if snapshots is None or snapshots.empty:
         return snapshots
     own = snapshots["instrument_id"].astype(str).map(chosen)
     keep = snapshots["kind"].isin([kind, COVERAGE]) & (snapshots["source"] == own)
-    return snapshots[keep].assign(source=VENDOR)
+    return snapshots[keep].assign(source=label)
 
 
 def history_of_chosen(
-    snapshots: pd.DataFrame | None, kind: str, chosen: pd.Series, session: date
+    snapshots: pd.DataFrame | None,
+    kind: str,
+    chosen: pd.Series,
+    session: date,
+    order: tuple[str, ...] = SOURCES,
+    label: str = VENDOR,
 ) -> pd.DataFrame:
-    """``history_rows`` of ``kind`` over the vendors, only each name's chosen vendor's rows
-    (``chosen``: the estimates' source per name), labelled ``fmp``."""
-    both = [history_rows(snapshots, kind, vendor, session) for vendor in SOURCES]
+    """``history_rows`` of ``kind`` over the vendors of ``order``, only each name's chosen
+    vendor's rows (``chosen``: the group's source per name), labelled ``label``."""
+    both = [history_rows(snapshots, kind, vendor, session) for vendor in order]
     rows = pd.concat(both, ignore_index=True)
     if "source" not in rows.columns:  # no snapshot table: no history
         return rows
     own = rows["instrument_id"].map(chosen)
-    return rows[rows["source"] == own].assign(source=VENDOR).reset_index(drop=True)
+    return rows[rows["source"] == own].assign(source=label).reset_index(drop=True)

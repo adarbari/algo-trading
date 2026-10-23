@@ -17,7 +17,7 @@ a finished run of the session. Every attempt writes a coverage marker, so a refu
 is asked, not backlog; only a name no attempt reached in the window is.
 
 The same measure for Finnhub (``check_finnhub_backlog``, the recommendation trend that
-``analyst_ratings@v1`` reads): the share with no Finnhub row and no Finnhub coverage marker other
+``analyst_ratings@v2`` reads): the share with no Finnhub row and no Finnhub coverage marker other
 than FAILED in the last four ``[finnhub] refresh_days`` windows, against the same
 ``max_analyst_backlog``. When the run skipped Finnhub (no key, or the probe says DENIED) it WARNs
 with the run's reason: every name then reads NOT_FETCHED, and the ratings group would otherwise

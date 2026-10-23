@@ -6,18 +6,18 @@
 # --- analyst ratings and revisions ---
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_strong_buy"
+name = "rollup.analyst_ratings@v2.rating_strong_buy"
 theme = "analyst"
 reads = "How many analysts rate the stock a strong buy in the newest month the vendor lists. A count of 10 is ten analysts. Compare it with rating_count for the share, not the count alone."
 caveats = [
   "Analysts rate on different dates, and the vendor does not date each rating. A count mixes views from last week and from a year ago.",
-  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v1.rating_count beside the counts.",
+  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v2.rating_count beside the counts.",
   "Ratings follow the price: analysts upgrade after a rise and downgrade after a fall. A strong rating can be the lag of a rally.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "several analysts rate it a strong buy"
@@ -26,18 +26,18 @@ value = 3
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_buy"
+name = "rollup.analyst_ratings@v2.rating_buy"
 theme = "analyst"
 reads = "How many analysts rate the stock a buy in the newest month the vendor lists. A count of 10 is ten analysts. Compare it with rating_count for the share, not the count alone."
 caveats = [
   "Analysts rate on different dates, and the vendor does not date each rating. A count mixes views from last week and from a year ago.",
-  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v1.rating_count beside the counts.",
+  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v2.rating_count beside the counts.",
   "Ratings follow the price: analysts upgrade after a rise and downgrade after a fall. A strong rating can be the lag of a rally.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "at least five analysts rate it a buy"
@@ -46,18 +46,18 @@ value = 5
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_hold"
+name = "rollup.analyst_ratings@v2.rating_hold"
 theme = "analyst"
 reads = "How many analysts rate the stock a hold in the newest month the vendor lists. A count of 10 is ten analysts. Compare it with rating_count for the share, not the count alone."
 caveats = [
   "Analysts rate on different dates, and the vendor does not date each rating. A count mixes views from last week and from a year ago.",
-  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v1.rating_count beside the counts.",
+  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v2.rating_count beside the counts.",
   "Ratings follow the price: analysts upgrade after a rise and downgrade after a fall. A strong rating can be the lag of a rally.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "few analysts sit on the fence"
@@ -67,18 +67,18 @@ mode = "soft"
 tolerance = 3
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_sell"
+name = "rollup.analyst_ratings@v2.rating_sell"
 theme = "analyst"
 reads = "How many analysts rate the stock a sell in the newest month the vendor lists. A count of 10 is ten analysts. Compare it with rating_count for the share, not the count alone."
 caveats = [
   "Analysts rate on different dates, and the vendor does not date each rating. A count mixes views from last week and from a year ago.",
-  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v1.rating_count beside the counts.",
+  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v2.rating_count beside the counts.",
   "Ratings follow the price: analysts upgrade after a rise and downgrade after a fall. A strong rating can be the lag of a rally.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "no analyst rates it a sell"
@@ -87,18 +87,18 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_strong_sell"
+name = "rollup.analyst_ratings@v2.rating_strong_sell"
 theme = "analyst"
 reads = "How many analysts rate the stock a strong sell in the newest month the vendor lists. A count of 10 is ten analysts. Compare it with rating_count for the share, not the count alone."
 caveats = [
   "Analysts rate on different dates, and the vendor does not date each rating. A count mixes views from last week and from a year ago.",
-  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v1.rating_count beside the counts.",
+  "A few analysts make a thin consensus. Read rollup.analyst_ratings@v2.rating_count beside the counts.",
   "Ratings follow the price: analysts upgrade after a rise and downgrade after a fall. A strong rating can be the lag of a rally.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "no analyst rates it a strong sell"
@@ -107,17 +107,17 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_count"
+name = "rollup.analyst_ratings@v2.rating_count"
 theme = "analyst"
 reads = "How many analysts the five ratings add up to in the newest month. A count of 20 is a well covered name, 3 a thin one. Zero means no analyst rates the name."
 caveats = [
   "The vendor counts the analysts it tracks, not every analyst on the Street. Large caps read 20 to 40 and small names a handful.",
-  "The count can fall after a month of drop-outs with no change of view. Read rollup.analyst_ratings@v1.rating_month for the month it is from.",
+  "The count can fall after a month of drop-outs with no change of view. Read rollup.analyst_ratings@v2.rating_month for the month it is from.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "enough analysts behind the rating"
@@ -126,17 +126,17 @@ value = 5
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_score"
+name = "rollup.analyst_ratings@v2.rating_score"
 theme = "analyst"
 reads = "The mean analyst rating on a scale of 1 to 5. A 5 is every analyst at strong buy, 3 is hold, 1 is strong sell. Most covered stocks sit between 3.5 and 4.5, since analysts seldom publish a sell."
 caveats = [
   "Analysts lean to buy, so a score of 3.0 is already a cautious consensus. Compare the score with other names, not with the midpoint of the scale.",
-  "A score from a handful of analysts moves with each of them. Read rollup.analyst_ratings@v1.rating_count beside it.",
+  "A score from a handful of analysts moves with each of them. Read rollup.analyst_ratings@v2.rating_count beside it.",
   "The score says what analysts rate, not what the stock will do. A high score after a rally is often the lag of the price.",
   "Null when no analyst rates the name, and with ratings_status STALE, NOT_COVERED or NOT_FETCHED. A hard criterion rejects those names.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "most analysts rate it a buy"
@@ -151,16 +151,16 @@ mode = "soft"
 tolerance = 0.3
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_month"
+name = "rollup.analyst_ratings@v2.rating_month"
 theme = "analyst"
 reads = "The month the counts are for, shown as its first day. The vendor publishes one record a month, so 2026-12-01 is the December trend, read at the newest snapshot we hold."
 caveats = [
   "The month is the vendor's, not the day we fetched it. Analyst changes made since the month began are in the next record.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "a rating month exists"
@@ -168,18 +168,19 @@ op = "not_null"
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_ratings@v1.rating_score_change_90d"
+name = "rollup.analyst_ratings@v2.rating_score_change_90d"
 theme = "analyst"
-reads = "The mean rating now less the mean rating in our own snapshot about 90 days ago, on the 1 to 5 scale. A value of +0.3 is analysts turning more bullish, -0.3 more cautious."
+reads = "The mean rating now less the mean rating in our own snapshot about 90 days ago, on the 1 to 5 scale. A value of +0.3 is analysts turning more bullish, -0.3 more cautious. For a Yahoo name the span is about 60 to 120 days (calendar months)."
 caveats = [
   "The history is ours: the vendor restates its past months, so only our snapshots are compared. Our history starts on 2026-10-19, so the field is null until about 2027-01-17.",
-  "A move of 0.1 can be one analyst on a thin name. Read rollup.analyst_ratings@v1.rating_count before trusting a small change.",
+  "A move of 0.1 can be one analyst on a thin name. Read rollup.analyst_ratings@v2.rating_count before trusting a small change.",
   "A snapshot more than a week older than 90 days is not used, so a name the nightly rotation missed for weeks reads null.",
+  "For a name read from Yahoo (see rollup.analyst_ratings@v2.ratings_source) the change is this month's score less the score three months back. Both come from the one snapshot Yahoo gave. Its buckets are calendar months, so the span is roughly 60 to 120 days, not 90. The analyst set can change between them: ARX went from 10 analysts to 6. It is null when the snapshot lacks the month three back or either month has no analyst.",
   "Null with ratings_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.",
-  "Null with ratings_status STALE: the newest snapshot is over 45 days old, so no value is served.",
+  "Null with ratings_status STALE: the newest snapshot is over 45 days old (60 for Yahoo's), so no value is served.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "analysts turning more bullish"
@@ -189,16 +190,16 @@ mode = "hard"
 note = "history starts 2026-10-19, so the field is null before about 2027-01-17"
 
 [[field]]
-name = "rollup.analyst_ratings@v1.ratings_status"
+name = "rollup.analyst_ratings@v2.ratings_status"
 theme = "analyst"
-reads = "Whether the analyst ratings of the name can be used. OK: a snapshot at most 45 days old. STALE: older, so no value is served. NOT_COVERED: the vendor has no ratings for the name. NOT_FETCHED: we have not asked yet."
+reads = "Whether the analyst ratings of the name can be used. OK: a snapshot at most 45 days old (60 for a name read from Yahoo). STALE: older, so no value is served. NOT_COVERED: the vendor has no ratings for the name. NOT_FETCHED: we have not asked yet."
 caveats = [
   "NOT_COVERED and NOT_FETCHED read the same to a trader, as not covered. The admin cause tells them apart, and NOT_FETCHED ends as the nightly rotation reaches the name.",
-  "STALE is not the old value: a snapshot past 45 days serves nothing, so a vendor outage shows as STALE rather than as old counts.",
-  "OK does not say the score has a 90-day change: rollup.analyst_ratings@v1.rating_score_change_90d is null until our history is that long.",
+  "STALE is not the old value: a snapshot past 45 days (60 for Yahoo) serves nothing, so a vendor outage shows as STALE rather than as old counts.",
+  "OK does not say the score has a 90-day change: rollup.analyst_ratings@v2.rating_score_change_90d is null until our history is that long.",
 ]
 sources = [
-  "Finnhub analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+  "Finnhub and Yahoo Finance analyst recommendation trends, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md, docs/adr/0080-yahoo-analyst-source.md)",
 ]
 [[field.use]]
 for = "ratings are current"
