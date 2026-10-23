@@ -10,10 +10,10 @@ and the ``job_id`` of the job that wrote it (ADR 0059 amendment 2026-10-10); its
 ledger has gone under a nonzero count was pruned, one with no count is older than the ledger).
 A site edge's canonical run also publishes its verdict headline (``results/edge_verdict``, ADR
 0053 amendment 2026-10-22), framed from the run's own rows: a framing error costs that row (the
-reader judges live, ``verdict_row`` false on the record), never the evaluation."""
+reader judges live, ``verdict_row`` ``failed`` on the record), never the evaluation."""
 
 import logging
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
@@ -323,20 +323,20 @@ def _verdict_headline(
     record: RunRecord,
     frame: pd.DataFrame,
     now: datetime,
-) -> tuple[pd.DataFrame | None, bool]:
-    """``(row, ok)``: the verdict row of the run, or None for a run that gets none (no ``stores``,
-    or not the canonical kind; ``ok``) or whose framing failed (not ``ok``: logged, never raised:
-    the row is a fingerprint-checked cache, and a lost evaluation costs more than a missing row)."""
+) -> tuple[pd.DataFrame | None, str]:
+    """``(row, status)``: ``written``, ``none`` (no ``stores``, or not the canonical kind: no row
+    by design) or ``failed`` (framing raised: logged, never re-raised: the row is a
+    fingerprint-checked cache, and a lost evaluation costs more than a missing row)."""
     if stores is None:
-        return None, True
+        return None, "none"
     try:
         row = verdict.edge_verdict_frame(stores, evaluation.edge_id, record, frame, now)
         if row is not None:
             validate_frame(result_table(verdict.RESULT), row)  # a bad row costs the row only
-        return row, True
+        return row, "none" if row is None else "written"
     except Exception:
         log.exception("verdict of %s not framed; the reader judges live", evaluation.edge_id)
-        return None, False
+        return None, "failed"
 
 
 def write_edge_eval(
@@ -384,10 +384,12 @@ def write_edge_eval(
         "legs_invalidated": dict(evaluation.legs_invalidated),  # stored legs recomputed, by reason
         "ledger_rows": len(ledger),  # results/edge_trades rows written (ADR 0064)
     }
-    finished = replace(record, finished_at=now, stats=stats)  # what the run will have saved
-    headline, headline_ok = _verdict_headline(stores, evaluation, finished, frame, now)
+    record.finish(now, complete=True, stats=stats)  # what the publish below saves
+    headline, status = _verdict_headline(stores, evaluation, record, frame, now)
     if stores is not None:
-        stats["verdict_row"] = headline is not None and headline_ok
+        stats["verdict_row"] = (
+            status  # written | none (by design) | failed (the reader judges live)
+        )
     # The record goes in before the commit: a crash between the two leaves a trial counted
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
     with writer.publishing(record.run_id, now):
@@ -403,5 +405,5 @@ def write_edge_eval(
             writer.write_result(
                 verdict.RESULT, evaluation.end, record.run_id, headline, pending=True
             )
-        writer.save_run(record.finish(now, complete=True, stats=stats))
+        writer.save_run(record)
     return record

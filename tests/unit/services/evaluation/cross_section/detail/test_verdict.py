@@ -89,6 +89,9 @@ def test_the_published_row_equals_the_readers_judgement_of_the_committed_rows(
     )  # fmt: skip
     assert row["source"] == "edge-eval" and row["judge_version"] == stamp.JUDGE_VERSION
     assert row["judge_digest"] == stamp.judge_digest()
+    saved = world.results.load_run(record.run_id)
+    assert saved is not None and saved.status.value == "complete"
+    assert saved.stats["verdict_row"] == "written"
     assert row["knowledge_ts"] == pd.Timestamp(NOW)  # the write instant, as its edge_eval rows
     assert {c.name for c in EDGE_VERDICT.columns} >= set(stored(world).columns)
 
@@ -122,7 +125,7 @@ def test_a_framing_error_keeps_the_evaluation_and_writes_no_row(
     assert stored(world) is None
     assert world.reader.table("results/edge_eval", DAYS[-1]) is not None
     saved = world.results.load_run(record.run_id)
-    assert saved is not None and saved.stats["verdict_row"] is False
+    assert saved is not None and saved.stats["verdict_row"] == "failed"
 
 
 def test_a_run_the_reader_would_not_call_canonical_gets_no_row(world: World) -> None:
@@ -130,6 +133,18 @@ def test_a_run_the_reader_would_not_call_canonical_gets_no_row(world: World) -> 
     ev = evaluated(world, ctx, split=DAYS[2].isoformat())  # exploratory: not the frozen period
     write_edge_eval(world.results, ev, NOW, stores=ctx)
     assert stored(world) is None
+    saved = world.results.runs_for("edge-eval:drift:site")[0]
+    assert saved.stats["verdict_row"] == "none"  # by design, not a failure
+
+
+def test_a_run_of_another_user_writes_no_row_even_with_the_site_as_owner(world: World) -> None:
+    ctx = site_stores(world)
+    ev = evaluate_edge(
+        world.reader, world.results, ctx.configs, UserContext("bob"),
+        edge(frozen_from=SPLIT.isoformat()), DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+    record = write_edge_eval(world.results, ev, NOW, owner="site", stores=ctx)
+    assert record.job == "edge-eval:drift:bob" and stored(world) is None
 
 
 def test_a_direct_call_without_stores_writes_no_row(world: World) -> None:

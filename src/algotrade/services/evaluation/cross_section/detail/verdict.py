@@ -16,7 +16,7 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.edges.document import MAIN
+from algotrade.config.edges.document import MAIN, job_name
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.user import SITE_USER
@@ -109,6 +109,8 @@ def edge_verdict_frame(
     then judges live."""
     edge = edges.load_edge(stores, edge_id)
     if edge is None:
+        return None
+    if record.job != job_name(edge_id, SITE_USER):  # a run of another user's: never the site's
         return None
     run = runs.run_of_record(record, edge, str(record.stats.get("owner") or SITE_USER))
     if not canonical_kind(edge, run):
