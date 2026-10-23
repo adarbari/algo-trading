@@ -261,6 +261,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "ComparePrices",
         "EventCalendar",
         "InstrumentEventStudy",
+        "InstrumentEventList",  # the chart's event list: events and study with source pages
         "TableView",
         "GuideField",
         "GuideHelpField",

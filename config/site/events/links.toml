@@ -1,0 +1,17 @@
+# L3 site setting: where a macro release's own page lives (the list under the Explore chart
+# links each release to its agency, never to a page the app built), typed in
+# src/algotrade/config/site/events/links.py. Release keys are those of releases.toml (a fitness
+# test checks it); a release with no entry here has no link. https only.
+#
+# [macro]   <release key> = "<the agency's page for that release>"
+
+[macro]
+CPI = "https://www.bls.gov/cpi/"
+EMPLOYMENT = "https://www.bls.gov/news.release/empsit.toc.htm"
+PCE = "https://www.bea.gov/data/personal-consumption-expenditures-price-index"
+GDP = "https://www.bea.gov/data/gdp/gross-domestic-product"
+PPI = "https://www.bls.gov/ppi/"
+RETAIL_SALES = "https://www.census.gov/retail/index.html"
+ISM_MFG = "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/"
+ISM_SERVICES = "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/"
+FOMC = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"

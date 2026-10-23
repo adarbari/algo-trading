@@ -25,9 +25,11 @@ from datetime import date
 
 import pandas as pd
 
+from algotrade.config.site.events.links import load_event_links
 from algotrade.data.events import ALL_TIME, known_from, read_events
 from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.events.links import source_link
 from algotrade.services.read.events.market_days import MarketDay, market_days
 from algotrade.services.read.events.reference import FundReference, load_fund_references
 from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
@@ -62,7 +64,8 @@ class AheadEvent:
     ``source``: the catalogue field, the stored row's source or the calendar rule;
     ``known_from``: the first session the stored row was known on (None: a catalogue value, which
     is what the session knew, or a rule); ``expiry``: a monthly or quarterly option expiry day
-    (a market-structure day the calendar rules)."""
+    (a market-structure day the calendar rules); ``source_url``: the agency page of a macro
+    release (``links.source_link``; None for every other kind)."""
 
     date: dt.date
     time: str
@@ -73,6 +76,7 @@ class AheadEvent:
     source: str
     known_from: dt.date | None
     expiry: bool = False
+    source_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -155,6 +159,7 @@ def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown
         return (), Unknown(code, cause, None, ctx.kind_of(code, MACRO_TABLE))
     days = pd.to_datetime(frame["release_date"]).dt.date
     frame = frame[days <= end]
+    pages = load_event_links(ctx.configs).macro
     events = tuple(
         AheadEvent(
             date=pd.Timestamp(row["release_date"]).date(),
@@ -165,6 +170,9 @@ def _macro(ctx: ReadContext, end: date) -> tuple[tuple[AheadEvent, ...], Unknown
             subject_id=str(row["instrument_id"]),
             source=str(row["source"]),
             known_from=pd.Timestamp(stamp).date(),
+            source_url=source_link(
+                MACRO_RELEASE, release_key=str(row["release_key"]), macro_links=pages
+            ),
         )
         for row, stamp in zip(frame.to_dict("records"), known_from(frame), strict=True)
     )
