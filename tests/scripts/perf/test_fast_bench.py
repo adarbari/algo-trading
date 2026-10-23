@@ -1,9 +1,11 @@
 """`scripts/perf/fast_bench.py`: the bar file is valid, the recorded history parses, the rule
 judges critical paths, exceptions and the shell, and the tool refuses the real store (no server)."""
 
+import dataclasses
 import importlib.util
 import json
 import re
+import shutil
 import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -11,6 +13,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.helpers.api_store import as_user
@@ -550,3 +553,59 @@ def test_every_resolver_picks_an_id_the_real_api_answers_with_content(
         r = raw(d["query"], d["variables"])
         assert r.status_code == 200 and fb.al.answer_problem(r.status_code, r.content) is None
         assert fb.al.empty_note(r.status_code, r.content) is None, (d["name"], d["variables"])
+
+
+@pytest.mark.allow_localhost
+def test_edge_compare_is_asked_about_the_viewers_own_edge_and_answers_with_content(
+    api_golden: tuple, tmp_path: Path
+) -> None:
+    """The 2026-10-23 hand run failed integrity on EdgeCompare (answered null): the page asks it
+    only for an edge the viewer owns, a site edge answers `compare: null` by design, and the bench
+    asked about the capture's site edge. The bench now gives its viewer a copy and asks about it."""
+    site = "absolute_momentum_crash_filter"
+    cfg = tmp_path / "config"
+    shutil.copytree(Path(__file__).resolve().parents[3] / "config", cfg)
+    docs = fb.pdocs.web_documents() | fb.pdocs.hand_written_documents()
+    query = docs["EdgeCompare"]
+    ops = {"EdgeCompare#1": {"name": "EdgeCompare", "query": query, "variables": {"id": site}}}
+    fb.point_at_own_edge(ops, cfg)
+    assert ops["EdgeCompare#1"]["variables"] == {"id": fb.BENCH_COPY}
+    store = dataclasses.replace(api_golden[0], configs=FileConfigStore(cfg, local=False))
+    client = TestClient(
+        create_app(ApiSettings("memory://", str(cfg)), store, authenticator=as_user(fb.BENCH_USER))
+    )
+    r = client.post("/graphql", json={"query": docs["EdgeCompare"], "variables": {"id": site}})
+    assert fb.al.empty_note(r.status_code, r.content) is not None  # the site edge: null, as shown
+    d = ops["EdgeCompare#1"]
+    r = client.post("/graphql", json={"query": d["query"], "variables": d["variables"]})
+    assert fb.al.answer_problem(r.status_code, r.content) is None
+    assert fb.al.empty_note(r.status_code, r.content) is None
+
+
+def test_time_ops_marks_edge_compare_as_an_own_copy_not_run_and_no_other_op(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeApi:
+        url = "http://x"
+        last_error = ""
+
+        def __init__(self, *a: object, **k: object) -> None:
+            self.client = type("C", (), {"get": staticmethod(lambda url: None)})()
+
+        def call(self, body: dict) -> tuple[float, int, int, int]:
+            return 5.0, 200, 10, 1
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(fb.al, "Api", FakeApi)
+    monkeypatch.setattr(fb.al, "uncached_config", lambda src, dst: dst)
+    monkeypatch.setattr(fb.al, "guard", lambda: None)
+    monkeypatch.setattr(fb, "wait_quiet", lambda limit, load_max: 1.0)
+    ops = {
+        "EdgeCompare#1": {"name": "EdgeCompare", "query": "q", "variables": {"id": "e"}},
+        "EdgePaper#1": {"name": "EdgePaper", "query": "q", "variables": {"id": "e"}},
+    }
+    done, _ = fb.time_ops(ops, "file:///c", 1, 4.0)
+    assert done["EdgeCompare#1"]["fidelity"] == "own copy, not run"
+    assert "fidelity" not in done["EdgePaper#1"]
