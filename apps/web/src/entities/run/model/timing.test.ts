@@ -27,7 +27,6 @@ const run: NightlyRun = {
   session: '2026-10-02',
   status: 'partial',
   startedAt: '2026-10-03T09:00:00Z',
-  finishedAt: '2026-10-03T09:26:00Z',
   durationS: 1560,
   steps: [
     step('bars', 'COMPLETE', 0.5),

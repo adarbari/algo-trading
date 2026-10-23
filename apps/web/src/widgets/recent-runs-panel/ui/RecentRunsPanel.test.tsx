@@ -79,7 +79,6 @@ const run = (runId: string, startedAt: string, durationS: number, chains: number
   session: '2026-10-02',
   status: 'partial',
   startedAt,
-  finishedAt: null,
   durationS,
   steps: [step('chains', 'PARTIAL', chains), step('earnings', 'COMPLETE', 84)],
   problems: ['steps not complete: chains'],

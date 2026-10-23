@@ -18,7 +18,6 @@ const NightlyRuns = graphql(`
       session
       status
       startedAt
-      finishedAt
       durationS
       problems
       steps {

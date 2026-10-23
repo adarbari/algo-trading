@@ -10,7 +10,6 @@ const run = (over: Partial<NightlyRun>): NightlyRun => ({
   session: '2026-10-08',
   status: 'FAILED',
   startedAt: '2026-10-08T06:00:00Z',
-  finishedAt: null,
   durationS: null,
   problems: ['steps not complete: ibkr-iv'],
   steps: [
