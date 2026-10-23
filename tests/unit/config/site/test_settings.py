@@ -536,6 +536,7 @@ def test_analyst_snapshot_settings_default_and_validate() -> None:
     settings = SourcesSettings.from_document(site("sources"))
     assert (settings.fmp_refresh_days, settings.finnhub_per_night) == (7, 300)
     assert settings.max_analyst_failed == 0.20 and settings.finnhub_refresh_days == 7
+    assert settings.fmp_refused_hold_days == 90
     assert settings.max_analyst_backlog == 0.25
     assert settings.fmp_run_budget_s == 1500
     document = {

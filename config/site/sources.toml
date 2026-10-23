@@ -180,7 +180,8 @@ licence = "personal"             # FMP's free terms: personal use; features deri
 daily_budget = 200               # FMP calls a UTC day the analyst tasks may spend (the plan allows ~250; the rest is
                                  # headroom for a hand run); `analyst-probe` and `analyst-snapshot` count their own
 refresh_days = 7                 # analyst-snapshot: each name's FMP data (3 calls) is refetched this often, stalest first;
-                                 # a name FMP refused (402: not on the free plan) waits 4x this before it is asked again
+refused_hold_days = 90           # a name FMP refused (402: not on the free plan; a refusal costs a call) waits this many days
+                                 # before it is asked again (the plan gates by symbol and rarely changes)
 run_budget_s = 1500              # analyst-snapshot (FMP and Finnhub calls): after this many seconds no further call is made and
                                  # the names not yet asked are recorded OVER_BUDGET (a normal night takes ~9 min); the next
                                  # night continues, stalest first. A vendor that stalls can then not hold the ingest lock

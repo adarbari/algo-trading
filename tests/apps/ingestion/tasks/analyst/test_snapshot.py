@@ -93,6 +93,7 @@ def context(
     run_budget_s: int = 1500,
     dup: frozenset[str] = frozenset(),
     gated: frozenset[str] = frozenset(),
+    refused_names: frozenset[str] = frozenset(),
 ) -> TaskContext:
     def get(url: str) -> bytes:
         calls.append(url)
@@ -103,7 +104,11 @@ def context(
             return b"[]"
         if "finnhub" in url:
             return RECOMMENDATION.replace(b"AAPL", symbol.encode())
-        if symbol == "CHWY" or (symbol in gated and "analyst-estimates" in url):
+        if (
+            symbol == "CHWY"
+            or symbol in refused_names
+            or (symbol in gated and "analyst-estimates" in url)
+        ):
             raise HttpError(402, body=PREMIUM)  # gated: the plan serves the name but not estimates
         for fragment, payload in FMP_PAYLOADS.items():
             if fragment in url:
@@ -194,11 +199,11 @@ def test_names_rotate_within_the_daily_budget_new_names_first() -> None:
     writer, calls = StoreWriter(MemoryBackend()), []
     seed(writer, ("AAPL", "NVDA", "MSFT", "AMD"))
     ctx = context(writer, D1, calls, budget=7, per_night=2)  # 7 calls: two names of three calls
-    first = run(ctx, {"session": D1})
+    first = run(ctx, {"session": D1, "limit": 2})
     assert first.stats["fmp"]["names"] == ["AAPL", "AMD"]
     assert first.stats["finnhub"]["names"] == ["AAPL", "AMD"]
     d2 = D1 + timedelta(days=1)
-    second = run(context(writer, d2, [], budget=7, per_night=2), {"session": d2})
+    second = run(context(writer, d2, [], budget=7, per_night=2), {"session": d2, "limit": 2})
     assert second.stats["fmp"]["names"] == ["MSFT", "NVDA"]  # the ones not yet fetched
     assert second.stats["finnhub"]["names"] == ["MSFT", "NVDA"]
 
@@ -207,7 +212,7 @@ def test_the_budget_counts_the_probe_and_earlier_runs_of_the_day() -> None:
     writer = StoreWriter(MemoryBackend())
     seed(writer, ("AAPL", "NVDA"))
     first = run(context(writer, D1, [], budget=3), {"session": D1})
-    assert first.stats["fmp"]["asked"] == 1
+    assert first.stats["fmp"]["asked"] == 1 and first.stats["fmp"]["fetched"] == 1
     again = run(context(writer, D1, [], budget=3, hour=15), {"session": D1})  # same UTC day: spent
     assert again.stats["fmp"]["asked"] == 0 and again.stats["fmp"]["calls_before"] == 3
 
@@ -291,14 +296,14 @@ def test_markers_are_point_in_time_and_merge_within_a_session() -> None:
     assert (mine["knowledge_ts"] >= mine["ts"]).all() and (mine["ts"].dt.date == D1).all()
 
 
-def test_a_refused_name_is_asked_again_after_four_refresh_windows() -> None:
+def test_a_refused_name_is_asked_again_after_refused_hold_days() -> None:
     writer = StoreWriter(MemoryBackend())
     seed(writer, ("CHWY",))
     run(context(writer, D1, []), {"session": D1})
-    held, calls = D1 + timedelta(days=27), []
+    held, calls = D1 + timedelta(days=89), []
     run(context(writer, held, calls), {"session": held})
     assert not any("financialmodelingprep" in c for c in calls)
-    due, calls = D1 + timedelta(days=28), []
+    due, calls = D1 + timedelta(days=90), []
     ctx = context(writer, due, calls)
     run(ctx, {"session": due})
     assert sum("symbol=CHWY" in c and "financialmodelingprep" in c for c in calls) == 1
@@ -331,7 +336,7 @@ def test_a_spent_run_budget_stops_the_calls_and_the_next_night_continues() -> No
 def test_the_rotation_advances_when_the_probe_denies_price_targets() -> None:
     writer = StoreWriter(MemoryBackend())
     seed(writer, ("AAPL", "NVDA", "MSFT", "AMD", "CHWY"), denied=("fmp:price_targets",))
-    first = run(context(writer, D1, [], budget=8), {"session": D1})  # 2 calls a name: 4 names
+    first = run(context(writer, D1, [], budget=8), {"session": D1, "limit": 4})
     assert first.stats["fmp"]["names"] == ["AAPL", "AMD", "CHWY", "MSFT"]
     d2, calls = D1 + timedelta(days=1), []
     second = run(context(writer, d2, calls), {"session": d2})
@@ -410,3 +415,64 @@ def test_a_name_that_answers_one_kind_is_not_held_when_a_later_kind_is_refused()
     d2 = D1 + timedelta(days=14)  # past the 7-day refresh, well inside a 28-day hold
     again = run(context(writer, d2, [], gated=frozenset({"AAPL"})), {"session": d2})
     assert again.stats["fmp"]["held_not_covered"] == 0 and again.stats["fmp"]["names"] == ["AAPL"]
+
+
+def fmp_calls(calls: list[str]) -> list[str]:
+    return [c for c in calls if "financialmodelingprep" in c]
+
+
+def seed_caps(writer: StoreWriter, caps: dict[str, float]) -> None:
+    """Roll-ups giving each symbol a market cap of ``caps`` (shares x close = cap, close 1)."""
+    ids = [f"EQ:{s}" for s in caps]
+    px = stamped([{"instrument_id": i, "close": 1.0} for i in ids], REFERENCE_DAY, "px")
+    sh = stamped(
+        [{"instrument_id": f"EQ:{s}", "shares_outstanding": c} for s, c in caps.items()],
+        REFERENCE_DAY,
+        "sh",
+    )
+    writer.write_table("rollups/instrument/price_stats@v2", REFERENCE_DAY, "px", px)
+    writer.write_table("rollups/instrument/fundamentals@v4", REFERENCE_DAY, "sh", sh)
+
+
+def test_a_night_of_refusals_asks_more_names_than_budget_over_three() -> None:
+    """The under-use bug: names were planned at three calls each, so a night of mostly refused
+    names (one call each) asked only budget // 3 of them and left the budget unspent."""
+    writer, calls = StoreWriter(MemoryBackend()), []
+    refused = tuple(f"R{i}" for i in range(12))
+    seed(writer, refused)
+    ctx = context(writer, D1, calls, budget=12, refused_names=frozenset(refused))
+    record = run(ctx, {"session": D1})
+    assert record.stats["fmp"]["asked"] == 12 > 12 // 3
+    assert len(fmp_calls(calls)) == 12 and record.stats["fmp"]["not_covered"] == 12
+
+
+def test_the_daily_budget_is_never_exceeded_and_a_cut_off_name_has_no_false_marker() -> None:
+    writer, calls = StoreWriter(MemoryBackend()), []
+    names = ("AAPL", "MSFT", "NVDA", "AMD")  # all covered: three calls each
+    seed(writer, names)
+    seed_caps(writer, {n: 4.0 - i for i, n in enumerate(names)})
+    ctx = context(writer, D1, calls, budget=7)
+    record = run(ctx, {"session": D1})
+    assert len(fmp_calls(calls)) == 7
+    assert record.stats["fmp"]["fetched"] == 2 and record.stats["fmp"]["asked"] == 3
+    got = markers(ctx, D1)
+    assert got["EQ:AAPL", "fmp"] == "OK" and got["EQ:MSFT", "fmp"] == "OK"
+    assert ("EQ:AMD", "fmp") not in got  # never reached: no marker
+    cut = record.items  # NVDA made its first call only; its other kinds are not made
+    assert cut["fmp:NVDA:grades"].startswith("OVER_BUDGET")
+
+
+def test_due_names_are_asked_largest_market_cap_first_unknown_last() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer, ("AAA", "BBB", "CCC", "DDD", "EEE"))
+    seed_caps(writer, {"BBB": 50.0, "CCC": 90.0, "DDD": 50.0, "EEE": 10.0})  # AAA: no cap
+    record = run(context(writer, D1, [], budget=200), {"session": D1})
+    assert record.stats["fmp"]["names"] == ["CCC", "BBB", "DDD", "EEE", "AAA"]
+
+
+def test_limit_takes_the_largest_caps_of_the_due_names() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer, ("AAA", "BBB", "CCC"))
+    seed_caps(writer, {"AAA": 1.0, "BBB": 2.0, "CCC": 3.0})
+    record = run(context(writer, D1, []), {"session": D1, "limit": 2})
+    assert record.stats["fmp"]["names"] == ["CCC", "BBB"]
