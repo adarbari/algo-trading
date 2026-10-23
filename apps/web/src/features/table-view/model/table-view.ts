@@ -4,14 +4,26 @@
  * sort or decisions is applied at once and saved into the view in use; "save as" names the
  * current choice as a new view, and a named view can be removed. Nothing saved: the lists are
  * empty and `decisions` is null, so the table applies its own defaults.
+ *
+ * A surface with a filter bar passes its `f` binding (ADR 0082): the view then saves the URL's
+ * `f` with its columns and sort, and loading or switching to a view patches the URL's `f`
+ * (filters of ids the surface no longer defines are dropped and listed in `droppedFilters`).
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useDeleteView, useSavedView, useSaveView } from '../api/views';
 
-import type { ViewContent } from './view';
+import { restorableFilters, type ViewContent } from './view';
 
 type Edits = Partial<ViewContent>;
+
+/** The surface's `f` search parameter: its current value and the writer (the route's). */
+export interface FilterBinding {
+  f: string | undefined;
+  onChange: (next: string | undefined) => void;
+  /** The filter ids the surface defines now; undefined: not loaded yet (nothing is dropped). */
+  known?: readonly string[];
+}
 
 export interface TableViewState {
   scope: string;
@@ -27,6 +39,8 @@ export interface TableViewState {
   sort: string | null;
   /** The decisions shown; null: none chosen (the table's default). */
   decisions: readonly string[] | null;
+  /** The filter ids saved in the view in use that the surface no longer defines. */
+  droppedFilters: readonly string[];
   /** Apply and save a change to the view in use. */
   change: (next: Edits) => void;
   /** Switch to another of the views (null: the default); unsaved choices are dropped. */
@@ -41,20 +55,33 @@ export interface TableViewState {
   error: unknown;
 }
 
-export function useTableView(scope: string): TableViewState {
+export function useTableView(scope: string, filters?: FilterBinding): TableViewState {
   const [name, setName] = useState<string | null>(null);
   const [edits, setEdits] = useState<Edits>({});
   const saved = useSavedView(scope, name);
   const save = useSaveView(scope);
   const removal = useDeleteView(scope);
   const view = saved.data;
+  const restore = useRef<'initial' | 'switched' | null>('initial');
+  const restored = restorableFilters(view?.filters ?? '', filters?.known);
+  const onFilters = filters?.onChange;
+  const urlFilters = filters?.f;
+  const known = filters?.known !== undefined;
+  useEffect(() => {
+    if (!onFilters || !view || !restore.current || !known) return;
+    // The URL's own `f` (a shared link) wins over the default view's on first load.
+    if (restore.current === 'switched' || !urlFilters) onFilters(restored.f || undefined);
+    restore.current = null;
+  }, [view, onFilters, urlFilters, known, restored.f]);
   const current: ViewContent = {
     columns: edits.columns ?? view?.columns ?? [],
     narrowColumns: edits.narrowColumns ?? view?.narrowColumns ?? [],
     sort: edits.sort !== undefined ? edits.sort : (view?.sort ?? null),
     decisions: edits.decisions ?? (view?.saved ? view.decisions : []),
+    filters: filters ? (filters.f ?? '') : (view?.filters ?? ''),
   };
   const select = (next: string | null) => {
+    restore.current = 'switched';
     setName(next);
     setEdits({});
   };
@@ -68,6 +95,7 @@ export function useTableView(scope: string): TableViewState {
     sort: current.sort,
     decisions:
       edits.decisions ?? (view?.saved && view.decisions.length > 0 ? view.decisions : null),
+    droppedFilters: restored.dropped,
     change: (next) => {
       setEdits((now) => ({ ...now, ...next }));
       save.mutate({ name, view: { ...current, ...next } });

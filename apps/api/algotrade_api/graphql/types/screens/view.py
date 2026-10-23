@@ -22,6 +22,7 @@ class TableView:
     decisions: list[str]
     names: list[str]
     narrow_columns: list[str]
+    filters: str
 
     @classmethod
     def of(cls, d: views.TableView) -> Self:
@@ -34,4 +35,5 @@ class TableView:
             decisions=list(d.decisions),
             names=list(d.names),
             narrow_columns=list(d.narrow_columns),
+            filters=d.filters,
         )
