@@ -100,12 +100,3 @@ export const Truncated: Story = {
     children: 'A very long instrument description that cannot fit '.repeat(4),
   },
 };
-
-export const Clamped: Story = {
-  args: {
-    clamp: 2,
-    as: 'p',
-    children:
-      'A long one-line description that wraps onto more than two lines and is cut off '.repeat(4),
-  },
-};

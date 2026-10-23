@@ -47,6 +47,7 @@ OWN = {
     "kind": "screener",
     "impl": "rules",
     "selection": "all_active",
+    "description": "Shares above ten dollars.",
     "criteria": {"price": {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 10}},
 }
 
@@ -56,7 +57,11 @@ def test_copy_finalise_and_rebase(writer_client: TestClient, root: Path) -> None
     assert _detail(c, "vrp")["versions"] == []  # an uncopied preset
     copied = c.post("/screeners/my_vrp/copy", json={"preset": "vrp"})
     assert copied.status_code == 201
-    assert copied.json()["document"] == {"id": "my_vrp", "extends": "vrp@3"}
+    assert copied.json()["document"] == {
+        "id": "my_vrp",
+        "extends": "vrp@3",
+        "description": "Rich premiums near a one-year high.",  # the preset's, as a starting point
+    }
     assert _detail(c, "my_vrp")["working"]["criteria"]["price"]["value"] == 5
     assert c.post("/screeners/my_vrp/copy", json={"preset": "vrp"}).status_code == 409
     done = c.post("/screeners/my_vrp/finalise").json()

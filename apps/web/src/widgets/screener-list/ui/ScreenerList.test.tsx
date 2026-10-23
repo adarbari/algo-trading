@@ -220,7 +220,10 @@ describe('ScreenerList', () => {
 
   it('shows the description under the name, clamped, and an add link only on your own without one', async () => {
     const { onEdit } = setup();
-    expect(screen.getByText('Rich premium in calm names')).toHaveAttribute('data-clamp', '2');
+    expect(screen.getByText('Rich premium in calm names').parentElement).toHaveAttribute(
+      'title',
+      'Rich premium in calm names',
+    ); // inside a LineClamp, which keeps the full text as its tooltip
     // Only `broken` is yours, resolved and without a description; presets and the draft-only idea get none.
     expect(screen.getAllByRole('button', { name: 'Add a description' })).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Add a description' }));

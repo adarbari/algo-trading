@@ -140,7 +140,6 @@ Source: `design-system/primitives/Text`
 | `mono` | `boolean` | no | Monospace (symbols, codes, ids). |
 | `numeric` | `boolean` | no | A number in a column: right-aligned, tabular figures. |
 | `truncate` | `boolean` | no | Single line with an ellipsis when too long. |
-| `clamp` | `2` | no | At most this many lines with an ellipsis (a description under a name). |
 | `as` | `TextElement` | no | The semantic element (`p` for paragraphs; `span` default). |
 | `title` | `string` | no | Tooltip / full value for truncated text or abbreviations. |
 | `children` | `ReactNode` | no |  |
@@ -962,6 +961,17 @@ Source: `design-system/components/Legend`
 | `swatch` | `'cell' \| 'solid' \| 'line' \| 'hatch'` | no | Swatch shape: `cell` (tinted fill + border, matches HeatGrid cells), `solid` (bars and areas, the default), `line` (chart lines) or `hatch` (diagonal lines in the tone, for a hatched chart band). |
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
+
+### LineClamp
+
+LineClamp: a block of text cut to two lines with an ellipsis (a one-line description under a name that may wrap on a phone). The full text stays in the DOM and in `title`.
+
+Source: `design-system/components/LineClamp`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | no | The full text as a tooltip, for the part the clamp cuts. |
+| `children` | `ReactNode` | yes |  |
 
 ### LinkButton
 

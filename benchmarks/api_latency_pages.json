@@ -102,7 +102,7 @@
     "kind": "graphql",
     "op": "ScreenerRuns",
     "variables": {},
-    "query": "\n  query ScreenerRuns {\n    session {\n      date\n    }\n    screeners {\n      id\n      name\n      criteria {\n        id\n        field\n        mode\n        op\n        value\n      }\n      notRun {\n        kindText\n      }\n      pickHistory {\n        session\n        picked\n      }\n      latestRun {\n        runId\n        session\n        picked\n        paused\n        decisions {\n          decision\n          count\n        }\n        changes {\n          change\n          count\n        }\n      }\n    }\n  }\n"
+    "query": "\n  query ScreenerRuns {\n    session {\n      date\n    }\n    screeners {\n      id\n      name\n      description\n      criteria {\n        id\n        field\n        mode\n        op\n        value\n      }\n      notRun {\n        kindText\n      }\n      pickHistory {\n        session\n        picked\n      }\n      latestRun {\n        runId\n        session\n        picked\n        paused\n        decisions {\n          decision\n          count\n        }\n        changes {\n          change\n          count\n        }\n      }\n    }\n  }\n"
    },
    {
     "kind": "graphql",

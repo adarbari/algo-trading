@@ -6,10 +6,7 @@ export const MAX_DESCRIPTION_LENGTH = 140;
 
 /** The text as one line (newlines become spaces, runs of spaces one) cut to the length the server accepts. */
 export function oneLine(text: string): string {
-  return text
-    .replace(/\s*[\r\n]+\s*/g, ' ')
-    .replace(/ {2,}/g, ' ')
-    .slice(0, MAX_DESCRIPTION_LENGTH);
+  return text.replace(/\s*[\r\n]\s*/g, ' ').slice(0, MAX_DESCRIPTION_LENGTH);
 }
 
 /** The screen's description: the draft's own, else the base's (a preset's), else ''. */

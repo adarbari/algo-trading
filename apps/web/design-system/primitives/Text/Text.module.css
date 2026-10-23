@@ -118,11 +118,3 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.text[data-clamp='2'] {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
