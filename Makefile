@@ -133,7 +133,7 @@ TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests
 
 test-shard:      ## one CI shard (SHARD=unit-a|unit-b|unit-c|apps|arch|rest), optionally one slice of it (GROUP=i SPLITS=n, pytest-split): its coverage data in .coverage.<shard>-<group>, no gate (coverage-combine gates)
 	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }
-	COVERAGE_FILE=.coverage.$(SHARD)-$(or $(GROUP),1) $(PY) -m pytest -n $(WORKERS) --splits $(or $(SPLITS),1) --group $(or $(GROUP),1) --splitting-algorithm least_duration --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
+	COVERAGE_FILE=.coverage.$(SHARD)-$(or $(GROUP),1) $(PY) -m pytest -n $(WORKERS) --splits $(or $(SPLITS),1) --group $(or $(GROUP),1) --splitting-algorithm least_duration --store-durations --durations-path=.durations-$(SHARD)-$(or $(GROUP),1)of$(or $(SPLITS),1).json --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
 
 coverage-combine: ## the 90% coverage gate over the shards' data files (.coverage.*), then coverage.xml
 	$(BIN)coverage combine --keep $(wildcard .coverage.*)
