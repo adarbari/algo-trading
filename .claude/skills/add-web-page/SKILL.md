@@ -60,3 +60,6 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    `architecture/guide_coverage.toml`; every titled `Panel` / `Section` passes `actions` with its help button
    (`GuideHelp` or `termHelp`); every new word the page shows (a status, a verdict, a control)
    is a glossary term. `tests/architecture/guide/` fails until they are; its baselines only shrink.
+12. **1 s page gate** (`docs/perf/page-latency-bar.md`, "Cover a new page"): a new route, tab or panel
+   with its own read is measured by the nightly gate: run `make api-latency-views` and commit
+   `benchmarks/api_latency_views*.json`; `tests/scripts/perf/test_views.py` fails otherwise.

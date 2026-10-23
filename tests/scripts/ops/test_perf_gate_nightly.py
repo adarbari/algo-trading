@@ -546,3 +546,31 @@ def test_the_lock_start_time_is_read_in_the_c_locale_whatever_the_callers_locale
     env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "LC_ALL": "fr_FR.UTF-8", "TZ": "Europe/Paris"}
     res = rig.run(**env)
     assert res.returncode == 3 and "holds" in res.stderr  # a live holder, not a stale lock
+
+
+def test_uncovered_operations_are_flagged_in_status_and_notice_but_never_change_the_verdict(
+    rig: Rig,
+) -> None:
+    rig.bench_code = 0
+    rig.bench_body = (
+        "echo '0 views over 1.0 s on the critical path (0.0 s above the bar); shell 0.5'\n"
+        "echo 'COVERAGE 14 operations not covered by the gate (2 not in the exception list): A'\n"
+        "exit 0\n"
+    )
+    assert rig.run().returncode == 0  # the verdict is the bench's, whatever the drift flag says
+    status = json.loads((_evidence(rig) / "status.json").read_text())
+    assert status["uncovered_ops"] == 14 and status["uncovered_ops_new"] == 2
+    assert "14 operations not covered by the gate (2 new" in (rig.tmp / "notified").read_text()
+    assert "outcome=ok" in rig.status.read_text()
+
+
+def test_no_new_uncovered_operation_sends_no_notice_on_a_clean_run(rig: Rig) -> None:
+    rig.bench_code = 0
+    rig.bench_body = (
+        "echo '0 views over 1.0 s on the critical path (0.0 s above the bar); shell 0.5'\n"
+        "echo 'COVERAGE 14 operations not covered by the gate (0 not in the exception list): A'\n"
+        "exit 0\n"
+    )
+    assert rig.run().returncode == 0
+    assert not (rig.tmp / "notified").exists()
+    assert json.loads((_evidence(rig) / "status.json").read_text())["uncovered_ops"] == 14
