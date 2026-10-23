@@ -472,7 +472,7 @@ def _during_copy(
 def test_a_deploy_during_the_copy_does_not_stop_it_and_the_bench_waits_for_it(
     rig: Rig, line: str
 ) -> None:
-    code, err = _during_copy(rig, line, gone_after=3.5, PERF_DEPLOY_WAIT_S="20")
+    code, err = _during_copy(rig, line, gone_after=9, PERF_DEPLOY_WAIT_S="40")
     assert code == 1 and "copy stopped" not in err  # the bench ran, after the deploy was gone
     assert "waiting" in err and "ignored deploy: pid 9 " in (_evidence(rig) / "run.log").read_text()
 
@@ -532,5 +532,80 @@ def test_the_release_trees_head_moving_during_the_bench_is_not_recorded(rig: Rig
     res = rig.run(PERF_TREE=str(tree))
     assert "code changed during the bench" in res.stderr
     assert "outcome=code-changed" in rig.status.read_text()
+    assert hist.read_text() == '{"old": 1}\n'
+    assert "NOT recorded" in (rig.tmp / "notified").read_text()
+
+
+def test_a_bench_killed_at_its_cap_leaves_a_report_a_timeline_and_the_cause_in_the_notice(
+    rig: Rig,
+) -> None:
+    rig.bench_body = "sleep 30\n"
+    res = rig.run(PERF_BENCH_LIMIT_S="3", PERF_SAMPLE_S="1")
+    assert res.returncode == 4
+    ev = _evidence(rig)
+    report = json.loads((ev / "kill-report.json").read_text())
+    assert report["phase"] == "bench" and report["reason"] == "over-time" and report["cap_s"] == 3
+    assert report["likely_cause"] and "timeline_tail" in report and "last_requests" in report
+    assert "likely cause:" in (rig.tmp / "notified").read_text()
+    summary = (rig.tmp / "logs" / "perf_gate" / "summary.csv").read_text()
+    assert "over-time | likely cause:" in summary
+    rows = (ev / "timeline.csv").read_text().splitlines()
+    assert rows[0].startswith("epoch,phase,load1,free_gb,cpu_indexing,cpu_gate,cpu_other,top5")
+    assert (ev / "README.txt").is_file()
+    assert (ev / "bench-head.txt").is_file()
+    status = json.loads((ev / "status.json").read_text())
+    assert {"wait", "copy", "bench"} <= set(status["phases"]) and "top_cpu" in status
+
+
+def test_a_copy_killed_at_its_cap_leaves_a_report_naming_the_entry(rig: Rig) -> None:
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    slow = _script(rig, "slowcp8.sh", "sleep 30\n")
+    assert rig.run(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S="2").returncode == 4
+    report = json.loads((_evidence(rig) / "kill-report.json").read_text())
+    assert report["phase"] == "copy" and report["in_flight"]["copy_entry"] == "tables"
+    assert "likely cause:" in (rig.tmp / "notified").read_text()
+
+
+def test_a_guard_exit_also_leaves_a_kill_report(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + "  9 .venv/bin/algotrade-ingest rollups --from 2013-01-01\n")
+    assert rig.run().returncode == 3
+    report = json.loads((_evidence(rig) / "kill-report.json").read_text())
+    assert report["reason"].startswith("guard: a writer runs")
+
+
+def test_the_prekill_sample_is_armed_eight_seconds_before_the_cap_not_at_seventy_percent(
+    rig: Rig,
+) -> None:
+    rig.bench_body = "sleep 4\necho x\nexit 1\n"  # done long before cap - 8 = 6 s: never sampled
+    rig.run(PERF_BENCH_LIMIT_S="14", PERF_SAMPLE_S="1")
+    assert not (_evidence(rig) / "prekill").exists()
+    rig.status.unlink()
+    rig.bench_body = "sleep 30\n"  # killed at the cap: sampled at 6 s of the 14
+    rig.run(PERF_BENCH_LIMIT_S="14", PERF_SAMPLE_S="1")
+    assert (_evidence(rig) / "prekill" / "ps-top15-bench.txt").is_file()
+
+
+def test_an_over_time_bench_that_was_sampled_keeps_its_over_time_cause(rig: Rig) -> None:
+    window = rig.tmp / "logs" / "perf_gate" / "2026-10-23" / "sample-window-bench.json"
+    rig.bench_body = f"echo '{{}}' > {window}\nsleep 30\n"
+    assert rig.run(PERF_BENCH_LIMIT_S="3", PERF_SAMPLE_S="1").returncode == 4
+    assert "outcome=over-time" in rig.status.read_text()
+    assert "outcome=sampled" not in rig.status.read_text()
+    assert "OVER-TIME" in (rig.tmp / "notified").read_text()
+    report = json.loads((_evidence(rig) / "kill-report.json").read_text())
+    assert report["reason"] == "over-time" and "pre-kill" not in report["likely_cause"]
+
+
+def test_a_run_that_was_sampled_is_not_recorded(rig: Rig) -> None:
+    hist = rig.tmp / "logs" / "perf_gate" / "history.jsonl"
+    hist.parent.mkdir(parents=True, exist_ok=True)
+    hist.write_text('{"old": 1}\n')
+    window = rig.tmp / "logs" / "perf_gate" / "2026-10-23" / "sample-window-bench.json"
+    rig.bench_body = (
+        f"echo '{{\"new\": 2}}' >> {hist}\necho '{{}}' > {window}\necho '{rig.bench_out}'\nexit 1\n"
+    )
+    res = rig.run(PERF_SAMPLE_S="1")
+    assert "a pre-kill stack sample paused the bench" in res.stderr
+    assert "outcome=sampled" in rig.status.read_text()
     assert hist.read_text() == '{"old": 1}\n'
     assert "NOT recorded" in (rig.tmp / "notified").read_text()

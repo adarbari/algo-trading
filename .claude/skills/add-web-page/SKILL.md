@@ -53,7 +53,9 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
 9. **Test:** unit tests next to each module; extend `e2e/smoke.spec.ts` (or add an e2e spec)
    for the route. Run `make changed`, then push: CI is the full gate. Every lint message names its rule
    and the fix.
-10. **Guide entry** (ADR 0051, `.claude/skills/add-guide-content`): a new section gets a Start
+10. **Table, list or feed?** Write its user-case list and tick the filter and search checklist
+   first: `.claude/skills/add-ui-component` step 7.
+11. **Guide entry** (ADR 0051, `.claude/skills/add-guide-content`): a new section gets a Start
    here page (`config/site/guide/start.toml`) declared as its `[[section]]` in
    `architecture/guide_coverage.toml`; every titled `Panel` / `Section` passes `actions` with its help button
    (`GuideHelp` or `termHelp`); every new word the page shows (a status, a verdict, a control)
