@@ -572,3 +572,12 @@ follow-up PR).
 - status: final
 - Note: owner, chat 2026-10-23: "I see this happen very few times but will add extra CI time for every push." Incident 2026-10-22: #855 and #856 each added a module to a folder one below its cap; main was red 20:57-21:54 UTC, #857 and #858 were blocked, about three agent cycles lost, no data or live-site effect. Policy text in `docs/ci.md`.
 - Reasoning: the failure is rare and its cost small and recoverable, while strict checks re-run CI on every push of every PR.
+
+## 2026-10-22 | Ideas SQLite index deferred; built in a separate session (data architecture v2) | Defer, revisit on measured triggers
+- Question: build the per-viewer prestored Ideas SQLite index now, or defer it after the cheaper read fixes?
+- Options: build now / defer on measured triggers.
+- Decision: defer (owner, in chat 2026-10-22: "On Ideas SQLite index let us defer. I will start a different session on SQLite separately."). Triggers to revisit: IdeasPage over 1 s cold again after the cheaper steps; run-file count or payload growth past the plan's thresholds; a second feature needing the same prestored shape. Re-measure with the nightly gate first. The ADR 0006 amendment of 2026-10-22 and the decision "Ideas ranking rule, store and licence (confirmed)" stand unchanged.
+- decided by: owner
+- status: final
+- Note: the owner starts the SQLite work in a separate session; the hand-off note is outside the repo.
+- Reasoning: IdeasPage is 0.91 s cold on a quiet machine (0.85 s for a trader without the personal licence) after #860 (skip the values-file read) and #861 (light IdeaScreener.top), against a 1 s bar. The architect's profile showed run-file reads (about 65% of load_ideas) were the cost, and an index would save only about 0.1-0.3 s; the batched run-file read (#863) was closed after measuring 0.018 s against an estimated 0.15-0.2 s.
