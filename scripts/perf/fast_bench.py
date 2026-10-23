@@ -61,7 +61,8 @@ MIN_PASSES = 2  # always done, whatever the budget
 CONFIDENT_PASSES = 3  # fewer passes than this is "low-confidence" and is not recorded
 GATE_WAIT_S = 60.0  # the most a pass waits for the load gate before running (and flagging noisy)
 OP_WAIT_S = 2.0
-HISTORY_KEYS = ("date", "sha", "load_before", "load_after", "machine", "views", "totals")
+HISTORY_KEYS = ("date", "sha", "load_before", "load_after", "machine", "method", "views", "totals")
+METHOD = "empty-cache"  # the method of every line from round 3 on; rounds 1-2 are "cache-mode"
 VIEW_KEYS = ("crit_s", "sum_s", "slowest_op")
 TOTAL_KEYS = ("views_over_1s", "seconds_above_bar", "shell_total_s")
 
@@ -121,9 +122,15 @@ def exceptions_by_op(bar: dict, today: date | None = None) -> dict[str, dict]:
     }
 
 
+def missing_shell(op_avg_s: dict[str, list[float]], shell_ops: list[str]) -> list[str]:
+    """The shell operations that were not measured: the shell budget is then unknown."""
+    return [n for n in shell_ops if not op_avg_s.get(n)]
+
+
 def shell_total(op_avg_s: dict[str, list[float]], shell_ops: list[str]) -> float:
-    """The shell's combined time: each shell operation counted once at its slowest variant."""
-    return round(sum(max(op_avg_s.get(n, [0.0])) for n in shell_ops), 2)
+    """The shell's combined time: each shell operation counted once at its slowest variant.
+    A shell operation that was not measured is an error here (see ``missing_shell``)."""
+    return round(sum(max(op_avg_s[n]) for n in shell_ops), 2)
 
 
 def evaluate(views: dict[str, dict], shell_s: float, bar: dict, scale: float = 1.0) -> dict:
@@ -183,7 +190,8 @@ def scale_from_history(shell_s: float, history: list[dict]) -> float:
 # ---- the history ----------------------------------------------------------------------------
 
 
-def read_history(path: Path = HISTORY_FILE) -> list[dict]:
+def read_history(path: Path | str = HISTORY_FILE) -> list[dict]:
+    path = Path(path)
     """Every recorded run, oldest first."""
     if not path.exists():
         return []
@@ -199,6 +207,7 @@ def history_record(
     machine: str,
     noisy: bool = False,
     timings: dict[str, int] | None = None,
+    passes: int = 5,
 ) -> dict:
     """One history line for a run (critical path, sum and slowest op per view, plus totals)."""
     return {
@@ -207,7 +216,8 @@ def history_record(
         "load_before": load_before,
         "load_after": load_after,
         "machine": machine,
-        "mode": "empty-cache first request, 5 reps averaged",
+        "method": METHOD,
+        "mode": f"empty-cache first request, {passes} passes averaged",
         "noisy": noisy,
         **({"timings": timings} if timings else {}),
         "views": {
@@ -229,8 +239,9 @@ def render_history(history: list[dict]) -> str:
     out = ["run summaries:"]
     for h in history:
         t = h["totals"]
+        other = "" if h.get("method") == METHOD else f" [method: {h.get('method')}; not comparable]"
         out.append(
-            f"  {h['date']} {h['sha']}: {t['views_over_1s']} views over 1 s, "
+            f"  {h['date']} {h['sha']}{other}: {t['views_over_1s']} views over 1 s, "
             f"{t['seconds_above_bar']} s above the bar, shell {t['shell_total_s']} s "
             f"(load {h['load_before']} -> {h['load_after']}; {h['machine']})"
         )
@@ -337,6 +348,7 @@ def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, 
                     continue
                 d = global_ops.get(name) or known.get(name)
                 if d is None:
+                    skipped[f"{vid} :: {name}"] = f"operation {name} has no document"
                     continue
                 ops[vw.op_key(name, vid)] = d
                 by[vid].append(vw.op_key(name, vid))
@@ -408,7 +420,12 @@ def time_ops(
                 api.client.get(f"{api.url}/__bench_clear")
                 ms, status, size, _ = api.call({"query": d["query"], "variables": d["variables"]})
                 samples[sig].append(round(ms, 1))
-                last[sig] = {"status": status, "bytes": size, "err": api.last_error}
+                last[sig] = {
+                    "status": status,
+                    "bytes": size,
+                    "err": api.last_error,
+                    "empty": bool(getattr(api, "last_note", None)),
+                }
             if partial is not None:
                 names = {s: distinct[s]["name"] for s in distinct}
                 partial.write_text(json.dumps({"samples": samples, "loads": loads, "names": names}))
@@ -429,6 +446,7 @@ def time_ops(
             "n": len(x),
             "noisy": any(ld > load_max for ld in loads[s]),
             "failed": last[s]["status"] != 200 or bool(last[s]["err"]),
+            "empty": last[s]["empty"],
         }
         for s, x in samples.items()
     }, meta
@@ -446,7 +464,51 @@ def per_view(ops: dict[str, dict], view_ops: dict[str, list[str]]) -> dict[str, 
             "sum_s": round(sum(ops[s]["avg"] for s in sigs) / 1000, 2),
             "slowest_op": ops[top]["name"],
             "failed": [ops[s]["name"] for s in sigs if ops[s]["failed"]],
+            "empty": [ops[s]["name"] for s in sigs if ops[s]["empty"]],
         }
+    return out
+
+
+def integrity_failures(
+    views: dict[str, dict],
+    view_ops: dict[str, list[str]],
+    skipped: dict[str, str],
+    by_name: dict[str, list[float]],
+    bar: dict,
+    subset: bool,
+    today: date | None = None,
+) -> list[str]:
+    """What makes the run no pass whatever the times: a stale capture must not pass silently.
+
+    Views that failed to parse and operations without a document (unless a view is on the bar's
+    unexpired ``unmeasured_views`` list), views with no operations, operations that failed or
+    answered null / empty (unless in ``empty_ok``), and shell operations not measured."""
+    today = today or datetime.now(UTC).date()
+    out: list[str] = []
+    accepted = set(bar.get("unmeasured_views", []))
+    if accepted and date.fromisoformat(bar["unmeasured_expiry"]) < today:
+        accepted = set()
+    bad = sorted(k for k in skipped if k not in accepted)
+    if bad:
+        out.append(
+            "views or operations not measured: " + "; ".join(f"{k} ({skipped[k]})" for k in bad)
+        )
+    if not subset:
+        empty_views = sorted(v for v, ss in view_ops.items() if not ss)
+        if empty_views:
+            out.append("views with no operations: " + ", ".join(empty_views))
+        miss = missing_shell(by_name, bar["shell_operations"])
+        if miss:
+            out.append(
+                f"shell operations not measured (the shell budget is unknown): {', '.join(miss)}"
+            )
+    failed = sorted({n for v in views.values() for n in v["failed"]})
+    if failed:
+        out.append(f"operations that failed (a fast failure is no pass): {', '.join(failed)}")
+    ok = set(bar.get("empty_ok", []))
+    empty = sorted({n for v in views.values() for n in v["empty"]} - ok)
+    if empty:
+        out.append(f"operations that answered null or empty (a stale capture?): {', '.join(empty)}")
     return out
 
 
@@ -489,6 +551,12 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     p.add_argument("--machine", default="", help="a note on the machine, stored with --record")
     p.add_argument("--out", help="a directory for ops.json and views.json")
+    p.add_argument(
+        "--history-file",
+        default=str(HISTORY_FILE),
+        help="the history to read and append to (the nightly wrapper uses one under var/logs/; "
+        "the repo's file is updated only by a PR)",
+    )
     p.add_argument("--only", help="comma-separated operation names to time (default: all)")
     p.add_argument(
         "--record-noisy",
@@ -540,7 +608,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     bar = load_bar()
     if args.history:
-        print(render_history(read_history()))
+        print(render_history(read_history(Path(args.history_file))))
         return 0
     try:
         data_url = al.check_target(
@@ -576,26 +644,29 @@ def main(argv: list[str] | None = None) -> int:
     by_name: dict[str, list[float]] = {}
     for o in ops.values():
         by_name.setdefault(o["name"], []).append(o["avg"] / 1000)
-    shell_s = shell_total(by_name, bar["shell_operations"])
-    history = read_history()
+    shell_s = (
+        shell_total(by_name, bar["shell_operations"])
+        if not missing_shell(by_name, bar["shell_operations"])
+        else 0.0
+    )
+    history = read_history(args.history_file)
     scale = scale_from_history(shell_s, history) if args.ratio_mode else 1.0
     result = evaluate(views, shell_s, bar, scale)
     if args.ratio_mode:
         print(f"ratio mode: times divided by {scale:.2f} (shell {shell_s} s now vs the last run)")
     print(render_table(result, bar))
-    failed = sorted({n for v in views.values() for n in v["failed"]})
-    if failed:
-        result["failures"].append(
-            f"operations that failed (a fast failure is no pass): {', '.join(failed)}"
-        )
+    integrity = integrity_failures(views, view_ops, skipped, by_name, bar, bool(names))
+    result["failures"] += integrity
     for vid, why in skipped.items():
         print(f"not measured: {vid}: {why}")
     noisy, may_record = report_run(ops, meta, args, bool(names))
     if out_dir:
         write_outputs(out_dir, ops, views, skipped, {**meta, "noisy": noisy})
+    may_record = may_record and not integrity  # a run with an integrity failure is never history
     if args.record and not may_record:
         print(
-            "not recorded: a noisy, low-confidence or --only run (--record-noisy to keep it)",
+            "not recorded: a noisy, low-confidence, --only or failed run (an integrity "
+            "failure is never kept; --record-noisy keeps only noisy and --only runs)",
             file=sys.stderr,
         )
     elif args.record:
@@ -609,9 +680,10 @@ def main(argv: list[str] | None = None) -> int:
             note.strip("; "),
             noisy,
             parse_timings(args.timings),
+            meta["passes"],
         )
-        append_history(rec)
-        print(f"recorded in {HISTORY_FILE.relative_to(REPO)}")
+        append_history(rec, Path(args.history_file))
+        print(f"recorded in {args.history_file}")
     for line in result["failures"]:
         print(f"FAIL {line}", file=sys.stderr)
     return 1 if result["failures"] else 0

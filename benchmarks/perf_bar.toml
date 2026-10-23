@@ -25,3 +25,23 @@ shell_operations = ["Viewer", "SessionDate", "Regime", "StatusStrip", "EdgeDesk"
 # approval = "owner, docs/decisions/log.md 2026-MM-DD"
 # date = "2026-10-22"
 # expiry = "2026-11-22"
+
+# Views the committed capture has no document for (the crawler needs a real id), so they are
+# listed as not measured: any OTHER view or operation that is not measured fails the gate. The
+# list expires; refresh the capture, or the owner renews it (docs/perf/page-latency-bar.md).
+# Added by the implementer 2026-10-22 pending the owner's approval.
+unmeasured_expiry = "2026-11-22"
+unmeasured_views = [
+    "/guide/fields/:name",
+    "/guide/glossary/:id",
+    "/guide/regime/episodes/:key",
+    "/guide/regime/indicators/:key",
+    "/guide/screeners/:id",
+    "/guide/screeners/c/:category",
+    "/guide/situations/:slug",
+    "/guide/start/:id",
+]
+
+# Operations whose answer is empty by design on a clone (no user configs, no run id): every other
+# operation that answers null or empty fails the gate (a stale capture). Pending owner approval.
+empty_ok = ["MyScreens", "HarnessRun"]

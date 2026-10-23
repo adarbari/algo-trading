@@ -4,6 +4,7 @@ per-date idempotence (before 03:00, done today, next day), with a fake bench and
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -25,10 +26,12 @@ class Rig:
         self.bench_code = 1
         self.bench_body: str | None = None  # replaces the fake bench script when set
 
-    def run(self, **over: str) -> subprocess.CompletedProcess[str]:
+    def env(self, **over: str) -> dict[str, str]:
         bench = self.tmp / "bench.sh"
         body = f"echo '{self.bench_out}'\nexit {self.bench_code}\n"
-        bench.write_text("#!/bin/sh\n" + (self.bench_body or body))
+        text = "#!/bin/sh\n" + (self.bench_body or body)
+        if not bench.exists() or bench.read_text() != text:  # never rewrite a running script
+            bench.write_text(text)
         bench.chmod(0o755)
         notify = self.tmp / "notify.sh"
         notify.write_text(f'#!/bin/sh\necho "$1" >> {self.tmp}/notified\n')
@@ -47,8 +50,11 @@ class Rig:
             "PERF_NOTIFY": str(notify),
             **over,
         }
+        return env
+
+    def run(self, **over: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["bash", str(SCRIPT)], env=env, capture_output=True, text=True, check=False
+            ["bash", str(SCRIPT)], env=self.env(**over), capture_output=True, text=True, check=False
         )
 
 
@@ -114,15 +120,19 @@ def test_done_today_is_a_no_op_and_the_next_day_runs_again(rig: Rig) -> None:
     assert "date=2026-10-24" in rig.status.read_text()
 
 
-def test_a_refused_bench_is_not_a_finished_day(rig: Rig) -> None:
+def test_a_refusal_after_the_copy_is_a_finished_day_with_one_notification(rig: Rig) -> None:
     rig.bench_code, rig.bench_out = 2, "refused"
     assert rig.run().returncode == 2
-    assert "finished=no" in rig.status.read_text()
-    rig.bench_code, rig.bench_out = (
-        0,
-        "0 views over 1.0 s on the critical path (0.0 s above the bar)",
-    )
-    assert rig.run().returncode == 0  # retried the same day
+    assert "outcome=refused" in rig.status.read_text() and "finished=yes" in rig.status.read_text()
+    assert (rig.tmp / "notified").read_text().count("REFUSED") == 1
+    assert rig.run().returncode == 0  # no re-copy at the next retry
+
+
+def test_a_crash_is_reported_as_crashed_not_as_over_the_bar(rig: Rig) -> None:
+    rig.bench_code, rig.bench_out = 1, "Traceback (most recent call last)"
+    assert rig.run().returncode == 1
+    assert "outcome=crashed" in rig.status.read_text()
+    assert "CRASHED" in (rig.tmp / "notified").read_text()
 
 
 def test_status_line_records_the_phase_timings(rig: Rig) -> None:
@@ -138,7 +148,7 @@ def test_the_watchdog_kills_a_slow_bench_and_its_child_and_marks_over_time(rig: 
     res = rig.run(PERF_BENCH_LIMIT_S="1")
     assert res.returncode == 4
     line = rig.status.read_text()
-    assert "exit=4 finished=yes over_time=yes" in line
+    assert "exit=4 finished=yes outcome=over-time over_time=yes" in line
     assert "OVER-TIME" in (rig.tmp / "notified").read_text()
     assert not (rig.root / "data").exists()  # the clone is deleted
     child = int(pidfile.read_text())
@@ -200,3 +210,99 @@ def test_a_guard_day_records_why_and_only_the_last_14_run_directories_are_kept(r
     assert len(days) == 14 and days[-1] == "2026-10-23" and days[0] == "2026-09-08"
     assert (base / "keepme").exists()  # only dated directories are ever deleted
     assert json.loads((base / "2026-10-23" / "status.json").read_text())["stop_reason"] == "guard"
+
+
+def test_an_empty_or_relative_clone_root_is_an_error_not_a_default(rig: Rig) -> None:
+    for bad in ("", "perf-clone/data", "./perf-clone/data"):
+        res = rig.run(PERF_CLONE_ROOT=bad)
+        assert res.returncode == 2 and "absolute" in res.stderr, bad
+    assert (rig.tmp / "var" / "data" / "t.txt").exists()
+
+
+def test_guard_retries_write_no_summary_line_only_finished_runs_do(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + "  9 algotrade-ingest nightly\n")
+    assert rig.run().returncode == 3 and rig.run().returncode == 3
+    assert not (rig.tmp / "logs" / "perf_gate" / "summary.csv").exists()
+    rig.ps.write_text(QUIET_PS)
+    rig.run()
+    assert len((rig.tmp / "logs" / "perf_gate" / "summary.csv").read_text().splitlines()) == 2
+
+
+def test_a_second_instance_is_busy_and_leaves_the_first_ones_clone_alone(rig: Rig) -> None:
+    rig.bench_body = f"touch {rig.tmp}/started\nsleep 4\necho '{rig.bench_out}'\nexit 0\n"
+    rig.bench_out = "0 views over 1.0 s on the critical path (0.0 s above the bar)"
+    rig.bench_body = f"touch {rig.tmp}/started\nsleep 4\necho '{rig.bench_out}'\nexit 0\n"
+    first = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=rig.env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    try:
+        for _ in range(100):
+            if (rig.tmp / "started").exists():
+                break
+            time.sleep(0.1)
+        assert (rig.root / "data").exists()
+        second = rig.run()
+        assert second.returncode == 3 and "holds" in second.stderr
+        assert (rig.root / "data").exists()  # the first run's clone is intact
+    finally:
+        first.communicate(timeout=60)
+    assert first.returncode == 0
+    assert not (rig.tmp / "logs" / "perf_gate" / "lock.d").exists()  # released on exit
+    assert not (rig.root / "data").exists()
+
+
+def test_a_stale_lock_of_a_dead_process_is_taken_over(rig: Rig) -> None:
+    lock = rig.tmp / "logs" / "perf_gate" / "lock.d"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text("999999")
+    assert rig.run().returncode == 1 and not lock.exists()
+
+
+def test_term_kills_the_bench_group_drops_the_clone_and_releases_the_lock(rig: Rig) -> None:
+    pidfile = rig.tmp / "child.pid"
+    rig.bench_body = f"sleep 60 &\necho $! > {pidfile}\nwait\n"
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=rig.env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    for _ in range(100):
+        if pidfile.exists() and pidfile.read_text().strip():
+            break
+        time.sleep(0.1)
+    proc.terminate()
+    proc.communicate(timeout=30)
+    assert proc.returncode == 143
+    assert not (rig.root / "data").exists()
+    assert not (rig.tmp / "logs" / "perf_gate" / "lock.d").exists()
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pidfile.read_text()), 0)
+
+
+def test_the_nightly_command_writes_its_history_under_var_logs_and_leaves_the_repo_clean(
+    rig: Rig,
+) -> None:
+    argv_file = rig.tmp / "argv.txt"
+    fake_py = rig.tmp / "fakepy.sh"
+    fake_py.write_text(
+        f'#!/bin/sh\necho "$@" > {argv_file}\necho "0 views over 1.0 s (0.0 s above the bar)"\n'
+    )
+    fake_py.chmod(0o755)
+    repo = SCRIPT.parents[2]
+    tracked = ["benchmarks/critical_path_history.jsonl"]
+    before = subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain", *tracked],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout
+    res = rig.run(PERF_BENCH_CMD="", PERF_PY=str(fake_py))
+    assert res.returncode == 0, res.stderr
+    argv = argv_file.read_text()
+    assert f"--history-file {rig.tmp}/logs/perf_gate/history.jsonl" in argv
+    assert f"--out {rig.tmp}/logs/perf_gate/2026-10-23" in argv and "--record" in argv
+    after = subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain", *tracked],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout
+    assert before == after

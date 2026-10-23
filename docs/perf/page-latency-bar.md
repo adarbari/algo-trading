@@ -36,7 +36,7 @@ volume (the guards `--min-free-swap-mb` / `--min-free-disk-gb` default to those 
 waits up to 3 minutes for them and never lowers them). An operation timed above `--load-max` is
 `noisy`; a noisy run, or an `--only` subset, is not appended by `--record` (`--record-noisy`
 keeps it, flagged). Exit codes: 0 every view and the shell within the bar or a named exception;
-1 something over, or an operation that failed (a fast failure is no pass); 2 refused (no clone).
+1 something over, or an integrity failure (an operation that failed, answered empty, or was not measured); 2 refused (no clone).
 Do not point it at `var/`, the real store, launchd or the live API, and never export
 `ALGOTRADE_DATA_URL`.
 
@@ -78,11 +78,12 @@ many views (EdgesPage on every edges list view).
 ## Read the history
 
 `benchmarks/critical_path_history.jsonl`: one JSON line per recorded run, written **only** by
-`--record`: date, git sha, load before and after, a machine note, per view `crit_s` (critical
+`--record` (`--history-file` picks another file, as the nightly does) or by a PR: date, git sha, a
+`method` (`empty-cache`; rounds 1 and 2 are `cache-mode`, a different method that `--history`
+marks "not comparable"), the passes done in `mode`, load before and after, a machine note, per view `crit_s` (critical
 path), `sum_s` and `slowest_op`, and `totals` (`views_over_1s`, `seconds_above_bar`,
 `shell_total_s`). `--history` prints a summary line per run and the critical-path trend of every
-view that was ever over 1 s. Compare runs only when the machine notes allow: round 3 (the first
-line) ran with the machine 2x slower than round 4; the shas of both seed lines are inferred from
+view that was ever over 1 s. Compare runs only when the machine notes allow: round 3 ran with the machine 2x slower than round 4; the shas of the round 3 and 4 lines are inferred from
 merge times. Fitness tests: `tests/scripts/perf/test_fast_bench.py`.
 
 ## The nightly run (a description; the owner installs it)
@@ -100,16 +101,35 @@ clone only grows by what the bench rewrites, and is deleted afterwards); about 5
 copy of 64 GB, 3-15 minutes for the run. The wrapper removes only a path ending in
 `/perf-clone/data` that is not the real store.
 
-**Idempotent per local date.** Before 03:00, or when `var/logs/perf_gate.status` already holds a
-finished run for today (clean or over the bar), it exits 0 at once. A guard (a writer in `ps`,
-disk, load, a writer that started during the copy: the clone is discarded) exits 3 "busy, retry";
-a start refused by a guard is not a finished run, so retries continue. Exit codes: 0 done (clean)
-or nothing to do; 1 finished with a view over the bar without a named exception (the owner is
-notified, as `deploy.sh` does, by a desktop notification), or an operation failed; 2 refused (a
-path guard, or the bench refused); 3 busy, retry; 4 over-time (the bench hit its 300 s cap). Each run appends `date= sha= views_over=
-seconds_above= exit= finished=` to `var/logs/perf_gate.status`, keeps the output in
-`var/logs/perf_gate.last.log`, and records the history line (`--record`: a noisy or
-low-confidence run is not recorded). The history is committed by the next harness PR, never by the agent.
+**Idempotent per local date, one instance at a time.** Before 03:00, or when
+`var/logs/perf_gate.status` already holds a finished run for today, it exits 0 at once. An atomic
+lock directory with a pid file (`var/logs/perf_gate/lock.d`, a dead pid is a stale lock, released
+on every exit including TERM / INT, which also kill the bench's process group and drop the clone)
+makes a second instance (the 900 s retry) exit 3 "busy" without touching the first one's clone.
+A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
+discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
+continue. After the copy **every** outcome is a finished day (one notification, never a re-copy
+at the next retry): `ok`, `over-the-bar`, `over-time`, `refused` (the bench refused) and
+`crashed` (it died without a result). Exit codes: 0 done (clean) or nothing to do today; 1 a view
+over the bar without a named exception, an integrity failure (below), or a crash; 2 refused (a
+path guard, an empty or relative `PERF_CLONE_ROOT`, or the bench refused); 3 busy, retry; 4
+over-time (the bench hit its 300 s cap); 143 stopped by a signal. Each finished run appends
+`date= sha= views_over= seconds_above= exit= finished= outcome=` and the phase timings to
+`var/logs/perf_gate.status` and keeps the output in `var/logs/perf_gate.last.log`.
+
+**Nothing leaves `var/logs`.** The nightly records its history to `var/logs/perf_gate/history.jsonl`
+(`--history-file`), never to the repo: a modified tracked file in the main checkout would make
+`deploy.sh` stop ingest deploys. The tracked `benchmarks/critical_path_history.jsonl` changes only in
+a PR: copy the rounds worth keeping (`tail -n 1 var/logs/perf_gate/history.jsonl >>
+benchmarks/critical_path_history.jsonl`) with the estimate-against-actual note. A noisy,
+low-confidence, `--only` or integrity-failing run is not recorded at all.
+
+**Integrity failures.** Whatever the times, the gate fails (exit 1) on: a view that did not parse
+or an operation with no document, views with no operations, an operation that failed or answered
+null / empty (a stale capture), and a shell operation that was not measured (its budget is then
+unknown). `perf_bar.toml` lists, with an expiry, the views the capture cannot cover
+(`unmeasured_views`) and the operations that are empty by design (`empty_ok`); both need the
+owner's approval like an exception.
 
 **Timing, and the 5-minute cap.** The cap applies to the benchmark phase; the snapshot is a
 separate step. Expected breakdown: the CoW snapshot takes 4-10 minutes depending on load

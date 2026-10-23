@@ -53,6 +53,7 @@ def test_bar_file_is_valid_and_every_exception_has_reason_and_date() -> None:
         assert e["operation"] and e["reason"].strip() and e["approval"].strip()
         assert date.fromisoformat(e["date"]) <= date.fromisoformat(e["expiry"])
         assert date.fromisoformat(e["expiry"]) >= today, f"{e['operation']}: expired, remove it"
+    assert date.fromisoformat(bar["unmeasured_expiry"]) >= today, "unmeasured_views expired"
 
 
 def test_an_expired_exception_no_longer_excuses_a_view() -> None:
@@ -305,3 +306,83 @@ def test_wrapper_timings_are_parsed_and_stored_in_the_history_record() -> None:
     )
     assert rec["timings"] == {"wait_s": 3}
     assert "timings" not in fb.history_record({"/a": _view(0.4, "X")}, totals, "a", 1.0, 2.0, "n")
+
+
+def _ops(**kw: float) -> dict[str, list[float]]:
+    return {k: [v] for k, v in kw.items()}
+
+
+def _failures(**over: object) -> list[str]:
+    args: dict = {
+        "views": {"/a": {"failed": [], "empty": []}},
+        "view_ops": {"/a": ["X#1"]},
+        "skipped": {},
+        "by_name": _ops(Viewer=0.1, GuideEntries=0.1),
+        "bar": BAR,
+        "subset": False,
+        "today": date(2026, 10, 23),
+    }
+    args.update(over)
+    return fb.integrity_failures(**args)
+
+
+def test_a_clean_run_has_no_integrity_failure() -> None:
+    assert _failures() == []
+
+
+def test_a_view_that_did_not_parse_or_an_unresolved_operation_fails_the_gate() -> None:
+    out = _failures(skipped={"/b": "bad", "/c :: Gone": "operation Gone has no document"})
+    assert len(out) == 1 and "/b" in out[0] and "Gone" in out[0]
+
+
+def test_listed_unmeasured_views_pass_until_the_list_expires() -> None:
+    bar = {**BAR, "unmeasured_views": ["/b"], "unmeasured_expiry": "2026-11-01"}
+    assert _failures(bar=bar, skipped={"/b": "no document"}) == []
+    assert _failures(bar=bar, skipped={"/b": "x"}, today=date(2026, 11, 2))
+
+
+def test_empty_views_missing_shell_failed_and_empty_answers_all_fail() -> None:
+    assert "no operations" in _failures(view_ops={"/a": []})[0]
+    assert "shell operations not measured" in _failures(by_name=_ops(Viewer=0.1))[0]
+    assert _failures(by_name=_ops(Viewer=0.1), subset=True) == []
+    failed = {"/a": {"failed": ["Boom"], "empty": []}}
+    assert "failed" in _failures(views=failed)[0] and "Boom" in _failures(views=failed)[0]
+    empty = {"/a": {"failed": [], "empty": ["Hollow", "MyScreens"]}}
+    bar = {**BAR, "empty_ok": ["MyScreens"]}
+    out = _failures(views=empty, bar=bar)
+    assert len(out) == 1 and "Hollow" in out[0] and "MyScreens" not in out[0]
+
+
+def test_a_missing_shell_operation_is_not_counted_as_zero() -> None:
+    assert fb.missing_shell(_ops(Viewer=0.1), ["Viewer", "Regime"]) == ["Regime"]
+    with pytest.raises(KeyError):
+        fb.shell_total(_ops(Viewer=0.1), ["Viewer", "Regime"])
+
+
+def test_history_mode_states_the_passes_and_rounds_1_and_2_are_a_different_method() -> None:
+    totals = {"views_over_1s": 0, "seconds_above_bar": 0, "shell_total_s": 0.3}
+    rec = fb.history_record({"/a": _view(0.4, "X")}, totals, "a", 1.0, 2.0, "n", False, None, 3)
+    assert "3 passes" in rec["mode"] and rec["method"] == fb.METHOD
+    history = fb.read_history()
+    assert [h["method"] for h in history[:2]] == ["cache-mode", "cache-mode"]
+    assert all(h["method"] == fb.METHOD for h in history[2:])
+    text = fb.render_history(history)
+    assert text.count("not comparable") == 2
+
+
+def test_the_history_file_is_a_parameter_and_the_tracked_file_is_not_touched(
+    tmp_path: Path,
+) -> None:
+    rec = fb.history_record(
+        {"/a": _view(0.4, "X")},
+        {"views_over_1s": 0, "seconds_above_bar": 0, "shell_total_s": 0.3},
+        "a",
+        1.0,
+        2.0,
+        "n",
+    )
+    before = fb.HISTORY_FILE.read_bytes()
+    fb.append_history(rec, tmp_path / "h.jsonl")
+    assert fb.read_history(str(tmp_path / "h.jsonl"))[0]["sha"] == "a"
+    assert fb.HISTORY_FILE.read_bytes() == before
+    assert fb.parse_args(["--history-file", "x"]).history_file == "x"

@@ -32,14 +32,18 @@
 #
 # Exit codes: 0 done (clean) or nothing to do today; 1 finished with a view over the bar without
 # a named exception, or an operation that failed; 2 refused (a path guard, or the bench refused);
-# 3 busy, retry; 4 over-time (the bench hit its wall cap). Env (tests): PERF_CLONE_ROOT, PERF_SRC, PERF_STATUS, PERF_NOW_DATE, PERF_NOW_HM,
+# 3 busy, retry (also: another instance holds the lock); 4 over-time (the bench hit its wall cap).
+# After the copy every outcome is a finished day (one notification, no re-copy at the next retry):
+# a bench refusal (2) and a crash (reported as outcome=crashed, exit 1) included. The nightly's own
+# history is var/logs/perf_gate/history.jsonl; the repo's benchmarks/critical_path_history.jsonl
+# is only ever changed by a PR (docs/perf/page-latency-bar.md). Env (tests): PERF_CLONE_ROOT, PERF_SRC, PERF_STATUS, PERF_NOW_DATE, PERF_NOW_HM,
 # PERF_PS_FILE, PERF_FREE_GB, PERF_LOAD, PERF_BENCH_CMD, PERF_NOTIFY, PERF_BENCH_LIMIT_S,
 # PERF_TOTAL_LIMIT_S.
 set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 src=${PERF_SRC:-$repo/var/data}
-clone=${PERF_CLONE_ROOT:-/Users/adarbari/perf-clone/data}
+clone=${PERF_CLONE_ROOT-/Users/adarbari/perf-clone/data}  # set but empty is an error, not a default
 status=${PERF_STATUS:-$repo/var/logs/perf_gate.status}
 today=${PERF_NOW_DATE:-$(date +%Y-%m-%d)}
 hm=${PERF_NOW_HM:-$(date +%H%M)}
@@ -61,6 +65,7 @@ if [ "$((10#$hm))" -lt 300 ]; then exit 0; fi  # before 03:00 local
 if [ -f "$status" ] && grep -q "^date=$today .*finished=yes" "$status"; then exit 0; fi
 
 # the clone is removed and rewritten: only the fixed clone path, never the real store
+case "$clone" in /*) ;; *) say "refusing: PERF_CLONE_ROOT must be an absolute path (got '$clone')"; exit 2 ;; esac
 case "$clone" in */perf-clone/data) ;; *) say "refusing: $clone does not end in /perf-clone/data"; exit 2 ;; esac
 real_src=$(cd "$src" 2>/dev/null && pwd -P || echo "$src")
 real_clone=$(cd "$(dirname "$clone")" 2>/dev/null && pwd -P || dirname "$clone")/data
@@ -69,6 +74,37 @@ case "$real_src/" in "$real_clone"/*) say "refusing: the real store is inside th
 [ "$real_clone" != "$real_src" ] || { say "refusing: the clone is the real store"; exit 2; }
 [ -d "$src" ] || { say "refusing: no store at $src"; exit 2; }
 
+# one instance at a time: an atomic mkdir lock with a pid file; a lock whose pid is dead is stale
+lockdir=$logs/perf_gate/lock.d
+mkdir -p "$logs/perf_gate"
+lock_held=0
+take_lock() {
+  if mkdir "$lockdir" 2>/dev/null; then echo $$ >"$lockdir/pid"; lock_held=1; return 0; fi
+  holder=$(cat "$lockdir/pid" 2>/dev/null || true)
+  if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then return 1; fi
+  rm -rf "$lockdir"  # stale: its owner is gone
+  mkdir "$lockdir" 2>/dev/null || return 1
+  echo $$ >"$lockdir/pid"; lock_held=1
+}
+if ! take_lock; then say "busy, retry: another perf gate run holds $lockdir"; exit 3; fi
+wd_pid=
+clone_made=0
+cleanup() {
+  [ -n "${sampler_pid:-}" ] && kill "$sampler_pid" 2>/dev/null
+  [ "$lock_held" = 1 ] && rm -rf "$lockdir"
+  return 0
+}
+abort() {  # TERM / INT: stop the bench's whole process group, drop the clone, release the lock
+  [ -n "$wd_pid" ] && kill -TERM "$wd_pid" 2>/dev/null
+  [ -n "$wd_pid" ] && wait "$wd_pid" 2>/dev/null
+  [ "$clone_made" = 1 ] && [ -d "$clone" ] && rm -rf "$clone"
+  say "aborted by a signal"
+  cleanup
+  exit 143
+}
+trap cleanup EXIT
+trap abort TERM INT
+
 mkdir -p "$rundir"; rundir_made=1
 sampler_pid=
 free_now() { df -k "$(dirname "$clone")" 2>/dev/null | awk 'NR==2 {printf "%d", $4/1048576}'; }
@@ -76,7 +112,6 @@ load_now() { uptime | sed 's/.*load averages*: *//' | awk '{gsub(",", "", $1); p
 echo "epoch,load1,free_gb" >"$rundir/load.csv"
 ( while true; do echo "$(date +%s),$(load_now),$(free_now)" >>"$rundir/load.csv"; sleep "${PERF_SAMPLE_S:-10}"; done ) >/dev/null 2>&1 &
 sampler_pid=$!
-trap '[ -n "$sampler_pid" ] && kill "$sampler_pid" 2>/dev/null' EXIT
 
 top_procs() { ps -Ao pid,pcpu,pmem,etime,command 2>/dev/null | sed 1d | sort -k2 -nr | head -10 | cut -c1-200; }
 
@@ -107,7 +142,7 @@ status = {
 (run / "status.json").write_text(json.dumps(status, indent=1) + "\n")
 summary = Path(e["SUMMARY"])
 new = not summary.exists()
-with summary.open("a", newline="") as f:
+with (summary.open("a", newline="") if e["STOP_REASON"] != "guard" else open(os.devnull, "w")) as f:
     w = csv.writer(f)
     if new:
         w.writerow("date sha total_s snapshot_s bench_s passes views_over_bar seconds_above noisy notes".split())
@@ -144,6 +179,7 @@ drop_clone
 mkdir -p "$(dirname "$clone")"
 top_procs >"$rundir/procs-start.txt"
 free_before=$free_gb
+clone_made=1
 if ! cp -cR "$src" "$clone"; then drop_clone; busy "the copy failed"; fi
 t_copied=$(date +%s)
 snapshot_s=$((t_copied - t_ready)); wait_s=$((t_ready - t_start))
@@ -157,16 +193,22 @@ if [ "$ingest_during" = true ]; then drop_clone; busy "a writer started during t
 
 sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
 out=$(mktemp)
-py=$repo/.venv/bin/python
-cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir"}
+py=${PERF_PY:-$repo/.venv/bin/python}
+cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
 
 # the watchdog: run a command in its own process group; at the limit kill the whole group (the
-# bench and its API child) and exit 124. macOS has no `timeout`. $1 = seconds.
+# bench and its API child) and exit 124. macOS has no `timeout`. $1 = seconds. It `exec`s, so
+# call it only in a subshell or the background.
 watchdog() {
-  python3 - "$@" <<'PY'
+  exec python3 - "$@" <<'PY'
 import os, signal, subprocess, sys
 limit, cmd = float(sys.argv[1]), sys.argv[2:]
 p = subprocess.Popen(cmd, start_new_session=True)
+def stop(*_):
+    os.killpg(p.pid, signal.SIGKILL)
+    p.wait()
+    sys.exit(143)
+signal.signal(signal.SIGTERM, stop)
 try:
     sys.exit(p.wait(timeout=limit))
 except subprocess.TimeoutExpired:
@@ -177,22 +219,29 @@ PY
 }
 t_bench=$(date +%s)
 # shellcheck disable=SC2086
-watchdog "$bench_limit" $cmd >"$out" 2>&1
+watchdog "$bench_limit" $cmd >"$out" 2>&1 &
+wd_pid=$!
+wait "$wd_pid"
 code=$?
+wd_pid=
 t_benched=$(date +%s)
 bench_s=$((t_benched - t_bench))
 top_procs >"$rundir/procs-end.txt"
 over=$(sed -n 's/^\([0-9]*\) views over.*(\([0-9.]*\) s above the bar).*/\1 \2/p' "$out" | tail -1)
 views_over=${over%% *}; above=${over##* }
-finished=no; if [ "$code" -le 1 ]; then finished=yes; fi
-overtime=no
-if [ "$code" -eq 124 ]; then overtime=yes; finished=yes; code=4; fi  # a finished day: no retry loop
+# every outcome after the copy is a finished day (no endless re-copy of the store at every retry)
+finished=yes; overtime=no; outcome=ok
+if [ "$code" -eq 124 ]; then overtime=yes; code=4; outcome=over-time
+elif [ "$code" -eq 2 ]; then outcome=refused
+elif [ "$code" -eq 1 ] && [ -n "${over:-}" ]; then outcome=over-the-bar
+elif [ "$code" -ne 0 ]; then outcome=crashed; code=1
+fi
 cat "$out" >>"$rundir/run.log"
 cp "$out" "$logs/perf_gate.last.log"
 rm -f "$out"
 
 # the profiles: the slowest 3 operations over the bar, 60 s at most, before the clone goes
-if [ "$code" -eq 1 ] && [ -f "$rundir/ops.json" ]; then
+if [ "$outcome" = over-the-bar ] && [ -f "$rundir/ops.json" ]; then
   names=$(python3 - "$rundir/ops.json" <<'PY'
 import json, sys
 ops = json.load(open(sys.argv[1]))
@@ -202,18 +251,21 @@ PY
 )
   pcmd=${PERF_PROFILE_CMD:-"$py $repo/scripts/perf/api_latency.py --profile --data-url file://$clone --profile-limit 20 --profile-out $rundir/profiles.md --ops"}
   # shellcheck disable=SC2086
-  [ -n "$names" ] && { watchdog 60 $pcmd $names >>"$rundir/run.log" 2>&1 || say "profiles cut or failed"; }
+  [ -n "$names" ] && { (watchdog 60 $pcmd $names) >>"$rundir/run.log" 2>&1 || say "profiles cut or failed"; }
 fi
 
 drop_clone
 t_end=$(date +%s)
 cleanup_s=$((t_end - t_benched)); total_s=$((t_end - t_start))
-echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?} exit=$code finished=$finished over_time=$overtime wait_s=$wait_s snapshot_s=$snapshot_s bench_s=$bench_s cleanup_s=$cleanup_s total_s=$total_s" >>"$status"
+echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?} exit=$code finished=$finished outcome=$outcome over_time=$overtime wait_s=$wait_s snapshot_s=$snapshot_s bench_s=$bench_s cleanup_s=$cleanup_s total_s=$total_s" >>"$status"
 reason=""; [ "$overtime" = yes ] && reason=over-time
+[ "$outcome" = refused ] && reason=refused; [ "$outcome" = crashed ] && reason=crashed
 finish_evidence "$reason"
 
-if [ "$code" -eq 1 ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
+if [ "$code" -ne 0 ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
+  [ "$outcome" = crashed ] && msg="1 s page gate CRASHED (no result): $msg"
+  [ "$outcome" = refused ] && msg="1 s page gate REFUSED by the bench (no result): $msg"
   [ "$overtime" = yes ] && msg="1 s page gate OVER-TIME: bench killed at ${bench_limit}s (not recorded); $msg"
   if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
   else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
