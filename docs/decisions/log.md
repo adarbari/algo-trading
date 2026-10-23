@@ -593,9 +593,9 @@ follow-up PR).
 
 ## 2026-10-23 | Analyst revisions v3 (#883) | Raise the entry-closure bundle budget to 196367 B (+77 B)
 - Question: the Web performance budgets job fails on #883 with the entry closure at 196297 B against 196290 B (+7 B); trim the entry or raise the budget?
-- Options: trim the entry closure by at least 10 B / raise `bundle.entry_closure_gzip_bytes` to the CI value plus the usual 70 B margin.
-- Decision: raise to 196367 B (CI 196297 B + 70 B), noted in `apps/web/perf-budgets.json`; inside the #773 owner waiver (max 196390 B).
-- decided by: Opus on the owner's behalf (owner asleep, routine per the #773 waiver)
-- status: final
-- Note: main's own CI run on f56e951 measured 196290 B, exactly the budget, so any PR touching the chunk graph trips it. The next raise past 196390 B needs the owner.
-- Reasoning: no honest trim exists: `SITE_FEATURES` is tree-shaken out of the entry (the catalogue names, `revisions_basis` included, ship only in the lazy FinancialsTab chunk), and the PR's web diff touches only that lazy chunk and the generated catalogue, so the 7 B is chunk-graph and gzip noise, not code to remove.
+- Options: trim the entry closure by at least 10 B / raise `bundle.entry_closure_gzip_bytes` to the CI value plus the usual 70 B margin / drop the catalogue change.
+- Decision: keep the raise to 196367 B (CI 196297 B + 70 B), noted in `apps/web/perf-budgets.json`; inside the #773 owner waiver (ceiling 196390 B). No trim required.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Note: an Opus agent measured the delta and proposed the raise (commit c2d30f6fb); Fable reviewed the evidence (the perf-budgets.json notes, the #773 waiver entry, CI job 120340124713 of run 39931132000: `196297 B gzip is over its budget of 196290 B`) and decided. Main's own CI run on f56e951 measured 196290 B, exactly the budget, so any PR touching the chunk graph trips it. The PR's web diff touches only the generated catalogue and the lazy financials-panel widget, nothing in the entry. The next raise past 196390 B needs the owner.
+- Reasoning: no honest trim exists: `SITE_FEATURES` is tree-shaken out of the entry (the catalogue names, `revisions_basis` included, ship only in the lazy FinancialsTab chunk), so the 7 B is chunk-graph and gzip noise, not code to remove; the waiver the owner gave on 2026-10-21 covers exactly this noise band.
