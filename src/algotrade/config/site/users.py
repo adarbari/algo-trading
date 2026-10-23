@@ -59,6 +59,11 @@ class UserRecord:
         unknown = sorted(set(self.licences) - set(HELD_LICENCES))
         if unknown:
             raise ConfigurationError(f"user '{self.user_id}' licences: unknown {unknown}")
+        if "yahoo" in self.licences and "personal" not in self.licences:
+            # a column's licence is the strictest of what it reads (``yahoo`` over ``personal``),
+            # and the gate asks for that exact licence: a holder of ``yahoo`` alone would be
+            # served an expression over an IBKR (``personal``) and an analyst feature (ADR 0080)
+            raise ConfigurationError(f"user '{self.user_id}' licences: yahoo needs personal")
         if self.subject is not None:
             object.__setattr__(self, "subject", _subject(self.subject, f"user '{self.user_id}'"))
         if self.email is None and self.subject is None:

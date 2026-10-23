@@ -168,3 +168,11 @@ def test_the_committed_registry_gives_the_personal_licence_to_the_owner_only() -
     users = UsersSettings.from_document(doc)
     assert [u.user_id for u in users.users if "personal" in u.licences] == ["local"]
     assert [u.user_id for u in users.users if "yahoo" in u.licences] == ["local"]  # ADR 0080
+
+
+def test_yahoo_requires_personal() -> None:
+    """ADR 0080: ``yahoo`` is the strictest licence and gates by exact match, so holding it
+    without ``personal`` would serve IBKR values inside an expression over both."""
+    with pytest.raises(ConfigurationError, match="yahoo needs personal"):
+        UserRecord("a", Role.TRADER, licences=("yahoo",))
+    assert UserRecord("a", Role.TRADER, licences=("personal", "yahoo")).licences

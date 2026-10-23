@@ -61,7 +61,7 @@ The reader chooses the vendor per (name, kind), FMP first: FMP's row set wins wh
 or STALE; the other vendor's rows and its coverage markers for that (name, kind) are dropped, so a
 flip from Yahoo to FMP leaves no mixed history. The groups move to `analyst_estimates@v2`,
 `analyst_targets@v2` and `analyst_revisions@v2` with a `*_source` string column (`fmp` / `yahoo`);
-revisions are null until 90 days of the new vendor's rows exist after a flip. Yahoo's and FMP's EPS
+revisions are null until 90 days of the new vendor's rows exist after a flip (sooner if it had already been fetching the name). Yahoo's and FMP's EPS
 bases differ (which EPS an analyst reports), so the two are never differenced. Ratings stay
 Finnhub-only. `parse_targets` gates on `financialCurrency` (the reporting currency), so an ADR such as
 TSM loses valid USD targets; PR B should gate on the listing currency instead. The `yahoo` licence is owner-only: the groups carry it and a viewer without it reads
@@ -82,7 +82,8 @@ TSM loses valid USD targets; PR B should gate on the listing currency instead. T
   only the chosen vendor's rows of the kind and its coverage markers (relabelled `fmp`, so the rest
   of the group reads as before); `history_of_chosen` does the same for the revisions' history from
   the estimates' `estimates_source`, so after a flip the new vendor's revisions are BUILDING /
-  NO_PRIOR until its own snapshots span the windows (90 days). A fitness test checks every group
+  NO_PRIOR until its own snapshots span the windows (90 days, sooner if it had already been
+  fetching the name). A fitness test checks every group
   reads through them.
 - **Versions.** `analyst_estimates@v2`, `analyst_targets@v2`, `analyst_revisions@v2` (v1 in
   `SUPERSEDED`), each with `estimates_source` / `targets_source` / `revisions_source` (fmp / yahoo;
@@ -108,3 +109,6 @@ TSM loses valid USD targets; PR B should gate on the listing currency instead. T
 - **Not done here.** The Financials panel moved to the v2 fields; it does not display the source.
   Showing "from Yahoo" beside a value is a later UI change (a Guide entry exists for each
   `*_source` field).
+- **Holding `yahoo` requires holding `personal`** (`UserRecord` refuses otherwise). The ranking makes
+  an expression over an IBKR (`personal`) and an analyst (`yahoo`) feature `yahoo`, and the gate
+  asks for that exact licence, so a `yahoo`-only holder would otherwise read IBKR values.

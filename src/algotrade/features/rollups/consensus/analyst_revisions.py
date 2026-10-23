@@ -9,7 +9,8 @@ reads it: its ``estimates_status`` STALE, NOT_COVERED or NOT_FETCHED passes thro
 covered", STALE as old data), and ``revisions_source`` is its ``estimates_source``. The history a
 revision compares with is ONLY that vendor's snapshots of the name (``history_of_chosen``): after
 a name flips vendor (FMP's estimates lapse, or return) its revisions are BUILDING / NO_PRIOR
-until the new vendor's own snapshots span the windows (90 days), never a difference across
+until the new vendor's own snapshots span the windows (90 days; sooner only if it had already
+been fetching the name), never a difference across
 vendors (their EPS bases differ; ADR 0080). A column cannot carry the licence of the vendor it
 holds for a name, so every feature carries the stricter: ``licence = "yahoo"`` (ADR 0068, 0069,
 0080). v2 (v1: FMP only) adds ``revisions_source``; every v1 column is unchanged.
