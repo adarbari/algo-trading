@@ -11,8 +11,8 @@
 #     12 GB, or 1-minute load over 4 -> exit 3 "busy, retry" (a start refused by a guard is not
 #     a finished run, so launchd's retries continue);
 #   - removes the old clone (only a path ending in /perf-clone/data that is not the real store),
-#     `cp -cR` of tables/ runs/ serving/ only (APFS clonefile at low I/O priority; PERF_COPY_CMD
-#     overrides, for tests; raw/ and staging/ are not copied; the copy is killed at 10 min), and re-checks that no ingest started during the copy (if one
+#     `cp -cR` of tables/ runs/ serving/ only (APFS clonefile at nice -n 10, CPU only: `taskpolicy -b` throttles I/O and was 4x slower; PERF_COPY_CMD
+#     overrides, for tests; raw/ and staging/ are not copied; the copy is killed at 900 s; a writer appearing during it, polled every PERF_POLL_S = 10 s, stops it), and re-checks that no ingest started during the copy (if one
 #     did: the clone is discarded, exit 3);
 #   - runs scripts/perf/fast_bench.py --data-url file://<clone> --record with the default guards
 #     (never lowered), appends a line to var/logs/perf_gate.status, deletes the clone, and
@@ -22,7 +22,7 @@
 #     pass), run-meta.json, load.csv (load and free disk every 10 s), procs-start.txt /
 #     procs-end.txt (top 10 by CPU), snapshot.json, profiles.md (page_profile.py on the 3 slowest
 #     ops over the bar, 60 s at most); one line per run in var/logs/perf_gate/summary.csv. The bench stops
-#     itself within 5 minutes (--budget-s 270); with the snapshot the night's run is ~10 minutes.
+#     itself within 5 minutes (--budget-s 270); with the snapshot (about 3-4 minutes) the night's run is 5-10 minutes wall.
 #     A noisy or low-confidence bench run is not recorded (it is still a finished day).
 #
 # The benchmark phase is hard-capped at 300 s (PERF_BENCH_LIMIT_S): a watchdog kills the whole
@@ -39,7 +39,7 @@
 # history is var/logs/perf_gate/history.jsonl; the repo's benchmarks/critical_path_history.jsonl
 # is only ever changed by a PR (docs/perf/page-latency-bar.md). Env (tests): PERF_CLONE_ROOT, PERF_SRC, PERF_STATUS, PERF_NOW_DATE, PERF_NOW_HM,
 # PERF_PS_FILE, PERF_FREE_GB, PERF_LOAD, PERF_BENCH_CMD, PERF_NOTIFY, PERF_BENCH_LIMIT_S,
-# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE, PERF_SNAPSHOT_LIMIT_S, PERF_LOWPRI.
+# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE, PERF_SNAPSHOT_LIMIT_S, PERF_LOWPRI, PERF_POLL_S.
 set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -316,12 +316,12 @@ SRC=$src CLONE=$clone ENTRIES=$copy_entries PROG=$progress_file COPY="$PERF_LOWP
 wd_pid=$!
 # how far the copy got, written when it is killed (the files and kB counts are capped at 5 s each)
 capped() { ( watchdog 5 sh -c "$1" _ "$clone" 2>/dev/null ); }
-write_progress() {  # $1 = why the copy stopped
+write_progress() {  # $1 = why the copy stopped; snapshot_s is taken BEFORE the counts (they add up to 10 s)
   local n kb entry
   n=$(capped 'find "$1" -type f | wc -l' | tr -d ' '); kb=$(capped 'du -sk "$1" | cut -f1' | tr -d ' ')
   entry=$(cat "$progress_file" 2>/dev/null)
   printf '{"copy_stopped": "%s", "copy_s": %s, "limit_s": %s, "entry": "%s", "files_so_far": "%s", "kb_so_far": "%s", "free_gb_before": %s, "free_gb_after": %s}\n' \
-    "$1" "$(( $(date +%s) - t_ready ))" "$snapshot_limit" "${entry:-none}" "${n:-unknown}" "${kb:-unknown}" "${free_before:-null}" "$(free_now)" >"$rundir/snapshot.json"
+    "$1" "$snapshot_s" "$snapshot_limit" "${entry:-none}" "${n:-unknown}" "${kb:-unknown}" "${free_before:-null}" "$(free_now)" >"$rundir/snapshot.json"
 }
 # a writer that appears while the copy runs makes the snapshot torn: stop the copy, discard, retry later
 poll=${PERF_POLL_S:-10}; tick=0; writer_mid=
@@ -340,9 +340,10 @@ if [ -n "$writer_mid" ]; then
   discard_clone; busy "a writer started during the copy (copy stopped): $writer_mid"
 fi
 if [ "$copy_code" -eq 124 ]; then
+  t_now=$(date +%s); snapshot_s=$((t_now - t_ready)); wait_s=$((t_ready - t_start))
   write_progress over-time
   discard_clone
-  t_now=$(date +%s); snapshot_s=$((t_now - t_ready)); wait_s=$((t_ready - t_start)); total_s=$((t_now - t_start))
+  total_s=$(( $(date +%s) - t_start ))
   sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
   say "snapshot over-time: the copy was killed at ${snapshot_limit}s"
   echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=snapshot-over-time over_time=yes wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
@@ -417,7 +418,7 @@ reason=""; [ "$overtime" = yes ] && reason=over-time
 finish_evidence "$reason"
 
 if [ "$code" -ne 0 ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
-  msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
+  msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); snapshot ${snapshot_s}s, bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
     msg="1 s page gate INTEGRITY FAILURE (not a timing result): $why evidence in var/logs/perf_gate/$today/"

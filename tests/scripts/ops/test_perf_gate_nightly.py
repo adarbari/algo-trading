@@ -696,3 +696,22 @@ def test_a_glob_in_a_childs_args_is_not_expanded_into_a_sleep(rig: Rig) -> None:
 def test_python_dash_m_ingestion_is_a_real_writer(rig: Rig) -> None:
     rig.ps.write_text(QUIET_PS + "  9 /x/python -m algotrade_ingestion run rollups\n")
     assert rig.run(**_stubs(rig, {9: ""}, {})).returncode == 3
+
+
+def test_copy_seconds_are_taken_before_the_progress_counts(rig: Rig) -> None:
+    """A probe killed at 2 s reported 13: the capped counts (up to 10 s) were added."""
+    d = rig.tmp / "slowdu"
+    d.mkdir()
+    (d / "du").write_text("#!/bin/sh\nsleep 4\necho 0\n")
+    (d / "du").chmod(0o755)
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    slow = _script(rig, "slowcp4.sh", "sleep 30\n")
+    rig.run(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S="2", PATH=f"{d}:{os.environ['PATH']}")
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert 2 <= snap["copy_s"] <= 3
+    assert "snapshot_s=2 " in rig.status.read_text() or "snapshot_s=3 " in rig.status.read_text()
+
+
+def test_a_slow_total_notification_names_the_snapshot_time(rig: Rig) -> None:
+    rig.run(PERF_TOTAL_LIMIT_S="0")
+    assert "snapshot " in (rig.tmp / "notified").read_text()
