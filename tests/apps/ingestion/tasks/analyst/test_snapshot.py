@@ -164,7 +164,11 @@ def test_a_night_stores_every_kind_and_asks_a_refused_name_once() -> None:
     assert "2030-09-27" in set(estimate["period"]) and estimate["eps_avg"].notna().all()
     assert record.items["fmp:CHWY:price_target"].startswith("NOT_COVERED")
     assert record.stats["fmp"]["not_covered"] == 1 and record.stats["fmp"]["fetched"] == 2
-    assert record.stats["licence"] == {"fmp": "personal", "finnhub": "personal"}
+    assert record.stats["licence"] == {
+        "fmp": "personal",
+        "finnhub": "personal",
+        "yahoo": "yahoo",
+    }
 
 
 def test_ts_is_the_fetch_instant_and_knowledge_is_not_before_it() -> None:

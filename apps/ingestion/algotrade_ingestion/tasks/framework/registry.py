@@ -196,15 +196,19 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "analyst-snapshot",
-            "tonight's FMP and Finnhub analyst data of a rotating slice of names, appended to our "
-            "own point-in-time history (analyst/estimate_snapshots); within [fmp] daily_budget",
+            "tonight's FMP and Finnhub analyst data of a rotating slice of names, and Yahoo's for "
+            "the names FMP refuses, appended to our own point-in-time history "
+            "(analyst/estimate_snapshots); within [fmp] daily_budget and [yahoo] per_night",
             analyst_snapshot,
             ("analyst/estimate_snapshots",),
             analyst_snapshot.run,
             optional_sources=analyst_snapshot.SOURCES,
             skip=source_guards.no_analyst_source,
-            settings="sources.toml [fmp] [finnhub]; events/scope.toml",
-            params=(SESSION, Param("limit", ("--limit",), int, "ask at most N names of FMP")),
+            settings="sources.toml [fmp] [finnhub] [yahoo]; events/scope.toml",
+            params=(
+                SESSION,
+                Param("limit", ("--limit",), int, "ask at most N names of FMP and of Yahoo"),
+            ),
         ),
         Task(
             "index-membership",
