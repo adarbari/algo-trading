@@ -15,6 +15,7 @@ dependencies = [
     "algotrade",
     "openpyxl>=3.1",
     "ib_async>=2.0",
+    "yfinance>=1.7",  # Yahoo analyst data (ADR 0080), imported lazily by vendors/yahoo/client.py
 ]
 
 [tool.uv.sources]

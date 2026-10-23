@@ -14,6 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.edge_schemas import EDGE_VERDICT
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import (
@@ -24,6 +25,7 @@ from algotrade_ingestion.tasks.derived import (
     residual_returns,
     rollups,
 )
+from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
 from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
 from algotrade_ingestion.tasks.framework import (
     entries_market,
@@ -194,15 +196,19 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "analyst-snapshot",
-            "tonight's FMP and Finnhub analyst data of a rotating slice of names, appended to our "
-            "own point-in-time history (analyst/estimate_snapshots); within [fmp] daily_budget",
+            "tonight's FMP and Finnhub analyst data of a rotating slice of names, and Yahoo's for "
+            "the names FMP refuses, appended to our own point-in-time history "
+            "(analyst/estimate_snapshots); within [fmp] daily_budget and [yahoo] per_night",
             analyst_snapshot,
             ("analyst/estimate_snapshots",),
             analyst_snapshot.run,
             optional_sources=analyst_snapshot.SOURCES,
             skip=source_guards.no_analyst_source,
-            settings="sources.toml [fmp] [finnhub]; events/scope.toml",
-            params=(SESSION, Param("limit", ("--limit",), int, "ask at most N names of FMP")),
+            settings="sources.toml [fmp] [finnhub] [yahoo]; events/scope.toml",
+            params=(
+                SESSION,
+                Param("limit", ("--limit",), int, "ask at most N names of FMP and of Yahoo"),
+            ),
         ),
         Task(
             "index-membership",
@@ -809,6 +815,33 @@ TASKS: dict[str, Task] = {
                     ("--verify",),
                     None,
                     "with --dry-run: also verify the plan (slow), as a live run does",
+                ),
+            ),
+        ),
+        Task(
+            "edge-verdicts",
+            "store the headline of every site edge's canonical run in results/edge_verdict, the "
+            "backfill of runs stored before it and the re-judge after the judge, verdict.toml or "
+            "an edge document changed (idempotent, resumable: a run with a row under the current "
+            "fingerprint is skipped; --limit caps the rows written)",
+            edge_verdicts,
+            (EDGE_VERDICT.name,),
+            entries_ops.run_edge_verdicts,
+            skip=source_guards.no_config_store,
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "only runs ending this session"),
+                Param("edge", ("--edge",), str, "judge this one site edge only"),
+                FROM,
+                TO,
+                Param("limit", ("--limit",), int, "write at most N rows this run"),
+                Param(
+                    "dry_run", ("--dry-run",), None, "count what would be written; write nothing"
+                ),
+                Param(
+                    "verify",
+                    ("--verify",),
+                    None,
+                    "read-only check: judge current rows too, list differences, write nothing",
                 ),
             ),
         ),

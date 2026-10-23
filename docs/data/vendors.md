@@ -8,7 +8,7 @@ swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `ishares`, `proshares`, `massive`, `sec`, `treasury`, `fred`, `tiingo`, `fmp`, `finnhub`, `published`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
+`nasdaq`, `ishares`, `proshares`, `massive`, `sec`, `treasury`, `fred`, `tiingo`, `fmp`, `finnhub`, `yahoo`, `published`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
 spaces requests across every worker thread **and every process** on the machine (a lock file
 per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and the nightly
 run never exceed a vendor's limit together. The pace is **adaptive** between the section's
@@ -47,7 +47,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
-| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v1`, `analyst_targets@v1`, `analyst_ratings@v1`, `analyst_revisions@v1` are built (docs/data/layers.md) |
+| Analyst estimates, price targets, ratings (free tier) | **Yahoo** (unofficial, owner-only licence, ADR 0080: stored for the names FMP refuses, not yet read), **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v1`, `analyst_targets@v1`, `analyst_ratings@v1`, `analyst_revisions@v1` are built (docs/data/layers.md) |
 | Short interest (twice a month) and daily short-sale volume | **FINRA Query API** (`api.finra.org`, anonymous; `consolidatedShortInterest` by `settlementDate`, `regShoDaily` by `tradeReportDate`); `no_ml` tables | `cdn.finra.org` daily files (website terms: no ML, no database), Nasdaq short-interest pages (scraping), FMP (paid) | Implemented (EB D9): `short-interest`, `short-volume` |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
@@ -293,7 +293,7 @@ listing; overall: the share of delisted names with bars to their end date, the g
 a recycled ticker leaks another company's rows). It writes no table: the raw payloads are in
 `raw/source=tiingo`. At most 200 unique symbols of the free tier's 500 a month.
 
-## Analyst data: FMP and Finnhub (adapters, probe, nightly snapshot and feature groups implemented, ADR 0068)
+## Analyst data: FMP, Finnhub and Yahoo (adapters, probe, nightly snapshot and feature groups implemented, ADR 0068; Yahoo stored only, ADR 0080)
 
 Both are free-tier, personal-licence vendors (`[fmp]`, `[finnhub]` in `config/site/sources.toml`,
 `licence = "personal"`), keyed in `.env`; what is stored is under "What is stored and when" below. Endpoints and
@@ -334,6 +334,23 @@ Host `https://finnhub.io/api/v1`; key `ALGOTRADE_FINNHUB_API_KEY` in an `X-Finnh
 | `stock/recommendation` for CHWY | ALLOWED | the same shape (coverage is not symbol-gated like FMP's) |
 | `stock/price-target?symbol=` | DENIED: 403 `You don't have access to this resource` | premium |
 
+### Yahoo Finance (unofficial; owner-only licence `yahoo`, ADR 0080)
+
+No key, no published API terms, and Yahoo's terms forbid scraping, so everything from it is
+personal use of the owner only (licence tag `yahoo`: never served to another viewer, never
+redistributed). Read through the `yfinance` package's cookie and crumb session
+(`vendors/yahoo/client.py`, imported lazily; caches under `[yahoo] cache_dir`, `var/cache/yahoo`),
+ONE request a name: `quoteSummary/<SYM>?modules=financialData,earningsTrend,recommendationTrend`
+gives the target mean / median / high / low, the `0y` and `+1y` consensus EPS and revenue with their
+`endDate` and currency, and the current recommendation counts. Spike 2026-10-22: 30 requests
+(10 at 0.5 s, 20 unpaced) all 200; an unknown symbol 404 after three requests (the crumb dance, which
+bypasses the limiter, so `[yahoo] min_interval_s = 1.0`); an ETF 404 `No fundamentals data`. Community
+reports say Yahoo answers 429 per IP under heavy use, so the step is capped (`[yahoo] per_night = 60`),
+fail-soft and stops after three failures in a row. Not USD: no estimate rows, and no targets when
+`financialCurrency` is not USD, until the forward formulas handle currency. It asks only the names
+FMP's plan refuses (the "Financial Modeling Prep" section above: 402 is held 90 days); nothing reads
+its rows yet.
+
 ### What is stored and when
 
 `analyst/vendor_access` (the by-hand probe) and `analyst/estimate_snapshots` (the nightly optional
@@ -347,8 +364,11 @@ failed from the store alone. With neither key set the nightly step is skipped wi
 screens and stops calling after `[fmp] run_budget_s` (1500 s; the names left are `OVER_BUDGET` and the
 next night continues). A name's cadence is dated by the run's session, from any of its FMP calls. Names: S&P 500 members plus the event-study
 scope list. Rows are appended per session (`ts` = fetch instant, `knowledge_ts` = publish instant),
-licence `personal`. History starts at the first fetch: neither vendor serves a point-in-time history, so
-none is backdated (ADR 0068).
+licence `personal` (Yahoo's `yahoo`). History starts at the first fetch: no vendor serves a point-in-time
+history, so none is backdated (ADR 0068). The same step then asks Yahoo (one call a name, `source = "yahoo"`,
+`[yahoo] per_night` names a night, due every `[yahoo] refresh_days`, largest cap first, own `[yahoo] run_budget_s`)
+for the names FMP refuses; a 404 is `NOT_COVERED` and waits four refresh windows; its calls are not counted
+in FMP's budget (ADR 0080).
 
 ## FINRA short interest and daily short-sale volume (implemented, EB D9)
 
