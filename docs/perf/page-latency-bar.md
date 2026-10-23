@@ -58,15 +58,36 @@ merge times. Fitness tests: `tests/scripts/perf/test_fast_bench.py`.
 
 ## The nightly run (a description; the owner installs it)
 
-A launchd agent, `com.algotrade.perf-bar`, started after the nightly workflow completes (so the
-clone is refreshed from the real store first, `cp -c` on the same volume), runs
+`scripts/ops/perf_gate_nightly.sh` runs the gate once a night at **03:00 America/Los_Angeles**,
+and as soon as possible after 03:00 when the machine was not available then (an ingest holds the
+lock, free disk under 12 GB, 1-minute load over 4, or the Mac was asleep).
 
-    make api-latency-fast ARGS="--data-url file://<clone>/data --record --out <var/logs dir>"
+**Why a clone.** The gate empties every cache before each of about 300 timings: pointed at the
+live data or the live API it would load the live site, and the store changes under it (an ingest
+mid-copy gives a torn snapshot). It runs on a copy-on-write clone (`cp -cR var/data
+/Users/adarbari/perf-clone/data`) of a store no writer touches; the tool itself refuses the real
+store, by design. **Cost:** the clone shares every block with the store, so near-zero disk (a
+clone only grows by what the bench rewrites, and is deleted afterwards); about 5 minutes for the
+copy of 64 GB, 3-15 minutes for the run. The wrapper removes only a path ending in
+`/perf-clone/data` that is not the real store.
 
-on the clone in the main checkout's `.venv` with the same guards (load, disk, swap: a refused or
-noisy night records nothing and is not a pass), and writes the exit code and the table to
-`var/logs/`. The history line is committed by the next harness PR, never by the agent. Nothing in
-this repo installs or loads it; `scripts/` writes no plist for it until the owner asks.
+**Idempotent per local date.** Before 03:00, or when `var/logs/perf_gate.status` already holds a
+finished run for today (clean or over the bar), it exits 0 at once. A guard (a writer in `ps`,
+disk, load, a writer that started during the copy: the clone is discarded) exits 3 "busy, retry";
+a start refused by a guard is not a finished run, so retries continue. Exit codes: 0 done (clean)
+or nothing to do; 1 finished with a view over the bar without a named exception (the owner is
+notified, as `deploy.sh` does, by a desktop notification), or an operation failed; 2 refused (a
+path guard, or the bench refused); 3 busy, retry. Each run appends `date= sha= views_over=
+seconds_above= exit= finished=` to `var/logs/perf_gate.status`, keeps the output in
+`var/logs/perf_gate.last.log`, and records the history line (`--record`: a noisy run is not
+recorded). The history is committed by the next harness PR, never by the agent.
+
+**The launchd entry** (not written or loaded by anything in this repo; the owner installs it like
+the nightly's, `docs/hosting.md`): label `com.algotrade.perf-gate`, `ProgramArguments`
+`/Users/adarbari/workspace/algo-trading/scripts/ops/perf_gate_nightly.sh`, `StartCalendarInterval`
+`Hour=3 Minute=0` plus `StartInterval` 900 (launchd also fires after wake or login), and
+`StandardOutPath` / `StandardErrorPath` under `var/logs/`. Retries every 15 minutes cost nothing
+once the day is done: the script exits at the first check.
 
 ## An exception
 

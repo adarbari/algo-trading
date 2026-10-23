@@ -196,7 +196,7 @@ purpose = "tests for the delivery-pipeline scripts in scripts/ (changed_tests, c
 
 [[test_dir]]
 path = "tests/scripts/ops"
-purpose = "tests for the operator scripts in scripts/ops/ (deploy, check_lock, guard_main_checkout, guard_waive, merge_durations, xdist_workers)"
+purpose = "tests for the operator scripts in scripts/ops/ (deploy, check_lock, guard_main_checkout, guard_waive, merge_durations, perf_gate_nightly, xdist_workers)"
 
 [[test_dir]]
 path = "tests/scripts/perf"
