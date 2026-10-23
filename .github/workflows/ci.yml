@@ -125,12 +125,14 @@ jobs:
         cell:
           - unit-a-1of1
           - unit-b-1of1
-          - unit-c-1of6
-          - unit-c-2of6
-          - unit-c-3of6
-          - unit-c-4of6
-          - unit-c-5of6
-          - unit-c-6of6
+          - unit-c-1of8
+          - unit-c-2of8
+          - unit-c-3of8
+          - unit-c-4of8
+          - unit-c-5of8
+          - unit-c-6of8
+          - unit-c-7of8
+          - unit-c-8of8
           - apps-1of5
           - apps-2of5
           - apps-3of5
