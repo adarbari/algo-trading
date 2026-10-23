@@ -17,6 +17,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_ingestion.tasks.derived import outcomes
 from algotrade_ingestion.tasks.derived.outcomes import compute_outcomes
 from algotrade_ingestion.tasks.derived.rollups import compute_rollups
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
@@ -35,7 +36,11 @@ def edge_store(golden_source: FixtureSource) -> MemoryBackend:
     ctx = task_ctx(StoreWriter(backend))
     load_golden(ctx, golden_source)
     compute_rollups(ctx, TO, FROM, TO, ONLY)
-    compute_outcomes(ctx, TO, FROM, TO)
+    # only the horizon and benchmark of the edge under test: the site's other edges' outcome
+    # windows would be computed for nothing (most of the build time)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(outcomes, "horizons_and_benchmarks", lambda configs=None: ([20], ["SPY"]))
+        compute_outcomes(ctx, TO, FROM, TO)
     return backend
 
 
