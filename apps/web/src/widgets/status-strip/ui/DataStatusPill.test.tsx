@@ -7,10 +7,11 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { DataStatusPill, pillText } from './DataStatusPill';
 
-const hooks = vi.hoisted(() => ({ useDataStatus: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useDataStatus: vi.fn(), useDataStatusDetail: vi.fn() }));
 vi.mock('@/entities/system-status', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDataStatus: hooks.useDataStatus,
+  useDataStatusDetail: hooks.useDataStatusDetail,
 }));
 vi.mock('@/features/guide-help', () => ({
   GuideHelp: ({ entry }: { entry: { id: string } }) => `help ${entry.id}`,
@@ -58,7 +59,13 @@ const TRADER: DataStatusView = {
   })),
 };
 
-beforeEach(() => hooks.useDataStatus.mockReset());
+const detail = (data: DataStatusView | null) =>
+  hooks.useDataStatusDetail.mockReturnValue({ isPending: false, data });
+
+beforeEach(() => {
+  hooks.useDataStatus.mockReset();
+  hooks.useDataStatusDetail.mockReset();
+});
 
 describe('DataStatusPill', () => {
   it.each(STATES)('says %s in the server-given words and dates', (state, text, newerDate) => {
@@ -76,6 +83,7 @@ describe('DataStatusPill', () => {
 
   it('opens the detail for a trader: session, datasets with the server share, counts, no cause', async () => {
     hooks.useDataStatus.mockReturnValue(TRADER);
+    detail(TRADER);
     render(<DataStatusPill admin={false} />);
     await userEvent.click(screen.getByRole('button', { name: 'Data: 22 Oct, complete' }));
     expect(
@@ -97,9 +105,11 @@ describe('DataStatusPill', () => {
 
   it('adds the cause and the ingestion link for an admin', async () => {
     hooks.useDataStatus.mockReturnValue(BASE);
+    detail(BASE);
     render(<DataStatusPill admin />);
     expect(hooks.useDataStatus).toHaveBeenCalledWith(true);
     await userEvent.click(screen.getByRole('button', { name: 'Data: 22 Oct, complete' }));
+    expect(hooks.useDataStatusDetail).toHaveBeenCalledWith(true);
     expect(await screen.findByText('sec-facts')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ingestion' })).toHaveAttribute(
       'href',

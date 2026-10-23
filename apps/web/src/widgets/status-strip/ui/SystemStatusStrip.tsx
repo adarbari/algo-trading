@@ -12,7 +12,9 @@ import { StatusStrip, TextLink, type StatusIssue } from '@algotrade/ui';
 import { useSystemIssues, type SystemIssue } from '@/entities/system-status';
 import { useSnooze } from '@/features/issue-snooze';
 
-const StatusExtras = lazy(() => import('./StatusExtras'));
+import { DataStatusPill } from './DataStatusPill';
+
+const SessionNoticeBanner = lazy(() => import('./SessionNoticeBanner'));
 
 export interface SystemStatusStripProps {
   /** The viewer may read the nightly run (an admin). */
@@ -36,9 +38,12 @@ export function SystemStatusStrip({ admin }: SystemStatusStripProps) {
   const { issues, notice } = useSystemIssues(admin);
   return (
     <>
-      <Suspense fallback={null}>
-        <StatusExtras notice={notice} admin={admin} />
-      </Suspense>
+      {notice !== null && (
+        <Suspense fallback={null}>
+          <SessionNoticeBanner notice={notice} />
+        </Suspense>
+      )}
+      <DataStatusPill admin={admin} />
       <StatusStrip issues={visible(issues).map(toIssue)} onSnooze={snooze} />
     </>
   );

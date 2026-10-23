@@ -22,6 +22,7 @@ export interface DatasetView {
   gaps: ReadonlyArray<Pick<ServedUnavailable, 'cause'>>;
 }
 
+/** The detail the popover shows (its own read, on the first click). */
 export interface DataStatusView {
   /** The session the pages show. */
   date: string;
@@ -35,26 +36,6 @@ export interface DataStatusView {
   totalScreeners: number;
 }
 
-export const DATASET_LABEL: Record<DatasetName, string> = {
-  PRICES: 'Prices',
-  OPTIONS_CHAINS: 'Options chains',
-  FUNDAMENTALS: 'Fundamentals',
-};
-
-export const DATASET_STATE_LABEL: Record<DatasetState, string> = {
-  COMPLETE: 'Complete',
-  PARTIAL: 'Partial',
-  MISSING: 'Missing',
-  UNKNOWN: 'Unknown',
-};
-
-export const DATASET_STATE_TONE: Record<DatasetState, StatusTone> = {
-  COMPLETE: 'positive',
-  PARTIAL: 'warning',
-  MISSING: 'negative',
-  UNKNOWN: 'neutral',
-};
-
 export const DATA_STATE_TONE: Record<DataState, StatusTone> = {
   COMPLETE: 'positive',
   PARTIAL: 'warning',
@@ -62,7 +43,22 @@ export const DATA_STATE_TONE: Record<DataState, StatusTone> = {
   NEXT_FAILED_SHOWING_PREVIOUS: 'negative',
 };
 
-/** What the response carries of a session (a structural slice of the generated type). */
+/** What the pill shows: the session, the newer one and the state, from the strip's read. */
+export type PillView = Pick<DataStatusView, 'date' | 'newerDate' | 'state'>;
+
+export function pillOf(session: {
+  date: string;
+  newer?: { date: string } | null;
+  dataStatus: { state: DataState };
+}): PillView {
+  return {
+    date: session.date,
+    newerDate: session.newer?.date ?? null,
+    state: session.dataStatus.state,
+  };
+}
+
+/** What the detail read carries of a session (a structural slice of the generated type). */
 interface SessionData {
   date: string;
   newer?: { date: string } | null;

@@ -467,19 +467,27 @@ test('Screener results: the edge line and the evidence fit a phone and the pick 
   await expectAccessible(page);
 });
 
-/** The pill's read with a session and its data status (the pill's states). */
+/** The strip's read with the pill's state, and the popover's detail read (the pill's states). */
 async function mockDataStatus(page: Page, state: string, newer: string | null) {
   await page.route('**/api/graphql', async (route) => {
-    const body = route.request().postDataJSON() as { query?: string } | null;
-    if (!/query\s+DataStatus\b/.test(body?.query ?? '')) {
+    const query = (route.request().postDataJSON() as { query?: string } | null)?.query ?? '';
+    const session = {
+      date: '2026-10-22',
+      newer: newer === null ? null : { date: newer, state: 'IN_PROGRESS' },
+    };
+    if (/query\s+StatusStrip\b/.test(query)) {
+      await route.fulfill({
+        json: { data: { session: { ...session, dataStatus: { state } }, screeners: [] } },
+      });
+      return;
+    }
+    if (!/query\s+DataStatus\b/.test(query)) {
       await route.fallback();
       return;
     }
     const dataset = (name: string, status: string, share: number) => ({
       name,
       status,
-      present: share * 100,
-      expected: 100,
       share,
       unavailable: [],
     });
@@ -487,8 +495,7 @@ async function mockDataStatus(page: Page, state: string, newer: string | null) {
       json: {
         data: {
           session: {
-            date: '2026-10-22',
-            newer: newer === null ? null : { date: newer, state: 'IN_PROGRESS' },
+            ...session,
             dataStatus: {
               state,
               knowledgeTs: '2026-10-22T21:05:00+00:00',

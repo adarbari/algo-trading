@@ -34,10 +34,7 @@ CLASS_NAMES = {LOAD: "on-load", MAYBE: "uncertain", HANDLER: "interaction"}
 SHELL_ROOTS = (
     ("app/layouts/WorkspaceLayout.tsx", "WorkspaceLayout"),
     ("app/layouts/GuideLayout.tsx", "GuideLayout"),
-    (
-        "widgets/status-strip/ui/DataStatusPill.tsx",
-        "DataStatusPill",
-    ),  # lazy in the strip: the pill's own read
+    ("widgets/status-strip/ui/DataStatusPanel.tsx", "DataStatusPanel"),  # the pill's lazy detail
     ("app/workspaces/guard.ts", "workspaceGuard"),
     ("app/workspaces/guard.ts", "viewerGuard"),
     ("entities/page-cache/api/query-persistence.ts", "defaultDeps"),  # the session stamp

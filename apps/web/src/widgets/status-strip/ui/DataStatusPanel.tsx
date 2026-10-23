@@ -4,19 +4,19 @@
  * Guide. An admin also reads the cause chain the server sent for a dataset and gets a link to
  * the ingestion page; a trader's response carries none. Lazy: loaded when the pill opens.
  */
-import { formatValue, Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
+import { formatValue, Skeleton, Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
 
 import { GapCauses } from '@/entities/availability';
 import {
   DATASET_LABEL,
   DATASET_STATE_LABEL,
   DATASET_STATE_TONE,
+  useDataStatusDetail,
   type DataStatusView,
 } from '@/entities/system-status';
 import { GuideHelp, guidePath } from '@/features/guide-help';
 
 export interface DataStatusPanelProps {
-  data: DataStatusView;
   admin: boolean;
 }
 
@@ -25,7 +25,16 @@ const date = (iso: string) => formatValue(iso, { kind: 'date', style: 'short' })
 const instant = (iso: string) => `${iso.slice(0, 16).replace('T', ' ')} UTC`;
 const percent = (share: number) => formatValue(share, { kind: 'percent', digits: 0 }).text;
 
-export function DataStatusPanel({ data, admin }: DataStatusPanelProps) {
+export function DataStatusPanel({ admin }: DataStatusPanelProps) {
+  const query = useDataStatusDetail(admin);
+  if (query.isPending) return <Skeleton lines={3} label="Loading the data status" />;
+  if (query.data === null || query.data === undefined) {
+    return <Text tone="muted">The data status could not be read.</Text>;
+  }
+  return <DataStatusDetail data={query.data} admin={admin} />;
+}
+
+function DataStatusDetail({ data, admin }: { data: DataStatusView; admin: boolean }) {
   const known = data.knowledgeTs === null ? 'not complete yet' : instant(data.knowledgeTs);
   return (
     <Stack gap={2}>

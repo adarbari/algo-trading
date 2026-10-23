@@ -679,7 +679,7 @@ export type StatusStripQueryVariables = Exact<{
 }>;
 
 
-export type StatusStripQuery = { session: { date: string, newer: { date: string, state: NewerState } | null } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, problems: Array<string>, steps: Array<{ name: string, status: string }> }>, completeness?: { sessions: Array<string>, lastClosed: string } | null };
+export type StatusStripQuery = { session: { date: string, newer: { date: string, state: NewerState } | null, dataStatus: { state: DataState } } | null, screeners: Array<{ id: string, name: string, notRun: { code: UnknownCode, kindText: string } | null }>, nightlyRuns?: Array<{ runId: string, session: string, status: string, problems: Array<string>, steps: Array<{ name: string, status: string }> }>, completeness?: { sessions: Array<string>, lastClosed: string } | null };
 
 export type DataStatusQueryVariables = Exact<{
   admin: boolean;
@@ -4271,6 +4271,9 @@ export const StatusStripDocument = new TypedDocumentString(`
     date
     newer {
       date
+      state
+    }
+    dataStatus {
       state
     }
   }

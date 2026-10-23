@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dataStatusOf, type DatasetView } from './data-status';
+import { dataStatusOf, pillOf, type DatasetView } from './data-status';
 
 const BASE = {
   date: '2026-10-22',
@@ -39,5 +39,18 @@ describe('dataStatusOf', () => {
 
   it('names the newer session', () => {
     expect(dataStatusOf({ ...BASE, newer: { date: '2026-10-23' } }).newerDate).toBe('2026-10-23');
+  });
+});
+
+describe('pillOf', () => {
+  it('keeps the session, the newer date and the server state only', () => {
+    expect(
+      pillOf({
+        date: '2026-10-22',
+        newer: { date: '2026-10-23' },
+        dataStatus: { state: 'NEXT_PROCESSING' },
+      }),
+    ).toEqual({ date: '2026-10-22', newerDate: '2026-10-23', state: 'NEXT_PROCESSING' });
+    expect(pillOf({ date: '2026-10-22', dataStatus: { state: 'COMPLETE' } }).newerDate).toBeNull();
   });
 });
