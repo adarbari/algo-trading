@@ -266,6 +266,23 @@ internal detail of the backend; nothing outside `storage/backends/` relies on it
   1–1.5M rows a day, roughly 10–20 GB a year as Parquet. Daily bars for about 10k
   instruments are tiny.
 
+## Choosing a store
+
+Two engines plus files, no third without an ADR (decision log 2026-10-22, "Two engines: Parquet for
+domain data, SQLite for operational state, files for configuration"; ADR 0006, amendment of
+2026-10-22, Ideas):
+
+- **Parquet**: analytical data (many rows, few columns, immutable, bulk-written by ingestion,
+  versioned point-in-time).
+- **SQLite**: small, mutable or keyed operational state and derived, rebuildable indexes (lookups of
+  few rows among many, ordering and pagination, transactional updates, a per-viewer prestored
+  list). Parquet stays the truth for a derived index.
+- **Files (TOML)**: human-edited configuration and documents.
+
+Triggers to move something to SQLite: a keyed read still above about 0.3 s after row-group pruning
+and the history copy; run files past about 100,000; a list that needs ordering and paging. The
+first answer is always to measure on a real-shaped store (`docs/perf/page-latency-bar.md`).
+
 ## Adapters: changing storage without touching callers
 
 ```

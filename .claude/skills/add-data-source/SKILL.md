@@ -75,7 +75,12 @@ must pass with `architecture/known_violations.toml` still empty.
     - Resolve ids as_of the row's date. A failed or missing source answer FAILS the item
       (never cached as empty/OK). Comparisons are NA-safe.
     - A source under a restricted licence declares `licence` (e.g. `"personal"`, ADR 0028) on its features and notes it in `tables.toml`.
-11. Before you push: `make changed`, then `tests/architecture` and `tests/unit/config` run
+11. **Acceptance checks** (sharpens ADRs 0039 and 0055: a step SUCCEEDS or FAILS, never PARTIAL):
+    every ingest task declares an acceptance check that FAILS when it skipped everything or
+    processed zero items while work existed; a task with a default window reports how many items
+    fell outside it. (history-copy reported complete with nothing built; screen-runs-backfill and
+    edge-verdicts defaulted to today only and reported complete with 0 sessions.)
+12. Before you push: `make changed`, then `tests/architecture` and `tests/unit/config` run
     fully (`make changed` does), new task modules in a NEW folder by kind when the parent is at
     8+ modules (`make layout`), schemas in the schemas package modules (file-length cap).
-12. Push: CI is the full gate.
+13. Push: CI is the full gate.

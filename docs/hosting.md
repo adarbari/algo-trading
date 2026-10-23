@@ -255,6 +255,18 @@ gives an agent 256 descriptors and every open connection takes one. The agent's 
 past `MAX_CONNECTIONS` (`ops/schedule.py`) connections are answered 503. Slow answers with
 few connections open usually mean the Mac is swapping (`sysctl vm.swapusage`).
 
+## Disk floors
+
+Each step that writes a lot refuses to start under a free-disk floor on the data volume. A step
+that skips for a floor says so loudly (its run record and the nightly summary name the floor and
+the free space), never as a quiet success.
+
+| Floor | Guards | Setting |
+|---|---|---|
+| 8 GB | the bench (a benchmark run writes a store copy) | bench settings |
+| 10 GB | the history copy (a rebuilt year exists twice) | `nightly.toml [history_copy]` |
+| 15 GB (6 GB while the owner's temporary lowering stands) | the nightly start (a full disk stops every agent) | `nightly.toml [resources] min_free_gb` |
+
 ## The Mac
 
 The site is up only while the Mac is awake, online and logged in (the API agent is a user

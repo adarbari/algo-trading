@@ -24,6 +24,10 @@ When planning, return:
 3. The risks specific to this repo: lookahead or `knowledge_ts` leaks, missing data passing
    as zero, non-determinism in strategies or screeners, partial writes, layer violations.
 4. Which steps are mechanical (hand to `implementer`) and which you must review after.
+5. Every seconds-saved figure is tagged [M] measured or [I] inferred; an [I] above 0.2 s is
+   measured by a microbenchmark or profile in the PR before review, and the PR says estimated X,
+   measured Y (the batched read: estimated 0.15-0.2 s, measured 0.018 s). In a review, flag an
+   untagged or unmeasured figure.
 
 When reviewing a diff (`git diff main...HEAD`), report only real defects with `path:line`,
 the failure scenario and the fix, most severe first. Say plainly when you found none. Do not

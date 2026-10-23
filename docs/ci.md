@@ -268,6 +268,12 @@ A spec that fails under load and passes on re-run goes in `apps/web/quarantine.j
   phase `finished` and `document.fonts.ready`; a story that still settles later must wait for
   its own ready state inside `play`, or go in the list.
 
+## Merging on the merged result
+
+PRs merge only when up to date with main (strict required checks or a merge queue), so the cap and
+layout checks run on the merged result (#855 and #856 each added a module to a folder one below its
+cap; main went red). This is a GitHub repository setting (owner); the repo does not set it.
+
 ## Running the checks locally before pushing
 
 `make check` runs every CI step (tests in parallel, one worker per CPU; `make test
