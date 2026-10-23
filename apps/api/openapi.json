@@ -1082,6 +1082,30 @@
             "title": "Hash",
             "type": "string"
           },
+          "run_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the one-off run finalising started (poll GET /jobs/{id}); None when the results for this version were already stored or runs are off",
+            "title": "Run Job Id"
+          },
+          "run_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "that run's state (ready, queued, running, ...); None when none was asked",
+            "title": "Run State"
+          },
           "screener_id": {
             "title": "Screener Id",
             "type": "string"

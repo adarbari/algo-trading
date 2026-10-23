@@ -846,6 +846,16 @@ export interface components {
         Finalised: {
             /** Hash */
             hash: string;
+            /**
+             * Run Job Id
+             * @description the one-off run finalising started (poll GET /jobs/{id}); None when the results for this version were already stored or runs are off
+             */
+            run_job_id?: string | null;
+            /**
+             * Run State
+             * @description that run's state (ready, queued, running, ...); None when none was asked
+             */
+            run_state?: string | null;
             /** Screener Id */
             screener_id: string;
             /** Version */
