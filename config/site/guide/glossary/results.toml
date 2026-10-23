@@ -188,3 +188,53 @@ The badges are the screener's own flags, LIQUIDITY_RISK when the decision is tha
 """
 next = "Open the pick's screener to see the criterion behind each reason."
 see_also = ["liquidity_risk", "idea_decision", "near_miss"]
+
+[[term]]
+id = "screener_picks"
+term = "Picks today"
+short = "How many names the screener picked in the latest session, with how many joined and left since the run before."
+body = """
+The number counts the names the screener kept after its criteria and its ranking. The green +N is the names that are new since the previous run, the red −N the names that dropped out. A muted line says how many were paused because the market regime stopped the screener that session. For example, 12 with +3 −2 means three new names, two gone and ten kept. A dash means no run is stored for the session. Don't read a long list as a better screener: a loose screen picks many names, and the track record says whether the picks did well.
+"""
+next = "Open the screener to see each pick and the criterion behind its decision."
+see_also = ["paused", "idea_decision", "screener_track_record"]
+
+[[term]]
+id = "screener_decisions"
+term = "Screener decisions"
+short = "The bar splits the screener's picks by decision, such as QUALIFIED, WATCH or REJECT; the line under it counts each."
+body = """
+Each pick carries one decision, worked out from its criteria. The bar's segments are in proportion to the counts, which the muted line spells out, such as 8 qualified · 3 watch · 1 reject. A screener whose bar is mostly QUALIFIED had most names meet every threshold; a long WATCH segment means many names only came close. Don't read QUALIFIED as a forecast: it says the thresholds were met, nothing about the next move.
+"""
+next = "Open the screener's row to see its criteria and which one decides most picks."
+see_also = ["qualified", "watch", "reject", "idea_decision"]
+
+[[term]]
+id = "screener_track_record"
+term = "Screener track record"
+short = "How the picks of the edge this screener implements did in the past: win rate against the base rate, trades and holding period."
+body = """
+A screener has a record only when it implements an edge. The figures are the edge's frozen-period record: the out-of-sample test whose date was fixed before it was read, never an exploratory run. The win rate is the share of picks whose outcome came true, the base rate the same share for every eligible name. A win rate only means something beside its base rate. The trades are the independent test dates behind the numbers, and the holding period is how many sessions each outcome was given. For example, 62% against a 55% base rate on 40 trades with a 20-session hold means the picks beat the field by 7 points. With few trades it is noise. No record yet means no edge covers the screener, or its test has not run. It does not mean the screener is bad. Don't read it as profit: it counts outcomes, not amounts.
+"""
+next = "Open Edge evidence in the row to see the curve, the sample size and the verdict."
+see_also = ["win_rate", "base_rate", "lift", "trades", "out_of_sample"]
+
+[[term]]
+id = "screener_history"
+term = "30d picks"
+short = "A small line of how many names the screener picked on each of the last sessions."
+body = """
+The line rises when the screener picked more names that session and falls when it picked fewer. It has no scale: read its shape, not its height. Gaps are sessions with no stored run. A flat line means a steady list. A spike means more names met the thresholds that day. A drop to zero may mean the screener was paused. Don't read a spike as a stronger signal.
+"""
+next = "Open the screener to compare today's picks with its earlier runs."
+see_also = ["screener_picks", "paused"]
+
+[[term]]
+id = "screener_last_run"
+term = "Screener last run"
+short = "The session of the screener's latest run, or why there is none: No run today or Paused."
+body = """
+The date is the trading session the run read, not the day it was started. No run today means the screener has no run for the session the page shows, so its picks are not the latest. Paused means the market regime stopped the screener for that session and it picked nothing on purpose. A dash means the screener has no rules, or it is a draft that was never run.
+"""
+next = "Check the date before you act on a screener's picks."
+see_also = ["paused", "not_run", "screener_picks"]
