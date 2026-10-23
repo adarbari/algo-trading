@@ -56,7 +56,7 @@ closed one is refused: the vendors serve only today's values, which would land i
 
 Rows are staged per item and published as one partition (atomic, ADR 0022); the step is optional,
 so a vendor outage only warns. The groups ``analyst_estimates@v2``, ``analyst_targets@v2`` and
-``analyst_revisions@v2`` read the history (one vendor per name, ADR 0080), and its rows carry the
+``analyst_revisions@v3`` read the history (one vendor per name, ADR 0080), and its rows carry the
 vendors' licences (``stats["licence"]``: ``personal``, and Yahoo's ``yahoo``).
 """
 

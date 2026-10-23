@@ -590,7 +590,7 @@ value = "fmp"
 mode = "hard"
 
 [[field]]
-name = "rollup.analyst_revisions@v2.revisions_source"
+name = "rollup.analyst_revisions@v3.revisions_source"
 theme = "analyst"
 reads = "Which data vendor the revisions of the name come from: fmp (Financial Modeling Prep) or yahoo (Yahoo Finance, used when FMP has none for the name). A name neither has reached reads fmp with a status of NOT_COVERED or NOT_FETCHED."
 caveats = [
@@ -624,4 +624,23 @@ sources = [
 for = "only the first vendor's data"
 op = "eq"
 value = "finnhub"
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_revisions@v3.revisions_basis"
+theme = "analyst"
+reads = "Where the EPS revisions of the name come from. own_snapshots: our own nightly snapshots, compared 30, 60 and 90 days apart. vendor_trend: Yahoo's own record of its EPS consensus. It gives the value now and as it stood 30, 60 and 90 days before we asked. We use it for a name on Yahoo whose own history is still short."
+caveats = [
+  "Yahoo's earlier values are its restatement as of the day we asked, not what was known on the earlier day. They enter on the day we fetched them. They are never back-dated, so an earlier session has no trend.",
+  "The trend windows are exactly 30, 60 and 90 days. Our own snapshots' windows are 30 to 37, 60 to 67 and 90 to 97 days. The two bases are close, not identical.",
+  "Only the EPS revisions switch basis. The revenue revisions and the analyst-count change are always our own snapshots, because Yahoo has no revenue history. They stay null for a name on Yahoo until our history spans the window.",
+  "A name on FMP is always own_snapshots, and a name that is not covered reads own_snapshots with no values. Yahoo's trend is never compared with FMP's estimate.",
+]
+sources = [
+  "Yahoo Finance earnings trend, stored nightly in analyst/estimate_snapshots (docs/adr/0080-yahoo-analyst-source.md, amendment 2026-10-24)",
+]
+[[field.use]]
+for = "only revisions from our own snapshots"
+op = "eq"
+value = "own_snapshots"
 mode = "hard"
