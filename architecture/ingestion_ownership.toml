@@ -25,11 +25,12 @@ detect = [{ string = "analyst/vendor_access" }, { call = "fmp_calls_today" }]
 
 [[responsibility]]
 id = "analyst-estimate-snapshots"
-description = "Append tonight's FMP (annual estimates, price-target consensus, grades consensus) and Finnhub (recommendation trend) analyst data of a rotating slice of names to our own point-in-time history (analyst/estimate_snapshots): ts = fetch instant, knowledge_ts = publish instant, never a vendor date, never replacing an earlier session's rows; the rotation reads back the run records' items; FMP within [fmp] daily_budget; a nightly optional step (ADR 0068); Yahoo (owner-only licence) is asked of every name it has answered on a refresh cadence (14 days, 45 for a name FMP answers), and the one-off analyst-backfill asks the whole stock population (population.py: COMMON_STOCK and ADR) a resumable batch a run, quiet until the nightly is complete and stopped by the first 429 (ADR 0080 amendment 2026-10-23b)"
+description = "Append tonight's FMP (annual estimates, price-target consensus, grades consensus) and Finnhub (recommendation trend) analyst data of a rotating slice of names to our own point-in-time history (analyst/estimate_snapshots): ts = fetch instant, knowledge_ts = publish instant, never a vendor date, never replacing an earlier session's rows; the rotation reads back the run records' items; FMP within [fmp] daily_budget; a nightly optional step (ADR 0068); Yahoo (owner-only licence) is asked of every name it has answered on a refresh cadence (14 days, 45 for a name FMP answers), and the one-off analyst-backfill asks the whole stock population (population.py: COMMON_STOCK and ADR) a resumable batch a run, quiet until the nightly is complete and stopped by the first 429 (ADR 0080 amendment 2026-10-23b); which names Yahoo is asked tonight is the pure yahoo_schedule.py: a rolling baseline by stable slot, event pulls around a report date, one nightly ceiling, the answer fingerprint and the 429 cool-off (amendment 2026-10-23c)"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py",
     "apps/ingestion/algotrade_ingestion/tasks/analyst/backfill.py",
     "apps/ingestion/algotrade_ingestion/tasks/analyst/population.py",
+    "apps/ingestion/algotrade_ingestion/tasks/analyst/yahoo_schedule.py",
 ]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task

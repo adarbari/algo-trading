@@ -193,7 +193,7 @@ purpose = "ingestion tasks by domain (no modules of its own)"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/analyst"
-purpose = "analyst-data tasks (ADR 0068): the probe of what each free vendor key may call (analyst/vendor_access), the FMP daily call budget it counts against, the nightly snapshot of what the vendors say (analyst/estimate_snapshots), the one-off Yahoo backfill of the whole stock population, and the check of the names it has not asked yet (ADR 0072)"
+purpose = "analyst-data tasks (ADR 0068): the probe of what each free vendor key may call (analyst/vendor_access), the FMP daily call budget it counts against, the nightly snapshot of what the vendors say (analyst/estimate_snapshots), the one-off Yahoo backfill of the whole stock population, the Yahoo scheduler (which names a night asks: a rolling baseline and event pulls), and the check of the names it has not asked yet (ADR 0072)"
 kind = "task-domain"
 
 [[dir]]
