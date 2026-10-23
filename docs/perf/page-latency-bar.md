@@ -100,13 +100,14 @@ the owner. An agent never adds, renews or widens one. There are none today.
 ## How every view stays under 1 s
 
 1. **Design time**: a new or changed page read states its critical-path budget and its store
-   choice (`docs/data/storage.md`) in the PR description.
+   choice (the Choosing a store section of the storage doc, added by the harness PR) in the PR
+   description.
 2. **PR time**: a CI-safe test that every GraphQL operation the web sends is measured
    (`test_every_web_query_operation_is_measured_so_no_page_ships_unmeasured` in
    `tests/scripts/perf/test_page_docs.py`: the operation is in `benchmarks/api_latency_pages.json`
    or in a view of `benchmarks/api_latency_views.json`; its baseline of nine unmeasured
-   operations only shrinks), and a files-opened-per-request budget test for reads that touch
-   stored partitions (not written yet: the first read PR that opens partitions adds it).
+   operations only shrinks): this is the enforced check. A files-opened-per-request budget test
+   for reads that touch stored partitions is PLANNED (a follow-up), not in force.
 3. **After merge**: this gate runs nightly on a clone and records the history; any view over 1 s
    fails unless it has a named exception with reason, date, expiry and the owner's approval.
 4. **Learning loop**: every round's estimate against actual is appended to
