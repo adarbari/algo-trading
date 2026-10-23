@@ -1,7 +1,8 @@
 /**
  * The top-ideas table's columns, in two sets chosen by the page's `columns` search param. Stocks
- * (default): rank, ticker, why it is here, who picked it, decision, score, criteria, price
- * and the watch-outs. Options: rank, ticker, decision, score, who picked it, then the served facts for the
+ * (default): rank, ticker, who picked it, decision (the badge over the criteria it comes from),
+ * score, size, price and the watch-outs (flags, then the near-miss reasons). Options: rank, ticker,
+ * decision, score, who picked it, then the served facts for the
  * session (days to the nearest expiry, flagged when the server says earnings come first; IV30),
  * the screeners' stored display values (HV30, IV / HV and the best put) and the watch-outs. The
  * regime's size for the idea shows in both when the run stamped one; a fact or display-value
@@ -139,8 +140,9 @@ const RANK: DataTableColumn<Idea> = {
 
 /** The size the regime gives a new position (the best pick's run stamped it): a column when some
  * idea has one. */
-const SIZE: DataTableColumn<Idea> = {
+const SIZE: HelpedColumn<Idea> = {
   id: 'size',
+  help: { kind: 'term', id: 'idea_size' },
   header: 'Size',
   value: (idea) => idea.sizeMultiplier,
   format: { kind: 'percent', digits: 0 },
@@ -170,27 +172,11 @@ const tickerColumn: DataTableColumn<Idea> = {
   },
 };
 
-/** Why the idea is here: the best pick's reasons. */
-const whyColumn: DataTableColumn<Idea> = {
-  id: 'why',
-  header: "Why it's here",
-  value: (idea) => idea.best.reasons || null,
-  width: '2xl',
-  grow: true,
-  sortable: false,
-  essential: true,
-  cell: ({ row }) =>
-    row.best.reasons ? (
-      <Text size="sm" truncate title={row.best.reasons}>
-        {row.best.reasons}
-      </Text>
-    ) : null,
-};
-
 /** Every screener that picked the idea (the best first), each a link to its results with the
  * place the ticker holds in that screener's list. */
-const pickedByColumn: DataTableColumn<Idea> = {
+const pickedByColumn: HelpedColumn<Idea> = {
   id: 'picked-by',
+  help: { kind: 'term', id: 'picked_by' },
   header: 'Picked by',
   value: (idea) => idea.pickedBy.length,
   width: 'lg',
@@ -209,21 +195,14 @@ const pickedByColumn: DataTableColumn<Idea> = {
 };
 
 /** The idea's score under the Ideas rule (its best pick's weight over position). */
-const scoreColumn: DataTableColumn<Idea> = {
+const scoreColumn: HelpedColumn<Idea> = {
   id: 'score',
+  help: { kind: 'term', id: 'ideas_ranking' },
   header: 'Score',
   value: (idea) => idea.score,
   format: { kind: 'number', digits: 2 },
   width: 'xs',
   essential: true,
-};
-
-const decisionColumn: DataTableColumn<Idea> = {
-  id: 'decision',
-  header: 'Decision',
-  value: (idea) => idea.best.decision,
-  essential: true,
-  cell: ({ row }) => <DecisionBadge decision={row.best.decision} />,
 };
 
 const OUTCOME_DOT: Readonly<Record<string, OutcomeDot['tone']>> = {
@@ -240,18 +219,26 @@ function criterionDots(idea: Idea): OutcomeDot[] {
   }));
 }
 
-const criteriaColumn: DataTableColumn<Idea> = {
-  id: 'criteria',
-  header: 'Criteria',
-  value: (idea) => idea.best.criteria.map((c) => c.outcome).join(),
-  sortable: false,
+/** The decision badge over the criteria it is derived from (one square each). */
+const decisionColumn: HelpedColumn<Idea> = {
+  id: 'decision',
+  header: 'Decision',
+  help: { kind: 'term', id: 'idea_decision' },
+  value: (idea) => idea.best.decision,
+  essential: true,
   width: 'md',
-  cell: ({ row }) => <OutcomeDots items={criterionDots(row)} label="Criteria" />,
+  cell: ({ row }) => (
+    <Stack gap={1}>
+      <DecisionBadge decision={row.best.decision} />
+      <OutcomeDots items={criterionDots(row)} label="Criteria" />
+    </Stack>
+  ),
 };
 
 /** The close over the one-session move, each in the format the server sent. */
-const priceColumn: DataTableColumn<Idea> = {
+const priceColumn: HelpedColumn<Idea> = {
   id: 'price',
+  help: { kind: 'term', id: 'idea_price' },
   header: 'Price',
   value: (idea) => idea.facts[IDEA_FACTS.close]?.value,
   width: 'sm',
@@ -273,15 +260,18 @@ const priceColumn: DataTableColumn<Idea> = {
   },
 };
 
-/** The watch-outs, else the next earnings in muted text. */
-const watchOutColumn: DataTableColumn<Idea> = {
+/** The watch-outs as badges, the near-miss reasons under them in muted text, else the next
+ * earnings (only when there is neither). */
+const watchOutColumn: HelpedColumn<Idea> = {
   id: 'watch-out',
   header: 'Watch out',
+  help: { kind: 'term', id: 'idea_watch_out' },
   value: (idea) => idea.watchOut.length,
   width: 'lg',
   grow: true,
   cell: ({ row }) => {
-    if (row.watchOut.length === 0) {
+    const reasons = row.best.reasons;
+    if (row.watchOut.length === 0 && !reasons) {
       const shown = earningsCell(row);
       return (
         <Text size="sm" tone="muted" {...(shown.title === undefined ? {} : { title: shown.title })}>
@@ -290,12 +280,21 @@ const watchOutColumn: DataTableColumn<Idea> = {
       );
     }
     return (
-      <Stack direction="row" gap={1} wrap>
-        {row.watchOut.map((w) => (
-          <StatusBadge key={w.id} tone="warning">
-            {w.label}
-          </StatusBadge>
-        ))}
+      <Stack gap={1}>
+        {row.watchOut.length > 0 && (
+          <Stack direction="row" gap={1} wrap>
+            {row.watchOut.map((w) => (
+              <StatusBadge key={w.id} tone="warning">
+                {w.label}
+              </StatusBadge>
+            ))}
+          </Stack>
+        )}
+        {reasons && (
+          <Text size="xs" tone="muted" truncate title={reasons}>
+            {reasons}
+          </Text>
+        )}
       </Stack>
     );
   },
@@ -324,12 +323,10 @@ export function ideaColumns(
   return [
     RANK,
     tickerColumn,
-    whyColumn,
     pickedByColumn,
     decisionColumn,
     scoreColumn,
     ...size,
-    criteriaColumn,
     priceColumn,
     watchOutColumn,
   ];

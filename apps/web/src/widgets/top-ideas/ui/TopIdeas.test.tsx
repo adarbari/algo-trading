@@ -253,12 +253,18 @@ describe('TopIdeas', () => {
     expect(grid()).toHaveAttribute('data-lines', '3');
   });
 
-  it('draws one labelled square per criterion of the best pick', () => {
+  it('draws one labelled square per criterion of the best pick, under the decision', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
     expect(within(aapl).getByRole('img', { name: /^Criteria:/ })).toHaveAccessibleName(
       'Criteria: Trend up: Passed, Iv rank: Near miss, Spread: Missed, Gap: No value',
     );
+  });
+
+  it('shows the near-miss reasons under the watch-out badges, with the full text in the title', () => {
+    const { grid } = setup();
+    const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
+    expect(within(aapl).getByTitle('IV rank high, spread tight')).toBeInTheDocument();
   });
 
   it('keeps the column set in the search params and shows the options set', async () => {
@@ -269,13 +275,13 @@ describe('TopIdeas', () => {
         .getAllByRole('columnheader')
         .map((h) => h.textContent)
         .join(' | ');
-    expect(headers()).toMatch(/Why it's here/);
-    expect(headers()).not.toMatch(/IV30/);
+    expect(headers()).toMatch(/Picked by.*Decision.*Score/);
+    expect(headers()).not.toMatch(/IV30|Why it's here|Criteria/);
     await user.click(screen.getByRole('radio', { name: 'Options columns' }));
     expect(headers()).toMatch(/IV30.*HV30/);
     expect(headers()).not.toMatch(/Why it's here|Criteria|Price/);
     await user.click(screen.getByRole('radio', { name: 'Stocks columns' }));
-    expect(headers()).toMatch(/Why it's here/);
+    expect(headers()).toMatch(/Price.*Watch out/);
   });
 
   it("links every screener name in a row to that screener's results, not to the ticker", async () => {
@@ -488,7 +494,7 @@ describe('TopIdeas', () => {
 });
 
 describe('TopIdeas field headers', () => {
-  it('puts the Guide help button in the field headers and the ranking columns, not in the rest', async () => {
+  it('puts the Guide help button in the field headers and every Ideas column, not in the rank or ticker', async () => {
     vi.mocked(gql).mockResolvedValue({ guideField: null });
     const { grid } = setup({ columns: 'options' });
     const help = (name: RegExp) =>
@@ -498,10 +504,13 @@ describe('TopIdeas field headers', () => {
           name: /^What is .*\?$/,
         },
       );
-    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(3);
+    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(7);
     expect(help(/Expiry DTE/)).toBeVisible();
     expect(help(/IV30/)).toBeVisible();
-    expect(help(/Score/)).toBeNull();
-    expect(help(/Decision/)).toBeNull();
+    expect(help(/Score/)).toBeVisible();
+    expect(help(/Decision/)).toBeVisible();
+    expect(help(/Picked by/)).toBeVisible();
+    expect(help(/Watch out/)).toBeVisible();
+    expect(help(/Ticker/)).toBeNull();
   });
 });
