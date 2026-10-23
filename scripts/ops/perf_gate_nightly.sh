@@ -50,7 +50,10 @@ today=${PERF_NOW_DATE:-$(date +%Y-%m-%d)}
 hm=${PERF_NOW_HM:-$(date +%H%M)}
 min_disk_gb=12
 max_load=4
-markers='algotrade-ingest|var/logs/'
+markers='algotrade-ingest|algotrade-backtest|var/logs/'
+# a real writer: an ingest or backtest command (rollups, nightly and compaction run through them). Any
+# other marker match is a driver script (var/logs/...): a writer only while it has a live child that is not `sleep`
+real_writer='algotrade-ingest|algotrade-backtest|rollups|nightly|compaction'
 
 # the bench starts an API on a spare port of ALGOTRADE_PORT_BASE + 8..19: a fixed block outside the
 # worktrees' (10000-14990) and the live API's 8000, so the nightly never collides with either
@@ -254,8 +257,32 @@ PY
 discard_clone() { rename_clone; [ -n "$trash_dir" ] && delete_trash "$trash_dir"; return 0; }
 
 ps_lines() { if [ -n "${PERF_PS_FILE:-}" ]; then cat "$PERF_PS_FILE"; else ps -eo pid,args; fi; }
+# a driver script parked in a sleep loop writes nothing: it is not a writer. Fail closed: a driver whose
+# children cannot be listed or read, or that has any child other than `sleep`, is a writer.
+driver_busy() {  # $1 = pid; returns 0 (busy) unless it has no child or only sleep children
+  local kids rc c cargs cmd
+  case "$1" in ''|*[!0-9]*) return 0 ;; esac
+  kids=$(pgrep -P "$1" 2>/dev/null); rc=$?
+  [ "$rc" -le 1 ] || return 0                 # pgrep failed or is missing: cannot tell
+  for c in $kids; do
+    cargs=$(ps -o args= -p "$c" 2>/dev/null)
+    [ -n "$cargs" ] || return 0               # the child vanished or is unreadable: cannot tell
+    set -- $cargs; cmd=${1##*/}
+    [ "$cmd" = sleep ] || return 0
+  done
+  return 1
+}
 busy_writer() {
-  ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench" | head -1
+  local pid args
+  ps_lines | grep -E "$markers" | grep -vE "grep|perf_gate_nightly|fast_bench" | {
+    while read -r pid args; do
+      if printf '%s' "$args" | grep -qE "$real_writer" || driver_busy "$pid"; then
+        echo "$pid $args"; return 0
+      fi
+      [ "$rundir_made" = 1 ] && echo "perf_gate: ignored parked driver (no child but sleep): pid $pid $args" >>"$rundir/run.log"
+    done
+    return 0
+  }
 }
 if w=$(busy_writer) && [ -n "$w" ]; then busy "a writer runs: $w"; fi
 

@@ -3,6 +3,7 @@ per-date idempotence (before 03:00, done today, next day), with a fake bench and
 
 import json
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -523,3 +524,110 @@ def test_the_lock_start_time_is_read_in_the_c_locale_whatever_the_callers_locale
     env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "LC_ALL": "fr_FR.UTF-8", "TZ": "Europe/Paris"}
     res = rig.run(**env)
     assert res.returncode == 3 and "holds" in res.stderr  # a live holder, not a stale lock
+
+
+def _stubs(rig: Rig, children: dict[int, str | None], args: dict[int, str]) -> dict[str, str]:
+    """Stub `pgrep -P` and `ps -o args= -p` on PATH (children: pid -> 'c1 c2'; None: unreadable)."""
+    d = rig.tmp / "stubs"
+    (d / "kids").mkdir(parents=True, exist_ok=True)
+    (d / "args").mkdir(exist_ok=True)
+    for pid, kids in children.items():
+        (d / "kids" / str(pid)).write_text("ERR" if kids is None else kids)
+    for pid, a in args.items():
+        (d / "args" / str(pid)).write_text(a)
+    (d / "pgrep").write_text(
+        f'#!/bin/sh\nf={d}/kids/"$2"\n[ -f "$f" ] || exit 1\n'
+        '[ "$(cat "$f")" = ERR ] && exit 2\n'
+        'for k in $(cat "$f"); do echo $k; done\n[ -s "$f" ] || exit 1\n'
+    )
+    real_ps = shutil.which("ps")
+    (d / "ps").write_text(
+        f'#!/bin/sh\nif [ "$1" = -o ] && [ "$2" = args= ]; then\n'
+        f'  f={d}/args/"$4"; [ -f "$f" ] && cat "$f"; exit 0\nfi\n'
+        f'exec {real_ps} "$@"\n'
+    )
+    for n in ("pgrep", "ps"):
+        (d / n).chmod(0o755)
+    return {"PATH": f"{d}:{os.environ['PATH']}"}
+
+
+DRIVER = "  7 /bin/sh var/logs/ops/eb_tail.sh\n"
+
+
+def test_a_real_ingest_is_busy_whatever_its_children(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + "  9 .venv/bin/algotrade-ingest rollups --from 2013-01-01\n")
+    env = _stubs(rig, {9: ""}, {})
+    assert rig.run(**env).returncode == 3 and not rig.root.joinpath("data").exists()
+
+
+def test_a_driver_parked_on_a_sleep_is_not_a_writer_and_is_logged(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + DRIVER)
+    env = _stubs(rig, {7: "8"}, {8: "sleep 60"})
+    assert rig.run(**env).returncode == 1  # the bench ran (over the bar), the gate was not refused
+    log = _evidence(rig).joinpath("run.log").read_text()
+    assert "ignored parked driver" in log and "pid 7 /bin/sh var/logs/ops/eb_tail.sh" in log
+
+
+def test_a_driver_with_no_child_is_not_a_writer(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + DRIVER)
+    assert rig.run(**_stubs(rig, {7: ""}, {})).returncode == 1
+
+
+@pytest.mark.parametrize("child", ["algotrade-ingest rollups", "/usr/bin/python3 -m x"])
+def test_a_driver_with_a_running_non_sleep_child_is_a_writer(rig: Rig, child: str) -> None:
+    rig.ps.write_text(QUIET_PS + DRIVER)
+    res = rig.run(**_stubs(rig, {7: "8 9"}, {8: "sleep 60", 9: child}))
+    assert res.returncode == 3 and "a writer runs" in res.stderr
+
+
+def test_a_driver_whose_children_cannot_be_read_is_a_writer(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + DRIVER)
+    assert rig.run(**_stubs(rig, {7: None}, {})).returncode == 3  # pgrep fails
+    assert rig.run(**_stubs(rig, {7: "8"}, {})).returncode == 3  # the child's command is unreadable
+
+
+def test_a_driver_is_a_writer_when_pgrep_is_missing(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + DRIVER)
+    empty = rig.tmp / "nopgrep"
+    empty.mkdir()
+    for n in (
+        "sh",
+        "bash",
+        "ps",
+        "grep",
+        "date",
+        "mkdir",
+        "cat",
+        "dirname",
+        "readlink",
+        "ln",
+        "rm",
+        "mv",
+        "tr",
+        "sed",
+        "awk",
+        "sort",
+        "head",
+        "cut",
+        "stat",
+        "mktemp",
+        "python3",
+        "env",
+        "git",
+        "id",
+        "uname",
+        "df",
+        "uptime",
+    ):
+        w = shutil.which(n)
+        if w:
+            (empty / n).symlink_to(w)
+    res = rig.run(PATH=str(empty))
+    assert res.returncode == 3 and "a writer runs" in res.stderr
+
+
+def test_the_gate_itself_and_the_bench_are_never_a_driver_match(rig: Rig) -> None:
+    own = "  5 bash scripts/ops/perf_gate_nightly.sh var/logs/x\n"
+    own += "  6 python scripts/perf/fast_bench.py var/logs/y\n"
+    rig.ps.write_text(QUIET_PS + own)
+    assert rig.run(**_stubs(rig, {}, {})).returncode == 1
