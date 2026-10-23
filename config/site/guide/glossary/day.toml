@@ -157,3 +157,34 @@ Don't read a link as a copy of the figures: the filing and the agency page are t
 the row only points to them. Links open in a new tab, on SEC's EDGAR site or the agency's own.
 """
 see_also = ["session", "knowledge_time"]
+
+[[term]]
+id = "data_state"
+term = "Data status"
+short = "Whether today's data is whole, partly missing, or about to be replaced by a newer day."
+body = """
+The pill in the top bar sums up the day the pages show. Data complete: the day's nightly update
+finished and prices, option chains and fundamentals are all in. Data partial: the day is not
+finished, or one of those is short, so some values read UNKNOWN and some screens rank fewer names.
+Next day processing: a newer day is being built or published, and the pages keep showing the last
+complete one. Next day failed, showing previous: the newer day's update failed and is being
+retried; the pages stay on the last complete day. The pill also counts how many of your screeners
+have no run, a partial run or a run missing a required input. A screener missing only an optional
+input is not counted.
+"""
+next = "Nothing is needed from you: a newer day replaces the one shown by itself, and a failure is for the owner to fix."
+see_also = ["dataset_status", "unknown", "last_complete_session", "publishing_session", "not_run"]
+
+[[term]]
+id = "dataset_status"
+term = "Dataset status"
+short = "How much of one kind of data (prices, option chains, fundamentals) the shown day has."
+body = """
+Each dataset is the share of names the app got a good value for against the names it asked about.
+Complete means at least 98%. Partial means less than that, and some. Missing means the update ran
+and got none. Not measured means the update left no record for the day, so the share is unknown,
+which is different from 0%. Example: option chains at 90% of 3,000 names is partial, and the
+other 300 names read UNKNOWN on option fields. A high share can still hide the one name you hold.
+"""
+next = "Check the instrument's own fields: an UNKNOWN there says whether this name is among the gaps."
+see_also = ["data_state", "unknown", "not_run"]

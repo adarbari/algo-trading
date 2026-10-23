@@ -354,6 +354,52 @@ type CurvePoint {
   weight: Float!
 }
 
+"""What the session's data amounts to"""
+enum DataState {
+  COMPLETE
+  PARTIAL
+  NEXT_PROCESSING
+  NEXT_FAILED_SHOWING_PREVIOUS
+}
+
+"""
+The data of the served session in one object (every viewer): `state`, `knowledgeTs` (when the session completed; null: not yet), the `datasets`, and how many of the viewer's `totalScreeners` have no run, a partial run or a run without a required table (`affectedScreeners`)
+"""
+type DataStatus {
+  state: DataState!
+  knowledgeTs: DateTime
+  datasets: [DatasetStatus!]!
+  affectedScreeners: Int!
+  totalScreeners: Int!
+}
+
+"""A dataset the data status reports"""
+enum DatasetName {
+  PRICES
+  OPTIONS_CHAINS
+  FUNDAMENTALS
+}
+
+"""How much of a dataset the session has"""
+enum DatasetState {
+  COMPLETE
+  PARTIAL
+  MISSING
+  UNKNOWN
+}
+
+"""
+One dataset on the session: `present` of `expected` (`share`, 0 to 1), graded as `status`; UNKNOWN (no record, never 0%) carries `unavailable` in public words
+"""
+type DatasetStatus {
+  name: DatasetName!
+  status: DatasetState!
+  present: Int
+  expected: Int
+  share: Float
+  unavailable: [Unavailable!]!
+}
+
 """Date (isoformat)"""
 scalar Date
 
@@ -3417,6 +3463,11 @@ type Session {
   unavailable: [Unavailable!]!
   complete: Boolean!
   newer: NewerSession
+
+  """
+  How complete this session's data is (prices, option chains, fundamentals) and how many of the viewer's screeners it touches: for every viewer, from run records alone; a dataset with no record is UNKNOWN, never 0%
+  """
+  dataStatus: DataStatus!
 }
 
 """A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""
