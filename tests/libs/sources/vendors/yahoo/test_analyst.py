@@ -111,7 +111,8 @@ def test_the_request_is_one_quote_summary_with_the_hyphenated_class_symbol() -> 
     YahooAnalyst(http).fetch(FetchRequest("BRK.B"))
     assert urls == [
         "https://query2.finance.yahoo.com/v10/finance/quoteSummary/BRK-B"
-        "?modules=financialData%2CearningsTrend%2CrecommendationTrend&formatted=false"
+        "?modules=financialData%2CearningsTrend%2CrecommendationTrend%2CcalendarEvents"
+        "%2CupgradeDowngradeHistory&formatted=false"
     ]
     assert vendor_symbol(" brk.b ") == "BRK-B" and url("ARX").count("quoteSummary/ARX?") == 1
 
@@ -128,3 +129,15 @@ def test_a_404_is_refused_at_once_and_a_server_error_is_not() -> None:
         source.fetch(FetchRequest("ZZZZQ9"))
     assert caught.value.status == 404 and b"Not Found" in caught.value.body and len(calls) == 1
     assert refused(HttpError(404)) and not refused(HttpError(401)) and not refused(HttpError(500))
+
+
+def test_the_calendar_row_has_the_next_report_and_the_latest_analyst_action() -> None:
+    def add(result: dict) -> None:  # type: ignore[type-arg]
+        result["calendarEvents"] = {"earningsDate": [1793000000, 1793400000]}  # 2026-10-26..30
+        result["upgradeDowngradeHistory"] = {"history": [{"epochGradeDate": 1792000000}]}
+
+    row = parsed(edited(add))["calendar"].iloc[0]
+    assert str(row["next_report"]) == "2026-10-26" and str(row["last_action"]) == "2026-10-14"
+    assert (
+        parsed(ARX)["calendar"].iloc[0][["next_report", "last_action"]].isna().all()
+    )  # a name without the modules: no dates

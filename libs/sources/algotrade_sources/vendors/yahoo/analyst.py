@@ -1,7 +1,8 @@
 """Yahoo analyst data (``YahooAnalyst``): price targets, annual consensus estimates and the
 current recommendation counts of one name, from ONE ``quoteSummary`` request.
 
-``quoteSummary/<SYM>?modules=financialData,earningsTrend,recommendationTrend`` answers
+``quoteSummary/<SYM>?modules=financialData,earningsTrend,recommendationTrend,calendarEvents,
+upgradeDowngradeHistory`` answers
 ``quoteSummary.result[0]`` with ``financialData`` (``targetMeanPrice``, ``targetMedianPrice``,
 ``targetHighPrice``, ``targetLowPrice``, ``financialCurrency``), ``earningsTrend.trend[]``
 (``period`` 0q / +1q / 0y / +1y, ``endDate`` the fiscal period end, ``earningsEstimate`` and
@@ -11,6 +12,10 @@ current recommendation counts of one name, from ONE ``quoteSummary`` request.
 numbers come bare while ``earningsTrend`` ones still come as ``{"raw": 1.5, "fmt": "1.5"}``, so a
 number is read as either (an empty ``{}`` is missing). An unknown symbol answers 404
 (``client.refused``); an ETF the same.
+
+``calendarEvents.earningsDate`` and ``upgradeDowngradeHistory.history[].epochGradeDate`` give
+``parsed["calendar"]`` (one row: the next report date and the newest analyst action date; the
+task schedules by them, ADR 0080 amendment 2026-10-23c; never stored as rows).
 
 Request key: the symbol. ``normalize`` returns ``parsed["price_target"]``, ``["estimates_annual"]``
 and ``["recommendation"]`` (a kind with nothing to store is an empty frame), shaped like the FMP
@@ -62,6 +67,7 @@ ESTIMATE_COLUMNS = [
     "currency",
 ]
 RECOMMENDATION_COLUMNS = ["symbol", "period", *COUNTS.values()]
+CALENDAR_COLUMNS = ["symbol", "next_report", "last_action"]
 
 
 def number(value: Any) -> float | None:
@@ -137,6 +143,30 @@ def parse_recommendation(symbol: str, found: dict[str, Any], session: date) -> p
     return frame.astype(dict.fromkeys(COUNTS.values(), "Int64"))
 
 
+def day(seconds: Any) -> date | None:
+    """A Yahoo epoch second (a bare number) as its UTC date; anything else -> None."""
+    value = number(seconds)
+    return None if value is None else datetime.fromtimestamp(value, UTC).date()
+
+
+def parse_calendar(symbol: str, found: dict[str, Any]) -> pd.DataFrame:
+    """One row: ``next_report`` the first ``calendarEvents.earningsDate`` (Yahoo's estimate until
+    the company confirms: it can be stale or in the past, the caller judges) and ``last_action``
+    the newest ``upgradeDowngradeHistory`` date (``None`` when a module is missing)."""
+    dates = [day(d) for d in (found.get("calendarEvents") or {}).get("earningsDate") or []]
+    actions = [
+        day(h.get("epochGradeDate"))
+        for h in (found.get("upgradeDowngradeHistory") or {}).get("history") or []
+    ]
+    first = min((d for d in dates if d is not None), default=None)
+    latest = max((d for d in actions if d is not None), default=None)
+    return pd.DataFrame(
+        [{"symbol": symbol, "next_report": first, "last_action": latest}],
+        columns=CALENDAR_COLUMNS,
+        dtype=object,
+    )
+
+
 class YahooAnalyst:
     """Implements ``sources.base.Source``. Request key: the symbol."""
 
@@ -157,5 +187,6 @@ class YahooAnalyst:
             "price_target": parse_targets(symbol, found),
             "estimates_annual": parse_estimates(symbol, found),
             "recommendation": parse_recommendation(symbol, found, session),
+            "calendar": parse_calendar(symbol, found),
         }
         return Normalized(request.session_date, {}, {}, parsed)

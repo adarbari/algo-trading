@@ -102,7 +102,7 @@ def test_the_population_is_the_operating_companies_whether_or_not_fmp_or_scope_h
     assert yahoo_calls(calls) == ["AAPL", "ADRX", "SMALL"]  # no ETF, no closed-end fund
     assert record.stats["population"] == 3 and record.stats["due_remaining"] == 0
     assert record.stats["licence"] == {"yahoo": "yahoo"}
-    assert record.items["yahoo:SMALL"] == "OK"
+    assert record.items["yahoo:SMALL"].startswith("OK: fp=")
 
 
 def test_a_name_yahoo_refused_is_held_and_one_it_answered_is_not_asked_again() -> None:

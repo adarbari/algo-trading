@@ -197,10 +197,12 @@ refresh_days = 7                 # analyst-snapshot: each name's recommendation 
 enabled = true                   # unofficial, no published limit (30 requests in a row answered 200, 2026-10-22), terms forbid scraping
 min_interval_s = 1.0             # one request a name; yfinance's hidden crumb requests bypass the limiter, so a floor of 1 s
 licence = "yahoo"                # owner only: never served to another viewer, no redistribution; features derived from it inherit it
-per_night = 360                  # analyst-snapshot: names a night (1 call each), largest market cap first; the one-off backfill (analyst-backfill)
-                                 # leaves ~5,000 names due over refresh_days, so a night takes 360 (amendment 2026-10-23b)
+per_night = 360                  # analyst-snapshot: baseline names a night at most (1 call each; ~5,000 names / refresh_days = ~360, amendment 2026-10-23b)
 refresh_days = 14                # a name FMP does not answer is asked again after this many days (the reader goes stale at 21); a refused one (404) after 4 x this
 standby_days = 45                # a name FMP answers is asked this rarely (the reader prefers FMP; Yahoo's row is the standby)
+nightly_ceiling = 400            # every Yahoo call a night, event pulls and the baseline together; the baseline yields (amendment 2026-10-23c)
+events_enabled = true            # false: only the rolling baseline (no pull around a report date)
+cycle_anchor = "2026-10-23"      # day 0 of the rolling cycles: a name is due on the day its stable slot (hash of its id) falls in refresh_days / standby_days
 run_budget_s = 900               # its own time cap (the step runs last, so [fmp] run_budget_s cannot starve it); after it no further
                                  # call is made and the names left are recorded OVER_BUDGET
 backfill_batch = 500             # analyst-backfill: names one run asks, then it ends (the ingest lock is released between batches)

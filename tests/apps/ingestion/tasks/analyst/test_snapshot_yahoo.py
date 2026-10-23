@@ -3,7 +3,7 @@ largest market cap first, within ``[yahoo] per_night`` and its own run budget, f
 rows are stored with source ``yahoo`` and read back by ``stored_snapshots``."""
 
 import dataclasses
-from datetime import timedelta
+from datetime import date, timedelta
 
 from algotrade.config.site.vendors.yahoo import YahooSettings
 from algotrade.data.analyst.reading import stored_snapshots
@@ -11,7 +11,8 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.schemas import validate_frame
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.analyst.snapshot import TABLE, run
+from algotrade_ingestion.tasks.analyst import yahoo_schedule as ys
+from algotrade_ingestion.tasks.analyst.snapshot import COOLOFF, TABLE, History, note_yahoo, run
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.yahoo.analyst import YahooAnalyst
@@ -27,6 +28,7 @@ from tests.apps.ingestion.tasks.analyst.test_snapshot import (
     stored,
 )
 from tests.helpers.ingest_fakes import http_for
+from tests.helpers.stored_frames import stamped
 
 ARX = (FIXTURES / "yahoo" / "quote_summary_arx.json").read_bytes()
 NOT_FOUND = (FIXTURES / "yahoo" / "not_found_404.json").read_bytes()
@@ -38,7 +40,8 @@ def with_yahoo(
     calls: list[str],
     broken: frozenset[str] = frozenset(),
     unknown: frozenset[str] = frozenset(),
-    **settings: int,
+    limited: frozenset[str] = frozenset(),
+    **settings: object,
 ) -> TaskContext:
     """``ctx`` plus the Yahoo source: every symbol answers ARX's recorded payload except the
     ``unknown`` ones (404) and the ``broken`` ones (500)."""
@@ -48,13 +51,15 @@ def with_yahoo(
         symbol = url.split("quoteSummary/")[1].split("?", maxsplit=1)[0]
         if symbol in unknown:
             raise HttpError(404, body=NOT_FOUND)
+        if symbol in limited:
+            raise HttpError(429)
         if symbol in broken:
             raise HttpError(500, body=b"boom")
         return ARX
 
     source = YahooAnalyst(http_for(get, RetryPolicy(rejected=refused, tries=1)))
     sources = {**ctx.sources, "yahoo_analyst": source}
-    yahoo = YahooSettings(**settings)
+    yahoo = YahooSettings(**settings)  # type: ignore[arg-type]
     return dataclasses.replace(
         ctx, sources=sources, settings=dataclasses.replace(ctx.settings, yahoo=yahoo)
     )
@@ -96,7 +101,7 @@ def test_a_name_fmp_refuses_is_asked_of_yahoo_and_its_rows_are_read_back() -> No
     estimates = yahoo[yahoo["kind"] == "estimates_annual"]
     assert set(estimates["period"]) == {"2026-12-31", "2027-12-31"}
     assert set(estimates["currency"]) == {"USD"}
-    assert record.items["yahoo:CHWY"] == "OK"
+    assert record.items["yahoo:CHWY"].startswith("OK: fp=")
     assert record.stats["licence"]["yahoo"] == "yahoo"
 
 
@@ -245,3 +250,86 @@ def test_the_limit_param_caps_yahoo_names_too() -> None:
     ctx = with_yahoo(context(writer, later, calls, refused_names=refuse), calls)
     run(ctx, {"session": later, "limit": 1})
     assert len(yahoo_calls(calls)) == 1
+
+
+def refused_world(*names: str) -> tuple[StoreWriter, list[str], frozenset[str]]:
+    writer, calls = world("AAPL", *names)
+    seed_caps(writer, {n: 9e9 - i * 1e9 for i, n in enumerate(names)})
+    return writer, calls, frozenset(names)
+
+
+def test_the_first_429_sets_a_cooloff_of_two_to_the_k_nights_and_a_clean_night_resets_it() -> None:
+    writer, calls, refuse = refused_world("N1", "N2", "N3")
+    hit = frozenset({"N2"})
+
+    def night(offset: int, limited: frozenset[str]) -> object:
+        day = D1 + timedelta(days=offset)
+        calls.clear()
+        ctx = with_yahoo(context(writer, day, calls, refused_names=refuse), calls, limited=limited)
+        return run(ctx, {"session": day})
+
+    first = night(0, hit)
+    assert yahoo_calls(calls) == ["N1", "N2"]  # the 429 ends the step: N3 is not asked
+    stats = first.stats["yahoo"]  # type: ignore[attr-defined]
+    assert (stats["cooloff_k"], stats["cooloff_until"]) == (1, str(D1 + timedelta(days=2)))
+    assert first.items[COOLOFF] == f"OVER_BUDGET: k=1 until={D1 + timedelta(days=2)}"  # type: ignore[attr-defined]
+    held = night(1, frozenset())
+    assert calls == [] and "cool-off" in held.stats["yahoo"]["stopped"]  # type: ignore[attr-defined]
+    again = night(2, hit)  # asked again after 2 nights, 429 again: k = 2, 4 nights
+    assert again.stats["yahoo"]["cooloff_k"] == 2  # type: ignore[attr-defined]
+    assert again.stats["yahoo"]["cooloff_until"] == str(D1 + timedelta(days=6))  # type: ignore[attr-defined]
+    assert night(5, frozenset()).stats["yahoo"]["asked"] == 0  # type: ignore[attr-defined]
+    clean = night(6, frozenset())
+    assert clean.stats["yahoo"]["asked"] > 0 and "cooloff_k" not in clean.stats["yahoo"]  # type: ignore[attr-defined]
+    after = night(7, hit)
+    assert after.stats["yahoo"].get("cooloff_k", 1) == 1  # type: ignore[attr-defined]
+
+
+def seed_earnings(writer: StoreWriter, day: date, symbol: str, last: date) -> None:
+    rows = [
+        {"instrument_id": f"EQ:{symbol}", "last_earnings_date": last, "next_earnings_date": None}
+    ]
+    writer.write_table("rollups/instrument/earnings@v1", day, "r", stamped(rows, day, "r"))
+
+
+def test_a_known_report_triggers_the_post_pull_and_events_enabled_false_turns_it_off() -> None:
+    reported = D1 - timedelta(days=2)  # the session before knew it: its day after is owed
+    for events, expected in ((True, True), (False, False)):
+        writer, calls = world("AAPL", "CHWY")
+        seed_caps(writer, {"CHWY": 5e9})
+        seed_earnings(writer, D1 - timedelta(days=1), "CHWY", reported)  # the session before
+        early = D1 - timedelta(days=9)
+        run(with_yahoo(context(writer, early, calls), calls), {"session": early})  # asked then
+        calls.clear()
+        ctx = with_yahoo(context(writer, D1, calls), calls, events_enabled=events)
+        record = run(ctx, {"session": D1})
+        assert ("post" in record.stats["yahoo"]["reasons"]) is expected
+        assert expected is False or yahoo_calls(calls) == ["CHWY"]
+
+
+def test_a_report_date_known_only_on_the_session_itself_is_not_used() -> None:
+    writer, calls = world("AAPL", "CHWY")
+    seed_earnings(writer, D1, "CHWY", D1 - timedelta(days=2))  # tonight's partition: not read
+    early = D1 - timedelta(days=9)
+    run(with_yahoo(context(writer, early, calls), calls), {"session": early})
+    ctx = with_yahoo(context(writer, D1, calls), calls)
+    assert "post" not in run(ctx, {"session": D1}).stats["yahoo"]["reasons"]
+
+
+def test_the_nightly_ceiling_caps_every_yahoo_call_of_a_night() -> None:
+    writer, calls, refuse = refused_world("N1", "N2", "N3", "N4")
+    ctx = with_yahoo(context(writer, D1, calls, refused_names=refuse), calls, nightly_ceiling=2)
+    record = run(ctx, {"session": D1})
+    assert yahoo_calls(calls) == ["N1", "N2"] and record.stats["yahoo"]["ceiling"] == 2
+
+
+def test_history_reads_the_fingerprint_dates_and_a_repeat_is_not_new() -> None:
+    out = History({}, {}, {}, {}, {}, {}, {}, {}, {})
+    d1, d2, d3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)
+    first = "OK: fp=aaaaaaaa next=2026-11-03 act=2026-09-20"
+    assert note_yahoo(out, "A", first, d1) and out.changed["A"] == d1
+    assert note_yahoo(out, "A", first, d2) and out.changed["A"] == d1  # a repeat is not new
+    assert out.yahoo["A"] == d2 and out.yahoo_next["A"] == date(2026, 11, 3)
+    assert note_yahoo(out, "A", "OK: fp=aaaaaaaa act=2026-10-02", d3) and out.changed["A"] == d3
+    assert not note_yahoo(out, "B", "FETCH_ERROR: boom", d3) and "B" not in out.yahoo
+    assert ys.answer_of("OK: fp=bbbbbbbb").fp == "bbbbbbbb"

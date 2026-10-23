@@ -147,5 +147,54 @@ qualified. The owner wants Yahoo's data for every operating company.
 - **Not changed:** `check_analyst_backlog` and `check_finnhub_backlog` measure FMP's and Finnhub's
   coverage of the scope list, which this does not touch; the nightly acceptance check
   (`check_analyst_snapshot`) reads the `analyst-snapshot` run only.
-- **PR2 (not built):** a scheduler that runs the backfill batches between nightlies, so the owner
-  does not start the loop by hand.
+- **PR2 (built, amendment 2026-10-23c below):** the scheduler.
+
+## Amendment 2026-10-23c: a rolling baseline, event pulls and a cool-off (PR2 built)
+The flat rule of 2026-10-23b ("asked again after `refresh_days`") put the whole population on
+one weekly beat after the backfill: every name was due the same day, 14 days later. The
+nightly Yahoo step now schedules by `tasks/analyst/yahoo_schedule.py` (pure; the step only
+gathers its inputs and asks).
+- **Rolling baseline.** Each name has a stable slot, `sha256(instrument_id) mod cycle`, counted from
+  `[yahoo] cycle_anchor` (the backfill's day, 2026-10-23), and is due on that day of every
+  cycle: `refresh_days = 14` for a name FMP does not answer, `standby_days = 45` for one FMP
+  answers. About 1/14 (1/45) of the population a night, flat; a name keeps its slot whatever its
+  history. A missed night is caught up the next (a name whose latest slot day came after its last
+  answer, or a full cycle old, is due, stalest first); a name never asked is the stalest.
+  It alone serves every name and is the whole schedule of a name with no known report date.
+  Every name Yahoo serves stays within 14 days (18 at worst under load) of its last answer; the
+  reader goes stale at 21 and the revisions need a snapshot within 7 days of 90 days back.
+- **Event pulls on top** (`[yahoo] events_enabled`). Evidence (owner, 2026-10-23): analyst actions
+  spike in the 3 days after a report (about 7.4% a day against 1.1% uniform), are flat before
+  it, and a quarter's EPS consensus drifts continuously up to it, so estimate drift says nothing
+  of timing; the pulls are timed by the report date. **Post:** the day after a report our own
+  `earnings@v1` has seen (the session before's partition, point in time; tonight's rollup may not
+  exist and a date known only later is never read), and once more about 3 days later only if the
+  first pull showed nothing new; new data (a changed fingerprint or a newer analyst action
+  date) ends it. **Pre:** one pull in the last week before the expected report (taken 3 days
+  before; none if a pull was already made since the window opened): it stores the final
+  pre-report consensus and refreshes the date. The date is `earnings@v1` / `earnings_expected@v1`
+  of the session before; Yahoo's `calendarEvents` date, which every answer carries, is the
+  fallback and the refresh; a date that is not after the session (stale, or past with no report
+  seen) is unknown. The first sketch (enable about 83 days after the last pull, try daily until
+  new data) guessed the gap; this is timed by the date and stops at the first new data.
+- **One ceiling.** `[yahoo] nightly_ceiling = 400` calls a night, in this order: names near the
+  reader's staleness (18 days, so a busy season never starves the baseline), post pulls, pre
+  pulls (each largest market cap first), then the baseline (at most `per_night = 360`, stalest
+  first, then largest cap). A small cap past the ceiling falls back to its baseline slot.
+- **New-data detection.** The item status is `OK: fp=ab12cd34 next=2026-11-03 act=2026-10-20`
+  (`status_label` splits at the colon): a fingerprint of the stable values (target mean, high,
+  low; both annual estimates' period, average and analyst count; rating counts), not epsTrend's 7
+  / 30-days-ago fields nor the month of the rating bucket; Yahoo's next report date and newest
+  `upgradeDowngradeHistory` date. The one request now asks `calendarEvents` and
+  `upgradeDowngradeHistory` too (still one request a name); no stored kind changes (the
+  dates are item status only), so `history()` needs no store read and stays bounded (the run
+  records of the 200 days before the session).
+- **Safety.** The first 429 stops the step and records a `yahoo_cooloff` item (`k=` nights in a
+  row, `until=`): no call for `2 ** k` nights (k at most 8), the next night's history reads it;
+  a night with an answer and no 429 resets k. Three failed calls in a row still stop it. Kill
+  switches: `enabled = false` (no Yahoo), `events_enabled = false` (baseline only). Never breaks the
+  nightly (the step is optional and fail-soft).
+- **Measured (simulation, 5,000 names, 60% reporting within four weeks, the rest spread over
+  eight):** peak 325 event pulls a night, the ceiling saturated at the season's peak (mean 399 a
+  night over 99 nights), worst gap since a name's last answer 19 days with a ceiling of 400
+  (none past 21), 13 days with 600. Off season: about 70 event pulls and 300 baseline pulls.

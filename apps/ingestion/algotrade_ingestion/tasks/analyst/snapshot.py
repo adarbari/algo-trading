@@ -26,13 +26,18 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
   estimates, recommendation counts), asked of the names FMP refuses (its last outcome a 402, or
   refused tonight) and of every name Yahoo has answered (ADR 0080 amendment 2026-10-23b: the
   one-off ``analyst-backfill`` answers the whole stock population, ``population.py``), at most
-  ``[yahoo] per_night``, largest market cap first, within its own ``[yahoo] run_budget_s``. A name
-  FMP does not answer is due by ``[yahoo] refresh_days`` (the reader goes stale at 21 days); one
-  FMP answers (the reader prefers FMP, so Yahoo's row is a standby) only every ``standby_days``;
-  an unknown symbol (404) is ``NOT_COVERED`` and waits four refresh windows. It is fail-soft:
-  every error is a ``FETCH_ERROR`` item (asked again next night) and three failures in a row
-  stop the step, the names left being ``OVER_BUDGET``. Its calls are not FMP's (``budget.py``
-  counts ``fmp:`` items). With no FMP built, every name FMP never answered is a candidate;
+  ``[yahoo] nightly_ceiling``, within its own ``[yahoo] run_budget_s``. Which names is
+  ``yahoo_schedule.plan`` (ADR 0080 amendment 2026-10-23c): a rolling baseline (each name due on
+  its own slot day of the ``refresh_days`` cycle, ``standby_days`` for a name FMP answers, at most
+  ``per_night`` a night) with event pulls on top (the days after a report, the week before one)
+  that the baseline yields to; the reader goes stale at 21 days. An unknown symbol (404) is
+  ``NOT_COVERED`` and waits four refresh windows. It is fail-soft:
+  every error is a ``FETCH_ERROR`` item (asked again next night), three failures in a row stop
+  the step (the names left ``OVER_BUDGET``) and the first 429 stops it and sets a cool-off of
+  2 ** k nights (``yahoo_cooloff`` item, read back by ``history``). An answer's item status
+  carries its fingerprint and Yahoo's report and action dates (``OK: fp=ab12cd34 next=...``).
+  Its calls are not FMP's (``budget.py`` counts ``fmp:`` items).
+  With no FMP built, every name FMP never answered is a candidate;
 - which names a night asked is the run record's items (``fmp:SYM:price_target``,
   ``finnhub:SYM``, ``yahoo:SYM``...), read back by the next night: the rotation keeps no state of
   its own. An
@@ -67,9 +72,10 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import instruments
 from algotrade.services.events.scope import LIST, REFERENCE, scoped_instruments
 from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.analyst import yahoo_schedule as schedule
 from algotrade_ingestion.tasks.analyst.budget import NOT_MADE, PREFIX, fmp_calls_today
 from algotrade_ingestion.tasks.analyst.ordering import by_market_cap, market_caps
-from algotrade_ingestion.tasks.analyst.population import Name, listed_names
+from algotrade_ingestion.tasks.analyst.population import Name, listed_names, report_dates
 from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
@@ -96,6 +102,7 @@ RETRY_WINDOWS = (
 CHECKPOINT_EVERY = 25
 FINNHUB = "finnhub:"
 YAHOO = "yahoo:"
+COOLOFF = "yahoo_cooloff"  # the run item that records a 429 night's cool-off (``history`` reads it)
 YAHOO_NOT_FOUND = 404  # Yahoo: an unknown symbol, or one with no fundamentals (an ETF)
 YAHOO_KINDS = ("price_target", "estimates_annual", "recommendation")  # the frames one call parses
 YAHOO_RATE_LIMITED = (
@@ -160,6 +167,37 @@ class History:
     finnhub: dict[str, date]  # Finnhub: its call answered
     yahoo: dict[str, date]  # Yahoo: its call answered
     yahoo_refused: dict[str, date]  # Yahoo: its call said unknown (404)
+    fingerprint: dict[str, str]  # Yahoo: the fingerprint of the last answer
+    changed: dict[
+        str, date
+    ]  # Yahoo: the session an answer last differed (fingerprint, newer action)
+    action: dict[str, date]  # Yahoo: the newest analyst action date seen
+    yahoo_next: dict[str, date]  # Yahoo: its date of the next report in the last answer
+    cooloff_k: int = (
+        0  # Yahoo: nights in a row it answered 429 (0: the last night it was asked was clean)
+    )
+    cooloff_until: date | None = None  # Yahoo: not asked before this session
+
+
+def note_yahoo(out: "History", symbol: str, status: str, day: date) -> bool:
+    """Fold one ``yahoo:SYM`` item into ``out``; whether Yahoo answered it (OK, EMPTY, 404)."""
+    label = status_label(status)
+    if label in (OK, EMPTY):
+        out.yahoo[symbol] = day
+        out.yahoo_refused.pop(symbol, None)
+        got = schedule.answer_of(status)
+        if got.next_report is not None:
+            out.yahoo_next[symbol] = got.next_report
+        newer = got.action is not None and got.action > out.action.get(symbol, date.min)
+        if got.action is not None:
+            out.action[symbol] = max(got.action, out.action.get(symbol, date.min))
+        if (got.fp is not None and got.fp != out.fingerprint.get(symbol)) or newer:
+            out.changed[symbol] = day
+        if got.fp is not None:
+            out.fingerprint[symbol] = got.fp
+    elif label == NOT_COVERED:
+        out.yahoo_refused[symbol] = day
+    return label in (OK, EMPTY, NOT_COVERED)
 
 
 def history(run: IngestRun) -> History:
@@ -169,7 +207,7 @@ def history(run: IngestRun) -> History:
     (``refused_on``), its Finnhub call answered and Yahoo's answered or refused. Dated by the
     run's session, the day the rotation counts in (a nightly starts after midnight UTC, so its
     start date is a day late)."""
-    out = History({}, {}, {}, {}, {})
+    out = History({}, {}, {}, {}, {}, {}, {}, {}, {})
     first = run.session - timedelta(days=HISTORY_DAYS)
     records = run.reader.runs_of((TASK, BACKFILL_TASK), first, run.session)
     for record in sorted(records, key=lambda r: r.started_at):
@@ -177,6 +215,7 @@ def history(run: IngestRun) -> History:
             continue
         day = record.session_date
         labels: dict[str, list[str]] = {}  # symbol -> its FMP calls' labels in this run
+        yahoo_clean, cooled = False, None  # a night with an answer; the cool-off it set
         for key, status in record.items.items():
             label = status_label(status)
             if key.startswith(PREFIX):
@@ -184,12 +223,13 @@ def history(run: IngestRun) -> History:
             elif key.startswith(FINNHUB) and label in (OK, EMPTY):
                 out.finnhub[key[len(FINNHUB) :]] = day
             elif key.startswith(YAHOO):
-                symbol = key[len(YAHOO) :]
-                if label in (OK, EMPTY):
-                    out.yahoo[symbol] = day
-                    out.yahoo_refused.pop(symbol, None)
-                elif label == NOT_COVERED:
-                    out.yahoo_refused[symbol] = day
+                yahoo_clean |= note_yahoo(out, key[len(YAHOO) :], status, day)
+            elif key == COOLOFF:
+                cooled = _cooloff(status)
+        if cooled is not None:
+            out.cooloff_k, out.cooloff_until = cooled
+        elif yahoo_clean:
+            out.cooloff_k, out.cooloff_until = 0, None
         for symbol, calls in labels.items():  # FMP gates by endpoint: held only if none answered
             if OK in calls or EMPTY in calls:
                 out.answered[symbol] = day
@@ -197,6 +237,15 @@ def history(run: IngestRun) -> History:
             elif NOT_COVERED in calls:
                 out.refused_on[symbol] = day
     return out
+
+
+def _cooloff(status: str) -> tuple[int, date | None]:
+    """``(k, until)`` of a ``yahoo_cooloff`` item (``OVER_BUDGET: k=2 until=2026-10-30``)."""
+    found = dict(p.split("=", 1) for p in status.partition(": ")[2].split() if "=" in p)
+    try:
+        return int(found["k"]), date.fromisoformat(found["until"])
+    except (KeyError, ValueError):
+        return 0, None
 
 
 def estimate_rows(frame: pd.DataFrame, instrument_id: str) -> pd.DataFrame:
@@ -457,22 +506,53 @@ def _yahoo(
     limit: Any,
 ) -> dict[str, Any]:
     settings = run.ctx.settings.yahoo
+    if schedule.cooling(past.cooloff_until, run.session):
+        return {
+            "asked": 0,
+            "stopped": f"cool-off after HTTP {YAHOO_RATE_LIMITED}: not before {past.cooloff_until}",
+            "cooloff_k": past.cooloff_k,
+            "cooloff_until": str(past.cooloff_until),
+            "names": [],
+        }
     by_symbol = {n.symbol: n for n in names if n.symbol in candidates}
     hold = timedelta(days=RETRY_WINDOWS * settings.refresh_days)
     holding = {s for s, day in past.yahoo_refused.items() if run.session - day < hold}
     askable = [s for s in by_symbol if s not in holding]
-    standby = [s for s in askable if s in past.answered and s in past.yahoo]  # FMP is read first
-    waiting = set(standby)
-    fast = [s for s in askable if s not in waiting]
-    due = due_keys(fast, past.yahoo, run.session, settings.refresh_days) + due_keys(
-        standby, past.yahoo, run.session, settings.standby_days
+    dates = report_dates(run.reader, run.session) if settings.events_enabled else {}
+    pool = []
+    for s in askable:
+        n = by_symbol[s]
+        last, upcoming = dates.get(n.instrument_id, (None, None))
+        pool.append(
+            schedule.Candidate(
+                s,
+                n.instrument_id,
+                standby=s in past.answered and s in past.yahoo,  # FMP is read first
+                last_asked=past.yahoo.get(s),
+                changed=past.changed.get(s),
+                yahoo_next=past.yahoo_next.get(s),
+                last_report=last,
+                next_report=upcoming,
+            )
+        )
+    rank = by_market_cap(askable, {s: n.instrument_id for s, n in by_symbol.items()}, caps(run))
+    ceiling = (
+        settings.nightly_ceiling if limit is None else min(settings.nightly_ceiling, int(limit))
     )
-    due = by_market_cap(due, {s: n.instrument_id for s, n in by_symbol.items()}, caps(run))
-    cap = settings.per_night if limit is None else min(settings.per_night, int(limit))
-    take = due[:cap]
+    rules = schedule.Rules(
+        settings.refresh_days,
+        settings.standby_days,
+        settings.cycle_anchor,
+        ceiling,
+        settings.per_night,
+        settings.events_enabled,
+    )
+    tonight = schedule.plan(run.session, pool, rules, rank)
+    take = tonight.take
     started, stopped = run.clock(), ""
     labels: list[str] = []
     streak = 0  # consecutive failed calls
+    limited = False
     for done, symbol in enumerate(take, 1):
         key = f"{YAHOO}{symbol}"
         if not stopped and out_of_time(run, started, settings.run_budget_s):
@@ -486,15 +566,18 @@ def _yahoo(
         labels.append(label)
         streak = streak + 1 if label in FAILURES else 0
         if YAHOO_RATE_LIMITED in errors:
-            stopped = RATE_LIMITED_REASON  # one 429 ends the step: more calls only deepen the block
+            stopped, limited = RATE_LIMITED_REASON, True  # one 429 ends the step
         elif streak >= YAHOO_MAX_FAILURES:
             stopped = f"yahoo failed {YAHOO_MAX_FAILURES} calls in a row"
         if done % CHECKPOINT_EVERY == 0:
             run.checkpoint()
-    return {
-        "due": len(due),
+    out: dict[str, Any] = {
+        "due": tonight.due_baseline,
+        "events_due": tonight.due_events,
+        "reasons": tonight.counts(),
+        "ceiling": ceiling,
         "held_not_covered": len(holding),
-        "standby": len(standby),
+        "standby": sum(1 for c in pool if c.standby),
         "asked": len(labels),
         "fetched": sum(1 for x in labels if x in (OK, EMPTY)),
         "not_covered": labels.count(NOT_COVERED),
@@ -502,6 +585,12 @@ def _yahoo(
         "stopped": stopped or None,
         "names": take,
     }
+    if limited:
+        k = past.cooloff_k + 1
+        until = run.session + timedelta(days=schedule.cooloff_nights(k))
+        run.record_item(COOLOFF, f"{NOT_MADE}: k={k} until={until}")
+        out.update(cooloff_k=k, cooloff_until=str(until))
+    return out
 
 
 def ask_yahoo(
@@ -532,7 +621,13 @@ def ask_yahoo(
             rows = build_rows(kind, parsed, name.instrument_id).assign(ts=fetched_at)
             run.stage(TABLE, f"{key}:{kind}", rows, "yahoo")
             staged += 1
-        return OK if staged else EMPTY
+        return (
+            schedule.with_answer(
+                OK, schedule.fingerprint(normalized.parsed), normalized.parsed.get("calendar")
+            )
+            if staged
+            else EMPTY
+        )
 
     return status_label(run.attempt(key, ask))
 
