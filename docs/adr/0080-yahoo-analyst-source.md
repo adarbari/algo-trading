@@ -41,7 +41,8 @@ and the endpoint is unofficial; community reports are of 429s per IP under heavy
    count does not see a 429) stop the step and the names left are `OVER_BUDGET`. `[yahoo] per_night
    = 60`, `refresh_days = 14`, and its own `run_budget_s = 600` so the shared `[fmp] run_budget_s`
    cannot starve it (it runs last). Its calls are not counted in `budget.py` (FMP's alone).
-5. **Whom it asks.** Only names FMP refuses: held by its 402 (`[fmp] refused_hold_days`) or refused
+5. **Whom it asks.** Only names whose last FMP outcome is a refusal (`history` drops a name once FMP
+   answers it; the end of FMP's 90-day hold does not release it, FMP's budget may delay asking again) or refused
    tonight; never a name FMP answers. With no FMP built, every name FMP never answered. Due names
    largest market cap first.
 6. **Snapshots from the first fetch**, no history: Yahoo restates, so as for FMP and Finnhub the
@@ -62,11 +63,14 @@ flip from Yahoo to FMP leaves no mixed history. The groups move to `analyst_esti
 `analyst_targets@v2` and `analyst_revisions@v2` with a `*_source` string column (`fmp` / `yahoo`);
 revisions are null until 90 days of the new vendor's rows exist after a flip. Yahoo's and FMP's EPS
 bases differ (which EPS an analyst reports), so the two are never differenced. Ratings stay
-Finnhub-only. The `yahoo` licence is owner-only: the groups carry it and a viewer without it reads
+Finnhub-only. `parse_targets` gates on `financialCurrency` (the reporting currency), so an ADR such as
+TSM loses valid USD targets; PR B should gate on the listing currency instead. The `yahoo` licence is owner-only: the groups carry it and a viewer without it reads
 `UNKNOWN`, not the value.
 
 ## Consequences
 - The store starts collecting Yahoo's view of the refused names now, so PR B has history on day one.
 - A new unofficial dependency whose failure only warns; the nightly never depends on it.
-- If Yahoo starts blocking, the breaker stops it and `per_night` is the knob; nothing downstream
+- If Yahoo starts blocking, the step stops after three failed calls in a row (`CircuitBreaker.record`
+  resets on a 429 and transport errors never reach it, so the breaker cannot be relied on) and
+  `per_night` is the knob; nothing downstream
   reads the rows until PR B.

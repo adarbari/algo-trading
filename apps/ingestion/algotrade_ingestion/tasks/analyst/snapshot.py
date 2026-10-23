@@ -23,8 +23,8 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
 - Finnhub: one call a name (recommendation trend), at most ``[finnhub] per_night`` names, due on
   the same cadence, stalest first;
 - Yahoo (ADR 0080, owner-only licence ``yahoo``): one call a name (``quoteSummary``: targets,
-  annual estimates, recommendation counts), asked of the names FMP refuses (held by its 402 or
-  refused tonight, never a name FMP answers), at most ``[yahoo] per_night``, due by ``[yahoo]
+  estimates, recommendation counts), asked of the names FMP refuses (its last outcome a 402, or
+  refused tonight; never one FMP answers), at most ``[yahoo] per_night``, due by ``[yahoo]
   refresh_days``, largest market cap first, within its own ``[yahoo] run_budget_s``; an unknown
   symbol (404) is ``NOT_COVERED`` and waits four refresh windows. It is fail-soft: every error is
   a ``FETCH_ERROR`` item (asked again next night) and three failures in a row stop the step, the
@@ -289,7 +289,7 @@ def snapshot_analyst(ctx: TaskContext, session: date, limit: Any = None) -> RunR
         else:
             stats["finnhub"] = {"skipped": _why_not(ctx, "finnhub")}
         if yahoo_ready:
-            candidates = _yahoo_candidates(run, past, refused_tonight, fmp_ready)
+            candidates = _yahoo_candidates(past, names, refused_tonight, fmp_ready)
             stats["yahoo"] = _yahoo(
                 run, sources[source_guards.YAHOO_SOURCE], names, candidates, past, limit
             )
@@ -422,15 +422,15 @@ def _finnhub(
 
 
 def _yahoo_candidates(
-    run: IngestRun, past: History, refused_tonight: set[str], fmp_ready: bool
+    past: History, names: Sequence[Name], refused_tonight: set[str], fmp_ready: bool
 ) -> set[str]:
-    """The symbols Yahoo may be asked: the ones FMP refuses (its 402 hold, or refused tonight),
-    never one it answers. With no FMP built, every symbol FMP never answered."""
+    """The symbols Yahoo may be asked: the ones whose last FMP outcome is a refusal (``history``
+    drops a name from ``refused_on`` once FMP answers it, and the hold's end does not release it:
+    FMP's budget may delay asking again), or refused tonight; never one FMP answers. With no FMP
+    built, every symbol FMP never answered."""
     if not fmp_ready:
-        return {n.symbol for n in names_for(run, run.ctx) if n.symbol not in past.answered}
-    hold = timedelta(days=run.ctx.settings.fmp_refused_hold_days)
-    held = {s for s, day in past.refused_on.items() if run.session - day < hold}
-    return held | refused_tonight
+        return {n.symbol for n in names if n.symbol not in past.answered}
+    return set(past.refused_on) | refused_tonight
 
 
 def _yahoo(

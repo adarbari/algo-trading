@@ -120,6 +120,17 @@ def test_a_name_refused_before_and_held_by_fmp_is_asked_without_fmp() -> None:
     assert not any("symbol=CHWY" in c for c in fmp_calls(calls))  # FMP holds it for 90 days
 
 
+def test_a_name_refused_before_the_hold_window_is_still_asked_of_yahoo() -> None:
+    """FMP's hold ending does not release a name: FMP's budget may delay asking it again."""
+    writer, calls = world("AAPL", "CHWY")
+    run(context(writer, D1, calls), {"session": D1})  # FMP refuses CHWY; no Yahoo built
+    later = D1 + timedelta(days=120)  # past [fmp] refused_hold_days (90)
+    calls.clear()
+    ctx = with_yahoo(context(writer, later, calls, budget=0), calls)  # FMP asks nobody tonight
+    run(ctx, {"session": later})
+    assert fmp_calls(calls) == [] and yahoo_calls(calls) == ["CHWY"]
+
+
 def test_due_names_are_asked_largest_market_cap_first_within_per_night() -> None:
     writer, calls = world("AAPL", "BIG", "MID", "SMALL")
     seed_caps(writer, {"BIG": 9e9, "MID": 5e9, "SMALL": 1e9})
