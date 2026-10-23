@@ -32,6 +32,7 @@ import {
 } from '@/entities/screen';
 import { screenerPath } from '@/entities/guide';
 import { CopyPresetDialog } from '@/features/screener-copy';
+import { termHelp } from '@/features/guide-help';
 import { DeleteScreenerDialog } from '@/features/screener-delete';
 
 import { filterRows, SEGMENTS, toRows, type ListRow, type Segment } from '../model/rows';
@@ -53,14 +54,27 @@ export interface ScreenerListProps {
   onOpenEdge: (edgeId: string) => void;
 }
 
+/** A header with the help button of the Guide term that explains the column (ADR 0051). */
+const withHelp = (label: string, term: string) => (
+  <Stack direction="row" gap={1} align="center">
+    {label}
+    {termHelp(term)}
+  </Stack>
+);
+
 /** The columns; the 30-day pick history is the one beyond the phone's three. */
 const COLUMNS: readonly ExpandableTableColumn[] = [
   { id: 'screener', label: 'Screener', grow: 2.2, narrow: true },
-  { id: 'picks', label: 'Picks today', align: 'end', narrow: true },
-  { id: 'decisions', label: 'Decisions', grow: 1.2 },
-  { id: 'record', label: 'Track record', grow: 1.6, narrow: true },
-  { id: 'history', label: '30d picks' },
-  { id: 'last', label: 'Last run' },
+  { id: 'picks', label: withHelp('Picks today', 'screener_picks'), align: 'end', narrow: true },
+  { id: 'decisions', label: withHelp('Decisions', 'screener_decisions'), grow: 1.2 },
+  {
+    id: 'record',
+    label: withHelp('Track record', 'screener_track_record'),
+    grow: 1.6,
+    narrow: true,
+  },
+  { id: 'history', label: withHelp('30d picks', 'screener_history') },
+  { id: 'last', label: withHelp('Last run', 'screener_last_run') },
 ];
 
 export function ScreenerList({ onOpen, onEdit, onOpenTicker, onOpenEdge }: ScreenerListProps) {

@@ -63,6 +63,11 @@ an item, then delete its baseline line.
    explained, passing the entry reference `{ kind, id }` (for a field, its catalogue name),
    never text (from GD2 / GD3; `HelpDrawer` is imported only by that feature). In a feature
    table the column factories in `entities/feature` already add it to every field header.
+   **Every column header of every table says what it means** (owner 2026-10-22, after the
+   Ideas and Screeners tables shipped bare headers): a `HelpedColumn` with `help` in a
+   `DataTable`, or `termHelp(id)` in an `ExpandableTable` label; a new or renamed column ships
+   its glossary term (what it counts, how to read it, one example, when it misleads) in the
+   same PR. Key-value rows (`Facts`) use `Labelled`.
 5. **Moving an old surface**: delete its text and its Disclosure from the page, put the
    button in its place, and lower or delete the file's line in `architecture/web_prose.toml`
    in the same PR (the test fails until you do); tick the row in docs/ui/guide.md section 4.
