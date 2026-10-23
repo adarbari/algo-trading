@@ -556,7 +556,7 @@ py=${PERF_PY:-$repo/.venv/bin/python}
 cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
 
 rm -f "$rundir/sample-window-bench.json"
-set_phase bench; start_prekill bench "${PERF_BENCH_PREKILL_AFTER_S:-$(( ${PERF_BENCH_BUDGET_S:-270} + 15 ))}"
+set_phase bench; start_prekill bench "${PERF_BENCH_PREKILL_AFTER_S:-$(( bench_limit > 9 ? bench_limit - 8 : 1 ))}"
 head_before=$(git -C "${PERF_TREE:-$repo}" rev-parse HEAD 2>/dev/null || echo unknown)
 t_bench=$(date +%s)
 hist=$logs/perf_gate/history.jsonl; hist_size=$(wc -c <"$hist" 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
@@ -591,10 +591,11 @@ if [ "${paused_bench:-0}" -gt 0 ] && [ "$outcome" != crashed ] && [ "$outcome" !
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "the machine paused or stalled during the bench ($paused_bench late samples): not recorded"
 fi
-# a pre-kill `sample` suspended the bench or its API for 3 s (armed only once the bench overran its budget):
+# a pre-kill `sample` suspended the bench or its API for 3 s (armed 8 s before the cap, so only a bench about to
+# be killed gets one; an over-time run keeps its over-time cause):
 # its times are worthless; the window is in sample-window-bench.json, the run is not recorded
 if [ -f "$rundir/sample-window-bench.json" ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ] \
-   && [ "$outcome" != integrity ] && [ "$outcome" != paused ]; then
+   && [ "$outcome" != integrity ] && [ "$outcome" != paused ] && [ "$outcome" != over-time ]; then
   outcome=sampled
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "a pre-kill stack sample paused the bench ($(cat "$rundir/sample-window-bench.json")): not recorded"
@@ -607,6 +608,7 @@ if [ "$head_after" != "$head_before" ] && [ "$outcome" != crashed ] && [ "$outco
   [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
   say "code changed during the bench (${head_before:0:9} -> ${head_after:0:9}): not recorded"
 fi
+[ "$outcome" = over-time ] && [ -f "$rundir/sample-window-bench.json" ] && say "a pre-kill stack sample was taken in the last seconds of the bench (sample-window-bench.json)"
 case "$outcome" in over-time|paused|code-changed|crashed|sampled)
   kill_report bench "$bench_limit" "$outcome" ;;
 esac

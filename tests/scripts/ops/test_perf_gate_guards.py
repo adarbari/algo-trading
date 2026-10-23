@@ -573,16 +573,27 @@ def test_a_guard_exit_also_leaves_a_kill_report(rig: Rig) -> None:
     assert report["reason"].startswith("guard: a writer runs")
 
 
-def test_the_prekill_sample_is_armed_after_the_bench_budget_not_at_seventy_percent(
+def test_the_prekill_sample_is_armed_eight_seconds_before_the_cap_not_at_seventy_percent(
     rig: Rig,
 ) -> None:
-    rig.bench_body = "sleep 12\necho x\nexit 1\n"
-    # the default arming is the bench budget (270) + 15 s: a 10 s run is never sampled
-    rig.run(PERF_BENCH_LIMIT_S="10", PERF_SAMPLE_S="1")
+    rig.bench_body = "sleep 4\necho x\nexit 1\n"  # done long before cap - 8 = 6 s: never sampled
+    rig.run(PERF_BENCH_LIMIT_S="14", PERF_SAMPLE_S="1")
     assert not (_evidence(rig) / "prekill").exists()
     rig.status.unlink()
-    rig.run(PERF_BENCH_LIMIT_S="10", PERF_SAMPLE_S="1", PERF_BENCH_PREKILL_AFTER_S="3")
+    rig.bench_body = "sleep 30\n"  # killed at the cap: sampled at 6 s of the 14
+    rig.run(PERF_BENCH_LIMIT_S="14", PERF_SAMPLE_S="1")
     assert (_evidence(rig) / "prekill" / "ps-top15-bench.txt").is_file()
+
+
+def test_an_over_time_bench_that_was_sampled_keeps_its_over_time_cause(rig: Rig) -> None:
+    window = rig.tmp / "logs" / "perf_gate" / "2026-10-23" / "sample-window-bench.json"
+    rig.bench_body = f"echo '{{}}' > {window}\nsleep 30\n"
+    assert rig.run(PERF_BENCH_LIMIT_S="3", PERF_SAMPLE_S="1").returncode == 4
+    assert "outcome=over-time" in rig.status.read_text()
+    assert "outcome=sampled" not in rig.status.read_text()
+    assert "OVER-TIME" in (rig.tmp / "notified").read_text()
+    report = json.loads((_evidence(rig) / "kill-report.json").read_text())
+    assert report["reason"] == "over-time" and "pre-kill" not in report["likely_cause"]
 
 
 def test_a_run_that_was_sampled_is_not_recorded(rig: Rig) -> None:
