@@ -91,7 +91,7 @@ export function isOwn(feature: Pick<CatalogueFeature, 'scope'>): boolean {
  * open): its values are shown to the owner only, never shared or published.
  */
 export function isPersonal(feature: Pick<CatalogueFeature, 'licence'>): boolean {
-  return feature.licence !== 'open';
+  return feature.licence === 'personal' || feature.licence === 'yahoo';
 }
 
 /** The marks a feature carries in lists: "yours", "personal licence". */
