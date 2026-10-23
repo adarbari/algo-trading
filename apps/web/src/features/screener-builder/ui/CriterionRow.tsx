@@ -15,12 +15,14 @@ import {
   Stack,
   Text,
 } from '@algotrade/ui';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import {
   allowsTolerance,
   coerceValue,
+  FeatureCombobox,
   featureMarks,
+  fieldOptions,
   fieldKind,
   opFor,
   operatorsFor,
@@ -32,7 +34,6 @@ import { MODES, type Criterion, type CriterionMode } from '@/entities/screen';
 
 import { applyGuideUse } from '../model/guide';
 
-import { FeaturePicker } from './FeaturePicker';
 import { ThresholdDistribution } from './ThresholdDistribution';
 import { ThresholdInput } from './ThresholdInput';
 import { ToleranceFields } from './ToleranceFields';
@@ -77,6 +78,7 @@ export function CriterionRow({
   renderFieldHelp,
   actions,
 }: CriterionRowProps) {
+  const options = useMemo(() => fieldOptions(catalogue), [catalogue]);
   const feature = catalogue.find((f) => f.name === criterion.field);
   const kind = fieldKind(feature);
   const [showDistribution, setShowDistribution] = useState(false);
@@ -131,11 +133,15 @@ export function CriterionRow({
           disabled={disabled}
         />
         <Box grow>
-          <FeaturePicker
-            catalogue={catalogue}
-            loading={catalogueLoading}
+          <FeatureCombobox
+            aria-label="Feature or formula"
+            size="sm"
+            mono
+            options={options}
             value={criterion.field}
-            onChange={setField}
+            loading={catalogueLoading}
+            placeholder="Choose a feature…"
+            onPick={setField}
             invalid={error !== null}
             disabled={disabled}
           />

@@ -3,10 +3,14 @@
  * low first. One a preset sets can be changed or cleared in a copy.
  */
 import { Button, SegmentedControl, Stack, Text } from '@algotrade/ui';
+import { useMemo } from 'react';
 
-import { isNumericFeature, type CatalogueFeature } from '@/entities/feature';
-
-import { FeaturePicker } from './FeaturePicker';
+import {
+  FeatureCombobox,
+  fieldOptions,
+  isNumericFeature,
+  type CatalogueFeature,
+} from '@/entities/feature';
 
 export interface TieBreakFieldProps {
   catalogue: readonly CatalogueFeature[];
@@ -28,15 +32,20 @@ export function TieBreakField({
   onChange,
   disabled = false,
 }: TieBreakFieldProps) {
+  const options = useMemo(() => fieldOptions(catalogue.filter(isNumericFeature)), [catalogue]);
   return (
     <Stack direction="row" gap={2} align="center" wrap>
       <Text size="sm" tone="secondary">
         Tie-break on
       </Text>
-      <FeaturePicker
-        catalogue={catalogue.filter(isNumericFeature)}
+      <FeatureCombobox
+        aria-label="Feature or formula"
+        size="sm"
+        mono
+        options={options}
         value={field}
-        onChange={(next) => {
+        placeholder="Choose a feature…"
+        onPick={(next) => {
           onChange(next, order);
         }}
         disabled={disabled}
