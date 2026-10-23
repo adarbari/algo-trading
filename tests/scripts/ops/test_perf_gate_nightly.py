@@ -22,10 +22,12 @@ class Rig:
         self.ps.write_text(QUIET_PS)
         self.bench_out = "3 views over 1.0 s on the critical path (2.5 s above the bar); shell 0.5"
         self.bench_code = 1
+        self.bench_body: str | None = None  # replaces the fake bench script when set
 
     def run(self, **over: str) -> subprocess.CompletedProcess[str]:
         bench = self.tmp / "bench.sh"
-        bench.write_text(f"#!/bin/sh\necho '{self.bench_out}'\nexit {self.bench_code}\n")
+        body = f"echo '{self.bench_out}'\nexit {self.bench_code}\n"
+        bench.write_text("#!/bin/sh\n" + (self.bench_body or body))
         bench.chmod(0o755)
         notify = self.tmp / "notify.sh"
         notify.write_text(f'#!/bin/sh\necho "$1" >> {self.tmp}/notified\n')
@@ -120,3 +122,25 @@ def test_a_refused_bench_is_not_a_finished_day(rig: Rig) -> None:
         "0 views over 1.0 s on the critical path (0.0 s above the bar)",
     )
     assert rig.run().returncode == 0  # retried the same day
+
+
+def test_status_line_records_the_phase_timings(rig: Rig) -> None:
+    rig.run()
+    line = rig.status.read_text()
+    for key in ("wait_s=", "snapshot_s=", "bench_s=", "cleanup_s=", "total_s=", "over_time=no"):
+        assert key in line
+
+
+def test_the_watchdog_kills_a_slow_bench_and_its_child_and_marks_over_time(rig: Rig) -> None:
+    pidfile = rig.tmp / "child.pid"
+    rig.bench_body = f"sleep 60 &\necho $! > {pidfile}\nwait\n"
+    res = rig.run(PERF_BENCH_LIMIT_S="1")
+    assert res.returncode == 4
+    line = rig.status.read_text()
+    assert "exit=4 finished=yes over_time=yes" in line
+    assert "OVER-TIME" in (rig.tmp / "notified").read_text()
+    assert not (rig.root / "data").exists()  # the clone is deleted
+    child = int(pidfile.read_text())
+    with pytest.raises(ProcessLookupError):  # the whole process group died
+        os.kill(child, 0)
+    assert rig.run().returncode == 0  # a finished day: no retry loop

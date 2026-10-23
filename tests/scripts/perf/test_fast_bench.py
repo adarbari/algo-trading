@@ -293,3 +293,13 @@ def test_the_gate_measures_the_capture_by_default_and_warns_on_the_static_list(
     assert fb.resolve_views_file("x.json") == (Path("x.json"), "")
     path, warning = fb.resolve_views_file(None, tmp_path / "missing.json")
     assert path == fb.vw.VIEWS_FILE and "no captured variables" in warning
+
+
+def test_wrapper_timings_are_parsed_and_stored_in_the_history_record() -> None:
+    assert fb.parse_timings("wait_s=3,snapshot_s=240,bad,x=y") == {"wait_s": 3, "snapshot_s": 240}
+    totals = {"views_over_1s": 0, "seconds_above_bar": 0, "shell_total_s": 0.3}
+    rec = fb.history_record(
+        {"/a": _view(0.4, "X")}, totals, "a", 1.0, 2.0, "n", False, {"wait_s": 3}
+    )
+    assert rec["timings"] == {"wait_s": 3}
+    assert "timings" not in fb.history_record({"/a": _view(0.4, "X")}, totals, "a", 1.0, 2.0, "n")

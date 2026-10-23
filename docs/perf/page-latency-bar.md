@@ -106,10 +106,21 @@ disk, load, a writer that started during the copy: the clone is discarded) exits
 a start refused by a guard is not a finished run, so retries continue. Exit codes: 0 done (clean)
 or nothing to do; 1 finished with a view over the bar without a named exception (the owner is
 notified, as `deploy.sh` does, by a desktop notification), or an operation failed; 2 refused (a
-path guard, or the bench refused); 3 busy, retry. Each run appends `date= sha= views_over=
+path guard, or the bench refused); 3 busy, retry; 4 over-time (the bench hit its 300 s cap). Each run appends `date= sha= views_over=
 seconds_above= exit= finished=` to `var/logs/perf_gate.status`, keeps the output in
 `var/logs/perf_gate.last.log`, and records the history line (`--record`: a noisy or
 low-confidence run is not recorded). The history is committed by the next harness PR, never by the agent.
+
+**Timing, and the 5-minute cap.** The cap applies to the benchmark phase; the snapshot is a
+separate step. Expected breakdown: the CoW snapshot takes 4-10 minutes depending on load
+(measured 4m17s and 5m07s on a quiet machine, 9m41s under load), the bench at most 5 minutes by
+its budget, so the night's total is about 10-16 minutes. The bench is hard-capped: a watchdog
+runs it in its own process group and at 300 s kills the whole group (the bench and its API
+child), marks the run over-time (exit 4; a finished day, so no retry loop; nothing is recorded)
+and the clone is deleted. Every run appends `wait_s snapshot_s bench_s cleanup_s total_s` (and
+`over_time=`) to `var/logs/perf_gate.status`; the history line carries `wait_s` and
+`snapshot_s` (`--timings`). The owner is notified when `bench_s` is over 300, `total_s` over 15
+minutes, or any view is over the bar.
 
 **The launchd entry** (not written or loaded by anything in this repo; the owner installs it like
 the nightly's, `docs/hosting.md`): label `com.algotrade.perf-gate`, `ProgramArguments`

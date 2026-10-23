@@ -198,6 +198,7 @@ def history_record(
     load_after: float,
     machine: str,
     noisy: bool = False,
+    timings: dict[str, int] | None = None,
 ) -> dict:
     """One history line for a run (critical path, sum and slowest op per view, plus totals)."""
     return {
@@ -208,6 +209,7 @@ def history_record(
         "machine": machine,
         "mode": "empty-cache first request, 5 reps averaged",
         "noisy": noisy,
+        **({"timings": timings} if timings else {}),
         "views": {
             k: {"crit_s": v["crit_s"], "sum_s": v["sum_s"], "slowest_op": v["slowest_op"]}
             for k, v in views.items()
@@ -496,9 +498,24 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=BUDGET_S,
         help="wall clock for the timed passes (at least 2 passes always, at most --reps)",
     )
+    p.add_argument(
+        "--timings",
+        default="",
+        help="phase timings of the nightly wrapper, k=v,k=v (seconds), stored with --record",
+    )
     p.add_argument("--min-free-disk-gb", type=float, default=al.pp.MIN_FREE_DISK_GB)
     p.add_argument("--min-free-swap-mb", type=int, default=al.pp.MIN_FREE_SWAP_MB)
     return p.parse_args(argv)
+
+
+def parse_timings(text: str) -> dict[str, int]:
+    """``wait_s=3,snapshot_s=240`` -> {'wait_s': 3, 'snapshot_s': 240}; bad pairs are dropped."""
+    out: dict[str, int] = {}
+    for pair in text.split(","):
+        k, _, v = pair.partition("=")
+        if k and v.isdigit():
+            out[k] = int(v)
+    return out
 
 
 def report_run(ops: dict, meta: dict, args: argparse.Namespace, subset: bool) -> tuple[bool, bool]:
@@ -581,7 +598,14 @@ def main(argv: list[str] | None = None) -> int:
     elif args.record:
         note = args.machine + ("; ratio mode" if args.ratio_mode else "")
         rec = history_record(
-            views, result["totals"], git_sha(), load_before, load_after, note.strip("; "), noisy
+            views,
+            result["totals"],
+            git_sha(),
+            load_before,
+            load_after,
+            note.strip("; "),
+            noisy,
+            parse_timings(args.timings),
         )
         append_history(rec)
         print(f"recorded in {HISTORY_FILE.relative_to(REPO)}")
