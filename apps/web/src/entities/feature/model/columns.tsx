@@ -30,8 +30,9 @@ import { shownValue, valueFormat } from './value';
  * table turns it into the button (`features/guide-help`); an entity cannot import a feature.
  */
 export interface ColumnHelp {
-  kind: 'field';
-  /** The catalogue name. */
+  /** A catalogue field, or a glossary term for a column that is not one (the Ideas table's). */
+  kind: 'field' | 'term';
+  /** The catalogue name, or the term id. */
   id: string;
 }
 

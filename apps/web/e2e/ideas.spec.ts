@@ -106,7 +106,7 @@ test('the column switch swaps the stock columns for the options set, kept in the
   page,
 }) => {
   await page.goto('/ideas');
-  await expect(grid(page).getByRole('columnheader')).toContainText(["Why it's here", 'Criteria']);
+  await expect(grid(page).getByRole('columnheader')).toContainText(['Picked by', 'Decision', 'Watch out']);
   await page.getByRole('radio', { name: 'Options columns' }).click();
   await expect(page).toHaveURL(/columns=options/);
   const aapl = grid(page).getByRole('row', { name: /AAPL/ });

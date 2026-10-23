@@ -148,3 +148,43 @@ body = """
 Some screeners rank names by values from a source under a personal data licence. Without that licence you can see which names the screener picked, but not their order, because its first picks would reveal the hidden values. So the ranking leaves the whole screener out of your ideas and lists it as withheld, with the number of names it picked. The ideas from your other screeners are unaffected. With the licence, the screener's picks join the list again.
 """
 see_also = ["ideas_ranking", "picked_by"]
+
+[[term]]
+id = "idea_decision"
+term = "Idea decision"
+short = "The badge says how the best pick fared overall; the squares under it show each criterion it was judged on."
+body = """
+The decision comes from the criteria, never the other way round. A square is green for a pass, amber for a near miss, red for a miss and grey when no value was stored. A criterion that misses outright or has no value makes the row REJECT. A near miss gives WATCH, LIQUIDITY_RISK or EVENT_RISK by the criterion's on_miss setting, and a row with only passes is QUALIFIED. With the regime gate on, a regime the screener pauses in shows PAUSED. For example, four squares of green, amber, red and grey beside REJECT mean the red miss decided it. Don't read QUALIFIED as a forecast: it says the screen's thresholds were met, nothing about the next move. Hover a square for its criterion and outcome.
+"""
+next = "Open the pick's screener from Picked by to see each criterion's value and threshold."
+see_also = ["qualified", "watch", "liquidity_risk", "event_risk", "reject", "paused", "near_miss", "on_miss"]
+
+[[term]]
+id = "idea_size"
+term = "Idea size"
+short = "The share of a normal position the market regime allows for a new idea: 100% in Clear down to 25% in Severe storm."
+body = """
+The multipliers are Clear (CALM) 100%, Clouds building (CAUTION) 75%, Storm (STRESS) 50% and Severe storm (CRISIS) 25%. It is 0% when the idea's screener pauses in the session's regime, and 0% when the regime is unknown, because sizing fails closed. For example, a pick on a Storm session shows 50%: half the size you would take on a Clear day. The column appears only when the run stamped a size, and the regime gate is off unless the site or your settings turn it on. Don't read it as a forecast or a recommendation: it only scales a new position.
+"""
+next = "Check the regime label in the Guide before sizing a trade."
+see_also = ["regime", "paused", "idea_decision"]
+
+[[term]]
+id = "idea_price"
+term = "Idea price"
+short = "The stored close of the session and its move from the session before; end of day, not live."
+body = """
+The close is the last price of the session the page is showing, with the return from the previous close under it, such as 226.80 and +1.2%. It reads Unknown when no close is stored for that session, never an older day's price. Don't trade from it: the live quote on a ticker's own page is the one to check before an order.
+"""
+next = "Open the ticker to see its live quote and chart."
+see_also = ["unknown", "idea_decision"]
+
+[[term]]
+id = "idea_watch_out"
+term = "Idea watch out"
+short = "What the screener flagged on the idea, with the reasons it came close to missing; empty does not mean safe."
+body = """
+The badges are the screener's own flags, LIQUIDITY_RISK when the decision is that, and earnings before the nearest expiry for an option idea. The muted lines under them are the near-miss reasons, such as a spread slightly too wide, with the full text on hover. They list criteria that missed or nearly missed, never why a pick passed. With nothing flagged the cell shows the next earnings date in muted text. An empty cell means nothing was flagged, not that the idea is safe. Check the event calendar and the spread before acting.
+"""
+next = "Open the pick's screener to see the criterion behind each reason."
+see_also = ["liquidity_risk", "idea_decision", "near_miss"]
