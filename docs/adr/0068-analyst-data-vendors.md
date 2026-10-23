@@ -61,7 +61,7 @@ stored before stays across sessions, and `checked_ts` says how old it is.
 ### The pull as built (amended 2026-10-17; the first design said otherwise)
 - **FMP: a rotating pull over S&P 500 members plus the scope list.** 200 calls a day cannot cover
   the universe, and the free plan covers few names (see the measurement above). A name answered with
-  402 is `NOT_COVERED` after one call and is asked again only after four refresh windows (not "until
+  402 is `NOT_COVERED` after one call and is asked again only after `[fmp] refused_hold_days` (90; amended 2026-10-23, a refusal costs a call: not "until
   the next probe": the table is read each night and nothing re-probes), so the budget goes mostly to
   the covered large caps; each name's estimates, targets and ratings are refreshed on
   `[fmp] refresh_days`. The first design also named tier A / B names; they are not in the
@@ -79,7 +79,7 @@ run for a session before the last closed one is refused) appends each night's sl
 publish instant, never a vendor date, no earlier session's row replaced. Names: S&P 500 members and
 the scope list. FMP spends three calls a name within `[fmp] daily_budget` on names due on the
 `[fmp] refresh_days` cadence (never fetched first, then the stalest); a 402 name is `NOT_COVERED`
-and waits four windows. Finnhub reads up to `[finnhub] per_night` names on its own
+and waits `[fmp] refused_hold_days` (90); the due names go largest market cap first and the night plans one call a name (the guards stop it). Finnhub reads up to `[finnhub] per_night` names on its own
 `[finnhub] refresh_days`. With neither key set the step is skipped with a WARN (a pass). The rotation
 is read back from the run records' items. Every attempt of a vendor for a name also stores one
 `kind = "coverage"` row (`period = "current"`, `status` OK / EMPTY / NOT_COVERED / FAILED, `ts` the

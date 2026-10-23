@@ -9,15 +9,17 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
   (``config/site/events/scope.toml``) and the stocks its funds track, as ``SymbolResolver`` knows
   them; what the probe stored in ``analyst/vendor_access`` as DENIED is not asked (a kind with no
   verdict is);
-- FMP: three calls a name (price-target consensus, grades consensus, annual estimates), as many
-  names as ``[fmp] daily_budget`` still allows tonight (``budget.py``; the probe's calls and every
-  earlier run of the day count). A name is due when never fetched or past its slot in ``[fmp]
-  refresh_days`` (``due_keys``: new names first, then the stalest), so every name is refreshed on
-  that cadence as far as the budget goes. A name FMP refuses (402, not on the free plan) is
-  ``NOT_COVERED`` after one call and is asked again only after four refresh windows. FMP gates by
+- FMP: three calls a name (price-target consensus, grades consensus, annual estimates), planned
+  at the cheapest cost (one call, a refusal) so a night takes as many names as ``[fmp]
+  daily_budget`` still allows calls (``budget.py``; the probe's calls and every earlier run of the
+  day count) and the in-loop guards stop it when the calls are spent (a covered name cut off
+  keeps the rows it got and its remaining kinds are ``OVER_BUDGET`` items). A name is due when
+  never fetched or past its slot in ``[fmp] refresh_days`` (``due_keys``); the due names are
+  asked largest market cap first (``ordering.py``: the covered names are large caps). A name FMP
+  refuses (402, not on the free plan) is ``NOT_COVERED`` after one call (which counts against the
+  day's calls) and is asked again only after ``[fmp] refused_hold_days`` (90). FMP gates by
   endpoint, so a name any of whose calls answered is never held (a refused later kind just has no
-  rows); the free
-  plan covers few names, so most nights spend their budget on the covered large caps;
+  rows); the free plan covers few names;
 - Finnhub: one call a name (recommendation trend), at most ``[finnhub] per_night`` names, due on
   the same cadence, stalest first;
 - which names a night asked is the run record's items (``fmp:SYM:price_target``,
@@ -52,6 +54,7 @@ from algotrade.data.reference import instruments
 from algotrade.services.events.scope import LIST, REFERENCE, scoped_instruments
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst.budget import NOT_MADE, PREFIX, fmp_calls_today
+from algotrade_ingestion.tasks.analyst.ordering import by_market_cap, market_caps
 from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
@@ -69,7 +72,9 @@ SOURCES = source_guards.ANALYST_SOURCES
 NOT_COVERED, EMPTY, OK, FAILED = "NOT_COVERED", "EMPTY", "OK", "FAILED"
 COVERAGE = "coverage"  # the snapshot ``kind`` of an attempt's marker row
 PLAN_REFUSAL = 402  # FMP: "Premium Query Parameter", a symbol the free plan does not serve
-RETRY_WINDOWS = 4  # a refused name waits this many refresh windows before it is asked again
+RETRY_WINDOWS = (
+    4  # Finnhub: a refused name waits this many refresh windows (FMP: refused_hold_days)
+)
 CHECKPOINT_EVERY = 25
 FINNHUB = "finnhub:"
 
@@ -256,7 +261,7 @@ def snapshot_analyst(ctx: TaskContext, session: date, limit: Any = None) -> RunR
 
 
 def retry_days(refresh_days: int) -> int:
-    """Days a refused name waits before it is asked again: ``RETRY_WINDOWS`` refresh windows (the
+    """Finnhub: days a name waits before it is asked again, ``RETRY_WINDOWS`` refresh windows (the
     backlog check counts an attempt of this age as asked)."""
     return RETRY_WINDOWS * refresh_days
 
@@ -282,13 +287,13 @@ def _fmp(
     spent = fmp_calls_today(run)
     left = max(settings.fmp_daily_budget - spent, 0)
     by_symbol = {n.symbol: n for n in names}
-    holding = {
-        s for s, day in refused_on.items() if run.session - day < timedelta(days=retry_days(window))
-    }
+    hold = timedelta(days=settings.fmp_refused_hold_days)
+    holding = {s for s, day in refused_on.items() if run.session - day < hold}
     due = due_keys([s for s in by_symbol if s not in holding], answered, run.session, window)
-    capacity = left // max(len(calls), 1) if calls else 0
+    due = by_market_cap(due, {s: n.instrument_id for s, n in by_symbol.items()}, caps(run))
+    capacity = left if calls else 0  # a refusal costs one call: the cheapest case, guards stop it
     take = due[: capacity if limit is None else min(capacity, int(limit))]
-    fetched = refused_n = 0
+    fetched = refused_n = asked = 0
     for symbol in take:
         name = by_symbol[symbol]
         labels: list[str] = []
@@ -308,6 +313,7 @@ def _fmp(
             labels.append(status)
             if status == NOT_COVERED and OK not in labels and EMPTY not in labels:
                 break  # nothing answered yet: the plan does not serve this name, spare the rest
+        asked += bool(labels)
         if coverage_status(labels) == NOT_COVERED:
             refused_n += 1
         elif not unmade:
@@ -320,12 +326,16 @@ def _fmp(
         "budget": settings.fmp_daily_budget,
         "due": len(due),
         "held_not_covered": len(holding),
-        "asked": len(take),
+        "asked": asked,
         "fetched": fetched,
         "not_covered": refused_n,
         "kinds": [c[3] for c in calls],
         "names": take,
     }
+
+
+def caps(run: IngestRun) -> dict[str, float]:
+    return market_caps(run.reader, run.session)
 
 
 def out_of_time(run: IngestRun, started: datetime) -> bool:

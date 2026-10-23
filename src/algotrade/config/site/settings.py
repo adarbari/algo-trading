@@ -158,7 +158,7 @@ VENDOR_EXTRAS = {
     "finra": ("short_interest_lookback_days", "short_volume_lookback_days"),
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
-    "fmp": ("licence", "daily_budget", "refresh_days", "run_budget_s"),
+    "fmp": ("licence", "daily_budget", "refresh_days", "refused_hold_days", "run_budget_s"),
     "finnhub": ("licence", "per_night", "refresh_days"),
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
@@ -242,14 +242,11 @@ class SourcesSettings:
     finra_short_volume_lookback_days: int = 10  # [finra]: nightly window of trade dates
     fred_base_url: str = "https://api.stlouisfed.org/fred"  # [fred] base_url (ADR 0048)
     tiingo_licence: str = "personal"  # [tiingo] licence: what its bars are licensed for (ADR 0028)
-    tiingo_monthly_symbol_budget: int = (
-        450  # [tiingo] monthly_symbol_budget: distinct tickers a month
-    )
+    tiingo_monthly_symbol_budget: int = 450  # [tiingo] monthly_symbol_budget: tickers a month
     fmp_licence: str = "personal"  # [fmp] licence: what its analyst data is licensed for (ADR 0068)
-    fmp_daily_budget: int = (
-        200  # [fmp] daily_budget: FMP calls a UTC day the analyst tasks may spend
-    )
+    fmp_daily_budget: int = 200  # [fmp] daily_budget: FMP calls a UTC day
     fmp_refresh_days: int = 7  # [fmp] refresh_days: refetch cadence of a name
+    fmp_refused_hold_days: int = 90  # [fmp] refused_hold_days: wait after a 402
     fmp_run_budget_s: int = 1500  # [fmp] run_budget_s: analyst-snapshot stops calling after this
     finnhub_licence: str = "personal"  # [finnhub] licence (ADR 0068)
     finnhub_per_night: int = 300  # [finnhub] per_night: names read a night
@@ -409,6 +406,9 @@ class SourcesSettings:
             fmp_licence=_extra(vendors, "fmp").choice("licence", d.fmp_licence, LICENCES),
             fmp_daily_budget=_extra(vendors, "fmp").integer("daily_budget", d.fmp_daily_budget, 0),
             fmp_refresh_days=_extra(vendors, "fmp").integer("refresh_days", d.fmp_refresh_days, 1),
+            fmp_refused_hold_days=_extra(vendors, "fmp").integer(
+                "refused_hold_days", d.fmp_refused_hold_days, 1
+            ),
             fmp_run_budget_s=_extra(vendors, "fmp").integer("run_budget_s", d.fmp_run_budget_s, 1),
             finnhub_per_night=_extra(vendors, "finnhub").integer(
                 "per_night", d.finnhub_per_night, 0
