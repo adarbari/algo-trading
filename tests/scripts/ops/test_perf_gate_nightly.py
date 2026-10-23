@@ -306,3 +306,34 @@ def test_the_nightly_command_writes_its_history_under_var_logs_and_leaves_the_re
         check=False,
     ).stdout
     assert before == after
+
+
+def test_an_integrity_failure_has_its_own_outcome_and_notice_listing_the_failures(rig: Rig) -> None:
+    rig.bench_body = (
+        "echo '0 views over 1.0 s on the critical path (0.0 s above the bar); shell 0.5'\n"
+        "echo 'INTEGRITY operations that failed: Boom'\n"
+        "echo 'INTEGRITY shell operations not measured: Regime'\nexit 1\n"
+    )
+    assert rig.run().returncode == 1
+    assert "outcome=integrity" in rig.status.read_text()
+    note = (rig.tmp / "notified").read_text()
+    assert "INTEGRITY FAILURE" in note and "Boom" in note and "Regime" in note
+    assert "0 views over the bar" not in note
+
+
+def test_two_instances_racing_for_a_stale_lock_never_both_run(rig: Rig) -> None:
+    lock = rig.tmp / "logs" / "perf_gate" / "lock.d"
+    lock.mkdir(parents=True)
+    (lock / "pid").write_text("999999")
+    rig.bench_body = (
+        "sleep 3\necho '0 views over 1.0 s on the critical path (0.0 s above the bar)'\nexit 0\n"
+    )
+    env = rig.env()
+    procs = [
+        subprocess.Popen(
+            ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        for _ in range(3)
+    ]
+    codes = sorted(p.communicate(timeout=60) and p.returncode for p in procs)
+    assert codes == [0, 3, 3]

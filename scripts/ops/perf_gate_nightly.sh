@@ -82,9 +82,15 @@ take_lock() {
   if mkdir "$lockdir" 2>/dev/null; then echo $$ >"$lockdir/pid"; lock_held=1; return 0; fi
   holder=$(cat "$lockdir/pid" 2>/dev/null || true)
   if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then return 1; fi
-  rm -rf "$lockdir"  # stale: its owner is gone
-  mkdir "$lockdir" 2>/dev/null || return 1
-  echo $$ >"$lockdir/pid"; lock_held=1
+  # stale: its owner is gone. Takeovers are serialised by a guard directory, and the holder is
+  # read again under it, so two instances never both take over (or take a live lock).
+  mkdir "$lockdir.takeover" 2>/dev/null || return 1
+  holder=$(cat "$lockdir/pid" 2>/dev/null || true)
+  if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then rmdir "$lockdir.takeover"; return 1; fi
+  rm -rf "$lockdir"
+  if mkdir "$lockdir" 2>/dev/null; then echo $$ >"$lockdir/pid"; lock_held=1; fi
+  rmdir "$lockdir.takeover"
+  [ "$lock_held" = 1 ]
 }
 if ! take_lock; then say "busy, retry: another perf gate run holds $lockdir"; exit 3; fi
 wd_pid=
@@ -233,10 +239,12 @@ views_over=${over%% *}; above=${over##* }
 finished=yes; overtime=no; outcome=ok
 if [ "$code" -eq 124 ]; then overtime=yes; code=4; outcome=over-time
 elif [ "$code" -eq 2 ]; then outcome=refused
+elif [ "$code" -eq 1 ] && grep -q '^INTEGRITY ' "$out"; then outcome=integrity
 elif [ "$code" -eq 1 ] && [ -n "${over:-}" ]; then outcome=over-the-bar
 elif [ "$code" -ne 0 ]; then outcome=crashed; code=1
 fi
 cat "$out" >>"$rundir/run.log"
+out_copy=$rundir/run.log
 cp "$out" "$logs/perf_gate.last.log"
 rm -f "$out"
 
@@ -259,11 +267,16 @@ t_end=$(date +%s)
 cleanup_s=$((t_end - t_benched)); total_s=$((t_end - t_start))
 echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?} exit=$code finished=$finished outcome=$outcome over_time=$overtime wait_s=$wait_s snapshot_s=$snapshot_s bench_s=$bench_s cleanup_s=$cleanup_s total_s=$total_s" >>"$status"
 reason=""; [ "$overtime" = yes ] && reason=over-time
+[ "$outcome" = integrity ] && reason=integrity
 [ "$outcome" = refused ] && reason=refused; [ "$outcome" = crashed ] && reason=crashed
 finish_evidence "$reason"
 
 if [ "$code" -ne 0 ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
+  if [ "$outcome" = integrity ]; then
+    why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
+    msg="1 s page gate INTEGRITY FAILURE (not a timing result): $why evidence in var/logs/perf_gate/$today/"
+  fi
   [ "$outcome" = crashed ] && msg="1 s page gate CRASHED (no result): $msg"
   [ "$outcome" = refused ] && msg="1 s page gate REFUSED by the bench (no result): $msg"
   [ "$overtime" = yes ] && msg="1 s page gate OVER-TIME: bench killed at ${bench_limit}s (not recorded); $msg"

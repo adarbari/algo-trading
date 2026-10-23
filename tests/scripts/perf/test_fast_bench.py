@@ -33,6 +33,9 @@ BAR = {
 }
 
 
+CLEAN = {**BAR, "exception": []}
+
+
 def _view(crit: float, op: str) -> dict:
     return {"crit_s": crit, "sum_s": crit, "slowest_op": op}
 
@@ -52,8 +55,8 @@ def test_bar_file_is_valid_and_every_exception_has_reason_and_date() -> None:
     for e in exceptions:
         assert e["operation"] and e["reason"].strip() and e["approval"].strip()
         assert date.fromisoformat(e["date"]) <= date.fromisoformat(e["expiry"])
-        assert date.fromisoformat(e["expiry"]) >= today, f"{e['operation']}: expired, remove it"
-    assert date.fromisoformat(bar["unmeasured_expiry"]) >= today, "unmeasured_views expired"
+        assert date.fromisoformat(e["date"]) <= today  # never dated in the future
+    date.fromisoformat(bar["unmeasured_expiry"])
 
 
 def test_an_expired_exception_no_longer_excuses_a_view() -> None:
@@ -318,7 +321,7 @@ def _failures(**over: object) -> list[str]:
         "view_ops": {"/a": ["X#1"]},
         "skipped": {},
         "by_name": _ops(Viewer=0.1, GuideEntries=0.1),
-        "bar": BAR,
+        "bar": CLEAN,
         "subset": False,
         "today": date(2026, 10, 23),
     }
@@ -336,7 +339,7 @@ def test_a_view_that_did_not_parse_or_an_unresolved_operation_fails_the_gate() -
 
 
 def test_listed_unmeasured_views_pass_until_the_list_expires() -> None:
-    bar = {**BAR, "unmeasured_views": ["/b"], "unmeasured_expiry": "2026-11-01"}
+    bar = {**CLEAN, "unmeasured_views": ["/b"], "unmeasured_expiry": "2026-11-01"}
     assert _failures(bar=bar, skipped={"/b": "no document"}) == []
     assert _failures(bar=bar, skipped={"/b": "x"}, today=date(2026, 11, 2))
 
@@ -348,7 +351,7 @@ def test_empty_views_missing_shell_failed_and_empty_answers_all_fail() -> None:
     failed = {"/a": {"failed": ["Boom"], "empty": []}}
     assert "failed" in _failures(views=failed)[0] and "Boom" in _failures(views=failed)[0]
     empty = {"/a": {"failed": [], "empty": ["Hollow", "MyScreens"]}}
-    bar = {**BAR, "empty_ok": ["MyScreens"]}
+    bar = {**CLEAN, "empty_ok": ["MyScreens"]}
     out = _failures(views=empty, bar=bar)
     assert len(out) == 1 and "Hollow" in out[0] and "MyScreens" not in out[0]
 
@@ -386,3 +389,55 @@ def test_the_history_file_is_a_parameter_and_the_tracked_file_is_not_touched(
     assert fb.read_history(str(tmp_path / "h.jsonl"))[0]["sha"] == "a"
     assert fb.HISTORY_FILE.read_bytes() == before
     assert fb.parse_args(["--history-file", "x"]).history_file == "x"
+
+
+def test_an_expired_exception_or_unmeasured_list_is_reported_loudly_at_run_time() -> None:
+    assert (
+        "exception for Slow expired on 2999-01-01" in _failures(bar=BAR, today=date(3000, 1, 1))[0]
+    )
+    bar = {**BAR, "exception": [{"operation": "Old", "expiry": "2020-01-01"}]}
+    assert "exception for Old expired on 2020-01-01" in _failures(bar=bar)[0]
+
+
+def test_the_committed_capture_resolves_every_operation_except_the_listed_views() -> None:
+    """Fitness: the gate must not fail its integrity check on day one, nor skip an operation
+    silently: whatever op_set cannot resolve is on the bar's unmeasured_views list."""
+    distinct, view_ops, skipped = fb.op_set(fb.vw.load_views(fb.CAPTURED_FILE))
+    listed = set(fb.load_bar()["unmeasured_views"])
+    assert set(skipped) <= listed, sorted(set(skipped) - listed)
+    assert all(view_ops.values()) and {"EdgeCompare", "EdgePaper", "GuideEdge"} <= {
+        d["name"] for d in distinct.values()
+    }
+
+
+def test_hand_written_web_documents_are_found_with_their_constants_filled() -> None:
+    docs = fb.pdocs.hand_written_documents()
+    assert "edge(id: $id)" in docs["EdgeCompare"] and "${" not in docs["EdgeCompare"]
+    assert "winRate baseRate liftPts trades" in docs["EdgeCompare"]
+    assert "edgePaper" in docs["EdgePaper"]
+
+
+def test_an_operation_failing_in_an_early_pass_is_failed_even_if_the_last_pass_is_fine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    statuses = iter([500, 200, 200])
+
+    class FlakyApi:
+        url = "http://x"
+        last_error = ""
+
+        def __init__(self, *a: object, **k: object) -> None:
+            self.client = type("C", (), {"get": staticmethod(lambda url: None)})()
+
+        def call(self, body: dict) -> tuple[float, int, int, int]:
+            return 5.0, next(statuses), 1, 1
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(fb.al, "Api", FlakyApi)
+    monkeypatch.setattr(fb.al, "uncached_config", lambda src, dst: dst)
+    monkeypatch.setattr(fb.al, "guard", lambda: None)
+    monkeypatch.setattr(fb, "wait_quiet", lambda limit, load_max: 1.0)
+    ops, _ = fb.time_ops({"A#1": {"name": "A", "query": "q", "variables": {}}}, "file:///c", 3, 4.0)
+    assert ops["A#1"]["failed"] is True

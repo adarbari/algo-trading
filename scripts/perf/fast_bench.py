@@ -48,6 +48,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import api_latency as al
+import page_docs as pdocs
 import views as vw
 
 REPO = Path(__file__).resolve().parents[2]
@@ -327,6 +328,40 @@ def resolve_views_file(arg: str | None, captured: Path = CAPTURED_FILE) -> tuple
     )
 
 
+EDGE_VARS = ("id", "edgeId")  # the variables an edge operation takes: the one edge the capture uses
+# the first-render values of the edge trades ledger (widgets/edge-trades/ui/EdgeTrades.tsx)
+FIRST_RENDER = {"period": "ALL", "page": 1, "sort": "DECISION", "descending": False}
+
+
+def edge_id_of(doc: dict) -> str | None:
+    """The edge id the capture's own requests use (EdgeDetail `ids`, EdgeDocument `id`...)."""
+    for v in doc["views"].values():
+        for r in vw.captured_requests(v):
+            ids = r["variables"].get("ids")
+            if isinstance(ids, list) and ids and r["op"].startswith("Edge"):
+                return str(ids[0])
+            if isinstance(r["variables"].get("id"), str) and r["op"].startswith("Edge"):
+                return str(r["variables"]["id"])
+    return None
+
+
+def web_fallback(name: str, edge: str | None) -> dict | None:
+    """An operation the capture never recorded, from the web's own document (generated gql.ts, or
+    typed by hand in the source) with the capture's edge id; None when a required variable has no
+    known value (the operation then stays not measured, which fails the gate)."""
+    docs = {**pdocs.hand_written_documents(), **pdocs.web_documents()}
+    query = docs.get(name)
+    if query is None or edge is None:
+        return None
+    required = pdocs.required_variables(query)
+    if not required <= set(EDGE_VARS) | set(FIRST_RENDER):
+        return None
+    declared = pdocs.declared_variables(query)
+    variables = {v: edge for v in declared if v in EDGE_VARS}
+    variables |= {v: x for v, x in FIRST_RENDER.items() if v in declared}
+    return {"query": query, "variables": variables}
+
+
 def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, str]]:
     """(distinct ops by signature, signatures per view, views not measured with the reason)."""
     pages = json.loads(al.PAGES_FILE.read_text())["pages"]
@@ -339,6 +374,7 @@ def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, 
     distinct: dict[str, dict] = {}
     view_ops: dict[str, list[str]] = {}
     skipped: dict[str, str] = {}
+    edge = edge_id_of(doc)
     for vid in ids:
         try:
             ops, by = vw.view_operations(doc, [vid], known)
@@ -346,7 +382,7 @@ def op_set(doc: dict) -> tuple[dict[str, dict], dict[str, list[str]], dict[str, 
             for name in doc["views"][vid].get("ops", []):
                 if name in have or name in doc["views"][vid].get("uncertain", []):
                     continue
-                d = global_ops.get(name) or known.get(name)
+                d = global_ops.get(name) or known.get(name) or web_fallback(name, edge)
                 if d is None:
                     skipped[f"{vid} :: {name}"] = f"operation {name} has no document"
                     continue
@@ -420,11 +456,13 @@ def time_ops(
                 api.client.get(f"{api.url}/__bench_clear")
                 ms, status, size, _ = api.call({"query": d["query"], "variables": d["variables"]})
                 samples[sig].append(round(ms, 1))
+                prev = last.get(sig, {})
                 last[sig] = {
                     "status": status,
                     "bytes": size,
                     "err": api.last_error,
-                    "empty": bool(getattr(api, "last_note", None)),
+                    "bad": prev.get("bad", False) or status != 200 or bool(api.last_error),
+                    "empty": prev.get("empty", False) or bool(getattr(api, "last_note", None)),
                 }
             if partial is not None:
                 names = {s: distinct[s]["name"] for s in distinct}
@@ -445,7 +483,7 @@ def time_ops(
             "avg": round(statistics.mean(x), 1),
             "n": len(x),
             "noisy": any(ld > load_max for ld in loads[s]),
-            "failed": last[s]["status"] != 200 or bool(last[s]["err"]),
+            "failed": last[s]["bad"],  # judged over every pass, not the last one
             "empty": last[s]["empty"],
         }
         for s, x in samples.items()
@@ -469,6 +507,21 @@ def per_view(ops: dict[str, dict], view_ops: dict[str, list[str]]) -> dict[str, 
     return out
 
 
+def avg_by_name(ops: dict[str, dict]) -> dict[str, list[float]]:
+    """Each operation name's averages in seconds, one per variant."""
+    out: dict[str, list[float]] = {}
+    for o in ops.values():
+        out.setdefault(o["name"], []).append(o["avg"] / 1000)
+    return out
+
+
+def shell_seconds(by_name: dict[str, list[float]], bar: dict) -> float:
+    """The shell total, or 0.0 when a shell operation is missing (``integrity_failures`` fails
+    the run then, so the number is never judged)."""
+    ops = bar["shell_operations"]
+    return 0.0 if missing_shell(by_name, ops) else shell_total(by_name, ops)
+
+
 def integrity_failures(
     views: dict[str, dict],
     view_ops: dict[str, list[str]],
@@ -485,6 +538,9 @@ def integrity_failures(
     answered null / empty (unless in ``empty_ok``), and shell operations not measured."""
     today = today or datetime.now(UTC).date()
     out: list[str] = []
+    for e in bar.get("exception", []):
+        if date.fromisoformat(e["expiry"]) < today:
+            out.append(f"exception for {e['operation']} expired on {e['expiry']}: renew or remove")
     accepted = set(bar.get("unmeasured_views", []))
     if accepted and date.fromisoformat(bar["unmeasured_expiry"]) < today:
         accepted = set()
@@ -641,14 +697,8 @@ def main(argv: list[str] | None = None) -> int:
     ops, meta = time_ops(distinct, data_url, args.reps, args.load_max, partial, args.budget_s)
     load_after = load1()
     views = per_view(ops, view_ops)
-    by_name: dict[str, list[float]] = {}
-    for o in ops.values():
-        by_name.setdefault(o["name"], []).append(o["avg"] / 1000)
-    shell_s = (
-        shell_total(by_name, bar["shell_operations"])
-        if not missing_shell(by_name, bar["shell_operations"])
-        else 0.0
-    )
+    by_name = avg_by_name(ops)
+    shell_s = shell_seconds(by_name, bar)
     history = read_history(args.history_file)
     scale = scale_from_history(shell_s, history) if args.ratio_mode else 1.0
     result = evaluate(views, shell_s, bar, scale)
@@ -657,6 +707,8 @@ def main(argv: list[str] | None = None) -> int:
     print(render_table(result, bar))
     integrity = integrity_failures(views, view_ops, skipped, by_name, bar, bool(names))
     result["failures"] += integrity
+    for line in integrity:
+        print(f"INTEGRITY {line}")
     for vid, why in skipped.items():
         print(f"not measured: {vid}: {why}")
     noisy, may_record = report_run(ops, meta, args, bool(names))

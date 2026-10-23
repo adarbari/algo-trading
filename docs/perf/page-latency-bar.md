@@ -109,7 +109,7 @@ makes a second instance (the 900 s retry) exit 3 "busy" without touching the fir
 A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
 discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
 continue. After the copy **every** outcome is a finished day (one notification, never a re-copy
-at the next retry): `ok`, `over-the-bar`, `over-time`, `refused` (the bench refused) and
+at the next retry): `ok`, `over-the-bar`, `integrity` (an integrity failure: its own notice lists the failures, not "0 views over"), `over-time`, `refused` (the bench refused) and
 `crashed` (it died without a result). Exit codes: 0 done (clean) or nothing to do today; 1 a view
 over the bar without a named exception, an integrity failure (below), or a crash; 2 refused (a
 path guard, an empty or relative `PERF_CLONE_ROOT`, or the bench refused); 3 busy, retry; 4
@@ -128,8 +128,13 @@ low-confidence, `--only` or integrity-failing run is not recorded at all.
 or an operation with no document, views with no operations, an operation that failed or answered
 null / empty (a stale capture), and a shell operation that was not measured (its budget is then
 unknown). `perf_bar.toml` lists, with an expiry, the views the capture cannot cover
-(`unmeasured_views`) and the operations that are empty by design (`empty_ok`); both need the
-owner's approval like an exception.
+(`unmeasured_views`, the 8 parametrised guide routes with no captured id; approval pending) and, if
+ever needed, the operations that are empty by design (`empty_ok`, none today: add one only after a
+run on a clone shows it empty, with reason and expiry); both need the owner's approval like an
+exception. Operations the capture never recorded are resolved from the web's own documents
+(generated `gql.ts`, or typed by hand in the source: `page_docs.hand_written_documents`) with the
+capture's edge id and the first-render values of the trades ledger; one that cannot be resolved
+fails the gate. Expired exceptions and an expired list are reported at run time, not in CI.
 
 **Timing, and the 5-minute cap.** The cap applies to the benchmark phase; the snapshot is a
 separate step. Expected breakdown: the CoW snapshot takes 4-10 minutes depending on load
