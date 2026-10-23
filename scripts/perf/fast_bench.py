@@ -399,6 +399,31 @@ VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object
 }
 
 
+# EdgeCompare compares a user's OWN edge (the page renders it only for `edge.mine`; a site edge
+# answers compare = null by design). The bench viewer owns no edge, so the bench gives it one: a
+# copy of the capture's edge in the config copy it runs on; EdgeCompare is asked about that copy.
+BENCH_USER = "local"
+BENCH_COPY = "perf_bench_copy"
+OWN_EDGE_OPS = ("EdgeCompare",)
+
+
+def add_bench_edge(config: Path, site_edge: str, user: str = BENCH_USER) -> str:
+    """Write the viewer's copy of ``site_edge`` (``extends``, no run: it answers "not run yet") into
+    the config copy at ``config``; returns the copy's id."""
+    folder = config / "users" / user / "edges"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{BENCH_COPY}.toml").write_text(f'extends = "{site_edge}"\n')
+    return BENCH_COPY
+
+
+def point_at_own_edge(distinct: dict[str, dict], config: Path) -> None:
+    """Give the operations of ``OWN_EDGE_OPS`` the viewer's own edge copy instead of the capture's
+    site edge (written into ``config``)."""
+    for d in distinct.values():
+        if d["name"] in OWN_EDGE_OPS and isinstance(d["variables"].get("id"), str):
+            d["variables"] = {**d["variables"], "id": add_bench_edge(config, d["variables"]["id"])}
+
+
 def resolve_variables(post: Callable[[str, dict], dict], distinct: dict[str, dict]) -> list[str]:
     """Fill the ``VARIABLE_RESOLVERS`` variables from the clone (``post(query, variables)`` ->
     the GraphQL ``data``). Returns the operations that could not be resolved: the gate fails on
@@ -521,7 +546,8 @@ def time_ops(
     loads = {s: [] for s in distinct}
     last: dict[str, dict] = {}
     unresolved: list[str] = []
-    api = al.Api("empty", data_url=data_url, config_dir=cfg)
+    point_at_own_edge(distinct, cfg)
+    api = al.Api("empty", data_url=data_url, config_dir=cfg, user=BENCH_USER)
     try:
         unresolved = resolve_variables(lambda q, v: _post(api, q, v), distinct)
         t0, done = clock(), 0

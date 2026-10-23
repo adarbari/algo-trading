@@ -346,6 +346,7 @@ class Api:
         mode: str = "cache",
         data_url: str | None = None,
         config_dir: Path | None = None,
+        user: str | None = None,
     ) -> None:
         self.mode = mode
         self.port = free_port()
@@ -359,6 +360,8 @@ class Api:
             env["ALGOTRADE_DATA_URL"] = data_url
         if config_dir:
             env["ALGOTRADE_CONFIG_DIR"] = str(config_dir)
+        if user:
+            env["ALGOTRADE_USER"] = user
         self.client = httpx.Client(timeout=TIMEOUT)
         try:
             self._start(env)

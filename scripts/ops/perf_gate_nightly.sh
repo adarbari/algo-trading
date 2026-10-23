@@ -11,15 +11,16 @@
 #     12 GB, or 1-minute load over 4 -> exit 3 "busy, retry" (a start refused by a guard is not
 #     a finished run, so launchd's retries continue);
 #   - removes the old clone (only a path ending in /perf-clone/data that is not the real store),
-#     `cp -cR` of tables/ runs/ serving/ only (APFS clonefile at low I/O priority; PERF_COPY_CMD
-#     overrides, for tests; raw/ and staging/ are not copied; the copy is killed at 10 min), and re-checks that no ingest started during the copy (if one
-#     did: the clone is discarded, exit 3);
+#     `cp -cR` of tables/ runs/ serving/ only (APFS clonefile at nice -n 10, CPU only: `taskpolicy -b` throttles I/O and was 4x slower; PERF_COPY_CMD
+#     overrides, for tests; raw/ and staging/ are not copied; the copy is killed at 900 s WALL CLOCK), and re-checks every 10 s while it runs that no writer
+#     started (if one did: the copy stops, the clone is discarded, exit 3). A RUNNING delete of a
+#     data.trash.* (rm/find, the clone's own sibling) is itself a guard: exit 3 busy, never copy while it runs;
 #   - runs scripts/perf/fast_bench.py --data-url file://<clone> --record with the default guards
 #     (never lowered), appends a line to var/logs/perf_gate.status, deletes the clone, and
 #     notifies the owner (osascript, as deploy.sh) when a view is over the bar.
 #   - EVIDENCE: var/logs/perf_gate/YYYY-MM-DD/ (the last 14 kept; nothing is written outside
 #     var/logs): status.json, run.log, ops.json, views.json, samples-partial.json (per op per
-#     pass), run-meta.json, load.csv (load and free disk every 10 s), procs-start.txt /
+#     pass), run-meta.json, load.csv (epoch before the commands, load, free disk, how late the tick was, how long the sample took; every 10 s), procs-start.txt /
 #     procs-end.txt (top 10 by CPU), snapshot.json, profiles.md (page_profile.py on the 3 slowest
 #     ops over the bar, 60 s at most); one line per run in var/logs/perf_gate/summary.csv. The bench stops
 #     itself within 5 minutes (--budget-s 270); with the snapshot the night's run is ~10 minutes.
@@ -39,7 +40,7 @@
 # history is var/logs/perf_gate/history.jsonl; the repo's benchmarks/critical_path_history.jsonl
 # is only ever changed by a PR (docs/perf/page-latency-bar.md). Env (tests): PERF_CLONE_ROOT, PERF_SRC, PERF_STATUS, PERF_NOW_DATE, PERF_NOW_HM,
 # PERF_PS_FILE, PERF_FREE_GB, PERF_LOAD, PERF_BENCH_CMD, PERF_NOTIFY, PERF_BENCH_LIMIT_S,
-# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE, PERF_SNAPSHOT_LIMIT_S, PERF_LOWPRI.
+# PERF_TOTAL_LIMIT_S, PERF_COPY_CMD, PERF_PORT_BASE, PERF_SNAPSHOT_LIMIT_S, PERF_LOWPRI, PERF_POLL_S.
 set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -143,9 +144,6 @@ mkdir -p "$rundir"; rundir_made=1
 sampler_pid=
 free_now() { df -k "$(dirname "$clone")" 2>/dev/null | awk 'NR==2 {printf "%d", $4/1048576}'; }
 load_now() { uptime | sed 's/.*load averages*: *//' | awk '{gsub(",", "", $1); print $1}'; }
-echo "epoch,load1,free_gb" >"$rundir/load.csv"
-( while true; do echo "$(date +%s),$(load_now),$(free_now)" >>"$rundir/load.csv"; sleep "${PERF_SAMPLE_S:-10}"; done ) >/dev/null 2>&1 &
-sampler_pid=$!
 
 top_procs() { ps -Ao pid,pcpu,pmem,etime,command 2>/dev/null | sed 1d | sort -k2 -nr | head -10 | cut -c1-200; }
 
@@ -216,6 +214,29 @@ except subprocess.TimeoutExpired:
     sys.exit(124)
 PY
 }
+# load.csv sampler: never blocks on `df` / `uptime` (an I/O stall used to leave gaps of 900 s). Each tick
+# stamps the epoch BEFORE the commands, runs the sample as its own capped job (5 s each) that writes its
+# row when done, and never starts a second one while the last still runs (a row marked `skipped`).
+# Columns: epoch (before), load1, free_gb, late_s (this tick vs the interval: the machine paused or the
+# loop was not scheduled), took_s (the sample's duration).
+echo "epoch,load1,free_gb,late_s,took_s" >"$rundir/load.csv"
+sample_row() {  # $1 = epoch before, $2 = late_s
+  local t1 l f
+  l=$( (watchdog 5 uptime) 2>/dev/null | sed 's/.*load averages*: *//' | awk '{gsub(",", "", $1); print $1}')
+  f=$( (watchdog 5 df -k "$(dirname "$clone")") 2>/dev/null | awk 'NR==2 {printf "%d", $4/1048576}')
+  t1=$(date +%s)
+  echo "$1,$l,$f,$2,$((t1 - $1))" >>"$rundir/load.csv"
+}
+(
+  every=${PERF_SAMPLE_S:-10}; last=$(date +%s); prev=
+  while true; do
+    now=$(date +%s); late=$((now - last - every)); [ "$late" -lt 0 ] && late=0; last=$now
+    if [ -n "$prev" ] && kill -0 "$prev" 2>/dev/null; then echo "$now,,,$late,skipped" >>"$rundir/load.csv"
+    else sample_row "$now" "$late" & prev=$!; fi
+    sleep "$every"
+  done
+) >/dev/null 2>&1 &
+sampler_pid=$!
 # CPU priority only for the copy and the delete. NOT `taskpolicy -b`: it throttles disk I/O and made the
 # CoW copy 4.0x slower (measured 2026-10-23: 42 s normal, 170 s under -b, 42 s under nice -n 10).
 : "${PERF_LOWPRI=nice -n 10}"
@@ -234,7 +255,7 @@ delete_trash() {  # detached, low priority, guarded; logs trash_delete_s when it
   (
     trap - EXIT TERM INT
     t0=$(date +%s)
-    $PERF_LOWPRI rm -rf "$1"
+    $PERF_LOWPRI find "$1" -delete   # measured 6-7 s vs rm -rf 10 s per 100k CoW files, parallel rm 8 s
     took=$(( $(date +%s) - t0 ))
     day=${1##*.trash.}; day=${day%%.*}  # the day of the run that made this trash, not today
     dayrun=$logs/perf_gate/$day
@@ -255,6 +276,11 @@ PY
 }
 discard_clone() { rename_clone; [ -n "$trash_dir" ] && delete_trash "$trash_dir"; return 0; }
 
+# a delete of an earlier run's clone is running (rm -rf or find on a sibling data.trash.*): never copy while it runs
+trash_delete_running() {
+  ps_lines | grep -F "$(dirname "$clone")/data.trash." | grep -E '^ *[0-9]+ +([^ ]*/)?(rm|find) ' |
+    grep -vE "perf_gate_nightly" | head -1
+}
 ps_lines() { if [ -n "${PERF_PS_FILE:-}" ]; then cat "$PERF_PS_FILE"; else ps -eo pid,args; fi; }
 # a driver script parked in a sleep loop writes nothing: it is not a writer. Fail closed: a driver whose
 # children cannot be listed or read, or that has any child other than `sleep`, is a writer.
@@ -278,20 +304,25 @@ busy_writer() {
       if printf '%s' "$args" | grep -qE "$real_writer" || driver_busy "$pid"; then
         echo "$pid $args"; return 0
       fi
-      [ "$rundir_made" = 1 ] && echo "perf_gate: ignored parked driver (no child but sleep): pid $pid $args" >>"$rundir/run.log"
+      [ "$rundir_made" = 1 ] && ! grep -q "ignored parked driver (no child but sleep): pid $pid " "$rundir/run.log" 2>/dev/null &&
+        echo "perf_gate: ignored parked driver (no child but sleep): pid $pid $args" >>"$rundir/run.log"
     done
     return 0
   }
 }
+if d=$(trash_delete_running) && [ -n "$d" ]; then busy "trash delete running (pid $(printf '%s' "$d" | awk '{print $1}')): $d"; fi
 if w=$(busy_writer) && [ -n "$w" ]; then busy "a writer runs: $w"; fi
 
-# a leftover clone or trash of an earlier run is deleted first, in the background (never blocking)
+# a leftover clone or trash of an earlier run (no delete runs, checked above): start its delete in the
+# background and be busy this tick; the copy never overlaps a delete (they contend on the one volume:
+# 2k files/s instead of 6k, the first complete run took 2561 s). The next tick sees the delete running.
 leftover=0
 for t in "$clone".trash.*; do [ -e "$t" ] && { delete_trash "$t"; leftover=1; }; done
 [ -d "$clone" ] && { discard_clone; leftover=1; }
+if [ "$leftover" = 1 ]; then busy "a leftover clone or trash of an earlier run: its delete is started, retry once it is gone"; fi
 free_gb=${PERF_FREE_GB:-$(free_now)}
 if [ "${free_gb:-0}" -lt "$min_disk_gb" ]; then
-  busy "${free_gb:-?} GB free, need $min_disk_gb$([ "$leftover" = 1 ] && echo ' (an earlier run'"'"'s trash is still being deleted)')"
+  busy "${free_gb:-?} GB free, need $min_disk_gb"
 fi
 load=${PERF_LOAD:-$(load_now)}
 if awk "BEGIN {exit !($load > $max_load)}"; then busy "load $load over $max_load"; fi
@@ -310,23 +341,61 @@ clone_made=1
 mkdir -p "$clone"
 # the real nightly copies with cp -c (APFS clonefile: shared blocks); PERF_COPY_CMD replaces it
 # where cp has no -c (the tests, Linux). One watchdog caps the whole copy.
-progress_file=$rundir/copy-entry.txt
-SRC=$src CLONE=$clone ENTRIES=$copy_entries PROG=$progress_file COPY="$PERF_LOWPRI ${PERF_COPY_CMD:-cp -cR}" \
-  watchdog "$snapshot_limit" sh -c 'set -e; for e in $ENTRIES; do [ -e "$SRC/$e" ] || continue; echo "$e" >"$PROG"; $COPY "$SRC/$e" "$CLONE/$e"; done; echo done >"$PROG"; mkdir -p "$CLONE/locks"' &
+progress_file=$rundir/copy-entry.txt; timings_file=$rundir/copy-timings.txt; : >"$timings_file"
+# One cp per child of each entry (tables/<dataset>...), each timed, so a slow one shows in snapshot.json;
+# an entry with no child is copied whole. The cap below is WALL CLOCK (date +%s), not the watchdog's
+# monotonic timeout, which does not advance while the Mac sleeps: the watchdog gets a day, the poll loop
+# enforces snapshot_limit.
+SRC=$src CLONE=$clone ENTRIES=$copy_entries PROG=$progress_file TIMINGS=$timings_file COPY="$PERF_LOWPRI ${PERF_COPY_CMD:-cp -cR}" \
+  watchdog 86400 sh -c '
+set -e
+copy_one() { t=$(date +%s); $COPY "$1" "$2"; echo "$3 $(( $(date +%s) - t ))" >>"$TIMINGS"; }
+for e in $ENTRIES; do
+  [ -e "$SRC/$e" ] || continue
+  echo "$e" >"$PROG"
+  kids=
+  if [ -d "$SRC/$e" ]; then for c in "$SRC/$e"/* "$SRC/$e"/.[!.]*; do [ -e "$c" ] && kids=1; done; fi
+  if [ -z "$kids" ]; then copy_one "$SRC/$e" "$CLONE/$e" "$e"; continue; fi
+  mkdir -p "$CLONE/$e"
+  for c in "$SRC/$e"/* "$SRC/$e"/.[!.]*; do
+    [ -e "$c" ] || continue
+    echo "$e/${c##*/}" >"$PROG"
+    copy_one "$c" "$CLONE/$e/${c##*/}" "$e/${c##*/}"
+  done
+done
+echo done >"$PROG"; mkdir -p "$CLONE/locks"' &
 wd_pid=$!
-# how far the copy got, written when it is killed (the files and kB counts are capped at 5 s each)
+# how far the copy got, written when it is stopped (the files and kB counts are capped at 5 s each);
+# $snapshot_s must be set before the call so the counts are not added to the copy time
 capped() { ( watchdog 5 sh -c "$1" _ "$clone" 2>/dev/null ); }
+timings_json() {  # seconds per copied entry: {"tables/x": 12, ...}
+  python3 - "$timings_file" <<'PY'
+import json, sys
+out = {}
+for line in open(sys.argv[1]):
+    name, _, sec = line.rpartition(" ")
+    if name:
+        out[name] = int(sec)
+print(json.dumps(out))
+PY
+}
 write_progress() {  # $1 = why the copy stopped
   local n kb entry
   n=$(capped 'find "$1" -type f | wc -l' | tr -d ' '); kb=$(capped 'du -sk "$1" | cut -f1' | tr -d ' ')
   entry=$(cat "$progress_file" 2>/dev/null)
-  printf '{"copy_stopped": "%s", "copy_s": %s, "limit_s": %s, "entry": "%s", "files_so_far": "%s", "kb_so_far": "%s", "free_gb_before": %s, "free_gb_after": %s}\n' \
-    "$1" "$(( $(date +%s) - t_ready ))" "$snapshot_limit" "${entry:-none}" "${n:-unknown}" "${kb:-unknown}" "${free_before:-null}" "$(free_now)" >"$rundir/snapshot.json"
+  printf '{"copy_stopped": "%s", "copy_s": %s, "limit_s": %s, "entry": "%s", "files_so_far": "%s", "kb_so_far": "%s", "entry_s": %s, "free_gb_before": %s, "free_gb_after": %s}\n' \
+    "$1" "$snapshot_s" "$snapshot_limit" "${entry:-none}" "${n:-unknown}" "${kb:-unknown}" "$(timings_json)" "${free_before:-null}" "$(free_now)" >"$rundir/snapshot.json"
 }
-# a writer that appears while the copy runs makes the snapshot torn: stop the copy, discard, retry later
-poll=${PERF_POLL_S:-10}; tick=0; writer_mid=
+# poll once a second on the WALL clock: the cap, a writer that appears (every PERF_POLL_S s: the copy would
+# be torn: stop it, discard, retry later), and a pause: a gap over 60 s between ticks is logged
+poll=${PERF_POLL_S:-10}; tick=0; writer_mid=; cap_hit=0; last_t=$(date +%s)
 while kill -0 "$wd_pid" 2>/dev/null; do
-  sleep 1; tick=$((tick + 1))
+  sleep 1; tick=$((tick + 1)); now=$(date +%s)
+  if [ $((now - last_t)) -gt 60 ]; then
+    say "machine paused or stalled for $((now - last_t)) s (during the copy, tick $tick)"
+  fi
+  last_t=$now
+  if [ $((now - t_ready)) -ge "$snapshot_limit" ]; then cap_hit=1; kill -TERM "$wd_pid" 2>/dev/null; break; fi
   if [ $((tick % poll)) -eq 0 ] && w=$(busy_writer) && [ -n "$w" ]; then
     writer_mid=$w; kill -TERM "$wd_pid" 2>/dev/null; break
   fi
@@ -339,10 +408,11 @@ if [ -n "$writer_mid" ]; then
   write_progress writer-during-copy
   discard_clone; busy "a writer started during the copy (copy stopped): $writer_mid"
 fi
-if [ "$copy_code" -eq 124 ]; then
+if [ "$cap_hit" = 1 ]; then
+  t_now=$(date +%s); snapshot_s=$((t_now - t_ready)); wait_s=$((t_ready - t_start))
   write_progress over-time
   discard_clone
-  t_now=$(date +%s); snapshot_s=$((t_now - t_ready)); wait_s=$((t_ready - t_start)); total_s=$((t_now - t_start))
+  total_s=$(( $(date +%s) - t_start ))
   sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
   say "snapshot over-time: the copy was killed at ${snapshot_limit}s"
   echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=snapshot-over-time over_time=yes wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
@@ -359,8 +429,8 @@ ingest_during=false
 if w=$(busy_writer) && [ -n "$w" ]; then ingest_during=true; fi
 files="skipped: counting every file is slower than the copy's value (PERF_COUNT_FILES=1 counts)"
 [ "${PERF_COUNT_FILES:-0}" = 1 ] && files=$(find "$clone" -type f | wc -l | tr -d ' ')
-printf '{"copy_s": %s, "file_count": "%s", "free_gb_before": %s, "free_gb_after": %s, "ingest_started_during_copy": %s}\n' \
-  "$snapshot_s" "$files" "${free_before:-null}" "$(free_now)" "$ingest_during" >"$rundir/snapshot.json"
+printf '{"copy_s": %s, "file_count": "%s", "entry_s": %s, "free_gb_before": %s, "free_gb_after": %s, "ingest_started_during_copy": %s}\n' \
+  "$snapshot_s" "$files" "$(timings_json)" "${free_before:-null}" "$(free_now)" "$ingest_during" >"$rundir/snapshot.json"
 if [ "$ingest_during" = true ]; then discard_clone; busy "a writer started during the copy: $w"; fi
 
 sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)

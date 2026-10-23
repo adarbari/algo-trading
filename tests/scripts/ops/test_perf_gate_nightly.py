@@ -429,16 +429,39 @@ def test_the_clone_is_renamed_at_once_and_deleted_detached_with_the_time_logged(
     assert json.loads((_evidence(rig) / "status.json").read_text())["trash_delete_s"] >= 3
 
 
-def test_leftover_trash_is_deleted_in_the_background_and_nothing_else_is(rig: Rig) -> None:
+def test_leftover_trash_is_deleted_in_the_background_and_the_run_is_busy_not_overlapping(
+    rig: Rig,
+) -> None:
     old = rig.root / "data.trash.2026-10-20"
     (old / "tables").mkdir(parents=True)
     (old / "tables" / "z.txt").write_text("z")
     keep = [rig.root / "other", rig.root / "data.keep", rig.root / "data.trashy"]
     for k in keep:
         k.mkdir()
-    assert rig.run().returncode == 1  # the run was not blocked by the leftover
+    res = rig.run()
+    # the copy never overlaps a delete: this tick starts the delete and is busy, the next one runs
+    assert res.returncode == 3 and "leftover" in res.stderr and not rig.status.exists()
+    assert not (rig.root / "data").exists()
     assert _wait_gone(old)
     assert all(k.exists() for k in keep)  # the guard: only perf-clone/data.trash.* goes
+    assert rig.run().returncode == 1  # nothing left: the bench ran
+
+
+@pytest.mark.parametrize("cmd", ["rm -rf {t}", "find {t} -delete", "/usr/bin/find {t} -delete"])
+def test_a_running_trash_delete_is_busy_and_nothing_is_copied_or_started(
+    rig: Rig, cmd: str
+) -> None:
+    trash = rig.root / "data.trash.2026-10-22"
+    (trash / "tables").mkdir(parents=True)
+    rig.ps.write_text(QUIET_PS + f"  9 {cmd.format(t=trash)}\n")
+    res = rig.run()
+    assert res.returncode == 3 and "trash delete running (pid 9)" in res.stderr
+    assert trash.exists() and not (rig.root / "data").exists() and not rig.status.exists()
+
+
+def test_a_delete_elsewhere_is_not_a_trash_delete(rig: Rig) -> None:
+    rig.ps.write_text(QUIET_PS + f"  9 rm -rf {rig.tmp}/elsewhere/data.trash.2026-10-22\n")
+    assert rig.run().returncode == 1  # not our sibling: the bench ran
 
 
 def test_a_copy_over_ten_minutes_is_killed_and_the_day_finishes_with_an_error(rig: Rig) -> None:
@@ -696,3 +719,65 @@ def test_a_glob_in_a_childs_args_is_not_expanded_into_a_sleep(rig: Rig) -> None:
 def test_python_dash_m_ingestion_is_a_real_writer(rig: Rig) -> None:
     rig.ps.write_text(QUIET_PS + "  9 /x/python -m algotrade_ingestion run rollups\n")
     assert rig.run(**_stubs(rig, {9: ""}, {})).returncode == 3
+
+
+def _date_stub(rig: Rig, jump_file: Path, jump: int) -> dict[str, str]:
+    """`date +%s` jumps forward by ``jump`` s once ``jump_file`` exists (the Mac slept)."""
+    d = rig.tmp / "datestub"
+    d.mkdir(exist_ok=True)
+    real = shutil.which("date")
+    (d / "date").write_text(
+        "#!/bin/sh\n"
+        f'if [ "$1" = +%s ] && [ -f {jump_file} ]; then echo $(( $({real} +%s) + {jump} ));\n'
+        f'else exec {real} "$@"; fi\n'
+    )
+    (d / "date").chmod(0o755)
+    return {"PATH": f"{d}:{os.environ['PATH']}"}
+
+
+def test_the_snapshot_cap_is_wall_clock_and_a_pause_is_logged(rig: Rig) -> None:
+    """A monotonic timeout does not advance while the Mac sleeps: the cap counts `date +%s`."""
+    (rig.tmp / "var" / "data" / "tables").mkdir()
+    jump = rig.tmp / "slept"
+    slow = _script(rig, "slowcp5.sh", "sleep 60\n")
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)],
+        env=rig.env(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S="500", **_date_stub(rig, jump, 600)),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    time.sleep(2.5)
+    jump.write_text("")
+    _, err = proc.communicate(timeout=40)
+    assert proc.returncode == 4 and "snapshot over-time" in err
+    assert "machine paused or stalled for" in (_evidence(rig) / "run.log").read_text()
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert snap["copy_stopped"] == "over-time" and snap["copy_s"] >= 500
+
+
+def test_snapshot_json_has_the_seconds_of_every_copied_entry(rig: Rig) -> None:
+    for name in ("alpha", "beta"):
+        (rig.tmp / "var" / "data" / "tables" / name).mkdir(parents=True)
+        (rig.tmp / "var" / "data" / "tables" / name / "f.txt").write_text(name)
+    assert rig.run().returncode == 1
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert set(snap["entry_s"]) == {"tables/alpha", "tables/beta"}
+    assert (rig.root / "data").exists() is False  # renamed to trash after the run
+    assert all(isinstance(v, int) for v in snap["entry_s"].values())
+
+
+def test_a_hung_uptime_does_not_block_the_load_sampler_and_late_samples_are_marked(
+    rig: Rig,
+) -> None:
+    d = rig.tmp / "hang"
+    d.mkdir()
+    (d / "uptime").write_text("#!/bin/sh\nsleep 30\n")
+    (d / "uptime").chmod(0o755)
+    rig.bench_body = "sleep 9\necho 3 views over 1.0 s\nexit 1\n"
+    rig.run(PERF_SAMPLE_S="1", PATH=f"{d}:{os.environ['PATH']}")
+    rows = (_evidence(rig) / "load.csv").read_text().splitlines()
+    assert rows[0] == "epoch,load1,free_gb,late_s,took_s"
+    assert len(rows) >= 6  # one tick a second although every uptime hangs
+    assert any(r.endswith(",skipped") for r in rows[1:])  # one sample at a time, the rest marked
+    assert any(r.split(",")[-1].isdigit() and int(r.split(",")[-1]) >= 4 for r in rows[1:])

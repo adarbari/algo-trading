@@ -137,7 +137,28 @@ non-numeric pid counts as a writer. The gate itself and `fast_bench` never match
 **Writers are also checked while the copy runs**, every 10 s (`PERF_POLL_S`), with the same rules:
 one that appears kills the copy's process group, the clone is renamed away and deleted in the
 background, and the run exits 3 busy naming the writer (retries continue). `python -m
-algotrade_ingestion` counts like `algotrade-ingest`. A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
+algotrade_ingestion` counts like `algotrade-ingest`. **A running delete is a guard too.** Deleting a CoW clone of about 1M files is slow (about 400
+files/s at 80% CPU measured on 2026-10-23: up to ~40 min, in the background, `nice -n 10`) and `cp` and
+`rm` of that many files on one APFS volume contend badly: the first complete hand run copied at 2k
+files/s instead of 6k beside the delete and took 2561 s. So a running `rm` / `find` on a sibling
+`data.trash.*` of the clone (matched by the guard's own path) makes the gate exit 3 `busy: trash
+delete running (pid N)`, and a leftover trash or clone found at the start only STARTS its delete and
+exits 3 for this tick: the copy never overlaps a delete, of an earlier run or of its own. The delete is
+`find <trash> -delete` (measured on a scratch CoW tree of 100k files: `rm -rf` 10 s, `find -delete`
+6-7 s, 4-way parallel `rm -rf` of the subdirectories 8 s: not materially faster, so not kept).
+**The snapshot cap is wall clock** (`date +%s` in the poll loop, once a second; a monotonic timeout
+does not advance while the Mac sleeps), and a gap over 60 s between ticks is logged in `run.log`
+(`machine paused or stalled for N s`). `snapshot.json` also holds `entry_s`, the seconds of every
+copied entry (`tables/<dataset>`), so a slow one shows. `load.csv` columns are `epoch` (taken before
+the commands), `load1`, `free_gb`, `late_s` (the tick was late: the machine paused or the loop was not
+scheduled) and `took_s`; `uptime` / `df` run under a 5 s cap in their own job and a sample is skipped
+(marked `skipped`) while the last still runs, so an I/O stall never leaves a gap. The expected
+breakdown: the copy about 3-4 minutes [I] when alone; the delete up to ~40 minutes in the background.
+**EdgeCompare** is asked about the viewer's own edge: the page renders it only for an edge the viewer
+owns (a site edge answers `compare: null` by design, which failed integrity on 2026-10-23), so the
+bench writes a copy of the capture's edge for its viewer into its config copy (`fast_bench.py`
+`point_at_own_edge`) and asks about that.
+A guard (a writer in `ps`, disk, load, a writer that started during the copy: the clone is
 discarded) also exits 3; it is not a finished run and appends no `summary.csv` line, so retries
 continue. After the copy **every** outcome is a finished day (one notification, never a re-copy
 at the next retry): `ok`, `over-the-bar`, `integrity` (an integrity failure: its own notice lists the failures, not "0 views over"), `over-time`, `refused` (the bench refused) and
