@@ -1,9 +1,11 @@
 """`scripts/ops/perf_gate_nightly.sh`: the path guards, the busy guards (exit 3), and the
 per-date idempotence (before 03:00, done today, next day), with a fake bench and no real store."""
 
+import contextlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -766,7 +768,9 @@ def test_a_pause_during_the_copy_stops_it_and_retries_instead_of_finishing_the_d
     assert "machine paused or stalled for" in (_evidence(rig) / "run.log").read_text()
     snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
     assert snap["copy_stopped"] == "machine-paused"
-    assert not rig.status.exists() and not (rig.root / "data").exists()
+    line = rig.status.read_text()
+    assert "pause_abort=1 finished=no" in line and "finished=yes" not in line  # retries go on
+    assert not (rig.root / "data").exists()
 
 
 def test_the_run_holds_the_machine_awake_with_caffeinate_for_its_own_pid(rig: Rig) -> None:
@@ -850,3 +854,64 @@ def test_a_hung_uptime_does_not_block_the_load_sampler_and_late_samples_are_mark
     assert len(rows) >= 6  # one tick a second although every uptime hangs
     assert any(r.endswith(",skipped") for r in rows[1:])  # one sample at a time, the rest marked
     assert any(r.split(",")[-1].isdigit() and int(r.split(",")[-1]) >= 4 for r in rows[1:])
+
+
+def test_the_third_pause_abort_of_a_day_finishes_it_with_one_notification(rig: Rig) -> None:
+    rig.status.parent.mkdir(parents=True, exist_ok=True)
+    rig.status.write_text(
+        "date=2026-10-23 pause_abort=1 finished=no\ndate=2026-10-23 pause_abort=2 finished=no\n"
+    )
+    code, err = _run_with_jump(rig, 600, "500")
+    assert code == 4 and "repeated pauses" in err
+    lines = rig.status.read_text().splitlines()
+    assert "pause_abort=3 finished=no" in lines[2]
+    assert "outcome=repeated-pauses" in lines[3] and "finished=yes" in lines[3]
+    assert (rig.tmp / "notified").read_text().count("\n") == 1
+    assert rig.run().returncode == 0  # a finished day: the next retry is a no-op
+
+
+def test_a_pause_during_the_bench_is_paused_noisy_and_not_recorded(rig: Rig) -> None:
+    hist = rig.tmp / "logs" / "perf_gate" / "history.jsonl"
+    hist.parent.mkdir(parents=True, exist_ok=True)
+    hist.write_text('{"old": 1}\n')
+    rig.bench_body = f"sleep 5\necho '{{\"new\": 2}}' >> {hist}\necho '{rig.bench_out}'\nexit 1\n"
+    jump = rig.tmp / "slept"
+    env = rig.env(PERF_SAMPLE_S="1", **_date_stub(rig, jump, 600))
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    time.sleep(2.5)
+    jump.write_text("")
+    _, err = proc.communicate(timeout=60)
+    assert "paused or stalled during the bench" in err
+    assert "outcome=paused" in rig.status.read_text()
+    assert hist.read_text() == '{"old": 1}\n'  # the run is not recorded
+    assert "NOT recorded" in (rig.tmp / "notified").read_text()
+
+
+def test_the_trash_delete_runs_in_its_own_session_and_survives_the_wrappers_group_kill(
+    rig: Rig,
+) -> None:
+    """Under launchd the wrapper's whole group is killed when it exits: a delete in it died."""
+    old = rig.root / "data.trash.2026-10-20"
+    (old / "tables").mkdir(parents=True)
+    (old / "tables" / "z.txt").write_text("z")
+    pgid_file = rig.tmp / "delete.pgid"
+    slow = _script(rig, "slowdel.sh", f'ps -o pgid= -p $$ > {pgid_file}\nsleep 3\nexec "$@"\n')
+    proc = subprocess.Popen(
+        ["bash", str(SCRIPT)],
+        env=rig.env(PERF_LOWPRI=slow),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,  # the wrapper leads its own group, as under launchd
+    )
+    proc.communicate(timeout=30)
+    with contextlib.suppress(ProcessLookupError):  # what launchd does when the wrapper exits
+        os.killpg(proc.pid, signal.SIGKILL)
+    end = time.time() + 10
+    while not pgid_file.exists() or not pgid_file.read_text().strip():
+        assert time.time() < end
+        time.sleep(0.1)
+    assert int(pgid_file.read_text()) != proc.pid  # its own group
+    assert _wait_gone(old, 30)  # and it ran to the end

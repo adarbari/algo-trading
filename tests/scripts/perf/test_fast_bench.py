@@ -580,3 +580,32 @@ def test_edge_compare_is_asked_about_the_viewers_own_edge_and_answers_with_conte
     r = client.post("/graphql", json={"query": d["query"], "variables": d["variables"]})
     assert fb.al.answer_problem(r.status_code, r.content) is None
     assert fb.al.empty_note(r.status_code, r.content) is None
+
+
+def test_time_ops_marks_edge_compare_as_an_own_copy_not_run_and_no_other_op(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeApi:
+        url = "http://x"
+        last_error = ""
+
+        def __init__(self, *a: object, **k: object) -> None:
+            self.client = type("C", (), {"get": staticmethod(lambda url: None)})()
+
+        def call(self, body: dict) -> tuple[float, int, int, int]:
+            return 5.0, 200, 10, 1
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(fb.al, "Api", FakeApi)
+    monkeypatch.setattr(fb.al, "uncached_config", lambda src, dst: dst)
+    monkeypatch.setattr(fb.al, "guard", lambda: None)
+    monkeypatch.setattr(fb, "wait_quiet", lambda limit, load_max: 1.0)
+    ops = {
+        "EdgeCompare#1": {"name": "EdgeCompare", "query": "q", "variables": {"id": "e"}},
+        "EdgePaper#1": {"name": "EdgePaper", "query": "q", "variables": {"id": "e"}},
+    }
+    done, _ = fb.time_ops(ops, "file:///c", 1, 4.0)
+    assert done["EdgeCompare#1"]["fidelity"] == "own copy, not run"
+    assert "fidelity" not in done["EdgePaper#1"]

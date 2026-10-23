@@ -156,7 +156,14 @@ advance while the Mac sleeps). The concurrent delete was real but the smaller pa
 the machine awake (`caffeinate -i -w <pid>`; a lid close on battery cannot be prevented), and a gap over
 60 s between the copy's one-second ticks is a PAUSE: the copy is stopped, the clone discarded, the run
 logs `machine paused N s` and exits 3, so retries continue (it is not a finished `snapshot-over-time`
-day). A copy that is genuinely slow still hits the 900 s cap.
+day). A copy that is genuinely slow still hits the 900 s cap. **Retry budget:** at most 3 pause-aborts per
+local day (each appends `date=<day> pause_abort=N finished=no` to `perf_gate.status`); the third
+finishes the day (`outcome=repeated-pauses`, exit 4, one notification). **A pause during the bench** is
+not detected by the copy's loop: the sampler's `late_s` (over 60 s from the bench's start) marks the run
+`outcome=paused`: noisy, not recorded (the history line the bench appended is cut back), no verdict, and
+the notice says so. The trash delete runs in its own session (python `start_new_session`; macOS has no
+`setsid`), writes `var/logs/perf_gate/trash-delete.pid` (`pid trash start`) while it runs, and tests
+kill the wrapper's group to prove it survives.
 **The snapshot cap is wall clock** (`date +%s` in the poll loop, once a second), and a pause is logged in `run.log`
 (`machine paused or stalled for N s`). `snapshot.json` also holds `entry_s`, the seconds of every
 copied entry (`tables/<dataset>`), so a slow one shows. `load.csv` columns are `epoch` (taken before
@@ -246,7 +253,10 @@ the nightly's, `docs/hosting.md`): label `com.algotrade.perf-gate`, `ProgramArgu
 `Hour=3 Minute=0` plus `StartInterval` 900 (launchd also fires after wake or login), and
 `EnvironmentVariables` `ALGOTRADE_PORT_BASE` 15990 (the wrapper exports it itself: a block outside
 the worktrees' 10000-14990 and the live API's 8000), and `StandardOutPath` /
-`StandardErrorPath` under `var/logs/`. The wrapper copies with `cp -cR` (APFS clonefile);
+`StandardErrorPath` under `var/logs/`, and `AbandonProcessGroup` = `true`: launchd otherwise kills every
+process of the wrapper's group when it exits, and the background delete of the clone would die at once
+(the delete also starts in its own session, so it survives either way; the key keeps the bench's API
+child from being reaped mid-way too). The wrapper copies with `cp -cR` (APFS clonefile);
 `PERF_COPY_CMD` replaces it where cp has no `-c` (the tests). Retries every 15 minutes cost nothing
 once the day is done: the script exits at the first check.
 

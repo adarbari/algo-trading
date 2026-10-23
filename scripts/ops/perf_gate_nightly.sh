@@ -51,6 +51,7 @@ today=${PERF_NOW_DATE:-$(date +%Y-%m-%d)}
 hm=${PERF_NOW_HM:-$(date +%H%M)}
 min_disk_gb=12
 max_load=4
+max_pause_aborts=3  # a day with this many copies stopped by a paused machine finishes (repeated-pauses)
 markers='algotrade-ingest|algotrade_ingestion|algotrade-backtest|var/logs/'
 # a real writer: an ingest or backtest command (rollups, nightly and compaction run through them). Any
 # other marker match is a driver script (var/logs/...): a writer only while it has a live child that is not `sleep`
@@ -218,7 +219,7 @@ except subprocess.TimeoutExpired:
     sys.exit(124)
 PY
 }
-# load.csv sampler: never blocks on `df` / `uptime` (an I/O stall used to leave gaps of 900 s). Each tick
+# load.csv sampler: never blocks on `df` / `uptime` (a sleep or an I/O stall used to leave gaps of 900 s). Each tick
 # stamps the epoch BEFORE the commands, runs the sample as its own capped job (5 s each) that writes its
 # row when done, and never starts a second one while the last still runs (a row marked `skipped`).
 # Columns: epoch (before), load1, free_gb, late_s (this tick vs the interval: the machine paused or the
@@ -254,18 +255,27 @@ rename_clone() {  # an instant rename on the same volume: the clone leaves the c
   while [ -e "$trash_dir" ]; do n=$((n + 1)); trash_dir=$clone.trash.$today.$n; done
   mv "$clone" "$trash_dir"
 }
-delete_trash() {  # detached, low priority, guarded; logs trash_delete_s when it finishes
+# The delete runs in its OWN session and process group (python's start_new_session; macOS has no setsid):
+# under launchd (no AbandonProcessGroup in older plists) the wrapper's whole group is killed when it exits,
+# and a delete in it died at once, leaving the trash: with a leftover meaning "busy" the gate would never
+# copy again. nice (PERF_LOWPRI) and the trash_ok guard are kept; `trash-delete.pid` holds
+# "pid trash start_epoch" while it runs (evidence; the busy check reads `ps`).
+delete_trash() {  # detached in its own session, low priority, guarded; logs trash_delete_s when it finishes
   trash_ok "$1" || return 0
-  (
-    trap - EXIT TERM INT
-    t0=$(date +%s)
-    $PERF_LOWPRI find "$1" -delete   # measured 6-7 s vs rm -rf 10 s per 100k CoW files, parallel rm 8 s
-    took=$(( $(date +%s) - t0 ))
-    day=${1##*.trash.}; day=${day%%.*}  # the day of the run that made this trash, not today
-    dayrun=$logs/perf_gate/$day
-    [ -d "$dayrun" ] || exit 0
-    echo "$took" >"$dayrun/trash_delete_s.txt"
-    TOOK=$took RUNDIR=$dayrun python3 - <<'PY'
+  mkdir -p "$logs/perf_gate"
+  TRASH=$1 LOGS=$logs LOWPRI=$PERF_LOWPRI python3 - <<'PY'
+import os, subprocess
+body = r"""
+t0=$(date +%s)
+echo "$$ $TRASH $t0" >"$LOGS/perf_gate/trash-delete.pid"
+$LOWPRI find "$TRASH" -delete   # measured 6-7 s vs rm -rf 10 s per 100k CoW files, parallel rm 8 s
+took=$(( $(date +%s) - t0 ))
+rm -f "$LOGS/perf_gate/trash-delete.pid"
+t=${TRASH##*.trash.}; day=${t%%.*}  # the day of the run that made this trash, not today
+dayrun=$LOGS/perf_gate/$day
+[ -d "$dayrun" ] || exit 0
+echo "$took" >"$dayrun/trash_delete_s.txt"
+TOOK=$took RUNDIR=$dayrun python3 -c '
 import json, os
 from pathlib import Path
 f = Path(os.environ["RUNDIR"]) / "status.json"
@@ -273,9 +283,17 @@ if f.is_file():
     d = json.loads(f.read_text())
     d["trash_delete_s"] = int(os.environ["TOOK"])
     f.write_text(json.dumps(d, indent=1) + "\n")
+'
+"""
+subprocess.Popen(
+    ["sh", "-c", body],
+    start_new_session=True,
+    stdin=subprocess.DEVNULL,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+    env=os.environ,
+)
 PY
-  ) </dev/null >/dev/null 2>&1 &
-  disown 2>/dev/null
   return 0
 }
 discard_clone() { rename_clone; [ -n "$trash_dir" ] && delete_trash "$trash_dir"; return 0; }
@@ -412,7 +430,21 @@ wd_pid=
 if [ -n "$paused_s" ]; then
   snapshot_s=$(( $(date +%s) - t_ready )); wait_s=$((t_ready - t_start))
   write_progress machine-paused
-  discard_clone; busy "machine paused $paused_s s during the copy (copy stopped, retry)"
+  discard_clone
+  aborts=$(( $(grep -c "^date=$today pause_abort=" "$status" 2>/dev/null || true) + 1 ))
+  echo "date=$today pause_abort=$aborts finished=no" >>"$status"
+  if [ "$aborts" -ge "$max_pause_aborts" ]; then  # the retry budget: the day finishes, one notification
+    sha=$(git -C "$repo" rev-parse --short=9 HEAD 2>/dev/null || echo unknown)
+    total_s=$(( $(date +%s) - t_start ))
+    echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=repeated-pauses over_time=no wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
+    say "repeated pauses: $aborts copies stopped by a paused machine today"
+    code=4; bench_s=0; cleanup_s=0; finish_evidence repeated-pauses
+    msg="1 s page gate: the machine paused during the copy $aborts times today; no result tonight; evidence in var/logs/perf_gate/$today/"
+    if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
+    else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
+    exit 4
+  fi
+  busy "machine paused $paused_s s during the copy (copy stopped, retry $aborts of $((max_pause_aborts - 1)))"
 fi
 if [ -n "$writer_mid" ]; then
   snapshot_s=$(( $(date +%s) - t_ready )); wait_s=$((t_ready - t_start))
@@ -450,6 +482,7 @@ py=${PERF_PY:-$repo/.venv/bin/python}
 cmd=${PERF_BENCH_CMD:-"$py $repo/scripts/perf/fast_bench.py --data-url file://$clone --record --machine nightly-clone --timings wait_s=$wait_s,snapshot_s=$snapshot_s --out $rundir --history-file $logs/perf_gate/history.jsonl"}
 
 t_bench=$(date +%s)
+hist=$logs/perf_gate/history.jsonl; hist_size=$(wc -c <"$hist" 2>/dev/null | tr -d ' '); hist_size=${hist_size:-0}
 # shellcheck disable=SC2086
 watchdog "$bench_limit" $cmd >"$out" 2>&1 &
 wd_pid=$!
@@ -468,6 +501,14 @@ elif [ "$code" -eq 2 ]; then outcome=refused
 elif [ "$code" -eq 1 ] && grep -q '^INTEGRITY ' "$out"; then outcome=integrity
 elif [ "$code" -eq 1 ] && [ -n "${over:-}" ]; then outcome=over-the-bar
 elif [ "$code" -ne 0 ]; then outcome=crashed; code=1
+fi
+# a sleep or stall DURING the bench (the sampler's late_s over 60 s, from the bench's start) makes its
+# times worthless: the run is `paused` (noisy), not recorded in the history, and the notice says so
+paused_bench=$(awk -F, -v t="$t_bench" 'NR > 1 && $1 >= t - 10 && $4 + 0 > 60 {n++} END {print n + 0}' "$rundir/load.csv" 2>/dev/null)
+if [ "${paused_bench:-0}" -gt 0 ] && [ "$outcome" != crashed ] && [ "$outcome" != refused ]; then
+  outcome=paused
+  [ -f "$hist" ] && [ "$(wc -c <"$hist" | tr -d ' ')" -gt "$hist_size" ] && { head -c "$hist_size" "$hist" >"$hist.tmp" && mv "$hist.tmp" "$hist"; }
+  say "the machine paused or stalled during the bench ($paused_bench late samples): not recorded"
 fi
 cat "$out" >>"$rundir/run.log"
 out_copy=$rundir/run.log
@@ -495,14 +536,16 @@ echo "date=$today sha=$sha views_over=${views_over:-?} seconds_above=${above:-?}
 reason=""; [ "$overtime" = yes ] && reason=over-time
 [ "$outcome" = integrity ] && reason=integrity
 [ "$outcome" = refused ] && reason=refused; [ "$outcome" = crashed ] && reason=crashed
+[ "$outcome" = paused ] && reason=paused
 finish_evidence "$reason"
 
-if [ "$code" -ne 0 ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
+if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
     msg="1 s page gate INTEGRITY FAILURE (not a timing result): $why evidence in var/logs/perf_gate/$today/"
   fi
+  [ "$outcome" = paused ] && msg="1 s page gate: the machine paused or stalled during the bench (noisy, NOT recorded, no verdict): $msg"
   [ "$outcome" = crashed ] && msg="1 s page gate CRASHED (no result): $msg"
   [ "$outcome" = refused ] && msg="1 s page gate REFUSED by the bench (no result): $msg"
   [ "$overtime" = yes ] && msg="1 s page gate OVER-TIME: bench killed at ${bench_limit}s (not recorded); $msg"
