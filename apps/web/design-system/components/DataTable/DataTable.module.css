@@ -63,6 +63,15 @@
   overscroll-behavior: contain;
 }
 
+/*
+ * visibleRows="all": no height cap and no inner scroll, so the window scrolls and the sticky
+ * header sticks to it (`clip`, unlike `auto`, does not make the grid its own scroll container).
+ */
+.scroller[data-fit] {
+  overflow: clip;
+  max-height: none;
+}
+
 .scroller:focus-visible {
   outline-offset: calc(-1 * var(--focus-ring-width));
 }

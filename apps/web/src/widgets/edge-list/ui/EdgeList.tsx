@@ -101,6 +101,7 @@ export function EdgeList({ onSelect, view = 'all', onViewChange }: EdgeListProps
           }}
           groupBy={GROUPS}
           rowLines={2}
+          visibleRows="all"
           defaultSort={{ columnId: 'name', direction: 'asc' }}
           emptyMessage="No edge is declared."
         />

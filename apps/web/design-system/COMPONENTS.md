@@ -416,7 +416,7 @@ Source: `design-system/components/ConditionGroup`
 
 ### DataTable
 
-DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view; `pinFirst`). Under the `sm` breakpoint (its own width: a phone, not a desktop's aside column) only the `essential` columns show by default (else the first three) and the column picker appears so the user adds the rest back. `groupBy` puts the rows under group headings in a declared order (the sort still orders the rows inside each group). Built on TanStack Table + Virtual, which stay internal.
+DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view). Under the `sm` breakpoint (its own width: a phone, not a desktop's aside column) only the `essential` columns show by default (else the first three) and the column picker appears so the user adds the rest back. `groupBy` puts the rows under group headings in a declared order (the sort still orders the rows inside each group). Built on TanStack Table + Virtual, which stay internal.
 
 Source: `design-system/components/DataTable`
 
@@ -431,9 +431,7 @@ Source: `design-system/components/DataTable`
 | `defaultSort` | `DataTableSort \| null` | no | Initial sort when uncontrolled. |
 | `onSortChange` | `(sort: DataTableSort \| null) => void` | no |  |
 | `sortMode` | `'client' \| 'server'` | no | `client` (default): the table sorts `rows` by the sorted column's values. `server`: `rows` come sorted (and paged) by the caller; a header click only reports the sort it asks for. |
-| `hiddenColumns` | `readonly string[]` | no | Controlled hidden column ids (pair with `onHiddenColumnsChange`). |
-| `defaultHiddenColumns` | `readonly string[]` | no | Initially hidden column ids when uncontrolled. |
-| `onHiddenColumnsChange` | `(hidden: string[]) => void` | no |  |
+| `defaultHiddenColumns` | `readonly string[]` | no | Column ids hidden at first (the picker shows them again). |
 | `narrowColumns` | `readonly string[]` | no | Controlled ids of the columns the user added back on a narrow table (pair with `onNarrowColumnsChange`). A page backs it with the user's saved view or the URL so a phone remembers the columns the user added; uncontrolled, the table keeps them for the session. Ids that are not columns are ignored. |
 | `onNarrowColumnsChange` | `(ids: string[]) => void` | no |  |
 | `columnPicker` | `boolean` | no | Show the "Columns" picker in the toolbar (a narrow table shows it whenever it hid a column). |
@@ -450,11 +448,10 @@ Source: `design-system/components/DataTable`
 | `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` (placeholder rows) or `error` (shows `errorMessage`). |
 | `errorMessage` | `ReactNode` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no rows. |
-| `visibleRows` | `number` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. |
+| `visibleRows` | `number \| 'all'` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. `'all'` shows every row at its full height: the page scrolls instead of the table and the header stays at the top of the window (on a narrow table, which scrolls sideways, it falls back to 12 rows). |
 | `rowLines` | `1 \| 2 \| 3` | no | Lines of text per row: 1 (default), 2 (a symbol with its name underneath) or 3 (a cell that wraps a short list of links). |
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
 | `toolbarEnd` | `ReactNode` | no | Toolbar content at the end, beside the column picker (the catalogue "Columns" picker): the two sit in one row, so a narrow table does not spend a row on each. |
-| `pinFirst` | `boolean` | no | Pin the checkbox column and the first column at the start while the table scrolls sideways (default true): pass false when the first column is not the row's key. |
 | `groupBy` | `DataTableGroupBy<TRow>` | no | Show the rows under group headings (see `DataTableGroupBy`); none: one flat list. |
 
 ### Dialog
