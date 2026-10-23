@@ -1,0 +1,125 @@
+# L3 site setting: the filters of the Ideas list (ADR 0082, docs/ui/filtering.md). Typed by
+# src/algotrade/config/filters/definitions.py; fitness tests: tests/unit/config/filters/.
+# Edit by PR. A `field` is a catalogue name or `column:<id>` of a [[column]] below; the licence of
+# a field is never declared here (derived per viewer, ADR 0069). Every filter's `guide` entry is
+# written in config/site/guide/glossary/filters.toml.
+#
+# Owner-approved filters not here, because the Ideas read does not store the fact yet (listed in
+# the PR that added this file as "needs new data"):
+#   changed:   new_today (a pick of this session that the screener's previous run did not make:
+#              an Idea carries no comparison), rank_moved_up (the previous session's rank)
+#   tradeable: optionable (no stored yes / no; option_chain_known says the chain run knew the
+#              answer, not that the name has options)
+
+label = "Ideas"
+
+# The columns of an Idea (services/read/screens/ideas.py) a filter reads, by where they come from.
+[[column]]
+id = "decision"
+dtype = "str"
+source = "best.decision"
+
+[[column]]
+id = "screener"
+dtype = "str"
+source = "picked_by.config_id"
+
+[[column]]
+id = "agreeing"
+dtype = "int"
+source = "len(picked_by)"
+
+# ------------------------------------------------------------------------------------ setup
+
+[[filter]]
+id = "decision"
+label = "Decision"
+group = "setup"
+kind = "pick"
+field = "column:decision"
+options = "enum"
+enum = "algotrade.strategies.screeners.base:Decision"
+guide = "term:filter_decision"
+
+[[filter]]
+id = "screener"
+label = "Screener"
+group = "setup"
+kind = "pick"
+field = "column:screener"
+options = "values"
+guide = "term:filter_screener"
+
+[[filter]]
+id = "agreeing"
+label = "Agreeing screeners"
+group = "setup"
+kind = "range"
+field = "column:agreeing"
+bins = [1, 2, 3, 4, 5, 8]
+guide = "term:filter_agreeing"
+
+# ------------------------------------------------------------------------------------ tradeable
+
+[[filter]]
+id = "option_tier"
+label = "Option liquidity class"
+group = "tradeable"
+kind = "pick"
+field = "feature.option_tier"
+options = "static"
+guide = "term:filter_option_tier"
+
+[[filter.option]]
+value = "A"
+label = "A"
+
+[[filter.option]]
+value = "B"
+label = "B"
+
+[[filter.option]]
+value = "C"
+label = "C"
+
+[[filter.option]]
+value = "D"
+label = "D"
+
+[[filter]]
+id = "spread"
+label = "Option spread %"
+group = "tradeable"
+kind = "range"
+field = "rollup.option_liquidity@v1.put_spread_pct"
+bins = [0, 0.02, 0.05, 0.10, 0.20, 0.35, 0.50, 1, 2]
+guide = "term:filter_spread"
+
+[[filter]]
+id = "dollar_volume"
+label = "Dollar volume"
+group = "tradeable"
+kind = "range"
+field = "rollup.volume@v1.dollar_volume"
+bins = [0, 1_000_000, 5_000_000, 20_000_000, 100_000_000, 500_000_000, 2_000_000_000]
+guide = "term:filter_dollar_volume"
+
+# ------------------------------------------------------------------------------------ coming up
+
+[[filter]]
+id = "earnings"
+label = "Earnings within"
+group = "coming_up"
+kind = "window"
+field = "rollup.earnings@v1.days_to_earnings"
+window_unit = "sessions"
+guide = "term:filter_earnings"
+
+[[filter]]
+id = "ex_dividend"
+label = "Ex-dividend within"
+group = "coming_up"
+kind = "window"
+field = "rollup.dividend_schedule@v1.days_to_ex_date"
+window_unit = "days"
+guide = "term:filter_ex_dividend"

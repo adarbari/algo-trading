@@ -76,6 +76,11 @@ purpose = "schedule vocabularies of an edge document, split from config/edges/do
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
+path = "src/algotrade/config/filters"
+purpose = "L3 filter settings: a surface's filter definitions (config/site/filters/<surface>.toml, ADR 0082) typed and shape-checked (definitions.py); the catalogue, Guide and licence checks are the resolver's (services/read/filtering) and fitness tests"
+contracts = ["Configs are pure: no storage I/O"]
+
+[[dir]]
 path = "src/algotrade/config/ranking"
 purpose = "L3 ranking settings: the Ideas ranking rule's parameters (config/site/ranking/ideas.toml, owner decision 2026-10-22) typed and validated, with the hash that identifies the rule (ideas.py)"
 contracts = ["Configs are pure: no storage I/O"]
