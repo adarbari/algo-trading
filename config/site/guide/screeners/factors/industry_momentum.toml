@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "industry_momentum"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by how well their sector did over the last 12 months."
 summary = "Ranks every tradeable name by the 12-month return of its sector, the strongest sector first. Moskowitz and Grinblatt find industries that did well keep doing well.[^1] It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, whose sector maps to one of the 11 sector funds with a year of history. Every name of one sector shares its value."
 not_checked = "It does not look at the name itself: every stock of a sector ranks alike, and the order within a sector is arbitrary. Eleven sectors are coarser than the industries of the paper. The harness reads the spread across all names."

@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Short-term momentum, heavy turnover"
+description = "Heavily traded stocks ranked by last month's gain, best first."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

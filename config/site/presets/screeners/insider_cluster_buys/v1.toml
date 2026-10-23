@@ -12,6 +12,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Opportunistic insider cluster buys"
+description = "Stocks where three or more insiders bought shares on the open market this month."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

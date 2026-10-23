@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Treasury funds on an upward curve and a rising trend (2-year slope)"
+description = "Treasury funds that rose over a year while long yields exceed 2-year yields."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

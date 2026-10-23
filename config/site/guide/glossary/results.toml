@@ -211,10 +211,10 @@ see_also = ["qualified", "watch", "reject", "idea_decision"]
 
 [[term]]
 id = "screener_column"
-term = "Screener name and last run"
-short = "The screener's name, whether it is a site preset or yours, and the session of its latest run."
+term = "Screener and what it finds"
+short = "The screener's name, the one line saying what it finds, whether it is a site preset or yours, and the session of its latest run."
 body = """
-A Preset is a screener the site ships; Mine is one you built. Draft means you have not finalized it, so it has not run. Does not resolve means its config no longer loads. The muted line is the session of the latest run, not the day it started. No run today means the screener has no run for the session the page shows, so its picks are not the latest. Paused means the market regime stopped it that session and it picked nothing on purpose. Built in code means the screener is written in code, not as criteria: you can view it, not edit or copy it.
+Under the name, one line says what the screener finds. A preset's line is written by the site; for your own screeners you write it when you save, up to 140 characters. A screener of yours without one shows Add a description. A Preset is a screener the site ships; Mine is one you built. Draft means you have not finalized it, so it has not run. Does not resolve means its config no longer loads. The muted line is the session of the latest run, not the day it started. No run today means the screener has no run for the session the page shows, so its picks are not the latest. Paused means the market regime stopped it that session and it picked nothing on purpose. Built in code means the screener is written in code, not as criteria: you can view it, not edit or copy it.
 """
 next = "Check the run date before you act on a screener's picks."
 see_also = ["screener_picks", "paused", "not_run"]

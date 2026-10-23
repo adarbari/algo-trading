@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "High implied-volatility rank"
+description = "Optionable names whose implied volatility is in the upper half of its year's range."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

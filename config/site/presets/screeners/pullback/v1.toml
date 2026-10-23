@@ -13,6 +13,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Pullback"
+description = "Leaders in an uptrend that dipped back to their one-month average on quiet volume."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # no liquidity_class: it bundles option liquidity, and these are stock-chart screens)

@@ -12,6 +12,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "ETF flow pressure"
+description = "Unleveraged iShares ETFs ranked by their one-month change in shares outstanding."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

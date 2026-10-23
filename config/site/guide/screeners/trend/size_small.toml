@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "size_small"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by market value, smallest first, as a baseline for other screens."
 summary = "Ranks every tradeable stock by its market value, smallest first: the size effect of the finance literature.[^1][^2] It is a yardstick, not a trade idea: an edge that picks small companies must do better than simply buying the smallest names."
 hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and it has a market cap. Every such name qualifies; the order is the point, smallest first."
 not_checked = "It does not check trend, quality, earnings or valuation. It is the edge harness's size baseline, not a trade signal."

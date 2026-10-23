@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "tender_offer_filed"
 version = 1  # the preset version this prose was written for
-line = "Stocks with a tender offer filed at least 20 sessions ago."
 summary = "Finds liquid stocks with a tender offer (the company's own SC TO-I or a third party's SC TO-T) that became known 20 or more sessions ago, the earliest it can have expired: the finding that firms outperform after buying back their own shares by tender.[^1][^2] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day and has a tender offer filing that became known at least 20 sessions ago (the group looks back 60). The most liquid ranks first."
 not_checked = "It does not know the expiry (an offer can be extended), whether the offer was the company's own or a takeover bid, or that it completed. It is the screen of the tender-offer edge, which the harness is still testing."

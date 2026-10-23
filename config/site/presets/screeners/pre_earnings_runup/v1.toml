@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Pre-earnings run-up in past winners"
+description = "Past-year winners with a report due within two weeks, strongest momentum first."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

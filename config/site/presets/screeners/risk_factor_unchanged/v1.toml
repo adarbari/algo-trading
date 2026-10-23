@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Risk factors that did not change"
+description = "Annual reports whose risk factors match the year before."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

@@ -963,6 +963,17 @@ Source: `design-system/components/Legend`
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
 
+### LineClamp
+
+LineClamp: a block of text cut to two lines with an ellipsis (a one-line description under a name that may wrap on a phone). The full text stays in the DOM and in `title`.
+
+Source: `design-system/components/LineClamp`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | no | The full text as a tooltip, for the part the clamp cuts. |
+| `children` | `ReactNode` | yes |  |
+
 ### LinkButton
 
 LinkButton: a button that reads as a link and goes somewhere (a screener's pick count opening its screener): accent text, a chevron after it that nudges on hover, an underline on hover and the app's focus ring. It runs a callback; a link with an address is a TextLink, and a control that opens a block in place is an ExpandLink.

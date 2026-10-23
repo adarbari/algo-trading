@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Filings that changed little"
+description = "Reports that read almost the same as a year earlier."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

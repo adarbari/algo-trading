@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Asset growth (shrinkers first)"
+description = "Stocks ranked by how fast their total assets grew in a year."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates)
 [criteria.security_type]

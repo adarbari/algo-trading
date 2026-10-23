@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Earnings announcement premium: all"
+description = "Liquid stocks with an earnings report coming, with the date known or guessed."
 
 # ------------------------------------------------ who is screened and tradeable (the liquid base gates)
 [criteria.security_type]

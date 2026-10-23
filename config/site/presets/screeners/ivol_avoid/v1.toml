@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Idiosyncratic volatility (avoid list)"
+description = "Stocks ranked by how erratically they move on their own, jumpiest last."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as ivol_high and size_small, so the decoys compare on one universe)

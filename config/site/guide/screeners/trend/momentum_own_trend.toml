@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "momentum_own_trend"
 version = 1  # the preset version this prose was written for
-line = "Momentum leaders with a positive year and a close above the 200-day average."
 summary = "Ranks names by 12-1 momentum, keeping only those whose own trend is up: a positive year and a close above the 200-day average.[^1] It drops winners whose last month broke their trend. It is a filter on the momentum ranking, tested as a variant."
 hit = "The name is a listed common stock, ADR or ETF closing above $5 that trades at least $50M a day, has a 12-1 momentum value, and reads 1 on the own-trend sign. Best momentum first."
 not_checked = "It does not check market timing, crash risk or earnings dates. Part of any own-trend payoff is a long position after a rising market, not stock selection.[^2]"

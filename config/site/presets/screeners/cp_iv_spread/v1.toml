@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Call-put IV spread"
+description = "Stocks whose calls cost more than their puts, largest gap first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1 for stocks, so the screens compare on one universe)

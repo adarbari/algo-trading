@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "momentum_12_1"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by 12-month return, leaving out the latest month."
 summary = "Ranks every tradeable name by its 12-month return with the last month left out, the momentum signal of the finance literature.[^1] It is a ranking, not a chart pattern: the top of the list is where the past year's winners are."
 hit = "The name is a listed common stock, ADR or ETF closing above $5 that trades at least $50M a day, and it has a 12-1 momentum value (the close a month ago over the close a year ago, minus one). Every such name qualifies; the order is the point, best momentum first."
 not_checked = "It does not check the trend's shape (a name can be ranked high on one old jump), how extended it is, or earnings dates. It is the edge harness's momentum test, not a trade signal."

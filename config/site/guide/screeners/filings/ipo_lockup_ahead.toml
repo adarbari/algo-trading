@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "ipo_lockup_ahead"
 version = 1  # the preset version this prose was written for
-line = "Stocks whose IPO lock-up ends within the next 11 sessions."
 summary = "Finds liquid stocks whose IPO lock-up ends within the next 11 sessions: an avoid list for longs and the short side of the lock-up edge.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock that trades at least $5M a day and whose IPO prospectus puts the lock-up expiry between today and 11 sessions ahead. The most liquid ranks first."
 not_checked = "It does not know who holds the locked shares (venture funds sell, buyout owners often do not) or whether part of the lock-up already ended early. It is the screen of the lock-up edge, which the harness is still testing."

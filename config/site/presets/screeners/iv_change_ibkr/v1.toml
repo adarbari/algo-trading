@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Rising IBKR IV30"
+description = "Stocks where options price in a bigger expected swing than a month ago."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1 for stocks, so the screens compare on one universe)

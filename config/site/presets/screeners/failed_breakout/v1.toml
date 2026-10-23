@@ -12,6 +12,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Failed breakout"
+description = "Shares that broke above their one-month high and have since closed back below it."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # no liquidity_class: it bundles option liquidity, and these are stock-chart screens)

@@ -159,3 +159,32 @@ the merge decoded the other nine tenths for nothing (`docs/perf/api-memory.md`: 
   reach every page.
 - Such a table is never listed in `[compaction]` (ADR 0078 keeps only changed rows, so its newest
   file would be a delta): a fitness test (`tests/unit/config/site/test_nightly.py`) refuses it.
+
+## Amendment 2026-10-23: a screener's one-line description is metadata, not part of a version
+
+The Screeners list shows one line under every screener's name (what it finds). The line belongs to
+the screener object (not read from the Guide at request time), for presets and user screens alike.
+
+- `description` is a top-level key of a screener document (`parse_strategy`): one line, at most 140
+  characters, never inherited. A user document's own value is its description; a screen that
+  `extends` a preset does **not** take the preset's (`_strategy_document` drops it before the merge),
+  and a run override cannot set one. `Screener.description` is `None` when none is written: text is
+  never invented.
+- It is **not part of what a run computes**: `ResolvedConfig.canonical()` (the run's config hash)
+  never contained `name` and does not contain `description`, so editing a sentence changes no hash,
+  no run id and no stored result.
+- **Preset immutability** stays byte-pinned, but the sha256 in `architecture/preset_versions.toml`
+  covers the file *without* its one top-level `description = "..."` line (`pinned_bytes`,
+  `tests/architecture/test_structure.py`). The check refuses anything but that exact form: the
+  parsed document with the line stripped must equal the original minus the `description` key, so a
+  second line, a dotted or multi-line form, or a look-alike line inside another string fails
+  (nothing but the sentence can change without a new version). Every existing pin stays valid, since
+  stripping a file with no such line is the identity; the backfill below was one commit.
+- **Backfill**: every version file of the 92 presets got its description from the Guide's one-line
+  `line` (a one-time script, not a runtime path); the Guide's `line` key is removed and the Guide
+  (category rows, search) reads the screener's description, so the sentence has one source. A
+  fitness test fails a preset without one.
+- **User screens**: required to **finalise** (`services/authoring/screens.finalise`), not to autosave
+  a draft or preview one. Versions are immutable, so editing a sentence finalises version N+1 with
+  the same hash. Duplicating a preset seeds the draft with the preset's description as a starting
+  point; a rebase keeps the user's.

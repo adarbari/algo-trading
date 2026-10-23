@@ -79,7 +79,7 @@ def test_every_related_id_is_a_site_screener() -> None:
 def test_every_catalogue_name_in_the_prose_is_in_the_catalogue(site: StoreContext) -> None:
     fields = catalog_of(site.features).fields
     for p in load_guide_screeners(SHIPPED).screeners:
-        texts = [p.line, *p.texts, *(a for _, a in p.asks)]
+        texts = [*p.texts, *(a for _, a in p.asks)]
         named = {n for text in texts for n in name_tokens(text) if not n[0].isdigit()}
         unknown = sorted(n for n in named if n not in fields)
         assert not unknown, f"{WHERE}/{p.id}.toml names fields not in the catalogue: {unknown}"
@@ -98,8 +98,22 @@ def test_every_marker_names_a_source_and_every_source_is_cited() -> None:
 
 def test_no_marker_stands_outside_the_prose_texts() -> None:
     for p in load_guide_screeners(SHIPPED).screeners:
-        outside = [t for t in (p.line, *(a for _, a in p.asks)) if markers(t)]
-        assert not outside, f"{WHERE}/{p.id}.toml: a marker in a line or an ask: {outside}"
+        outside = [t for _, t in p.asks if markers(t)]
+        assert not outside, f"{WHERE}/{p.id}.toml: a marker in an ask: {outside}"
+
+
+def test_every_site_preset_has_a_one_line_description() -> None:
+    """The Screeners list shows it under every screener's name (ADR 0029 amendment): a preset
+    without one fails here, not in the browser."""
+    missing, long = [], []
+    for preset in SHIPPED.names("site", SCREENERS):
+        text = (SHIPPED.load("site", SCREENERS, preset) or {}).get("description")
+        if not isinstance(text, str) or not text.strip():
+            missing.append(preset)
+        elif len(text) > 140 or "\n" in text:
+            long.append(preset)
+    assert not missing, f"presets without a `description` line: {missing}"
+    assert not long, f"descriptions over 140 characters: {long}"
 
 
 def test_every_url_is_https() -> None:
@@ -111,7 +125,6 @@ def test_every_url_is_https() -> None:
 DOC: dict[str, Any] = {
     "id": "alpha",
     "version": 2,
-    "line": "Leaders  that dipped.",
     "summary": "Finds  leaders.[^1]",
     "hit": "Up.",
     "not_checked": "News.",
@@ -129,7 +142,6 @@ def test_a_document_is_typed_and_a_missing_folder_has_nothing() -> None:
     found = load_guide_screeners(MemoryConfigStore({("site", FOLDER, "alpha"): DOC}))
     (alpha,) = found.screeners
     assert alpha.summary == "Finds leaders.[^1]"  # whitespace collapsed
-    assert alpha.line == "Leaders that dipped."
     assert alpha.sources == (
         GuideSource("A book", "https://example.com/book", "The dip."),
         GuideSource("A paper", None, "No page found."),
@@ -150,7 +162,7 @@ def test_a_document_is_typed_and_a_missing_folder_has_nothing() -> None:
         ({"version": 0}, "version"),
         ({"family": "trend"}, "unknown keys"),
         ({"summary": " "}, "summary: expected a non-empty string"),
-        ({"line": " "}, "line: expected a non-empty string"),
+        ({"line": "Up."}, "unknown keys"),  # the description is the preset's (ADR 0029)
         ({"summary": "Up.[^3]"}, r"marker \[\^3\] but there are 2 sources"),
         ({"summary": "Up.[^0]"}, r"marker \[\^0\]"),
         (

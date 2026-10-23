@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "qmj"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked on profitability and low debt, highest quality first."
 summary = "Ranks every tradeable stock by a quality score, highest first: how profitable it is and how little debt and distress risk it carries, each measured against every other stock. It is quality minus junk from the finance literature,[^1] built from what the stored statements support, a candidate edge under test."
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a quality minus junk score. Every such name qualifies; the order is the point, the highest quality first."
 not_checked = "It does not check price, momentum, size or industry (the score ranks across all names), and it has no growth part and no beta or earnings volatility in its safety. It is the screen of the quality minus junk edge, which the harness is still testing."

@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Industry momentum"
+description = "Stocks ranked by how well their sector did over the last 12 months."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1, so the variants compare on one universe)

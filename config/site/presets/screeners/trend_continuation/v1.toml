@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Trend continuation"
+description = "Shares in an orderly uptrend that are also beating the market over the quarter."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # no liquidity_class: it bundles option liquidity, and these are stock-chart screens)

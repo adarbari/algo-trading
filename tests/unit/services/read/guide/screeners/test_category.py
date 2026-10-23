@@ -2,7 +2,6 @@
 rows in Guide order with the line they ask in and the site edges that use them; ``None`` for an
 id that is no family or a family with no site screener."""
 
-from algotrade.config.site.guide.screeners import load_guide_screeners
 from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.services.read.context import StoreContext
 from algotrade.services.read.guide.edges.site_edges import edges_of_screener
@@ -28,11 +27,10 @@ def test_an_unknown_family_and_a_family_without_screeners_have_no_page(ctx: Stor
 def test_every_shipped_family_has_a_page_whose_rows_carry_the_edges_that_use_them(
     site: StoreContext,
 ) -> None:
-    prose = load_guide_screeners(SHIPPED)
     for family in load_guide_sections(SHIPPED).families:
         page = load_guide_screener_category(site, family.id)
         assert page is not None, family.id
         assert [s.id for s in page.screeners] == list(family.presets)
         for row in page.screeners:
-            assert row.line == prose.get(row.id).line  # type: ignore[union-attr]
+            assert row.line  # the preset's own description (ADR 0029 amendment)
             assert [e.id for e in row.edges] == [e.edge.id for e in edges_of_screener(site, row.id)]

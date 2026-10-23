@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Earnings gap on heavy volume"
+description = "Stocks up 10% beyond the market on earnings, on three times usual volume."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

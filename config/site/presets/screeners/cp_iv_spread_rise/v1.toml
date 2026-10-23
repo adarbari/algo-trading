@@ -8,6 +8,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Call-put IV spread, rising"
+description = "Stocks where the call-put price gap widened most over five sessions."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1 for stocks, so the screens compare on one universe)

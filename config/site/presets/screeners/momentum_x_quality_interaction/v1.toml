@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Momentum among quality names"
+description = "Last year's winners among companies with above-median quality, best gain first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1, so the variants compare on one universe)

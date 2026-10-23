@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Amihud illiquidity (most illiquid first)"
+description = "Stocks ranked by price move per dollar traded, most thinly traded first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as size_small, so the decoys compare on one universe; stocks only: an ETF has no

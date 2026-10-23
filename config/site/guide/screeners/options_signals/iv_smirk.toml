@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "iv_smirk"
 version = 1  # the preset version this prose was written for
-line = "Stocks whose protective puts cost least compared with calls, flattest first."
 summary = "Ranks every liquid optionable stock by its option smirk, the implied volatility of a 5% out-of-the-money put minus that of an at-the-money call, flattest first. A steep smirk is where traders pay most for protection, and the literature finds those stocks lag.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and has a smirk from our chain data. Every such name qualifies; the flattest smirk ranks first, the steepest last."
 not_checked = "It does not check how liquid the put wing is, borrow cost (steep-smirk names are often hard to short), or earnings inside the expiry. It is a screen of the option_cp_iv_signals edge, which the harness is still testing."

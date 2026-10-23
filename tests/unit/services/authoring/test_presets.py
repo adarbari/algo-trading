@@ -23,7 +23,11 @@ def _bump(writer: MemoryConfigWriter, **changes: object) -> None:
 
 def test_copy_pins_the_preset_version(writer: MemoryConfigWriter) -> None:
     draft = presets.copy_preset(writer, "alice", "my_vrp", "vrp")
-    assert draft == {"id": "my_vrp", "extends": "vrp@3"}
+    assert draft == {
+        "id": "my_vrp",
+        "extends": "vrp@3",
+        "description": "Rich premiums near a one-year high.",  # the preset's: the starting point
+    }
     with pytest.raises(ConflictError):
         presets.copy_preset(writer, "alice", "my_vrp", "vrp")
     with pytest.raises(ScreenNotFoundError):
@@ -35,7 +39,10 @@ def test_copy_pins_the_preset_version(writer: MemoryConfigWriter) -> None:
 
 def test_a_stale_pin_keeps_resolving_and_rebase_is_optional(writer: MemoryConfigWriter) -> None:
     screens.save_draft(
-        writer, "alice", "my_vrp", {"extends": "vrp@3", "criteria": {"price": {"value": 7}}}
+        writer,
+        "alice",
+        "my_vrp",
+        {"extends": "vrp@3", "description": "My take.", "criteria": {"price": {"value": 7}}},
     )
     screens.finalise(writer, "alice", "my_vrp")
     before = _detail(writer, "my_vrp")
@@ -45,7 +52,12 @@ def test_a_stale_pin_keeps_resolving_and_rebase_is_optional(writer: MemoryConfig
     assert detail.error is None and detail.working == before.working  # still v3's preset
     assert detail.preset and detail.preset.rebase_available
     draft = presets.rebase(writer, "alice", "my_vrp")
-    assert draft == {"id": "my_vrp", "extends": "vrp@4", "criteria": {"price": {"value": 7}}}
+    assert draft == {
+        "id": "my_vrp",
+        "extends": "vrp@4",
+        "description": "My take.",  # the user's text survives a rebase
+        "criteria": {"price": {"value": 7}},
+    }
     assert screens.finalise(writer, "alice", "my_vrp").version == 2
     assert _detail(writer, "my_vrp").error is None
 

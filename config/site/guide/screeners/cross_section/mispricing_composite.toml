@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "mispricing_composite"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by seven signs of being priced too high or too low."
 summary = "Ranks every liquid stock by a composite of seven published mispricing anomalies,[^2] the underpriced names first and the overpriced last. It is a simplified version of the Stambaugh, Yu and Yuan composite, which averages eleven.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day with at least five of the seven inputs from its filings. Every such name qualifies; the lowest composite rank, the most underpriced, comes first."
 not_checked = "It leaves out four of the paper's eleven anomalies (equity issues, investment to assets, momentum, distress from returns), so it is not their composite. Financial firms and ETFs have no inputs."

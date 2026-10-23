@@ -293,3 +293,34 @@ def test_an_id_under_both_kinds_is_ambiguous() -> None:
     s = store({("site", "screeners", "scr"): {"id": "scr"}})
     with pytest.raises(ConfigurationError, match="both"):
         resolve("scr", UserContext(SITE_USER), s.load)
+
+
+def test_a_description_is_the_documents_own_never_inherited_and_never_hashed() -> None:
+    """A copy of a preset does not read as the preset's sentence, a run override cannot set
+    one, and neither changes what a run computes (ADR 0029 amendment 2026-10-23)."""
+    site = {
+        "id": "p", "kind": "screener", "impl": "rules", "version": 1, "description": "The preset.",
+        "criteria": {"c": {"field": "instrument.status", "op": "eq", "value": "ACTIVE"}},
+    }  # fmt: skip
+
+    def load(scope: str, kind: str, name: str) -> dict[str, object] | None:
+        docs = {
+            ("site", "screeners", "p"): site,
+            ("site", "screeners", "p@1"): site,
+            ("u", "screeners", "mine"): {"id": "mine", "extends": "p@1", "description": "Own."},
+            ("u", "screeners", "bare"): {"id": "bare", "extends": "p@1"},
+        }
+        return docs.get((scope, kind, name))
+
+    assert resolve("p", UserContext("site"), load).config.description == "The preset."
+    assert resolve("mine", UserContext("u"), load).config.description == "Own."
+    assert resolve("bare", UserContext("u"), load).config.description is None
+    with pytest.raises(ConfigurationError, match="description"):
+        resolve("p", UserContext("site"), load, overrides={"description": "x"})
+    other = site | {"description": "Another."}
+    changed = resolve(
+        "p",
+        UserContext("site"),
+        lambda s, k, n: other if (s, k, n) == ("site", "screeners", "p") else None,
+    )
+    assert changed.hash == resolve("p", UserContext("site"), load).hash

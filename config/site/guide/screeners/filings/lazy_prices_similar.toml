@@ -2,7 +2,6 @@
 # "The screener page"). Keys as in insider_cluster_buys.toml; typed by src/algotrade/config/site/guide/screeners.py.
 id = "lazy_prices_similar"
 version = 1  # the preset version this prose was written for
-line = "Reports that read almost the same as a year earlier."
 summary = "Finds liquid stocks whose latest 10-K or 10-Q reads almost the same as the one a year earlier. Research finds that firms which rewrite their reports do worse;[^1] this is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $1M a day, with a 10-K or 10-Q that became public in the last 150 days and a stored report from a year earlier to compare with. The most similar text ranks first."
 not_checked = "It does not read what changed, only how much. A rewrite after a deal or a restatement is news the market prices at once, and a report that repeats last year's may simply be boilerplate.[^2]"

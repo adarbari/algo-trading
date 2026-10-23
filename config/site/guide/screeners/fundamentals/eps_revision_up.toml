@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "eps_revision_up"
 version = 3  # the preset version this prose was written for
-line = "Stocks whose analysts raised this year's earnings estimate most in a month."
 summary = "Ranks stocks by how much analysts revised their current-year earnings estimate over the last 30 days, the biggest upward revision first. Revisions tend to continue.[^1][^2] It is a candidate edge under test."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day, with a 30-day revision of the average current-year EPS estimate. The largest upward revision ranks first."
 not_checked = "It does not check how many analysts moved, the size of the old estimate or whether a report caused the change. The free data covers few names, so most stocks have no revision."

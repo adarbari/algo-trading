@@ -7,6 +7,7 @@ id = "vrp_scanner"
 kind = "screener"
 impl = "rules"
 version = 1
+description = "Optionable shares with rich option premiums, near a one-year high or low."
 selection = "liquid_optionable"   # the daily universe snapshot: active optionable stocks, ADRs, ETFs
 classify = "feature.near_52w"     # buckets the output: HIGH, LOW, BOTH
 

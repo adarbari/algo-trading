@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Recent reverse splits"
+description = "Stocks that reverse-split in the last month."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

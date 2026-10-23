@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "asset_growth"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by how fast their total assets grew in a year."
 summary = "Ranks every tradeable stock by how fast its total assets grew over the past year, from the slowest and shrinking up to the fastest builders. Fast asset growth has been followed by low returns in the research;[^1] the fastest growers at the bottom are the avoid list. A candidate edge under test."
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a year of asset growth. Every such name qualifies; the order is the point, the lowest asset growth first."
 not_checked = "It does not know whether the growth was organic, an acquisition or an issue of shares or debt, and it does not check price, quality or size."

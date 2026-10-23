@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Earnings gap, any volume"
+description = "Stocks that beat the market by 10% or more on their latest earnings report."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

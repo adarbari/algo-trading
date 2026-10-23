@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/income/vrp_scanner.toml.
 id = "vrp_iv_hv"
 version = 1  # the preset version this prose was written for
-line = "Optionable shares whose implied volatility sits well above the volatility they delivered."
 summary = "Finds liquid optionable shares whose 30-day implied volatility (IBKR's before option chains were stored) sits well above the volatility the share has actually delivered: the volatility premium alone, on the sessions where IBKR's implied volatility is stored (about two years).[^1] It is the VRP edge's screen for the edge harness; whether to sell premium on a name is a separate judgement."
 hit = "A common stock, ADR or ETF (not leveraged or inverse) with listed options, closing above $5 on at least $50M of 20-day dollar volume, whose 30-day implied volatility (IBKR's before option chains were stored) is at least 10 points above, and at least 1.25 times, the last 30 sessions' realised volatility. Ranked by that ratio, highest first. A missing value never passes."
 not_checked = "It reads no option chain: not the put's delta, spread, open interest or volume, not an option tier, not the 52-week range, not the implied volatility's level or rank. It does not check earnings. Use vrp_scanner for those once enough chain history is stored."

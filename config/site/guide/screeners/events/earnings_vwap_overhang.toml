@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "earnings_vwap_overhang"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by how far the close sits above the average price since earnings."
 summary = "Ranks liquid stocks by how far the close sits above the volume-weighted average price since the last earnings report: a proxy for holders' unrealised gain.[^1] Names most above their cost basis rank first. It is a candidate edge under test."
 hit = "The name is a common stock or ADR closing above $5 that trades at least $50M a day and has an earnings-anchored VWAP. Every such name qualifies; the order is the point, largest overhang first."
 not_checked = "It does not check the anchor's age (a fresh one sits near the price), the reason for the move since the report, or a retest of the average from above. The overhang of the study uses years of turnover; this one starts at the last report."

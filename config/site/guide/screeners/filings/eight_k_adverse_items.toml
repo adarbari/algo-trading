@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "eight_k_adverse_items"
 version = 1  # the preset version this prose was written for
-line = "Stocks with an 8-K on restated results, an auditor change or an officer change."
 summary = "Finds liquid stocks that disclosed an 8-K with Item 4.02 (non-reliance on past financials), 4.01 (a change of auditor) or 5.02 (an officer or director leaving or joining) in the last month: an avoid list, and the short side of the 8-K drift edge.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day and has one of those 8-K items known within the last 20 sessions, counting from the first session after the filing was accepted. The most liquid ranks first."
 not_checked = "It does not read the text: a 5.02 can be a retirement and a 4.01 a planned rotation. It does not know the reason behind a 4.02 or whether the news is already in the price. It is the screen of the adverse 8-K drift edge, which the harness is still testing."

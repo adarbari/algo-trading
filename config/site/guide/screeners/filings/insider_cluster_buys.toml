@@ -4,7 +4,6 @@
 # Keys as in tender_offer_filed.toml; typed by src/algotrade/config/site/guide/screeners.py.
 id = "insider_cluster_buys"
 version = 1  # the preset version this prose was written for
-line = "Stocks where three or more insiders bought shares on the open market this month."
 summary = "Finds liquid stocks where three or more insiders bought shares on the open market in the last 30 days and a buyer trades at irregular times.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $1M a day, with at least three different insiders buying in the last 30 days (counted from the session each filing became public). The most buyers rank first."
 not_checked = "It does not read the size of the purchases, whether the buyers are officers or directors, or why they bought. A purchase made under a pre-arranged plan is not screened out: its column rollup.insider_buys@v1.plan_10b5_1_flag shows it."

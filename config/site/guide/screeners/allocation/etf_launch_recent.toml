@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "etf_launch_recent"
 version = 1  # the preset version this prose was written for
-line = "Thematic and sector ETFs launched in the last three years that trade at least $5M a day."
 summary = "Finds thematic and sector ETFs that launched in the last three years and trade at least $5M a day: an avoid list for longs and the short side of the ETF launch edge.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The fund is an ETF the site calls thematic or sector, its first listing day in the Tiingo history is within the last 750 sessions, and it trades at least $5M a day. The most liquid ranks first."
 not_checked = "It does not know what the fund holds, what it costs, or whether the theme is still fashionable. The launch date is the ticker's first listing, which can be a few days after the fund was set up, and the category comes from the fund's name."

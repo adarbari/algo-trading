@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "residual_momentum"
 version = 1  # the preset version this prose was written for
-line = "Last year's winners after removing what the market itself contributed."
 summary = "Ranks every tradeable name by its 12-month return with the last month left out and the market's share taken off, so a name that only rode a rising market ranks low. It is momentum with the market stripped out,[^1] a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, and it has a market-residual 12-1 momentum value. Every such name qualifies; the best residual comes first."
 not_checked = "It does not remove the size and value parts of the return (the paper strips three factors; only the market is stored), and it does not scale by the residual's own volatility. The harness measures whether the order pays."

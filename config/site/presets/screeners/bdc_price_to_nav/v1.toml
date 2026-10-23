@@ -17,6 +17,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "BDC price to NAV (cheapest first)"
+description = "Business development companies trading at the deepest discount to their reported assets."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates)
 [criteria.security_type]

@@ -22,6 +22,7 @@ OWN = {
     "kind": "screener",
     "impl": "rules",
     "selection": "all_active",
+    "description": "Shares above ten dollars.",
     "criteria": {"price": {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 10}},
 }
 

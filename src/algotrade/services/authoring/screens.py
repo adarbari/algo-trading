@@ -93,7 +93,8 @@ class Finalised:
 def finalise(writer: ConfigWriter, user: str, name: str) -> Finalised:
     """The draft becomes version ``latest + 1`` (immutable) and the draft is removed. Fails
     closed: nothing is written unless the screen resolves and validates exactly as it will
-    run. Finalising puts the screen on the nightly (ADR 0033)."""
+    run, and a screen without a one-line ``description`` does not finalise (a draft may lack one:
+    ADR 0029 amendment 2026-10-23). Finalising puts the screen on the nightly (ADR 0033)."""
     who, name = author(user), screen_id(name)
     draft = writer.draft(who.user_id, name)
     if draft is None:
@@ -101,6 +102,10 @@ def finalise(writer: ConfigWriter, user: str, name: str) -> Finalised:
     versions = writer.versions(who.user_id, name)
     version = (versions[-1] if versions else 0) + 1
     document = draft_document(name, draft) | {"version": version}
+    if not str(document.get("description") or "").strip():
+        raise ConfigurationError(
+            f"{who.user_id}/{name}.description: add a one-line description to save the screener"
+        )
     resolved = validate(writer, who, name, document)
     try:
         writer.add_version(who.user_id, name, version, document)

@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "sector_reversal"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by their 20-session return against their sector fund, worst first."
 summary = "Ranks every tradeable name by its last 20 sessions against its sector fund, the worst first. It is the industry-neutral version of the residual reversal: a name that fell with its whole sector is not a loser here.[^1] It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, with a 20-session return against its sector fund. Every such name qualifies; the one furthest behind its sector comes first."
 not_checked = "It does not adjust for beta or exclude names that moved on news. The sector is the SEC SIC code's coarse market sector, 11 groups."

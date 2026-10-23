@@ -12,6 +12,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Residual reversal, news-free"
+description = "Stocks that lagged the market for a month with no filing or earnings news."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as residual_reversal, stocks only: an ETF has no 8-K)

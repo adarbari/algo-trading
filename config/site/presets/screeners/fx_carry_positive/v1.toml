@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Currency funds paying carry over the dollar"
+description = "Currency funds whose currency pays higher short-term interest than the dollar."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

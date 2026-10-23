@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "etf_above_200d"
 version = 1  # the preset version this prose was written for
-line = "Funds trading above their average price of the last 200 days."
 summary = "Lists unleveraged ETFs trading above their 200-day average, the one furthest above first. It is the moving-average timing rule of the ETF allocation edges.[^1]"
 hit = "An unleveraged ETF whose close is above the mean of its last 200 closes. The largest distance above the average ranks first. A fund with under 200 sessions of history is absent."
 not_checked = "It does not use Faber's 10-month average of month-end closes, add dividends or check liquidity. The 200-day mean is the stored stand-in for about 210 sessions."

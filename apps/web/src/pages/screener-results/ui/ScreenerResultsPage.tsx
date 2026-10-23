@@ -10,6 +10,7 @@
 import { Button, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
 import { useState } from 'react';
 
+import { ScreenerDescription, useMyScreeners, useScreenerRuns } from '@/entities/screen';
 import { ScreenerEdgeLine } from '@/widgets/screener-edge-line';
 import { ScreenerResults } from '@/widgets/feature-table';
 import { PickDetail } from '@/widgets/pick-detail';
@@ -35,6 +36,8 @@ export function ScreenerResultsPage({
   onCompare,
   onOpenEdge,
 }: ScreenerResultsPageProps) {
+  const description = useScreenerRuns().data?.byId.get(id)?.description ?? null;
+  const own = (useMyScreeners().data ?? []).some((s) => s.screenerId === id);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [compared, setCompared] = useState<readonly string[]>([]);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
@@ -52,6 +55,15 @@ export function ScreenerResultsPage({
       <Stack direction="row" gap={3} align="center" justify="between" wrap>
         <Stack gap={1}>
           <Heading level={1}>{id}</Heading>
+          {description ? (
+            <ScreenerDescription description={description} />
+          ) : own ? (
+            <Stack direction="row">
+              <Button size="sm" variant="ghost" onClick={onEdit}>
+                Add a description
+              </Button>
+            </Stack>
+          ) : null}
           <Text size="sm" tone="secondary">
             What this screener found in its latest run. Add any catalogue feature as a column; your
             columns and filters are saved as your view of it.

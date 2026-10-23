@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "dual_class_cheap_leg"
 version = 1  # the preset version this prose was written for
-line = "The cheaper of a company's two share classes when the gap is unusually wide."
 summary = "Finds the cheaper share class of a company with two listed classes, when it trades two or more standard deviations below its usual gap to its sibling.[^2] The spread tends to close.[^1] It is a candidate edge under test."
 hit = "The name is a common stock or ADR closing above $3 that trades at least $2M a day, one of exactly two listed classes of its issuer, with its price against its sibling at least 2 standard deviations under its own year."
 not_checked = "It does not check dividend or voting rights, a takeover or recapitalisation that moves one class, or the cost of borrowing the sibling. It uses its own year of the ratio, not a long history."

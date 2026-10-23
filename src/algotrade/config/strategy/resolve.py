@@ -230,6 +230,7 @@ def _strategy_document(
     layers = [f"site/{site_kind}/{site_name}"] if site_doc else []
     merged = dict(site_doc or {})
     if user_doc:
+        merged.pop("description", None)  # a preset's sentence describes the preset, not this copy
         merged = deep_merge(merged, {k: v for k, v in user_doc.items() if k != "extends"})
         merged["id"] = config_id
         layers.append(where)
@@ -261,6 +262,8 @@ def resolve(
         reject_secrets(overrides, "run-overrides")
     document, layers, preset = _strategy_document(config_id, user, load)
     if overrides:
+        if "description" in overrides:
+            raise ConfigurationError(f"{config_id}: a run override cannot set a description")
         document = deep_merge(document, overrides)
         layers.append("run-overrides")
     config = parse_strategy(document, "/".join(layers[-1:]) or config_id)

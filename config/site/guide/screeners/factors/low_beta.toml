@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "low_beta"
 version = 1  # the preset version this prose was written for
-line = "Stocks that move least with the market, lowest first."
 summary = "Ranks every tradeable name by its beta to SPY over the last year, the lowest first. Frazzini and Pedersen find low-beta names earn more for their risk than high-beta names.[^1] It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, with a positive beta over the last 252 sessions. Every such name qualifies; the lowest beta ranks first."
 not_checked = "It does not shrink the beta toward 1, lever the low-beta names to match market risk, or wait for a 24-month market uptrend.[^2] A low beta earns less than the market in a rising one: the claim is about return per unit of risk."

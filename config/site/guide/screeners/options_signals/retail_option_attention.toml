@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "retail_option_attention"
 version = 1  # the preset version this prose was written for
-line = "Lottery-like stocks with heavy option trading compared with share trading."
 summary = "Finds lottery-like stocks, with a best day of 10% or more last month, and ranks them by how heavy their option volume is against their share volume. Retail traders buy short-dated out-of-the-money calls in such names,[^1] and the literature finds the stock and the calls lose afterwards.[^2]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day, had a one-day gain of 10% or more in the last 21 sessions, and has an option-to-stock volume ratio. The edge ranks the highest ratio as the one to avoid."
 not_checked = "It does not see strikes, expiries or who traded: the share of option volume in short-dated out-of-the-money calls is not stored, so the volume ratio stands in for it. The 10% gate is a declared assumption."

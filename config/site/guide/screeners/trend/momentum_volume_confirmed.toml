@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "momentum_volume_confirmed"
 version = 1  # the preset version this prose was written for
-line = "Past-year winners that also show net buying on volume over 20 sessions."
 summary = "Ranks past-year winners that also show net buying: on-balance volume rising and closes in the upper half of the day's range on volume, over 20 sessions.[^2] It tests whether volume confirmation improves 12-1 momentum."
 hit = "The name closes above $5, trades at least $50M a day, has positive 12-1 momentum, and both the 20-session OBV trend and Chaikin money flow are above 0. Best momentum first."
 not_checked = "It does not check the size of any one day's volume, news, or earnings. OBV and CMF have no academic test of their own."

@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "momentum_x_quality_interaction"
 version = 1  # the preset version this prose was written for
-line = "Last year's winners among companies with above-median quality, best gain first."
 summary = "Ranks the names with an above-median quality score by their 12-1 return,[^1] momentum screened for quality as practitioners combine them.[^2] It keeps out the weak balance sheets that drive momentum crashes. It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, has a quality score of at least 0.5, and has a 12-1 momentum value. The strongest momentum ranks first."
 not_checked = "It does not check value, and it leaves out every name without enough statements for a quality score (new listings, many banks and funds). The harness measures whether the combination pays."

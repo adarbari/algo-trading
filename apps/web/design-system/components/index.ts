@@ -147,6 +147,7 @@ export { LinkedProse, type LinkedProsePart, type LinkedProseProps } from './Link
 export { ActionGroup, type ActionGroupProps, type ActionItem } from './ActionGroup';
 export { MasterDetail, type MasterDetailProps, type MasterDetailStep } from './MasterDetail';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
+export { LineClamp, type LineClampProps } from './LineClamp';
 export { NoticeLine, type NoticeLineProps } from './NoticeLine';
 export { NumberInput, type NumberInputProps } from './NumberInput';
 export {

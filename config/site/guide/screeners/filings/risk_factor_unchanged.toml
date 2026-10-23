@@ -2,7 +2,6 @@
 # "The screener page"). Keys as in insider_cluster_buys.toml; typed by src/algotrade/config/site/guide/screeners.py.
 id = "risk_factor_unchanged"
 version = 1  # the preset version this prose was written for
-line = "Annual reports whose risk factors match the year before."
 summary = "Finds liquid stocks whose latest 10-K lists nearly the same risk factors as the 10-K a year earlier. Research finds that firms which rewrite their risk section do worse;[^2] this is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $1M a day, with a 10-K that became public in the last 400 days and a stored 10-K from the year before, both with a risk section long enough to compare. The most similar section ranks first."
 not_checked = "It does not read what the new risks say, only how much the section changed. Risk sections tend to grow every year, and a rewrite can be a lawyer's style choice, not news.[^1]"

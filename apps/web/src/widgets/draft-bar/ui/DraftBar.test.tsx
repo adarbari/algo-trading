@@ -23,6 +23,7 @@ const POST = vi.mocked(api.POST);
 
 const save = vi.fn(() => Promise.resolve());
 const discard = vi.fn(() => Promise.resolve());
+const setDescription = vi.fn();
 const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unknown> = {}) => ({
   id: 'my-vrp',
   preset: null,
@@ -31,6 +32,8 @@ const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unk
   discarding: false,
   nextVersion: 2,
   criteria: [{ id: 'a' }],
+  description: 'Rich premium in calm names',
+  setDescription,
   pendingFormulas: [],
   save,
   discard,
@@ -58,11 +61,49 @@ function setup(onDeleted?: () => void, onReturn?: () => void) {
 beforeEach(() => {
   save.mockClear();
   discard.mockClear();
+  setDescription.mockClear();
   POST.mockReset();
   state.builder = builder();
 });
 
 describe('DraftBar', () => {
+  // Would have caught "a user-made screener saves with no description".
+  it('blocks Finalize without a description: shows the inline error and calls no API', async () => {
+    state.builder = builder({ dirty: true, description: '' });
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Finalize v2' }));
+    expect(
+      screen.getByText('Add a one-line description so you can tell your screeners apart.'),
+    ).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+    expect(POST).not.toHaveBeenCalled();
+  });
+
+  it('shows the same inline error when the server refuses the description', async () => {
+    state.builder = builder({ dirty: true });
+    POST.mockResolvedValue({
+      error: { detail: 'description: add a one-line description to save the screener' },
+      response: new Response(null, { status: 422 }),
+    });
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Finalize v2' }));
+    expect(
+      await screen.findByText('Add a one-line description so you can tell your screeners apart.'),
+    ).toBeInTheDocument();
+  });
+
+  it('counts the description, previews its list row and edits it as one line', async () => {
+    setup();
+    expect(screen.getByRole('textbox', { name: /Description/ })).toHaveValue(
+      'Rich premium in calm names',
+    );
+    expect(screen.getByText('26 / 140')).toBeInTheDocument();
+    expect(screen.getByText('On the Screeners list')).toBeInTheDocument();
+    expect(screen.getByText('Rich premium in calm names', { selector: 'p' })).toBeInTheDocument();
+    await userEvent.type(screen.getByRole('textbox', { name: /Description/ }), '!');
+    expect(setDescription).toHaveBeenCalledWith('Rich premium in calm names!');
+  });
+
   it('offers "Save and return to edge" only when opened from an edge: it saves unsaved edits first', async () => {
     const { unmount } = setup();
     expect(screen.queryByRole('button', { name: 'Save and return to edge' })).toBeNull();

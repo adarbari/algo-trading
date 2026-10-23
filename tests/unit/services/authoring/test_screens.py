@@ -17,9 +17,44 @@ OWN: dict[str, Any] = {
     "kind": "screener",
     "impl": "rules",
     "selection": "all_active",
+    "description": "Shares above ten dollars.",
     "criteria": {"price": {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 10}},
 }
 ALICE = UserContext("alice")
+
+
+def test_a_user_screener_does_not_save_without_a_description(writer: MemoryConfigWriter) -> None:
+    """The Screeners list shows the description under every name: finalise refuses a screen
+    without one (ADR 0029 amendment), while its draft saves and previews without."""
+    bare = {k: v for k, v in OWN.items() if k != "description"}
+    screens.save_draft(writer, "alice", "mine", bare)  # a draft may lack it
+    for blank in ("", "  "):  # a cleared field leaves a valid draft, never a draft error
+        screens.save_draft(writer, "alice", "mine", bare | {"description": blank})
+        detail = documents.screen_detail(writer, ALICE, "mine")
+        assert detail is not None and detail.draft_error is None
+    for missing in (None, "", "  "):
+        screens.save_draft(
+            writer, "alice", "mine", bare | ({} if missing is None else {"description": missing})
+        )
+        with pytest.raises(ConfigurationError, match="description"):
+            screens.finalise(writer, "alice", "mine")
+    assert writer.versions("alice", "mine") == []  # nothing written
+    for bad in ("a\nb", "x" * 141):
+        screens.save_draft(writer, "alice", "mine", OWN | {"description": bad})
+        with pytest.raises(ConfigurationError, match="description"):
+            screens.finalise(writer, "alice", "mine")
+    screens.save_draft(writer, "alice", "mine", OWN)
+    assert screens.finalise(writer, "alice", "mine").version == 1
+
+
+def test_a_new_version_with_another_description_keeps_the_hash(writer: MemoryConfigWriter) -> None:
+    """The sentence describes the screen, it is not part of what a run computes."""
+    doc = {"id": "mine", "version": 1} | OWN
+    other = doc | {"description": "Another sentence."}
+    assert (
+        screens.validate(writer, ALICE, "mine", doc).hash
+        == screens.validate(writer, ALICE, "mine", other).hash
+    )
 
 
 def test_save_draft_sets_id_and_drops_managed_keys(writer: MemoryConfigWriter) -> None:
@@ -139,8 +174,13 @@ def test_a_copy_may_share_its_presets_id_and_clear_the_tie_break(
     presets.copy_preset(writer, "alice", "vrp", "vrp")
     detail = documents.screen_detail(writer, ALICE, "vrp")
     assert detail is not None
-    assert detail.draft == {"id": "vrp", "extends": "vrp@3"} and detail.draft_error is None
-    cleared = {"extends": "vrp@3", "rank": {"tie_break": ""}}
+    assert detail.draft == {
+        "id": "vrp",
+        "extends": "vrp@3",
+        "description": "Rich premiums near a one-year high.",
+    }
+    assert detail.draft_error is None
+    cleared = {"extends": "vrp@3", "description": "Mine.", "rank": {"tie_break": ""}}
     screens.save_draft(writer, "alice", "vrp", cleared)
     assert screens.finalise(writer, "alice", "vrp").version == 1
 
