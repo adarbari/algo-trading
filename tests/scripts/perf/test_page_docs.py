@@ -66,10 +66,7 @@ def test_an_optional_variable_may_be_left_out_but_a_required_one_may_not() -> No
 # operation must be measured, never added to this set.
 UNMEASURED_BASELINE = {
     "AcceptedFormulas",
-    "EdgeDetail",
-    "EdgeDocument",
     "EdgeResultBasis",
-    "InstrumentEventList",
     "InstrumentHistory",
     "MyFeatureRequests",
     "PublishedEdge",

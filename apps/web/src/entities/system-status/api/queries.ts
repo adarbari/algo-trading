@@ -6,9 +6,7 @@
  * nightly runs, completeness, and the viewer's) before; the viewer stays its own cached read. Not
  * `Query.ideas`: that ranks every screener's picks with their values (1.3 s of the API's
  * reads on every page, for what the strip never shows). The session's `newer` (the incomplete
- * session left out, ADR 0062) feeds the session notice, and `dataStatus` (the server's state,
- * datasets and counts; an admin also gets each gap's cause) the data-status pill, which selects it
- * itself (`use-data-status.ts`, in the pill's lazy chunk). Every viewer may read it; the nightly
+ * session left out, ADR 0062) feeds the session notice. Every viewer may read it; the nightly
  * run and the grid carry the same fields as the run and ingestion entities' own reads.
  */
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
@@ -25,27 +23,6 @@ const StatusStrip = graphql(`
       newer {
         date
         state
-      }
-      dataStatus {
-        state
-        knowledgeTs
-        datasets {
-          name
-          status
-          share
-          unavailable {
-            cause @include(if: $admin) {
-              links {
-                level
-                subject
-                status
-                message
-              }
-            }
-          }
-        }
-        affectedScreeners
-        totalScreeners
       }
     }
     screeners {
@@ -82,7 +59,7 @@ export interface StatusStripState {
 }
 
 /** What the strip draws from; `admin` adds the nightly run and the grid to the same request. */
-export function statusStripQuery(admin: boolean) {
+function statusStripQuery(admin: boolean) {
   return queryOptions({
     queryKey: queryKeys.gql('StatusStrip', { admin }),
     queryFn: ({ queryKey }) => gql(StatusStrip, { admin }, queryKey),

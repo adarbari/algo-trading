@@ -467,11 +467,11 @@ test('Screener results: the edge line and the evidence fit a phone and the pick 
   await expectAccessible(page);
 });
 
-/** The status strip's one read with a session and its data status (the pill's states). */
+/** The pill's read with a session and its data status (the pill's states). */
 async function mockDataStatus(page: Page, state: string, newer: string | null) {
   await page.route('**/api/graphql', async (route) => {
     const body = route.request().postDataJSON() as { query?: string } | null;
-    if (!/query\s+StatusStrip\b/.test(body?.query ?? '')) {
+    if (!/query\s+DataStatus\b/.test(body?.query ?? '')) {
       await route.fallback();
       return;
     }
@@ -501,7 +501,6 @@ async function mockDataStatus(page: Page, state: string, newer: string | null) {
               totalScreeners: 7,
             },
           },
-          screeners: [],
         },
       },
     });

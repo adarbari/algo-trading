@@ -13,6 +13,7 @@ const meta = {
         Loading: 'a label is text; its owner shows loading',
         Empty: 'a label always has text',
         Error: 'a label is text; its owner shows errors',
+        Dense: 'a label is text and takes its size from its owner',
       },
     },
   },
