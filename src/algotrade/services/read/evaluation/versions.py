@@ -113,8 +113,12 @@ def _in_sample_words(text: str) -> str:
 
 def load_summary(ctx: Stores, edge: Edge) -> verdict.EdgeSummary:
     """The headline of ``edge``'s verdict (what the list shows): the same judge, run and
-    hidden-copy wording as ``load_verdict``, without the pieces the list never reads."""
-    return verdict.summary_of(load_verdict(ctx, edge, headline=True))
+    hidden-copy wording as ``load_verdict``, without the pieces the list never reads. A site
+    edge's stored headline is used when its fingerprint matches (``verdict.stored``), else the
+    live judge answers."""
+    return verdict.load_stored_summary(ctx, edge) or verdict.summary_of(
+        load_verdict(ctx, edge, headline=True)
+    )
 
 
 def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.EdgeVerdict:

@@ -123,6 +123,24 @@ describe('studyChartEvents', () => {
   });
 });
 
+describe('studyChartEvents, same-day filings', () => {
+  it('marks several filings of one day once, naming each', () => {
+    const study = {
+      ...STUDY_FIXTURE,
+      ahead: [],
+      filings: [
+        { ...FILING0, filingDate: '2026-07-30', form: '8-K', label: 'Results' },
+        { ...FILING0, filingDate: '2026-07-30', form: '8-K/A', label: 'Exhibits' },
+        { ...FILING0, filingDate: '2026-07-01', form: '8-K', label: 'Other events' },
+      ],
+    };
+    expect(studyChartEvents(study, new Set())).toEqual([
+      { time: '2026-07-01', kind: 'filing', detail: '8-K Other events' },
+      { time: '2026-07-30', kind: 'filing', detail: '8-K Results; 8-K/A Exhibits' },
+    ]);
+  });
+});
+
 describe('calendarDays', () => {
   it('puts market-wide events in a Market column and rules the expiry days', () => {
     const { days, names, ruledDays } = calendarDays(CALENDAR_FIXTURE);
