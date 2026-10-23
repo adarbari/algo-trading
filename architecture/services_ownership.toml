@@ -35,6 +35,7 @@ allowed = [
     "src/algotrade/services/selection.py",  # fields_view: the screen's one read of values
     "src/algotrade/services/read/context.py",  # ReadContext.licences: the request user's held set
     "src/algotrade/services/read/instruments/table.py",  # a table's filters and sort
+    "src/algotrade/services/read/filtering/definitions.py",  # which filters a viewer is offered (ADR 0082)
     "src/algotrade/services/read/screens/results.py",  # stored criterion values and sorts
     "src/algotrade/services/preview/frame.py",  # the Builder's frame, kept per licence set
     "src/algotrade/services/jobs/handlers.py",  # the screen job passes the user's licences
