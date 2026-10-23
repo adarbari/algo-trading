@@ -405,6 +405,9 @@ VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object
 BENCH_USER = "local"
 BENCH_COPY = "perf_bench_copy"
 OWN_EDGE_OPS = ("EdgeCompare",)
+# the copy has no run: `load_compare` stops at "You have not run this edge yet", so the expensive
+# path (load_run_rows twice, basis_of) is not timed; ops.json says so
+FIDELITY_OWN_COPY = {"fidelity": "own copy, not run"}
 
 
 def add_bench_edge(config: Path, site_edge: str, user: str = BENCH_USER) -> str:
@@ -592,6 +595,7 @@ def time_ops(
             "noisy": any(ld > load_max for ld in loads[s]),
             "failed": last[s]["bad"],  # judged over every pass, not the last one
             "empty": last[s]["empty"],
+            **(FIDELITY_OWN_COPY if distinct[s]["name"] in OWN_EDGE_OPS else {}),
         }
         for s, x in samples.items()
     }, meta

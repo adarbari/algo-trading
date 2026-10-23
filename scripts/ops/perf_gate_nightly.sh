@@ -76,6 +76,10 @@ say() { echo "perf_gate: $*" >&2; if [ "$rundir_made" = 1 ]; then echo "perf_gat
 if [ "$((10#$hm))" -lt 300 ]; then exit 0; fi  # before 03:00 local
 if [ -f "$status" ] && grep -q "^date=$today .*finished=yes" "$status"; then exit 0; fi
 
+# hold the Mac awake for the whole run (idle sleep only; a lid close on battery cannot be prevented: the
+# pause rule in the copy's poll loop detects it). Harmless where caffeinate is missing.
+if command -v caffeinate >/dev/null 2>&1; then caffeinate -i -w $$ >/dev/null 2>&1 & fi
+
 # the clone is removed and rewritten: only the fixed clone path, never the real store
 case "$clone" in /*) ;; *) say "refusing: PERF_CLONE_ROOT must be an absolute path (got '$clone')"; exit 2 ;; esac
 case "$clone" in */perf-clone/data) ;; *) say "refusing: $clone does not end in /perf-clone/data"; exit 2 ;; esac
@@ -388,11 +392,13 @@ write_progress() {  # $1 = why the copy stopped
 }
 # poll once a second on the WALL clock: the cap, a writer that appears (every PERF_POLL_S s: the copy would
 # be torn: stop it, discard, retry later), and a pause: a gap over 60 s between ticks is logged
-poll=${PERF_POLL_S:-10}; tick=0; writer_mid=; cap_hit=0; last_t=$(date +%s)
+poll=${PERF_POLL_S:-10}; tick=0; writer_mid=; paused_s=; cap_hit=0; last_t=$(date +%s)
 while kill -0 "$wd_pid" 2>/dev/null; do
   sleep 1; tick=$((tick + 1)); now=$(date +%s)
   if [ $((now - last_t)) -gt 60 ]; then
-    say "machine paused or stalled for $((now - last_t)) s (during the copy, tick $tick)"
+    paused_s=$((now - last_t))
+    say "machine paused or stalled for $paused_s s (during the copy, tick $tick)"
+    kill -TERM "$wd_pid" 2>/dev/null; break  # a copy across a sleep is not a result: retry, not a finished day
   fi
   last_t=$now
   if [ $((now - t_ready)) -ge "$snapshot_limit" ]; then cap_hit=1; kill -TERM "$wd_pid" 2>/dev/null; break; fi
@@ -403,6 +409,11 @@ done
 wait "$wd_pid"
 copy_code=$?
 wd_pid=
+if [ -n "$paused_s" ]; then
+  snapshot_s=$(( $(date +%s) - t_ready )); wait_s=$((t_ready - t_start))
+  write_progress machine-paused
+  discard_clone; busy "machine paused $paused_s s during the copy (copy stopped, retry)"
+fi
 if [ -n "$writer_mid" ]; then
   snapshot_s=$(( $(date +%s) - t_ready )); wait_s=$((t_ready - t_start))
   write_progress writer-during-copy

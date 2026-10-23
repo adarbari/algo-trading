@@ -735,25 +735,94 @@ def _date_stub(rig: Rig, jump_file: Path, jump: int) -> dict[str, str]:
     return {"PATH": f"{d}:{os.environ['PATH']}"}
 
 
-def test_the_snapshot_cap_is_wall_clock_and_a_pause_is_logged(rig: Rig) -> None:
-    """A monotonic timeout does not advance while the Mac sleeps: the cap counts `date +%s`."""
-    (rig.tmp / "var" / "data" / "tables").mkdir()
+def _run_with_jump(rig: Rig, jump_s: int, limit: str) -> tuple[int, str]:
+    (rig.tmp / "var" / "data" / "tables").mkdir(exist_ok=True)
     jump = rig.tmp / "slept"
     slow = _script(rig, "slowcp5.sh", "sleep 60\n")
+    env = rig.env(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S=limit, **_date_stub(rig, jump, jump_s))
     proc = subprocess.Popen(
-        ["bash", str(SCRIPT)],
-        env=rig.env(PERF_COPY_CMD=slow, PERF_SNAPSHOT_LIMIT_S="500", **_date_stub(rig, jump, 600)),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+        ["bash", str(SCRIPT)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     time.sleep(2.5)
     jump.write_text("")
     _, err = proc.communicate(timeout=40)
-    assert proc.returncode == 4 and "snapshot over-time" in err
+    return proc.returncode, err
+
+
+def test_the_snapshot_cap_is_wall_clock_not_a_monotonic_timeout(rig: Rig) -> None:
+    """A jump of the clock under the pause threshold still counts toward the cap."""
+    code, err = _run_with_jump(rig, 30, "20")
+    assert code == 4 and "snapshot over-time" in err
+    snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
+    assert snap["copy_stopped"] == "over-time" and snap["copy_s"] >= 20
+
+
+def test_a_pause_during_the_copy_stops_it_and_retries_instead_of_finishing_the_day(
+    rig: Rig,
+) -> None:
+    """A Mac that slept mid-copy is no slow copy: log it, drop the clone, exit 3 (retries go on)."""
+    code, err = _run_with_jump(rig, 600, "500")
+    assert code == 3 and "machine paused 60" in err
     assert "machine paused or stalled for" in (_evidence(rig) / "run.log").read_text()
     snap = json.loads((_evidence(rig) / "snapshot.json").read_text())
-    assert snap["copy_stopped"] == "over-time" and snap["copy_s"] >= 500
+    assert snap["copy_stopped"] == "machine-paused"
+    assert not rig.status.exists() and not (rig.root / "data").exists()
+
+
+def test_the_run_holds_the_machine_awake_with_caffeinate_for_its_own_pid(rig: Rig) -> None:
+    d = rig.tmp / "caf"
+    d.mkdir()
+    log = rig.tmp / "caf.log"
+    (d / "caffeinate").write_text(f"#!/bin/sh\necho $* >> {log}\n")
+    (d / "caffeinate").chmod(0o755)
+    rig.run(PATH=f"{d}:{os.environ['PATH']}")
+    args = log.read_text().split()
+    assert args[:2] == ["-i", "-w"] and args[2].isdigit()
+
+
+def test_the_trash_delete_guard_refuses_a_path_that_is_not_a_sibling_trash(rig: Rig) -> None:
+    """Mutation guard: `delete_trash` (the wrapper's own function, extracted) deletes only a
+    sibling `data.trash.*` of the clone: removing `trash_ok` from it deletes the others."""
+    funcs = subprocess.run(
+        ["sed", "-n", "/^trash_ok()/,/^}/p;/^delete_trash()/,/^}/p", str(SCRIPT)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    sibling = rig.root / "data.trash.2026-10-01"
+    elsewhere = rig.tmp / "elsewhere" / "perf-clone" / "data.trash.2026-10-01"
+    clone_itself = rig.root / "data"
+    for d in (sibling, elsewhere, clone_itself, rig.root / "data.keep"):
+        d.mkdir(parents=True)
+        (d / "f").write_text("x")
+    script = f"clone={clone_itself}; logs={rig.tmp}/logs; PERF_LOWPRI=\n{funcs}\n" + "".join(
+        f"delete_trash {d}\n" for d in (elsewhere, clone_itself, rig.root / "data.keep", sibling)
+    )
+    subprocess.run(["bash", "-c", script], check=True)
+    assert _wait_gone(sibling)  # only the sibling trash goes
+    assert (elsewhere / "f").exists() and (clone_itself / "f").exists()
+    assert (rig.root / "data.keep" / "f").exists()
+
+
+def test_the_trash_is_deleted_with_find_delete_not_rm(rig: Rig) -> None:
+    """Mutation guard: `find -delete` measured 6-7 s per 100k files against 10 s for `rm -rf`."""
+    d = rig.tmp / "tools"
+    d.mkdir()
+    log = rig.tmp / "tools.log"
+    for n in ("rm", "find"):
+        real = shutil.which(n)
+        (d / n).write_text(f'#!/bin/sh\necho {n} $* >> {log}\nexec {real} "$@"\n')
+        (d / n).chmod(0o755)
+    old = rig.root / "data.trash.2026-10-20"
+    old.mkdir(parents=True)
+    (old / "f").write_text("x")
+    rig.run(PATH=f"{d}:{os.environ['PATH']}")
+    assert _wait_gone(old)
+    calls = log.read_text().splitlines()
+    assert any(
+        c.startswith("find ") and "-delete" in c and "data.trash.2026-10-20" in c for c in calls
+    )
+    assert not any(c.startswith("rm ") and "data.trash" in c for c in calls)
 
 
 def test_snapshot_json_has_the_seconds_of_every_copied_entry(rig: Rig) -> None:
