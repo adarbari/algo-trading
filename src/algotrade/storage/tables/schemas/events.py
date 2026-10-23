@@ -297,6 +297,7 @@ ANALYST_ESTIMATE_SNAPSHOTS = fixed(
     "strong_sell int64",
     "consensus string",
     "status string",
+    "currency string",  # an estimate's currency (Yahoo; null before it and for FMP)
     runs="merge",
     key=("instrument_id", "source", "kind", "period"),
 )

@@ -22,8 +22,17 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
   rows); the free plan covers few names;
 - Finnhub: one call a name (recommendation trend), at most ``[finnhub] per_night`` names, due on
   the same cadence, stalest first;
+- Yahoo (ADR 0080, owner-only licence ``yahoo``): one call a name (``quoteSummary``: targets,
+  estimates, recommendation counts), asked of the names FMP refuses (its last outcome a 402, or
+  refused tonight; never one FMP answers), at most ``[yahoo] per_night``, due by ``[yahoo]
+  refresh_days``, largest market cap first, within its own ``[yahoo] run_budget_s``; an unknown
+  symbol (404) is ``NOT_COVERED`` and waits four refresh windows. It is fail-soft: every error is
+  a ``FETCH_ERROR`` item (asked again next night) and three failures in a row stop the step, the
+  names left being ``OVER_BUDGET``. Its calls are not FMP's (``budget.py`` counts ``fmp:`` items).
+  With no FMP built, every name FMP never answered is a candidate;
 - which names a night asked is the run record's items (``fmp:SYM:price_target``,
-  ``finnhub:SYM``...), read back by the next night: the rotation keeps no state of its own. An
+  ``finnhub:SYM``, ``yahoo:SYM``...), read back by the next night: the rotation keeps no state of
+  its own. An
   empty answer is ``EMPTY``, a refusal ``NOT_COVERED`` (neither fails the run); an error is a
   ``FETCH_ERROR`` item and the name is asked again next night;
 - every attempt of a vendor for a name also stores one ``kind = "coverage"`` row (``period``
@@ -31,14 +40,16 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
   tell a name the vendor refuses from one not yet fetched or one whose call failed, from the
   store alone. A refused name has that marker and no estimate rows.
 
-The run has a time budget (``[fmp] run_budget_s``, both vendors' calls): once spent no further call
+The run has a time budget (``[fmp] run_budget_s``, FMP's and Finnhub's calls): once spent no
+further call
 is made and the names not yet asked are ``OVER_BUDGET`` items (the next night continues, stalest
 first), so a stalling vendor cannot hold the ingest lock. A hand run for a session before the last
 closed one is refused: the vendors serve only today's values, which would land in an old partition.
 
 Rows are staged per item and published as one partition (atomic, ADR 0022); the step is optional,
 so a vendor outage only warns. Features over the history come later (track E): nothing reads the
-table yet, and its rows carry the vendors' ``licence = "personal"`` (``stats["licence"]``).
+table yet, and its rows carry the vendors' licences (``stats["licence"]``: ``personal``, and
+Yahoo's ``yahoo``).
 """
 
 from collections.abc import Mapping, Sequence
@@ -58,6 +69,7 @@ from algotrade_ingestion.tasks.analyst.ordering import by_market_cap, market_cap
 from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
+    FAILURES,
     PUBLISHED,
     IngestRun,
     TaskContext,
@@ -77,6 +89,10 @@ RETRY_WINDOWS = (
 )
 CHECKPOINT_EVERY = 25
 FINNHUB = "finnhub:"
+YAHOO = "yahoo:"
+YAHOO_NOT_FOUND = 404  # Yahoo: an unknown symbol, or one with no fundamentals (an ETF)
+YAHOO_KINDS = ("price_target", "estimates_annual", "recommendation")  # the frames one call parses
+YAHOO_MAX_FAILURES = 3  # consecutive failed calls after which the step stops for the night
 
 # FMP calls of a name in order: (item kind, source name, probe endpoint, snapshot kind).
 FMP_CALLS = (
@@ -131,14 +147,24 @@ def denied(run: IngestRun) -> set[tuple[str, str]]:
     return set(zip(rows["source"], rows["endpoint"], strict=True))
 
 
-def history(run: IngestRun) -> tuple[dict[str, date], dict[str, date], dict[str, date]]:
+@dataclass
+class History:
+    """The earlier published runs' items, by symbol -> the session of the last such item."""
+
+    answered: dict[str, date]  # FMP: any of its calls answered
+    refused_on: dict[str, date]  # FMP: every call refused (402)
+    finnhub: dict[str, date]  # Finnhub: its call answered
+    yahoo: dict[str, date]  # Yahoo: its call answered
+    yahoo_refused: dict[str, date]  # Yahoo: its call said unknown (404)
+
+
+def history(run: IngestRun) -> History:
     """From the earlier published runs' items: the session each symbol's FMP data was last
-    answered (``fmp``, any of its calls: the probe may deny some kinds), refused (``refused``)
-    and its Finnhub call answered (``finnhub``). Dated by the run's session, the day the
-    rotation counts in (a nightly starts after midnight UTC, so its start date is a day late)."""
-    answered: dict[str, date] = {}
-    refused_on: dict[str, date] = {}
-    finnhub: dict[str, date] = {}
+    answered (``answered``, any of its calls: the probe may deny some kinds), refused
+    (``refused_on``), its Finnhub call answered and Yahoo's answered or refused. Dated by the
+    run's session, the day the rotation counts in (a nightly starts after midnight UTC, so its
+    start date is a day late)."""
+    out = History({}, {}, {}, {}, {})
     for record in sorted(run.writer.runs_for(TASK), key=lambda r: r.started_at):
         if record.run_id == run.run_id or record.status not in PUBLISHED:
             continue
@@ -149,14 +175,21 @@ def history(run: IngestRun) -> tuple[dict[str, date], dict[str, date], dict[str,
             if key.startswith(PREFIX):
                 labels.setdefault(key.split(":")[1], []).append(label)
             elif key.startswith(FINNHUB) and label in (OK, EMPTY):
-                finnhub[key[len(FINNHUB) :]] = day
+                out.finnhub[key[len(FINNHUB) :]] = day
+            elif key.startswith(YAHOO):
+                symbol = key[len(YAHOO) :]
+                if label in (OK, EMPTY):
+                    out.yahoo[symbol] = day
+                    out.yahoo_refused.pop(symbol, None)
+                elif label == NOT_COVERED:
+                    out.yahoo_refused[symbol] = day
         for symbol, calls in labels.items():  # FMP gates by endpoint: held only if none answered
             if OK in calls or EMPTY in calls:
-                answered[symbol] = day
-                refused_on.pop(symbol, None)
+                out.answered[symbol] = day
+                out.refused_on.pop(symbol, None)
             elif NOT_COVERED in calls:
-                refused_on[symbol] = day
-    return answered, refused_on, finnhub
+                out.refused_on[symbol] = day
+    return out
 
 
 def estimate_rows(frame: pd.DataFrame, instrument_id: str) -> pd.DataFrame:
@@ -232,29 +265,44 @@ def snapshot_analyst(ctx: TaskContext, session: date, limit: Any = None) -> RunR
         sources = {n: s for n in SOURCES if isinstance((s := ctx.sources.get(n)), Source)}
         fmp_ready = all(n in sources for _, n, _, _ in FMP_CALLS)
         finnhub_ready = RECOMMENDATION[1] in sources
-        if not (fmp_ready or finnhub_ready):
+        yahoo_ready = source_guards.YAHOO_SOURCE in sources
+        if not (fmp_ready or finnhub_ready or yahoo_ready):
             run.failed("no analyst vendor is configured: " + _why_not(ctx))
             return run.record
         names = names_for(run, ctx)
         no = denied(run)
-        answered, refused_on, finnhub_on = history(run)
+        past = history(run)
         stats: dict[str, Any] = {
             "candidates": len(names),
             "denied": sorted("/".join(d) for d in no),
         }
+        refused_tonight: set[str] = set()
         if fmp_ready:
-            stats["fmp"] = _fmp(run, sources, names, no, (answered, refused_on), limit, started)
+            state = (past.answered, past.refused_on)
+            stats["fmp"] = _fmp(run, sources, names, no, state, limit, started, refused_tonight)
         else:
             stats["fmp"] = {"skipped": _why_not(ctx, "fmp")}
         if finnhub_ready:
             stats["finnhub"] = _finnhub(
-                run, sources[RECOMMENDATION[1]], names, no, finnhub_on, started
+                run, sources[RECOMMENDATION[1]], names, no, past.finnhub, started
             )
         else:
             stats["finnhub"] = {"skipped": _why_not(ctx, "finnhub")}
+        if yahoo_ready:
+            candidates = _yahoo_candidates(past, names, refused_tonight, fmp_ready)
+            stats["yahoo"] = _yahoo(
+                run, sources[source_guards.YAHOO_SOURCE], names, candidates, past, limit
+            )
+        else:
+            stats["yahoo"] = {"skipped": _why_not(ctx, "yahoo")}
+        settings = ctx.settings
         run.stats.update(
             stats,
-            licence={"fmp": ctx.settings.fmp_licence, "finnhub": ctx.settings.finnhub_licence},
+            licence={
+                "fmp": settings.fmp_licence,
+                "finnhub": settings.finnhub_licence,
+                "yahoo": settings.yahoo.licence,
+            },
         )
         run.stats.update(rows=run.publish(TABLE), counts=run.counts())
     return run.record
@@ -279,6 +327,7 @@ def _fmp(
     state: tuple[dict[str, date], dict[str, date]],
     limit: Any,
     started: datetime,
+    refused_tonight: set[str],
 ) -> dict[str, Any]:
     answered, refused_on = state
     settings = run.ctx.settings
@@ -316,6 +365,7 @@ def _fmp(
         asked += bool(labels)
         if coverage_status(labels) == NOT_COVERED:
             refused_n += 1
+            refused_tonight.add(symbol)
         elif not unmade:
             fetched += 1
         mark_coverage(run, name, "fmp", labels)
@@ -338,9 +388,11 @@ def caps(run: IngestRun) -> dict[str, float]:
     return market_caps(run.reader, run.session)
 
 
-def out_of_time(run: IngestRun, started: datetime) -> bool:
-    """Whether the run has spent ``[fmp] run_budget_s`` (the clock, between two calls)."""
-    return (run.clock() - started).total_seconds() > run.ctx.settings.fmp_run_budget_s
+def out_of_time(run: IngestRun, started: datetime, budget: int | None = None) -> bool:
+    """Whether ``budget`` seconds (default ``[fmp] run_budget_s``) passed since ``started`` (the
+    clock, between two calls)."""
+    spent = (run.clock() - started).total_seconds()
+    return spent > (run.ctx.settings.fmp_run_budget_s if budget is None else budget)
 
 
 def _finnhub(
@@ -367,6 +419,93 @@ def _finnhub(
         if done % CHECKPOINT_EVERY == 0:
             run.checkpoint()
     return {"due": len(due), "asked": len(take), "names": take}
+
+
+def _yahoo_candidates(
+    past: History, names: Sequence[Name], refused_tonight: set[str], fmp_ready: bool
+) -> set[str]:
+    """The symbols Yahoo may be asked: the ones whose last FMP outcome is a refusal (``history``
+    drops a name from ``refused_on`` once FMP answers it, and the hold's end does not release it:
+    FMP's budget may delay asking again), or refused tonight; never one FMP answers. With no FMP
+    built, every symbol FMP never answered."""
+    if not fmp_ready:
+        return {n.symbol for n in names if n.symbol not in past.answered}
+    return set(past.refused_on) | refused_tonight
+
+
+def _yahoo(
+    run: IngestRun,
+    source: Source,
+    names: Sequence[Name],
+    candidates: set[str],
+    past: History,
+    limit: Any,
+) -> dict[str, Any]:
+    settings = run.ctx.settings.yahoo
+    by_symbol = {n.symbol: n for n in names if n.symbol in candidates}
+    hold = timedelta(days=RETRY_WINDOWS * settings.refresh_days)
+    holding = {s for s, day in past.yahoo_refused.items() if run.session - day < hold}
+    due = due_keys(
+        [s for s in by_symbol if s not in holding], past.yahoo, run.session, settings.refresh_days
+    )
+    due = by_market_cap(due, {s: n.instrument_id for s, n in by_symbol.items()}, caps(run))
+    cap = settings.per_night if limit is None else min(settings.per_night, int(limit))
+    take = due[:cap]
+    started, stopped = run.clock(), ""
+    labels: list[str] = []
+    streak = 0  # consecutive failed calls
+    for done, symbol in enumerate(take, 1):
+        key = f"{YAHOO}{symbol}"
+        if not stopped and out_of_time(run, started, settings.run_budget_s):
+            stopped = "[yahoo] run_budget_s is spent"
+        if stopped:
+            run.record_item(key, f"{NOT_MADE}: {stopped}")
+            continue
+        label = _ask_yahoo(run, source, key, by_symbol[symbol])
+        mark_coverage(run, by_symbol[symbol], "yahoo", [label])
+        labels.append(label)
+        streak = streak + 1 if label in FAILURES else 0
+        if streak >= YAHOO_MAX_FAILURES:
+            stopped = f"yahoo failed {YAHOO_MAX_FAILURES} calls in a row"
+        if done % CHECKPOINT_EVERY == 0:
+            run.checkpoint()
+    return {
+        "due": len(due),
+        "held_not_covered": len(holding),
+        "asked": len(labels),
+        "fetched": sum(1 for x in labels if x in (OK, EMPTY)),
+        "not_covered": labels.count(NOT_COVERED),
+        "failed": sum(1 for x in labels if x in FAILURES),
+        "stopped": stopped or None,
+        "names": take,
+    }
+
+
+def _ask_yahoo(run: IngestRun, source: Source, key: str, name: Name) -> str:
+    """One Yahoo call -> its item label; each kind it parsed to rows is staged (``ts`` = now).
+    A 404 is ``NOT_COVERED``; every other error is a failure (the name is asked again)."""
+
+    def ask() -> str:
+        request = FetchRequest(name.symbol, name.instrument_id, run.session)
+        fetched_at = pd.Timestamp(run.clock())
+        try:
+            normalized = run.fetch(source, request)
+        except Exception as exc:
+            if getattr(exc, "status", None) == YAHOO_NOT_FOUND:
+                return f"{NOT_COVERED}: HTTP {YAHOO_NOT_FOUND}"
+            raise
+        assert normalized is not None
+        staged = 0
+        for kind in YAHOO_KINDS:
+            parsed = normalized.parsed.get(kind)
+            if parsed is None or parsed.empty:
+                continue
+            rows = build_rows(kind, parsed, name.instrument_id).assign(ts=fetched_at)
+            run.stage(TABLE, f"{key}:{kind}", rows, "yahoo")
+            staged += 1
+        return OK if staged else EMPTY
+
+    return status_label(run.attempt(key, ask))
 
 
 def _ask(run: IngestRun, source: Source, key: str, name: Name, kind: str, vendor: str) -> str:

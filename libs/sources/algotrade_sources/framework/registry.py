@@ -98,6 +98,8 @@ from algotrade_sources.vendors.tiingo.meta import TiingoListingMeta
 from algotrade_sources.vendors.tiingo.nav import TiingoFundNav, TiingoNavTickers
 from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
+from algotrade_sources.vendors.yahoo import client as yahoo_client
+from algotrade_sources.vendors.yahoo.analyst import YahooAnalyst
 
 type Env = Callable[[str], str | None]  # variable name -> value (``env.credential``)
 MASSIVE_KEY = "ALGOTRADE_MASSIVE_API_KEY"
@@ -139,6 +141,13 @@ class IbkrOptions(Protocol):
 
     @property
     def stream_wait_s(self) -> float: ...
+
+
+class YahooOptions(Protocol):
+    """``[yahoo]`` beyond the vendor keys (``config.site.vendors.yahoo.YahooSettings``)."""
+
+    @property
+    def cache_dir(self) -> str: ...
 
 
 class RegistrySettings(Protocol):
@@ -186,6 +195,9 @@ class RegistrySettings(Protocol):
     @property
     def sec_filing_text_error_cooldown_s(self) -> float: ...
 
+    @property
+    def yahoo(self) -> YahooOptions: ...
+
     def vendor(self, section: str) -> VendorConfig: ...
 
 
@@ -199,6 +211,10 @@ def _no_options(_: RegistrySettings) -> dict[str, Any]:
 
 def _fred_options(settings: RegistrySettings) -> dict[str, Any]:
     return {"base_url": settings.fred_base_url}
+
+
+def _yahoo_transport_options(settings: RegistrySettings) -> dict[str, Any]:
+    return {"cache_dir": settings.yahoo.cache_dir}
 
 
 @dataclass(frozen=True)
@@ -221,7 +237,8 @@ class SourceSpec:
     options: Callable[[RegistrySettings], dict[str, Any]] = _no_options  # keyword args of build
     # A vendor read by a POST the source names as a GET URL (FINRA's filters): builds the
     # transport from the headers in place of ``urllib_transport``.
-    transport: Callable[[dict[str, str]], Transport] | None = None
+    transport: Callable[..., Transport] | None = None
+    transport_options: Callable[[RegistrySettings], dict[str, Any]] = _no_options  # its kwargs
 
 
 def _bearer(key: str | None) -> dict[str, str]:
@@ -435,6 +452,17 @@ SOURCES: dict[str, SourceSpec] = {
                 ("finra_short_volume", FinraShortVolume),
             )
         ),
+        SourceSpec(
+            "yahoo_analyst",
+            "yahoo",
+            "yahoo",
+            YahooAnalyst,
+            1.0,  # no published limit; YfData's hidden crumb requests bypass the limiter
+            tries=2,  # a 404 is raised at once (``refused``); a 5xx or a 429 is tried once more
+            rejected=yahoo_client.refused,
+            transport=yahoo_client.yahoo_transport,
+            transport_options=_yahoo_transport_options,
+        ),
         SourceSpec("sp500_history", "sp500_history", "sp500_history", Sp500Membership, 1.0),
         SourceSpec("published", "published", "published", PublishedSeries, 1.0),
     )
@@ -641,7 +669,11 @@ def build_sources(
             breakers[key] = CircuitBreaker(key, settings.http_breaker_failures)
         secret = env(spec.env_var) if spec.env_var else None
         headers = spec.headers(secret)
-        transport = spec.transport(headers) if spec.transport else urllib_transport(headers=headers)
+        transport = (
+            spec.transport(headers, **spec.transport_options(settings))
+            if spec.transport
+            else urllib_transport(headers=headers)
+        )
         if spec.query_param and secret:
             transport = with_query_param(transport, spec.query_param, secret)
         http = Http(
