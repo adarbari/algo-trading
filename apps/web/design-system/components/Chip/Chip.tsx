@@ -4,7 +4,7 @@
  * (`onRemove`: an × button named "Remove <label>"), or the dashed "add" chip (`variant="dashed"`
  * with `onClick`: "+ Filter"). Several in a wrapping Stack form a filter bar.
  */
-import { useState, type MouseEventHandler } from 'react';
+import { useState, type MouseEventHandler, type Ref } from 'react';
 
 import { Icon, type IconName } from '../Icon';
 import { IconButton } from '../IconButton';
@@ -28,6 +28,12 @@ export interface ChipProps {
   /** A leading icon (`plus` on the add chip, `filter`). */
   icon?: IconName;
   disabled?: boolean;
+  /** Text after the label, muted ("removes 12"); part of the button's accessible name. */
+  meta?: string;
+  /** The label struck through (a filter switched off but kept). */
+  struck?: boolean;
+  /** The chip's main button (to move focus to it). */
+  buttonRef?: Ref<HTMLButtonElement>;
 }
 
 export function Chip({
@@ -40,6 +46,9 @@ export function Chip({
   variant = 'default',
   icon,
   disabled = false,
+  meta,
+  struck = false,
+  buttonRef,
 }: ChipProps) {
   const [internal, setInternal] = useState(defaultSelected);
   const toggle = onSelectedChange !== undefined || selected !== undefined;
@@ -47,7 +56,10 @@ export function Chip({
   const content = (
     <>
       {icon && <Icon name={icon} size="sm" />}
-      <span className={styles.label}>{label}</span>
+      <span className={styles.label} data-struck={struck || undefined}>
+        {label}
+      </span>
+      {meta !== undefined && <span className={styles.meta}>{meta}</span>}
     </>
   );
   return (
@@ -63,6 +75,8 @@ export function Chip({
           type="button"
           className={styles.main}
           data-interactive=""
+          ref={buttonRef}
+          aria-label={meta === undefined ? undefined : `${label}, ${meta}`}
           aria-pressed={toggle ? isSelected : undefined}
           disabled={disabled}
           onClick={(event) => {

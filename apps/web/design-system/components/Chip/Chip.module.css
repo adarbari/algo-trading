@@ -82,3 +82,14 @@
     align-self: stretch;
   }
 }
+
+.label[data-struck] {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+.meta {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

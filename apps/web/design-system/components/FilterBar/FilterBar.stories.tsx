@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { narrow } from '../../testing';
+import { Button } from '../Button';
 import { Chip } from '../Chip';
 import { Field } from '../Field';
+import { FilterGroupButton } from '../FilterGroupButton';
+import { OptionList } from '../OptionList';
 import { SearchInput } from '../SearchInput';
 import { Select } from '../Select';
 import { FilterBar } from './FilterBar';
@@ -100,4 +103,64 @@ export const NarrowOpen: Story = {
 export const NarrowScroll: Story = {
   decorators: [narrow],
   args: { ...WithActive.args, narrow: 'scroll' },
+};
+
+const groups = (
+  <>
+    <FilterGroupButton label="Setup" activeCount={2}>
+      <OptionList
+        label="Decision"
+        value={null}
+        values={['QUALIFIED']}
+        onSelect={noop}
+        items={[
+          { id: 'QUALIFIED', title: 'Qualified', count: 41 },
+          { id: 'WATCH', title: 'Watch', count: 12 },
+        ]}
+      />
+    </FilterGroupButton>
+    <FilterGroupButton label="What changed">x</FilterGroupButton>
+    <FilterGroupButton label="Tradeable">x</FilterGroupButton>
+    <FilterGroupButton label="Coming up">x</FilterGroupButton>
+  </>
+);
+
+const actions = (
+  <>
+    <Button size="sm" variant="ghost">
+      Clear all
+    </Button>
+    <Button size="sm" variant="ghost">
+      Save view
+    </Button>
+  </>
+);
+
+/** The ADR 0082 toolbar: search, group buttons and More filters on one row; chips; count line with actions. */
+export const WithGroups: Story = {
+  args: {
+    quick: undefined,
+    groups,
+    actions,
+    count: '12 of 340',
+    activeCount: 2,
+    active: (
+      <>
+        <Chip label="Decision Qualified" onRemove={noop} />
+        <Chip label="DTE ..14" onRemove={noop} />
+      </>
+    ),
+  },
+};
+
+/** The groups, a count and the sheet's "Show N results" button at 375 px. */
+export const NarrowGroups: Story = {
+  decorators: [narrow],
+  args: { ...WithGroups.args, applyLabel: 'Show 12 results' },
+};
+
+/** The same with the sheet open: groups in the sheet and the footer button. */
+export const NarrowGroupsOpen: Story = {
+  ...NarrowGroups,
+  args: { ...NarrowGroups.args, defaultOpen: true },
 };
