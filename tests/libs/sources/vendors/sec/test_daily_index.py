@@ -17,6 +17,7 @@ from algotrade_sources.framework.series import (
 )
 from algotrade_sources.vendors.sec.daily_index import (
     SecDailyIndex,
+    full_index_url,
     index_url,
     missing_index,
     parse_index,
@@ -145,3 +146,34 @@ def test_the_insider_forms_are_read_from_the_same_index_and_424b4_is_not_a_form_
     asked = DailyIndexRequest(key="2026-09-30", day=DAY, forms=("4", "4/A"))
     normalized = source.normalize(asked, lines)
     assert normalized is not None and len(normalized.parsed[DAILY_INDEX_FRAME]) == 2
+
+
+def test_the_full_index_url_names_the_quarter() -> None:
+    assert full_index_url(date(2011, 7, 5)).endswith("/full-index/2011/QTR3/form.idx")
+    assert full_index_url(date(2026, 1, 2)).endswith("/full-index/2026/QTR1/form.idx")
+
+
+def test_fetch_full_asks_for_the_quarters_full_index() -> None:
+    urls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        urls.append(url)
+        return INDEX
+
+    day = date(2011, 7, 5)
+    asked = DailyIndexRequest(key="2011Q3", day=day, full=True)
+    SecDailyIndex(http_for(transport)).fetch(asked)
+    assert urls == [full_index_url(day)] and "daily-index" not in urls[0]
+
+
+def test_parse_full_index_reads_dashed_dates_per_line() -> None:
+    payload = (FIXTURE / "full_index_form_2011q3_hand_built.idx").read_bytes()
+    frame = parse_index(payload, ("10-K", "10-Q", "10-K/A"), full=True)
+    assert set(frame["filing_date"].dt.date) == {
+        date(2011, 7, 1),
+        date(2011, 7, 5),
+        date(2011, 7, 6),
+    }
+    assert "8-K" not in set(frame["form"]) and len(frame) == 4
+    with pytest.raises(ValueError, match="unexpected daily index line"):
+        parse_index(payload, ("10-K",), full=False)  # the daily layout wants YYYYMMDD
