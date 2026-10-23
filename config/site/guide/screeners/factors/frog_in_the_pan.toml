@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "frog_in_the_pan"
 version = 1  # the preset version this prose was written for
-line = "Last year's winners that rose through many small gains, not a few jumps."
 summary = "Lists the past year's winners whose rise came on many small up days, not a few big jumps, strongest first. Da, Gurun and Warachka find momentum lasts when the news arrives gradually.[^1] It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, has a positive 12-1 return, and an information discreteness below 0 (more up days than down days over the window). The strongest 12-1 return ranks first."
 not_checked = "It does not check how the last month moved, or the paper's six-month hold (the harness holds a month). Names without a full year of daily bars are left out."

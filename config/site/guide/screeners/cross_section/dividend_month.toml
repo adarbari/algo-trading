@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "dividend_month"
 version = 1  # the preset version this prose was written for
-line = "Stocks that usually go ex-dividend next month, most regular payers first."
 summary = "Finds stocks that paid an ex-dividend date in the calendar month ahead in each of the last years, the most regular payers first. The finance literature finds stocks earn more in the months they are expected to pay.[^1]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day, with an ex-dividend date in the coming month in at least one of the last 3 years. Three of three ranks first."
 not_checked = "It does not know this year's declared date, a cut or suspension, or special dividends (which are excluded from the count). It predicts from history only."

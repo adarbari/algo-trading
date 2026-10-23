@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Adverse 8-K items"
+description = "Stocks with an 8-K on restated results, an auditor change or an officer change."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

@@ -3,7 +3,6 @@
 # amendment 2026-10-18): a yardstick, not a trade idea. Keys as size_small.toml.
 id = "max_ret_high"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by their biggest one-day return of the last 21 sessions."
 summary = "Ranks every tradeable stock by its biggest one-day return of the last 21 sessions, largest first (the MAX measure of lottery-like demand).[^1] It is a yardstick, not a trade idea: an edge whose picks are recent big jumpers must do better than simply buying them."
 hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and it has a MAX value. Every such name qualifies; the order is the point, the biggest recent one-day jump first."
 not_checked = "It does not check why the name jumped (earnings, a takeover bid), trend, quality or valuation. It is a decoy of the edge harness's battery, not a trade signal."

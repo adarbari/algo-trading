@@ -11,6 +11,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Idiosyncratic volatility (high first)"
+description = "Stocks ranked by volatility left after market, size, momentum, value and sector effects."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as size_small, so the decoys compare on one universe; stocks only: an ETF has no

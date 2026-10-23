@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "cp_iv_spread"
 version = 1  # the preset version this prose was written for
-line = "Stocks whose calls cost more than their puts, largest gap first."
 summary = "Ranks every liquid optionable stock by how much richer its calls are than its same-strike puts, the call-put implied volatility spread of the option literature.[^1][^2] It is a ranking: the top of the list is where option traders are paying most for upside."
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and has a call-put IV spread from our own chain data. Every such name qualifies; the order is the point, the largest positive spread first."
 not_checked = "It does not check how liquid the option quotes are, whether an earnings report falls inside the expiry, or the borrow cost that can explain a spread. It is the screen of the option_cp_iv_signals edge, which the harness is still testing."

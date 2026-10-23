@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "earnings_gap_volume"
 version = 1  # the preset version this prose was written for
-line = "Stocks up 10% beyond the market on earnings, on three times usual volume."
 summary = "Finds liquid stocks that jumped at least 10% more than the market on their latest earnings report on at least three times their usual volume, biggest jump first: the episodic pivot of growth-stock screeners, with the volume confirmation.[^2] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day, whose close after the report beat SPY's by 10% or more measured from the close before it, with the report's three sessions trading at least three times the volume of the 20 sessions before. The biggest reaction ranks first."
 not_checked = "It does not know why the stock moved (earnings, guidance, a bid or an offering look the same), whether the name had gone nowhere for months, or the opening gap: only closes are stored, so you buy a session later. It is the screen of the earnings gap edge, which the harness is still testing."

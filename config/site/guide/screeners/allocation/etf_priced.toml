@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "etf_priced"
 version = 1  # the preset version this prose was written for
-line = "Every listed fund with a closing price, highest price first."
 summary = "Lists every listed ETF with a close, the highest price first. It is a pass-through for allocation edges whose signal sits in the book's outcome, not in this list."
 hit = "An ETF that is listed and trading with a positive close. The rank is the price, which carries no meaning: the edge's own list of funds is what limits the names."
 not_checked = "It does not test trend, leverage, inverse exposure or liquidity. The volatility-managed and short-volatility edges read their signal from a size target or a canary.[^1]"

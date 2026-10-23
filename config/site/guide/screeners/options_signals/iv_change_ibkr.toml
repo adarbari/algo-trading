@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "iv_change_ibkr"
 version = 1  # the preset version this prose was written for
-line = "Stocks where options price in a bigger expected swing than a month ago."
 summary = "Ranks every liquid optionable stock by how much IBKR's 30-day implied volatility rose over the last 21 sessions. It stands in for the call-IV change of the option literature[^1] with a history of about 500 sessions, at the cost of blending calls and puts."
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and has an IBKR IV30 now and 21 sessions ago. Every such name qualifies; the largest rise ranks first."
 not_checked = "It does not separate calls from puts, so a fall-driven rise in put IV ranks like a rise in call IV, and it does not exclude earnings windows. IBKR's IV is for personal use only."

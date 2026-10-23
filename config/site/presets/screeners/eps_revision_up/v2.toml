@@ -13,6 +13,7 @@ kind = "screener"
 impl = "rules"
 version = 2
 name = "Upward EPS revisions"
+description = "Stocks whose analysts raised this year's earnings estimate most in a month."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

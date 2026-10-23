@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "ETFs on a positive 12-month trend"
+description = "Funds that gained over the last 12 months, best first."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

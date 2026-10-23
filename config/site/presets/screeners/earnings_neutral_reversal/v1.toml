@@ -8,6 +8,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Earnings-neutral reversal, losers first"
+description = "Stocks ranked by 20-session return excluding earnings-report days, biggest losers first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # the same as momentum_12_1 for stocks, so the screens compare on one universe)

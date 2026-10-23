@@ -17,17 +17,24 @@ from algotrade.storage.configs.writer import ConfigWriter
 
 
 def _preset_version(writer: ConfigWriter, preset: str) -> int:
+    return _preset(writer, preset)[0]
+
+
+def _preset(writer: ConfigWriter, preset: str) -> tuple[int, str | None]:
+    """The preset's current version and its description (the copy's starting point)."""
     found = config_document(writer.load, "site", screen_id(preset))
     if found is None or found[0] != "screeners":
         raise ScreenNotFoundError(f"no site rule-screen preset {preset!r}")
+    description = found[1].get("description")
     version = found[1].get("version")
     if not isinstance(version, int) or isinstance(version, bool) or version < 1:
         raise ConfigurationError(f"site/screeners/{preset}: a preset carries version = N")
-    return version
+    return version, description if isinstance(description, str) else None
 
 
 def copy_preset(writer: ConfigWriter, user: str, name: str, preset: str) -> dict[str, Any]:
     """A new draft ``name`` for ``user`` extending ``preset`` at its current version.
+    The draft starts with the preset's description (a finalised copy needs its own).
     ``ConflictError`` if ``user`` already has a screen or config ``name``."""
     who, name = author(user), screen_id(name)
     exists = (
@@ -38,7 +45,10 @@ def copy_preset(writer: ConfigWriter, user: str, name: str, preset: str) -> dict
     if exists:
         raise ConflictError(f"{who.user_id} already has a config {name!r}")
     refuse_deleted_id(writer, who.user_id, name)
-    draft: dict[str, Any] = {"id": name, "extends": f"{preset}@{_preset_version(writer, preset)}"}
+    version, description = _preset(writer, preset)
+    draft: dict[str, Any] = {"id": name, "extends": f"{preset}@{version}"}
+    if description:
+        draft["description"] = description  # the starting point; the user rewrites it
     validate(writer, who, name, draft)
     writer.save_draft(who.user_id, name, draft)
     return draft

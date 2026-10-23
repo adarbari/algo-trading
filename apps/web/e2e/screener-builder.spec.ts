@@ -48,7 +48,7 @@ test('the list shows your screeners and the site presets in one list', async ({ 
   ).toBeVisible();
   // The columns are the screener, its evidence, today's picks and the actions.
   await expect(list.getByRole('columnheader')).toHaveText([
-    'Screener',
+    'Screener and what it finds',
     'Evidence and edges',
     'Picks today',
     'Actions',

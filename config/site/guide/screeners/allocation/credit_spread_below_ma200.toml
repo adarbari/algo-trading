@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "credit_spread_below_ma200"
 version = 1  # the preset version this prose was written for
-line = "Corporate bond funds while borrowing-cost premiums are below their 200-day average."
 summary = "Lists HYG and LQD while their credit spread is tighter than its 200-day mean, the tightest first. It is the macro trend rule of the credit timing edge.[^1]"
 hit = "An unleveraged ETF whose own credit spread is below its 200-session mean: the high-yield spread for HYG, the investment-grade spread for LQD. Every other fund has no spread and is absent."
 not_checked = "It does not read the 50-day mean, the Baa spread, the fund's price trend or its coupon. A spread that is high and falling still passes."

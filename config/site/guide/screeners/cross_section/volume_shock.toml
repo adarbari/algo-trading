@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "volume_shock"
 version = 1  # the preset version this prose was written for
-line = "Stocks trading far more shares today than in the last month."
 summary = "Finds liquid stocks whose volume today is unusually high against their own last 20 sessions, the setup of the high-volume return premium: visibility from a volume shock is thought to bring buyers over the next weeks.[^1][^2]"
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and whose volume today is at least two standard deviations above the mean of the 20 sessions before. The biggest shock ranks first."
 not_checked = "It does not know why the volume came: an earnings report, a takeover or an index change look the same. It does not read the day's return, whose sign changes how the paper's effect behaves."

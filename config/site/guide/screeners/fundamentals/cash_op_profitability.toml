@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "cash_op_profitability"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by cash operating profit earned per dollar of assets."
 summary = "Ranks every tradeable stock by how much cash operating profit it earns on each dollar of assets, highest first: operating income less the accruals in earnings, over total assets.[^1] It is a quality ranking from the finance literature, a candidate edge under test, not a proven trade."
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a cash-based operating profitability value. Every such name qualifies; the order is the point, the most profitable per dollar of assets first."
 not_checked = "It does not check price (a profitable company can be expensive), momentum, size or sector, and banks, brokers and insurers have no value. It is the screen of the cash-based operating profitability edge, which the harness is still testing."

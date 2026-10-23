@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Quality minus junk"
+description = "Stocks ranked on profitability and low debt, highest quality first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates)
 [criteria.security_type]

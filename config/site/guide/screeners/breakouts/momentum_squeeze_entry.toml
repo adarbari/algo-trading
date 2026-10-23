@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "momentum_squeeze_entry"
 version = 1  # the preset version this prose was written for
-line = "Past-year winners in an uptrend whose price bands are the narrowest in a year."
 summary = "Finds past-year winners in an uptrend whose price bands have narrowed to the tightest fifth of their year, ranked by 12-1 momentum. It tests whether a tight base is a better entry into momentum.[^2] It is a candidate edge under test."
 hit = "The name closes above $5, trades at least $50M a day, has positive 12-1 momentum, sits in an UPTREND, and its Bollinger bandwidth is in the narrowest 20% of the last 252 sessions."
 not_checked = "It does not check the depth or length of the base, volume drying up or earnings dates. A squeeze says a larger move is likely, not which way.[^1]"

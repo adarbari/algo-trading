@@ -13,6 +13,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Per-name volatility premium (highest first)"
+description = "Optionable names ranked by implied volatility relative to the volatility they delivered."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

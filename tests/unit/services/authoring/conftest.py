@@ -14,6 +14,7 @@ PRESET = """id = "vrp"
 kind = "screener"
 impl = "rules"
 version = 3
+description = "Rich premiums near a one-year high."
 selection = "all_active"
 
 [criteria.price]

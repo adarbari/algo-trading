@@ -16,6 +16,7 @@ const ScreenerRuns = graphql(`
     screeners {
       id
       name
+      description
       criteria {
         id
         field

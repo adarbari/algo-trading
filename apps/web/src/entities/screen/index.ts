@@ -90,6 +90,8 @@ export {
   type Tolerance,
 } from './model/spec';
 export { MAX_NOTE_LENGTH, MAX_NOTES, mergeNotes, notesOf, withNotes } from './model/notes';
+export { descriptionOf, MAX_DESCRIPTION_LENGTH, oneLine, withDescription } from './lib/description';
+export { ScreenerDescription } from './ui/ScreenerDescription';
 export { DecisionBadge } from './ui/DecisionBadge';
 export {
   decisionLabel,

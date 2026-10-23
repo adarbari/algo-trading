@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "ivol_avoid"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by how erratically they move on their own, jumpiest last."
 summary = "Ranks every tradeable stock by idiosyncratic volatility, the jumpiest last. Ang and co-authors find the most volatile names earn less than the calm ones.[^1] It is the avoid list of a candidate edge under test."
 hit = "The name is a common stock or ADR closing above $3 that trades at least $2M a day, with a four-factor idiosyncratic volatility. Every such name qualifies; the highest volatility ranks last."
 not_checked = "It does not check trend, quality, borrow cost or availability, or a squeeze under way. The volatility is the 252-session residual, slower than the paper's prior-month figure."

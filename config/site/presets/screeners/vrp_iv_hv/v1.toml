@@ -12,6 +12,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "VRP (IV over HV)"
+description = "Optionable shares whose implied volatility sits well above the volatility they delivered."
 
 [criteria.security_type]
 field = "instrument.security_type"

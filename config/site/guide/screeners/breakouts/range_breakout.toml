@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "range_breakout"
 version = 1  # the preset version this prose was written for
-line = "Shares in their tightest range of a year, just under resistance, with volume rising."
 summary = "Finds shares that have gone quiet, with the tightest trading range they have had in a year, sitting just under a resistance level while volume and momentum start to stir.[^1] These are coiled names likely to make a larger move soon; the screen catches them before the move, not after.[^2][^3]"
 hit = "The daily range this week is at most 85% of the month's, the Bollinger bandwidth is tighter than on at least 85% of the last year's sessions (a squeeze), the last swing high above is within 1 ATR of the close, today's volume is at least 1.2 times the 20-session average, this week's return beat last week's, and the week itself was up."
 not_checked = "It does not know which way the squeeze resolves: the resistance condition leans upward but nothing confirms it, and a squeeze can break down. Once the level is cleared the breakout screener takes over."

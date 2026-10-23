@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Earnings announcement premium: high volume"
+description = "Stocks with an expected report whose past reports drew at least twice normal volume."
 
 # ------------------------------------------------ who is screened and tradeable (the liquid base gates)
 [criteria.security_type]

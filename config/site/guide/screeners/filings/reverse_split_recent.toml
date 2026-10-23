@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "reverse_split_recent"
 version = 1  # the preset version this prose was written for
-line = "Stocks that reverse-split in the last month."
 summary = "Finds liquid stocks that reverse-split in the last month: an exclusion list for longs and the short side of the reverse-split edge.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock that trades at least $5M a day and whose latest reverse split went ex within the last 20 sessions. The most liquid ranks first."
 not_checked = "It does not know why the company split (a cure for a sub-$1 bid, a merger and a spin-off look the same) or whether the business has recovered. It is the screen of the reverse-split edge, which the harness is still testing."

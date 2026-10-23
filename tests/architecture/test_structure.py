@@ -125,6 +125,28 @@ PRESETS = Path("config/site/presets/screeners")
 PRESET_LOCK = Path("architecture/preset_versions.toml")
 
 
+DESCRIPTION_LINE = re.compile(r'^description = "(?:[^"\\\n]|\\.)*"\n', re.MULTILINE)
+
+
+def pinned_bytes(text: str) -> bytes | None:
+    """What a preset's sha256 covers: the file without its one top-level ``description = "..."``
+    line (metadata, ADR 0029 amendment 2026-10-23: editing a sentence is not a new version).
+    ``None`` when stripping would change anything but that key (a second line, a dotted or
+    multi-line form, a look-alike line inside a string): the parsed documents must differ by
+    exactly ``description``."""
+    head, sep, rest = text.partition("\n[")
+    if len(DESCRIPTION_LINE.findall(head + "\n")) > 1:
+        return None
+    stripped = DESCRIPTION_LINE.sub("", head + "\n", count=1)[:-1] + sep + rest
+    try:
+        before, after = tomllib.loads(text), tomllib.loads(stripped)
+    except tomllib.TOMLDecodeError:
+        return None
+    if after != {k: v for k, v in before.items() if k != "description"}:
+        return None
+    return stripped.encode()
+
+
 def preset_version_problems(root: Path) -> list[str]:
     """Why the site rule-screen preset versions under ``root`` break immutability (ADR 0029):
     an unlisted or changed version file, a listed one gone, or a file whose ``id`` /
@@ -140,7 +162,11 @@ def preset_version_problems(root: Path) -> list[str]:
         if match is None:
             problems.append(f"{name}: a preset folder holds only v<N>.toml files")
             continue
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        covered = pinned_bytes(path.read_text())
+        if covered is None:
+            problems.append(f"{name}: `description` must be one top-level single-line string")
+            continue
+        digest = hashlib.sha256(covered).hexdigest()
         if name not in lock:
             problems.append(f'{name}: add `"{name}" = "{digest}"` to {PRESET_LOCK}')
         elif lock[name] != digest:
@@ -173,6 +199,19 @@ def test_preset_version_check_catches_edits(tmp_path: Path) -> None:
     assert "only v<N>.toml" in problems
     v1.unlink()
     assert any("gone" in p for p in preset_version_problems(tmp_path))
+
+
+def test_preset_description_is_metadata_but_nothing_else_is() -> None:
+    """A description line may change without a new version; a look-alike line that is part
+    of another value, a second line or a multi-line form may not (ADR 0029 amendment)."""
+    base = 'id = "vrp"\nversion = 1\n'
+    line = 'description = "a"\n'
+    assert pinned_bytes(base + line) == pinned_bytes(base + 'description = "b"\n') == base.encode()
+    assert pinned_bytes(base + line + 'description = "b"\n') is None
+    assert pinned_bytes(base + 'description = """a\nb"""\n') is None
+    assert pinned_bytes(base + 'where = """\ndescription = "x"\n"""\n') is None
+    table = base + '[t]\ndescription = "x"\n'
+    assert pinned_bytes(table) == table.encode()
 
 
 # Raw IBKR IV is personal-licence and missing for names IBKR has no history for; a screener

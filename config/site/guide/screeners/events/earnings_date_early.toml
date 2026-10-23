@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "earnings_date_early"
 version = 1  # the preset version this prose was written for
-line = "Stocks whose next earnings report is scheduled a week or more before last year's."
 summary = "Finds liquid stocks whose next earnings report is scheduled a week or more earlier than last year, the largest advance first: the finding that managers schedule good news early and the market reads the date as a calendar item.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day, and the calendar now lists its next report at least seven days before last year's report plus 52 weeks. The biggest advance ranks first."
 not_checked = "It does not know that the date is confirmed (the calendar only schedules), why it moved (a fiscal-year change or a merger looks the same), or how fresh the shift is. It is the screen of the earnings-date advance edge, which the harness is still testing."

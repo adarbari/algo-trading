@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "pre_earnings_runup"
 version = 1  # the preset version this prose was written for
-line = "Past-year winners with a report due within two weeks, strongest momentum first."
 summary = "Finds liquid stocks with a positive 12-month return and a report due within about two weeks, the strongest past winners first: the finding that attention-grabbing winners rise in the days before earnings.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock or ADR closing above $5 that trades at least $50M a day, with a positive return over the 12 months to one month ago, and its next report date is announced or taken from last year and falls within 10 sessions. The strongest 12-1 momentum ranks first."
 not_checked = "It does not know that the date is confirmed (a guessed date can miss the real one), why the stock rose, or what happens after the report: the edge holds only the days before it. It is the screen of the pre-earnings run-up edge, which the harness is still testing."

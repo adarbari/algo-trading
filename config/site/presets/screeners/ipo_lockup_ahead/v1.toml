@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "IPO lock-ups ending"
+description = "Stocks whose IPO lock-up ends within the next 11 sessions."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

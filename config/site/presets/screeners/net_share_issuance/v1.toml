@@ -10,6 +10,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Net share issuance (buybacks first)"
+description = "Stocks ranked by change in share count, biggest buybacks first."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates)
 [criteria.security_type]

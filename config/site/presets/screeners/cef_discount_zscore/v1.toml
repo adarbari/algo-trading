@@ -13,6 +13,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "Closed-end fund discount (widest against its own year first)"
+description = "Closed-end funds whose discount to asset value is unusually wide for them."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates)
 [criteria.security_type]

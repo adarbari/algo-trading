@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "residual_reversal"
 version = 1  # the preset version this prose was written for
-line = "Stocks ranked by last month's return after removing the market's move, losers first."
 summary = "Ranks every tradeable name by last month's return net of the market, the biggest losers first. Blitz and co-authors find the residual loser beats the residual winner next month: liquidity providers are paid to take the other side.[^1] It is a candidate edge under test."
 hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, with a market-residual 20-session return. Every such name qualifies; the lowest residual comes first."
 not_checked = "It does not exclude names that moved on news (an earnings reaction drifts, it does not reverse), nor strip size and value (the paper's residual). The harness measures whether the order pays after costs."

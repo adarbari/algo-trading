@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "nt_late_filer"
 version = 1  # the preset version this prose was written for
-line = "Stocks that filed a late-report notice in the last month."
 summary = "Finds liquid stocks that filed a late-filing notice (NT 10-K or NT 10-Q) in the last month: an exclusion list for longs and the short side of the late-filer edge.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day and filed an NT 10-K or NT 10-Q that became known within the last 20 sessions, counting from the first session after it was accepted. The most liquid ranks first."
 not_checked = "It does not read the reason in the notice (a routine delay and an accounting problem look the same) or know that the report was filed since. It is the screen of the late-filer edge, which the harness is still testing."

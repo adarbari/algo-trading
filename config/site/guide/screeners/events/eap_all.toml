@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "eap_all"
 version = 1  # the preset version this prose was written for
-line = "Liquid stocks with an earnings report coming, with the date known or guessed."
 summary = "Lists every liquid stock whose next earnings report is expected, with the date announced or guessed from last year: the earnings announcement premium, the finding that stocks earn more in the days around a report than at other times.[^1][^2] It is a candidate edge under test, and recent studies find it fading in the US."
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and its next report date is known (announced) or taken from last year's report plus 52 weeks. Every such name qualifies; the edge holds all of them from five sessions before the report to one after."
 not_checked = "It does not know that the date is confirmed (a guessed date can be wrong by weeks), whether the report is good or bad, or whether the premium exists: the harness measures that."

@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "ETFs above their 200-day average"
+description = "Funds trading above their average price of the last 200 days."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

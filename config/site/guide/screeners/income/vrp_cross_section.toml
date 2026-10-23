@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/income/vrp_scanner.toml.
 id = "vrp_cross_section"
 version = 1  # the preset version this prose was written for
-line = "Optionable names ranked by implied volatility relative to the volatility they delivered."
 summary = "Ranks liquid optionable names by how far their 30-day implied volatility sits above the volatility they delivered, with no minimum gap: the rank is the selection. It is the screen of a candidate edge under test, not a proven trade."
 hit = "A common stock, ADR or ETF (not leveraged or inverse) with listed options, closing above $5 on at least $50M of 20-day dollar volume, whose realised volatility is at least 10% and whose implied volatility is at least as high. Ranked by implied over realised, highest first."
 not_checked = "It does not check a report inside the month, the option chain, the spread or open interest. It ranks on 30-session realised volatility, where the source study used a 12-month one.[^1] Whether to sell premium on a name is a separate judgement."

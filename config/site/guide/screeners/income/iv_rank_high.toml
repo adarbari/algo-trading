@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/income/vrp_scanner.toml.
 id = "iv_rank_high"
 version = 1  # the preset version this prose was written for
-line = "Optionable names whose implied volatility is in the upper half of its year's range."
 summary = "Finds liquid optionable names whose implied volatility is in the upper half of its own year's range: the practitioner's gate for selling premium.[^1] It is the screen of a candidate edge under test, not a proven trade."
 hit = "A common stock, ADR or ETF (not leveraged or inverse) with listed options, closing above $5 on at least $50M of 20-day dollar volume, whose IV rank is at least 0.5. The highest rank comes first."
 not_checked = "It does not check why implied volatility is high: a report inside the month, a takeover or a crash can each set it. It does not compare implied with realised volatility, and it reads no option chain."

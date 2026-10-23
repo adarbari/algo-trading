@@ -1,6 +1,8 @@
 /** "Finalize vN": saves any unsaved edits as the draft, then freezes the draft as the next version. */
 import { Button } from '@algotrade/ui';
 
+import { errorDetail } from '@/shared/api';
+
 import { useFinalise, type FinaliseInput } from '../api/hooks';
 
 type DraftChoice = NonNullable<FinaliseInput['choices']>[number];
@@ -18,6 +20,10 @@ export interface FinaliseButtonProps {
   choices?: readonly DraftChoice[];
   /** The version was written: the session is over. */
   onFinalised?: () => void;
+  /** Checked first: false means nothing is saved or sent (the caller shows why). */
+  validate?: () => boolean;
+  /** The server refused the finalise: its message. */
+  onRefused?: (message: string) => void;
 }
 
 export function FinaliseButton({
@@ -28,6 +34,8 @@ export function FinaliseButton({
   draftSessionId = null,
   choices = [],
   onFinalised,
+  validate,
+  onRefused,
 }: FinaliseButtonProps) {
   const finalise = useFinalise(screenerId);
   return (
@@ -36,10 +44,13 @@ export function FinaliseButton({
       disabled={disabled}
       loading={finalise.isPending}
       onClick={() => {
+        if (validate && !validate()) return;
         void prepare()
           .then(() => finalise.mutateAsync({ draftSessionId, choices }))
           .then(() => onFinalised?.())
-          .catch(() => undefined);
+          .catch((error: unknown) => {
+            onRefused?.(errorDetail(error));
+          });
       }}
     >
       {`Finalize v${String(version)}`}

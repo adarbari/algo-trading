@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "sp500_deletion"
 version = 1  # the preset version this prose was written for
-line = "Stocks removed from the S&P 500 in the last month."
 summary = "Finds liquid stocks that left the S&P 500 in the last month, dated when the change was stored: the finding that names dropped from the index rebound over the next year as forced selling ends.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day and whose latest S&P 500 membership change in the last 20 sessions is a removal. The most liquid ranks first."
 not_checked = "It does not know why the name left (a demotion to a smaller index, or a takeover that delists it), and the date is when we stored the change, after the announcement. It is the screen of the S&P 500 deletions edge, which the harness is still testing."

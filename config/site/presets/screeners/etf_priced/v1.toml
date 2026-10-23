@@ -9,6 +9,7 @@ kind = "screener"
 impl = "rules"
 version = 1
 name = "ETFs with a close"
+description = "Every listed fund with a closing price, highest price first."
 
 # ------------------------------------------------ who is screened and tradeable
 [criteria.security_type]

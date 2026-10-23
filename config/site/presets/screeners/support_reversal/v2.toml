@@ -15,6 +15,7 @@ kind = "screener"
 impl = "rules"
 version = 2
 name = "Support reversal"
+description = "Shares that stopped at a tested price floor and printed their first up close."
 
 # ------------------------------------------------ who is screened and tradeable (the site base gates;
 # no liquidity_class bundle: option liquidity is gated explicitly below, after the ADV gate)

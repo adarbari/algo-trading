@@ -2,7 +2,6 @@
 # "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
 id = "etf_low_ibs"
 version = 1  # the preset version this prose was written for
-line = "Unleveraged ETFs that closed in the bottom fifth of the day's range."
 summary = "Lists unleveraged ETFs that closed in the bottom fifth of the day's range, the lowest close first. It is the entry rule of a one-day index ETF reversal under test.[^1][^2]"
 hit = "An unleveraged ETF whose close sits less than 20 percent of the way up its high-low range for the session. The weakest close ranks first. A bar with no range is absent."
 not_checked = "It does not check the market regime, the overnight gap, the volume of the day or liquidity. The edge's own short list of index funds is what limits the names."

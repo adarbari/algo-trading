@@ -3,13 +3,15 @@
 from the preset because a preset version is immutable and its explanation is not. Keys:
 ``id`` (the file's name), ``version`` (the preset version the prose was written for: a new
 preset version fails a fitness test until the prose is re-read and the number raised),
-``line`` (what the screen asks, in one line: its row on the family's page),
 ``summary`` (the page's hero), ``hit`` (what a hit looks like),
 ``not_checked`` (what it does not check), ``before_acting`` (the caveats, one string each),
 ``related`` (``{id, reason}``: other screeners), ``[[sources]]`` (``title``, ``url``, ``note``;
 ``sources.py``) and the ``[asks]`` table (each criterion of the preset's latest version in a
 few plain words, for the criteria table). A text cites a source with the marker ``[^n]``
 (``sources.py``). The family is ``sections.toml``'s and is never repeated here.
+
+The one-line description of a screen is the preset's own (``description``, ADR 0029 amendment),
+not the Guide's.
 
 The loader checks shape only: known keys, non-empty text, the id matching its file, no related
 id twice or naming itself, every marker naming a source, no secrets. That every site preset has
@@ -29,7 +31,6 @@ FOLDER = "guide_screeners"  # the config store's kind: site/guide/screeners/<fam
 KEYS = (
     "id",
     "version",
-    "line",
     "summary",
     "hit",
     "not_checked",
@@ -64,7 +65,6 @@ class ScreenerProse:
 
     id: str
     version: int
-    line: str
     summary: str
     hit: str
     not_checked: str
@@ -96,7 +96,6 @@ class ScreenerProse:
         prose = cls(
             id=name,
             version=version,
-            line=t.line("line"),
             summary=t.line("summary"),
             hit=t.line("hit"),
             not_checked=t.line("not_checked"),

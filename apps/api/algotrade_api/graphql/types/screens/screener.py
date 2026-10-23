@@ -212,7 +212,8 @@ class PickCount:
 @strawberry.type(
     description="A rule screen as the user sees it (their own config, else the site preset): "
     "`owner` is whose runs are its; `criteria`, `groups` and `displayColumns` the current "
-    "config's; "
+    "config's; `description` the one line saying what it finds (null: not written; not part of "
+    "`hash`); "
     "`latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its "
     "picked count per session over a window ending at the session"
 )
@@ -226,6 +227,7 @@ class Screener:
     criteria: list[ScreenCriterion]
     display_columns: list[ScreenColumn]
     groups: list[ScreenGroup]
+    description: str | None
     ctx: strawberry.Private[ReadContext]
 
     @classmethod
@@ -240,6 +242,7 @@ class Screener:
             criteria=[ScreenCriterion.of(c) for c in d.criteria],
             display_columns=[ScreenColumn.of(c) for c in d.display_columns],
             groups=[ScreenGroup.of(g) for g in d.groups],
+            description=d.description,
             ctx=ctx,
         )
 

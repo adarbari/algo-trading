@@ -5,7 +5,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "news_free_residual_reversal"
 version = 1  # the preset version this prose was written for
-line = "Stocks that lagged the market for a month with no filing or earnings news."
 summary = "Ranks stocks that fell against the market over the month with no 8-K or earnings report in the last 5 sessions, the biggest loser first.[^2] A fall with no filing is a pressure that tends to reverse.[^1] It is a candidate edge under test."
 hit = "The name is a common stock or ADR closing above $5 that trades at least $50M a day, with a market-residual 20-session return and no 8-K filing or earnings window in the last 5 sessions. The lowest residual comes first."
 not_checked = "It does not see news that is not an 8-K: a press story, an analyst note or a rumour. It does not check news older than 5 sessions inside the 20-session window, or strip size and value."

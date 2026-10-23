@@ -8,7 +8,6 @@
 # tests/unit/config/site/guide/test_screeners.py.
 id = "lottery_max"
 version = 1  # the preset version this prose was written for
-line = "Stocks with the biggest single-day jump last month, ranked to avoid."
 summary = "Ranks every liquid stock by its best one-day return of the last 21 sessions, the lottery measure of the finance literature, with the most lottery-like names last. Retail demand for skewness is thought to overprice them,[^1] so they are an avoid list."
 hit = "The name is a listed stock closing above $5 that trades at least $50M a day and has a best one-day return for the last 21 sessions. Every such name qualifies; the largest best day ranks last, as the one to avoid."
 not_checked = "It does not read option skew, which is what Boyer and Vorkink sort on, nor idiosyncratic volatility.[^2] A one-day jump on a takeover bid looks the same as lottery demand."
