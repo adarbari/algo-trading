@@ -221,6 +221,18 @@ A detached run goes through `taskpolicy -b nice -n 10` (background CPU and IO pr
 launchd nightly) so the website on the same Mac stays fast; put the same prefix before any other
 long backfill below.
 
+Yahoo's analyst data of the whole stock population (about 5,600 names, 30 to 45 minutes at 0.3 s a call;
+ADR 0080 amendment 2026-10-23b) is `analyst-backfill`: one batch of 500 names a run, the ingest lock
+released between batches (the nightly is never starved), quiet until the last session's nightly is
+complete, stopped by the first 429 (the loop then waits 60 s, 5 min, 30 min and gives up after three). `scripts/ops/yahoo_backfill.sh` loops it until nothing is due and
+writes `var/logs/yahoo-backfill.status` (resumable: start it again after an interruption):
+
+```bash
+algotrade-ingest run analyst-backfill --limit 10   # try a small batch first
+nohup scripts/ops/yahoo_backfill.sh >/dev/null 2>&1 &
+cat var/logs/yahoo-backfill.status                 # state, batches, names still due; tail var/logs/yahoo-backfill.log
+```
+
 Compacting a merge table's redundant run files (ADR 0078; the tables are `nightly.toml [compaction]`,
 today `forward_returns@v2`) is one such long run, resumable, with 4 worker processes (`--workers N`) taking one partition
 each, and it stops dispatching when the nightly or a backfill holds the `ingest` lock (the
