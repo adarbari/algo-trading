@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 
-from algotrade.config.filters.definitions import FilterDefinition, load_filter_set
+from algotrade.config.filters.definitions import FilterColumn, FilterDefinition, load_filter_set
 from algotrade.config.site.settings import load_users
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
@@ -84,13 +84,15 @@ class WithheldFilter:
 @dataclass(frozen=True)
 class ServedFilters:
     """``filters``: what the viewer may use (``resolved``: the same, as the pass takes them);
-    ``withheld``: the rest, in file order."""
+    ``withheld``: the rest, in file order; ``columns``: the surface's declared columns (the
+    sources a list builds its frame from, ``filtering/rows.py``)."""
 
     surface: str
     label: str
     resolved: ResolvedFilters
     filters: tuple[ServedFilter, ...]
     withheld: tuple[WithheldFilter, ...]
+    columns: tuple[FilterColumn, ...] = ()
 
 
 def site_catalogue(ctx: Stores) -> FeatureSet:
@@ -140,4 +142,4 @@ def load_served_filters(ctx: Stores, surface: str, day: date | None = None) -> S
         if f.id in resolved.withheld
     )
     offered = tuple(_served(f) for f in resolved.offered)
-    return ServedFilters(surface, filter_set.label, resolved, offered, withheld)
+    return ServedFilters(surface, filter_set.label, resolved, offered, withheld, filter_set.columns)
