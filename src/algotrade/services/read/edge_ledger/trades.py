@@ -48,7 +48,7 @@ from algotrade.services.read.evaluation.runs import (
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import NO, YES, FilterInput
 from algotrade.services.read.filtering.rows import frame_of
-from algotrade.services.read.filtering.served import load_served_filters
+from algotrade.services.read.filtering.served import load_list_filters
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.session import reference_snapshot_on, reference_snapshots
 from algotrade.services.read.values import Unknown, UnknownCode
@@ -410,7 +410,7 @@ def load_filtered_trades(
     """Page ``page`` of the trades of ``edge``'s verdict basis for ``period`` that pass
     ``filters``, with the filter bar's counts. ``FilterRefusedError`` for a filter the viewer is
     not offered (before any read)."""
-    served = load_served_filters(ctx, TRADE_SURFACE, ctx.session.date)
+    served = load_list_filters(ctx, TRADE_SURFACE)
     given = {i.id for i in filters}
     inputs = [*filters, *(f for f in period_filters(period) if f.id not in given)]
     served.resolved.check(i.id for i in inputs)  # before any read

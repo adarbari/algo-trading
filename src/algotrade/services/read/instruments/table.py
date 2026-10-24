@@ -45,7 +45,7 @@ from algotrade.services.read.context import NotFoundError, ReadContext, catalogu
 from algotrade.services.read.filtering.definitions import ResolvedFilters
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import Cell, FilterInput, rule_for
-from algotrade.services.read.filtering.served import load_served_filters
+from algotrade.services.read.filtering.served import load_list_filters
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments, resolve_id
@@ -259,7 +259,7 @@ def _passing(
     found = ctx.cache.get(key)
     if found is not None:
         return found  # type: ignore[no-any-return]
-    resolved = load_served_filters(ctx, SURFACE, ctx.session.date, [i.id for i in inputs]).resolved
+    resolved = load_list_filters(ctx, SURFACE, [i.id for i in inputs]).resolved
     resolved.check(i.id for i in inputs)
     ids = population.ids if keyed else None
     offered = list(dict.fromkeys(d.field for d in resolved.offered))
