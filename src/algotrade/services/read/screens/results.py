@@ -653,7 +653,7 @@ def _filter_run(
     """``run``'s rows (rank order) that pass ``inputs``, the facets over the whole run and the
     tables the SET catalogue-field filters read with nothing for the session.
     ``FilterRefusedError`` for an input the viewer is not offered (refused before any read)."""
-    resolved = load_served_filters(ctx, SURFACE, ctx.session.date).resolved
+    resolved = load_served_filters(ctx, SURFACE, ctx.session.date, [i.id for i in inputs]).resolved
     resolved.check(i.id for i in inputs)
     rows = run_rows(ctx, run)
     changes = load_run_changes(ctx, run).by_instrument

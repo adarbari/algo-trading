@@ -373,7 +373,7 @@ def load_ideas(
     best first, from the ``after`` cursor (none: the first page); ``Ideas.next_cursor`` is the
     next page's. ``FilterRefusedError`` for a filter the viewer is not offered."""
     rule = load_ideas_rule(ctx.configs)
-    resolved = load_served_filters(ctx, SURFACE, ctx.session.date).resolved
+    resolved = load_served_filters(ctx, SURFACE, ctx.session.date, [i.id for i in filters]).resolved
     resolved.check(i.id for i in filters)  # before any read: a hidden filter is refused whole
     screeners = load_screeners(ctx)
     latest = load_latest_runs(ctx, [(s.owner, s.id) for s in screeners])

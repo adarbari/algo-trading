@@ -37,6 +37,7 @@ allowed = [
     "src/algotrade/services/read/instruments/table.py",  # a table's filters and sort
     "src/algotrade/services/read/filtering/definitions.py",  # which filters a viewer is offered (ADR 0082)
     "src/algotrade/services/read/filtering/served.py",  # the viewer's held set and a withheld filter's licence
+    "src/algotrade/services/read/filtering/feature_filters.py",  # a filter made of a catalogue field is offered, searchable and accepted only when its licence is held (ADR 0082)
     "src/algotrade/services/read/screens/results.py",  # stored criterion values and sorts
     "src/algotrade/services/preview/frame.py",  # the Builder's frame, kept per licence set
     "src/algotrade/services/jobs/handlers.py",  # the screen job passes the user's licences

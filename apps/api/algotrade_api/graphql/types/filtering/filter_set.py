@@ -6,7 +6,7 @@ from typing import Self
 
 import strawberry
 
-from algotrade.services.read.filtering import served
+from algotrade.services.read.filtering import feature_filters, served
 from algotrade.services.read.filtering.masks import WindowUnit
 from algotrade_api.graphql.types.availability import Unavailable
 
@@ -74,14 +74,39 @@ class WithheldFilter:
 
 
 @strawberry.type(
+    description="A catalogue field the viewer may filter a surface on by search: `kind` the "
+    "control it gets (the filter's id is `feature:<name>`), `guide` its Guide entry "
+    "(`field:<name>`), `synonyms` the words a trader uses for it (the phrasebook)"
+)
+class FilterableFeature:
+    name: str
+    label: str
+    kind: served.FilterKind
+    guide: str
+    synonyms: list[str]
+
+    @classmethod
+    def of(cls, d: feature_filters.FilterableFeature) -> Self:
+        return cls(
+            name=d.name,
+            label=d.label,
+            kind=served.FilterKind(d.kind),
+            guide=d.guide,
+            synonyms=list(d.synonyms),
+        )
+
+
+@strawberry.type(
     description="The filters of a surface for the viewer: `filters` they may use, in the order "
-    "a group lists them, and `withheld` the ones they may not"
+    "a group lists them, and `withheld` the ones they may not; `searchable`: the surface takes a "
+    "filter on any catalogue field (`filterFeatures`, the id `feature:<field>`)"
 )
 class FilterSet:
     surface: str
     label: str
     filters: list[FilterDefinition]
     withheld: list[WithheldFilter]
+    searchable: bool
 
     @classmethod
     def of(cls, d: served.ServedFilters) -> Self:
@@ -90,4 +115,5 @@ class FilterSet:
             label=d.label,
             filters=[FilterDefinition.of(f) for f in d.filters],
             withheld=[WithheldFilter.of(w) for w in d.withheld],
+            searchable=d.searchable,
         )
