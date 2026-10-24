@@ -252,6 +252,21 @@ def test_a_blank_check_company_is_not_expected_to_have_earnings() -> None:
     assert cell(check, "rest")["missing"] == ["N1"]  # R2 is a SPAC: out of the denominator
 
 
+def test_funds_and_blank_checks_are_not_in_the_fundamentals_denominator() -> None:
+    """The pill read 47% because every ETF and fund counted as a company missing shares."""
+    writer, reader = store()
+    company = [{"instrument_id": "EQ:R2", "symbol": "R2", "cik": "1", "name": "R2 Acquisition",
+                "sic": "6770", "sector": None, "fetched_on": D}]  # fmt: skip
+    writer.write_table("instruments/company", D, "c", stamped(company, D, "c"))
+    put(writer, "rollups/instrument/fundamentals@v4", D,
+        {"C1": {"shares_outstanding": 1.0}, "R1": {"shares_outstanding": None}})  # fmt: skip
+    rule = CoverageRule("fundamentals.shares_outstanding", 0.5, 0.5)
+    check = only(check_coverage(reader, D, rules(rule)), "fundamentals.shares_outstanding")
+    # E1 is an ETF and R2 a SPAC: neither counts; C2, R1, N1 are companies without a count
+    assert cell(check, "rest")["missing"] == ["N1", "R1"]
+    assert cell(check, "core")["applicable"] == 2
+
+
 def _explaining() -> FeatureSet:
     """``prices.close`` whose null ``history.bar_status@v1`` explains (NO_TRADE), as
     ``price_stats.close`` and ``price_history@v1`` (ADR 0046)."""
