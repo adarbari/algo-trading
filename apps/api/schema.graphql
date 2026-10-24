@@ -3432,6 +3432,7 @@ type ScreenResultPage {
   reasons: [[NullReason]!]!
   kinds: [[UnavailableKind]!]!
   unavailable: [Unavailable!]!
+  facets: FilterFacets
 
   """The words of each kind `kinds` uses: how a cell's kind reads"""
   kindTexts: [KindText!]!
@@ -3532,9 +3533,9 @@ type ScreenerRun {
   pickIds(size: Int! = 100): PickIds!
 
   """
-  Its rows as a review table: `decisions` (none: all; any case), `change` (`new` / `dropped`) and `q` (the symbol or name contains it) filtered, sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows
+  Its rows as a review table: `filters` (the surface `screener_results` of `filterSet`) and `q` (the symbol or name contains it) filtered, `decisions` and `change` (deprecated: the `decision` and `change` filters; `new` / `dropped`) likewise, over the whole run, with the counts in `facets` (ADR 0082), sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows
   """
-  results(decisions: [String!] = null, change: String = null, q: String = null, sort: String = null, columns: [FeatureName!] = null, page: Int! = 1, size: Int! = 100): ScreenResultPage!
+  results(decisions: [String!] = null, change: String = null, q: String = null, sort: String = null, columns: [FeatureName!] = null, page: Int! = 1, size: Int! = 100, filters: [FilterInput!] = null): ScreenResultPage!
 }
 
 """
