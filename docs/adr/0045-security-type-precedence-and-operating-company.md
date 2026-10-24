@@ -40,11 +40,11 @@ shell with a ticker; it stays common stock and in the universe, but it has no ea
   `GENERIC_VENDOR_TYPES` (`universe_build.py`).
 
 ## Amendment 2026-10-24: closed-end funds
-Massive types about 31 "- Closed End Fund" names (Calamos CHY / CSQ, Sprott FUND, Herzfeld HERZ,
-Daxor, and 18 BDCs such as ARCC) `CS`, so they counted as operating companies and had no share
-count (2 of 31 have one). `classify.security_type` gains a `CEF` rule on the Nasdaq Trader name
-suffix "- Closed End Fund"; as a specific name result it overrides the generic vendor type
-(`name_over_vendor`). Royalty trusts (SIC 6792 / 6795) and REITs stay `COMMON_STOCK`: 10-K
-filers with operating income, no such suffix. Measured 0.59% of ACTIVE rows (2026-10-23), inside
-`max_name_over_vendor`. A `CEF` is a fund in `asset_class` (ADR 0013): the BDCs leave the stock
-populations; FIGI ids are unchanged.
+Massive types 31 "- Closed End Fund" names `CS` (Nasdaq Trader's suffix), so funds counted as
+operating companies and had no share count (2 of 31 have one). `classify.security_type` gains a
+`CEF` rule on that suffix; as a specific name result it overrides the generic vendor type
+(`name_over_vendor`). 17 of the 31 are BDCs (ARCC, PSEC, ...: 10-K filers, the population of
+`bdc_price_to_nav`, which needs `COMMON_STOCK`): a hand-kept `_BDC_SYMBOLS` set skips them. The
+other 14 become `CEF` (Calamos, Sprott FUND, Herzfeld, Oxford Lane, ArrowMark, Thornburg, Daxor).
+Royalty trusts (SIC 6792 / 6795) and REITs stay `COMMON_STOCK`. A `CEF` is a fund in `asset_class`
+(ADR 0013): they leave the stock populations; FIGI ids are unchanged; 0.27% of ACTIVE rows.

@@ -16,9 +16,10 @@ from algotrade.config.site.universe.etf_category import Phrases
 
 _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ETN", re.compile(r"\bETNs?\b|exchange[- ]traded notes?", re.I)),
-    # Nasdaq Trader suffixes a closed-end fund (and a BDC) "- Closed End Fund"; Massive types some
-    # of them "CS", and a generic vendor type yields to this rule (ADR 0045). Royalty trusts and
-    # REITs carry no such suffix and are operating entities (SIC 6792 / 6798), so they stay common.
+    # Nasdaq Trader suffixes a closed-end fund "- Closed End Fund", and a BDC too (``_BDC_SYMBOLS``
+    # are skipped: they file 10-K, stay common stock and feed ``bdc_price_to_nav``). Massive types
+    # both "CS"; a generic vendor type yields to this rule (ADR 0045). Royalty trusts and REITs
+    # carry no such suffix and are operating entities (SIC 6792 / 6798), so they stay common.
     ("CEF", re.compile(r"-\s*closed end fund\s*$", re.I)),
     # not a name that ends "Common Stock" / "Ordinary Shares" ("Preferred Bank - Common Stock")
     (
@@ -32,6 +33,30 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("NOTE", re.compile(r"\bnotes? due\b|\bdebentures?\b|\bsenior notes\b|% notes\b", re.I)),
     ("ADR", re.compile(r"american depositary|\bADSs?\b|\bADRs?\b", re.I)),
 )
+# Listed BDCs named "- Closed End Fund" (company entity_type "operating", 10-K filers; the
+# ``bdc_listed`` selection's 13 plus GECC NSLR BCIC RAND). A BDC new to the list is typed CEF until
+# added here; the carve-out is hand-kept because the company table is built after this step.
+_BDC_SYMBOLS = frozenset(
+    [
+        "ARCC",
+        "CGBD",
+        "FDUS",
+        "GBDC",
+        "GECC",
+        "GLAD",
+        "MFIC",
+        "OCSL",
+        "OFS",
+        "OXSQ",
+        "PSEC",
+        "SLRC",
+        "TCPC",
+        "WHF",
+        "NSLR",
+        "BCIC",
+        "RAND",
+    ]
+)
 _SYMBOL_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("PREFERRED", re.compile(r"\$")),
     ("WARRANT", re.compile(r"\.W[S]?$")),
@@ -42,6 +67,8 @@ _SYMBOL_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 def security_type(name: str, symbol: str, is_etf: bool) -> str:
     for kind, pattern in _RULES:
+        if kind == "CEF" and symbol in _BDC_SYMBOLS:
+            continue
         if (kind == "ETN" or not is_etf) and pattern.search(name):
             return kind
     if is_etf:

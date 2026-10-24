@@ -76,11 +76,15 @@ def test_vendor_type_wins_and_disagreements_are_counted() -> None:
     assert none == 0 and plain["figi"].isna().all()
 
 
-def type_after_precedence(name: str, vendor: str, is_etf: bool = False) -> tuple[str, str]:
+def type_after_precedence(
+    name: str, vendor: str, is_etf: bool = False, symbol: str = "X"
+) -> tuple[str, str]:
     from algotrade_ingestion.tasks.reference.classify import security_type  # noqa: PLC0415
 
-    reference = pd.DataFrame({"symbol": ["X"], "security_type": [security_type(name, "X", is_etf)]})
-    enriched, _ = apply_identifiers(reference, parse_tickers([ticker("X", vendor, "F1")]))
+    reference = pd.DataFrame(
+        {"symbol": [symbol], "security_type": [security_type(name, symbol, is_etf)]}
+    )
+    enriched, _ = apply_identifiers(reference, parse_tickers([ticker(symbol, vendor, "F1")]))
     row = enriched.iloc[0]
     return row["security_type"], row["security_type_source"]
 
@@ -217,6 +221,11 @@ CLOSED_END_FUNDS = (
     "Herzfeld Credit Income Fund, Inc.  - Closed End Fund",  # HERZ
     "Daxor Corporation - Closed End Fund",  # DXR
 )
+BDCS = (  # file 10-K, stay common stock: the bdc_price_to_nav screener needs COMMON_STOCK
+    ("ARCC", "Ares Capital Corporation - Closed End Fund"),
+    ("PSEC", "Prospect Capital Corporation - Closed End Fund"),
+    ("GECC", "Great Elm Capital Corp. - Closed End Fund"),
+)
 NOT_FUNDS = (  # operating entities by SIC: royalty trusts (6792) and REITs (6798) stay common
     "San Juan Basin Royalty Trust Common Stock",
     "Permian Basin Royalty Trust Common Stock",
@@ -237,3 +246,8 @@ def test_a_closed_end_fund_typed_common_by_the_vendor_becomes_cef() -> None:
 def test_royalty_trusts_and_reits_are_not_closed_end_funds() -> None:
     for name in NOT_FUNDS:
         assert type_after_precedence(name, "CS") == ("COMMON_STOCK", "vendor"), name
+
+
+def test_bdcs_named_closed_end_fund_stay_common_stock() -> None:
+    for symbol, name in BDCS:
+        assert type_after_precedence(name, "CS", symbol=symbol) == ("COMMON_STOCK", "vendor")
