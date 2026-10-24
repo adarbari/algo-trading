@@ -28,12 +28,12 @@
   },
   "e2e": {
     "/ideas": {
-      "first_load_js_gzip_bytes": 241000,
+      "first_load_js_gzip_bytes": 241700,
       "requests": 66,
       "dom_nodes": 340
     },
     "/screeners": {
-      "first_load_js_gzip_bytes": 216100,
+      "first_load_js_gzip_bytes": 217000,
       "requests": 71,
       "dom_nodes": 222
     },
@@ -71,8 +71,8 @@
     "e2e./explore?focus=AAPL&tab=chart.first_load_js_gzip_bytes": "2026-10-24 #924 the entry chunk's f codec is on every page (owner pre-approved); then, before it: 2026-10-24 #915 Admin Screener runs: the run detail's UnavailableNote import splits the chunk Combobox shared with it, so the Explore first load gains one request-free chunk boundary (+403 B measured locally by removing and restoring the route; CI 305.3 kB against 305000): budget 305420 (owner approved the raise in the session; no real trim found); then, before it: 2026-10-23 #902 the data-status pill's badge sits in the entry chunk every page loads (owner-approved): CI measured 304925 B against 304630 B, +75 B margin, budget 305000; then, before it: 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom); then 2026-10-10 #461 ED8 E8: the builder's shared Checkbox / SectionNav / NumberInput / ScreenerRecord chunks and the lazy Screen Builder routes (measured by CI: 304590 B)",
     "e2e./ideas.requests": "2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): one more request from the entry chunk's growth (measured 65); then, before it: 2026-10-24 #924 the FilterSet read and the lazy chunks of the filter bar's controls (measured 61, +1 margin); then, before it: 2026-10-23 #873 the Ideas column headers' help buttons open Guide terms (idea_decision, idea_size, idea_price, idea_watch_out): CI measured 55 against 54, +1 margin for the font-file spread; then, before it: 2026-10-22 #844 the Ideas rule's page: +1 request (CI measured 54 against main's 53; locally main reads 51-54 and this page 54-55, the spread is the two weight-500 font files and the Guide entries batch; the Picked by header and the ranking help add term entries; trimmed first: no Score help, no separators, no #1); then, before it: 2026-10-21 #773 the early start of a trader page's reads adds one request: the lazy early-reads chunk (owner-requested remote-client work)",
     "e2e./admin/ingestion.requests": "2026-10-21 #773 the early start of a trader page's reads adds one request: the lazy early-reads chunk (owner-requested remote-client work)",
-    "e2e./ideas.first_load_js_gzip_bytes": "2026-10-24 #941 More filters' code in the Ideas chunk (measured locally 240.0 kB; the search loads on first open); then, before it: 2026-10-24 #924 the filter bar's components and the FilterSet read load with Ideas (CI measured 238.6 kB; owner pre-approved); then, before it: 2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",
-    "e2e./screeners.first_load_js_gzip_bytes": "2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (ADR 0082; owner pre-approved raises that come from the filter bar's shared code): the bar's components and its two reads load with the page (measured 215887 B, +213 B margin); then, before it: 2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +295 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",
+    "e2e./ideas.first_load_js_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #941 More filters' code in the Ideas chunk (measured locally 240.0 kB; the search loads on first open); then, before it: 2026-10-24 #924 the filter bar's components and the FilterSet read load with Ideas (CI measured 238.6 kB; owner pre-approved); then, before it: 2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",
+    "e2e./screeners.first_load_js_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (ADR 0082; owner pre-approved raises that come from the filter bar's shared code): the bar's components and its two reads load with the page (measured 215887 B, +213 B margin); then, before it: 2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #452 the row criteria come typed from the run summary (toCriteria and its mapping, +295 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",
     "e2e./regime.first_load_js_gzip_bytes": "2026-10-10 #461 ED8 E8 the six-step edge builder reuses Checkbox, SectionNav, NumberInput and ScreenerRecord, so they leave the page chunk that inlined them and load as shared chunks: one more small request and its modulepreload link (measured)",
     "e2e./screeners/vrp_scanner.first_load_js_gzip_bytes": "2026-10-24 #924 the entry chunk's f codec is on every page (CI measured 255431 B against 255400 B; owner pre-approved); then, before it: 2026-10-09 #440 the saved page cache (idb-keyval and the persister, one lazy chunk) loads after first paint on trader pages; then 2026-10-09 #447 the criteria scorecard reads the resolved config's rules table (resolvedRules, +2 B over the exact budget); then 2026-10-09 #452 the criteria scorecard reads typed criteria through the screeners list query (+685 B); then 2026-10-09 #454 ED8 PR-A: BarList gains the diverging option (decile bars), shared by this route's chunks; then 2026-10-09 #456 ED8 E7: the shared generated GraphQL client gains the follow / problems operations and the edge entity's shared hooks (measured by CI); then 2026-10-09 #457 ED8 PR-D: edge signals on Ideas and the paper record on the edge page: the EdgeDesk / EdgePaper operations grow the shared generated GraphQL client and the edge entity's shared hooks (measured, +~200 B headroom)",
     "e2e./admin/ingestion.first_load_js_gzip_bytes": "2026-10-10 #461 ED8 E8 the six-step edge builder reuses Checkbox, SectionNav, NumberInput and ScreenerRecord, so they leave the page chunk that inlined them and load as shared chunks: one more small request and its modulepreload link (measured)",
@@ -105,9 +105,9 @@
     "bundle.routes.src/pages/admin-llm-usage/ui/CallsSection.tsx": "2026-10-23 #909 owner decision: route budgets at measured + 5 % headroom (docs/decisions/log.md)",
     "bundle.routes.src/pages/admin-screener-runs/index.ts": "2026-10-23 first budget: the Admin Screener runs page (list with filters, run detail), measured locally 38.9 kB gzip + 5 % headroom (route budgets at measured + 5 %, #909 owner decision, docs/decisions/log.md)",
     "e2e./explore?focus=AAPL&tab=features.first_load_js_gzip_bytes": "2026-10-24 #941 the shared filter bar code moves a few bytes (measured locally 270020 B against 270000 B)",
-    "network./ideas.wire_gzip_bytes": "2026-10-24 #941 More filters: the percent presentation and the lazy search's loader in the Ideas chunk (measured locally 369895 B against 369700 B, +1.1 kB margin for CI; owner pre-approved raises from the filter bar's shared code)",
-    "network./screeners.wire_gzip_bytes": "2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk and the lists' components and reads (measured 343198 B, +~200 B margin); then, before it: previous budget",
-    "network./edges.wire_gzip_bytes": "2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk's growth (CI measured 370093 B, +~300 B margin); then, before it: previous budget"
+    "network./ideas.wire_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #941 More filters: the percent presentation and the lazy search's loader in the Ideas chunk (measured locally 369895 B against 369700 B, +1.1 kB margin for CI; owner pre-approved raises from the filter bar's shared code)",
+    "network./screeners.wire_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk and the lists' components and reads (measured 343198 B, +~200 B margin); then, before it: previous budget",
+    "network./edges.wire_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk's growth (CI measured 370093 B, +~300 B margin); then, before it: previous budget"
   },
   "waivers": {
     "bundle.entry_closure_gzip_bytes": {
@@ -122,17 +122,17 @@
   "network": {
     "/ideas": {
       "round_trip_depth": 5,
-      "wire_gzip_bytes": 371000,
+      "wire_gzip_bytes": 371800,
       "settled_ms": 3200
     },
     "/screeners": {
       "round_trip_depth": 5,
-      "wire_gzip_bytes": 343400,
+      "wire_gzip_bytes": 344300,
       "settled_ms": 3100
     },
     "/edges": {
       "round_trip_depth": 6,
-      "wire_gzip_bytes": 370400,
+      "wire_gzip_bytes": 371100,
       "settled_ms": 3400
     },
     "/regime": {
