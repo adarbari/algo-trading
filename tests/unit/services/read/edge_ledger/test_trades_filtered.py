@@ -124,3 +124,61 @@ def test_a_period_with_no_filters_and_no_counts_keeps_the_fast_read(backend: Mem
     counted = load_trades_page(ctx, "drift", Period.ALL, 1, None, False, (), True)
     assert counted is not None and counted.facets is not None and counted.total == 4
     assert load_trades_page(ctx, "nope", Period.ALL, 1, None, False) is None
+
+
+def hidden_copy() -> tuple[Any, Any]:
+    """A viewer's copy whose out-of-sample result is withheld: one in-sample and one
+    out-of-sample row stored, only the first is ever served."""
+    from algotrade.services.read.evaluation.edges import load_edge  # noqa: PLC0415
+    from algotrade.storage.tables.result_writer import ResultWriter  # noqa: PLC0415
+    from tests.helpers.stored_frames import stamped  # noqa: PLC0415
+    from tests.unit.services.read.evaluation.conftest import END  # noqa: PLC0415
+    from tests.unit.services.read.evaluation.test_versions import (  # noqa: PLC0415
+        MOVED,
+        write_own_run,
+    )
+
+    backend = MemoryBackend()
+    write_own_run(backend)
+    record = backend_run(backend)
+    rows = [
+        {**pick(FROZEN, "EQ:A", 1, True, edge_id="mine", split_from=MOVED), "user_id": "me"},
+        {**pick(END, "EQ:Z", 1, False, edge_id="mine", split_from=MOVED), "user_id": "me"},
+    ]
+    frame = stamped(rows, END, "mine1", record.started_at, "edge-eval")
+    writer = ResultWriter(backend)
+    with writer.publishing("mine1", record.started_at):
+        writer.write_result("edge_trades", END, "mine1", frame, pending=True)
+        record.stats["ledger_rows"] = 2
+        writer.save_run(record)
+    docs = {**DOCS, ("me", "edges", "mine"): {"extends": "drift", "screeners": ["momo"]}}
+    ctx = context(backend, "me", docs, cutoff=CUTOFF)
+    edge = load_edge(ctx, "mine")
+    assert edge is not None and edge.oos_hidden
+    return ctx, edge
+
+
+def backend_run(backend: MemoryBackend) -> Any:
+    from tests.unit.services.read.edge_ledger.test_trades import run_record  # noqa: PLC0415
+
+    return run_record(backend, "mine1")
+
+
+def test_a_hidden_copys_withheld_trades_are_disclosed_whichever_filter_chose_the_rows() -> None:
+    ctx, edge = hidden_copy()
+    out = load_filtered_trades(ctx, edge, Period.OUT_OF_SAMPLE, 1, None, False, ())
+    assert (out.rows, out.total, out.oos_hidden) == ((), 0, True)  # the old early return
+    for period, filters in [
+        (Period.ALL, ()),
+        (None, ()),
+        (Period.LIVE, [FilterInput("record", ["backtest"])]),  # a viewer's record beats `live`
+        (Period.IN_SAMPLE, [FilterInput("in_sample", ["no"])]),  # and so does in_sample
+    ]:
+        page = load_filtered_trades(ctx, edge, period, 1, None, False, filters)
+        assert page.oos_hidden, (period, filters)
+    inside = load_filtered_trades(ctx, edge, Period.IN_SAMPLE, 1, None, False, ())
+    assert ids(inside) == ["EQ:A"] and not inside.oos_hidden  # nothing was withheld from it
+    out_but_filtered = load_filtered_trades(
+        ctx, edge, Period.OUT_OF_SAMPLE, 1, None, False, [FilterInput("in_sample", ["no"])]
+    )
+    assert out_but_filtered.oos_hidden and out_but_filtered.facets is not None  # counts asked for

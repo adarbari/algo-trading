@@ -138,7 +138,7 @@ id = "filter_sector"
 term = "Sector filter"
 short = "Keeps the instruments in the sectors you tick."
 body = """
-The sector is the company's classification from the reference data. Funds and many ETFs have none, so ticking a sector leaves them out. The number beside each counts the instruments in that sector among those that pass your other filters. In a table of trades it is the sector the name has in the session you are reading. It is not the sector on the day of the trade. A name that has since left the data has none.
+The sector is the company's classification from the reference data. Funds and many ETFs have none, so ticking a sector leaves them out. The number beside each counts the instruments in that sector among those that pass your other filters. In a table of trades it is the sector the name has in the session you are reading. It is not the sector on the day of the trade. A name that has since left the data has none, so ticking a sector leaves out the names delisted since.
 """
 next = "Combine it with the market cap range to compare a sector's large names."
 see_also = ["filter_security_type", "filter_unknown_rows"]

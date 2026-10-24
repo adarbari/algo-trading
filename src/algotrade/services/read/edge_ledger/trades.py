@@ -385,6 +385,14 @@ def _sorted(rows: list[TradeRow], sort: str | None, descending: bool) -> list[Tr
     return present + missing
 
 
+def _chosen(inputs: Sequence[FilterInput]) -> dict[str, list[str]]:
+    """The values of each active ``record`` / ``in_sample`` input (the ones that pick the rows to
+    read; an input that sets nothing is not there)."""
+    return {
+        i.id: i.values for i in inputs if i.id in ("record", "in_sample") and i.active and i.values
+    }
+
+
 def _unknown(why: str, code: UnknownCode) -> Unknown:
     return Unknown(code, Cause((CauseLink(CauseLevel.STEP, PAPER_STEP, code.value, why),)))
 
@@ -403,34 +411,37 @@ def load_filtered_trades(
     ``filters``, with the filter bar's counts. ``FilterRefusedError`` for a filter the viewer is
     not offered (before any read)."""
     served = load_served_filters(ctx, TRADE_SURFACE, ctx.session.date)
-    served.resolved.check(i.id for i in filters)
+    given = {i.id for i in filters}
+    inputs = [*filters, *(f for f in period_filters(period) if f.id not in given)]
+    served.resolved.check(i.id for i in inputs)  # before any read
     page = max(page, 1)
     basis = official_basis(ctx, edge)
-    if basis.key is None or basis.run is None:
-        return EdgeTradePage(period or Period.ALL, page, basis.unknown)
-    words = f"{basis.key[0]}, {basis.key[1]} trading days"
     shown = period or Period.ALL
-    hidden = basis.run.oos_hidden and period in (None, Period.OUT_OF_SAMPLE, Period.ALL)
-    if basis.run.oos_hidden and period is Period.OUT_OF_SAMPLE:
-        return EdgeTradePage(shown, page, None, words, oos_hidden=True)
+    if basis.key is None or basis.run is None:
+        return EdgeTradePage(shown, page, basis.unknown)
+    words = f"{basis.key[0]}, {basis.key[1]} trading days"
+    chosen = _chosen(inputs)  # what the inputs say, the viewer's over the period's
+    record, sample = chosen.get("record"), chosen.get("in_sample")
+    backtest = record is None or BACKTEST in record
+    live = record is None or LIVE_RECORD in record
     recording = is_recording(edge)
-    if period is Period.LIVE and not recording:
+    withheld = basis.run.oos_hidden and backtest and sample != [YES]  # OOS rows are never served
+    if withheld and sample == [NO] and not given & {"record", "in_sample"}:
+        return EdgeTradePage(shown, page, None, words, oos_hidden=True)  # the out-of-sample period
+    if live and not backtest and not recording:
         why = "paper trades are recorded once the edge is evidenced or followed"
         return EdgeTradePage(shown, page, _unknown(why, UnknownCode.NOT_RECORDING), words)
-    given = {i.id for i in filters}
-    both = period is None or "record" in given  # the viewer chose the record: read both
+    hidden = withheld
     rows: list[TradeRow] = []
     licence = None
-    if both or period is not Period.LIVE:
+    if backtest:
         found = _backtest(ctx, basis, Period.ALL, 0, None, None, False)
         if found.unknown is not None:
             return EdgeTradePage(shown, page, found.unknown, words)
         rows.extend(found.rows)
         licence = found.licence
-    if (both or period is Period.LIVE) and recording:
+    if live and recording:
         rows.extend(_live(ctx, edge, basis, None, False))
-    inputs = [*filters, *(f for f in period_filters(period) if f.id not in given)]
-    served.resolved.check(i.id for i in inputs)
     wanted = SECTOR in {f.field for f in served.resolved.offered}
     catalogue = {SECTOR: _sector_cells(ctx, rows)} if wanted else None
     frame = frame_of(rows, served.resolved, served.columns, catalogue)

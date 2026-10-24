@@ -28,3 +28,24 @@ def test_facets_are_served_only_when_asked_for(graph: Graph) -> None:
 def test_a_filter_the_viewer_is_not_offered_is_refused(graph: Graph) -> None:
     body = graph(TRADES, {"id": first_edge(graph), "filters": [{"id": "nope", "values": ["x"]}]})
     assert "not offered" in str(body["errors"]), body
+
+
+def test_facets_asked_for_through_a_fragment_are_served_as_when_selected_directly(
+    graph: Graph,
+) -> None:
+    edge = first_edge(graph)
+    direct = graph(
+        "query($id: String!) { edgeTrades(edgeId: $id, period: null) { unknown { kind } "
+        "facets { total } } }",
+        {"id": edge},
+    )["data"]["edgeTrades"]
+    spread = "fragment F on EdgeTradePage { facets { total } }"
+    for body in (
+        "query($id: String!) { edgeTrades(edgeId: $id, period: null) { unknown { kind } ...F } } "
+        + spread,
+        "query($id: String!) { edgeTrades(edgeId: $id, period: null) { unknown { kind } "
+        "... on EdgeTradePage { facets { total } } } }",
+    ):
+        found = graph(body, {"id": edge})
+        assert "errors" not in found, found
+        assert found["data"]["edgeTrades"] == direct
