@@ -12,6 +12,42 @@ export interface ViewContent {
   /** A column id, `-` prefix for descending; null: the table's default. */
   sort: string | null;
   decisions: readonly string[];
+  /** The filter bar's `f` string (ADR 0082); empty: none. */
+  filters: string;
+}
+
+/** An `f` string cut into its entries and each entry's filter id (`!` and escapes undone). */
+function entries(f: string): { id: string; entry: string }[] {
+  return f
+    .split(';')
+    .filter((entry) => entry.includes(':'))
+    .map((entry) => {
+      const head = entry.slice(0, entry.indexOf(':')).replace(/^!/, '');
+      let id = head;
+      try {
+        id = decodeURIComponent(head);
+      } catch {
+        // an undecodable id is kept as written; no definition will name it
+      }
+      return { id, entry };
+    });
+}
+
+/**
+ * The saved `f` as the surface can use it: entries of filters the surface still defines are
+ * kept, the rest dropped and their ids reported (a view survives a definition change; the
+ * page says what it dropped). `known` undefined: the definitions are not known, nothing dropped.
+ */
+export function restorableFilters(
+  f: string,
+  known: readonly string[] | undefined,
+): { f: string; dropped: string[] } {
+  if (known === undefined) return { f, dropped: [] };
+  const kept = entries(f).filter(({ id }) => known.includes(id));
+  const dropped = entries(f)
+    .filter(({ id }) => !known.includes(id))
+    .map(({ id }) => id);
+  return { f: kept.map(({ entry }) => entry).join(';'), dropped };
 }
 
 /** The scope of a screener's results (`screener:<id>`, as `preferences.toml` keys it). */

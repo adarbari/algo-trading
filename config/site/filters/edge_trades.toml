@@ -1,0 +1,118 @@
+# L3 site setting: the filters of an edge's trade ledger (ADR 0082, docs/ui/filtering.md).
+# Typed by src/algotrade/config/filters/definitions.py; fitness tests: tests/unit/config/filters/.
+# The row is a TradeRow (services/read/evaluation/runs.py). The ledger's period selector stays
+# the page's own control: its in-sample / out-of-sample sides are `before_split` here, live is
+# `source`. A name's sector is the catalogue field. Every filter's `guide` entry is in
+# config/site/guide/glossary/filters.toml.
+#
+# Not here (listed in the PR as "needs new data"):
+#   date window      (a date range is a new filter kind: a window counts ahead, a range is numeric)
+#   regime at entry  (no regime is stored on a ledger row; only the by-regime slice has it)
+
+label = "Edge trades"
+
+[[column]]
+id = "before_split"
+dtype = "bool"
+source = "before_split"
+
+[[column]]
+id = "record"
+dtype = "str"
+source = "source"
+
+[[column]]
+id = "result"
+dtype = "str"
+source = "status"
+
+[[column]]
+id = "return_value"
+dtype = "float"
+source = "value.value"
+
+[[column]]
+id = "adv"
+dtype = "float"
+source = "adv_usd.value"
+
+# ------------------------------------------------------------------------------------ setup
+
+[[filter]]
+id = "result"
+label = "Result"
+group = "setup"
+kind = "pick"
+field = "column:result"
+options = "static"
+guide = "term:filter_trade_result"
+
+[[filter.option]]
+value = "won"
+label = "Won"
+
+[[filter.option]]
+value = "lost"
+label = "Lost"
+
+[[filter.option]]
+value = "excluded"
+label = "Excluded"
+
+[[filter.option]]
+value = "open"
+label = "Open"
+
+[[filter]]
+id = "in_sample"
+label = "In sample"
+group = "setup"
+kind = "toggle"
+field = "column:before_split"
+guide = "term:filter_trade_in_sample"
+
+[[filter]]
+id = "record"
+label = "Backtest or live"
+group = "setup"
+kind = "pick"
+field = "column:record"
+options = "static"
+guide = "term:filter_trade_record"
+
+[[filter.option]]
+value = "backtest"
+label = "Backtest"
+
+[[filter.option]]
+value = "live"
+label = "Live"
+
+[[filter]]
+id = "sector"
+label = "Sector"
+group = "setup"
+kind = "pick"
+field = "instrument.sector"
+options = "values"
+guide = "term:filter_sector"
+
+[[filter]]
+id = "return"
+label = "Return"
+group = "setup"
+kind = "range"
+field = "column:return_value"
+bins = [-0.5, -0.2, -0.1, -0.05, 0, 0.05, 0.1, 0.2, 0.5]
+guide = "term:filter_trade_return"
+
+# ------------------------------------------------------------------------------------ tradeable
+
+[[filter]]
+id = "adv"
+label = "Average dollar volume"
+group = "tradeable"
+kind = "range"
+field = "column:adv"
+bins = [0, 1_000_000, 5_000_000, 20_000_000, 100_000_000, 500_000_000, 2_000_000_000]
+guide = "term:filter_trade_adv"

@@ -29,7 +29,8 @@ class TableView:
     """``scope``: the table the view is of (``screener:<id>``); ``name``: None for the default
     view; ``names``: the user's named views of the scope, sorted; ``sort``: a column id, ``-``
     first for descending (None: the table's default); ``narrow_columns``: the table column ids
-    the user added back on a narrow (phone) table."""
+    the user added back on a narrow (phone) table; ``filters``: the ``f`` string of the filter
+    bar (ADR 0082; empty: none, and for a view saved before it)."""
 
     scope: str
     name: str | None
@@ -39,6 +40,7 @@ class TableView:
     decisions: tuple[str, ...]
     names: tuple[str, ...]
     narrow_columns: tuple[str, ...] = ()
+    filters: str = ""
 
 
 def scope_parts(scope: str) -> tuple[str, str]:
@@ -80,6 +82,7 @@ def table_view(configs: ConfigStore, user: str, scope: str, name: str | None = N
         decisions=tuple(str(d) for d in view.get("decisions") or []),
         names=names,
         narrow_columns=tuple(str(c) for c in view.get("narrow_columns") or []),
+        filters=str(view.get("filters") or ""),
     )
 
 

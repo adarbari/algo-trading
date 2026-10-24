@@ -1,0 +1,83 @@
+# L3 site setting: the filters of the Screeners list (ADR 0082, docs/ui/filtering.md). Typed by
+# src/algotrade/config/filters/definitions.py; fitness tests: tests/unit/config/filters/.
+# The row is a Screener (services/read/screens/screeners.py) with the facts the list reads beside
+# it: `latest_run` (its ScreenerRun for the session) and `track_records` (one per edge that lists
+# it). The search by name and description is the table's `q`, not a filter. Every filter's
+# `guide` entry is in config/site/guide/glossary/filters.toml.
+#
+# `owner`: the loader reads "mine" as the viewer's own id and "site" as a site preset.
+#
+# Not here (listed in the PR as "needs new data"):
+#   asset type  (a screener's config stores no asset class; its universe is a selection)
+#   style       (a screener's family is a Guide grouping of the site presets only, not a field of
+#                the Screener a user's own screener could carry)
+#   has candidates: the range below with a minimum of 1 says it, so it is not a toggle of its own
+
+label = "Screeners"
+
+[[column]]
+id = "owner"
+dtype = "str"
+source = "owner"
+
+[[column]]
+id = "run_status"
+dtype = "str"
+source = "latest_run.status"
+
+[[column]]
+id = "picked"
+dtype = "int"
+source = "latest_run.picked"
+
+[[column]]
+id = "edges"
+dtype = "int"
+source = "len(track_records)"
+
+# ------------------------------------------------------------------------------------ setup
+
+[[filter]]
+id = "owner"
+label = "Owner"
+group = "setup"
+kind = "pick"
+field = "column:owner"
+options = "static"
+guide = "term:filter_owner"
+
+[[filter.option]]
+value = "mine"
+label = "Mine"
+
+[[filter.option]]
+value = "site"
+label = "Presets"
+
+[[filter]]
+id = "edges"
+label = "Edges that list it"
+group = "setup"
+kind = "range"
+field = "column:edges"
+bins = [0, 1, 2, 3, 5]
+guide = "term:filter_edges_implemented"
+
+[[filter]]
+id = "picked"
+label = "Candidates in the latest run"
+group = "setup"
+kind = "range"
+field = "column:picked"
+bins = [0, 1, 5, 10, 25, 50, 100, 250, 1000]
+guide = "term:filter_picked"
+
+[[filter]]
+id = "run_status"
+label = "Last run"
+group = "setup"
+kind = "pick"
+field = "column:run_status"
+options = "enum"
+enum = "algotrade.storage.runs:RunStatus"
+guide = "term:filter_run_status"

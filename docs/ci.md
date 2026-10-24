@@ -190,7 +190,9 @@ without a settings change) builds the production bundle and runs two gates; ever
 - **Phone** (`apps/web/e2e/perf.spec.ts`, `npm run perf:e2e`, config `playwright.perf.config.ts`):
   per main route (Ideas, Screeners, Explore with a ticker, Regime, Screener results, Admin
   ingestion), with the API mocked as in the e2e suite, the gzip bytes of scripts transferred, the
-  requests made and the DOM nodes once settled stay under their budgets.
+  requests made and the DOM nodes of `<body>` once the count has been quiet for 2 s stay under their
+  budgets (`<head>` is not counted: preload `<link>` elements come and go between runs; the count
+  is identical across runs, 2026-10-23).
 
 - **Distant client** (`apps/web/e2e/perf-network.spec.ts`, `npm run perf:network`, owner ask 2026-10-21):
   each main route (Ideas, Screeners, Edges, Regime, Calendar, Explore, Admin ingestion) loaded over a

@@ -2858,6 +2858,11 @@
             "title": "Decisions",
             "type": "array"
           },
+          "filters": {
+            "description": "the filter bar's `f` string ('' : no filters)",
+            "title": "Filters",
+            "type": "string"
+          },
           "name": {
             "anyOf": [
               {
@@ -2917,7 +2922,8 @@
           "sort",
           "decisions",
           "names",
-          "narrow_columns"
+          "narrow_columns",
+          "filters"
         ],
         "title": "TableView",
         "type": "object"
@@ -2939,6 +2945,18 @@
             },
             "title": "Decisions",
             "type": "array"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the filter bar's `f` string (ADR 0082); absent or empty: no filters",
+            "title": "Filters"
           },
           "narrow_columns": {
             "anyOf": [

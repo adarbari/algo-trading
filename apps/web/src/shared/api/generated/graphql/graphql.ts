@@ -731,7 +731,7 @@ export type TableViewQueryVariables = Exact<{
 }>;
 
 
-export type TableViewQuery = { view: { scope: string, name: string | null, saved: boolean, columns: Array<string>, narrowColumns: Array<string>, sort: string | null, decisions: Array<string>, names: Array<string> } | null };
+export type TableViewQuery = { view: { scope: string, name: string | null, saved: boolean, columns: Array<string>, narrowColumns: Array<string>, filters: string, sort: string | null, decisions: Array<string>, names: Array<string> } | null };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -4471,6 +4471,7 @@ export const TableViewDocument = new TypedDocumentString(`
     saved
     columns
     narrowColumns
+    filters
     sort
     decisions
     names

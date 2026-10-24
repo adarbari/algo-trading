@@ -15,6 +15,10 @@ class TableViewBody(BaseModel):
         default=None,
         description="table column ids added back on a narrow (phone) table; absent: kept as saved",
     )
+    filters: str | None = Field(
+        default=None,
+        description="the filter bar's `f` string (ADR 0082); absent or empty: no filters",
+    )
 
 
 class TableView(Schema):
@@ -28,6 +32,7 @@ class TableView(Schema):
     narrow_columns: list[str] = Field(
         description="table column ids added back on a narrow (phone) table"
     )
+    filters: str = Field(description="the filter bar's `f` string ('' : no filters)")
 
 
 class ViewNames(Schema):
