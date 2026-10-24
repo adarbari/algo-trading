@@ -8,6 +8,13 @@ in the context of the same member. A single-class filer tags the shares in a con
 dimension (its ``class_member`` is ``None``). A class with no symbol fact (unlisted) keeps a null
 ``trading_symbol``; a filing with no cover tags (most 40-F) gives an empty answer.
 
+Notes for the task that stores these rows: a no-dimension total and class rows must never be
+summed (the total, when both exist, is the filer's own); a single-class filer with listed notes
+has symbols on class members, so a null symbol does not mean "unlisted"; a missing instance
+(``read`` is None: pre-inline filings) is Unknown, never zero shares; amendments pick the row with
+the latest ``as_of``. Two facts for one member at one instant that disagree, or several symbols
+for one member, raise ``CoverParseError`` (identical duplicates are fine).
+
 Two requests per filing, on the shared ``sec`` limiter (10 requests a second at most, contact
 ``User-Agent``; ``[sec_edgar]``): the filing's ``index.json`` (the instance file is only used when
 it is listed there) and the instance, ``<primary document stem>_htm.xml`` under
@@ -24,6 +31,7 @@ after the period); ``period_end`` is the report's own period (``dei:DocumentPeri
 Nothing is stored here: the task that stores the rows stamps ``known_from`` and the instrument id.
 """
 
+import io
 import json
 import re
 import xml.etree.ElementTree as ET
@@ -52,7 +60,10 @@ _BLOCKED = (b"Request Rate Threshold", b"Undeclared Automated Tool")  # SEC's 20
 _XBRLI = "{http://www.xbrl.org/2003/instance}"
 _XBRLDI = "{http://xbrl.org/2006/xbrldi}"
 _DEI = "http://xbrl.sec.gov/dei/"
-_CLASS_AXIS = "us-gaap:StatementClassOfStockAxis"
+_CLASS_AXES = (  # (namespace URI prefix, local name): the prefix in a filing is its own choice
+    ("http://fasb.org/us-gaap/", "StatementClassOfStockAxis"),
+    ("http://xbrl.ifrs.org/taxonomy/", "ClassesOfShareCapitalAxis"),
+)
 _SHARES, _SYMBOL, _TITLE, _PERIOD_END = (
     "EntityCommonStockSharesOutstanding",
     "TradingSymbol",
@@ -86,7 +97,14 @@ def _day(text: str, what: str) -> date:
         raise CoverParseError(f"{what} is not a date: {text!r}") from exc
 
 
-def _member(context: ET.Element) -> tuple[bool, str | None]:
+def _is_class_axis(dimension: str | None, prefixes: dict[str, str]) -> bool:
+    """Whether the QName ``dimension`` is a class-of-stock axis, its prefix resolved by URI."""
+    prefix, _, local = (dimension or "").rpartition(":")
+    uri = prefixes.get(prefix, "")
+    return any(uri.startswith(base) and local == name for base, name in _CLASS_AXES)
+
+
+def _member(context: ET.Element, prefixes: dict[str, str]) -> tuple[bool, str | None]:
     """(usable, class member): usable unless the context has a dimension other than the class
     axis; the member is None when it has no dimension at all."""
     members = list(context.iter(f"{_XBRLDI}explicitMember")) + list(
@@ -94,16 +112,18 @@ def _member(context: ET.Element) -> tuple[bool, str | None]:
     )
     if not members:
         return True, None
-    if len(members) == 1 and members[0].get("dimension") == _CLASS_AXIS:
+    if len(members) == 1 and _is_class_axis(members[0].get("dimension"), prefixes):
         return True, (members[0].text or "").strip() or None
     return False, None
 
 
-def _contexts(root: ET.Element) -> dict[str, tuple[str | None, date | None]]:
+def _contexts(
+    root: ET.Element, prefixes: dict[str, str]
+) -> dict[str, tuple[str | None, date | None]]:
     """context id -> (class member, instant) for the contexts the cover can use."""
     out: dict[str, tuple[str | None, date | None]] = {}
     for context in root.iter(f"{_XBRLI}context"):
-        usable, member = _member(context)
+        usable, member = _member(context, prefixes)
         cid = context.get("id")
         if not usable or not cid:
             continue
@@ -128,19 +148,16 @@ def _local(tag: str) -> tuple[str, str]:
     return namespace.lstrip("{"), name
 
 
-def parse_cover_shares(xml: bytes, cik: str, accession: str) -> tuple[ClassShares, ...]:
-    """The cover share classes of one XBRL instance, sorted (module doc). Empty when the
-    instance tags no ``EntityCommonStockSharesOutstanding``."""
-    padded = pad_cik(cik)
-    if padded is None or _ACCESSION.fullmatch(accession) is None:
-        raise ValueError(f"not a CIK / accession: {cik!r} / {accession!r}")
-    if b"<!DOCTYPE" in xml or b"<!ENTITY" in xml:
-        raise CoverParseError("XBRL instance has a document type declaration")
-    try:
-        root = ET.fromstring(xml)
-    except ET.ParseError as exc:
-        raise CoverParseError(f"XBRL instance is not well-formed XML: {exc}") from exc
-    contexts = _contexts(root)
+def _facts(
+    root: ET.Element, contexts: dict[str, tuple[str | None, date | None]]
+) -> tuple[
+    dict[str | None, tuple[date, int]],
+    dict[str | None, set[str]],
+    dict[str | None, set[str]],
+    date | None,
+]:
+    """The cover facts by class member: (as_of, shares) with the latest as_of winning, symbols,
+    titles and the report's period end."""
     shares: dict[str | None, tuple[date, int]] = {}  # member -> (as_of, shares), latest as_of wins
     symbols: dict[str | None, set[str]] = {}
     titles: dict[str | None, set[str]] = {}
@@ -163,8 +180,47 @@ def parse_cover_shares(xml: bytes, cik: str, accession: str) -> tuple[ClassShare
         elif name == _SHARES:
             if instant is None:
                 raise CoverParseError(f"shares outstanding for {member!r} has no instant")
+            count = _count(text)
+            if member in shares and shares[member][0] == instant and shares[member][1] != count:
+                raise CoverParseError(f"two share counts for {member!r} at {instant}")
             if member not in shares or instant > shares[member][0]:
-                shares[member] = (instant, _count(text))
+                shares[member] = (instant, count)
+    return shares, symbols, titles, period_end
+
+
+def _has_dtd(xml: bytes) -> bool:
+    """A document type declaration or entity, in whatever encoding (UTF-16 has a BOM or NULs)."""
+    wide = xml[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in xml[:4]
+    text = xml.decode("utf-16" if wide else "utf-8", errors="replace").lower()
+    return "<!doctype" in text or "<!entity" in text
+
+
+def parse_cover_shares(xml: bytes, cik: str, accession: str) -> tuple[ClassShares, ...]:
+    """The cover share classes of one XBRL instance, sorted (module doc). Empty when the
+    instance tags no ``EntityCommonStockSharesOutstanding``."""
+    padded = pad_cik(cik)
+    if padded is None or _ACCESSION.fullmatch(accession) is None:
+        raise ValueError(f"not a CIK / accession: {cik!r} / {accession!r}")
+    if _has_dtd(xml):
+        raise CoverParseError("XBRL instance has a document type declaration")
+    prefixes: dict[str, str] = {}
+    try:
+        root: ET.Element | None = None
+        for event, node in ET.iterparse(io.BytesIO(xml), events=("start-ns", "start")):
+            if event == "start-ns":
+                prefix, uri = node
+                prefixes[prefix] = uri
+            elif root is None:
+                root = node
+    except ET.ParseError as exc:
+        raise CoverParseError(f"XBRL instance is not well-formed XML: {exc}") from exc
+    if root is None:
+        raise CoverParseError("XBRL instance is empty")
+    contexts = _contexts(root, prefixes)
+    shares, symbols, titles, period_end = _facts(root, contexts)
+    for member, found in symbols.items():
+        if len(found) > 1:
+            raise CoverParseError(f"several trading symbols for {member!r}: {sorted(found)}")
     rows = [
         ClassShares(
             cik=padded,
@@ -173,7 +229,7 @@ def parse_cover_shares(xml: bytes, cik: str, accession: str) -> tuple[ClassShare
             shares=count,
             as_of=as_of,
             period_end=period_end,
-            trading_symbol=min(symbols[member]) if member in symbols else None,
+            trading_symbol=next(iter(symbols[member])) if member in symbols else None,
             security_title=min(titles[member]) if member in titles else None,
         )
         for member, (as_of, count) in shares.items()

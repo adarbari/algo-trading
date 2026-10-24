@@ -180,3 +180,37 @@ def test_fetch_refuses_other_requests_and_forms() -> None:
     bad = FilingTextRequest(key=ACCN, cik=CIK, form="8-K", primary_document="a.htm")
     with pytest.raises(ValueError):
         src.fetch(bad)
+
+
+def test_conflicting_duplicate_facts_raise_but_identical_ones_do_not() -> None:
+    base = fixture("single_class")
+    tag = b"dei:EntityCommonStockSharesOutstanding"
+    fact = b"<" + tag + b' contextRef="s-1" unit="shares">%s</' + tag + b">"
+    same = base.replace(b"</xbrli:xbrl>", fact % b"15115823000" + b"</xbrli:xbrl>")
+    assert len(parse_cover_shares(same, CIK, ACCN)) == 1
+    other = base.replace(b"</xbrli:xbrl>", fact % b"1" + b"</xbrli:xbrl>")
+    with pytest.raises(CoverParseError):
+        parse_cover_shares(other, CIK, ACCN)
+    symbol = b'<dei:TradingSymbol contextRef="s-1">AAPL2</dei:TradingSymbol>'
+    with pytest.raises(CoverParseError):
+        parse_cover_shares(base.replace(b"</xbrli:xbrl>", symbol + b"</xbrli:xbrl>"), CIK, ACCN)
+
+
+def test_utf16_and_uppercase_doctype_are_refused() -> None:
+    hostile = '<?xml version="1.0" encoding="utf-16"?><!DocType x [<!ENTITY a "b">]><x/>'
+    with pytest.raises(CoverParseError):
+        parse_cover_shares(hostile.encode("utf-16"), CIK, ACCN)
+    with pytest.raises(CoverParseError):
+        parse_cover_shares(b"<!doctype x><x/>", CIK, ACCN)
+
+
+def test_class_axis_is_found_by_namespace_not_prefix() -> None:
+    renamed = (
+        fixture("unlisted_class")
+        .replace(b"us-gaap:", b"gaap:")
+        .replace(
+            b'xmlns:us-gaap="http://fasb.org/us-gaap/2024"',
+            b'xmlns:gaap="http://fasb.org/us-gaap/2024"',
+        )
+    )
+    assert [r.shares for r in parse_cover_shares(renamed, CIK, ACCN)] == [46_000_000, 2500]
