@@ -4,6 +4,6 @@
  * switches, names and removes views.
  */
 export { TABLE_VIEW_OPERATION, type SavedView } from './api/views';
-export { useTableView, type TableViewState } from './model/table-view';
+export { useTableView, type FilterBinding, type TableViewState } from './model/table-view';
 export { formatSort, parseSort, screenerScope, type ViewContent } from './model/view';
 export { ViewControls, type ViewControlsProps } from './ui/ViewControls';

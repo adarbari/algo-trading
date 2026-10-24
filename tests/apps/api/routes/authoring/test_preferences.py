@@ -14,7 +14,9 @@ VIEW = "/preferences/views/screener:vrp/view"
 CLOSE = "rollup.price_stats@v2.close"
 BODY = {"columns": [CLOSE], "sort": f"-{CLOSE}", "decisions": ["QUALIFIED", "WATCH"]}
 READ = """query View($scope: String!, $name: String) {
-  view(scope: $scope, name: $name) { scope name saved columns sort decisions names narrowColumns }
+  view(scope: $scope, name: $name) {
+    scope name saved columns sort decisions names narrowColumns filters
+  }
 }"""
 
 
@@ -32,7 +34,7 @@ def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
     prefs = root / "users" / "local" / "preferences.toml"
     assert read(writer_client) == {
         "scope": "screener:vrp", "name": None, "saved": False, "columns": [], "sort": None,
-        "decisions": [], "names": [], "narrow_columns": [],
+        "decisions": [], "names": [], "narrow_columns": [], "filters": "",
     }  # fmt: skip
     saved = writer_client.put(VIEW, json=BODY)
     assert (saved.status_code, saved.json()) == (
@@ -43,6 +45,7 @@ def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
             "saved": True,
             "names": [],
             "narrow_columns": [],
+            "filters": "",
             **BODY,
         },
     )
@@ -53,6 +56,27 @@ def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
     assert (root / "users" / "bob" / "preferences.toml").exists()  # bob's own file
     cleared = writer_client.put(VIEW, json={"columns": [], "sort": None, "decisions": []})
     assert cleared.json()["sort"] is None and cleared.json()["columns"] == []
+
+
+def test_a_view_carries_its_filters_and_an_unknown_id_is_kept(
+    writer_client: TestClient, root: Path
+) -> None:
+    f = "decision:QUALIFIED,WATCH;!no_such_filter:1..5;dte:..14"  # no_such_filter: no definition
+    saved = writer_client.put(VIEW, json={**BODY, "filters": f})
+    assert (saved.status_code, saved.json()["filters"]) == (200, f)
+    assert read(writer_client)["filters"] == f
+    assert writer_client.put(VIEW, json=BODY).json()["filters"] == ""  # absent: none
+    assert read(writer_client)["filters"] == ""
+
+
+def test_a_view_stored_without_filters_reads_with_none(
+    writer_client: TestClient, root: Path
+) -> None:
+    prefs = root / "users" / "local" / "preferences.toml"
+    prefs.parent.mkdir(parents=True)
+    prefs.write_text('[views."screener:vrp".view]\ncolumns = []\ndecisions = ["WATCH"]\n')
+    legacy = read(writer_client)
+    assert (legacy["saved"], legacy["decisions"], legacy["filters"]) == (True, ["WATCH"], "")
 
 
 def test_a_view_saved_under_the_old_layout_moves_on_the_next_write(
@@ -83,6 +107,11 @@ def test_a_view_is_checked_before_it_is_saved(writer_client: TestClient, root: P
         {**BODY, "narrow_columns": [" name"]},
         {**BODY, "narrow_columns": [""]},
         {**BODY, "narrow_columns": [f"c{i}" for i in range(41)]},
+        {**BODY, "filters": "decision"},
+        {**BODY, "filters": "a:1;;b:2"},
+        {**BODY, "filters": ":1"},
+        {**BODY, "filters": "a:" + "x" * 2000},
+        {**BODY, "filters": "a:1\n"},
     )
     for body in refused:
         assert writer_client.put(VIEW, json=body).status_code == 400, body
