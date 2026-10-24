@@ -109,6 +109,7 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
       </Stack>
       <SurfaceFilterBar
         surface={SURFACE}
+        views
         state={filters}
         facets={ledger.facets}
         help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}

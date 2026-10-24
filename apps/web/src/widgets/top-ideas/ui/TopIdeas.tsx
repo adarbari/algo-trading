@@ -105,6 +105,7 @@ export function TopIdeas({
       />
       <SurfaceFilterBar
         surface={SURFACE}
+        views
         state={filters}
         facets={facets}
         help={(entry) =>

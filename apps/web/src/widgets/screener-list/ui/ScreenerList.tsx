@@ -140,6 +140,7 @@ export function ScreenerList({
     <Stack gap={3}>
       <SurfaceFilterBar
         surface={SURFACE}
+        views
         state={filters}
         facets={narrowing.data?.facets}
         help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}

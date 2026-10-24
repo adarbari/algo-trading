@@ -37,7 +37,7 @@ vi.mock('@/entities/screen', async (importOriginal) => ({
   useScreenerResults: hooks.useScreenerResults,
   useRunScreener: () => ({ start: vi.fn(), run: undefined, running: false, error: null }),
 }));
-vi.mock('@/features/table-view', async (importOriginal) => ({
+vi.mock('@/entities/saved-view', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useTableView: hooks.useTableView,
 }));
@@ -215,6 +215,7 @@ function view(patch: Record<string, unknown> = {}) {
     scope: 'screener:vrp',
     name: null,
     names: [],
+    droppedFilters: [] as string[],
     ready: true,
     columns: [CLOSE],
     sort: null,

@@ -11,6 +11,10 @@ import type { FilterPatch, FilterState } from '../model/state';
 
 export interface FilterStateApi {
   filters: FilterState[];
+  /** The `f` string as the route holds it (undefined: none). */
+  f: string | undefined;
+  /** Replace the whole `f` (a saved view applied). */
+  replace: (next: string | undefined) => void;
   /** Change one filter, adding it (on) when absent; setting a kind of value clears the others. */
   set: (id: string, patch: FilterPatch) => void;
   /** Switch a filter off or back on (kept either way). */
@@ -56,6 +60,8 @@ export function useFilterState(
   return useMemo(
     () => ({
       filters,
+      f,
+      replace: onChange,
       set: (id, patch) => {
         const exists = filters.some((x) => x.id === id);
         write(
@@ -74,6 +80,6 @@ export function useFilterState(
         write([]);
       },
     }),
-    [filters, write],
+    [filters, f, onChange, write],
   );
 }

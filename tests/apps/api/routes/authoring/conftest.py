@@ -54,6 +54,7 @@ def root(tmp_path: Path) -> Path:
     (site / "presets" / "selections").mkdir(parents=True)
     (site / "presets" / "screeners" / "vrp").mkdir(parents=True)
     (site / "features").symlink_to(REPO_ROOT / "config" / "site" / "features")
+    (site / "filters").symlink_to(REPO_ROOT / "config" / "site" / "filters")
     (site / "defaults.toml").symlink_to(REPO_ROOT / "config" / "site" / "defaults.toml")
     (site / "users.toml").write_text(USERS)
     (site / "presets" / "selections" / "all_active.toml").write_text(SELECTION)

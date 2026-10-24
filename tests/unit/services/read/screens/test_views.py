@@ -61,3 +61,16 @@ def test_scope_parts() -> None:
     for bad in ("screener:", "vrp_scanner", "other:x"):
         with pytest.raises(ValueError, match="view scope"):
             scope_parts(bad)
+
+
+def test_a_surface_with_a_filter_bar_has_views_and_one_without_has_none(
+    reader: StoreReader,
+) -> None:
+    saved = {("me", "preferences", "preferences"): {
+        "views": {"surface:ideas": {"view": {"columns": [], "filters": "decision:QUALIFIED"}}},
+    }}  # fmt: skip
+    ctx = context(reader, saved)
+    found = load_view(ctx, "surface:ideas")
+    assert found is not None and (found.saved, found.filters) == (True, "decision:QUALIFIED")
+    assert load_view(ctx, "surface:no_such_surface") is None
+    assert scope_parts("surface:edge_trades") == ("surface", "edge_trades")

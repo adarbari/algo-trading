@@ -73,7 +73,7 @@ on the web, `isShownCriterion` (`entities/screen`); `TableView` scopes generalis
 `views.<scope>` (`screener:<id>`) in `preferences.toml` (`services/authoring/preferences.py`
 moves a view saved under `screeners.<id>` on the user's next preferences write; the read side
 reads both until then), written by `PUT` / `DELETE /preferences/views/{scope}/view` and read
-only through `features/table-view` (`useTableView(scope)`, `ViewControls`; WEB 7); the
+only through `entities/saved-view` (`useTableView(scope)` and the filter bar's Views menu; WEB 7); the
 `widgets/feature-table` renders all four tables (`FeatureTable`, `ScreenerResults`,
 `PreviewResults` on one `TableFrame`; `widgets/{screener-results,preview-results}` deleted) with
 the new factories `screenColumn`, `reasonsColumn` (and `decisionColumn(leaving)`,
@@ -605,7 +605,7 @@ feature list, screeners, admin run records and checks) keep typed structure colu
 listed, with the reason, in `columns.js`'s `STRUCTURE`; the instrument tables not migrated yet
 are in its shrink-only `PENDING` (PR 8 removed screener results and preview; top ideas remains:
 its earnings, expiry and display-value cells are Ideas-specific presentation, so moving it is
-its own change). View preferences go through one adapter, `features/table-view`
+its own change). View preferences go through one adapter, `entities/saved-view`
 (`useTableView(scope)`, PR 8; WEB 7).
 
 ## Enforcement
@@ -628,7 +628,7 @@ its own change). View preferences go through one adapter, `features/table-view`
 | WEB 4 | Column defs only from the factories | ESLint `algotrade/column-factories` on `DataTableColumn` outside `entities/feature/model/columns.tsx` (`apps/web/lint-rules/columns.js`) | **on** (PR 7); `PENDING` (shrink-only) lists top ideas only since PR 8 |
 | WEB 5 | Feature names typed | ESLint on `rollup.` / `feature.` / `instrument.` literals outside `feature('<name>')` (tests and stories exempt) | **on** |
 | WEB 6 | Generated files fresh | `npm run generated:check` (`schema.ts`, `generated/graphql/**`); `catalogue.ts` by `tests/scripts/test_export_catalogue.py` | **on** |
-| WEB 7 | One view-prefs adapter | ESLint `algotrade-views/view-adapter` on a `/preferences/` literal outside `features/table-view/api` (`apps/web/lint-rules/views.js`) | **on** (PR 8) |
+| WEB 7 | One view-prefs adapter | ESLint `algotrade-views/view-adapter` on a `/preferences/` literal outside `entities/saved-view/api` (`apps/web/lint-rules/views.js`) | **on** (PR 8) |
 
 ### Ownership during the migration
 
@@ -674,7 +674,7 @@ Each PR is independently shippable with `make check` green and updates `docs/roa
 | 5 | Screens read model + Ideas | `read/screens/{screeners,runs,results,ideas,views}.py` (one `latest_run`); `types/{screener,result,ideas,view}.py`; Ideas on the `IdeasPage` query; `summarise()` and `ideas/ranking.py` deleted; `GET /ideas` off the allow-list; the two `Idea` entries out of `TYPED_FACT_FIELDS`; `chain_expiries` detect rule; PR 5 derivation entry | every value in an Ideas row is for `ideas.session.date` or says why not |
 | 6 | Explore detail pane (**done**) | `read/instruments/{events,chains,holdings,prices,series}.py`; `Instrument.{events,chain,holdings,prices,series,screenerHits,description}` (`description` came in PR 4; `screenerHits` needs PR 5's screens read model: it lands with PR 5 or PR 8); `explore/{instruments,chains,funds}` deleted; `/instruments/*`, `/chains/{id}` off the list | the detail pane is one query (per tab) |
 | 7 | FeatureTable + Explore tickers + compare (**done**) | `read/instruments/table.py` (columnar, server-paged); `Query.table`; `widgets/feature-table`, the column factories (WEB 4); ticker table and compare rebuilt; `explore/{universe,compare}.py` deleted (admin review lists to `explore/review.py` until PR 10); `/explore/*`, `/universe` off the list | one page per request (no 12-page fan-out) |
-| 8 | Screener results + preview + views (**done**) | `ScreenerRun.results`; `features/table-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7; `Instrument.screenerHits` | one table widget renders all four tables |
+| 8 | Screener results + preview + views (**done**) | `ScreenerRun.results`; `entities/saved-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7; `Instrument.screenerHits` | one table widget renders all four tables |
 | 9 | Catalogue, distribution, backtests, configs (**done**) | `Query.{catalogue,distribution,backtests}`, screener authoring reads; `explore/{features,backtests,configs}.py` deleted; their GETs off the list | the trader workspace is fully on GraphQL |
 | 10a | Admin on GraphQL (**done**) | `read/ops/{runs,quality,ingestion,review}.py`; `types/ops/*`; the Admin entities (ingestion, run, verification, review) on GraphQL; `explore/{runs,ingestion,review}.py`, `routes/{admin,runs}.py` and their schemas deleted; every `/admin` GET off the list | Admin reads no REST |
 | 10b | The end of explore (**done**) | `services/explore/` deleted (preview to `services/preview/` over `ReadContext`; `store.py` split: `ReadStore` to API `deps`, `latest_session` / `store_info` to `read/session.py`, `records` to `read/values.py`); `explore-queries` removed; READ 2 widens to all use cases and the API; `add-api-endpoint` loses its read steps | allow-list = writes, jobs, health, live, preview, files |

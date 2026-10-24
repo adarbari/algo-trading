@@ -26,7 +26,9 @@ from algotrade.services.features import catalogue
 from algotrade.services.read.screens.views import (
     LEGACY_SCREENERS,
     SCREENER_SCOPE,
+    SURFACE_SCOPE,
     scope_parts,
+    surface_exists,
 )
 from algotrade.storage.configs.writer import ConfigWriter
 
@@ -140,7 +142,7 @@ def view_name(name: str | None) -> str | None:
 
 def view_scope(writer: ConfigWriter, who: str, scope: str) -> str:
     """``scope`` checked: a known kind naming a table the user has (``screener:<id>``: their
-    screener or a site preset)."""
+    screener or a site preset; ``surface:<name>``: a surface with a filters file)."""
     try:
         kind, ident = scope_parts(scope)
     except ValueError as error:
@@ -150,6 +152,8 @@ def view_scope(writer: ConfigWriter, who: str, scope: str) -> str:
         known = {*writer.names(who, "screeners"), *writer.names(SITE_USER, "screeners")}
         if sid not in known:
             raise ConfigurationError(f"view: {sid!r} is not your screener or a site preset")
+    if kind == SURFACE_SCOPE and not surface_exists(writer, ident):
+        raise ConfigurationError(f"view: {ident!r} is not a surface with a filter bar")
     return scope
 
 

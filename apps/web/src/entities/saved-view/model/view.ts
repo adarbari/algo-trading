@@ -55,6 +55,11 @@ export function screenerScope(id: string): string {
   return `screener:${id}`;
 }
 
+/** The scope of a list with a filter bar (`surface:<name>`, its filters file's name). */
+export function surfaceScope(name: string): string {
+  return `surface:${name}`;
+}
+
 /** `-criterion:iv30` -> the table's sort; none (or blank) -> `fallback`. */
 export function parseSort(
   value: string | null | undefined,

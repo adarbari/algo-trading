@@ -134,15 +134,18 @@ test('a link with filters opens the filtered run; an empty result says what to s
   await expect(grid(page).getByRole('row', { name: /XOM/ })).toBeVisible();
 });
 
-test('a view can be saved under a name, switched to and deleted', async ({ page }) => {
+test('a view can be saved under a name, shows the filters it holds, is switched to and deleted', async ({
+  page,
+}) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
   await toggleDecision(page, /^Liquidity risk/); // a change to the default view
-  await page.getByRole('button', { name: 'Save view as…' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Save view as' });
-  await dialog.getByLabel('Name of the view').fill('VRP review');
-  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Views' }).click();
+  const menu = page.getByRole('dialog', { name: 'Views' });
+  await expect(menu).toContainText('Decision');
+  await menu.getByLabel('Name of the view').fill('VRP review');
+  await menu.getByRole('button', { name: 'Save view' }).click();
   await expect
     .poll(() => mock.views.at(-1))
     .toMatchObject({
@@ -150,17 +153,19 @@ test('a view can be saved under a name, switched to and deleted', async ({ page 
       name: 'VRP review',
       view: { filters: 'decision:QUALIFIED,WATCH,EVENT_RISK,PAUSED' },
     });
-  const views = page.getByRole('combobox', { name: 'View' });
-  await expect(views).toHaveValue('VRP review');
   // What you change now is saved into that view, not the default one.
   await toggleDecision(page, /^Watch/);
   await expect.poll(() => mock.views.at(-1)).toMatchObject({ name: 'VRP review' });
-  await views.selectOption({ label: 'Default view' });
-  await expect(views).toHaveValue('');
-  await views.selectOption({ label: 'VRP review' });
-  await page.getByRole('button', { name: 'Delete view' }).click();
+  await page.getByRole('button', { name: /^Views/ }).click();
+  const reopened = page.getByRole('dialog', { name: 'Views' });
+  await expect(reopened.getByRole('button', { name: /^VRP review/ })).toContainText('Decision');
+  await reopened.getByRole('button', { name: 'Default view' }).click();
+  await page.getByRole('button', { name: /^Views/ }).click();
+  await page
+    .getByRole('dialog', { name: 'Views' })
+    .getByRole('button', { name: 'Delete view VRP review' })
+    .click();
   await expect.poll(() => mock.removedViews).toEqual(['VRP review']);
-  await expect(views).toHaveValue('');
 });
 
 test('sorting is saved too, and a ticker opens in Explore', async ({ page }) => {

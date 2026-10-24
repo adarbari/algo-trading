@@ -164,3 +164,18 @@ def test_narrow_columns_are_saved_read_back_and_optional(writer_client: TestClie
     assert old_client.json()["narrow_columns"] == body["narrow_columns"]
     cleared = writer_client.put(VIEW, json={**BODY, "narrow_columns": []})  # an empty list clears
     assert cleared.json()["narrow_columns"] == []
+
+
+def test_a_surface_with_a_filter_bar_keeps_views_and_an_unknown_one_is_refused(
+    writer_client: TestClient,
+) -> None:
+    url = "/preferences/views/surface:ideas/view"
+    body = {"columns": [], "sort": None, "decisions": [], "filters": "decision:QUALIFIED"}
+    assert writer_client.put(url, json=body).status_code == 200
+    assert writer_client.put(url, json=body, params={"name": "Qualified"}).status_code == 200
+    seen = writer_client.post("/graphql", json={"query": READ, "variables": {
+        "scope": "surface:ideas", "name": "Qualified"}}).json()["data"]["view"]  # fmt: skip
+    assert (seen["saved"], seen["filters"], seen["names"]) == (
+        True, "decision:QUALIFIED", ["Qualified"]
+    )  # fmt: skip
+    assert writer_client.put("/preferences/views/surface:nope/view", json=body).status_code == 400

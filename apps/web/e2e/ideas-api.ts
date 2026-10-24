@@ -148,12 +148,91 @@ function served(filters: Input[] | null): unknown {
 /** The signals of a user who follows nothing (the Ideas page then shows one line). */
 export const NO_EDGE_DESK = { data: { edgeDesk: null } };
 
-export async function mockIdeasApi(page: Page, edgeDesk: unknown = NO_EDGE_DESK): Promise<void> {
+interface SavedView {
+  name: string | null;
+  filters: string;
+}
+
+/** The surface views a flow saved (`surface:<name>`), read back by the `TableView` operation. */
+export interface SavedViews {
+  saved: Map<string, SavedView>;
+}
+
+const viewKey = (scope: string, name: string | null) => `${scope}|${name ?? ''}`;
+const namesOf = (store: Map<string, SavedView>, scope: string) =>
+  [...store.entries()]
+    .filter(([key, v]) => key.startsWith(`${scope}|`) && v.name !== null)
+    .map(([, v]) => v.name as string)
+    .sort();
+
+export async function mockIdeasApi(
+  page: Page,
+  edgeDesk: unknown = NO_EDGE_DESK,
+): Promise<SavedViews> {
+  const store = new Map<string, SavedView>();
+  await page.route('**/api/preferences/views/**', async (route: Route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const scope = decodeURIComponent(url.pathname).replace(
+      /^\/api\/preferences\/views\/|\/view$/g,
+      '',
+    );
+    const name = url.searchParams.get('name');
+    if (request.method() === 'PUT') {
+      const body = request.postDataJSON() as { filters?: string };
+      store.set(viewKey(scope, name), { name, filters: body.filters ?? '' });
+      await route.fulfill({
+        json: {
+          columns: [],
+          narrow_columns: [],
+          decisions: [],
+          sort: null,
+          filters: body.filters ?? '',
+          scope,
+          name,
+          saved: true,
+          names: namesOf(store, scope),
+        },
+      });
+      return;
+    }
+    store.delete(viewKey(scope, name));
+    await route.fulfill({ json: { names: namesOf(store, scope) } });
+  });
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as {
       query?: string;
-      variables?: { filters?: Input[] | null; withFeatures?: string[] | null; surface?: string };
+      variables?: {
+        filters?: Input[] | null;
+        withFeatures?: string[] | null;
+        surface?: string;
+        scope?: string;
+        name?: string | null;
+      };
     } | null;
+    if (/query\s+TableView\b/.test(body?.query ?? '')) {
+      const scope = String(body?.variables?.scope ?? '');
+      const name = (body?.variables?.name as string | null | undefined) ?? null;
+      const found = store.get(viewKey(scope, name));
+      await route.fulfill({
+        json: {
+          data: {
+            view: {
+              scope,
+              name,
+              saved: found !== undefined,
+              columns: [],
+              narrowColumns: [],
+              filters: found?.filters ?? '',
+              sort: null,
+              decisions: [],
+              names: namesOf(store, scope),
+            },
+          },
+        },
+      });
+      return;
+    }
     if (/query\s+EdgeDesk\b/.test(body?.query ?? '')) {
       await route.fulfill({ json: edgeDesk });
       return;
@@ -172,4 +251,5 @@ export async function mockIdeasApi(page: Page, edgeDesk: unknown = NO_EDGE_DESK)
     }
     await route.fulfill({ json: served(body?.variables?.filters ?? null) });
   });
+  return { saved: store };
 }

@@ -1,12 +1,12 @@
 /**
  * Read model WEB 7 (docs/api/read-model.md "Enforcement"): one adapter for a user's views of a
- * table. Only src/features/table-view/api names the preferences path (`/preferences/...`):
+ * table. Only src/entities/saved-view/api names the preferences path (`/preferences/...`):
  * every table reads and saves its view through `useTableView(scope)`, never a REST call of its
  * own.
  */
 import { readModelMessage } from './guide.js';
 
-const ADAPTER = 'src/features/table-view/api/**';
+const ADAPTER = 'src/entities/saved-view/api/**';
 
 const ALLOWED = [];
 
@@ -14,7 +14,7 @@ const PATH = /\/preferences\//;
 
 const MESSAGE = readModelMessage(
   7,
-  "a table's saved view goes through the one adapter, features/table-view (useTableView(scope), ViewControls): only its api/ names /preferences/.",
+  "a table's saved view goes through the one adapter, entities/saved-view (useTableView(scope), the filter bar's Views menu): only its api/ names /preferences/.",
 );
 
 /** Reports a string or template literal naming `/preferences/` outside the adapter. */

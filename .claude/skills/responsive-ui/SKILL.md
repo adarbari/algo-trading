@@ -48,7 +48,7 @@ Never a mobile page, route, widget or component variant: adapt the one component
    **A row of actions is `ActionGroup`** (icon buttons with tooltips under `sm`). Never arrange
    chips or shrink buttons for a phone in page code.
 10. **Columns a phone user adds back are remembered**: pass the table's `narrowColumns` /
-    `onNarrowColumnsChange` from the user's saved view (`features/table-view`) or the page's URL
+    `onNarrowColumnsChange` from the user's saved view (`entities/saved-view`) or the page's URL
     state (Explore `ncols`); never browser storage. A caller's own column picker goes in
     `toolbarEnd`, beside the table's.
 11. **Anything absolutely positioned inside a scroller** (a `VisuallyHidden` caption, a badge)

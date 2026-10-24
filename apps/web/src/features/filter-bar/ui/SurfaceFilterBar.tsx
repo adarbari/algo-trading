@@ -14,13 +14,17 @@ import {
   FEATURE_FILTER_PREFIX,
   FILTER_GROUPS,
   useFilterSet,
+  type FilterDefinition,
   type FilterFacets,
   type FilterGroup,
 } from '@/entities/filter';
 
+import { surfaceScope, useTableView, type TableViewState } from '@/entities/saved-view';
+
 import type { FilterStateApi } from '../api/use-filter-state';
 import { chipItems, countLine, groupCounts, type LabelOf } from '../model/surface';
 import { FilterControls, type GuideRef } from './FilterControls';
+import { ViewsMenu } from './ViewsMenu';
 
 // The search and the catalogue behind it load when "More filters" first opens.
 const MoreFilters = lazy(() => import('./MoreFilters').then((m) => ({ default: m.MoreFilters })));
@@ -41,6 +45,34 @@ export interface SurfaceFilterBarProps {
   actions?: ReactNode;
   /** A name for a stored value the definitions do not label (a screener's name for its id). */
   labelOf?: LabelOf;
+  /**
+   * The Views menu (saved views, ADR 0082): `true` (the bar keeps the user's views of this
+   * surface, scope `surface:<name>`), a scope, or the `useTableView` state a page that also saves
+   * columns and sort in its view already holds. None: no Views button.
+   */
+  views?: boolean | string | TableViewState;
+}
+
+/** The Views menu of a scope the bar keeps itself. */
+function ScopedViews({
+  scope,
+  state,
+  known,
+  definitions,
+  labelOf,
+}: {
+  scope: string;
+  state: FilterStateApi;
+  known: readonly string[] | undefined;
+  definitions: readonly FilterDefinition[];
+  labelOf: LabelOf | undefined;
+}) {
+  const view = useTableView(scope, {
+    f: state.f,
+    onChange: state.replace,
+    ...(known && { known }),
+  });
+  return <ViewsMenu view={view} state={state} definitions={definitions} labelOf={labelOf} />;
 }
 
 export function SurfaceFilterBar({
@@ -51,6 +83,7 @@ export function SurfaceFilterBar({
   search = null,
   actions,
   labelOf,
+  views,
 }: SurfaceFilterBarProps) {
   const [pending, setPending] = useState<readonly string[]>([]);
   const fields = [
@@ -60,8 +93,17 @@ export function SurfaceFilterBar({
     ...pending,
   ];
   const set = useFilterSet(surface, [...new Set(fields)]);
-  const searchable = set.data?.filterSet?.searchable ?? false;
   const definitions = set.data?.filterSet?.filters ?? [];
+  const searchable = set.data?.filterSet?.searchable ?? false;
+  // A saved view keeps the filters the surface still defines: its own and the picked features.
+  const known = set.data?.filterSet
+    ? [
+        ...definitions.map((d) => d.id),
+        ...state.filters.map((f) => f.id).filter((id) => id.startsWith(FEATURE_FILTER_PREFIX)),
+      ]
+    : set.isError
+      ? []
+      : undefined;
   const counts = groupCounts(state.filters, definitions);
   const inGroup = (group: FilterGroup) => definitions.filter((d) => d.group === group);
   const toolbar = FILTER_GROUPS.filter((g) => g.id !== 'MORE' && inGroup(g.id).length > 0);
@@ -71,21 +113,38 @@ export function SurfaceFilterBar({
     <FilterBar
       search={search}
       activeCount={state.filters.length}
-      groups={toolbar.map((group) => (
-        <FilterGroupButton
-          key={group.id}
-          label={group.label}
-          activeCount={counts.get(group.id) ?? 0}
-        >
-          <FilterControls
-            definitions={inGroup(group.id)}
-            state={state}
-            facets={facets}
-            help={help}
-            labelOf={labelOf}
-          />
-        </FilterGroupButton>
-      ))}
+      groups={
+        <>
+          {toolbar.map((group) => (
+            <FilterGroupButton
+              key={group.id}
+              label={group.label}
+              activeCount={counts.get(group.id) ?? 0}
+            >
+              <FilterControls
+                definitions={inGroup(group.id)}
+                state={state}
+                facets={facets}
+                help={help}
+                labelOf={labelOf}
+              />
+            </FilterGroupButton>
+          ))}
+          {views !== undefined &&
+            views !== false &&
+            (typeof views === 'string' || views === true ? (
+              <ScopedViews
+                scope={views === true ? surfaceScope(surface) : views}
+                state={state}
+                known={known}
+                definitions={definitions}
+                labelOf={labelOf}
+              />
+            ) : (
+              <ViewsMenu view={views} state={state} definitions={definitions} labelOf={labelOf} />
+            ))}
+        </>
+      }
       {...(searchable
         ? {
             more: (

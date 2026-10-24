@@ -1,8 +1,9 @@
 """A user's saved view of a table (ADR 0032, ``TableView``): the catalogue columns they added,
 the sort and the decisions they show, from ``views.<scope>.view`` (the default view) or
 ``views.<scope>.views.<name>`` of their ``preferences.toml`` (read-model PR 8 generalised it
-from ``screeners.<id>``). A scope names a table: ``screener:<id>`` is a screener's results
-(``SCOPE_KINDS``). A view saved before PR 8 under ``screeners.<id>`` is still read as
+from ``screeners.<id>``). A scope names a table: ``screener:<id>`` is a screener's results,
+``surface:<name>`` a list with a filter bar (Ideas, the Screeners list, ...; ``SCOPE_KINDS``).
+A view saved before PR 8 under ``screeners.<id>`` is still read as
 ``screener:<id>``'s until the user's next preferences write moves it
 (``services.authoring.preferences``).
 
@@ -14,13 +15,16 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from algotrade.config.filters.definitions import Documents, load_filter_set
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens.screeners import load_screener
 from algotrade.storage.configs.store import ConfigStore
 
 PREFERENCES = "preferences"
 SCREENER_SCOPE = "screener"  # ``screener:<id>``: a screener's results
-SCOPE_KINDS = (SCREENER_SCOPE,)
+# ``surface:<name>``: a list with a filter bar (config/site/filters/<name>)
+SURFACE_SCOPE = "surface"
+SCOPE_KINDS = (SCREENER_SCOPE, SURFACE_SCOPE)
 LEGACY_SCREENERS = "screeners"  # where PR 5-7 saved a screener's views (``screeners.<id>``)
 
 
@@ -50,6 +54,12 @@ def scope_parts(scope: str) -> tuple[str, str]:
     if kind not in SCOPE_KINDS or not ident:
         raise ValueError(f"view scope {scope!r}: expected one of {', '.join(SCOPE_KINDS)}:<id>")
     return kind, ident
+
+
+def surface_exists(configs: Documents, name: str) -> bool:
+    """Whether ``name`` is a surface with a filters file (its views are its filter bar's)."""
+    found = load_filter_set(configs, name)
+    return bool(found.filters or found.columns)
 
 
 def view_entry(doc: Mapping[str, Any], scope: str) -> Mapping[str, Any]:
@@ -94,5 +104,7 @@ def load_view(ctx: ReadContext, scope: str, name: str | None = None) -> TableVie
     except ValueError:
         return None
     if kind == SCREENER_SCOPE and load_screener(ctx, ident) is None:
+        return None
+    if kind == SURFACE_SCOPE and not surface_exists(ctx.configs, ident):
         return None
     return table_view(ctx.configs, ctx.user.user_id, scope, name)

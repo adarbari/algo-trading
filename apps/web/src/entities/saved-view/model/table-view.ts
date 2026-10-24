@@ -52,8 +52,8 @@ export interface TableViewState {
   select: (name: string | null) => void;
   /** Save the current choice as the view `name` (replacing one of that name), then use it. */
   saveAs: (name: string, onDone?: () => void) => void;
-  /** Remove the named view in use and go back to the default view. */
-  remove: () => void;
+  /** Remove the named view `target` (default: the one in use; removing that goes back to the default view). */
+  remove: (target?: string) => void;
   saving: boolean;
   removing: boolean;
   /** Why the last save was refused. */
@@ -127,11 +127,11 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
         },
       );
     },
-    remove: () => {
-      if (name === null) return;
-      removal.mutate(name, {
+    remove: (target = name ?? undefined) => {
+      if (target === undefined) return;
+      removal.mutate(target, {
         onSuccess: () => {
-          select(null);
+          if (target === name) select(null);
         },
       });
     },
