@@ -42,6 +42,7 @@ const STRUCTURE = [
   'src/widgets/holdings-panel/model/columns.tsx', // an ETF's holdings (issuer-dated weights)
   'src/widgets/options-panel/model/columns.tsx', // an option chain's quotes by strike
   'src/widgets/regime-episodes/model/columns.tsx', // the regime's reference market falls
+  'src/widgets/screener-run-list/model/columns.tsx', // admin: screener runs, one record each
   'src/widgets/screener-list/model/columns.tsx', // the user's screeners
   'src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx', // admin: data-quality checks
   'src/widgets/recent-runs-panel/ui/RecentRunsPanel.tsx', // admin: nightly runs

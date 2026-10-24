@@ -318,6 +318,8 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "ScreenVersions",
         "HarnessRuns",
         "HarnessRun",
+        "AdminScreenerRuns",
+        "AdminScreenerRun",
         "RunRecord",
         "RunItems",
         "FigiReview",
