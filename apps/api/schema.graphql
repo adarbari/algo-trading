@@ -1309,7 +1309,7 @@ type FilterChoice {
 }
 
 """
-One filter of a surface: `guide` is its Guide entry reference (`term:<id>`); `options` the values of a static or enum pick / select (empty: the stored ones, counted in the result's facets); `bins` a range's histogram edges; `windowUnit` what a window counts
+One filter of a surface: `guide` is its Guide entry reference (`term:<id>`); `options` the values of a static or enum pick / select (empty: the stored ones, counted in the result's facets); `bins` a range's histogram edges; `windowUnit` what a window counts; `unit` PERCENT: a range's stored 0..1 value is shown and entered as 0..100, its limits are sent as 0..1
 """
 type FilterDefinition {
   id: String!
@@ -1320,6 +1320,7 @@ type FilterDefinition {
   options: [FilterChoice!]!
   bins: [Float!]!
   windowUnit: WindowUnit
+  unit: ValueUnit
 }
 
 """
@@ -3974,6 +3975,11 @@ type UsePass {
   intent: String!
   count: Int!
   bins: [Int!]!
+}
+
+"""How a range shows its stored value"""
+enum ValueUnit {
+  PERCENT
 }
 
 """

@@ -47,6 +47,12 @@ class FilterKind(StrEnum):
     PERCENTILE = "percentile"
 
 
+class ValueUnit(StrEnum):
+    """How a range shows its stored value (the definition's ``unit``)."""
+
+    PERCENT = "percent"
+
+
 @dataclass(frozen=True)
 class ServedOption:
     """One value a pick or select offers."""
@@ -59,7 +65,8 @@ class ServedOption:
 class ServedFilter:
     """An offered filter. ``options``: the definition's static values or the members of its
     ``enum`` (empty for ``values``: the stored ones, counted in each result's facets); ``bins``:
-    a range's histogram edges; ``window_unit``: what a window counts."""
+    a range's histogram edges; ``window_unit``: what a window counts; ``unit``: how a range shows
+    its value (``percent``: shown as 0..100, sent as 0..1)."""
 
     id: str
     label: str
@@ -69,6 +76,7 @@ class ServedFilter:
     options: tuple[ServedOption, ...]
     bins: tuple[float, ...]
     window_unit: WindowUnit | None
+    unit: ValueUnit | None = None
 
 
 @dataclass(frozen=True)
@@ -113,7 +121,15 @@ def _options(definition: FilterDefinition) -> tuple[ServedOption, ...]:
 def _served(f: FilterDefinition) -> ServedFilter:
     unit = WindowUnit(f.window_unit) if f.window_unit else None
     return ServedFilter(
-        f.id, f.label, FilterGroup(f.group), FilterKind(f.kind), f.guide, _options(f), f.bins, unit
+        f.id,
+        f.label,
+        FilterGroup(f.group),
+        FilterKind(f.kind),
+        f.guide,
+        _options(f),
+        f.bins,
+        unit,
+        ValueUnit(f.unit) if f.unit else None,
     )
 
 

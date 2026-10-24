@@ -71,6 +71,7 @@ label = "12-1 momentum, percentile in its sector"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_price@v1.mom_12_1_pct_sector"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_mom_pct_sector"
 
@@ -80,6 +81,7 @@ label = "Relative strength, percentile in its sector"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_rs_pct_sector"
 
@@ -89,6 +91,7 @@ label = "Relative strength, percentile in its industry"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_price@v1.rs_spy_63d_pct_industry"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_rs_pct_industry"
 
@@ -98,6 +101,7 @@ label = "Days to cover, percentile in its sector"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_fundamental@v1.days_to_cover_pct_sector"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_days_to_cover_pct_sector"
 
@@ -107,6 +111,7 @@ label = "P/E, percentile in its sector"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_valuation@v1.pe_ratio_pct_sector"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_pe_pct_sector"
 
@@ -116,6 +121,7 @@ label = "P/E, percentile in its industry"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_valuation@v1.pe_ratio_pct_industry"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_pe_pct_industry"
 
@@ -125,6 +131,7 @@ label = "IV rank, percentile in its sector"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_options@v1.iv_rank_252d_pct_sector"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_iv_rank_pct_sector"
 
@@ -134,6 +141,7 @@ label = "IV rank, percentile in its industry"
 group = "setup"
 kind = "range"
 field = "rollup.cohort_pct_options@v1.iv_rank_252d_pct_industry"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_iv_rank_pct_industry"
 
@@ -174,5 +182,6 @@ label = "Dollar volume, percentile in the universe"
 group = "tradeable"
 kind = "range"
 field = "rollup.cohort_pct_price@v1.adv_usd_20d_pct_universe"
+unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_dollar_volume_pct_universe"
