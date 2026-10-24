@@ -14,6 +14,7 @@ from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec.company_facts import (
     FACT_COLUMNS,
     FACTS_URL,
+    SHARE_CONCEPTS_VERSION_DATE,
     SecCompanyFacts,
     parse_company_facts,
 )
@@ -29,7 +30,7 @@ def test_keeps_share_counts_and_the_flows_and_nothing_else() -> None:
     assert list(rows.columns) == list(FACT_COLUMNS)
     assert set(rows["concept"]) == {"dei", "weighted_basic", "revenue"}  # not the public float
     counts = rows[rows["concept"] != "revenue"]
-    assert counts["value"].isna().all() and counts["unit"].isna().all()
+    assert counts["value"].isna().all() and (counts["unit"] == "shares").all()
     revenue = rows[rows["concept"] == "revenue"].iloc[0]
     assert (revenue["value"], revenue["unit"], revenue["shares"]) == (95359000000.0, "usd", None)
     assert set(rows["cik"]) == {"0000320193"}
@@ -188,3 +189,65 @@ def test_losses_and_eps_are_kept_with_their_units() -> None:
     eps = rows[rows["concept"] == "eps_diluted"]
     assert eps["value"].tolist() == [-0.5] and eps["unit"].tolist() == ["usd_per_share"]
     assert set(rows["concept"]) == {"revenue", "net_income", "eps_diluted"}  # basic EPS: not kept
+
+
+def _ifrs_doc() -> bytes:
+    """Hand-built in the shape of a 20-F filer's document (AZN-like): IFRS facts only, an annual
+    weighted average with its comparative, a half-year restatement of nothing else."""
+    year = ("2025-01-01", "2025-12-31")
+    doc = {
+        "cik": 901832,
+        "facts": {
+            "ifrs-full": {
+                "WeightedAverageShares": _entry(
+                    "shares",
+                    _row(*year, 1550000000, "2026-02-20", "20-F", accn="A-1"),
+                    _row("2024-01-01", "2024-12-31", 1545000000, "2026-02-20", "20-F", accn="A-1"),
+                    _row(*year, 1550000000, "2027-02-20", "20-F", accn="A-2"),
+                )
+            }
+        },
+    }
+    return json.dumps(doc).encode()
+
+
+def test_an_ifrs_filer_without_us_gaap_facts_has_an_ifrs_weighted_count() -> None:
+    """Regression: a filer with only ifrs-full facts parsed to no share count (NO_SHARES)."""
+    rows = parse_company_facts(_ifrs_doc())
+    assert set(rows["concept"]) == {"ifrs_weighted"}
+    by_accn = rows.set_index("accn")
+    assert len(by_accn) == 2  # one current period per filing, the comparative dropped
+    current = rows[rows["filed"] == "2026-02-20"].iloc[0]
+    assert (current["period_end"], current["shares"], current["unit"]) == (
+        "2025-12-31",
+        1550000000.0,
+        "shares",
+    )
+    assert current["tag"] == "ifrs-full:WeightedAverageShares"
+    assert current["form"] == "20-F"
+
+
+def test_a_count_tagged_in_units_is_read_and_the_unit_kept() -> None:
+    """A royalty trust tags units of beneficial interest, not shares."""
+    cover = _entry(
+        "units",
+        {"end": "2026-03-01", "val": 46608796, "accn": "A-1", "fy": 2025, "fp": "FY",
+         "form": "10-K", "filed": "2026-03-05"},
+    )  # fmt: skip
+    doc = {"cik": 278384, "facts": {"dei": {"EntityCommonStockSharesOutstanding": cover}}}
+    rows = parse_company_facts(json.dumps(doc).encode())
+    assert list(rows["concept"]) == ["dei"]
+    assert (rows.iloc[0]["shares"], rows.iloc[0]["unit"]) == (46608796.0, "units")
+
+
+def test_the_shares_unit_wins_over_units_when_both_are_tagged() -> None:
+    row = {"end": "2026-03-01", "val": 5, "accn": "A-1", "fy": 2025, "fp": "FY", "form": "10-K",
+           "filed": "2026-03-05"}  # fmt: skip
+    cover = {"units": {"shares": [row], "units": [{**row, "val": 9, "accn": "A-2"}]}}
+    doc = {"cik": 1, "facts": {"dei": {"EntityCommonStockSharesOutstanding": cover}}}
+    rows = parse_company_facts(json.dumps(doc).encode())
+    assert list(rows["shares"]) == [5.0]
+
+
+def test_a_company_facts_fetch_before_the_share_concepts_date_is_backlog() -> None:
+    assert SecCompanyFacts.statements_tags_date >= SHARE_CONCEPTS_VERSION_DATE

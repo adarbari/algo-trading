@@ -2,7 +2,7 @@
 XBRL filings (free, no key).
 
 ``https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`` holds every
-non-dimensional XBRL fact a company has filed (MBs for a large filer). We keep two share
+non-dimensional XBRL fact a company has filed (MBs for a large filer). We keep three share
 counts:
 
 - ``dei:EntityCommonStockSharesOutstanding`` (``dei``): the cover-page count as of a date
@@ -13,6 +13,13 @@ counts:
   fallback for filers that stopped tagging the cover page (most multi-class issuers, e.g.
   Alphabet). Each filing reports several periods (quarter, year to date, prior-year
   comparatives); we keep its current period: the latest ``end``, then the shortest span.
+- ``ifrs-full:WeightedAverageShares`` (``ifrs_weighted``): the same weighted average for
+  foreign filers that report under IFRS and have no us-gaap facts (AZN, BP, TECK), reduced
+  the same way. The fact says nothing about ADS ratios: the reader decides whom it may count for
+  (``fundamentals@v5``: not ADRs, whose count is ordinary shares).
+
+A count is read from the ``shares`` unit; a filer that tags ``units`` instead (royalty trusts
+report units of beneficial interest) is read from it, and the unit read is kept in ``unit``.
 
 and three flows (``FLOWS``), the inputs of ``financials@v3``:
 
@@ -67,11 +74,16 @@ SOURCE = "sec_edgar"
 # the task counts such a CIK's marker as backlog. Set at release, the day of the first nightly
 # with this code.
 ACCEPTANCE_VERSION_DATE = date(2026, 10, 19)
+# The day the ``ifrs_weighted`` concept and the ``units`` unit were added to the share counts: a
+# CIK fetched before it is backlog again, like the two dates above.
+SHARE_CONCEPTS_VERSION_DATE = date(2026, 10, 25)
 FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 CONCEPTS = {  # our short name -> (taxonomy, XBRL concept)
     "dei": ("dei", "EntityCommonStockSharesOutstanding"),
     "weighted_basic": ("us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"),
+    "ifrs_weighted": ("ifrs-full", "WeightedAverageShares"),
 }
+COUNT_UNITS = ("shares", "units")  # the unit keys a share count may be filed under, best first
 FLOWS = {  # short name -> (unit key in the document, our unit, us-gaap tags best first)
     "revenue": (
         "USD",
@@ -122,11 +134,15 @@ FACT_FIELDS = ["start", "end", "val", "accn", "fy", "fp", "form", "filed", "tag"
 def _facts(doc: dict[str, Any], concept: str) -> pd.DataFrame:
     taxonomy, name = CONCEPTS[concept]
     entry = (doc.get("facts") or {}).get(taxonomy, {}).get(name) or {}
-    rows = (entry.get("units") or {}).get("shares") or []
+    units = entry.get("units") or {}
+    unit = next((u for u in COUNT_UNITS if units.get(u)), COUNT_UNITS[0])
+    rows = units.get(unit) or []
     frame = pd.DataFrame(rows, columns=["start", "end", "val", "accn", "fy", "fp", "form", "filed"])
     frame = frame.dropna(subset=["end", "val", "accn", "filed"])
     frame = frame[pd.to_numeric(frame["val"], errors="coerce") > 0]
-    return frame.assign(concept=concept, tag=f"{taxonomy}:{name}", val=frame["val"].astype(float))
+    return frame.assign(
+        concept=concept, tag=f"{taxonomy}:{name}", unit=unit, val=frame["val"].astype(float)
+    )
 
 
 def _cover(frame: pd.DataFrame) -> pd.DataFrame:
@@ -140,7 +156,8 @@ def _cover(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _current_period(frame: pd.DataFrame) -> pd.DataFrame:
-    """One ``weighted_basic`` row per filing: its latest period end, then the shortest span."""
+    """One ``weighted_basic`` / ``ifrs_weighted`` row per filing: its latest period end, then the
+    shortest span."""
     ordered = frame.assign(start=frame["start"].fillna(frame["end"]))
     ordered = ordered.sort_values(["accn", "end", "start"], kind="stable")
     return ordered.drop_duplicates("accn", keep="last").assign(class_values=1)
@@ -179,10 +196,10 @@ def _document(payload: bytes) -> tuple[dict[str, Any], str]:
 
 def _share_rows(doc: dict[str, Any], cik: str) -> pd.DataFrame:
     parts = []
-    for concept, reduce in (("dei", _cover), ("weighted_basic", _current_period)):
+    for concept in CONCEPTS:
         frame = _facts(doc, concept)
         if not frame.empty:
-            parts.append(reduce(frame))
+            parts.append(_cover(frame) if concept == "dei" else _current_period(frame))
     parts += [flow for c in FLOWS if not (flow := _flow_facts(doc, c)).empty]
     if not parts:
         return pd.DataFrame(columns=list(FACT_COLUMNS))
@@ -190,7 +207,7 @@ def _share_rows(doc: dict[str, Any], cik: str) -> pd.DataFrame:
         columns={"start": "period_start", "end": "period_end", "val": "value"}
     )
     out = out.assign(cik=cik)
-    counts = out["concept"].isin(["dei", "weighted_basic"])
+    counts = out["concept"].isin(CONCEPTS)
     out["shares"] = out["value"].where(counts)  # a share count is `shares`, a flow is `value`
     out["value"] = out["value"].where(~counts)
     out.loc[out["concept"] == "dei", "period_start"] = None
@@ -260,7 +277,9 @@ class SecCompanyFacts:
     dataset = "companyfacts"
     # read by the shares task (its backlog): a refetch is due when the tag lists grew or the
     # acceptance times arrived after a CIK's last fetch
-    statements_tags_date = max(STATEMENT_TAGS_VERSION_DATE, ACCEPTANCE_VERSION_DATE)
+    statements_tags_date = max(
+        STATEMENT_TAGS_VERSION_DATE, ACCEPTANCE_VERSION_DATE, SHARE_CONCEPTS_VERSION_DATE
+    )
 
     def __init__(self, http: Http) -> None:
         self._http = http

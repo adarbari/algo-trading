@@ -9,8 +9,8 @@ name = "feature.market_cap"
 theme = "fundamentals"
 reads = "Shares outstanding times the close, in dollars. The usual US buckets: micro under $300M, small $300M to $2B, mid $2B to $10B, large $10B to $200B, mega above $200B. They are conventions, not rules: index providers draw the lines differently and names migrate across them as prices move."
 caveats = [
-  "The count is the company total and the price is this share class's, so a company with two listed classes shows the same cap on both only when they trade at the same price. Check rollup.fundamentals@v4.market_cap_status.",
-  "Null for funds (no share count filed), for a stale count (rollup.fundamentals@v4.market_cap_status STALE) and for a company with no SEC filing (foreign private issuers); a hard size gate drops ETFs and many ADRs.",
+  "The count is the company total and the price is this share class's, so a company with two listed classes shows the same cap on both only when they trade at the same price. Check rollup.fundamentals@v5.market_cap_status.",
+  "Null for funds (no share count filed), for a stale count (rollup.fundamentals@v5.market_cap_status STALE) and for a company with no SEC share count. A foreign company that files under IFRS has one only for its ordinary listing (rollup.fundamentals@v5.shares_source ifrs_weighted); its ADR has none, since the ordinary-share count needs the shares-per-ADR ratio. A hard size gate drops ETFs and many ADRs.",
   "Cap is size, not quality or liquidity: a $20B name can trade $5M a day (a controlled company) and a $500M name $50M (a meme). Pair with rollup.price_stats@v2.adv_usd_20d.",
 ]
 sources = [
@@ -218,7 +218,7 @@ theme = "fundamentals"
 reads = "Market capitalisation over revenue of the trailing twelve months: the dollars the market pays for each dollar of yearly sales. Under 1 is cheap on sales (a distressed or low-margin business), under 2 is the value end, 2 to 5 is ordinary, 5 to 10 is a growth price that needs sustained growth to be earned, above 10 prices in years of it. Unlike feature.pe_ratio it exists for a loss maker, which is the point of using it."
 caveats = [
   "Sales are not profit: a grocer and a software company trade at very different P/S for good reason. Pair it with feature.net_margin, or compare within instrument.sector; a low P/S on a 1% margin is not cheap.",
-  "Market cap is the company total count times this class's close (rollup.fundamentals@v4.market_cap_status says whether the count is current), while revenue is the company's: misstated when share classes trade at very different prices, and for an ADR whose ratio is not stored.",
+  "Market cap is the company total count times this class's close (rollup.fundamentals@v5.market_cap_status says whether the count is current), while revenue is the company's: misstated when share classes trade at very different prices, and for an ADR whose ratio is not stored.",
   "Banks, insurers and other financials report revenue in ways that do not compare with industrials; the ratio means little there.",
   "Null for funds, for a stale or missing count, for a missing or stale revenue TTM (rollup.financials@v3.financials_status STALE) and for no revenue: a hard 'lt 2' silently drops all of them. The revenue TTM can be four months old.",
 ]
@@ -395,7 +395,7 @@ caveats = [
   "The counts are the company total from the filings: a cover-page count against a cover-page count, or a weighted average against a weighted average, never one against the other, so a company that began tagging the cover page recently is null. Weighted averages lag a buyback or an offering by about half a period.",
   "A stock split is adjusted away, but a spin-off, a merger or a reverse merger changes the count without being dilution; check feature.market_cap and the filings when the change is above 0.5.",
   "A shrinking count can hide an offering: companies buy back what compensation issues, so a flat count is not a company that does nothing. Pair with rollup.financials@v3.eps_diluted_ttm growth.",
-  "Null for funds, companies without two counts a year apart (recent IPOs and filers), and a stale count (rollup.fundamentals@v4.market_cap_status STALE).",
+  "Null for funds, companies without two counts a year apart (recent IPOs and filers), and a stale count (rollup.fundamentals@v5.market_cap_status STALE).",
 ]
 sources = [
   "Pontiff and Woodgate (2008), Share Issuance and Cross-Sectional Returns, Journal of Finance: issuers underperform, repurchasers outperform",

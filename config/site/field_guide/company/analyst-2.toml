@@ -444,7 +444,7 @@ theme = "fundamentals"
 reads = "True when the company's share count fell by at least 1% over the year: it bought back more stock than it issued. False means the count held or grew. 0.8% fewer shares is false; 3% fewer is true. It is a flag on feature.shares_change_yoy, measured from share counts, not a repurchase announcement."
 caveats = [
   "Buybacks that only offset stock pay leave the count flat and read false, though cash was spent; a count that fell through a reverse split is not a buyback. Check feature.net_issuance_pct_12m and cash flow.",
-  "Share counts come from filing cover pages, so a count can lag a quarter. Null when the year-ago count is missing or the current one is stale (rollup.fundamentals@v4.market_cap_status STALE); a hard 'eq true' drops those names.",
+  "Share counts come from filing cover pages, so a count can lag a quarter. Null when the year-ago count is missing or the current one is stale (rollup.fundamentals@v5.market_cap_status STALE); a hard 'eq true' drops those names.",
   "A company can retire stock while borrowing to do it; check feature.debt_to_equity.",
 ]
 sources = ["Ikenberry, Lakonishok and Vermaelen (1995), Market underreaction to open market share repurchases, JFE 39; Pontiff and Woodgate (2008), Share issuance and cross-sectional returns, JF 63"]

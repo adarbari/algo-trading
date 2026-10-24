@@ -52,7 +52,7 @@ def test_the_ratio_is_the_short_position_over_current_shares_and_null_without_th
     )  # fmt: skip
     out = fs.evaluate(
         {"rollups/instrument/short_interest@v1": shorts,
-         "rollups/instrument/fundamentals@v4": funds}, ["short_interest_ratio"],
+         "rollups/instrument/fundamentals@v5": funds}, ["short_interest_ratio"],
     )  # fmt: skip
     got = out.set_index("instrument_id")["short_interest_ratio"]
     assert got["EQ:A"] == 0.1

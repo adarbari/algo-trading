@@ -2,8 +2,9 @@
 consumers and the producer.
 
 The table holds two kinds of fact, told apart by ``concept``: share counts (``dei``,
-``weighted_basic``; the count is in ``shares``) and flows (``revenue``, ``net_income``,
-``eps_diluted``; the amount is in ``value``, its ``unit`` is ``usd`` or ``usd_per_share``).
+``weighted_basic``, ``ifrs_weighted``; the count is in ``shares``, its ``unit`` is ``shares``, or
+``units`` for a trust that tags those) and flows (``revenue``, ``net_income``, ``eps_diluted``;
+the amount is in ``value``, its ``unit`` is ``usd`` or ``usd_per_share``).
 
 The table is stored in increments: each run of the ``shares`` task adds the facts it found
 new plus one ``checked`` marker per instrument whose CIK it fetched (``fetched_on``). A read

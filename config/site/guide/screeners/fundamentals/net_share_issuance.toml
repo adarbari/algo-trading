@@ -12,7 +12,7 @@ summary = "Ranks every tradeable stock by how much its share count changed over 
 hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a year-over-year share count change. Every such name qualifies; the order is the point, the biggest net buyer of its own shares first."
 not_checked = "It does not know why the count moved: an acquisition paid in shares looks like an issue, a spin-off or a split not yet adjusted can look like either, and option dilution beyond the reported count is missed. It does not check price or quality."
 before_acting = [
-  "The count is the cover-page figure when the company tags it: compare feature.shares_change_yoy with rollup.fundamentals@v4.shares_source before trusting a small change.",
+  "The count is the cover-page figure when the company tags it: compare feature.shares_change_yoy with rollup.fundamentals@v5.shares_source before trusting a small change.",
   "A buyback can fund itself with debt: check feature.debt_to_equity and rollup.mispricing@v1.ohlson_o before treating a shrinking count as strength.",
   "Heavy issuers are often high asset growers: rollup.mispricing@v1.asset_growth shows whether the issue was spent on assets.",
 ]
