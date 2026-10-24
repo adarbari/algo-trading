@@ -35,17 +35,21 @@ function entries(f: string): { id: string; entry: string }[] {
 
 /**
  * The saved `f` as the surface can use it: entries of filters the surface still defines are
- * kept, the rest dropped and their ids reported (a view survives a definition change; the
+ * kept (so are ids under `knownPrefix`: filters made on the fly, which the server gates), the rest
+ * dropped and their ids reported (a view survives a definition change; the
  * page says what it dropped). `known` undefined: the definitions are not known, nothing dropped.
  */
 export function restorableFilters(
   f: string,
   known: readonly string[] | undefined,
+  knownPrefix?: string,
 ): { f: string; dropped: string[] } {
   if (known === undefined) return { f, dropped: [] };
-  const kept = entries(f).filter(({ id }) => known.includes(id));
+  const defined = (id: string) =>
+    known.includes(id) || (knownPrefix !== undefined && id.startsWith(knownPrefix));
+  const kept = entries(f).filter(({ id }) => defined(id));
   const dropped = entries(f)
-    .filter(({ id }) => !known.includes(id))
+    .filter(({ id }) => !defined(id))
     .map(({ id }) => id);
   return { f: kept.map(({ entry }) => entry).join(';'), dropped };
 }

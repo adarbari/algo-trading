@@ -71,6 +71,7 @@ function ScopedViews({
     f: state.f,
     onChange: state.replace,
     ...(known && { known }),
+    knownPrefix: FEATURE_FILTER_PREFIX,
   });
   return <ViewsMenu view={view} state={state} definitions={definitions} labelOf={labelOf} />;
 }
@@ -95,15 +96,8 @@ export function SurfaceFilterBar({
   const set = useFilterSet(surface, [...new Set(fields)]);
   const definitions = set.data?.filterSet?.filters ?? [];
   const searchable = set.data?.filterSet?.searchable ?? false;
-  // A saved view keeps the filters the surface still defines: its own and the picked features.
-  const known = set.data?.filterSet
-    ? [
-        ...definitions.map((d) => d.id),
-        ...state.filters.map((f) => f.id).filter((id) => id.startsWith(FEATURE_FILTER_PREFIX)),
-      ]
-    : set.isError
-      ? []
-      : undefined;
+  // A saved view keeps the filters the surface still defines, and any made of a catalogue field.
+  const known = set.data?.filterSet ? definitions.map((d) => d.id) : set.isError ? [] : undefined;
   const counts = groupCounts(state.filters, definitions);
   const inGroup = (group: FilterGroup) => definitions.filter((d) => d.group === group);
   const toolbar = FILTER_GROUPS.filter((g) => g.id !== 'MORE' && inGroup(g.id).length > 0);

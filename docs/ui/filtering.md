@@ -80,3 +80,13 @@ without `SurfaceFilterBar` / `FilterBar`, unless `architecture/web_filter_bar.to
 is used, as for prose and derivations, because the baseline carries a reason per file, which
 an ESLint rule cannot. A listed file that gained the bar fails with its name, so a PR that
 migrates a surface must delete its line.
+
+## Views (saved views of a surface)
+Every filter-bar surface offers "Views" in the toolbar (`SurfaceFilterBar views`: `true` keeps the
+user's views under the scope `surface:<name>`; a page that also saves columns and sort passes its
+`useTableView` state). A view is the `f` string (and the page's columns and sort where it has them);
+the list shows each view with the filters it holds, in the chips' words from the definitions, and
+the save form shows the filters about to be saved. Applying a view puts its `f` in the URL; filters
+the surface no longer defines are dropped and named ("Not applied"); a `feature:` filter is kept (the
+server gates it). The server accepts `surface:<name>` for a surface with a filters file
+(`services/read/screens/views.py`).

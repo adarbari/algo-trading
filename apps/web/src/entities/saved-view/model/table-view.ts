@@ -23,6 +23,8 @@ export interface FilterBinding {
   onChange: (next: string | undefined) => void;
   /** The filter ids the surface defines now; undefined: not loaded yet (nothing is dropped). */
   known?: readonly string[];
+  /** Ids starting with it are defined too (`feature:`: made on the fly, the server gates them). */
+  knownPrefix?: string;
   /**
    * The `f` for a view that holds none: nothing saved yet, or one saved with only the decisions
    * it showed (before filters existed; `decisions` is what it held, maybe none).
@@ -70,7 +72,7 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
   const restore = useRef<'initial' | 'switched' | null>('initial');
   // With a filter binding the table waits for the view's `f` to be in the URL before it reads.
   const [restoredF, setRestoredF] = useState(false);
-  const restored = restorableFilters(view?.filters ?? '', filters?.known);
+  const restored = restorableFilters(view?.filters ?? '', filters?.known, filters?.knownPrefix);
   const decided = view?.saved ? view.decisions : [];
   const seeded =
     restored.f ||

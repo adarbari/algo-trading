@@ -74,3 +74,7 @@ def test_a_surface_with_a_filter_bar_has_views_and_one_without_has_none(
     assert found is not None and (found.saved, found.filters) == (True, "decision:QUALIFIED")
     assert load_view(ctx, "surface:no_such_surface") is None
     assert scope_parts("surface:edge_trades") == ("surface", "edge_trades")
+
+
+def test_a_surface_id_no_file_could_have_is_no_view_not_an_error(reader: StoreReader) -> None:
+    assert load_view(context(reader, {}), "surface:Bad!") is None
