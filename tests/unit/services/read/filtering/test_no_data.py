@@ -13,6 +13,7 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.filtering import no_data
 from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.filtering.served import NO_DATA_TERM, load_served_filters
+from algotrade.services.read.instruments import features as features_module
 from algotrade.services.read.screens.ideas import load_ideas
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
@@ -79,8 +80,33 @@ def test_a_session_with_no_table_at_all_withholds_it() -> None:
     assert withheld["dollar_volume"] is UnavailableKind.NOT_STORED
 
 
+def test_check_builds_no_cells(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check answers from the session's columns: no ``FeatureValue`` is built, and the
+    population is read once (``field_view``), not once per field."""
+    built: list[object] = []
+    reads: list[object] = []
+    real_view = features_module.field_view
+
+    def counting_cell(*args: object, **kwargs: object) -> object:
+        built.append(args)
+        raise AssertionError("a FeatureValue was built")
+
+    def counting_view(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        reads.append(args)
+        return real_view(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(features_module, "FeatureValue", counting_cell)
+    monkeypatch.setattr(features_module, "field_view", counting_view)
+    ctx = view([None, 5e6, None], "full")
+    fields = [IV, "rollup.volume@v1.dollar_volume"]
+    assert no_data.fields_without_data(ctx, fields) == {IV}
+    assert not built and len(reads) == 1
+
+
 def test_an_empty_population_withholds_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(no_data, "load_feature_values", lambda *args: {})
+    monkeypatch.setattr(
+        no_data, "known_fields", lambda ctx, fields: dict.fromkeys(fields, (False, False))
+    )
     offered, withheld = by_id(view(None))
     assert "dollar_volume" in offered and "dollar_volume" not in withheld
 

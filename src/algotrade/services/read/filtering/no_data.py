@@ -3,35 +3,31 @@ session (decision log 2026-10-24 "Cohort / IV-rank percentile filters"). A filte
 can only match zero rows, so ``filterSet`` serves it as withheld (``NOT_STORED``) instead of
 offering a control that erodes trust (the lists still read an input that names it). It returns
 by itself once the session has data: an IV-rank percentile needs about 60 sessions of IV history,
-a cohort rank the universe and company snapshots. One read of the whole population for every
-field of a surface, kept per published version, session and licence set. A field the viewer's
-licences do not cover is never read here (it is withheld as ``LICENCE`` first), and an empty
-population withholds nothing."""
+a cohort rank the universe and company snapshots. One columnar read of the whole population for
+every field of a surface (no per-cell value objects), kept per published version, session and
+licence set. A field the viewer's licences do not cover is never read here (it is withheld as
+``LICENCE`` first), and an empty population withholds nothing."""
 
 from collections.abc import Iterable
 
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.instruments.features import load_feature_values
+from algotrade.services.read.instruments.features import known_fields
 
 
 def _known(ctx: ReadContext, fields: tuple[str, ...]) -> dict[str, tuple[bool, bool]]:
     """``{field: (population is not empty, some instrument has a known value)}``, one read of
     the whole population for every field of the surface, kept per published version, session
-    and licence set (``load_feature_values`` bars a field the licences do not cover)."""
+    and licence set (``known_fields`` bars a field the licences do not cover)."""
 
     def read() -> dict[str, tuple[bool, bool]]:
-        found = load_feature_values(ctx, None, list(fields))
-        return {
-            f: (bool(found), any(v[k].value is not None for v in found.values()))
-            for k, f in enumerate(fields)
-        }
+        return known_fields(ctx, fields)
 
     key = (
         "filter-known",
         ctx.reader.version(),
         ctx.session.date,
         tuple(sorted(ctx.licences)),
-        fields,
+        tuple(sorted(fields)),
     )
     known: dict[str, tuple[bool, bool]] = ctx.cache.get_or_compute(key, read)
     return known

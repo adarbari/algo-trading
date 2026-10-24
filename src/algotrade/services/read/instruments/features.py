@@ -398,3 +398,42 @@ def load_feature_values(
         return _value(infos[n], tables[n], rows.get(iid), missing, ctx, iid, reasons[n])
 
     return {iid: tuple(cell(n, iid) for n in asked) for iid in instrument_ids}
+
+
+def known_fields(ctx: ReadContext, names: Sequence[str]) -> dict[str, tuple[bool, bool]]:
+    """``{name: (the population is not empty, some instrument has a known value)}`` for each of
+    ``names`` over every instrument of the session's reference snapshot: the answer
+    ``load_feature_values(ctx, None, names)`` gives (a cell is known when its value is not
+    ``None``), without building a ``FeatureValue`` or reading a reason. Same rules: the licence
+    gate first (a barred field is never read and never known), a table with no partition for
+    the session (or a company snapshot taken after it) makes the field unknown, no reference
+    snapshot makes every field unknown over an empty population. One difference: a ``pd.NA``
+    cell is unknown here (``to_scalar`` made it the text ``<NA>``, a known value)."""
+    asked = list(dict.fromkeys(names))
+    infos = feature_infos(ctx.features, asked)
+    wanted = [n for n in asked if infos[n].licence in ctx.licences]
+    populated = False
+    missing: tuple[str, ...] = ()
+    frame = pd.DataFrame()
+    if wanted and ctx.session.reference_snapshot is not None:
+        view = field_view(
+            ctx.reader,
+            ctx.session.date,
+            wanted,
+            None,
+            features=ctx.features,
+            memo=ctx.cache.get_or_compute,
+        )
+        # the last row of an id wins, as ``_by_id`` did
+        frame, missing = view.frame.drop_duplicates("instrument_id", keep="last"), view.missing
+        if view.company_pre_snapshot:  # not known on the session (no lookahead)
+            missing = (*missing, COMPANY_TABLE)
+        populated = not frame.empty
+    absent: set[str] = set(missing)  # no reference snapshot: no frame, so nothing is known
+
+    def known(n: str) -> bool:
+        if n not in frame or absent & set(_tables(ctx.features, n)):
+            return False
+        return bool(frame[n].notna().any())
+
+    return {n: (populated, n in wanted and known(n)) for n in asked}
