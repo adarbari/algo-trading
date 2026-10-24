@@ -54,7 +54,24 @@ const item = (
 
 const screener = (id: string, name: string, notRun = false): Served['screeners'][number] => ({
   screener: { id, name, owner: 'abhinav', version: 3 },
-  run: notRun ? null : { runId: `run-${id}`, configVersion: 2, paused: id === 'vrp' ? 1 : 0 },
+  run: notRun
+    ? null
+    : {
+        runId: `run-${id}`,
+        configVersion: 2,
+        paused: id === 'vrp' ? 1 : 0,
+        coverage: id === 'liq' ? 'PARTIAL' : 'COMPLETE',
+        unavailable:
+          id === 'liq'
+            ? [
+                {
+                  kind: 'NOT_STORED',
+                  guideTerm: 'not_stored',
+                  kindText: 'not stored for this session',
+                },
+              ]
+            : [],
+      },
   notRun: notRun
     ? {
         code: 'NOT_RUN',
@@ -150,6 +167,15 @@ describe('toIdeasData', () => {
       version: 3,
       top: [],
     });
+  });
+
+  it("carries a run's coverage and what it went without, in the server's public words", () => {
+    expect(data.screeners[0]).toMatchObject({ coverage: 'COMPLETE', gaps: [] });
+    expect(data.screeners[1]).toMatchObject({
+      coverage: 'PARTIAL',
+      gaps: [{ kind: 'NOT_STORED', kindText: 'not stored for this session' }],
+    });
+    expect(data.screeners[2]).toMatchObject({ coverage: null, gaps: [] });
   });
 
   it("carries each idea's regime stamp, as stored (null: not stamped)", () => {

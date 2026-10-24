@@ -58,6 +58,35 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
+test('the screener chips show each run state and link to the screener, with no Run now', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/ideas');
+  const chips = page.getByRole('list', { name: 'Screeners' });
+  await expect(chips.getByRole('listitem')).toHaveCount(4);
+  const vrp = chips.getByRole('listitem').filter({ hasText: 'VRP scanner' });
+  await expect(vrp).toContainText('16 picks');
+  await expect(vrp.getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
+    'href',
+    '/screeners/vrp-scanner',
+  );
+  const partial = chips.getByRole('listitem').filter({ hasText: 'Post-earnings IV crush' });
+  await expect(partial).toContainText('4 picks · partial');
+  await expect(partial).toContainText('not stored for this session');
+  await expect(chips.getByRole('listitem').filter({ hasText: 'Momentum breakout' })).toContainText(
+    'Not run',
+  );
+  await expect(page.getByRole('button', { name: /run now/i })).toHaveCount(0);
+  await chips
+    .getByRole('button', { name: /NOT_RUN|not run/i })
+    .first()
+    .click();
+  await expect(page.getByRole('dialog')).toContainText('NOT_RUN');
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('a field header in Top ideas opens its Guide drawer', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/ideas?columns=options');

@@ -106,6 +106,21 @@ test('Ideas: the views and filter chips fit the screen and a tapped view narrows
   expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
 });
 
+test('Ideas: the screener chips wrap inside the screen and a tapped one opens the screener', async ({
+  page,
+}) => {
+  await page.goto('/ideas');
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  const items = page.getByRole('list', { name: 'Screeners' }).getByRole('listitem');
+  await expect(items).toHaveCount(4);
+  for (const item of await items.all()) {
+    const box = await item.boundingBox();
+    expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  }
+  await items.first().getByRole('link').tap();
+  await expect(page).toHaveURL(/\/screeners\/vrp-scanner/);
+});
+
 test('Ideas: a phone row keeps the ticker, who picked it, decision and score', async ({ page }) => {
   await page.goto('/ideas');
   const headers = page.getByRole('grid', { name: 'Top ideas' }).getByRole('columnheader');

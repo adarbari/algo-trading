@@ -57,6 +57,12 @@ const IdeasPage = graphql(`
           runId
           configVersion
           paused
+          coverage
+          unavailable {
+            kind
+            guideTerm
+            kindText
+          }
         }
         notRun {
           code

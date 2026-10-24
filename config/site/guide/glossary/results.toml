@@ -150,6 +150,15 @@ Some screeners rank names by values from a source under a personal data licence.
 see_also = ["ideas_ranking", "picked_by"]
 
 [[term]]
+id = "partial_run"
+term = "Partial run"
+short = "A screener that ran for the session but without some of its data, so it may have missed names."
+body = """
+The chip shows the picks the run made and, beside it, what the run went without in general words, such as data that was not stored for the session. A name with no value for a hard criterion is rejected, so a partial run can leave out names that would have passed with the data. Its picks are real and join the ideas; read them as a shorter list than a complete run would give, not as a verdict on the names left out. Open the screener to see its run.
+"""
+see_also = ["not_run", "withheld_screener", "unknown"]
+
+[[term]]
 id = "idea_decision"
 term = "Idea decision"
 short = "The badge says how the best pick fared overall; the squares under it show each criterion it was judged on."
