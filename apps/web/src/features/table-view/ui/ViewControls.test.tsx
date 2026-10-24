@@ -18,6 +18,7 @@ function state(patch: Partial<TableViewState> = {}): TableViewState {
     narrowColumns: [],
     sort: null,
     decisions: null,
+    droppedFilters: [],
     change: vi.fn(),
     select: vi.fn(),
     saveAs: vi.fn(),

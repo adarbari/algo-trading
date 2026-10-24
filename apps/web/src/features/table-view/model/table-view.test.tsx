@@ -28,6 +28,7 @@ const view = (patch: Record<string, unknown> = {}) => ({
   narrowColumns: ['name'],
   sort: '-score',
   decisions: ['QUALIFIED'],
+  filters: 'decision:QUALIFIED;gone:1..2',
   names: ['Earnings'],
   ...patch,
 });
@@ -78,9 +79,67 @@ describe('useTableView', () => {
           narrow_columns: ['name'],
           sort: 'symbol',
           decisions: ['QUALIFIED'],
+          filters: 'decision:QUALIFIED;gone:1..2', // no binding: the saved f is kept
         },
       });
     });
+  });
+
+  it('saves the URL f with the view, restores the saved f on first load, and says what it drops', async () => {
+    GQL.mockResolvedValue({ view: view() });
+    PUT.mockResolvedValue(ok(restView()));
+    const onChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ f }: { f: string | undefined }) =>
+        useTableView(SCOPE, { f, onChange, known: ['decision', 'dte'] }),
+      { wrapper, initialProps: { f: undefined as string | undefined } },
+    );
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith('decision:QUALIFIED');
+    });
+    expect(result.current.droppedFilters).toEqual(['gone']);
+    rerender({ f: 'dte:..14' });
+    act(() => {
+      result.current.change({ sort: 'symbol' });
+    });
+    await waitFor(() => {
+      expect(PUT.mock.calls[0]?.[1]).toMatchObject({ body: { filters: 'dte:..14' } });
+    });
+  });
+
+  it("keeps a shared link's f over the default view's, but a picked view replaces it", async () => {
+    GQL.mockResolvedValue({ view: view() });
+    const onChange = vi.fn();
+    const { result } = renderHook(
+      () => useTableView(SCOPE, { f: 'dte:..5s', onChange, known: ['decision', 'dte'] }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    GQL.mockResolvedValue({ view: view({ name: 'Earnings', filters: '' }) });
+    act(() => {
+      result.current.select('Earnings');
+    });
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  it('a view stored before filters existed restores no f', async () => {
+    const { filters: _omitted, ...legacy } = view();
+    GQL.mockResolvedValue({ view: legacy });
+    const onChange = vi.fn();
+    const { result } = renderHook(
+      () => useTableView(SCOPE, { f: undefined, onChange, known: ['decision'] }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+    expect(onChange).toHaveBeenCalledWith(undefined);
+    expect(result.current.droppedFilters).toEqual([]);
   });
 
   it('nothing saved: empty lists and no decisions (the table applies its defaults)', async () => {

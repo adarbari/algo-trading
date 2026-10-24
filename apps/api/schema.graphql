@@ -3528,6 +3528,7 @@ type TableView {
   decisions: [String!]!
   names: [String!]!
   narrowColumns: [String!]!
+  filters: String!
 }
 
 """A run of a sentence: plain text, or a term linked to `url`"""
