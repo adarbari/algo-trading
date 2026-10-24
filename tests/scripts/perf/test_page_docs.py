@@ -56,3 +56,11 @@ def test_an_optional_variable_may_be_left_out_but_a_required_one_may_not() -> No
     docs = {"X": "query X($first: Int!, $after: String) { x(first: $first, after: $after) }"}
     assert pd.drift({"/a": [call("X", docs["X"], {"first": 1})]}, docs) == []
     assert "variables" in pd.drift({"/a": [call("X", docs["X"], {"after": "a"})]}, docs)[0]
+
+
+def test_a_list_of_non_null_items_is_not_a_required_variable() -> None:
+    """`[FilterInput!]` is nullable (its `!` is the item's); `Int!` and `[T!]!` are required."""
+    head = (
+        "query Q($edgeId: String!, $names: [N!]!, $filters: [FilterInput!], $page: Int = 1) { x }"
+    )
+    assert pd.required_variables(head) == {"edgeId", "names"}

@@ -40,7 +40,11 @@ def declared_variables(document: str) -> set[str]:
 def required_variables(document: str) -> set[str]:
     """The declared variables with a non-null type (`$first: Int!`): a call must send them."""
     head = _HEAD_VARS.search(document)
-    return set(re.findall(r"\$(\w+)\s*:\s*[^,$]*!", head.group(1))) if head else set()
+    if not head:
+        return set()
+    # Each `$name: Type` chunk; only a type that itself ends in `!` is required (`[T!]` is not).
+    chunks = re.findall(r"\$(\w+)\s*:\s*([^$]*)", head.group(1))
+    return {name for name, kind in chunks if kind.split("=")[0].strip().rstrip(",").endswith("!")}
 
 
 def web_documents() -> dict[str, str]:
