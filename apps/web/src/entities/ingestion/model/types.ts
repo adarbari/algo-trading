@@ -6,7 +6,7 @@ export type CompletenessCell = Completeness['cells'][number];
 export type CellDetail = NonNullable<gqlTypes.IngestionCellQuery['ingestionCell']>;
 export type ChainCoverage = NonNullable<gqlTypes.IngestionCompletenessQuery['chainCoverage']>;
 
-export type KnownCoverage = NonNullable<gqlTypes.KnownCoverageQuery['knownCoverage']>;
+export type KnownCoverage = NonNullable<gqlTypes.IngestionCompletenessQuery['knownCoverage']>;
 export type KnownByType = KnownCoverage['byType'][number];
 export type KnownGapCount = KnownCoverage['gaps'][number];
 

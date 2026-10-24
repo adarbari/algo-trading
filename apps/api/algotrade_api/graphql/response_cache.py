@@ -314,7 +314,6 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "IngestionCompleteness",
         "NightlyRuns",
         "QualityChecks",
-        "KnownCoverage",  # the nightly record's coverage breakdown: run records only
         "ScreenerResults",
         "ScreenerPicks",
         "InstrumentScreenerHits",

@@ -548,17 +548,12 @@ export type IdeasPageQueryVariables = Exact<{
 
 export type IdeasPageQuery = { ideas: { session: string, total: number, hasMore: boolean, nextCursor: string | null, pausedTotal: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, withheld: boolean, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number, coverage: string | null, unavailable: Array<{ kind: UnavailableKind, guideTerm: string, kindText: string }> } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, score: number, regime: string | null, sizeMultiplier: number | null, watchOut: Array<string>, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, best: { configId: string, decision: string, score: number | null, reasons: string, criteria: Array<{ id: string, outcome: string }> }, pickedBy: Array<{ configId: string, own: boolean, position: number, score: number, decision: string }>, metrics: Array<{ name: string, value: unknown }> }> } | null };
 
-export type KnownCoverageQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type KnownCoverageQuery = { knownCoverage: { session: string, runId: string | null, byType: Array<{ securityType: string, names: number, rows: number, known: number, share: number | null }>, gaps: Array<{ gap: KnownGap, names: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
-
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
 }>;
 
 
-export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null, chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null };
+export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null, chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null, knownCoverage: { session: string, runId: string | null, byType: Array<{ securityType: string, names: number, rows: number, known: number, share: number | null }>, gaps: Array<{ gap: KnownGap, names: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
 
 export type IngestionCellQueryVariables = Exact<{
   dataset: string;
@@ -3134,40 +3129,6 @@ export const IdeasPageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<IdeasPageQuery, IdeasPageQueryVariables>;
-export const KnownCoverageDocument = new TypedDocumentString(`
-    query KnownCoverage {
-  knownCoverage {
-    session
-    runId
-    byType {
-      securityType
-      names
-      rows
-      known
-      share
-    }
-    gaps {
-      gap
-      names
-    }
-    unknown {
-      code
-      kind
-      guideTerm
-      kindText
-      cause {
-        links {
-          level
-          subject
-          status
-          message
-          runId
-        }
-      }
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<KnownCoverageQuery, KnownCoverageQueryVariables>;
 export const IngestionCompletenessDocument = new TypedDocumentString(`
     query IngestionCompleteness($sessions: Int!) {
   completeness(sessions: $sessions) {
@@ -3203,6 +3164,36 @@ export const IngestionCompletenessDocument = new TypedDocumentString(`
     chronicNames
     previousChronic
     drift
+  }
+  knownCoverage {
+    session
+    runId
+    byType {
+      securityType
+      names
+      rows
+      known
+      share
+    }
+    gaps {
+      gap
+      names
+    }
+    unknown {
+      code
+      kind
+      guideTerm
+      kindText
+      cause {
+        links {
+          level
+          subject
+          status
+          message
+          runId
+        }
+      }
+    }
   }
 }
     `) as unknown as TypedDocumentString<IngestionCompletenessQuery, IngestionCompletenessQueryVariables>;

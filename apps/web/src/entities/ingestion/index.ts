@@ -5,8 +5,8 @@ export {
   useChainCoverage,
   useCompleteness,
   useFocusCell,
+  useKnownCoverage,
 } from './api/queries';
-export { useKnownCoverage } from './api/known';
 export { datasetLabel, isChains } from './model/dataset';
 export {
   cellShare,
