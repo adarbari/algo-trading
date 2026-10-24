@@ -142,6 +142,67 @@ describe('useTableView', () => {
     expect(result.current.droppedFilters).toEqual([]);
   });
 
+  it('a view with no filters is seeded by the fallback: nothing saved, or only decisions saved', async () => {
+    const fallback = vi.fn((decisions: readonly string[]) =>
+      decisions.length > 0 ? `decision:${decisions.join(',')}` : 'decision:QUALIFIED',
+    );
+    GQL.mockResolvedValue({ view: view({ saved: false, filters: '', decisions: [] }) });
+    const first = vi.fn();
+    const one = renderHook(
+      () => useTableView(SCOPE, { f: undefined, onChange: first, known: ['decision'], fallback }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(first).toHaveBeenCalledWith('decision:QUALIFIED');
+    });
+    one.unmount();
+    GQL.mockResolvedValue({ view: view({ filters: '', decisions: ['WATCH', 'REJECT'] }) });
+    const second = vi.fn();
+    renderHook(
+      () => useTableView(SCOPE, { f: undefined, onChange: second, known: ['decision'], fallback }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(second).toHaveBeenCalledWith('decision:WATCH,REJECT');
+    });
+  });
+
+  it('a table with no view stored at all (the server answers null) is seeded by the fallback and ready', async () => {
+    GQL.mockResolvedValue({ view: null });
+    const onChange = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useTableView(SCOPE, {
+          f: undefined,
+          onChange,
+          known: ['decision'],
+          fallback: () => 'decision:QUALIFIED',
+        }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+    expect(onChange).toHaveBeenCalledWith('decision:QUALIFIED');
+  });
+
+  it('with a filter binding, is not ready until the view has been read and its f restored', async () => {
+    GQL.mockResolvedValue({ view: view() });
+    const { result, rerender } = renderHook(
+      ({ known }: { known: string[] | undefined }) =>
+        useTableView(SCOPE, { f: undefined, onChange: vi.fn(), ...(known && { known }) }),
+      { wrapper, initialProps: { known: undefined as string[] | undefined } },
+    );
+    await waitFor(() => {
+      expect(GQL).toHaveBeenCalled();
+    });
+    expect(result.current.ready).toBe(false);
+    rerender({ known: ['decision', 'gone'] });
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+  });
+
   it('nothing saved: empty lists and no decisions (the table applies its defaults)', async () => {
     GQL.mockResolvedValue({
       view: view({ saved: false, columns: [], narrowColumns: [], sort: null, decisions: [] }),

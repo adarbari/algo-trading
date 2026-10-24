@@ -25,6 +25,8 @@ const renderPage = (onEdit = vi.fn()) =>
   render(
     <ScreenerResultsPage
       id="my-vrp"
+      f={undefined}
+      onFilterChange={vi.fn()}
       onEdit={onEdit}
       onOpenTicker={vi.fn()}
       onCompare={vi.fn()}
@@ -67,6 +69,8 @@ describe('ScreenerResultsPage', () => {
     render(
       <ScreenerResultsPage
         id="my-vrp"
+        f={undefined}
+        onFilterChange={vi.fn()}
         onEdit={onEdit}
         onOpenTicker={vi.fn()}
         onCompare={vi.fn()}

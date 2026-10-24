@@ -27,6 +27,7 @@ describe('feature table', () => {
       session: { date: '2026-10-02', unavailable: [gap('SYSTEM', ['rollup.earnings@v1.x'])] },
       universeSnapshot: '2026-10-02',
       preSnapshot: false,
+      facets: null,
       sort: '-a.b',
       total: 11_427,
       page: 2,
@@ -87,7 +88,8 @@ describe('feature table', () => {
     expect(
       tableVariables({
         columns: ['feature.y'],
-        filters: { securityType: 'ETF', q: 'nv' },
+        filters: [{ id: 'security_type', values: ['ETF'], active: true }],
+        q: ' nv ',
         sort: '-feature.y',
         page: 3,
         size: 100,
@@ -95,11 +97,9 @@ describe('feature table', () => {
     ).toEqual({
       columns: ['feature.y'],
       keys: null,
-      securityType: 'ETF',
-      sector: null,
-      liquidityClass: null,
-      leveraged: null,
-      optionable: null,
+      filters: [
+        { id: 'security_type', values: ['ETF'], min: null, max: null, within: null, active: true },
+      ],
       q: 'nv',
       sort: '-feature.y',
       page: 3,
@@ -107,6 +107,7 @@ describe('feature table', () => {
     });
     const keyed = tableVariables({ columns: [], keys: ['AAPL'] });
     expect(keyed.keys).toEqual(['AAPL']);
+    expect(keyed.filters).toBeNull();
     expect('page' in keyed || 'size' in keyed).toBe(false); // the server's defaults
   });
 });

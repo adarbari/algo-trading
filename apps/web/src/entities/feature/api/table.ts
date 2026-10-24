@@ -13,11 +13,7 @@ const FeatureTable = graphql(`
   query FeatureTable(
     $columns: [FeatureName!]!
     $keys: [String!]
-    $securityType: String
-    $sector: String
-    $liquidityClass: String
-    $leveraged: Boolean
-    $optionable: Boolean
+    $filters: [FilterInput!]
     $q: String
     $sort: String
     $page: Int
@@ -26,11 +22,7 @@ const FeatureTable = graphql(`
     table(
       columns: $columns
       keys: $keys
-      securityType: $securityType
-      sector: $sector
-      liquidityClass: $liquidityClass
-      leveraged: $leveraged
-      optionable: $optionable
+      filters: $filters
       q: $q
       sort: $sort
       page: $page
@@ -94,6 +86,25 @@ const FeatureTable = graphql(`
       unknown
       reasons
       kinds
+      facets {
+        total
+        matched
+        items {
+          id
+          active
+          removes
+          unknown
+          options {
+            value
+            count
+          }
+          bins {
+            lo
+            hi
+            count
+          }
+        }
+      }
       kindTexts {
         kind
         text

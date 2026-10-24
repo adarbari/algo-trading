@@ -14,6 +14,8 @@ describe('explore search params', () => {
       }),
     ).toEqual({ sel: 'AAPL,MSFT', tab: 'options', range: '2Y' });
     expect(parseExploreSearch({ tab: 'nope', right: 'X', sel: '  ' })).toEqual({});
+    // the universe table's filters ride in `f`, as the filter bar wrote them
+    expect(parseExploreSearch({ f: 'sector:Technology' })).toEqual({ f: 'sector:Technology' });
   });
 
   it('drops the retired table state and Field guide tab (an old link opens the default view)', () => {

@@ -52,7 +52,6 @@ export {
   type FeatureTableData,
   type FeatureTableQuery,
   type TableCell,
-  type TableFilters,
   type PickEdge,
   type TableRow,
 } from './model/table';

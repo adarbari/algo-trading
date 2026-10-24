@@ -60,6 +60,7 @@ function served(patch: Partial<FeatureTableData> = {}): FeatureTableData {
     total: 250,
     page: 1,
     size: 100,
+    facets: null,
     ...patch,
   };
 }
@@ -82,7 +83,6 @@ describe('FeatureTable', () => {
         label="Tickers"
         columns={[EARN]}
         onColumnsChange={vi.fn()}
-        filters={{ leveraged: true }}
         sortMode="server"
         sort={{ columnId: EARN, direction: 'desc' }}
         onSortChange={onSortChange}
@@ -94,7 +94,8 @@ describe('FeatureTable', () => {
     expect(asked()).toEqual({
       columns: [EARN],
       keys: undefined,
-      filters: { leveraged: true },
+      filters: undefined,
+      q: undefined,
       sort: `-${EARN}`,
       page: 1,
       size: 100,
@@ -113,20 +114,42 @@ describe('FeatureTable', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('starts a changed query on its first page', async () => {
+  it('sends the filters and the search to the server, starts a changed query on its first page, and hands the counts to the caller', async () => {
     const user = userEvent.setup();
+    const facets = { total: 250, matched: 40, items: [] };
+    hooks.useFeatureTable.mockReturnValue(fakeQuery(served({ facets })));
+    const header = vi.fn(() => 'the bar');
     const props = {
       label: 'Tickers',
       columns: [EARN],
       onColumnsChange: vi.fn(),
       sortMode: 'server' as const,
+      header,
       emptyMessage: 'none',
     };
-    const { rerender } = render(<FeatureTable {...props} filters={{}} />);
+    const { rerender } = render(<FeatureTable {...props} filters={[]} q="" />);
+    expect(header).toHaveBeenLastCalledWith(facets);
     await user.click(screen.getByRole('button', { name: 'Next page' }));
     expect(asked().page).toBe(2);
-    rerender(<FeatureTable {...props} filters={{ q: 'mrv' }} />);
-    expect(asked().page).toBe(1);
+    const filters = [{ id: 'security_type', values: ['ETF'], active: true }];
+    rerender(<FeatureTable {...props} filters={filters} q="mrv" />);
+    expect(asked()).toMatchObject({ filters, q: 'mrv', page: 1 });
+    expect(screen.getByText('the bar')).toBeInTheDocument();
+  });
+
+  it('asks a function empty message with the counts', () => {
+    const facets = { total: 250, matched: 0, items: [] };
+    hooks.useFeatureTable.mockReturnValue(fakeQuery(served({ rows: [], total: 0, facets })));
+    render(
+      <FeatureTable
+        label="Tickers"
+        columns={[EARN]}
+        onColumnsChange={vi.fn()}
+        sortMode="server"
+        emptyMessage={(f) => `none of ${String(f?.total)}`}
+      />,
+    );
+    expect(screen.getByText('none of 250')).toBeInTheDocument();
   });
 
   it('reads the keys asked for in one request and sorts them in the table', () => {
@@ -142,7 +165,7 @@ describe('FeatureTable', () => {
         emptyMessage="none"
       />,
     );
-    expect(asked()).toEqual({ columns: [EARN], keys: ['MRVL', 'AAPL'], filters: undefined });
+    expect(asked()).toEqual({ columns: [EARN], keys: ['MRVL', 'AAPL'] });
     expect(screen.queryByRole('button', { name: 'Next page' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Dimension' })).toBeInTheDocument();
   });
