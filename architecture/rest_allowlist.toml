@@ -19,7 +19,7 @@
 #   keep       true: stays REST by design (health, job polling, live quotes); false: retires
 #   retire_in  the read-model PR that moves it to GraphQL and removes this entry
 
-max_get_routes = 5
+max_get_routes = 6
 
 # ---------------------------------------------------------------------------- stays REST
 
@@ -46,6 +46,12 @@ method = "GET"
 path = "/files/edges/{edge_id}/trades.csv"
 keep = true
 reason = "a file, not a page read (ADR 0064 decision 11, amending 0037): the verdict basis's trades as CSV, from the loader Query.edgeTrades reads (same licence redaction and withheld out-of-sample trades), streamed, authenticated like every route"
+
+[[route]]
+method = "GET"
+path = "/files/{surface}.csv"
+keep = true
+reason = "a file, not a page read (ADR 0082 decision 6, amending 0037): a filter-bar surface's rows under the page's `f` string, built by the surface's own gated loader (same licence rule: a personal value is LICENCE to a non-holder), streamed, one audit line per export, authenticated like every route"
 
 [[route]]
 method = "GET"

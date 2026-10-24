@@ -3833,6 +3833,118 @@
         ]
       }
     },
+    "/files/{surface}.csv": {
+      "get": {
+        "operationId": "surface_csv_files__surface__csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "surface",
+            "required": true,
+            "schema": {
+              "title": "Surface",
+              "type": "string"
+            }
+          },
+          {
+            "description": "the page's filter string (ADR 0082)",
+            "in": "query",
+            "name": "f",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the page's filter string (ADR 0082)",
+              "title": "F"
+            }
+          },
+          {
+            "description": "screener_results: the screener whose run to export",
+            "in": "query",
+            "name": "screener",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "screener_results: the screener whose run to export",
+              "title": "Screener"
+            }
+          },
+          {
+            "description": "catalogue columns to add (screener_results, universe)",
+            "in": "query",
+            "name": "columns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 40,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "catalogue columns to add (screener_results, universe)",
+              "title": "Columns"
+            }
+          },
+          {
+            "description": "the session to read (default: the one pages show)",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the session to read (default: the one pages show)",
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Surface Csv",
+        "tags": [
+          "files"
+        ]
+      }
+    },
     "/graphql": {
       "post": {
         "operationId": "handle_http_post_graphql_post",

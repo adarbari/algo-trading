@@ -11,12 +11,10 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from algotrade.config.user import UserContext
-from algotrade.services.read.context import open_context
 from algotrade.services.read.edge_ledger import trades
 from algotrade.services.read.edge_ledger.trades_csv import csv_lines
 from algotrade.services.read.evaluation.edges import load_edge
-from algotrade_api.deps import Caller, Followed, Store
+from algotrade_api.deps import Caller, Followed, Store, dated_context
 
 router = APIRouter(prefix="/files/edges", tags=["files"])
 
@@ -35,14 +33,7 @@ def trades_csv(
         Query(description="the session to read (default: the one the pages show); live rows"),
     ] = None,
 ) -> StreamingResponse:
-    ctx = open_context(
-        store.reader,
-        store.configs,
-        UserContext(caller.user_id),
-        date,
-        cache=store.cache,
-        serving=serving,
-    )
+    ctx = dated_context(store, caller, serving, date)
     edge = load_edge(ctx, edge_id)
     if edge is None:
         raise HTTPException(404, f"no such edge: {edge_id}")

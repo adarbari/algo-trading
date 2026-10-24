@@ -3,7 +3,7 @@
 **Status:** accepted (2026-10-05; owner decision). Amends [0024](0024-api.md) (thin routes over
 `services.explore` become thin GraphQL types over `services.read`; `services.explore` is
 deleted at the end) and [0025](0025-frontend-architecture.md) rule 4 (the generated client
-has two generators); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (one file GET, the edge ledger CSV). Spec: [docs/api/read-model.md](../api/read-model.md). Implemented over
+has two generators); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (one file GET, the edge ledger CSV) and by [0082](0082-shared-filter-bar.md) (filter-bar files, `GET /files/{surface}.csv`). Spec: [docs/api/read-model.md](../api/read-model.md). Implemented over
 read-model PRs 2-10; PR 1 records it and builds the harness.
 
 ## Context
@@ -41,6 +41,8 @@ one could pick a different session (ADR 0036).
    `GET /edges/{id}/evaluate/{job_id}` (0059): `max_get_routes` goes from 5 to 4.
    Amended by [0064](0064-edge-evidence-series-and-trade-ledger.md): the edge ledger's CSV file, `GET /files/edges/{edge_id}/trades.csv`
    (same loader as `Query.edgeTrades`): `max_get_routes` goes from 4 to 5.
+   Amended by [0082](0082-shared-filter-bar.md): the filter bar's files, `GET /files/{surface}.csv`
+   (the surface's own gated loader): `max_get_routes` goes from 5 to 6.
 5. **Migration in ten PRs** (the spec's plan), each green and shippable; `services/explore` is
    deleted in the last.
 
