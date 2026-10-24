@@ -143,6 +143,7 @@ entry had no `PERF_CLONE_ROOT`, the old default `/Users/adarbari/perf-clone` was
 instead of 98 s on the excluded path (2026-10-24). A clone outside the exclusion is not refused, but
 `run.log` gets a `WARNING` line and the notification says `clone outside the Spotlight exclusion:
 indexing will skew the bench`; any plist that sets `PERF_CLONE_ROOT` must keep it under `~/workspace`.
+The old `/Users/adarbari/perf-clone` folder can be removed by hand once it is empty.
 **The timeline goes on through the background delete:** after the wrapper has started it, a detached
 `flight_recorder.py trash-watch` appends rows with phase `trash-delete` to `timeline.csv` until the
 delete's `trash-delete.pid` file is gone or 15 minutes (`PERF_TRASH_WATCH_S`), so what slows the delete

@@ -201,36 +201,46 @@ def timeline(
         time.sleep(max(0.0, every - prev_dur))
 
 
-def _alive_pid(pid_file: Path) -> int | None:
-    """The pid in the trash delete's ``pid trash start`` file; None when gone or stale."""
+def _pid_file(pid_file: Path) -> tuple[int, str, str] | None:
+    """(pid, trash, start epoch) of the trash delete's ``pid trash start`` file; None when the file
+    is gone, unreadable or stale (the pid is dead)."""
     try:
-        pid = int(pid_file.read_text().split()[0])
-        os.kill(pid, 0)
-    except (OSError, ValueError, IndexError):
+        pid, trash, start = pid_file.read_text().split()[:3]
+        os.kill(int(pid), 0)
+        return int(pid), trash, start
+    except (OSError, ValueError):
         return None
-    return pid
 
 
 def trash_watch(
-    rundir: Path, pid_file: Path, store: str, every: float, max_s: float, appear_s: float = 10.0
-) -> None:
+    rundir: Path, pid_file: Path, store: str, every: float, max_s: float, appear_s: float = 10.0,
+    trash: str | None = None,
+) -> None:  # fmt: skip
     """Keep sampling into timeline.csv, phase ``trash-delete``, while the background trash delete
-    runs (its pid file exists and the pid lives), at most ``max_s``; waits ``appear_s`` for it."""
+    runs (its pid file exists and the pid lives), at most ``max_s``; waits ``appear_s`` for it.
+    It stops when the file now names another delete (another trash or start): a second run of the
+    day must not get a stale watcher's rows."""
+    every = max(every, 1.0)  # PERF_SAMPLE_S=0 must not spin
     path = rundir / "timeline.csv"
     if not path.exists():
         path.write_text(",".join(COLUMNS) + "\n")
     start = time.time()
-    pid = None
-    while pid is None and time.time() - start < appear_s:
-        pid = _alive_pid(pid_file)
-        if pid is None:
+    seen = None
+    while seen is None and time.time() - start < appear_s:
+        seen = _pid_file(pid_file)
+        if seen is None:
             time.sleep(0.2)
-    while pid is not None and time.time() - start < max_s:
-        row = sample_row(rundir, pid, 0, store, "trash-delete")
+    if seen is None or (trash is not None and seen[1] != trash):
+        return
+    while seen is not None and time.time() - start < max_s:
+        row = sample_row(rundir, seen[0], 0, store, "trash-delete")
         with path.open("a", newline="") as f:
             csv.writer(f).writerow(row)
         time.sleep(every)
-        pid = _alive_pid(pid_file)
+        now = _pid_file(pid_file)
+        if now is None or now[1:] != seen[1:]:
+            return
+        seen = now
 
 
 def read_rows(rundir: Path) -> list[dict]:
@@ -493,6 +503,7 @@ def _parser() -> argparse.ArgumentParser:
             p.add_argument("--stop-file", type=Path)
         if name == "trash-watch":
             p.add_argument("--pid-file", required=True, type=Path)
+            p.add_argument("--trash")
             p.add_argument("--max-s", type=float, default=900.0)
             p.add_argument("--foreground", action="store_true")
         if name in ("prekill", "report"):
@@ -507,7 +518,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def _trash_watch_cli(a: argparse.Namespace, argv: list[str] | None) -> None:
     if a.foreground:
-        trash_watch(a.rundir, a.pid_file, a.store, a.every, a.max_s)
+        trash_watch(a.rundir, a.pid_file, a.store, a.every, a.max_s, trash=a.trash)
         return
     # detached in its own session: it never holds the wrapper's exit
     args = [sys.executable, __file__, *(argv if argv is not None else sys.argv[1:])]

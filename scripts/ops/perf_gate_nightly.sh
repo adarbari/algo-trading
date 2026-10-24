@@ -49,7 +49,7 @@ repo=$(cd "$(dirname "$0")/../.." && pwd)
 src=${PERF_SRC:-$repo/var/data}
 # set but empty is an error, not a default. The default is inside the owner's Spotlight Privacy exclusion
 # (~/workspace): outside it mds / mds_stores took 380-480% CPU during the bench and slowed the delete 4x
-spot_dir=${PERF_SPOTLIGHT_DIR:-${HOME:-/Users/adarbari}/workspace}
+spot_dir=${PERF_SPOTLIGHT_DIR:-${HOME:-/Users/adarbari}/workspace}; spot_dir=${spot_dir%/}
 clone=${PERF_CLONE_ROOT-${HOME:-/Users/adarbari}/workspace/perf-clone/data}
 status=${PERF_STATUS:-$repo/var/logs/perf_gate.status}
 today=${PERF_NOW_DATE:-$(date +%Y-%m-%d)}
@@ -101,11 +101,16 @@ if command -v caffeinate >/dev/null 2>&1; then caffeinate -i -w $$ >/dev/null 2>
 # the clone is removed and rewritten: only the fixed clone path, never the real store
 case "$clone" in /*) ;; *) say "refusing: PERF_CLONE_ROOT must be an absolute path (got '$clone')"; exit 2 ;; esac
 case "$clone" in */perf-clone/data) ;; *) say "refusing: $clone does not end in /perf-clone/data"; exit 2 ;; esac
-real_src=$(cd "$src" 2>/dev/null && pwd -P || echo "$src")
-real_clone=$(cd "$(dirname "$clone")" 2>/dev/null && pwd -P || dirname "$clone")/data
-case "$real_clone/" in "$real_src"/*) say "refusing: the clone is the real store"; exit 2 ;; esac
-case "$real_src/" in "$real_clone"/*) say "refusing: the real store is inside the clone"; exit 2 ;; esac
-[ "$real_clone" != "$real_src" ] || { say "refusing: the clone is the real store"; exit 2; }
+# the parent exists first, so the clone's path is symlink-resolved on a first run too (a link into the store)
+check_clone_paths() {
+  real_src=$(cd "$src" 2>/dev/null && pwd -P || echo "$src")
+  real_clone=$(cd "$(dirname "$clone")" 2>/dev/null && pwd -P || dirname "$clone")/data
+  case "$real_clone/" in "$real_src"/*) say "refusing: the clone is the real store"; exit 2 ;; esac
+  case "$real_src/" in "$real_clone"/*) say "refusing: the real store is inside the clone"; exit 2 ;; esac
+  [ "$real_clone" != "$real_src" ] || { say "refusing: the clone is the real store"; exit 2; }
+}
+mkdir -p "$(dirname "$clone")" 2>/dev/null
+check_clone_paths
 [ -d "$src" ] || { say "refusing: no store at $src"; exit 2; }
 
 # one instance at a time: an atomic mkdir lock with a pid file; a lock whose pid is dead is stale
@@ -275,10 +280,14 @@ phase=wait; timeline_pid=; prekill_pid=; kr_msg=; kr_note=
 set_phase() { phase=$1; echo "$1" >"$rundir/phase.txt"; echo "$1 $(date +%s)" >>"$rundir/phases.txt"; }
 set_phase wait
 clone_warn=
+real_spot=$(cd "$spot_dir" 2>/dev/null && pwd -P || echo "$spot_dir")
 case "$clone" in
   "$spot_dir"/*) ;;
-  *) clone_warn=" (clone outside the Spotlight exclusion: indexing will skew the bench)"
-     say "WARNING: the clone $clone is outside the Spotlight exclusion ($spot_dir): indexing will skew the bench" ;;
+  *) case "${real_clone:-$clone}" in
+       "$real_spot"/*) ;;
+       *) clone_warn=" (clone outside the Spotlight exclusion: indexing will skew the bench)"
+          say "WARNING: the clone $clone is outside the Spotlight exclusion ($spot_dir): indexing will skew the bench" ;;
+     esac ;;
 esac
 if [ -f "$fr" ]; then
   python3 "$fr" timeline --rundir "$rundir" --root $$ --every "${PERF_SAMPLE_S:-10}" --store "$logs" >/dev/null 2>&1 &
@@ -350,7 +359,7 @@ subprocess.Popen(
 PY
   # keep the timeline going while the delete runs (phase trash-delete, until its pid file is gone or
   # 15 min): detached, so it neither holds the wrapper's exit nor is a writer (flight_recorder is excluded)
-  [ -f "${fr:-}" ] && python3 "$fr" trash-watch --rundir "$rundir" --pid-file "$logs/perf_gate/trash-delete.pid" \
+  [ -f "${fr:-}" ] && python3 "$fr" trash-watch --rundir "$rundir" --pid-file "$logs/perf_gate/trash-delete.pid" --trash "$1" \
     --store "$logs" --every "${PERF_SAMPLE_S:-10}" --max-s "${PERF_TRASH_WATCH_S:-900}" >/dev/null 2>&1
   return 0
 }
@@ -440,6 +449,7 @@ if awk "BEGIN {exit !($load > $max_load)}"; then busy "load $load over $max_load
 
 t_ready=$(date +%s)
 case "$clone" in */perf-clone/data) ;; *) exit 2 ;; esac
+check_clone_paths  # again, resolved, right before the copy
 mkdir -p "$(dirname "$clone")"
 dev_of() { if [ -n "${PERF_DEV_CMD:-}" ]; then $PERF_DEV_CMD "$1"; else stat -c %d "$1" 2>/dev/null || stat -f %d "$1"; fi; }
 # cp -c silently falls back to a full copy across volumes: the clone must be on the store's volume

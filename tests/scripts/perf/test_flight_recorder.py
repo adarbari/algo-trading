@@ -312,3 +312,27 @@ def test_trash_watch_stops_for_a_stale_pid_file(tmp_path: Path) -> None:
     t0 = time.time()
     fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.2, 30.0, appear_s=0.5)
     assert time.time() - t0 < 5
+
+
+def test_trash_watch_with_a_zero_interval_does_not_spin(tmp_path: Path) -> None:
+    pid_file = tmp_path / "t.pid"
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.1 5")
+    threading.Timer(1.5, pid_file.unlink).start()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.0, 30.0)
+    assert len((tmp_path / "timeline.csv").read_text().splitlines()) <= 4  # a row a second at most
+
+
+def test_trash_watch_ignores_a_pid_file_of_another_trash_and_stops_when_it_changes(
+    tmp_path: Path,
+) -> None:
+    pid_file = tmp_path / "t.pid"
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.2 5")
+    fr.trash_watch(
+        tmp_path, pid_file, str(tmp_path), 0.2, 30.0, appear_s=0.5, trash="/x/data.trash.1"
+    )
+    assert len((tmp_path / "timeline.csv").read_text().splitlines()) == 1  # header only
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.1 5")
+    t0 = time.time()
+    threading.Timer(1.2, pid_file.write_text, args=(f"{os.getpid()} /x/data.trash.9 7",)).start()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.3, 30.0, trash="/x/data.trash.1")
+    assert time.time() - t0 < 8  # the file named another delete: the stale watcher left

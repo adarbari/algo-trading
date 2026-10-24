@@ -759,3 +759,24 @@ def test_the_timeline_goes_on_through_the_background_trash_delete(rig: Rig) -> N
             break
         time.sleep(0.3)
     assert any(",trash-delete," in r for r in rows)
+
+
+def test_a_clone_reached_through_a_symlink_into_the_store_is_refused_on_a_first_run(
+    rig: Rig,
+) -> None:
+    """The parent does not exist yet: it is made first so the real path resolves, then refused."""
+    store = rig.tmp / "var" / "data"
+    link = rig.tmp / "linkdir"
+    link.symlink_to(store)  # linkdir/perf-clone/data is store/perf-clone/data
+    res = rig.run(PERF_CLONE_ROOT=str(link / "perf-clone" / "data"), PERF_SRC=str(store))
+    assert res.returncode == 2 and "the clone is the real store" in res.stderr
+
+
+def test_the_spotlight_check_ignores_a_trailing_slash_and_compares_resolved_paths(rig: Rig) -> None:
+    assert rig.run(PERF_SPOTLIGHT_DIR=str(rig.tmp) + "/").returncode == 1
+    assert "Spotlight" not in (_evidence(rig) / "run.log").read_text()
+    rig.status.unlink()
+    link = rig.tmp.parent / (rig.tmp.name + "-spotlink")
+    link.symlink_to(rig.tmp)  # the exclusion named through a symlink to the clone's real place
+    assert rig.run(PERF_SPOTLIGHT_DIR=str(link)).returncode == 1
+    assert "Spotlight" not in (_evidence(rig) / "run.log").read_text()
