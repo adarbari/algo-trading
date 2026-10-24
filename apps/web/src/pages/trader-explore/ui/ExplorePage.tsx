@@ -8,7 +8,6 @@
 import { Heading, Skeleton, Stack, TabStrip } from '@algotrade/ui';
 import { Suspense } from 'react';
 
-import type { FilterSearch } from '@/features/filter-bar';
 import { TickerSearch } from '@/features/ticker-search';
 import { lazyPage } from '@/shared/lib/lazy';
 
@@ -31,7 +30,7 @@ export const preloadUniverseTable = UniverseTable.preload;
 
 export interface ExplorePageProps {
   /** Explore's state and, with no ticker open, the universe table's filters (`f`). */
-  search: ExploreSearch & FilterSearch;
+  search: ExploreSearch;
   onSearchChange: (patch: SearchPatch) => void;
   /** Opens one screener's results (a name in the Screener hits tab). */
   onOpenScreener: (screenerId: string) => void;

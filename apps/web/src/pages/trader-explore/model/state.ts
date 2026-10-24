@@ -6,7 +6,6 @@
 import type { ChartRange } from '@algotrade/ui';
 
 import { MAX_COMPARE } from '@/features/compare-set';
-import type { FilterSearch } from '@/features/filter-bar';
 
 import {
   DEFAULT_DIMENSIONS,
@@ -16,9 +15,7 @@ import {
 } from '@/entities/explore';
 
 /** A change to the search params; `undefined` removes a key. */
-export type SearchPatch = {
-  [K in keyof (ExploreSearch & FilterSearch)]?: (ExploreSearch & FilterSearch)[K] | undefined;
-};
+export type SearchPatch = { [K in keyof ExploreSearch]?: ExploreSearch[K] | undefined };
 
 /** Tabs open at once: the compare chart gives each one of its series colours. */
 export const MAX_OPEN = MAX_COMPARE;
