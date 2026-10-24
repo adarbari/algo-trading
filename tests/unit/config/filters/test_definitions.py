@@ -162,7 +162,7 @@ def test_the_control_words_have_guide_entries() -> None:
 
 def test_the_shipped_files_leave_out_what_is_not_stored() -> None:
     ids = {f.id for f in shipped("ideas").filters}
-    assert not ids & {"new_today", "rank_moved_up", "optionable"}, "needs new data first"
+    assert not ids & {"new_today", "days_picked", "rank_moved_up", "optionable"}, "needs data first"
     results = {f.id for f in shipped("screener_results").filters}
     assert not results & {"optionable", "score_components"}, "needs new data first"
     leaving = {
