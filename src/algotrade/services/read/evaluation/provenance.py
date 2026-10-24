@@ -14,7 +14,7 @@ week), so the read holds no clock. Public: the short run id and the figures; the
 is served to admins only (``AdminCause`` on the field), with no step or table name here."""
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
@@ -39,6 +39,9 @@ STALE_AFTER_SESSIONS = 5
 # ``stats["user"]``, the edge in ``stats["params"]["edge"]``, ``started_at`` its submission). The
 # read model never imports the jobs package (ADR 0037), so the shape is read here.
 EDGE_EVAL_JOB = "job:edge-eval"
+JOB_LIVE_FOR = timedelta(
+    hours=6
+)  # an unfinished job older than this, behind a newer record, is dead
 
 
 @dataclass(frozen=True)
@@ -100,17 +103,22 @@ def _changed(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> tuple[bool, int
 
 def _running_since(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> datetime | None:
     """When a newer evaluation of this edge by the run's owner started: an ``edge-eval`` job
-    queued or running (the jobs record the pool fails when its process stops, so a crash does not
-    stay running) submitted after the run committed, on the request's session or later. The run
-    record itself is written once, already COMPLETE, so it never shows an evaluation in flight."""
+    queued or running, submitted after the run committed, on the request's session or later, and
+    not an orphan. Only the pool fails the jobs of a stopped process; a job the API's runner
+    started is never recovered, so a QUEUED / RUNNING record more than ``JOB_LIVE_FOR`` older
+    than the newest ``edge-eval`` record (or the run) is taken as dead. No clock is read. The
+    run record is written once, already COMPLETE, so it never shows an evaluation in flight."""
+    jobs = ctx.reader.runs(EDGE_EVAL_JOB)
+    newest = max([run.knowledge_ts, *(j.finished_at or j.started_at for j in jobs)])
     started = [
         job.started_at
-        for job in ctx.reader.runs(EDGE_EVAL_JOB)
+        for job in jobs
         if job.stats.get("user") == run.owner
         and (job.stats.get("params") or {}).get("edge") == edge.id
         and job.status in (RunStatus.QUEUED, RunStatus.RUNNING)
         and job.started_at > run.knowledge_ts
         and job.started_at.date() >= ctx.session.date
+        and newest - job.started_at <= JOB_LIVE_FOR
     ]
     return max(started, default=None)
 

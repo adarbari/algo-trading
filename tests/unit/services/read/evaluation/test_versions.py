@@ -14,6 +14,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.configs import resolve_config
+from algotrade.services.jobs.models import JobRecord
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.evaluation import runs, versions
 from algotrade.services.read.evaluation.edges import Edge, load_edge, load_edge_problems, load_edges
@@ -422,11 +423,10 @@ def _job(
 ) -> None:
     """An ``edge-eval`` job record as the jobs package saves it (``job:edge-eval``)."""
     at = HERE.replace(day=2, hour=3) + timedelta(minutes=minutes)
-    record = RunRecord(
-        f"job-{edge}-{owner}-{minutes}", "job:edge-eval", at.date(), at, status=status
+    job = JobRecord(
+        f"job-{edge}-{owner}-{minutes}", "edge-eval", {"edge": edge}, owner, at, status=status
     )
-    record.stats = {"params": {"edge": edge}, "user": owner}
-    backend.runs.save(record)
+    backend.runs.save(job.to_run())
 
 
 def test_a_run_of_the_served_session_is_current_with_today_s_data(backend: MemoryBackend) -> None:
@@ -499,6 +499,19 @@ def test_another_edges_or_owners_job_is_ignored(backend: MemoryBackend) -> None:
     _job(backend, owner="someone", minutes=40)
     found = _provenance(backend, END)
     assert found is not None and not found.re_evaluating
+
+
+def test_an_orphaned_job_behind_a_newer_record_is_ignored_and_a_fresh_one_counted(
+    backend: MemoryBackend,
+) -> None:
+    write_run(backend, "r", FROZEN, 0.6, screener_hashes={"momo": _current_hash(backend)})
+    _job(backend, RunStatus.RUNNING, minutes=30)  # never finished: its process died
+    _job(backend, RunStatus.COMPLETE, minutes=30 + 7 * 60)  # a later job finished 7 h on
+    found = _provenance(backend, END)
+    assert found is not None and not found.re_evaluating
+    _job(backend, RunStatus.RUNNING, minutes=30 + 8 * 60)  # a fresh one is in flight
+    found = _provenance(backend, END)
+    assert found is not None and found.re_evaluating
 
 
 def test_a_job_from_an_earlier_session_is_ignored(backend: MemoryBackend) -> None:
