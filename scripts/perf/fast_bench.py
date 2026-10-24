@@ -395,6 +395,9 @@ def _edge_screener(d: dict) -> str:
 _SCREENER = ("EdgesPage", {}, _edge_screener)
 VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object]]]] = {
     "HarnessRun": {"runId": ("HarnessRuns", {"limit": 1}, lambda d: d["harnessRuns"][0]["runId"])},
+    "AdminScreenerRun": {
+        "runId": ("AdminScreenerRuns", {"limit": 1}, lambda d: d["screenerRuns"][0]["runId"])
+    },
     "GuideField": {"name": _FEATURE},
     "GuideHelpField": {"name": _FEATURE},
     "GuideSituation": {

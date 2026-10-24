@@ -55,7 +55,7 @@ class PickCount:
     not_run: Unknown | None
 
 
-def _decisions(record: RunRecord) -> Mapping[str, int] | None:
+def record_decisions(record: RunRecord) -> Mapping[str, int] | None:
     """The run's count of each decision (None: a record that finished no screen)."""
     if record.finished_at is None or record.status.value not in FINISHED:
         return None
@@ -179,7 +179,7 @@ def _entry(
     record = latest.get((job, day))
     if record is None:
         return _not_run(key[1], day)
-    decisions = _decisions(record)
+    decisions = record_decisions(record)
     if decisions is not None:
         return _counted(day, decisions)
     return _of_run(day, key[1], latest_run(at_session(ctx, day), *key).run)
