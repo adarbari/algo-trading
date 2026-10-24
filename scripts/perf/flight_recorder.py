@@ -79,12 +79,21 @@ def probe(fn, timeout: float | None = None):
 
 
 def run_cmd(args: list[str], timeout: float | None = None) -> str:
-    """Stdout of a command, the child killed (and not waited for) after ``timeout`` s."""
+    """Stdout of a command; after ``timeout`` s the child is killed and reaped (a Popen left running
+    is a ResourceWarning at collection, an error under pytest's warning filter), then the
+    ``TimeoutExpired`` is raised."""
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     try:
         out, _ = p.communicate(timeout=PROBE_TIMEOUT_S if timeout is None else timeout)
-    except subprocess.TimeoutExpired:
+    except BaseException:
         p.kill()
+        with contextlib.suppress(
+            Exception
+        ):  # a process stuck in the kernel is left, never waited on
+            p.wait(timeout=2)
+        if p.stdout:
+            with contextlib.suppress(Exception):
+                p.stdout.close()
         raise
     return out
 

@@ -336,3 +336,21 @@ def test_trash_watch_ignores_a_pid_file_of_another_trash_and_stops_when_it_chang
     threading.Timer(1.2, pid_file.write_text, args=(f"{os.getpid()} /x/data.trash.9 7",)).start()
     fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.3, 30.0, trash="/x/data.trash.1")
     assert time.time() - t0 < 8  # the file named another delete: the stale watcher left
+
+
+def test_a_timed_out_probe_command_is_reaped_not_left_running(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CI failed with Popen.__del__ warnings: a killed child that was not waited for."""
+    made = []
+    real = fr.subprocess.Popen
+
+    class Recording(real):
+        def __init__(self, *a: object, **k: object) -> None:
+            super().__init__(*a, **k)
+            made.append(self)
+
+    monkeypatch.setattr(fr.subprocess, "Popen", Recording)
+    with pytest.raises(fr.subprocess.TimeoutExpired):
+        fr.run_cmd(["sleep", "5"], timeout=0.2)
+    assert made and made[0].returncode is not None  # killed and reaped
