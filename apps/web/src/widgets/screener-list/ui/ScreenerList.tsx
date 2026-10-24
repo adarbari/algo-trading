@@ -1,7 +1,7 @@
 /**
  * The screeners as one list: your own (finalized and draft-only) and the site presets, narrowed
  * by the shared filter bar (ADR 0082: owner, last run, candidates, edges that list it, in the
- * URL's `f`) and a search over name and description, both answered by the server. A row is not expandable as a whole: it shows
+ * URL's `f`) and a search over name and description, both answered by the server. Clicking a row (outside its own controls) opens the screener's page. A row shows
  * the screener (kind, last run), its evidence (the strongest edge's name first, opening in place
  * whenever it has edges to one block per edge, one row at a time), today's picks (a link to the
  * screener, "Not run" without a run: the one way into the screener page, for presets and Python
@@ -257,6 +257,9 @@ function toTableRow(
     id: `${row.kind}:${row.id}`,
     open,
     onOpenChange,
+    onActivate: () => {
+      onOpen(row.id);
+    },
     detail: (
       <ScreenerEvidenceDetail
         screenerId={row.id}
