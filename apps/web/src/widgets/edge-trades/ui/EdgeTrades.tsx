@@ -1,9 +1,11 @@
 /**
  * Section 5 of an edge's page, Trades: the picks of the verdict's basis (its screen and holding
  * period, never chosen here), one page at a time. The server sorts and pages them; the page only
- * says which (an In-sample / Out-of-sample / Live / All switch, a header click, Previous / Next)
- * and hands the same rows back as a CSV file. Live is off for an edge that records no paper
- * trades, with the live state's word and Guide term beside the switch (never "0 trades"). A per-name value the viewer may not read shows as
+ * says which (the shared filter bar, ADR 0082: backtest or live, in sample, result, sector, return;
+ * a header click, Previous / Next) and hands the period the filters stand for back as a CSV file.
+ * The filters narrow the whole ledger before it is paged, and a change starts at page 1. An edge
+ * that records no paper trades has the live state's word and Guide term beside the bar (never
+ * "0 trades"). A per-name value the viewer may not read shows as
  * an unknown cell; a ledger that cannot be read (no run, pruned, never stored) says why in place
  * of the table. States: loading, error, unknown, ready.
  */
@@ -12,14 +14,12 @@ import {
   DataTable,
   formatValue,
   ErrorState,
-  SegmentedControl,
   Skeleton,
   Stack,
   Text,
   type DataTableSort,
-  type SegmentedOption,
 } from '@algotrade/ui';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { UnknownNote } from '@/entities/availability';
 import {
@@ -28,26 +28,25 @@ import {
   useEdgeLiveStates,
   useEdgeTrades,
   type EdgeTradeRow,
-  type TradePeriod,
 } from '@/entities/edge';
 import { TradesCsvButton } from '@/features/edge-trades-csv';
+import { SurfaceFilterBar, SurfaceZeroResults, useFilterState } from '@/features/filter-bar';
 import { termHelp } from '@/features/guide-help';
 
 import { SORT_OF, tradeColumns } from '../model/columns';
+import { periodOf } from '../model/period';
 
-const OPTIONS: SegmentedOption<TradePeriod>[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'IN_SAMPLE', label: 'In-sample' },
-  { value: 'OUT_OF_SAMPLE', label: 'Out-of-sample' },
-  { value: 'LIVE', label: 'Live' },
-];
+/** The surface of the filter bar: its definitions are `config/site/filters/edge_trades.toml`. */
+const SURFACE = 'edge_trades';
 
 export interface EdgeTradesProps {
   edgeId: string;
 }
 
 export function EdgeTrades({ edgeId }: EdgeTradesProps) {
-  const [period, setPeriod] = useState<TradePeriod>('ALL');
+  // The filters in force live in the widget (the edges route's `f` belongs to the list); the read
+  // keeps the older default period `ALL`, which a `record` filter the viewer sets overrides.
+  const [f, setF] = useState<string | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<DataTableSort | null>({
     columnId: 'decision',
@@ -56,22 +55,23 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
   const columns = useMemo(() => tradeColumns(), []);
   const notRecording =
     useEdgeLiveStates().data?.find((s) => s.edgeId === edgeId)?.state === 'not_recording';
-  const options = useMemo(
-    () => OPTIONS.map((o) => (o.value === 'LIVE' && notRecording ? { ...o, disabled: true } : o)),
-    [notRecording],
+  const filters = useFilterState(
+    f,
+    useCallback((next: string | undefined) => {
+      setF(next);
+      setPage(1); // a page of the old filters means nothing under the new ones
+    }, []),
   );
+  const period = periodOf(filters.filters);
   const query = useEdgeTrades({
     edgeId,
-    period,
+    period: 'ALL',
+    filters: filters.filters,
     page,
     sort: SORT_OF[sort?.columnId ?? 'decision'] ?? 'DECISION',
     descending: sort?.direction === 'desc',
   });
   const ledger = query.data;
-  const choose = (next: TradePeriod) => {
-    setPeriod(next);
-    setPage(1);
-  };
   const order = (next: DataTableSort | null) => {
     setSort(next);
     setPage(1);
@@ -88,13 +88,6 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
       <Stack direction="row" gap={2} align="center" wrap>
         <Text weight="medium">Trades</Text>
         {termHelp('trade_ledger')}
-        <SegmentedControl
-          aria-label="Filter trades"
-          size="sm"
-          options={options}
-          value={period}
-          onValueChange={choose}
-        />
         {notRecording && (
           <>
             <Text
@@ -114,6 +107,12 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
         )}
         <TradesCsvButton edgeId={edgeId} period={period} />
       </Stack>
+      <SurfaceFilterBar
+        surface={SURFACE}
+        state={filters}
+        facets={ledger.facets}
+        help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
+      />
       {ledger.unknown ? (
         <UnknownNote unknown={ledger.unknown} kindWords={EDGE_UNKNOWN_WORDS} />
       ) : ledger.oosHidden ? (
@@ -134,7 +133,13 @@ export function EdgeTrades({ edgeId }: EdgeTradesProps) {
             sortMode="server"
             sort={sort}
             onSortChange={order}
-            emptyMessage="No trades in this period"
+            emptyMessage={
+              filters.filters.some((x) => x.active) ? (
+                <SurfaceZeroResults surface={SURFACE} state={filters} facets={ledger.facets} />
+              ) : (
+                'No trades in this period'
+              )
+            }
             visibleRows={12}
           />
           <Stack direction="row" gap={2} align="center">

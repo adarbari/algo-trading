@@ -30,6 +30,110 @@ const DETAILS: Record<string, Json> = {
   fresh: fixture('detail-fresh.json'),
 };
 
+interface FilterIn {
+  id: string;
+  values: string[];
+  active: boolean;
+}
+
+/** The definitions of the results surface (`FilterSet`, `screener_results`): the two the page reads first. */
+const RESULT_FILTERS = {
+  filterSet: {
+    surface: 'screener_results',
+    label: 'Results',
+    filters: [
+      {
+        id: 'decision',
+        label: 'Decision',
+        group: 'SETUP',
+        kind: 'PICK',
+        guide: 'term:filter_result_decision',
+        options: [
+          { value: 'QUALIFIED', label: 'Qualified' },
+          { value: 'WATCH', label: 'Watch' },
+          { value: 'LIQUIDITY_RISK', label: 'Liquidity risk' },
+          { value: 'EVENT_RISK', label: 'Event risk' },
+          { value: 'PAUSED', label: 'Paused' },
+          { value: 'REJECT', label: 'Reject' },
+        ],
+        bins: [],
+        windowUnit: null,
+      },
+      {
+        id: 'change',
+        label: 'Since the previous run',
+        group: 'CHANGED',
+        kind: 'PICK',
+        guide: 'term:filter_change',
+        options: [
+          { value: 'new', label: 'New' },
+          { value: 'dropped', label: 'Dropped' },
+        ],
+        bins: [],
+        windowUnit: null,
+      },
+    ],
+  },
+};
+
+/** The fixture's results as the server serves them under `filters`: the rows that pass, and the counts. */
+function narrowed(results: Json, filters: FilterIn[]): Json {
+  const run = (results['screener'] as Json)['latestRun'] as Json;
+  const page = run['results'] as Json;
+  const rows = page['results'] as { decision: string; change: string | null }[];
+  const valueOf = (row: (typeof rows)[number], id: string) =>
+    id === 'decision' ? row.decision : row.change;
+  const active = filters.filter((f) => f.active);
+  const keeps = (row: (typeof rows)[number], others: FilterIn[]) =>
+    others.every((f) => f.values.includes(String(valueOf(row, f.id))));
+  const kept = [...rows.keys()].filter((i) => keeps(rows[i] as (typeof rows)[number], active));
+  const pick = (name: string) => kept.map((i) => (page[name] as unknown[])[i]);
+  const rejects = (run['decisions'] as { decision: string; count: number }[])
+    .filter((d) => d.decision === 'REJECT')
+    .reduce((sum, d) => sum + d.count, 0);
+  const rejected =
+    !active.some((f) => f.id === 'decision') || active.some((f) => f.values.includes('REJECT'));
+  const matched = kept.length + (rejected ? rejects : 0);
+  const facets = {
+    total: rows.length + rejects,
+    matched,
+    items: filters.map((f) => ({
+      id: f.id,
+      active: f.active,
+      removes: f.active
+        ? rows.filter((row) =>
+            keeps(
+              row,
+              active.filter((o) => o !== f),
+            ),
+          ).length - kept.length
+        : null,
+      unknown: 0,
+      options: [],
+      bins: [],
+    })),
+  };
+  return {
+    ...results,
+    screener: {
+      ...(results['screener'] as Json),
+      latestRun: {
+        ...run,
+        results: {
+          ...page,
+          total: matched,
+          rows: pick('rows'),
+          unknown: pick('unknown'),
+          reasons: pick('reasons'),
+          kinds: pick('kinds'),
+          results: pick('results'),
+          facets,
+        },
+      },
+    },
+  };
+}
+
 /** The definitions of the Screeners list's filters (config/site/filters/screeners.toml), trimmed. */
 const SCREENER_FILTER_SET = {
   surface: 'screeners',
@@ -185,6 +289,9 @@ export async function mockBuilderApi(
     const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
     const raw = operation.variables?.['id'];
     const id = typeof raw === 'string' ? raw : '';
+    if (name === 'FilterSet' && operation.variables?.['surface'] === 'screener_results') {
+      return RESULT_FILTERS;
+    }
     if (name === 'ScreenerConfigs') return { configs: CONFIGS };
     if (name === 'FilterSet' && operation.variables?.['surface'] === 'screeners') {
       return { filterSet: SCREENER_FILTER_SET };
@@ -271,8 +378,9 @@ export async function mockBuilderApi(
       mock.tables.push(operation.variables ?? {});
       const results = fixture('results.json') as { screener: Json };
       const screener = { ...results.screener, id };
+      const filters = (operation.variables?.['filters'] as FilterIn[] | null | undefined) ?? [];
       return id === 'vrp_scanner' || ran.has(id)
-        ? { ...results, screener }
+        ? narrowed({ ...results, screener }, filters)
         : {
             ...results,
             screener: {

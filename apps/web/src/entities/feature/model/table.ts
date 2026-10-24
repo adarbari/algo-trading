@@ -4,26 +4,19 @@
  * not), the columns' catalogue entries (their format comes from the server), and the query
  * that asks for a page of it (server-side filters, sort and paging).
  */
+import { toFilterInputs, type AppliedFilter, type FilterFacets } from '@/entities/filter';
 import type { PreviewRow } from '@/entities/screen';
 import type { gqlTypes } from '@/shared/api';
-
-/** The server-side filters (catalogue fields; text matches ignore case). */
-export interface TableFilters {
-  securityType?: string | undefined;
-  sector?: string | undefined;
-  liquidityClass?: string | undefined;
-  leveraged?: boolean | undefined;
-  optionable?: boolean | undefined;
-  /** The symbol or name contains it. */
-  q?: string | undefined;
-}
 
 export interface FeatureTableQuery {
   /** Catalogue names, in column order. */
   columns: readonly string[];
   /** The instruments to show (tickers or ids), in this order; absent: the universe. */
   keys?: readonly string[] | undefined;
-  filters?: TableFilters | undefined;
+  /** The filter bar's filters in force (the surface `universe`, ADR 0082); with `keys`: none. */
+  filters?: readonly AppliedFilter[] | undefined;
+  /** The symbol or name contains it. */
+  q?: string | undefined;
   /** A column id (`symbol` or a catalogue name), `-` prefix descending; absent: the default. */
   sort?: string | undefined;
   /** Paging (1-based); absent: the first page of the API's default size. */
@@ -123,6 +116,8 @@ export interface FeatureTableData {
   total: number;
   page: number;
   size: number;
+  /** The filter bar's counts for the whole list under the filters (absent: `keys` with no filter). */
+  facets: FilterFacets | null;
 }
 
 /** The response's columnar table as rows. */
@@ -158,21 +153,17 @@ export function toTableData(table: Served): FeatureTableData {
     total: table.total,
     page: table.page,
     size: table.size,
+    facets: table.facets ?? null,
   };
 }
 
 /** The operation's variables for `query` (paging only when asked: the server's defaults). */
 export function tableVariables(query: FeatureTableQuery): gqlTypes.FeatureTableQueryVariables {
-  const f = query.filters ?? {};
   return {
     columns: [...query.columns],
     keys: query.keys ? [...query.keys] : null,
-    securityType: f.securityType ?? null,
-    sector: f.sector ?? null,
-    liquidityClass: f.liquidityClass ?? null,
-    leveraged: f.leveraged ?? null,
-    optionable: f.optionable ?? null,
-    q: f.q ?? null,
+    filters: toFilterInputs(query.filters ?? []),
+    q: query.q?.trim() || null,
     sort: query.sort ?? null,
     // Absent, not null: the server's defaults apply (`page` and `size` are non-null there).
     ...(query.page !== undefined ? { page: query.page } : {}),

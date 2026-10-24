@@ -20,6 +20,9 @@ import { PriceChartPanel } from '@/widgets/price-chart-panel';
 export interface ScreenerResultsPageProps {
   /** The screener shown. */
   id: string;
+  /** The filter bar's `f` search param and its writer (the route's). */
+  f: string | undefined;
+  onFilterChange: (f: string | undefined) => void;
   /** Open the full Builder page for this screener. */
   onEdit: () => void;
   /** Open a ticker in Explore. */
@@ -32,6 +35,8 @@ export interface ScreenerResultsPageProps {
 
 export function ScreenerResultsPage({
   id,
+  f,
+  onFilterChange,
   onEdit,
   onOpenTicker,
   onCompare,
@@ -88,6 +93,8 @@ export function ScreenerResultsPage({
       <ScreenerEdgeLine screenerId={id} onOpenEdge={onOpenEdge} />
       <ScreenerResults
         id={id}
+        f={f}
+        onFilterChange={onFilterChange}
         onOpen={onOpenTicker}
         focusId={focusId}
         onFocusChange={(row) => {

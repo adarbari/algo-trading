@@ -1,16 +1,15 @@
 /**
  * A screener's run as a review table (GraphQL `ScreenerRun.results`): what a page asks for
- * (decisions, change, search, the catalogue columns to add, the sort, paging), the decisions a
- * review opens on, and the run's decision counts in display order. Pure.
+ * (the filter bar's filters, search, the catalogue columns to add, the sort, paging) and the
+ * decisions a review opens on. Pure.
  */
+import { toFilterInputs, type AppliedFilter } from '@/entities/filter';
 import type { gqlTypes } from '@/shared/api';
-
-export type ScreenChange = 'new' | 'dropped';
 
 /** What the review table asks the server for. */
 export interface ScreenResultsQuery {
-  decisions: readonly string[];
-  change?: ScreenChange | undefined;
+  /** The filters in force (decision, since the previous run, ranges ...), the filter bar's. */
+  filters: readonly AppliedFilter[];
   q?: string | undefined;
   /** Catalogue names added as columns, in order. */
   columns: readonly string[];
@@ -39,33 +38,13 @@ export function resultsVariables(
 ): gqlTypes.ScreenerResultsQueryVariables {
   return {
     id,
-    decisions: query.decisions.length > 0 ? [...query.decisions] : null,
-    change: query.change ?? null,
+    filters: toFilterInputs(query.filters),
     q: query.q?.trim() || null,
     sort: query.sort ?? null,
     columns: [...query.columns],
     ...(query.page !== undefined ? { page: query.page } : {}),
     ...(query.size !== undefined ? { size: query.size } : {}),
   };
-}
-
-/** The decisions to show: the saved ones, else the picks. */
-export function shownDecisions(
-  view: { saved: boolean; decisions: readonly string[] } | null | undefined,
-): readonly string[] {
-  return view?.saved && view.decisions.length > 0 ? view.decisions : DEFAULT_DECISIONS;
-}
-
-/** The decisions of a run in display order (picks first, rejects last), with their counts. */
-export function orderedDecisions(counts: readonly { decision: string; count: number }[]) {
-  const order = [...DEFAULT_DECISIONS, 'UNKNOWN', 'REJECT', 'SKIPPED', 'EXCLUDED'];
-  const rank = (decision: string) => {
-    const i = order.indexOf(decision);
-    return i < 0 ? order.length : i;
-  };
-  return counts
-    .filter(({ count }) => count > 0)
-    .sort((a, b) => rank(a.decision) - rank(b.decision) || a.decision.localeCompare(b.decision));
 }
 
 /**

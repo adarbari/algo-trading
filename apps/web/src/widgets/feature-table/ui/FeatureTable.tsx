@@ -7,17 +7,18 @@
  * snapshot from after it). `sortMode="client"` (a few instruments asked for by `keys`, e.g.
  * the compare set): every row in one request, sorted in the table. A row click focuses the
  * ticker; ticked rows are the caller's selection.
+ *
+ * With `filters` and `q` (the universe) the server filters before it pages and counts them
+ * (`facets`, ADR 0082); `header` and `emptyMessage` may be given as functions of those counts, so
+ * the caller draws the filter bar and the zero-result recovery from them. A change of filters
+ * starts again on the first page.
  */
 import type { DataTableSort, IconName } from '@algotrade/ui';
 import { useMemo, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
-import {
-  useFeatureTable,
-  withCompanions,
-  type TableFilters,
-  type TableRow,
-} from '@/entities/feature';
+import type { AppliedFilter, FilterFacets } from '@/entities/filter';
+import { useFeatureTable, withCompanions, type TableRow } from '@/entities/feature';
 
 import { usePageOf } from '../model/paging';
 import { pageCount, tablePlan } from '../model/plan';
@@ -38,7 +39,9 @@ export interface FeatureTableProps {
   pickerIcon?: IconName;
   /** The instruments to show (tickers), in this order; absent: the universe. */
   keys?: readonly string[];
-  filters?: TableFilters;
+  /** The filters in force and the search text (server mode, the universe), sent to the server. */
+  filters?: readonly AppliedFilter[];
+  q?: string;
   /** `server`: the server sorts and pages (the universe); `client`: the table sorts the rows. */
   sortMode: 'server' | 'client';
   /** Controlled sort (server mode: sent to the server); absent: the table keeps its own. */
@@ -46,15 +49,16 @@ export interface FeatureTableProps {
   onSortChange?: (sort: DataTableSort | null) => void;
   /** Rows per page (server mode). */
   pageSize?: number;
-  /** Above the table: filters. */
-  header?: ReactNode;
+  /** Above the table: filters (given the server's counts when a function). */
+  header?: ReactNode | ((facets: FilterFacets | null) => ReactNode);
   /** Ticked rows (tickers); absent: no checkboxes. */
   selected?: readonly string[];
   onSelectedChange?: (symbols: string[]) => void;
   /** The most rows the selection holds (said in the summary when reached). */
   maxSelected?: number;
   onRowActivate?: (symbol: string) => void;
-  emptyMessage: ReactNode;
+  /** What an empty table says (given the server's counts when a function). */
+  emptyMessage: ReactNode | ((facets: FilterFacets | null) => ReactNode);
   visibleRows?: number;
 }
 
@@ -75,6 +79,7 @@ export function FeatureTable({
   pickerIcon = 'columns',
   keys,
   filters,
+  q,
   sortMode,
   sort,
   onSortChange,
@@ -89,16 +94,17 @@ export function FeatureTable({
 }: FeatureTableProps) {
   const server = sortMode === 'server';
   const [page, setPage] = usePageOf(
-    JSON.stringify([columns, keys, filters, server ? sortParam(sort) : null]),
+    JSON.stringify([columns, keys, filters, q, server ? sortParam(sort) : null]),
   );
   const asked = useMemo(() => withCompanions(columns), [columns]);
   const table = useFeatureTable(
     server
-      ? { columns: asked, keys, filters, sort: sortParam(sort), page, size: pageSize }
-      : { columns: asked, keys, filters },
+      ? { columns: asked, keys, filters, q, sort: sortParam(sort), page, size: pageSize }
+      : { columns: asked, keys },
     !keys || keys.length > 0,
   );
   const data = table.data;
+  const facets = data?.facets ?? null;
   const plan = useMemo(() => tablePlan(data?.columns ?? [], columns), [data?.columns, columns]);
   const rows: readonly TableRow[] = data?.rows ?? [];
   const full = maxSelected !== undefined && (selected?.length ?? 0) >= maxSelected;
@@ -122,7 +128,7 @@ export function FeatureTable({
         onRetry: () => void table.refetch(),
       }}
       notes={server ? data : null}
-      header={header}
+      header={typeof header === 'function' ? header(facets) : header}
       summary={summary}
       pager={
         server && data ? { page, pages: pageCount(data.total, data.size), onPage: setPage } : null
@@ -154,7 +160,12 @@ export function FeatureTable({
           onRowActivate?.(row.symbol);
         },
         status: table.isPending && !data ? 'loading' : 'ready',
-        emptyMessage: table.data === null ? NOTHING_STORED : emptyMessage,
+        emptyMessage:
+          table.data === null
+            ? NOTHING_STORED
+            : typeof emptyMessage === 'function'
+              ? emptyMessage(facets)
+              : emptyMessage,
       }}
     />
   );

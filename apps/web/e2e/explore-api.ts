@@ -114,6 +114,81 @@ function compare(a: unknown, b: unknown): number {
   return String(a).localeCompare(String(b));
 }
 
+interface FilterIn {
+  id: string;
+  values: string[];
+  min: number | null;
+  max: number | null;
+  active: boolean;
+}
+
+/** The universe's filter definitions the page reads (`FilterSet`, surface `universe`): two of the real ones. */
+const UNIVERSE_FILTERS = {
+  data: {
+    filterSet: {
+      surface: 'universe',
+      label: 'Tickers',
+      filters: [
+        {
+          id: 'security_type',
+          label: 'Security type',
+          group: 'SETUP',
+          kind: 'PICK',
+          guide: 'term:filter_security_type',
+          options: [
+            { value: 'COMMON_STOCK', label: 'Common stock' },
+            { value: 'ETF', label: 'ETF' },
+            { value: 'ADR', label: 'ADR' },
+          ],
+          bins: [],
+          windowUnit: null,
+        },
+        {
+          id: 'price',
+          label: 'Price',
+          group: 'SETUP',
+          kind: 'RANGE',
+          guide: 'term:filter_price',
+          options: [],
+          bins: [0, 50, 100, 250, 500],
+          windowUnit: null,
+        },
+      ],
+    },
+  },
+};
+
+const FILTER_FIELD: Record<string, string> = {
+  security_type: 'security_type',
+  price: 'rollup.price_stats@v2.close',
+};
+
+/** Whether a row passes one filter of the surface (a missing value never passes a range). */
+function passes(row: Row, f: FilterIn): boolean {
+  const value = row[FILTER_FIELD[f.id] ?? ''];
+  if (f.id === 'security_type') return f.values.includes(String(value));
+  if (typeof value !== 'number') return false;
+  return (f.min === null || value >= f.min) && (f.max === null || value <= f.max);
+}
+
+/** The counts the server serves with a filtered list: matches, and what each filter removes. */
+function facetsOf(all: Row[], filters: FilterIn[], matched: number): Json {
+  const active = filters.filter((f) => f.active);
+  const under = (others: FilterIn[]) => all.filter((r) => others.every((f) => passes(r, f))).length;
+  return {
+    total: all.length,
+    matched,
+    items: filters.map((f) => ({
+      id: f.id,
+      active: f.active,
+      removes: f.active ? under(active.filter((o) => o !== f)) - matched : null,
+      unknown: 0,
+      options: [],
+      bins: [],
+    })),
+  };
+}
+
 /** `FeatureTable`: filtered, sorted (missing last, ties by symbol) and paged like the server. */
 function featureTable(variables: Record<string, unknown>): Json {
   const columns = (variables['columns'] as string[] | undefined) ?? [];
@@ -122,9 +197,9 @@ function featureTable(variables: Record<string, unknown>): Json {
   const size = Number(variables['size'] ?? 100);
   const page = Number(variables['page'] ?? 1);
   let rows = keys ? keys.flatMap((k) => (BY_SYMBOL.has(k) ? [BY_SYMBOL.get(k) as Row] : [])) : ROWS;
-  const type = variables['securityType'];
-  if (type) rows = rows.filter((r) => r['security_type'] === type);
-  if (variables['optionable'] === true) rows = rows.filter((_, i) => i % 2 === 0);
+  const filters = (variables['filters'] as FilterIn[] | null | undefined) ?? [];
+  const all = rows;
+  rows = rows.filter((r) => filters.filter((f) => f.active).every((f) => passes(r, f)));
   const q = ((variables['q'] as string | null | undefined) ?? '').toLowerCase();
   if (q) {
     rows = rows.filter((r) =>
@@ -163,6 +238,7 @@ function featureTable(variables: Record<string, unknown>): Json {
         unknown: shown.map((r) => columns.map((c) => (valueOf(r, c) === null ? 'NULL' : null))),
         reasons: shown.map(() => columns.map(() => null)),
         kinds: shown.map((r) => columns.map((c) => (valueOf(r, c) === null ? 'NOT_STORED' : null))),
+        facets: keys ? null : facetsOf(all, filters, rows.length),
         kindTexts: [{ kind: 'NOT_STORED', text: 'not available for this instrument' }],
       },
     },
@@ -494,6 +570,9 @@ function graphqlAnswer(operation: Operation): Json | null {
   if (name === 'GuideField') return guideField(String(operation.variables?.['name']));
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
   if (name === 'GuideHelpField') return guideHelp(String(operation.variables?.['name']));
+  if (name === 'FilterSet' && operation.variables?.['surface'] === 'universe') {
+    return UNIVERSE_FILTERS;
+  }
   if (name === 'FeatureTable') return featureTable(operation.variables ?? {});
   if (name === 'ComparePrices') return comparePrices(operation.variables ?? {});
   if (operation.variables?.['key'] !== 'AAPL') return null;

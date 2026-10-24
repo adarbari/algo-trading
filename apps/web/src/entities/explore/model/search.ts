@@ -39,6 +39,8 @@ export interface ExploreSearch {
   feature?: string;
   /** The screener (config id) that surfaced the ticker, set when Ideas opens it. */
   via?: string;
+  /** The filter bar's filters of the universe table (`f`, ADR 0082), as the filter bar writes them. */
+  f?: string;
 }
 
 export const DEFAULT_DIMENSIONS: readonly string[] = [
@@ -71,6 +73,7 @@ export function parseExploreSearch(raw: Record<string, unknown>): ExploreSearch 
     if (value !== undefined) out[key] = value;
   };
   set('sel', text(raw['sel'])?.toUpperCase());
+  set('f', text(raw['f']));
   set('focus', text(raw['focus'])?.toUpperCase());
   set('tab', oneOf(EXPLORE_TABS, raw['tab']));
   set('range', oneOf(RANGES, raw['range']));

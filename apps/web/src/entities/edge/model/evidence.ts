@@ -4,6 +4,7 @@
  * (`Query.edgeVariants`). A per-name value under a licence the viewer lacks is an `unknown`, never
  * a number; every figure is the read model's. Names only: no derivation here.
  */
+import type { FilterFacets } from '@/entities/filter';
 import type { gqlTypes } from '@/shared/api';
 
 export type TradePeriod = 'IN_SAMPLE' | 'OUT_OF_SAMPLE' | 'LIVE' | 'ALL';
@@ -78,6 +79,8 @@ export interface EdgeTradePage {
   oosHidden: boolean;
   symbolsSnapshot: string | null;
   unknown: EvidenceUnknown | null;
+  /** The filter bar's counts (a read with filters in force). */
+  facets?: FilterFacets | null;
   rows: EdgeTradeRow[];
 }
 

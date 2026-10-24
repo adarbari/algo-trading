@@ -27,10 +27,7 @@ export interface TickerSearchProps {
 export function TickerSearch({ onChoose, chosen = [], focusKey }: TickerSearchProps) {
   const [typed, setTyped] = useState('');
   const asked = useDebounced(typed.trim(), SEARCH_DEBOUNCE_MS);
-  const found = useFeatureTable(
-    { columns: [], filters: { q: asked }, size: SUGGESTIONS },
-    asked !== '',
-  );
+  const found = useFeatureTable({ columns: [], q: asked, size: SUGGESTIONS }, asked !== '');
   const options: ComboboxOption[] = (asked ? (found.data?.rows ?? []) : []).map((row) => ({
     value: row.symbol,
     label: row.symbol,

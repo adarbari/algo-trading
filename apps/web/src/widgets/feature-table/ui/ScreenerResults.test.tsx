@@ -1,7 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { filterSearch } from '@/features/filter-bar';
+import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { ScreenerResults, type ScreenerResultsProps } from './ScreenerResults';
@@ -13,6 +16,11 @@ type Gap = {
   cause: null;
 };
 
+vi.mock('@/shared/api', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  gql: vi.fn(),
+}));
+
 const hooks = vi.hoisted(() => ({
   useScreenerResults: vi.fn(),
   useTableView: vi.fn(),
@@ -22,6 +30,7 @@ const hooks = vi.hoisted(() => ({
 // The header help button: TableFrame.test.tsx.
 vi.mock('@/features/guide-help', () => ({
   helped: ({ help: _help, ...column }: { help?: unknown }) => column,
+  termHelp: () => null,
 }));
 vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -85,6 +94,60 @@ const result = (rank: number, symbol: string, decision: string, change: string |
   ],
 });
 
+const option = (value: string, label: string) => ({ value, label });
+const FILTER_SET = {
+  filterSet: {
+    surface: 'screener_results',
+    label: 'Results',
+    filters: [
+      {
+        id: 'decision',
+        label: 'Decision',
+        group: 'SETUP',
+        kind: 'PICK',
+        guide: 'term:filter_result_decision',
+        options: [
+          option('QUALIFIED', 'Qualified'),
+          option('WATCH', 'Watch'),
+          option('PAUSED', 'Paused'),
+          option('REJECT', 'Reject'),
+        ],
+        bins: [],
+        windowUnit: null,
+      },
+      {
+        id: 'change',
+        label: 'Since the previous run',
+        group: 'CHANGED',
+        kind: 'PICK',
+        guide: 'term:filter_change',
+        options: [option('new', 'New'), option('dropped', 'Dropped')],
+        bins: [],
+        windowUnit: null,
+      },
+    ],
+  },
+};
+const FACETS = {
+  total: 4003,
+  matched: 2,
+  items: [
+    {
+      id: 'decision',
+      active: true,
+      removes: 4000,
+      unknown: 0,
+      options: [
+        { value: 'QUALIFIED', count: 1 },
+        { value: 'WATCH', count: 1 },
+        { value: 'PAUSED', count: 1 },
+        { value: 'REJECT', count: 4000 },
+      ],
+      bins: [],
+    },
+  ],
+};
+
 function served(total = 2) {
   return {
     session: { date: '2026-10-02', unavailable: [] },
@@ -138,6 +201,7 @@ function served(total = 2) {
           unknown: [[null], ['NO_ROW']],
           reasons: [[null], [null]],
           kinds: [[null], ['NOT_STORED']],
+          facets: FACETS,
           kindTexts: [{ kind: 'NOT_STORED' as const, text: 'not available for this instrument' }],
           results: [result(1, 'AAPL', 'QUALIFIED', 'new'), result(2, 'KO', 'WATCH')],
         },
@@ -166,9 +230,25 @@ function view(patch: Record<string, unknown> = {}) {
   };
 }
 
-function setup(patch: Partial<ScreenerResultsProps> = {}) {
+/** The route's job: the `f` search param held in state. */
+function Held({ props, initial }: { props: ScreenerResultsProps; initial: string | undefined }) {
+  const [f, setF] = useState(initial);
+  return (
+    <ScreenerResults
+      {...props}
+      f={f}
+      onFilterChange={(next) => {
+        setF(filterSearch({ f: next }).f);
+      }}
+    />
+  );
+}
+
+function setup(patch: Partial<ScreenerResultsProps> = {}, initial?: string) {
   const props: ScreenerResultsProps = {
     id: 'vrp',
+    f: undefined,
+    onFilterChange: vi.fn(),
     onOpen: vi.fn(),
     focusId: null,
     onFocusChange: vi.fn(),
@@ -178,7 +258,12 @@ function setup(patch: Partial<ScreenerResultsProps> = {}) {
     onShowDismissed: vi.fn(),
     ...patch,
   };
-  return { props, ...render(<ScreenerResults {...props} />) };
+  const view = render(
+    <TestQueryProvider>
+      <Held props={props} initial={initial} />
+    </TestQueryProvider>,
+  );
+  return { props, ...view };
 }
 
 const asked = () => hooks.useScreenerResults.mock.lastCall as [string, Record<string, unknown>];
@@ -188,16 +273,20 @@ beforeEach(() => {
   hooks.useScreenerResults.mockReturnValue(fakeQuery(served()));
   hooks.useTableView.mockReturnValue(view());
   hooks.change.mockReset();
+  vi.mocked(gql).mockImplementation((document) =>
+    Promise.resolve(
+      String(document).includes('query FilterSet') ? FILTER_SET : { guideField: null },
+    ),
+  );
 });
 
 describe('ScreenerResults', () => {
   it('shows a page of the run from the factories: criteria, display and added columns', async () => {
-    const { container } = setup();
+    const { container } = setup({}, 'decision:QUALIFIED,WATCH');
     expect(asked()).toEqual([
       'vrp',
       {
-        decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK', 'PAUSED'],
-        change: undefined,
+        filters: [{ id: 'decision', values: ['QUALIFIED', 'WATCH'], active: true }],
         q: '',
         columns: [CLOSE],
         sort: undefined,
@@ -234,7 +323,7 @@ describe('ScreenerResults', () => {
     expect(aapl).toHaveTextContent('Counts');
     expect(aapl).toHaveTextContent('Drift');
     expect(screen.getByRole('row', { name: /KO/ })).toHaveTextContent('Unknown');
-    expect(screen.getByText('2 shown · 4,003 in the run')).toBeInTheDocument();
+    expect(screen.getAllByText('2 shown · 4,003 in the run')[0]).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
@@ -337,24 +426,75 @@ describe('ScreenerResults', () => {
     expect(screen.queryByText('Partial run')).toBeNull();
   });
 
-  it("has a chip for the paused picks, selected by default, with the run's count", async () => {
-    setup();
-    const chip = screen.getByRole('button', { name: 'Paused 1' });
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
-    await userEvent.click(chip);
-    expect(hooks.change).toHaveBeenCalledWith({
-      decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK'],
+  it('asks for the run under the filters in the URL, and narrows with the bar, saving them into the view', async () => {
+    const user = userEvent.setup();
+    setup({}, 'decision:QUALIFIED,WATCH,PAUSED');
+    const chips = await screen.findByRole('group', { name: 'Applied filters' });
+    expect(await within(chips).findByText('Decision Qualified, Watch, Paused')).toBeInTheDocument();
+    expect(screen.getAllByText('2 of 4,003')[0]).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'What changed' }));
+    const list = await screen.findByRole('list', { name: 'Since the previous run' });
+    await user.click(within(list).getByRole('button', { name: /New/ }));
+    expect(asked()[1]).toMatchObject({
+      filters: [
+        { id: 'decision', values: ['QUALIFIED', 'WATCH', 'PAUSED'], active: true },
+        { id: 'change', values: ['new'], active: true },
+      ],
+    });
+    expect(hooks.change).toHaveBeenLastCalledWith({
+      filters: 'decision:QUALIFIED,WATCH,PAUSED;change:new',
+      decisions: [],
     });
   });
 
-  it('saves a decision chip and the sort into the view; New filters by the change', async () => {
+  it('reads the view with the f binding: the picks are the default, and a bad definitions read drops none', () => {
     setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Reject 4,000' }));
-    expect(hooks.change).toHaveBeenCalledWith({
-      decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK', 'PAUSED', 'REJECT'],
+    const [scope, binding] = hooks.useTableView.mock.lastCall as unknown as [
+      string,
+      { fallback: (d: string[]) => string; f: string | undefined },
+    ];
+    expect(scope).toBe('screener:vrp');
+    expect(binding.f).toBeUndefined();
+    expect(binding.fallback([])).toBe('decision:QUALIFIED,WATCH,LIQUIDITY_RISK,EVENT_RISK,PAUSED');
+    expect(binding.fallback(['REJECT'])).toBe('decision:REJECT');
+  });
+
+  it('says what each filter gives back when nothing matches, and switches it off', async () => {
+    const user = userEvent.setup();
+    const none = served();
+    hooks.useScreenerResults.mockReturnValue(
+      fakeQuery({
+        ...none,
+        screener: {
+          ...none.screener,
+          latestRun: {
+            ...none.screener.latestRun,
+            results: {
+              ...none.screener.latestRun.results,
+              total: 0,
+              rows: [],
+              unknown: [],
+              reasons: [],
+              kinds: [],
+              results: [],
+              facets: { ...FACETS, matched: 0 },
+            },
+          },
+        },
+      }),
+    );
+    setup({}, 'decision:REJECT');
+    expect(await screen.findByText('No results match this filter')).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole('button', { name: /Switch off Decision gives 4,000/ }),
+    );
+    expect(asked()[1]).toMatchObject({
+      filters: [{ id: 'decision', values: ['REJECT'], active: false }],
     });
-    await userEvent.click(screen.getByRole('button', { name: 'New 1' }));
-    expect(asked()[1]).toMatchObject({ change: 'new' });
+  });
+
+  it('saves the sort into the view', async () => {
+    setup();
     await userEvent.click(
       within(screen.getByRole('columnheader', { name: /Score/ })).getByRole('button'),
     );
@@ -382,7 +522,11 @@ describe('ScreenerResults', () => {
       const renderDetail = vi.fn(() => 'pick detail');
       const { props, rerender } = setup({ renderDetail });
       expect(screen.queryByRole('dialog')).toBeNull();
-      rerender(<ScreenerResults {...props} focusId="EQ:KO" />);
+      rerender(
+        <TestQueryProvider>
+          <Held props={{ ...props, focusId: 'EQ:KO' }} initial={undefined} />
+        </TestQueryProvider>,
+      );
       expect(screen.getByRole('dialog', { name: 'KO' })).toHaveTextContent('pick detail');
       await userEvent.keyboard('{Escape}');
       expect(props.onFocusChange).toHaveBeenLastCalledWith(null);

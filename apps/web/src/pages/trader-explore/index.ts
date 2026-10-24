@@ -1,9 +1,11 @@
 /** Page: Trader > Explore (ticker table, compare, chart, options, features, events). */
+import { prefetchFilterSet } from '@/entities/filter';
 import { prefetchScreenerHits } from '@/entities/screen';
 
 import type { ExploreSearch } from '@/entities/explore';
 import { exploreState } from './model/state';
 import { preloadOtherTabs } from './ui/DetailTabs';
+import { preloadUniverseTable } from './ui/ExplorePage';
 
 export { type SearchPatch } from './model/state';
 export { ExplorePage, type ExplorePageProps } from './ui/ExplorePage';
@@ -19,6 +21,11 @@ export function prefetchExploreReads(
   search: ExploreSearch,
 ): Promise<void> {
   const { tab, focused } = exploreState(search);
+  // no ticker open: the universe table's filter definitions load with the page
+  if (!focused) {
+    prefetchFilterSet(client, 'universe');
+    return preloadUniverseTable();
+  }
   if (tab === 'overview' || tab === 'chart') return Promise.resolve();
   if (focused && (tab === 'hits' || tab === 'why')) prefetchScreenerHits(client, focused);
   if (focused && tab === 'features') {

@@ -1,10 +1,11 @@
 /**
  * A screener's results: its latest run as a review table (GraphQL `ScreenerRun.results`),
- * filtered, sorted and paged on the server. Decision chips (with the run's counts) and New /
- * Dropped chips filter it, the search box finds a ticker, and the user's own catalogue
- * columns, sort and decisions are their view of this screener (`features/table-view`: saved at
- * once, never part of the screener). The header says the regime the run stamped, and the picks
- * the regime gate paused are a decision chip of their own (PAUSED, reason in the row's detail).
+ * filtered, sorted and paged on the server. The shared filter bar (ADR 0082, surface
+ * `screener_results`: decision, since the previous run, rank, score ...) filters it through the
+ * page's `f` search param and the search box finds a ticker; the user's own catalogue columns,
+ * sort and filters are their view of this screener (`features/table-view`: saved at once, never
+ * part of the screener). The header says the regime the run stamped, and the picks the regime
+ * gate paused are a decision of their own (PAUSED, reason in the row's detail).
  * A PARTIAL run says so with the tables it ran without, apart from the session's missing tables.
  * Enter on a row opens the ticker in Explore. With `renderDetail`, the row under review's detail
  * sits beside the table, or on a phone opens in a full-height sheet when a row is chosen
@@ -13,7 +14,6 @@
 import {
   ActionGroup,
   Button,
-  Chip,
   MasterDetail,
   SearchInput,
   Stack,
@@ -24,6 +24,14 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
 import {
+  encodeFilters,
+  SurfaceFilterBar,
+  SurfaceZeroResults,
+  useFilterState,
+  type LabelOf,
+} from '@/features/filter-bar';
+import { termHelp } from '@/features/guide-help';
+import {
   formatSort,
   parseSort,
   screenerScope,
@@ -31,17 +39,16 @@ import {
   ViewControls,
 } from '@/features/table-view';
 import { UnknownNote } from '@/entities/availability';
+import { useFilterSet } from '@/entities/filter';
 import { byName, useFeatureCatalogue, type CriterionInfo, type TableRow } from '@/entities/feature';
 import { RunRegimeChip } from '@/entities/regime';
 import {
   DEFAULT_DECISIONS,
   decisionLabel,
-  orderedDecisions,
   runMessage,
   useRunScreener,
   useScreenerResults,
   type RecentRun,
-  type ScreenChange,
 } from '@/entities/screen';
 
 import { usePageOf } from '../model/paging';
@@ -53,6 +60,9 @@ import { TableFrame } from './TableFrame';
 export interface ScreenerResultsProps {
   /** The screener whose latest run is shown. */
   id: string;
+  /** The filter bar's `f` search param (the filters in force) and its writer (the route's). */
+  f: string | undefined;
+  onFilterChange: (f: string | undefined) => void;
   /** Open a ticker in Explore (Enter on the row under review). */
   onOpen: (symbol: string) => void;
   /** The row under review (instrument id); null or not in the page: the first row. */
@@ -81,13 +91,31 @@ export interface ScreenerResultsProps {
   }) => ReactNode;
 }
 
+/** The surface of the filter bar: its definitions are `config/site/filters/screener_results.toml`. */
+const SURFACE = 'screener_results';
 const SEARCH_DELAY_MS = 300;
 const PAGE_SIZE = 100;
 const DEFAULT_SORT: DataTableSort = { columnId: 'rank', direction: 'asc' };
 const count = (n: number) => n.toLocaleString('en-US');
 
+/** A review opens on the picks, not the rejects (about 11k rows of misses). */
+const picksFilter = (decisions: readonly string[]) =>
+  encodeFilters([
+    {
+      id: 'decision',
+      values: decisions.length > 0 ? [...decisions] : [...DEFAULT_DECISIONS],
+      active: true,
+    },
+  ]);
+
+/** The wording of a stored decision (the definition's options label the other values). */
+const labelOf: LabelOf = (filterId, value) =>
+  filterId === 'decision' ? decisionLabel(value) : undefined;
+
 export function ScreenerResults({
   id,
+  f,
+  onFilterChange,
   onOpen,
   focusId,
   onFocusChange,
@@ -100,11 +128,25 @@ export function ScreenerResults({
   renderDetail,
   renderRunLine,
 }: ScreenerResultsProps) {
-  const view = useTableView(screenerScope(id));
+  const definitions = useFilterSet(SURFACE);
+  const known = definitions.data?.filterSet
+    ? definitions.data.filterSet.filters.map((d) => d.id)
+    : definitions.isError
+      ? []
+      : undefined;
+  const view = useTableView(screenerScope(id), {
+    f,
+    onChange: onFilterChange,
+    ...(known && { known }),
+    fallback: picksFilter,
+  });
+  const filters = useFilterState(f, (next) => {
+    onFilterChange(next);
+    view.change({ filters: next ?? '', decisions: [] });
+  });
   const runner = useRunScreener(id);
   const catalogue = useFeatureCatalogue();
-  const known = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
-  const [change, setChange] = useState<ScreenChange | undefined>(undefined);
+  const featureNames = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   useEffect(() => {
@@ -117,10 +159,8 @@ export function ScreenerResults({
   }, [text]);
 
   const sort = parseSort(view.sort, DEFAULT_SORT);
-  const decisions = view.decisions ?? DEFAULT_DECISIONS;
   const asked = {
-    decisions,
-    change,
+    filters: filters.filters,
     q,
     columns: view.columns,
     sort: formatSort(sort, DEFAULT_SORT) ?? undefined,
@@ -135,11 +175,11 @@ export function ScreenerResults({
         criteria: screener?.criteria ?? [],
         displayColumns: screener?.displayColumns ?? [],
         added: run?.results.columns ?? [],
-        catalogue: known,
+        catalogue: featureNames,
         leaving,
         changes: true,
       }),
-    [screener, run, known, leaving],
+    [screener, run, featureNames, leaving],
   );
   const rows = useMemo(
     () => (run ? resultRows(run.results) : []).filter((row) => !dismissed.has(row.instrumentId)),
@@ -148,8 +188,7 @@ export function ScreenerResults({
   const focusRow = rows.find((row) => row.instrumentId === focusId) ?? rows[0] ?? null;
   const loaded = results.data !== undefined;
   const state = results.isError && !loaded ? 'error' : loaded && !run ? 'empty' : 'ready';
-  const inRun = run ? run.decisions.reduce((sum, d) => sum + d.count, 0) : 0;
-  const changes = new Map((run?.changes ?? []).map((c) => [c.change, c.count]));
+  const facets = run?.results.facets;
 
   const table = (
     <TableFrame
@@ -193,45 +232,28 @@ export function ScreenerResults({
       header={
         <Stack gap={2}>
           {screener?.notRun ? <UnknownNote unknown={screener.notRun} /> : null}
-          <SearchInput
-            aria-label="Find a ticker"
-            placeholder="Ticker or name…"
-            value={text}
-            onValueChange={setText}
-            loading={results.isFetching}
-          />
-          <Stack direction="row" gap={1} wrap align="center">
-            {orderedDecisions(run?.decisions ?? []).map(({ decision, count: n }) => (
-              <Chip
-                key={decision}
-                label={`${decisionLabel(decision)} ${count(n)}`}
-                selected={decisions.includes(decision)}
-                onSelectedChange={(on) => {
-                  view.change({
-                    decisions: on
-                      ? [...decisions, decision]
-                      : decisions.filter((d) => d !== decision),
-                  });
-                }}
+          <SurfaceFilterBar
+            surface={SURFACE}
+            state={filters}
+            facets={facets}
+            help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
+            labelOf={labelOf}
+            search={
+              <SearchInput
+                aria-label="Find a ticker"
+                placeholder="Ticker or name…"
+                value={text}
+                onValueChange={setText}
+                loading={results.isFetching}
               />
-            ))}
-            {changes.size > 0
-              ? (['new', 'dropped'] as const).map((kind) => (
-                  <Chip
-                    key={kind}
-                    label={`${kind === 'new' ? 'New' : 'Dropped'} ${count(changes.get(kind) ?? 0)}`}
-                    selected={change === kind}
-                    onSelectedChange={(on) => {
-                      setChange(on ? kind : undefined);
-                    }}
-                  />
-                ))
-              : null}
-          </Stack>
+            }
+          />
         </Stack>
       }
       summary={
-        run ? `${count(run.results.total)} shown · ${count(inRun)} in the run` : 'Loading rows…'
+        run
+          ? `${count(run.results.total)} shown${facets ? ` · ${count(facets.total)} in the run` : ''}`
+          : 'Loading rows…'
       }
       pager={
         run
@@ -279,7 +301,13 @@ export function ScreenerResults({
           onOpen(row.symbol);
         },
         status: results.isPending ? 'loading' : 'ready',
-        emptyMessage: q ? `No ticker matches “${q}”` : 'No row has these decisions.',
+        emptyMessage: filters.filters.some((x) => x.active) ? (
+          <SurfaceZeroResults surface={SURFACE} state={filters} facets={facets} />
+        ) : q ? (
+          `No ticker matches “${q}”`
+        ) : (
+          'This run has no rows.'
+        ),
       }}
     />
   );

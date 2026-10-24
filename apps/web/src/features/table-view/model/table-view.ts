@@ -23,6 +23,11 @@ export interface FilterBinding {
   onChange: (next: string | undefined) => void;
   /** The filter ids the surface defines now; undefined: not loaded yet (nothing is dropped). */
   known?: readonly string[];
+  /**
+   * The `f` for a view that holds none: nothing saved yet, or one saved with only the decisions
+   * it showed (before filters existed; `decisions` is what it held, maybe none).
+   */
+  fallback?: (decisions: readonly string[]) => string | undefined;
 }
 
 export interface TableViewState {
@@ -31,7 +36,7 @@ export interface TableViewState {
   name: string | null;
   /** The user's named views of the table, sorted. */
   names: readonly string[];
-  /** The saved view has been read (the table can ask for its rows). */
+  /** The saved view has been read, and with a filter binding its `f` restored (the table can ask for its rows). */
   ready: boolean;
   columns: readonly string[];
   /** The columns added back on a narrow table. */
@@ -63,16 +68,25 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
   const removal = useDeleteView(scope);
   const view = saved.data;
   const restore = useRef<'initial' | 'switched' | null>('initial');
+  // With a filter binding the table waits for the view's `f` to be in the URL before it reads.
+  const [restoredF, setRestoredF] = useState(false);
   const restored = restorableFilters(view?.filters ?? '', filters?.known);
+  const decided = view?.saved ? view.decisions : [];
+  const seeded =
+    restored.f ||
+    (!view || (!view.filters && (!view.saved || decided.length > 0))
+      ? (filters?.fallback?.(decided) ?? '')
+      : '');
   const onFilters = filters?.onChange;
   const urlFilters = filters?.f;
   const known = filters?.known !== undefined;
   useEffect(() => {
-    if (!onFilters || !view || !restore.current || !known) return;
+    if (!onFilters || saved.isPending || !restore.current || !known) return;
     // The URL's own `f` (a shared link) wins over the default view's on first load.
-    if (restore.current === 'switched' || !urlFilters) onFilters(restored.f || undefined);
+    if (restore.current === 'switched' || !urlFilters) onFilters(seeded || undefined);
     restore.current = null;
-  }, [view, onFilters, urlFilters, known, restored.f]);
+    setRestoredF(true);
+  }, [saved.isPending, onFilters, urlFilters, known, seeded]);
   const current: ViewContent = {
     columns: edits.columns ?? view?.columns ?? [],
     narrowColumns: edits.narrowColumns ?? view?.narrowColumns ?? [],
@@ -82,6 +96,7 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
   };
   const select = (next: string | null) => {
     restore.current = 'switched';
+    setRestoredF(false);
     setName(next);
     setEdits({});
   };
@@ -89,7 +104,7 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
     scope,
     name,
     names: view?.names ?? [],
-    ready: !saved.isPending,
+    ready: !saved.isPending && (!filters || restoredF),
     columns: current.columns,
     narrowColumns: current.narrowColumns,
     sort: current.sort,

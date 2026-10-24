@@ -16,10 +16,6 @@
 # A path that no longer renders a data surface fails too (delete the line).
 
 [migrating]
-"src/pages/trader-explore/ui/OtherTabs.tsx" = "migrating: Explore tabs onto the bar (ADR 0082, session filter-web-results-explore)"
-"src/widgets/edge-trades/ui/EdgeTrades.tsx" = "migrating: edge trades onto the bar (ADR 0082, session filter-web-lists)"
-"src/widgets/feature-table/ui/ScreenerResults.tsx" = "migrating: screener results onto the bar (ADR 0082, session filter-web-results-explore)"
-"src/widgets/feature-table/ui/TableFrame.tsx" = "migrating: the shared table frame of screener results and Explore (ADR 0082, session filter-web-results-explore)"
 
 [exempt]
 "src/entities/run/ui/RunRecordDrawer.tsx" = "detail drawer: the steps of one run, fixed rows"
@@ -27,6 +23,7 @@
 "src/pages/admin-ingestion/ui/AdminIngestionPage.tsx" = "list of ingestion workflows (a handful of fixed rows) beside its detail"
 "src/pages/admin-llm-usage/ui/CallsSection.tsx" = "list beside its detail over UsageCallsPanel; admin usage log, not yet on the bar"
 "src/pages/admin-screener-runs/ui/AdminScreenerRunsPage.tsx" = "the filter bar is in ScreenerRunList, which this page renders beside its detail"
+"src/pages/trader-explore/ui/OtherTabs.tsx" = "the Compare tab's side-by-side table: at most six tickers the reader chose, a fixed handful of rows (the universe table, the many-row one, is UniverseTable on the bar)"
 "src/widgets/accepted-formula-list/ui/AcceptedFormulaList.tsx" = "per-user accepted formulas, a short list (admin review)"
 "src/widgets/edge-detail/ui/EdgeCompare.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
 "src/widgets/edge-detail/ui/EdgeDetailsBody.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
@@ -42,6 +39,7 @@
 "src/widgets/event-study-panel/ui/EventStudyPanel.tsx" = "one instrument's event-study statistics, a few fixed classes"
 "src/widgets/events-panel/ui/EventsPanel.tsx" = "one instrument's events, a short drill-down list"
 "src/widgets/feature-request-list/ui/FeatureRequestList.tsx" = "admin review queue, a short list"
+"src/widgets/feature-table/ui/TableFrame.tsx" = "the shared frame of the feature tables: its callers pass the filter bar in `header` (ScreenerResults, UniverseTable); the compare table has none"
 "src/widgets/features-panel/ui/FeaturesPanel.tsx" = "one instrument's stored features, the Explore field table with its own search"
 "src/widgets/guide-screener/ui/GuideScreener.tsx" = "Guide page: the criteria of one screener, fixed rows"
 "src/widgets/harness-run-detail/ui/HarnessRunDetail.tsx" = "detail of one harness run: its checks, fixed rows"

@@ -29,7 +29,7 @@ describe('TickerSearch', () => {
     await userEvent.type(screen.getByRole('combobox', { name: 'Search tickers' }), 'nv');
     await waitFor(() => {
       expect(hooks.useFeatureTable).toHaveBeenLastCalledWith(
-        { columns: [], filters: { q: 'nv' }, size: SUGGESTIONS },
+        { columns: [], q: 'nv', size: SUGGESTIONS },
         true,
       );
     });
