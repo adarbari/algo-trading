@@ -8,7 +8,13 @@
 import { Button, SearchInput, Stack, type DataTableSort } from '@algotrade/ui';
 import { useEffect, useState } from 'react';
 
-import { SurfaceFilterBar, SurfaceZeroResults, useFilterState } from '@/features/filter-bar';
+import { ExportButton } from '@/features/filter-export';
+import {
+  encodeFilters,
+  SurfaceFilterBar,
+  SurfaceZeroResults,
+  useFilterState,
+} from '@/features/filter-bar';
 import { termHelp } from '@/features/guide-help';
 import { DEFAULT_DIMENSIONS, joinList } from '@/entities/explore';
 import { FeatureTable } from '@/widgets/feature-table';
@@ -78,7 +84,7 @@ export function UniverseTable({
           'No ticker in the universe.'
         )
       }
-      header={(facets) => (
+      header={(facets, session) => (
         <Stack gap={2}>
           <SurfaceFilterBar
             surface={SURFACE}
@@ -86,6 +92,15 @@ export function UniverseTable({
             state={filters}
             facets={facets}
             help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
+            actions={
+              <ExportButton
+                surface={SURFACE}
+                f={encodeFilters(filters.filters)}
+                session={session}
+                columns={columns}
+                help={termHelp('export')}
+              />
+            }
             search={
               <SearchInput
                 aria-label="Find a ticker"

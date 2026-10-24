@@ -311,3 +311,22 @@ test('a screener no edge lists says so', async ({ page }) => {
   await page.goto('/screeners/short-premium-liquidity');
   await expect(page.getByText(/Not part of an edge/)).toBeVisible();
 });
+
+test('Export saves the run under the filters in force: the request carries f, date, screener and columns', async ({
+  page,
+}) => {
+  await mockBuilderApi(page);
+  await page.route('**/api/files/screener_results.csv*', (route) =>
+    route.fulfill({ contentType: 'text/csv', body: 'symbol,decision\nAAPL,QUALIFIED\n' }),
+  );
+  await page.goto('/screeners/vrp_scanner?f=decision:QUALIFIED;change:new');
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
+  const request = page.waitForRequest('**/api/files/screener_results.csv*');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export' }).click();
+  const query = new URL((await request).url()).searchParams;
+  expect(query.get('f')).toBe('decision:QUALIFIED;change:new');
+  expect(query.get('date')).toBe('2026-10-02');
+  expect(query.get('screener')).toBe('vrp_scanner');
+  expect((await download).suggestedFilename()).toBe('screener_results-2026-10-02.csv');
+});

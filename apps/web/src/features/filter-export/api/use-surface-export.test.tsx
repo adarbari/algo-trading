@@ -46,6 +46,31 @@ describe('useSurfaceExport', () => {
     });
   });
 
+  it('sends the screener and the added columns of a surface that has them', async () => {
+    GET.mockResolvedValue({ data: 'a\n', response: new Response() });
+    const { result } = renderHook(() => useSurfaceExport('screener_results'), { wrapper });
+    result.current.mutate({
+      f: 'decision:QUALIFIED',
+      session: '2026-10-01',
+      screener: 'vrp',
+      columns: ['feature.market_cap'],
+    });
+    await waitFor(() => {
+      expect(saveTextFile).toHaveBeenCalled();
+    });
+    expect(GET.mock.calls[0]?.[1]).toMatchObject({
+      params: {
+        path: { surface: 'screener_results' },
+        query: {
+          f: 'decision:QUALIFIED',
+          date: '2026-10-01',
+          screener: 'vrp',
+          columns: ['feature.market_cap'],
+        },
+      },
+    });
+  });
+
   it('sends no f for no filters and fails with the server detail', async () => {
     GET.mockResolvedValue({
       error: { detail: 'ideas: filter is not offered' },

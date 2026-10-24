@@ -31,13 +31,27 @@ describe('ExportButton', () => {
     expect(hooks.useSurfaceExport).toHaveBeenCalledWith('ideas');
     expect(screen.getByText('help')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-    expect(hooks.mutate).toHaveBeenCalledWith({ f: 'decision:QUALIFIED', session: '2026-10-01' });
+    expect(hooks.mutate).toHaveBeenCalledWith({
+      f: 'decision:QUALIFIED',
+      session: '2026-10-01',
+      screener: undefined,
+      columns: undefined,
+    });
     hooks.useSurfaceExport.mockReturnValue({
       mutate: hooks.mutate,
       isPending: false,
       isError: true,
     });
-    rerender(<ExportButton surface="ideas" f="" />);
+    rerender(
+      <ExportButton surface="screener_results" f="" screener="vrp" columns={['feature.close']} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(hooks.mutate).toHaveBeenLastCalledWith({
+      f: '',
+      session: undefined,
+      screener: 'vrp',
+      columns: ['feature.close'],
+    });
     expect(screen.getByText('The file could not be saved.')).toBeInTheDocument();
   });
 });

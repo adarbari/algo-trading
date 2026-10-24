@@ -23,6 +23,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
+import { ExportButton } from '@/features/filter-export';
 import {
   encodeFilters,
   SurfaceFilterBar,
@@ -233,6 +234,16 @@ export function ScreenerResults({
             help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
             labelOf={labelOf}
             views={view}
+            actions={
+              <ExportButton
+                surface={SURFACE}
+                f={encodeFilters(filters.filters)}
+                session={results.data?.session?.date}
+                screener={id}
+                columns={view.columns}
+                help={termHelp('export')}
+              />
+            }
             search={
               <SearchInput
                 aria-label="Find a ticker"

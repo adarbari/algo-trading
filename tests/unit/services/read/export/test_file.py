@@ -71,6 +71,19 @@ def test_the_file_is_the_page_for_the_same_f(filter_backend: MemoryBackend) -> N
     assert len(page.items) == 4 == same.row_count  # a narrower file than the unfiltered list
 
 
+def test_a_more_filters_feature_filter_exports_the_pages_rows(
+    filter_backend: MemoryBackend,  # noqa: F811
+) -> None:
+    """Found in the production check: Export after a More-filters filter answered 403 (the file
+    resolved the surface's filters without the requested ``feature:<field>`` ones)."""
+    ctx = view(filter_backend)
+    f = "feature%3Arollup.volume@v1.dollar_volume:50000000.."
+    page = load_ideas(ctx, 100, None, decode_filters(f))
+    same = export_file(ctx, "ideas", f)
+    assert 0 < page.total < load_ideas(ctx, 100).total
+    assert [r["instrument_id"] for r in rows_of(same)] == [i.instrument_id for i in page.items]
+
+
 def test_screener_results_have_the_pages_rows_for_the_same_f(reader: StoreReader) -> None:
     ctx = context(reader, user="me")
     run = latest_run(ctx, "site", "alpha").run
