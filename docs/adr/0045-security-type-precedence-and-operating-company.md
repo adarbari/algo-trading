@@ -38,3 +38,16 @@ shell with a ticker; it stays common stock and in the universe, but it has no ea
   catches it; the check measures the disagreement, it does not find these.
 - A new vendor type is mapped in `MASSIVE_TYPES`; a new generic one is added to
   `GENERIC_VENDOR_TYPES` (`universe_build.py`).
+
+## Amendment 2026-10-24: closed-end funds
+Massive types 31 "- Closed End Fund" names `CS` (Nasdaq Trader's suffix), so funds counted as
+operating companies and had no share count (2 of 31 have one). `classify.security_type` gains a
+`CEF` rule on that suffix; as a specific name result it overrides the generic vendor type
+(`name_over_vendor`). 17 of the 31 are BDCs (ARCC, PSEC, ...: 10-K filers, the population of
+`bdc_price_to_nav`, which needs `COMMON_STOCK`): a hand-kept `_BDC_SYMBOLS` set skips them. The
+other 14 become `CEF` (Calamos, Sprott FUND, Herzfeld, Oxford Lane, ArrowMark, Thornburg, Daxor).
+Royalty trusts (SIC 6792 / 6795) and REITs stay `COMMON_STOCK`. A `CEF` is a fund in `asset_class`
+(ADR 0013): they leave the stock populations; FIGI ids are unchanged; 0.27% of ACTIVE rows.
+Older reference snapshots are not rewritten: they keep these 14 as `COMMON_STOCK`, so edge trial logs and
+backtests over earlier sessions include them in stock populations. The rule sits after `PREFERRED` /
+`NOTE`; its pattern is deliberately a suffix match, narrower than `fund_nav.CLOSED_END_NAME` (contains).
