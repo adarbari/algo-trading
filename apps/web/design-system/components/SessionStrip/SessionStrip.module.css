@@ -1,0 +1,59 @@
+/* SessionStrip: a row of small squares; a session that did not run is an empty dashed square. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5);
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cell {
+  box-sizing: border-box;
+  width: var(--space-3);
+  height: var(--space-3);
+  padding: 0;
+  border: var(--border-width-thin) solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
+  cursor: pointer;
+}
+
+.cell[data-tone='positive'] {
+  background: var(--color-positive);
+}
+
+.cell[data-tone='warning'] {
+  background: var(--color-warning);
+}
+
+.cell[data-tone='muted'] {
+  border-style: dashed;
+  border-color: var(--color-muted);
+  background: transparent;
+}
+
+.cell[data-current='true'] {
+  outline: var(--border-width-thick) solid var(--color-text);
+  outline-offset: var(--border-width-thin);
+}
+
+.cell:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-focus-ring);
+  outline-offset: var(--border-width-thick);
+}
+
+/* A finger needs a larger square (the density token grows under a coarse pointer). */
+@media (pointer: coarse) {
+  .cell {
+    width: var(--density-control-height);
+    height: var(--density-control-height);
+  }
+}

@@ -25,6 +25,7 @@ export { prefetchScreenerHits, useScreenerHits, type ScreenerHitsResponse } from
 export {
   SCREENER_RESULTS_OPERATION,
   useScreenerResults,
+  type RecentRun,
   type ScreenerResultsResponse,
 } from './api/results';
 export {

@@ -17,6 +17,7 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.instruments.table import DEFAULT_SIZE
 from algotrade.services.read.screens import pick_history as picks
+from algotrade.services.read.screens import recent_runs as recent
 from algotrade.services.read.screens import results, runs, screeners
 from algotrade_api.graphql.limits import MAX_FILTERS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.offload import off_loop
@@ -224,13 +225,63 @@ class PickCount:
         )
 
 
+strawberry.enum(
+    recent.RunState,
+    description="What a screener's run was for a session: COMPLETE (ran to the end), PARTIAL "
+    "(ran with a gap, or its record is gone) or NOT_RUN",
+)
+
+
+@strawberry.type(
+    description="One session of a screener's recent runs (the run line and session strip of its "
+    "results page): `state`, `served` (the page's own session: the one `latestRun` shows; the "
+    "others are history, read as their run record left them), and for a run its `runId`, "
+    "`configVersion`, `picked` and `paused` (whole run), `newPicks` / `dropped` against its "
+    "previous run (null: none, or not stored; never 0), `leftOutShare` (0 to 1: the share of "
+    "names it could not judge for want of a value; null: not counted) and `unavailable` (what "
+    "the tables it went without leave out); a session with no run has `state` NOT_RUN and "
+    "`notRun` says why"
+)
+class RecentRun:
+    session: dt.date
+    state: recent.RunState
+    served: bool
+    run_id: str | None
+    config_version: int | None
+    picked: int | None
+    paused: int | None
+    new_picks: int | None
+    dropped: int | None
+    left_out_share: float | None
+    unavailable: list[Unavailable]
+    not_run: Unknown | None
+
+    @classmethod
+    def of(cls, d: recent.RecentRun) -> Self:
+        return cls(
+            session=d.session,
+            state=d.state,
+            served=d.served,
+            run_id=d.run_id,
+            config_version=d.config_version,
+            picked=d.picked,
+            paused=d.paused,
+            new_picks=d.new_picks,
+            dropped=d.dropped,
+            left_out_share=d.left_out_share,
+            unavailable=[Unavailable.of(u) for u in d.unavailable],
+            not_run=Unknown.of(d.not_run) if d.not_run is not None else None,
+        )
+
+
 @strawberry.type(
     description="A rule screen as the user sees it (their own config, else the site preset): "
     "`owner` is whose runs are its; `criteria`, `groups` and `displayColumns` the current "
     "config's; `description` the one line saying what it finds (null: not written; not part of "
     "`hash`); "
     "`latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its "
-    "picked count per session over a window ending at the session"
+    "picked count per session over a window ending at the session; `recentRuns` its last runs "
+    "for the run line and strip"
 )
 class Screener:
     id: str
@@ -296,3 +347,14 @@ class Screener:
     ) -> list[PickCount]:
         found = await self.ctx.loaders.screener_pick_history.load((self.owner, self.id, sessions))
         return [PickCount.of(p) for p in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Its run for each of the last `limit` (default 10, at most 10) exchange "
+        "sessions ending at the session, oldest first, one entry per session: the history "
+        "behind the run line, each as its run record left it (never an older run carried "
+        "into a later session); the entry of the session is what `latestRun` says",
+        extensions=[MaxItems("limit", recent.MAX_LIMIT)],
+    )
+    async def recent_runs(self, info: Info, limit: int = recent.DEFAULT_LIMIT) -> list[RecentRun]:
+        found = await self.ctx.loaders.screener_recent_runs.load((self.owner, self.id, limit))
+        return [RecentRun.of(r) for r in found]

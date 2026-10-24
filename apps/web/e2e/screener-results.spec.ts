@@ -192,11 +192,35 @@ test('a screener with no run says so, and Run now runs it and shows the results'
       'No run stored for this screener on 2026-10-02. Run it now to see what it picks.',
     ),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Run now' }).click();
+  await expect(page.getByRole('group', { name: 'Last 1 sessions' })).toBeVisible();
+  await expect(page.getByText('not run for this session')).toBeVisible(); // the reason, in public words
+  await page.getByRole('button', { name: 'Run now' }).first().click(); // the run line's, above the table
   await expect(page.getByText('Running for 2026-10-02…')).toBeVisible();
-  await expect(page.getByText('Updated for 2026-10-02')).toBeVisible();
+  await expect(page.getByText('Run 2026-10-02', { exact: true })).toBeVisible(); // the line now says the run
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
   expect(mock.runs).toEqual(['my-vrp']);
+});
+
+test('the run line says the last run and the strip shows the ten sessions with a label each', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner');
+  await expect(page.getByText('Run 2026-10-02', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('v3 · 13 picked · +2 new, −1 dropped · Missing data for 8% of names'),
+  ).toBeVisible();
+  const strip = page.getByRole('group', { name: 'Last 10 sessions' });
+  await expect(strip.getByRole('button')).toHaveCount(10);
+  await expect(strip.getByRole('button', { name: 'Sep 24: Not run' })).toBeVisible();
+  await expect(strip.getByRole('button', { name: 'Sep 29: Partial, 10 picked' })).toBeVisible();
+  await expectAccessible(page);
+  await strip.getByRole('button', { name: 'Sep 24: Not run' }).focus();
+  await expect(page.getByText('Sep 24: Not run', { exact: true })).toBeVisible(); // the caption
+  // A session that ran has no Run now beside the line (the table's own button stays).
+  await expect(page.getByRole('button', { name: 'Run now' })).toHaveCount(1);
+  expect(errors).toEqual([]);
 });
 
 test('Edit criteria opens the Builder; an edit there shows who would enter or leave', async ({

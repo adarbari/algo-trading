@@ -12,6 +12,7 @@ import { useState } from 'react';
 
 import { ScreenerDescription, useMyScreeners, useScreenerRuns } from '@/entities/screen';
 import { ScreenerEdgeLine } from '@/widgets/screener-edge-line';
+import { ScreenerRunLine } from '@/widgets/screener-run-line';
 import { ScreenerResults } from '@/widgets/feature-table';
 import { PickDetail } from '@/widgets/pick-detail';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
@@ -100,6 +101,7 @@ export function ScreenerResultsPage({
         }}
         dismissed={dismissed}
         compared={compared}
+        renderRunLine={(runs) => <ScreenerRunLine id={id} runs={runs} />}
         onShowDismissed={() => {
           setDismissed(new Set());
         }}

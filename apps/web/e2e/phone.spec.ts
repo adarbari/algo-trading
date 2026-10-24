@@ -152,6 +152,21 @@ test('Screener results: the pick sheet shows no keyboard hints on a phone', asyn
   await expect(sheet.getByRole('list', { name: 'Keyboard shortcuts' })).toBeHidden();
 });
 
+test('Screener results: the run line and the strip fit a phone and a tap on a square names its session', async ({
+  page,
+}) => {
+  await page.goto('/screeners/vrp_scanner');
+  await expect(page.getByText('Run 2026-10-02', { exact: true })).toBeVisible();
+  const strip = page.getByRole('group', { name: 'Last 10 sessions' });
+  await strip.getByRole('button', { name: 'Sep 29: Partial, 10 picked' }).tap();
+  await expect(page.getByText('Sep 29: Partial, 10 picked', { exact: true })).toBeVisible(); // the caption
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(false);
+  await expectAccessible(page);
+});
+
 test('Screener results: the pick opens as a full-height sheet; next, previous and back work', async ({
   page,
 }) => {

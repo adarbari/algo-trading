@@ -149,3 +149,30 @@ def test_pick_history_is_one_entry_per_session_oldest_first(graph: Graph) -> Non
     assert first["notRun"] == {"code": "NOT_RUN"}  # the run's absence is an entry, not a gap
     assert (second["session"], second["picked"], second["paused"]) == ("2022-11-22", 2, 0)
     assert (third["session"], third["picked"], third["paused"]) == ("2022-11-23", 2, 1)
+
+
+RECENT_RUNS = """query Recent($id: String!, $limit: Int) {
+  screener(id: $id) {
+    latestRun { session picked }
+    recentRuns(limit: $limit) {
+      session state served runId picked newPicks dropped leftOutShare notRun { code }
+    }
+  }
+}"""
+
+
+def test_recent_runs_end_at_the_served_run_and_a_gap_is_not_run(graph: Graph) -> None:
+    body = graph(RECENT_RUNS, {"id": "vrp_scanner", "limit": 3})
+    assert "errors" not in body, body
+    screener = body["data"]["screener"]
+    first, second, third = screener["recentRuns"]
+    assert first["state"] == "NOT_RUN" and first["notRun"] == {"code": "NOT_RUN"}
+    assert (first["runId"], first["picked"], first["newPicks"]) == (None, None, None)
+    assert second["served"] is False and third["served"] is True
+    assert third["session"] == screener["latestRun"]["session"]
+    assert third["picked"] == screener["latestRun"]["picked"]  # the served entry is latestRun
+
+
+def test_recent_runs_refuses_more_than_ten_sessions(graph: Graph) -> None:
+    body = graph(RECENT_RUNS, {"id": "vrp_scanner", "limit": 11})
+    assert "at most 10" in str(body["errors"])
