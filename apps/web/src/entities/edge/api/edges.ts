@@ -7,28 +7,57 @@
  * means and the lift among random-pick backtests), how it is defined, its sources, and every run
  * the user sees so exploratory ones can be listed and labelled. The cache holds the responses.
  */
-import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
+import { toFilterInputs, type AppliedFilter, type FilterInput } from '@/entities/filter';
 import { gql, graphql, queryKeys } from '@/shared/api';
 
 const EdgesPage = graphql(`
-  query EdgesPage {
+  query EdgesPage($filters: [FilterInput!], $q: String) {
+    edgeList(filters: $filters, q: $q) {
+      total
+      facets {
+        total
+        matched
+        items {
+          id
+          active
+          removes
+          unknown
+          options {
+            value
+            count
+          }
+          bins {
+            lo
+            hi
+            count
+          }
+        }
+      }
+      items {
+        id
+        name
+        status
+        state
+        mine
+        screeners
+        summary {
+          verdict
+          result
+          trades
+        }
+      }
+    }
+  }
+`);
+
+const EdgeProblems = graphql(`
+  query EdgeProblems {
     edgeProblems {
       edgeId
       reason
-    }
-    edges {
-      id
-      name
-      status
-      state
-      mine
-      screeners
-      summary {
-        verdict
-        result
-        trades
-      }
     }
   }
 `);
@@ -272,10 +301,20 @@ export function useEdgeDocument(id: string | null) {
   });
 }
 
-/** Every edge the user sees as a list row, with its headline verdict only (empty: none declared). */
-export function useEdges() {
-  return useQuery({ ...edgesQuery(), select: (data) => data.edges });
+/**
+ * The edges the user sees that pass `applied` and match `q` (over name and thesis), as list rows
+ * with the headline of each verdict only, and the filter bar's counts (`facets`: `total` is the
+ * count before the filters, 0 when none is declared). The last list stays while new filters load.
+ */
+export function useEdges(applied: readonly AppliedFilter[] = NO_FILTERS, q = '') {
+  const filters = useMemo(() => toFilterInputs(applied), [applied]);
+  return useQuery({
+    ...edgesQuery(filters, q),
+    placeholderData: keepPreviousData,
+    select: (data) => data.edgeList,
+  });
 }
+const NO_FILTERS: readonly AppliedFilter[] = [];
 
 /** One edge in full (null id: nothing is read); `data` is the edge, or null when it is not seen. */
 export function useEdge(id: string | null) {
@@ -299,24 +338,41 @@ export function prefetchEdge(client: QueryClient, id: string): void {
 
 /** The user's own edge files that did not load, each with its reason (empty: all load). */
 export function useEdgeProblems() {
-  return useQuery({ ...edgesQuery(), select: (data) => data.edgeProblems });
+  return useQuery({
+    queryKey: queryKeys.gql('EdgeProblems', {}),
+    queryFn: ({ queryKey }) => gql(EdgeProblems, {}, queryKey),
+    select: (data) => data.edgeProblems,
+  });
 }
 
-const edgesQuery = () =>
-  queryOptions({
-    queryKey: queryKeys.gql('EdgesPage', {}),
-    queryFn: ({ queryKey }) => gql(EdgesPage, {}, queryKey),
+const edgesQuery = (filters: readonly FilterInput[] | null, q: string) => {
+  const variables = { ...(filters && { filters: [...filters] }), ...(q && { q }) };
+  return queryOptions({
+    queryKey: queryKeys.gql('EdgesPage', variables),
+    queryFn: ({ queryKey }) =>
+      gql(EdgesPage, { filters: variables.filters ?? null, q: variables.q ?? null }, queryKey),
   });
+};
 
 /** Start reading the edges before the page opens (a link was hovered): a no-op while fresh. */
-export function prefetchEdges(client: QueryClient): void {
-  void client.query(edgesQuery()).catch(() => undefined);
+export function prefetchEdges(
+  client: QueryClient,
+  applied: readonly AppliedFilter[] = NO_FILTERS,
+  q = '',
+): void {
+  void client.query(edgesQuery(toFilterInputs(applied), q)).catch(() => undefined);
+  void client
+    .query({
+      queryKey: queryKeys.gql('EdgeProblems', {}),
+      queryFn: ({ queryKey }) => gql(EdgeProblems, {}, queryKey),
+    })
+    .catch(() => undefined);
 }
 
 /** Read the edges (and their runs) again, after an evaluation finished. */
 export function refreshEdges(client: QueryClient): Promise<void> {
   return Promise.all(
-    ['EdgeDocument', 'EdgeDetail', 'EdgesPage'].map((name) =>
+    ['EdgeDocument', 'EdgeDetail', 'EdgesPage', 'EdgeProblems'].map((name) =>
       client.invalidateQueries({ queryKey: queryKeys.gqlAll(name) }),
     ),
   ).then(() => undefined);

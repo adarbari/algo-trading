@@ -134,17 +134,24 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   expect(errors).toEqual([]);
 });
 
-test('the list filters by view and an edge offers Clone and Follow in dialogs', async ({
+test('the list narrows by filter and search, and an edge offers Clone and Follow in dialogs', async ({
   page,
 }) => {
   const errors = collectErrors(page);
   await page.goto('/edges');
   const list = page.getByRole('grid', { name: 'Edges' });
   await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toContainText('site edge');
-  await page.getByRole('button', { name: /^Mine · 0/ }).click();
-  await expect(page).toHaveURL(/view=mine/);
+  await page.getByRole('button', { name: 'Setup' }).click();
+  await page.getByRole('radiogroup', { name: 'Mine' }).getByRole('radio', { name: 'Yes' }).click();
+  await expect(page).toHaveURL(/f=mine/);
+  await page.keyboard.press('Escape');
   await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toHaveCount(0);
-  await page.getByRole('button', { name: /^All · / }).click();
+  await expect(page.getByText('No edges match this filter')).toBeVisible();
+  await list.getByRole('button', { name: 'Clear all' }).click();
+  await expect(page).not.toHaveURL(/f=/);
+  await page.getByRole('searchbox', { name: 'Search edges' }).fill('winners');
+  await expect(page).toHaveURL(/q=winners/);
+  await expect(list.getByRole('row', { name: /S&P 500 index changes/ })).toHaveCount(0);
   await list.getByRole('row', { name: /Momentum 12-1/ }).click();
   await page.getByRole('button', { name: 'Follow', exact: true }).click();
   await expect(page.getByRole('dialog', { name: /Follow · Momentum 12-1/ })).toBeVisible();
@@ -247,4 +254,17 @@ test('New edge opens the empty builder and Cancel goes back to the list', async 
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page).toHaveURL(/\/edges$/);
   expect(errors).toEqual([]);
+});
+
+test('an old ?view= link opens the list narrowed by the filter it stood for', async ({ page }) => {
+  await page.goto('/edges?view=rejected');
+  const list = page.getByRole('grid', { name: 'Edges' });
+  await expect(list.getByRole('row', { name: /S&P 500 index changes/ })).toBeVisible();
+  await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('group', { name: 'Applied filters' })
+      .getByRole('button', { name: /^Status Rejected/ }),
+  ).toBeVisible();
+  await expectAccessible(page);
 });

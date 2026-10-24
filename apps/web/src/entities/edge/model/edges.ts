@@ -9,14 +9,14 @@ import type { gqlTypes } from '@/shared/api';
 
 export type EdgesResponse = gqlTypes.EdgesPageQuery;
 /** One row of the list: the edge's own fields and the headline of its verdict (`summary`). */
-export type EdgeRow = EdgesResponse['edges'][number];
+export type EdgeRow = NonNullable<EdgesResponse['edgeList']>['items'][number];
 /** One edge in full (the `EdgeDetail` read): the whole verdict, definition and runs. */
 export type Edge = gqlTypes.EdgeDetailQuery['edges'][number];
 /** One edge's document, as the builder reads it (no verdict, no runs). */
 export type EdgeDocument = gqlTypes.EdgeDocumentQuery['edges'][number];
 export type EdgeVerdict = Edge['verdict'];
 export type VerdictCriterion = EdgeVerdict['criteria'][number];
-export type EdgeProblem = EdgesResponse['edgeProblems'][number];
+export type EdgeProblem = gqlTypes.EdgeProblemsQuery['edgeProblems'][number];
 export type VerdictYear = EdgeVerdict['years'][number];
 export type VerdictColumn = EdgeVerdict['columns'][number];
 export type EvidenceProgress = NonNullable<EdgeVerdict['evidence']>;
@@ -123,24 +123,6 @@ export const labelText = (label: string): string => LABEL_TEXTS[label] ?? label;
 const SIDE_LABELS: Record<string, string> = { short: 'Short', long_short: 'Long-short' };
 
 export const sideLabel = (side: string): string | null => SIDE_LABELS[side] ?? null;
-
-/** The list's views (a link keeps one): everything, the user's own edges, followed, rejected. */
-export const EDGE_VIEWS = [
-  { value: 'all', label: 'All' },
-  { value: 'mine', label: 'Mine' },
-  { value: 'following', label: 'Following' },
-  { value: 'rejected', label: 'Rejected' },
-] as const;
-
-export type EdgeView = (typeof EDGE_VIEWS)[number]['value'];
-
-/** Whether an edge belongs to a view (rejected: by the user, or the site's own verdict). */
-export function inView(edge: Pick<EdgeRow, 'mine' | 'state' | 'status'>, view: EdgeView): boolean {
-  if (view === 'mine') return edge.mine;
-  if (view === 'following') return edge.state === 'following';
-  if (view === 'rejected') return edge.state === 'rejected' || edge.status === 'rejected';
-  return true;
-}
 
 /** The state the list shows: the user's own, else the site's status for an edge not yet theirs. */
 export const stateOrStatus = (edge: Pick<EdgeRow, 'state' | 'status'>): string =>

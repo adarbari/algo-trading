@@ -1,7 +1,11 @@
 /** Trader > Screeners: your screeners and the site presets, with "+ New screener". */
 import { Button, Heading, Stack, Text } from '@algotrade/ui';
 
-import { ScreenerList } from '@/widgets/screener-list';
+import {
+  ScreenerList,
+  type ScreenerListSearch,
+  type ScreenerListSearchPatch,
+} from '@/widgets/screener-list';
 
 export interface ScreenersPageProps {
   /** Open a screener's results. */
@@ -12,9 +16,19 @@ export interface ScreenersPageProps {
   onOpenEdge: (edgeId: string) => void;
   /** Start a new screener. */
   onNew: () => void;
+  /** The list's filters and search (from the URL) and their change. */
+  search: ScreenerListSearch;
+  onSearchChange: (patch: ScreenerListSearchPatch) => void;
 }
 
-export function ScreenersPage({ onOpen, onEdit, onOpenEdge, onNew }: ScreenersPageProps) {
+export function ScreenersPage({
+  onOpen,
+  onEdit,
+  onOpenEdge,
+  onNew,
+  search,
+  onSearchChange,
+}: ScreenersPageProps) {
   return (
     <Stack gap={3}>
       <Stack direction="row" gap={3} align="center" justify="between" wrap>
@@ -29,7 +43,13 @@ export function ScreenersPage({ onOpen, onEdit, onOpenEdge, onNew }: ScreenersPa
           + New screener
         </Button>
       </Stack>
-      <ScreenerList onOpen={onOpen} onEdit={onEdit} onOpenEdge={onOpenEdge} />
+      <ScreenerList
+        search={search}
+        onSearchChange={onSearchChange}
+        onOpen={onOpen}
+        onEdit={onEdit}
+        onOpenEdge={onOpenEdge}
+      />
     </Stack>
   );
 }

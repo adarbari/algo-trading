@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
 
-import { filterRows, toRows } from './rows';
+import { narrowRows, toRows } from './rows';
 
 const config = (configId: string, scope: string, impl = 'rules', error: string | null = null) =>
   ({
@@ -47,15 +47,16 @@ describe('toRows', () => {
   });
 });
 
-describe('filterRows', () => {
-  it('narrows by segment', () => {
-    expect(filterRows(ROWS, 'mine', '')).toHaveLength(3);
-    expect(filterRows(ROWS, 'presets', '')).toHaveLength(2);
-    expect(filterRows(ROWS, 'all', '')).toHaveLength(5);
+describe('narrowRows', () => {
+  it('keeps every row, drafts and unresolved ones too, when no narrowing is in force', () => {
+    expect(narrowRows(ROWS, null)).toHaveLength(5);
   });
 
-  it('narrows by a name search in any case, within the segment', () => {
-    expect(filterRows(ROWS, 'all', ' VRP ').map((r) => r.id)).toEqual(['my-vrp', 'vrp_scanner']);
-    expect(filterRows(ROWS, 'presets', 'vrp').map((r) => r.id)).toEqual(['vrp_scanner']);
+  it('keeps only the ids the server named, in the list order', () => {
+    expect(narrowRows(ROWS, new Set(['vrp_scanner', 'my-vrp'])).map((r) => r.id)).toEqual([
+      'my-vrp',
+      'vrp_scanner',
+    ]);
+    expect(narrowRows(ROWS, new Set())).toEqual([]);
   });
 });

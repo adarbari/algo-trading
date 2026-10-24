@@ -10,8 +10,10 @@ export { EdgesPage, type EdgesPageProps } from './ui/EdgesPage';
 export function prefetchEdgesReads(
   client: Parameters<typeof prefetchEdges>[0],
   edge?: string | null,
+  filters: Parameters<typeof prefetchEdges>[1] = [],
+  q = '',
 ): void {
   if (edge) prefetchEdge(client, edge);
-  else prefetchEdges(client);
+  else prefetchEdges(client, filters, q);
   prefetchEdgeDesk(client);
 }
