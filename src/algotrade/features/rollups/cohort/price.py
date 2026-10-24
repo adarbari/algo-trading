@@ -40,11 +40,11 @@ SOURCES = (
 )
 _WHAT = {
     "mom_12_1": "12-1 momentum (the 12-month return without the last month)",
-    "adv_usd_20d": "20-session average dollar volume",
+    "adv_usd_20d": "20-session dollar volume",
     "rs_spy_63d": "63-session relative strength against SPY",
 }
 _COVERAGE = (
-    ", or fewer than min_coverage of the universe's stocks have a price_stats row (a partial day)"
+    ", or fewer than min_coverage of the universe's stocks have a source row (a partial day)"
 )
 
 FEATURES = percentile_features(SOURCES, _WHAT, _COVERAGE)

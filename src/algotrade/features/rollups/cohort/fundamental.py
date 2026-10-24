@@ -37,7 +37,7 @@ SOURCES = (
     (PE, "pe_ratio", LEVELS),
 )
 _WHAT = {
-    "days_to_cover": "FINRA's days to cover: the short position over the average daily volume",
+    "days_to_cover": "FINRA's days to cover: the short position over the daily volume",
     "pe_ratio": "trailing price to earnings; a loss-making name has none",
 }
 FEATURES = percentile_features(SOURCES, _WHAT, source_inputs={"pe_ratio": "pe_ratio@v1"})

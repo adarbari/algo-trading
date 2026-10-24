@@ -162,7 +162,7 @@ def percentile_features(
         Feature(
             f"{column}_pct_{level}", "float32", "decimal",
             f"The percentile rank of {column} ({what[column]}) among {_COHORT[level]} with a "
-            "known one: 0 the lowest, 1 the highest, ties share their average rank; 0.9 is "
+            "known one: 0 the lowest, 1 the highest, ties share one rank; 0.9 is "
             "above 90% of the cohort",
             "the instrument is not a STOCK of the universe snapshot the session sees (an ETF, "
             "fund or trust, or no snapshot yet)"

@@ -31,7 +31,7 @@ VERSION = 1
 IV_HISTORY = "rollups/instrument/iv_history@v2"
 # (table, source column, the levels it is ranked at)
 SOURCES = ((IV_HISTORY, "iv_rank_252d", LEVELS),)
-_WHAT = {"iv_rank_252d": "where today's IV30 sits in its 252-session range"}
+_WHAT = {"iv_rank_252d": "where the current IV30 sits in its 252-session range"}
 FEATURES = percentile_features(SOURCES, _WHAT)
 COLUMNS = column_types(FEATURES)
 
