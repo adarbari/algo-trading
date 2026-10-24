@@ -670,6 +670,15 @@ follow-up PR).
 - status: final
 - Reasoning: the cost is the filter bar's shared code adopted by two more lists (ADR 0082), not the lists' own code.
 
+## 2026-10-24 | Screener run line PR (#932) | Screener results route budgets raised by the run line's cost
+- Question: the run line and ten-session strip put the Screener results route over its script, request and DOM budgets (CI 256892 B scripts, 88 requests, 287 DOM nodes). Trim or raise?
+- Options: drop the strip's help button and its own CSS (breaks the Guide coverage rule) / raise the three route budgets by the measured cost plus a small margin / drop the strip.
+- Decision: `/screeners/vrp_scanner` scripts 256400 to 257500 B (CI measured 256892, then 257161 and 257322 as main's shared chunks shifted), requests 86 to 90 (CI measured 89), dom_nodes 272 to 292; no other budget changes.
+- decided by: owner
+- status: final
+- Reasoning: the two extra requests and the nodes are the strip and its help button, which the Guide rule requires; the owner chose to raise the budgets in chat on 2026-10-24.
+- Update 2026-10-24: after main raised the route to scripts 267500 and requests 103, CI measured scripts 268153; raised to 268300; CI then measured 105 requests against main's 103, raised to 106 (owner-approved, same decision).
+
 ## 2026-10-24 | ADR 0082 filter-bar Export | May personal-licence values leave as a file
 - Question: may the filter bar export the rows a viewer filtered, and what may the file hold?
 - Options: (a) none until the owner decides / (b) hybrid: files carry what the viewer can see, built server-side through the gated loader / (c) browser rows saved as a file.
@@ -708,3 +717,11 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: the gate cannot measure a lazy, click-only operation: `web_page_ops.py` does not follow `lazy(() => import(...))`, an uncertain operation is skipped by `fast_bench.op_set`, and views the crawl discovers are not timed.
 - Reasoning: B spends a request and a catalogue-sized read on every Ideas load against the request budget; C buys no measurement. Follow-up: teach the gate to time discovered click views, then shrink the list.
+
+## 2026-10-24 | Screener run line PR (#932) | Screeners list scripts budget raised by 100 B
+- Question: CI measured the Screeners list route's scripts at 217010 B against a budget of 217000 B (10 B over); the local build is unchanged at 217.0 kB. Trim or raise?
+- Options: trim another 10 B (an earlier trim changed nothing locally) / raise the `/screeners` scripts budget by 100 B / hold the PR.
+- Decision: `/screeners` `first_load_js_gzip_bytes` 217000 to 217100; no other budget changes.
+- decided by: owner
+- status: final
+- Reasoning: CI noise and main's drift, not the run line's behaviour; the owner chose to raise it in chat on 2026-10-24.

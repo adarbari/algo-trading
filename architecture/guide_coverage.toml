@@ -88,6 +88,11 @@ values = { COMPLETE = "term:data_state", PARTIAL = "term:data_state", NEXT_PROCE
 names = { COMPLETE = "Data complete", PARTIAL = "Data partial", NEXT_PROCESSING = "Next day processing", NEXT_FAILED_SHOWING_PREVIOUS = "Next day failed, showing previous" }
 
 [[enum]]
+source = "graphql:RunState"
+values = { COMPLETE = "term:run_state", PARTIAL = "term:run_state", NOT_RUN = "term:run_state" }
+names = { COMPLETE = "Complete", PARTIAL = "Partial", NOT_RUN = "Not run" }
+
+[[enum]]
 source = "graphql:DatasetState"
 values = { COMPLETE = "term:dataset_status", PARTIAL = "term:dataset_status", MISSING = "term:dataset_status", UNKNOWN = "term:dataset_status" }
 names = { COMPLETE = "complete", PARTIAL = "partial", MISSING = "missing", UNKNOWN = "not measured" }

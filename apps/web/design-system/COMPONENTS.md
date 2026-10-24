@@ -1443,6 +1443,17 @@ Source: `design-system/components/Select`
 | `name` | `string` | no |  |
 | `id` | `string` | no |  |
 
+### SessionStrip
+
+SessionStrip: a row of small squares, one per session, oldest first, each in the tone of what happened in it (ran, ran with a gap, did not run; the one being shown is outlined). Each square is a focusable button (the row is a named group of them) named by its label ("Oct 22: Not run"); hovering, focusing or tapping one writes its label in one caption under the strip, so colour is never the only signal (a session that did not run is an empty dashed square) and the row stays a few elements long. A tap opens a square's caption (no hover on a phone); a tap elsewhere closes it. Nothing is counted or derived: the caller says what each means.
+
+Source: `design-system/components/SessionStrip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly SessionStripItem[]` | yes | The sessions, oldest first. |
+| `label` | `string` | yes | Accessible name of the strip, e.g. "Last 10 sessions". |
+
 ### ShareBar
 
 ShareBar: one horizontal bar showing a share of a whole (coverage 94.1%, completeness 86%), with the percentage as text beside it. Exposed as a meter (`role="meter"`) with the value as text, so the colour is never the only signal (an unknown or loading share is an image named "<label>: unknown"). Tone defaults to the accent.

@@ -188,3 +188,37 @@ other 300 names read UNKNOWN on option fields. A high share can still hide the o
 """
 next = "Check the instrument's own fields: an UNKNOWN there says whether this name is among the gaps."
 see_also = ["data_state", "unknown", "not_run"]
+
+[[term]]
+id = "run_state"
+term = "Run state"
+short = "Whether a screener ran for a session: complete, partial (it ran with data missing) or not run."
+body = """
+The run line under a screener's title says what its latest run for the session did. Complete
+means the screener ran to the end on all the data it needs. Partial means it ran but a data set it
+needs or prefers was missing, or its record is gone, so some names could not be evaluated. Not run
+means nothing was screened for the session. Beside the state the line gives the version of the
+screener that ran and how many names it picked. It also gives how many are new and how many dropped
+since the run before, and the share of names with a value missing. Those names are unknown, never
+passed. Example: 12 picked, +2 new, −1 dropped, missing data for 8% of names. Eight in a hundred
+names were not evaluated, so the 12 can be too few. A change count is left out when the earlier run
+was not stored, and it is never shown as 0.
+"""
+next = "Open the gap's reason beside the line; for a session with no run, use Run now."
+see_also = ["not_run", "unknown", "session_strip"]
+
+[[term]]
+id = "session_strip"
+term = "Session strip"
+short = "One square for each of the last ten sessions: green for a complete run, amber for a partial one, an empty square for no run."
+body = """
+The strip is the screener's recent history, oldest session on the left. Hover or tap a square to
+read its day, state and picks. An outlined square is the session the page shows, and the results
+below belong to that session alone. The others are history, each as its own run left it: a missing
+run is never filled with an older one. A dashed empty square means the screener did not run that
+session, which is different from a run that picked nothing. Example: a run of green squares with
+one empty one means a single night was skipped. Do not read the strip as a track record: how often a
+screener ran says nothing about whether its picks worked.
+"""
+next = "Check the edge's own record for evidence on its picks."
+see_also = ["run_state", "not_run", "run"]

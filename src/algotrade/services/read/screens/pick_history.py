@@ -63,7 +63,9 @@ def record_decisions(record: RunRecord) -> Mapping[str, int] | None:
     return None if found is None else {str(d): int(n) for d, n in found.items()}
 
 
-def _records(ctx: ReadContext, jobs: frozenset[str], first: date, last: date) -> list[RunRecord]:
+def screen_records(
+    ctx: ReadContext, jobs: frozenset[str], first: date, last: date
+) -> list[RunRecord]:
     """The screen records of ``jobs`` for ``first..last``, one pass, once per publish."""
     # a record saved by a job or an on-request run moves the runs generation, not the seq
     key = (
@@ -142,7 +144,7 @@ def load_pick_histories(
     need = {
         d for d in earlier for key in keys if (found := frozen.get(d)) is None or key not in found
     }
-    records = _records(ctx, frozenset(jobs.values()), min(need), max(need)) if need else []
+    records = screen_records(ctx, frozenset(jobs.values()), min(need), max(need)) if need else []
     latest: dict[tuple[str, date], RunRecord] = {}
     for record in records:  # by start time: the session's latest record is the last
         latest[(record.job, record.session_date)] = record

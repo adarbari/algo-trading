@@ -295,3 +295,24 @@ def test_an_internal_error_is_generic_for_a_trader() -> None:
     assert shown["message"] == GENERIC_REASONS[UnavailableKind.SYSTEM]
     admin = response_of(result, admin=True)["errors"][0]  # type: ignore[typeddict-item]
     assert "IB Gateway" in admin["message"]
+
+
+RECENT_RUNS = f"""query($date: Date) {{
+  screener(id: "vrp_scanner", date: $date) {{
+    recentRuns(limit: 3) {{ notRun {{ {CHAIN} }} unavailable {{ {CHAIN} }} }}
+  }}
+}}"""
+
+
+def test_recent_runs_causes_are_withheld_from_a_trader_and_given_to_an_admin(
+    as_role: Callable[[Role], Graph],
+) -> None:
+    variables = {"date": END.isoformat()}
+    trader = as_role(Role.TRADER)(RECENT_RUNS, variables)
+    assert "errors" not in trader, trader
+    held = _causes(trader["data"])
+    assert held and all(c is None for c in held)  # the gap sessions carry a cause slot, empty
+    admin = as_role(Role.ADMIN)(RECENT_RUNS, variables)
+    assert "errors" not in admin, admin
+    given = _causes(admin["data"])
+    assert given and all(c and c["links"] for c in given)

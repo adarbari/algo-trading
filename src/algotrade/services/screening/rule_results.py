@@ -32,6 +32,7 @@ SCREEN_RUNS = "screen_runs"
 SCREEN_PICKS = "screen_picks"
 
 PAUSED = Decision.PAUSED.value  # the regime gate held the pick back (ADR 0049)
+UNKNOWN = Decision.UNKNOWN.value  # not processed: a value the criteria need is missing
 # Never a pick: rejected, not processed (SKIPPED, UNKNOWN), held back by the gate, or left out of
 # the run with a reason (EXCLUDED, a stale chain the chains gate tolerated, ADR 0054).
 NOT_PICKED = frozenset(
