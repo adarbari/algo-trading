@@ -22,13 +22,19 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import open_stores
+from algotrade.services.read.instruments.table import FeatureTable, UniverseFilter
 from algotrade.services.read.screens.ideas import Idea
+from algotrade.services.read.screens.results import ScreenResult
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from tests.conftest import REPO_ROOT
 
 SHIPPED = FileConfigStore(REPO_ROOT / "config")
-SURFACES = {"ideas": Idea}  # surface -> the read object its columns come from
+SURFACES = {
+    "ideas": Idea,
+    "screener_results": ScreenResult,
+    "universe": FeatureTable,
+}  # surface -> the read object its columns come from
 NUMERIC = {"int", "float", "float32", "float64", "int32", "int64"}
 KIND_DTYPES = {
     "pick": {"str"},
@@ -144,9 +150,18 @@ def test_the_control_words_have_guide_entries() -> None:
     assert words <= terms
 
 
-def test_the_shipped_ideas_file_leaves_out_what_is_not_stored() -> None:
+def test_the_shipped_files_leave_out_what_is_not_stored() -> None:
     ids = {f.id for f in shipped("ideas").filters}
     assert not ids & {"new_today", "rank_moved_up", "optionable"}, "needs new data first"
+    results = {f.id for f in shipped("screener_results").filters}
+    assert not results & {"rank_moved_up", "optionable", "score_components"}, "needs new data first"
+
+
+def test_the_universe_filters_replace_the_typed_universe_arguments() -> None:
+    typed = {f.name for f in dataclasses.fields(UniverseFilter)} - {
+        "q"
+    }  # `q` is the search, not a filter
+    assert typed <= {f.id for f in shipped("universe").filters}
 
 
 # ------------------------------------------------------------------ the loader's shape checks

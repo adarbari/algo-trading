@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,6 +20,105 @@ WEB_SRC = REPO / "apps/web/src"
 PAGES_FILE = REPO / "benchmarks/api_latency_pages.json"
 NOWHERE = "nowhere (reached through a prop or registry the walk cannot see, or dead code)"
 DOC_OUT = REPO / "docs/perf/view-coverage.md"
+CAPTURED_FILE = REPO / "benchmarks/api_latency_views.captured.json"
+GAPS_FILE = REPO / "architecture/perf_view_coverage.toml"
+FIX = (
+    "run `make api-latency-views` (re-enumerates the web's views into the gate's list, no store, "
+    "no server) and commit benchmarks/api_latency_views*.json; if the gate cannot build the "
+    "operation's variables, add a VARIABLE_RESOLVERS entry in scripts/perf/fast_bench.py "
+    "(docs/perf/page-latency-bar.md, 'Cover a new page')"
+)
+
+
+def load_gaps(path: Path = GAPS_FILE) -> dict[str, dict[str, str]]:
+    """The shrink-only exception list: {"view": {id: reason}, "operation": {name: reason}}."""
+    doc = tomllib.loads(path.read_text()) if path.is_file() else {}
+    return {
+        k: {e["name"]: e.get("reason", "") for e in doc.get(k, [])} for k in ("view", "operation")
+    }
+
+
+def gaps(enumerated: dict[str, dict], all_ops: set[str], distinct: dict, view_ops: dict) -> dict:
+    """What the gate does not measure: ``views`` the web has (with an operation to measure) that
+    the gate's list lacks, ``stale`` views the gate lists that the web no longer has, and
+    ``operations`` the web sends that no measured operation covers. ``distinct`` / ``view_ops``
+    are `fast_bench.op_set`'s result for the committed capture."""
+    measured = {d["name"] for d in distinct.values()}
+    return {
+        "views": sorted(
+            vid for vid, v in enumerated.items() if v.get("ops") and vid not in view_ops
+        ),
+        "stale": sorted(set(view_ops) - set(enumerated)),
+        "operations": sorted(all_ops - measured),
+    }
+
+
+def problems(found: dict, baseline: dict[str, dict[str, str]]) -> list[str]:
+    """The failures of a coverage check: a gap not in the baseline, a baseline entry that is no
+    longer a gap (it only shrinks), an entry with no reason, a stale view."""
+    out: list[str] = []
+    for kind, label, key in (("view", "view", "views"), ("operation", "operation", "operations")):
+        listed = baseline[kind]
+        out += [
+            f"web {label} `{name}` is not measured by the 1 s page gate: {FIX}"
+            for name in found[key]
+            if name not in listed
+        ]
+        out += [
+            f"architecture/perf_view_coverage.toml lists {label} `{name}` but it is now covered "
+            f"(or gone from the web): delete the entry (the list only shrinks)"
+            for name in sorted(set(listed) - set(found[key]))
+        ]
+        out += [
+            f"architecture/perf_view_coverage.toml {label} `{name}` has no reason"
+            for name, reason in listed.items()
+            if not reason.strip()
+        ]
+    out += [
+        f"the gate lists view `{vid}` that the web no longer has: {FIX}" for vid in found["stale"]
+    ]
+    return out
+
+
+def pin_problems(baseline_file: Path = GAPS_FILE) -> list[str]:
+    """The exception lists only shrink: each one's size equals its ``[baseline] max_*`` pin, which
+    a PR only lowers (adding an entry fails here; raising the pin shows in review)."""
+    doc = tomllib.loads(baseline_file.read_text())
+    out: list[str] = []
+    for kind in ("operation", "view"):
+        size, pin = len(doc.get(kind, [])), doc.get("baseline", {}).get(f"max_{kind}", 0)
+        if size > pin:
+            out.append(f"[{kind}] list grew to {size} (pin {pin}): cover it, never add to the list")
+        elif size < pin:
+            out.append(f"[{kind}] list shrank to {size}: set max_{kind} = {size}")
+    return out
+
+
+def web_ops_not_measured(distinct: dict, src: Path = WEB_SRC) -> dict:
+    """The nightly's drift flag: ``{"all": [...], "new": [...]}`` (``new``: not in the exception
+    list), or ``{}`` when every web operation is measured. Never part of the verdict."""
+    missing = sorted(wpo.all_query_ops(src) - {d["name"] for d in distinct.values()})
+    new = [o for o in missing if o not in load_gaps(GAPS_FILE)["operation"]]
+    return {"all": missing, "new": new} if missing else {}
+
+
+def drift_line(drift: dict) -> str:
+    """The one line the gate prints (the wrapper reads its counts into status.json)."""
+    names = ", ".join(drift["all"][:8]) + (", ..." if len(drift["all"]) > 8 else "")
+    return (
+        f"COVERAGE {len(drift['all'])} operations not covered by the gate "
+        f"({len(drift['new'])} not in the exception list): {names}"
+    )
+
+
+def sync_captured(captured: dict, enumerated: dict[str, dict], skip: set[str]) -> dict[str, dict]:
+    """The gate's list brought up to the web: ``merge_static`` keeping every capture, except that a
+    new view with nothing to measure, or one in the exception list (``skip``), is not added."""
+    old = captured.get("views", {})
+    fresh = {
+        vid: v for vid, v in enumerated.items() if vid in old or (v.get("ops") and vid not in skip)
+    }
+    return v.merge_static(captured, fresh)
 
 
 def coverage(doc: dict, all_ops: set[str], old_pages: dict[str, list[dict]] | None = None) -> dict:
@@ -146,9 +246,18 @@ def render(doc: dict, report: dict, generated: str) -> str:
 def main() -> int:
     """Re-enumerate the views (keeping what the crawler captured), write the views file and the
     coverage doc. No store, no server: safe on a busy machine."""
-    merged = v.merge_static(v.load_views(), v.enumerate_views(WEB_SRC))
+    static = v.enumerate_views(WEB_SRC)
+    merged = v.merge_static(v.load_views(), static)
     v.annotate_duplicates(merged)
     v.save_views(merged)
+    # the gate's own list (the committed capture), kept in step: no crawl, and the exception list's
+    # views stay out of it
+    captured = v.load_views(CAPTURED_FILE)
+    if captured["views"]:
+        skip = set(load_gaps()["view"])
+        synced = sync_captured(captured, static, skip)
+        stamp = captured.get("generated", "")
+        CAPTURED_FILE.write_text(json.dumps({"generated": stamp, "views": synced}) + "\n")
     doc = v.load_views()
     pages = json.loads(PAGES_FILE.read_text())["pages"] if PAGES_FILE.is_file() else {}
     report = coverage(doc, wpo.all_query_ops(WEB_SRC), pages)

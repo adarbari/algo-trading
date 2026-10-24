@@ -56,37 +56,3 @@ def test_an_optional_variable_may_be_left_out_but_a_required_one_may_not() -> No
     docs = {"X": "query X($first: Int!, $after: String) { x(first: $first, after: $after) }"}
     assert pd.drift({"/a": [call("X", docs["X"], {"first": 1})]}, docs) == []
     assert "variables" in pd.drift({"/a": [call("X", docs["X"], {"after": "a"})]}, docs)[0]
-
-
-# Web query operations that neither benchmarks/api_latency_pages.json nor the static ops of
-# benchmarks/api_latency_views.json list yet (the web's reads of an edge, the feature requests,
-# an instrument's event list and history, a run's items). The gate measures some of them through
-# crawled documents (`make api-latency-views-capture`), but a crawl is not a commitment: record
-# each in the pages file (`make api-latency-capture`) and delete it here. Shrink-only: a NEW web
-# operation must be measured, never added to this set.
-UNMEASURED_BASELINE = {
-    "AcceptedFormulas",
-    "EdgeResultBasis",
-    "InstrumentHistory",
-    "MyFeatureRequests",
-    "PublishedEdge",
-    "RunItems",
-}
-
-
-def test_every_web_query_operation_is_measured_so_no_page_ships_unmeasured() -> None:
-    """Fitness: each query operation the web declares is in the pages file or in a view's ops.
-
-    Fix: record the page (`make api-latency-capture`) or enumerate its view
-    (`make api-latency-views`); never add a name to UNMEASURED_BASELINE (it only shrinks)."""
-    pages = json.loads(pd.PAGES_FILE.read_text())["pages"]
-    views = json.loads((REPO / "benchmarks" / "api_latency_views.json").read_text())["views"]
-    measured = {c["op"] for calls in pages.values() for c in calls if c["kind"] == "graphql"}
-    measured |= {op for v in views.values() for op in v.get("ops", [])}
-    unmeasured = pd.wpo.all_query_ops(pd.WEB_SRC) - measured
-    assert not unmeasured - UNMEASURED_BASELINE, (
-        f"web operations in no benchmark page or view: {sorted(unmeasured - UNMEASURED_BASELINE)}"
-    )
-    assert not UNMEASURED_BASELINE - unmeasured, (
-        f"now measured, delete from UNMEASURED_BASELINE: {sorted(UNMEASURED_BASELINE - unmeasured)}"
-    )

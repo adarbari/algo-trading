@@ -55,6 +55,29 @@ operation that errors (HTTP error or a GraphQL error: "operations that failed (a
 no pass)", exit 1), so a stale capture cannot pass silently; two tests fail CI when the capture
 names an operation the web no longer has or a feature the catalogue no longer has.
 
+## Cover a new page
+
+A new route, a new tab or panel with its own read, or a new GraphQL operation is part of the gate
+the day it ships (owner decision 2026-10-23; CI enforces; the exception list only shrinks):
+
+1. `make api-latency-views` re-enumerates the web's views from the source (no store, no server,
+   seconds) into `benchmarks/api_latency_views.json` and the gate's own list
+   `benchmarks/api_latency_views.captured.json` (captures kept, nothing crawled). Commit both.
+   Ids a search param picks (`edge`, `sel`, `screener`...) come from `PICK_PARAMS` /
+   `PARAM_KINDS` in `scripts/perf/views.py`.
+2. The gate builds the operation's variables from the capture, the edge id, the trades ledger's
+   first-render values or `VARIABLE_RESOLVERS` (`scripts/perf/fast_bench.py`: operation ->
+   variable -> a source operation and a pick, about 3 lines). If it cannot, `make changed` /
+   CI names the operation: add the resolver (5-10 lines for a page) or, for a page that needs real
+   browser variables, run the crawl in "Refresh the capture" (about 22 minutes, on a clone).
+3. An operation only a click sends (no on-load read) has no static view of its own: it is measured
+   once the crawl captured it; until then it is listed in `architecture/perf_view_coverage.toml`
+   with a reason (a new entry is never added: ask the owner).
+
+Every night the gate also prints and records `COVERAGE N operations not covered by the gate (K not
+in the exception list)` in `status.json` (`uncovered_ops`, `uncovered_ops_new`) and in the
+notification when K > 0. It is a flag only: it never changes the verdict or the timed passes.
+
 ## The time budget
 
 A round must stay under 5 minutes, so `--budget-s` (default 270 s) caps the timed passes: after
@@ -300,12 +323,13 @@ never depends on the date) until it is removed or renewed by the owner. An agent
 1. **Design time**: a new or changed page read states its critical-path budget and its store
    choice (the Choosing a store section of the storage doc, added by the harness PR) in the PR
    description.
-2. **PR time**: a CI-safe test that every GraphQL operation the web sends is measured
-   (`test_every_web_query_operation_is_measured_so_no_page_ships_unmeasured` in
-   `tests/scripts/perf/test_page_docs.py`: the operation is in `benchmarks/api_latency_pages.json`
-   or in a view of `benchmarks/api_latency_views.json`; its baseline of nine unmeasured
-   operations only shrinks): this is the enforced check. A files-opened-per-request budget test
-   for reads that touch stored partitions is PLANNED (a follow-up), not in force.
+2. **PR time**: a CI-safe test that every web route / tab / panel with a read and every GraphQL
+   operation the web sends is measured by this gate, or listed with a reason in
+   `architecture/perf_view_coverage.toml` (`test_every_web_view_and_operation_is_measured_or_listed`
+   in `tests/scripts/perf/test_views.py`; static parsing, no store; the list only shrinks, today's
+   14 operations are "not yet captured" follow-up work). See "Cover a new page" below. A
+   files-opened-per-request budget test for reads that touch stored partitions is PLANNED (a
+   follow-up), not in force.
 3. **After merge**: this gate runs nightly on a clone and records the history; any view over 1 s
    fails unless it has a named exception with reason, date, expiry and the owner's approval.
 4. **Learning loop**: every round's estimate against actual is appended to

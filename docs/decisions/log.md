@@ -615,3 +615,19 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: 5 of 8 red web runs checked on 2026-10-23 failed the bundle check by tens of bytes; 5 % lets ordinary changes through while a real regression (a new dependency, a leaked lazy library) still fails.
+
+## 2026-10-23 | 1 s page gate coverage | Every new page and operation is declared for the gate; CI enforces
+- Question: the gate measures a one-day crawl snapshot of the views, so a new page, tab or operation was never measured and nothing failed. Keep it manual, or make CI enforce it?
+- Options: a manual refresh when someone remembers / a CI fitness test over the web source with a shrink-only exception list, plus a nightly drift flag / a crawl in CI.
+- Decision: every web view with a read and every GraphQL operation must be in the gate's list (`make api-latency-views`, no crawl) or in `architecture/perf_view_coverage.toml` with a reason; the list only shrinks; CI fails otherwise; the nightly records how many operations are not covered, as a flag that never changes the verdict.
+- decided by: owner
+- status: final
+- Reasoning: a bar nobody measures a page against is not a bar; static parsing keeps the check in CI without the clone.
+
+## 2026-10-23 | Data-status pill PR (#902) | Two e2e route budgets raised by the pill's cost
+- Question: with the badge in the entry chunk, CI's perf e2e fails two route budgets (Explore chart tab first-load JS, Admin ingestion DOM nodes). Trim, or raise those two?
+- Options: trim the badge further (about 295 B and 5 nodes, no honest cut left) / raise the two route budgets by the measured overage plus a small margin / drop the pill.
+- Decision: Explore chart tab `first_load_js_gzip_bytes` 304630 to 305000 B (CI 304925) and Admin ingestion `dom_nodes` 646 to 654 (CI 651); no other budget changes.
+- decided by: owner
+- status: final
+- Reasoning: the badge is on every page by design; the overage is the badge itself, and the route budgets sit at measured size.

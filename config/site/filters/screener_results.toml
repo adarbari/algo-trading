@@ -1,0 +1,150 @@
+# L3 site setting: the filters of a screener's results table (ADR 0082, docs/ui/filtering.md).
+# Typed by src/algotrade/config/filters/definitions.py; fitness tests: tests/unit/config/filters/.
+# A `field` is a catalogue name or `column:<id>` of a [[column]] below (a value of the row,
+# services/read/screens/results.py ScreenResult). Every filter's `guide` entry is in
+# config/site/guide/glossary/filters.toml. The tradeable and coming-up filters are Ideas' own:
+# a result row is an instrument, so the same catalogue fields apply.
+#
+# Not here, because nothing fixed is stored to filter on (listed in the PR as "needs new data"):
+#   setup:     score components / criterion outcomes (every screener has its own criteria, the
+#              row stores them per screener, not as one field a list-wide filter could name),
+#              the screen's display columns (the same: per screener)
+#   changed:   rank_moved_up (the previous run's rank is not stored on the row; `change` holds
+#              only new / dropped and the previous decision)
+#   tradeable: optionable (as in Ideas: no stored yes / no for a result row's chain)
+
+label = "Screener results"
+
+[[column]]
+id = "decision"
+dtype = "str"
+source = "decision"
+
+[[column]]
+id = "change"
+dtype = "str"
+source = "change"
+
+[[column]]
+id = "rank"
+dtype = "int"
+source = "rank"
+
+[[column]]
+id = "score"
+dtype = "float"
+source = "score"
+
+# ------------------------------------------------------------------------------------ setup
+
+[[filter]]
+id = "decision"
+label = "Decision"
+group = "setup"
+kind = "pick"
+field = "column:decision"
+options = "enum"
+enum = "algotrade.strategies.screeners.base:Decision"
+guide = "term:filter_result_decision"
+
+[[filter]]
+id = "rank"
+label = "Rank"
+group = "setup"
+kind = "range"
+field = "column:rank"
+bins = [1, 5, 10, 25, 50, 100, 250, 1000, 5000, 12000]
+guide = "term:filter_rank"
+
+[[filter]]
+id = "score"
+label = "Score"
+group = "setup"
+kind = "range"
+field = "column:score"
+bins = [0, 20, 40, 60, 80, 100]
+guide = "term:filter_score"
+
+# ------------------------------------------------------------------------------------ changed
+
+[[filter]]
+id = "change"
+label = "Since the previous run"
+group = "changed"
+kind = "pick"
+field = "column:change"
+options = "static"
+guide = "term:filter_change"
+
+[[filter.option]]
+value = "new"
+label = "New"
+
+[[filter.option]]
+value = "dropped"
+label = "Dropped"
+
+# ------------------------------------------------------------------------------------ tradeable
+
+[[filter]]
+id = "option_tier"
+label = "Option liquidity class"
+group = "tradeable"
+kind = "pick"
+field = "feature.option_tier"
+options = "static"
+guide = "term:filter_option_tier"
+
+[[filter.option]]
+value = "A"
+label = "A"
+
+[[filter.option]]
+value = "B"
+label = "B"
+
+[[filter.option]]
+value = "C"
+label = "C"
+
+[[filter.option]]
+value = "D"
+label = "D"
+
+[[filter]]
+id = "spread"
+label = "Option spread %"
+group = "tradeable"
+kind = "range"
+field = "rollup.option_liquidity@v1.put_spread_pct"
+bins = [0, 0.02, 0.05, 0.10, 0.20, 0.35, 0.50, 1, 2]
+guide = "term:filter_spread"
+
+[[filter]]
+id = "dollar_volume"
+label = "Dollar volume"
+group = "tradeable"
+kind = "range"
+field = "rollup.volume@v1.dollar_volume"
+bins = [0, 1_000_000, 5_000_000, 20_000_000, 100_000_000, 500_000_000, 2_000_000_000]
+guide = "term:filter_dollar_volume"
+
+# ------------------------------------------------------------------------------------ coming up
+
+[[filter]]
+id = "earnings"
+label = "Earnings within"
+group = "coming_up"
+kind = "window"
+field = "rollup.earnings@v1.days_to_earnings"
+window_unit = "sessions"
+guide = "term:filter_earnings"
+
+[[filter]]
+id = "ex_dividend"
+label = "Ex-dividend within"
+group = "coming_up"
+kind = "window"
+field = "rollup.dividend_schedule@v1.days_to_ex_date"
+window_unit = "days"
+guide = "term:filter_ex_dividend"

@@ -546,6 +546,11 @@ purpose = "read objects about events for one session (ADR 0050): the stored even
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/filtering"
+purpose = "the filtering pass of the read model (ADR 0082): a surface's filter definitions resolved for a viewer's licences (definitions.py), the truth of each active filter per row by core.model.predicates (masks.py: UNKNOWN never passes), and matched, per-filter removes, option counts, bins and unknown from one masked pass (facets.py); pure, deterministic, no loader adopts it yet"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/formulas"
 purpose = "read objects over the formulas traders accepted in Describe it (ADR 0066 note 2026-10-11): the admin's list grouped by fingerprint, counts only (the ops folder is at its cap)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]

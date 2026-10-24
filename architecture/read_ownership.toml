@@ -107,6 +107,14 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "source_link" }, { call = "filing_url" }, { call = "load_event_links" }]
 
 [[responsibility]]
+id = "filter-pass"
+description = "The one filtering pass of every table, list and feed (ADR 0082 decision 2-3, services/read/filtering/): a surface's definitions (config/site/filters, config/filters) resolved against the catalogue and the viewer's licences (a filter on a field the viewer's licences do not cover is not offered and is refused if sent, before any count: ADR 0069), the truth of each active filter on each row through core.model.predicates (the operator from the kind; UNKNOWN never passes; a min of 0 admits no null; a switched-off or empty input is in no mask), and from that one pass matched, removes(f) (rows passing every other active filter minus matched), option counts by count then value, fixed-edge bins and the unknown count; pure and deterministic; no loader adopts it before its measure (Ideas, screener results, the universe table follow)"
+owner = ["src/algotrade/services/read/filtering/*"]
+allowed = []
+section = "docs/adr/0082-shared-filter-bar.md#decision"
+detect = [{ call = "compute_facets" }, { call = "evaluate_filters" }, { call = "resolve_definitions" }]
+
+[[responsibility]]
 id = "graphql-schema"
 description = "The GraphQL read layer (ADR 0037): the Strawberry schema at POST /graphql, scalars (FeatureName, Date, JSON), error codes, limits, request context, dataloaders, the read pool's admission control (503 + Retry-After past the queue), the response cache (an allow-list of operations over published tables; ADR 0056: keyed on role, and user unless shared) and the thin types over services.read; the committed snapshot apps/api/schema.graphql (from read-model PR 4)"
 owner = ["apps/api/algotrade_api/graphql/*"]
