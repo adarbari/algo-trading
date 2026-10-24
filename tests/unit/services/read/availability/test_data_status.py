@@ -154,7 +154,7 @@ def test_the_datasets_are_graded_from_their_records(monkeypatch: pytest.MonkeyPa
 def test_a_dataset_far_below_98_percent_that_passes_its_minimums_is_complete(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Fundamentals cover about 47% and the rule accepts it: the share is shown, the grade is
+    """A coverage share far below 98% that the rule accepts: the share is shown, the grade is
     the rule's (a 98% cut would hold the pill at PARTIAL forever)."""
     backend = _records({"A": "OK"}, _step(shares=(470, 1000)))
     fundamentals = _status(backend, monkeypatch=monkeypatch).datasets[2]

@@ -164,8 +164,10 @@ def _not_applicable(
     if ruled_out == "operating_company":
         kind = _text(row.get(_SECURITY_TYPE)) or ""
         if kind in OPERATING_TYPES:
-            return f"{iid} is a blank-check company (SIC {BLANK_CHECK_SIC}): no earnings"
-        return f"{iid} is not an operating company: {kind} {snapshot}: no earnings"
+            return (
+                f"{iid} is a blank-check company (SIC {BLANK_CHECK_SIC}): no operations to report"
+            )
+        return f"{iid} is not an operating company: {kind} {snapshot}"
     if ruled_out == "leveraged_fund":
         return f"{iid} is not a leveraged or inverse fund {snapshot}: no fund reference"
     return ""
