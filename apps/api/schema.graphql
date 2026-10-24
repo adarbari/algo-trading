@@ -490,6 +490,11 @@ type Edge {
   runs: [EdgeRun!]!
 
   """
+  Which evaluation the verdict rests on and whether it is current (the canonical run of a site edge, the user's latest run of their own); null: no run
+  """
+  provenance: EdgeProvenance
+
+  """
   The most variants any run of the edge recorded as tried (the multiple-testing disclosure the builder shows); 0: none. Reads this edge's run records only
   """
   variantsTried: Int!
@@ -746,6 +751,23 @@ type EdgeProblem {
 }
 
 """
+Which evaluation a verdict rests on and whether it is current, decided by the server: `state` (CURRENT, STALE or RE_EVALUATING), the `evaluatedSession` and how many exchange `sessionsBehind` the served session it is, `screenerChanged` (a screener of the edge changed since the run; `screenerVersion` its current version), the run's `shortId` and `variantsTried`, `reEvaluating` with its start `reEvaluationStarted`, and the `line` to show. `runId` (the full id) is for admins only: null for anyone else
+"""
+type EdgeProvenance {
+  state: String!
+  evaluatedSession: Date!
+  sessionsBehind: Int!
+  screenerChanged: Boolean!
+  screenerVersion: Int
+  shortId: String!
+  variantsTried: Int
+  reEvaluating: Boolean!
+  reEvaluationStarted: DateTime
+  line: String!
+  runId: String
+}
+
+"""
 The figure the literature reports for the edge: `measure` (mean_excess, decile_spread or lift_pts) equal to `value` over `horizonSessions`, from `source` over `sample` years (null: not stated); `leg`: what the figure is of (long_short or long)
 """
 type EdgePublished {
@@ -922,7 +944,7 @@ type EdgeSummary {
 }
 
 """
-One page of the trades of the edge's verdict basis (`basis`: its screen and holding period, never chosen again). `unknown`: why there is no ledger (NOT_RUN: no official run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); `oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the trial licence of the rows; `symbolsSnapshot`: the newest reference snapshot a ticker on the page was read from
+One page of the trades of the edge's verdict basis (`basis`: its screen and holding period, never chosen again). `unknown`: why there is no ledger (NOT_RUN: no official run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); `oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the trial licence of the rows; `symbolsSnapshot`: the newest reference snapshot a ticker on the page was read from; `facets`: the filter bar's counts over the whole ledger (null unless asked for; `total` is then the trades that pass the filters)
 """
 type EdgeTradePage {
   period: TradePeriod!
@@ -935,6 +957,7 @@ type EdgeTradePage {
   symbolsSnapshot: Date
   unknown: Unknown
   rows: [EdgeTradeRow!]!
+  facets: FilterFacets
 }
 
 """
@@ -3013,14 +3036,15 @@ type Query {
   ): EdgePaper
 
   """
-  The trades of the verdict's basis of the edge `edgeId` (the screen and holding period its verdict rests on: never chosen here), one `page` (from 1) for `period`, sorted by the server (`descending`); `LIVE` reads the paper record as the session knew it. A per-name value under a licence the viewer lacks is Unknown(LICENCE); a copy's out-of-sample trades are withheld; null: no such edge
+  The trades of the verdict's basis of the edge `edgeId` (the screen and holding period its verdict rests on: never chosen here), one `page` (from 1) of the trades that pass `filters` (the surface `edge_trades` of `filterSet`, applied to the whole ledger before it is sorted and paged: `total` counts the matches, `facets` the counts, ADR 0082), sorted by the server (`descending`). `period` (deprecated: the filters `record` and `in_sample`) adds the filters it stands for unless they are set: `ALL` (the default) is the backtest's trades, `LIVE` the paper record as the session knew it; null reads backtest and live together. A per-name value under a licence the viewer lacks is Unknown(LICENCE) and never passes a filter on it; a copy's out-of-sample trades are withheld; null: no such edge
   """
   edgeTrades(
     edgeId: String!
-    period: TradePeriod! = ALL
+    period: TradePeriod = ALL @deprecated(reason: "use the filters record and in_sample")
     page: Int! = 1
     sort: TradeSort! = DECISION
     descending: Boolean! = false
+    filters: [FilterInput!] = null
 
     """
     the session to read (default: the latest with bars); every value below is for exactly this date

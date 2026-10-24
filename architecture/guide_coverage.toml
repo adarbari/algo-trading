@@ -157,6 +157,11 @@ values_from = "python:algotrade.config.edges.follow:LEGACY"
 values = { researching = "term:edge_state", following = "term:follow_edge", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:forward_test" }
 
 [[enum]]
+source = "graphql:EdgeProvenance.state"
+values_from = "python:algotrade.services.read.evaluation.provenance:STATES"
+values = { CURRENT = "term:provenance_current", STALE = "term:provenance_stale", RE_EVALUATING = "term:provenance_re_evaluating" }
+
+[[enum]]
 source = "graphql:Edge.labels"
 values_from = "python:algotrade.config.edges.follow:AUDIT_LABELS"
 values = { followed_against_verdict = "term:edge_labels", oos_viewed_during_tuning = "term:edge_labels", replaced_without_forward_test = "term:edge_labels", split_moved_after_viewing = "term:edge_labels" }

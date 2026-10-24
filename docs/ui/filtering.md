@@ -56,3 +56,13 @@ values, flag -> toggle, label -> pick; unit `percent` for a fraction; Guide entr
 and `filters: [{ id: "feature:<field>", ... }]` narrows the list with the same counts. A hidden
 field is refused if sent; a surface of its own columns (Screeners, Edges) takes none. In the
 URL the id is percent-encoded (`f=feature%3Arollup...:1000..`).
+
+## Enforcement
+`tests/architecture/test_layout_web.py::test_data_surfaces_use_the_filter_bar` ([ADR 0025 rule 12]) fails when a
+file under `apps/web/src` renders `DataTable`, `ExpandableTable`, `FeatureTable` or `MasterDetail`
+without `SurfaceFilterBar` / `FilterBar`, unless `architecture/web_filter_bar.toml` lists it:
+`[migrating]` (surfaces that will get the bar; shrink-only, the migrating PR deletes its line) or
+`[exempt]` (a reason: a fixed handful of rows, a detail panel). A fitness test with a TOML baseline
+is used, as for prose and derivations, because the baseline carries a reason per file, which
+an ESLint rule cannot. A listed file that gained the bar fails with its name, so a PR that
+migrates a surface must delete its line.

@@ -94,6 +94,14 @@ allowed = [
 detect = [{ call = "load_edge_verdict" }, { call = "load_verdict" }, { call = "judge_call" }]
 
 [[responsibility]]
+id = "edge-verdict-provenance"
+description = "Which evaluation an edge's verdict rests on and whether it is current (ADR 0053, the provenance line under the verdict): the run the verdict is judged on (a site edge's canonical run, a user's own edge's latest), its evaluated session, the exchange sessions it is behind the served one, whether a screener of the edge changed since (its config hash against the screener_hashes the run recorded in its stats; a run from before them is never claimed changed), whether a newer evaluation of the same owner is running for the session (a RUNNING record of the request's session, no clock), the state CURRENT / STALE / RE_EVALUATING and the sentence, all decided here with the stale limit a constant (not a verdict.toml key: it would change the stored headlines' fingerprint); read from run records as the run left them, no table, the verdict's basis untouched; the short run id is public, the full id admin-only (ADR 0056)"
+owner = ["src/algotrade/services/read/evaluation/provenance.py"]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+allowed = ["apps/api/algotrade_api/graphql/*"]  # Edge.provenance serves it
+detect = [{ call = "load_verdict_provenance" }]
+
+[[responsibility]]
 id = "event-source-link"
 description = "Where an event's own source page is, built server-side so the web app receives a ready URL and never assembles one (the Explore chart's event list, owner decision 2026-10-22): an 8-K or 8-K/A to its sec.gov filing index from the stored cik and accession (events/filing; a cik or accession that is not the plain digits SEC writes gives none), a report stored from an 8-K Item 2.02 release (source sec_8k) to the index of the same company's Item 2.02 filing accepted at that instant (never another filing of the day; a Nasdaq-calendar-only report and an upcoming one have none), a macro release key to the agency page of config/site/events/links.toml; every other kind (dividends, splits) none; no new stored column"
 owner = ["src/algotrade/services/read/events/links.py"]
@@ -116,6 +124,7 @@ allowed = [
     "src/algotrade/services/read/screens/results.py",  # a run's review table adopts it (ADR 0082)
     "apps/api/algotrade_api/graphql/types/query.py",  # filterSet: one loader call
     "src/algotrade/services/read/lists/*",  # the list loaders adopt the pass (ADR 0082)
+    "src/algotrade/services/read/edge_ledger/trades.py",  # the ledger adopts the pass (ADR 0082)
 ]
 section = "docs/adr/0082-shared-filter-bar.md#decision"
 detect = [{ call = "compute_facets" }, { call = "evaluate_filters" }, { call = "resolve_definitions" }, { call = "load_served_filters" }, { call = "filter_hash" }, { call = "frame_of" }]
