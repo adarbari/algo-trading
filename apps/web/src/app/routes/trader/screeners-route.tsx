@@ -7,7 +7,7 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
-import { decodeFilters, filterSearch } from '@/features/filter-bar';
+import { filterSearch } from '@/features/filter-bar';
 import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
 import { pageRoute } from '../page-loader';
@@ -89,7 +89,7 @@ const indexRoute = createRoute({
   validateSearch: validateScreenersSearch,
   loaderDeps: ({ search }) => ({ f: search.f, q: search.q ?? '' }),
   ...pageRoute(ScreenersPage, (page, client, deps: { f: string | undefined; q: string }) => {
-    page.prefetchScreenersReads(client, decodeFilters(deps.f), deps.q);
+    page.prefetchScreenersReads(client, deps.f, deps.q);
   }),
   component: ScreenersIndex,
 });
