@@ -708,3 +708,54 @@ def test_with_a_fake_ps_file_no_pid_is_the_gates_own_not_even_the_wrappers(rig: 
     rig.ps.write_text(QUIET_PS + f"  {proc.pid} .venv/bin/algotrade-ingest rollups\n")
     _, err = proc.communicate(timeout=60)
     assert proc.returncode == 3 and "copy stopped" in err
+
+
+def test_the_default_clone_is_inside_the_workspace_and_its_parent_is_created(rig: Rig) -> None:
+    """2026-10-24: the plist had no PERF_CLONE_ROOT, the old default sat outside ~/workspace."""
+    home = rig.tmp / "home"
+    (rig.tmp / "var" / "data").mkdir(exist_ok=True)
+    env = rig.env(HOME=str(home), PERF_SPOTLIGHT_DIR="")  # the built-in default of both
+    env.pop("PERF_CLONE_ROOT")
+    env.pop("PERF_SPOTLIGHT_DIR")
+    # the store and the clone must share a volume: the tmp dir does
+    env["PERF_SRC"] = str(rig.tmp / "var" / "data")
+    res = subprocess.run(
+        ["bash", str(SCRIPT)], env=env, capture_output=True, text=True, check=False
+    )
+    assert res.returncode == 1 and "Spotlight" not in res.stderr
+    assert (home / "workspace" / "perf-clone").is_dir()  # the parent was made, the run went through
+    assert "Spotlight" not in (_evidence(rig) / "run.log").read_text()
+
+
+def test_a_clone_outside_the_spotlight_exclusion_warns_in_the_log_and_the_notice(rig: Rig) -> None:
+    res = rig.run(PERF_SPOTLIGHT_DIR=str(rig.tmp / "elsewhere"))
+    assert res.returncode == 1  # warned, not refused
+    assert "outside the Spotlight exclusion" in (_evidence(rig) / "run.log").read_text()
+    assert "clone outside the Spotlight exclusion" in (rig.tmp / "notified").read_text()
+
+
+def test_a_clone_inside_the_exclusion_has_no_warning(rig: Rig) -> None:
+    assert rig.run().returncode == 1
+    assert "Spotlight" not in (_evidence(rig) / "run.log").read_text()
+    assert "Spotlight" not in (rig.tmp / "notified").read_text()
+
+
+def test_the_timeline_goes_on_through_the_background_trash_delete(rig: Rig) -> None:
+    old = rig.root / "data.trash.2026-10-20"
+    (old / "tables").mkdir(parents=True)
+    (old / "tables" / "z.txt").write_text("z")
+    slow = _script(rig, "slowdel2.sh", 'sleep 6\nexec "$@"\n')
+    t0 = time.time()
+    res = rig.run(PERF_LOWPRI=slow, PERF_SAMPLE_S="1")
+    assert (
+        res.returncode == 3 and time.time() - t0 < 30
+    )  # busy this tick; the watcher did not hold it
+    assert _wait_gone(old, 30)
+    end = time.time() + 20
+    rows: list[str] = []
+    while time.time() < end:
+        rows = (_evidence(rig) / "timeline.csv").read_text().splitlines()
+        if any(",trash-delete," in r for r in rows):
+            break
+        time.sleep(0.3)
+    assert any(",trash-delete," in r for r in rows)

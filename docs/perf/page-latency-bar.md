@@ -135,11 +135,24 @@ runs at low CPU priority only (`nice -n 10`, override `PERF_LOWPRI`; the trash d
 | `taskpolicy -b` | 170 s (4.0x slower) |
 | `nice -n 10` | 42 s |
 
+**Where the clone lives.** `PERF_CLONE_ROOT` defaults to `$HOME/workspace/perf-clone/data` (the guard
+still needs the path to end in `/perf-clone/data`; the parent is created). It must be inside the
+owner's Spotlight Privacy exclusion, `~/workspace` (`PERF_SPOTLIGHT_DIR` overrides it): the launchd
+entry had no `PERF_CLONE_ROOT`, the old default `/Users/adarbari/perf-clone` was outside the exclusion,
+`mds` and `mds_stores` took 380-480% CPU during the bench (load 14) and the background delete took 363 s
+instead of 98 s on the excluded path (2026-10-24). A clone outside the exclusion is not refused, but
+`run.log` gets a `WARNING` line and the notification says `clone outside the Spotlight exclusion:
+indexing will skew the bench`; any plist that sets `PERF_CLONE_ROOT` must keep it under `~/workspace`.
+**The timeline goes on through the background delete:** after the wrapper has started it, a detached
+`flight_recorder.py trash-watch` appends rows with phase `trash-delete` to `timeline.csv` until the
+delete's `trash-delete.pid` file is gone or 15 minutes (`PERF_TRASH_WATCH_S`), so what slows the delete
+is visible; it never holds the wrapper's exit and is not a writer (`flight_recorder` is excluded).
+
 so the whole clone (1.1M files, about 6k files/s) takes about 3-4 minutes [I] (measured: 42 s for the 257k files of `rollups/market`; the whole folder is inferred). The clone is renamed
 to a sibling `data.trash.<date>` at the end (instant) and deleted afterwards, detached, at low
 priority; a leftover trash of an earlier run is deleted first, in the background, never blocking
 the start (a free-disk refusal then says the trash is still being deleted). Only a sibling
-`<PERF_CLONE_ROOT>.trash.*` (for example `/Users/adarbari/perf-clone/data.trash.2026-10-23`) is
+`<PERF_CLONE_ROOT>.trash.*` (for example `/Users/adarbari/workspace/perf-clone/data.trash.2026-10-23`) is
 ever deleted. The clone must be on the store's volume (`cp -c` silently copies every byte across
 volumes): the wrapper refuses, exit 2, when the device ids differ.
 

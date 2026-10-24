@@ -280,3 +280,35 @@ def test_finish_writes_the_readme_and_the_phases_and_top_cpu_into_status(tmp_pat
     )
     assert "timeline.csv" in (d / "README.txt").read_text()
     assert (d / "api.log").stat().st_size == fr.API_LOG_CAP
+
+
+def test_trash_watch_samples_until_the_pid_file_is_gone(tmp_path: Path) -> None:
+    pid_file = tmp_path / "trash-delete.pid"
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.1 0")
+    threading.Timer(1.5, pid_file.unlink).start()
+    t0 = time.time()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.3, 30.0)
+    assert time.time() - t0 < 10
+    rows = (tmp_path / "timeline.csv").read_text().splitlines()
+    assert len(rows) >= 2 and all(",trash-delete," in r for r in rows[1:])
+
+
+def test_trash_watch_gives_up_when_the_pid_file_never_appears_and_stops_at_its_cap(
+    tmp_path: Path,
+) -> None:
+    t0 = time.time()
+    fr.trash_watch(tmp_path, tmp_path / "none.pid", str(tmp_path), 0.2, 30.0, appear_s=0.5)
+    assert time.time() - t0 < 5
+    pid_file = tmp_path / "live.pid"
+    pid_file.write_text(f"{os.getpid()} x 0")  # never goes: the max-s cap ends it
+    t0 = time.time()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.2, 1.0)
+    assert 1.0 <= time.time() - t0 < 6
+
+
+def test_trash_watch_stops_for_a_stale_pid_file(tmp_path: Path) -> None:
+    pid_file = tmp_path / "stale.pid"
+    pid_file.write_text("999999 /x/data.trash.1 0")  # no such process
+    t0 = time.time()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.2, 30.0, appear_s=0.5)
+    assert time.time() - t0 < 5

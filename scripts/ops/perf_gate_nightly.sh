@@ -47,7 +47,10 @@ set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 src=${PERF_SRC:-$repo/var/data}
-clone=${PERF_CLONE_ROOT-/Users/adarbari/perf-clone/data}  # set but empty is an error, not a default
+# set but empty is an error, not a default. The default is inside the owner's Spotlight Privacy exclusion
+# (~/workspace): outside it mds / mds_stores took 380-480% CPU during the bench and slowed the delete 4x
+spot_dir=${PERF_SPOTLIGHT_DIR:-${HOME:-/Users/adarbari}/workspace}
+clone=${PERF_CLONE_ROOT-${HOME:-/Users/adarbari}/workspace/perf-clone/data}
 status=${PERF_STATUS:-$repo/var/logs/perf_gate.status}
 today=${PERF_NOW_DATE:-$(date +%Y-%m-%d)}
 hm=${PERF_NOW_HM:-$(date +%H%M)}
@@ -271,6 +274,12 @@ fr=$repo/scripts/perf/flight_recorder.py
 phase=wait; timeline_pid=; prekill_pid=; kr_msg=; kr_note=
 set_phase() { phase=$1; echo "$1" >"$rundir/phase.txt"; echo "$1 $(date +%s)" >>"$rundir/phases.txt"; }
 set_phase wait
+clone_warn=
+case "$clone" in
+  "$spot_dir"/*) ;;
+  *) clone_warn=" (clone outside the Spotlight exclusion: indexing will skew the bench)"
+     say "WARNING: the clone $clone is outside the Spotlight exclusion ($spot_dir): indexing will skew the bench" ;;
+esac
 if [ -f "$fr" ]; then
   python3 "$fr" timeline --rundir "$rundir" --root $$ --every "${PERF_SAMPLE_S:-10}" --store "$logs" >/dev/null 2>&1 &
   timeline_pid=$!
@@ -339,6 +348,10 @@ subprocess.Popen(
     env=os.environ,
 )
 PY
+  # keep the timeline going while the delete runs (phase trash-delete, until its pid file is gone or
+  # 15 min): detached, so it neither holds the wrapper's exit nor is a writer (flight_recorder is excluded)
+  [ -f "${fr:-}" ] && python3 "$fr" trash-watch --rundir "$rundir" --pid-file "$logs/perf_gate/trash-delete.pid" \
+    --store "$logs" --every "${PERF_SAMPLE_S:-10}" --max-s "${PERF_TRASH_WATCH_S:-900}" >/dev/null 2>&1
   return 0
 }
 discard_clone() { rename_clone; [ -n "$trash_dir" ] && delete_trash "$trash_dir"; return 0; }
@@ -521,7 +534,7 @@ if [ -n "$paused_s" ]; then
     echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=repeated-pauses over_time=no wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
     say "repeated pauses: $aborts copies stopped by a paused machine today"
     code=4; bench_s=0; cleanup_s=0; finish_evidence repeated-pauses
-    msg="1 s page gate: the machine paused during the copy $aborts times today; no result tonight$kr_msg; evidence in var/logs/perf_gate/$today/"
+    msg="1 s page gate: the machine paused during the copy $aborts times today; no result tonight$kr_msg$clone_warn; evidence in var/logs/perf_gate/$today/"
     if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
     else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
     exit 4
@@ -543,7 +556,7 @@ if [ "$cap_hit" = 1 ]; then
   say "snapshot over-time: the copy was killed at ${snapshot_limit}s"
   echo "date=$today sha=$sha views_over=? seconds_above=? exit=4 finished=yes outcome=snapshot-over-time over_time=yes wait_s=$wait_s snapshot_s=$snapshot_s bench_s=0 cleanup_s=0 total_s=$total_s" >>"$status"
   code=4; bench_s=0; cleanup_s=0; finish_evidence snapshot-over-time
-  msg="1 s page gate: the snapshot copy was killed at ${snapshot_limit}s (no result)$kr_msg; evidence in var/logs/perf_gate/$today/"
+  msg="1 s page gate: the snapshot copy was killed at ${snapshot_limit}s (no result)$kr_msg$clone_warn; evidence in var/logs/perf_gate/$today/"
   if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
   else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
   exit 4
@@ -658,7 +671,7 @@ reason=""; [ "$overtime" = yes ] && reason=over-time
 [ "$outcome" = paused ] && reason=paused; [ "$outcome" = code-changed ] && reason=code-changed; [ "$outcome" = sampled ] && reason=sampled
 finish_evidence "$reason"
 
-if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$outcome" = sampled ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ] || [ "${cov_new:-0}" -gt 0 ]; then
+if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$outcome" = sampled ] || [ -n "$clone_warn" ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ] || [ "${cov_new:-0}" -gt 0 ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); snapshot ${snapshot_s}s, bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
@@ -668,6 +681,7 @@ if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ]
   [ "$outcome" = code-changed ] && msg="1 s page gate: the code changed during the bench (a deploy; NOT recorded, no verdict): $msg"
   [ "$outcome" = paused ] && msg="1 s page gate: the machine paused or stalled during the bench (noisy, NOT recorded, no verdict): $msg"
   [ -n "$kr_msg" ] && msg="$msg$kr_msg"
+  [ -n "$clone_warn" ] && msg="$msg$clone_warn"
   [ "$outcome" = crashed ] && msg="1 s page gate CRASHED (no result): $msg"
   [ "$outcome" = refused ] && msg="1 s page gate REFUSED by the bench (no result): $msg"
   [ "$overtime" = yes ] && msg="1 s page gate OVER-TIME: bench killed at ${bench_limit}s (not recorded); $msg"

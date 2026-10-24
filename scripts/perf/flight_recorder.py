@@ -152,7 +152,9 @@ def free_gb(path: str) -> str:
     return str(int(st.f_bavail * st.f_frsize / 1024**3))
 
 
-def sample_row(rundir: Path, root: int, late: int, store: str) -> list:
+def sample_row(
+    rundir: Path, root: int, late: int, store: str, phase_name: str | None = None
+) -> list:
     """One row of timeline.csv; every probe is bounded, a stuck one is noted."""
     notes: list[str] = []
 
@@ -163,7 +165,7 @@ def sample_row(rundir: Path, root: int, late: int, store: str) -> list:
             return default
         return v
 
-    phase = (
+    phase = phase_name or (
         (rundir / "phase.txt").read_text().strip() if (rundir / "phase.txt").is_file() else "wait"
     )
     table = get("ps", process_table, [])
@@ -197,6 +199,38 @@ def timeline(
             csv.writer(f).writerow(row)
         prev_dur = time.time() - start
         time.sleep(max(0.0, every - prev_dur))
+
+
+def _alive_pid(pid_file: Path) -> int | None:
+    """The pid in the trash delete's ``pid trash start`` file; None when gone or stale."""
+    try:
+        pid = int(pid_file.read_text().split()[0])
+        os.kill(pid, 0)
+    except (OSError, ValueError, IndexError):
+        return None
+    return pid
+
+
+def trash_watch(
+    rundir: Path, pid_file: Path, store: str, every: float, max_s: float, appear_s: float = 10.0
+) -> None:
+    """Keep sampling into timeline.csv, phase ``trash-delete``, while the background trash delete
+    runs (its pid file exists and the pid lives), at most ``max_s``; waits ``appear_s`` for it."""
+    path = rundir / "timeline.csv"
+    if not path.exists():
+        path.write_text(",".join(COLUMNS) + "\n")
+    start = time.time()
+    pid = None
+    while pid is None and time.time() - start < appear_s:
+        pid = _alive_pid(pid_file)
+        if pid is None:
+            time.sleep(0.2)
+    while pid is not None and time.time() - start < max_s:
+        row = sample_row(rundir, pid, 0, store, "trash-delete")
+        with path.open("a", newline="") as f:
+            csv.writer(f).writerow(row)
+        time.sleep(every)
+        pid = _alive_pid(pid_file)
 
 
 def read_rows(rundir: Path) -> list[dict]:
@@ -444,18 +478,23 @@ def finish(rundir: Path) -> None:
         log.write_bytes(log.read_bytes()[-API_LOG_CAP:])
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("timeline", "prekill", "report", "finish"):
+    for name in ("timeline", "prekill", "report", "finish", "trash-watch"):
         p = sub.add_parser(name)
         p.add_argument("--rundir", required=True, type=Path)
         if name in ("timeline", "prekill"):
             p.add_argument("--root", type=int, default=os.getppid())
-        if name == "timeline":
+        if name in ("timeline", "trash-watch"):
             p.add_argument("--every", type=float, default=10.0)
             p.add_argument("--store", default=".")
+        if name == "timeline":
             p.add_argument("--stop-file", type=Path)
+        if name == "trash-watch":
+            p.add_argument("--pid-file", required=True, type=Path)
+            p.add_argument("--max-s", type=float, default=900.0)
+            p.add_argument("--foreground", action="store_true")
         if name in ("prekill", "report"):
             p.add_argument("--phase", required=True)
         if name == "prekill":
@@ -463,17 +502,37 @@ def main(argv: list[str] | None = None) -> int:
         if name == "report":
             p.add_argument("--cap", type=int, default=0)
             p.add_argument("--reason", default="")
-    a = ap.parse_args(argv)
-    if a.cmd == "timeline":
-        timeline(a.rundir, a.root, a.every, a.store, a.stop_file)
-    elif a.cmd == "prekill":
-        prekill(a.rundir, a.root, a.phase, a.after)
-    elif a.cmd == "report":
-        d = report(a.rundir, a.phase, a.cap, a.reason)
-        top = ", ".join(f"{x['name']} {x['cpu_pct']:g}%" for x in d["top_cpu"]) or "none"
-        print(f"likely cause: {d['likely_cause']}; top CPU: {top}")
-    else:
-        finish(a.rundir)
+    return ap
+
+
+def _trash_watch_cli(a: argparse.Namespace, argv: list[str] | None) -> None:
+    if a.foreground:
+        trash_watch(a.rundir, a.pid_file, a.store, a.every, a.max_s)
+        return
+    # detached in its own session: it never holds the wrapper's exit
+    args = [sys.executable, __file__, *(argv if argv is not None else sys.argv[1:])]
+    subprocess.Popen(
+        [*args, "--foreground"], start_new_session=True, stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )  # fmt: skip
+
+
+def _report_cli(a: argparse.Namespace) -> None:
+    d = report(a.rundir, a.phase, a.cap, a.reason)
+    top = ", ".join(f"{x['name']} {x['cpu_pct']:g}%" for x in d["top_cpu"]) or "none"
+    print(f"likely cause: {d['likely_cause']}; top CPU: {top}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    a = _parser().parse_args(argv)
+    handlers = {
+        "timeline": lambda: timeline(a.rundir, a.root, a.every, a.store, a.stop_file),
+        "trash-watch": lambda: _trash_watch_cli(a, argv),
+        "prekill": lambda: prekill(a.rundir, a.root, a.phase, a.after),
+        "report": lambda: _report_cli(a),
+        "finish": lambda: finish(a.rundir),
+    }
+    handlers[a.cmd]()
     return 0
 
 
