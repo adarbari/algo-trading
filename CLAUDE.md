@@ -235,9 +235,11 @@ and jobs, the IBKR read-only boundary, a bug that survived two fixes) gets an `a
 review of the diff before it is finished (`.claude/skills/review-and-release`: review loop, policy gate, release), and an agent that hits ambiguity or fails the same check twice escalates one
 tier instead of retrying.
 
-Shared machine: at most 2 agents at once. Rule 9 keeps full checks off the machine, so nobody
+Shared machine: at most 2 agents at once, unless the owner asks for speed: then the cap lifts for file-disjoint work (owner 2026-10-17, 2026-10-24). Rule 9 keeps full checks off the machine, so nobody
 passes `WORKERS=2` / `WEB_WORKERS=2` any more (the cap dated from overloads on #94 / #95 / #98,
 when full checks ran side by side); tests run directly use `pytest -n auto`.
+
+A session orchestrating a multi-PR plan keeps its dependency map and, at every child-session note, merge or CI event, starts each newly unblocked, file-disjoint slice (a new session, or a message to the session that already has the context) without waiting to be asked, and tells the owner in one line what it started and what still waits on what; event-driven, never a poll loop; when the owner asks for speed the 2-agent cap lifts for file-disjoint work (owner 2026-10-17, 2026-10-24). Mechanics: `.claude/skills/review-and-release` section 4.
 
 Token habits (every session):
 

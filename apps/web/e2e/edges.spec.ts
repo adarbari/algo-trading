@@ -43,6 +43,10 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
   await expect(page).toHaveURL(/\/edges\?edge=momentum_12_1$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeVisible();
   await expect(page.getByText('+7.0 pts').first()).toBeVisible();
+  // The evaluation line under the verdict: the server's state and sentence, and no run id for a trader.
+  await expect(page.getByText('Stale', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Evaluated 2 Oct, 8 sessions ago\./)).toBeVisible();
+  await expect(page.getByRole('link', { name: /run-frozen/ })).toHaveCount(0);
   await page
     .getByRole('navigation', { name: 'Sections of this edge' })
     .getByRole('link', { name: 'Details' })

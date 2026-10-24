@@ -353,3 +353,84 @@ def test_prose_findings_tell_explanations_from_microcopy() -> None:
         "Plain English: the rows are a draft. Review each one before you save it here.",
         '<Disclosure label="How to read',
     ]
+
+
+FILTER_BAR_FILE = "architecture/web_filter_bar.toml"
+FILTER_BAR_HINT = (
+    "render SurfaceFilterBar (ADR 0082; docs/ui/filtering.md; .claude/skills/add-ui-component "
+    "step 7); a fixed handful of rows may instead be listed under [exempt] with its reason"
+)
+_DATA_SURFACE = re.compile(r"<(?:DataTable|ExpandableTable|FeatureTable|MasterDetail)\b")
+_FILTER_BAR = re.compile(r"<(?:SurfaceFilterBar|FilterBar)\b")
+
+
+def unfiltered_surfaces(src: Path) -> list[str]:
+    """Files of ``src/**/*.tsx`` (tests, stories, generated and the bar itself left out) that
+    render a table, list or feed without the shared filter bar, keyed like the baseline."""
+    found = []
+    for path in sorted(src.rglob("*.tsx")):
+        rel = path.relative_to(src.parent).as_posix()
+        if "/generated/" in rel or any(fnmatch.fnmatchcase(path.name, s) for s in DERIVED_SKIP):
+            continue
+        text = _COMMENT.sub("", path.read_text())
+        if _DATA_SURFACE.search(text) and not _FILTER_BAR.search(text):
+            found.append(rel)
+    return found
+
+
+def filter_bar_problems(found: list[str], baseline: dict[str, Any]) -> list[str]:
+    """What fails the check: surfaces in neither list, listed paths that are no longer
+    unfiltered surfaces, and entries without a reason."""
+    migrating, exempt = baseline.get("migrating", {}), baseline.get("exempt", {})
+    listed = {**migrating, **exempt}
+    problems = [
+        f"{rel}: a table, list or feed without the filter bar; {FILTER_BAR_HINT}"
+        for rel in found
+        if rel not in listed
+    ]
+    problems += [
+        f"{rel}: now has the filter bar or no data surface; delete its line from {FILTER_BAR_FILE}"
+        f" (the baseline only shrinks)"
+        for rel in listed
+        if rel not in found
+    ]
+    problems += [f"{rel}: no reason in {FILTER_BAR_FILE}" for rel, why in listed.items() if not why]
+    problems += [
+        f"{rel}: listed under both [migrating] and [exempt]" for rel in migrating if rel in exempt
+    ]
+    problems += [
+        f"{rel}: a [migrating] reason starts with 'migrating' and names the session or PR"
+        for rel, why in migrating.items()
+        if not why.startswith("migrating")
+    ]
+    return problems
+
+
+def test_data_surfaces_use_the_filter_bar() -> None:
+    """ADR 0082 / [ADR 0025 rule 12]: every table, list or feed filters through the shared bar
+    or is a documented exemption; the migrating list only shrinks."""
+    baseline = tomllib.loads((REPO_ROOT / FILTER_BAR_FILE).read_text())
+    found = unfiltered_surfaces(REPO_ROOT / WEB["root"] / "src")
+    problems = filter_bar_problems(found, baseline)
+    assert not problems, f"[ADR 0025 rule 12] {FILTER_BAR_FILE}:\n" + "\n".join(problems)
+
+
+def test_filter_bar_check_catches_a_new_unfiltered_table(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    (src / "widgets" / "new-list" / "ui").mkdir(parents=True)
+    ui = src / "widgets" / "new-list" / "ui"
+    (ui / "Bare.tsx").write_text("export const A = () => <DataTable rows={[]} />;\n")
+    (ui / "Barred.tsx").write_text("const A = () => <><SurfaceFilterBar /><DataTable /></>;\n")
+    (ui / "Commented.tsx").write_text("// <DataTable />\nexport const B = 1;\n")
+    (ui / "Bare.stories.tsx").write_text("const A = () => <DataTable />;\n")
+    found = unfiltered_surfaces(src)
+    assert found == ["src/widgets/new-list/ui/Bare.tsx"]
+    problems = filter_bar_problems(found, {})
+    assert len(problems) == 1 and "without the filter bar" in problems[0]
+    listed = {"exempt": {found[0]: "five fixed rows"}}
+    assert filter_bar_problems(found, listed) == []
+    assert "delete its line" in filter_bar_problems([], listed)[0]
+    assert "no reason" in filter_bar_problems(found, {"exempt": {found[0]: ""}})[0]
+    assert (
+        "starts with 'migrating'" in filter_bar_problems(found, {"migrating": {found[0]: "x"}})[0]
+    )
