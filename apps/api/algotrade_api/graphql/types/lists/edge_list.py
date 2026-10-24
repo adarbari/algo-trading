@@ -27,6 +27,6 @@ class EdgeList:
     def of(cls, d: list_reads.EdgeList, ctx: ReadContext) -> Self:
         return cls(
             total=d.total,
-            items=[Edge.of(r.edge, ctx) for r in d.items],
+            items=[Edge.of(r.edge, ctx, r.summary) for r in d.items],
             facets=FilterFacets.of(d.facets),
         )

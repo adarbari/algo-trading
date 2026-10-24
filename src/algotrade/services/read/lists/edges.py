@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.paper import load_trades
 from algotrade.services.read.edge_desk.states import LiveState, live_edges, load_live_states
+from algotrade.services.read.evaluation import versions
 from algotrade.services.read.evaluation.edges import Edge, load_edges
 from algotrade.services.read.evaluation.verdict.model import EdgeSummary
-from algotrade.services.read.evaluation.versions import load_summary
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.filtering.rows import frame_of
@@ -61,7 +61,7 @@ def load_edge_list(
     recording = live_edges(by_id)
     trades = load_trades(ctx, recording) if recording else ()
     states = {s.edge_id: s for s in load_live_states(ctx, by_id, trades)}
-    rows = tuple(EdgeRow(e, load_summary(ctx, e), states.get(e.id)) for e in found)
+    rows = tuple(EdgeRow(e, versions.load_summary(ctx, e), states.get(e.id)) for e in found)
     frame = frame_of(rows, served.resolved, served.columns)
     facets = compute_facets(frame, len(rows), served.resolved, filters)
     return EdgeList(tuple(rows[i] for i in facets.matched_rows), facets.matched, facets)

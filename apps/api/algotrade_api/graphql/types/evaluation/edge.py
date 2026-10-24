@@ -12,6 +12,7 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, runs, versions
+from algotrade.services.read.evaluation.verdict import model as verdict_model
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.evaluation.compare import EdgeCompare
 from algotrade_api.graphql.types.evaluation.verdict import (
@@ -221,7 +222,10 @@ class Edge:
     cache: strawberry.Private[dict[str, Any]]
 
     @classmethod
-    def of(cls, d: edges.Edge, ctx: Stores) -> Self:
+    def of(
+        cls, d: edges.Edge, ctx: Stores, summary: verdict_model.EdgeSummary | None = None
+    ) -> Self:
+        """``summary``: the headline a list already read, so ``summary`` does not read it twice."""
         return cls(
             id=d.id,
             name=d.name,
@@ -255,7 +259,7 @@ class Edge:
             settings=EdgeSettings.of(d.settings) if d.settings else None,
             edge=d,
             ctx=ctx,
-            cache={},
+            cache={} if summary is None else {"summary": summary},
         )
 
     async def _canonical(self) -> runs.CanonicalRun:
@@ -312,8 +316,10 @@ class Edge:
         "always equal to those fields of `verdict`, read without the pieces a list never shows"
     )
     async def summary(self, info: Info) -> EdgeSummary:
-        found = await off_loop(versions.load_summary, self.ctx, self.edge)
-        return EdgeSummary.of(found)
+        seeded: verdict_model.EdgeSummary | None = self.cache.get("summary")
+        if seeded is not None:
+            return EdgeSummary.of(seeded)
+        return EdgeSummary.of(await off_loop(versions.load_summary, self.ctx, self.edge))
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's own edge against the edge it extends and its baselines, "
