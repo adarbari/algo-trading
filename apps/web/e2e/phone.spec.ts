@@ -453,6 +453,54 @@ test('Edge runs: a tapped run opens its rows as a sheet', async ({ page }) => {
   );
 });
 
+test('Screener runs: a tapped run opens its record as a sheet', async ({ page }) => {
+  await mockAdminApi(page, {
+    screenerRuns: [
+      {
+        runId: 'screen-trend-site',
+        configId: 'trend_pullback',
+        owner: 'site',
+        session: '2026-10-22',
+        status: 'complete',
+        startedAt: '2026-10-22T22:05:00+00:00',
+        finishedAt: null,
+        knowledgeTs: '2026-10-22T22:05:00+00:00',
+        picked: null,
+        paused: null,
+        regime: null,
+        coverage: null,
+      },
+    ],
+    'screenerRun:screen-trend-site': {
+      runId: 'screen-trend-site',
+      configId: 'trend_pullback',
+      owner: 'site',
+      session: '2026-10-22',
+      status: 'complete',
+      startedAt: '2026-10-22T22:05:00+00:00',
+      finishedAt: null,
+      knowledgeTs: '2026-10-22T22:05:00+00:00',
+      configVersion: null,
+      configHash: null,
+      decisions: null,
+      picked: null,
+      paused: null,
+      regime: null,
+      coverage: null,
+      missingTables: [],
+      missingOptionalTables: [],
+      unavailable: [],
+      changes: null,
+    },
+  });
+  await page.goto('/admin/screener-runs');
+  await page.getByRole('row', { name: /trend_pullback/ }).tap();
+  await expect(page.getByRole('dialog', { name: 'screen-trend-site' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()?.width ?? 0,
+  );
+});
+
 test('Feature requests: the ranked list and the accepted formulas fit a phone and a status filter narrows it', async ({
   page,
 }) => {

@@ -59,7 +59,7 @@ describe('pageRoute', () => {
 describe('every page route loads its chunk in a loader', () => {
   // Routes that render no lazy page: layouts, the index redirect, placeholders and the sign-in.
   const NO_PAGE = new Set(['', '/', '/login', '/admin', '/guide']);
-  const placeholders = ['/admin/screener-runs', '/admin/users'];
+  const placeholders = ['/admin/users'];
 
   it('has a loader and a static preload on each', () => {
     const missing = flatten(routeTree as unknown as AnyRoute)
@@ -92,6 +92,7 @@ describe('the reads each page starts with its chunk', () => {
     ],
     ['/admin/llm-usage', ['LlmUsage']],
     ['/admin/harness-runs', ['HarnessRuns']],
+    ['/admin/screener-runs', ['AdminScreenerRuns']],
     ['/guide', ['FeatureCatalogue', 'GuideIndex']],
   ];
   it.each(cases)('%s', async (id, names) => {

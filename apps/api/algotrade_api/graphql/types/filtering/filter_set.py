@@ -11,6 +11,7 @@ from algotrade.services.read.filtering.masks import WindowUnit
 from algotrade_api.graphql.types.availability import Unavailable
 
 strawberry.enum(served.FilterGroup, description="Where a filter sits in the filter bar")
+strawberry.enum(served.ValueUnit, description="How a range shows its stored value")
 strawberry.enum(served.FilterKind, description="The control a filter is: how its input is read")
 
 
@@ -27,7 +28,9 @@ class FilterChoice:
 @strawberry.type(
     description="One filter of a surface: `guide` is its Guide entry reference (`term:<id>`); "
     "`options` the values of a static or enum pick / select (empty: the stored ones, counted in "
-    "the result's facets); `bins` a range's histogram edges; `windowUnit` what a window counts"
+    "the result's facets); `bins` a range's histogram edges; `windowUnit` what a window counts; "
+    "`unit` PERCENT: a range's stored 0..1 value is shown and entered as 0..100, "
+    "its limits are sent as 0..1"
 )
 class FilterDefinition:
     id: str
@@ -38,6 +41,7 @@ class FilterDefinition:
     options: list[FilterChoice]
     bins: list[float]
     window_unit: WindowUnit | None
+    unit: served.ValueUnit | None
 
     @classmethod
     def of(cls, d: served.ServedFilter) -> Self:
@@ -50,6 +54,7 @@ class FilterDefinition:
             options=[FilterChoice.of(o) for o in d.options],
             bins=list(d.bins),
             window_unit=d.window_unit,
+            unit=d.unit,
         )
 
 

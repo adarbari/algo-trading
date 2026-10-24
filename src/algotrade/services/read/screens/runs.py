@@ -214,7 +214,7 @@ def run_summaries(ctx: ReadContext) -> RunSummaries | Unknown:
             return _recounted(ctx)
         return RunSummaries(  # one small row per run, never the rows counted
             {
-                (str(row["user_id"]), str(row["config_id"])): _frozen_summary(row)
+                (str(row["user_id"]), str(row["config_id"])): frozen_summary(row)
                 for _, row in frozen.iterrows()
             }
         )
@@ -283,7 +283,7 @@ def _tables(stats: Mapping[str, Any], key: str) -> tuple[str, ...]:
     return tuple(sorted(str(t) for t in stats.get(key) or ()))
 
 
-def _coverage(stats: Mapping[str, Any]) -> tuple[str | None, tuple[str, ...], tuple[str, ...]]:
+def run_coverage(stats: Mapping[str, Any]) -> tuple[str | None, tuple[str, ...], tuple[str, ...]]:
     """The run record's coverage, the tables it ran without (``stats["missing_tables"]``) and
     the optional ones (``stats["missing_optional_tables"]``)."""
     coverage = stats.get("coverage")
@@ -327,7 +327,7 @@ def _day(value: object) -> date | None:
     return None if found is None else pd.Timestamp(str(found)).date()
 
 
-def _frozen_summary(row: pd.Series) -> RunSummary:
+def frozen_summary(row: pd.Series) -> RunSummary:
     """The summary of a ``screen_runs`` row: the same counts ``_summary`` makes from the rows
     (most first), and what the row froze."""
     names, counts = list(row["decision_names"]), list(row["decision_counts"])
@@ -359,7 +359,7 @@ def _run(ctx: ReadContext, owner: str, config_id: str, found: RunSummary) -> Scr
     """The screener's run: its summary and its run record."""
     record = ctx.reader.run(found.run_id)
     stats: Mapping[str, Any] = {} if record is None else dict(record.stats)
-    coverage, missing_tables, missing_optional = _coverage(stats)
+    coverage, missing_tables, missing_optional = run_coverage(stats)
     counts = {d.decision: d.count for d in found.decisions}
     return ScreenerRun(
         run_id=found.run_id,
@@ -518,7 +518,7 @@ def _frozen_run(ctx: ReadContext, run: ScreenerRun, run_id: str) -> ScreenerRun 
     mine = row[(row["user_id"] == run.owner) & (row["config_id"] == run.config_id)]
     if mine.empty:
         return None
-    return _run(ctx, run.owner, run.config_id, _frozen_summary(mine.iloc[-1]))
+    return _run(ctx, run.owner, run.config_id, frozen_summary(mine.iloc[-1]))
 
 
 def load_pick_ids(ctx: ReadContext, run: ScreenerRun, limit: int) -> PickIds:

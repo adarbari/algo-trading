@@ -13,8 +13,8 @@ from algotrade.services.read.screens.pick_history import (
     DEFAULT_SESSIONS,
     MAX_SESSIONS,
     _counted,
-    _decisions,
     load_pick_histories,
+    record_decisions,
 )
 from algotrade.services.read.screens.runs import latest_run
 from algotrade.services.read.values import UnknownCode
@@ -146,7 +146,7 @@ def test_a_real_gated_run_is_counted_as_latest_run_counts_it() -> None:
     assert run is not None and run.paused == outcome.audit["decisions"]["PAUSED"] == 2
     records = reader.runs(run_job_name("big_liquid", "site"))
     assert len(records) == 1
-    decisions = _decisions(records[0])  # what an earlier session's entry is counted from
+    decisions = record_decisions(records[0])  # what an earlier session's entry is counted from
     assert decisions is not None
     assert _counted(DAY, decisions).picked == run.picked and _counted(DAY, decisions).paused == 2
     entry = load_pick_histories(ctx, [key], 2)[key]

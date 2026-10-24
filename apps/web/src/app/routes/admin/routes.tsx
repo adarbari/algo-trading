@@ -9,6 +9,7 @@ import { featureRequestsRoute } from './feature-requests';
 import { harnessRunsRoute } from './harness-runs';
 import { ingestionRoute } from './ingestion';
 import { llmUsageRoute } from './llm-usage';
+import { screenerRunsRoute } from './screener-runs';
 
 export const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -22,6 +23,6 @@ export const adminRoutes = adminRoute.addChildren([
   llmUsageRoute(adminRoute),
   harnessRunsRoute(adminRoute),
   featureRequestsRoute(adminRoute),
-  placeholderRoute(adminRoute, ADMIN, '/admin/screener-runs', 'screener-runs'),
+  screenerRunsRoute(adminRoute),
   placeholderRoute(adminRoute, ADMIN, '/admin/users', 'users'),
 ]);

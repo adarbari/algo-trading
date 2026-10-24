@@ -55,6 +55,10 @@ source = "graphql:FilterKind"
 exempt = "the control a filter is (pick, range, ...): it decides the widget, never shown as a word; the filter's own Guide entry explains what it filters"
 
 [[enum]]
+source = "graphql:ValueUnit"
+exempt = "how a range filter shows its 0..1 value (as 0..100 percent); the control prints a % sign, and the filter's Guide entry and the percentile term explain the rank"
+
+[[enum]]
 source = "graphql:WindowUnit"
 exempt = "the unit of a window filter's input, shown by the control as days / sessions; the filter's Guide entry explains what it counts"
 
@@ -157,6 +161,11 @@ names = { oos_viewed_during_tuning = "out-of-sample seen while tuning" }  # the 
 [[enum]]
 source = "graphql:CauseLink.status"
 exempt = "admin-only cause chain (ADR 0056): the state recorded for a step, table or feature"
+
+[[enum]]
+source = "graphql:ScreenerRunEntry.status"
+values_from = "python:algotrade.storage.runs:RunStatus"
+values = { queued = "term:screener_run_status", running = "term:screener_run_status", complete = "term:screener_run_status", partial = "term:screener_run_status", waiting = "term:screener_run_status", failed = "term:screener_run_status" }
 
 [[enum]]
 source = "graphql:GuideLink.kind"
@@ -404,7 +413,7 @@ start = "start:read_feature_requests"
 
 [[section]]
 path = "/admin/screener-runs"
-exempt = "placeholder page, not built yet"
+start = "start:read_screener_runs"
 
 [[section]]
 path = "/admin/users"

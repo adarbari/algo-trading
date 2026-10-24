@@ -1,11 +1,13 @@
 # L3 site setting: the filters of the Edges list (ADR 0082, docs/ui/filtering.md). Typed by
 # src/algotrade/config/filters/definitions.py; fitness tests: tests/unit/config/filters/.
-# The row is an Edge (services/read/evaluation/edges.py) with its `verdict` (EdgeVerdict: the
-# figures are the basis's out-of-sample ones) and its `live` state (edge_desk/states.py
-# LiveState). Every filter's `guide` entry is in config/site/guide/glossary/filters.toml.
+# The row is an EdgeRow (services/read/lists/edges.py): the `edge` (evaluation/edges.py Edge), its
+# `summary` (EdgeSummary: the headline of its verdict, the figures are the basis's out-of-sample
+# ones) and its `live` state (edge_desk/states.py LiveState). Every filter's `guide` entry is in
+# config/site/guide/glossary/filters.toml. The search over the name and thesis is the list's `q`.
 # "Rejected" is a status; "decayed" is the live state `below` (under the backtest's usual range).
 #
 # Not here (listed in the PR as "needs new data"):
+#   hit rate      (the stored headline carries the lift and the trades, not the win rate)
 #   thesis type   (the document's mechanism_kind is not on the read Edge)
 #   asset class   (no edge field; it follows from the universe selection, which is free-form)
 #   horizon       (an edge holds a tuple of horizons: no single value to range over)
@@ -15,37 +17,32 @@ label = "Edges"
 [[column]]
 id = "status"
 dtype = "str"
-source = "status"
+source = "edge.status"
 
 [[column]]
 id = "mine"
 dtype = "bool"
-source = "mine"
+source = "edge.mine"
 
 [[column]]
 id = "followed"
 dtype = "bool"
-source = "followed"
+source = "edge.followed"
 
 [[column]]
 id = "verdict"
 dtype = "str"
-source = "verdict.verdict"
-
-[[column]]
-id = "hit_rate"
-dtype = "float"
-source = "verdict.win_rate"
+source = "summary.verdict"
 
 [[column]]
 id = "lift_pts"
 dtype = "float"
-source = "verdict.lift_pts"
+source = "summary.lift_pts"
 
 [[column]]
 id = "sample"
 dtype = "int"
-source = "verdict.oos_trades"
+source = "summary.oos_trades"
 
 [[column]]
 id = "live_state"
@@ -139,15 +136,6 @@ group = "setup"
 kind = "toggle"
 field = "column:followed"
 guide = "term:filter_edge_followed"
-
-[[filter]]
-id = "hit_rate"
-label = "Out-of-sample hit rate"
-group = "setup"
-kind = "range"
-field = "column:hit_rate"
-bins = [0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1]
-guide = "term:filter_edge_hit_rate"
 
 [[filter]]
 id = "lift"

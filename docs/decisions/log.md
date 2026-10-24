@@ -415,6 +415,22 @@ follow-up PR).
 - status: final
 - Reasoning: a gate that cannot be read on the launch day would leave the edge with no events; the established O2 gate keeps the short side a liquid-name test, at the cost of a small count, which the edge's notes disclose.
 
+## 2026-10-24 | Admin Screener runs PR (#915) | Explore chart tab first-load budget raised
+- Question: CI's phone perf e2e fails the Explore chart tab first-load script (305.3 kB against 305000 B): the Admin run detail's UnavailableNote import splits a chunk Combobox shared with it, +403 B on a page this PR does not change. Trim, or raise?
+- Options: trim (an implementer found no real trim: lazy import, the entities barrel and a chunk group each fail a budget) / drop UnavailableNote from the detail (loses the admin cause display) / raise the one route budget.
+- Decision: Explore chart tab `first_load_js_gzip_bytes` 305000 to 305420 B; no other budget changes.
+- decided by: owner
+- status: final
+- Reasoning: the admin Cause chain (ADR 0056) is part of the page; the overage is a chunk boundary, not new code on that route.
+
+## 2026-10-24 | Admin Screener runs PR (#915) | Entry budgets raised by the route registration's cost
+- Question: the Admin Screener runs route's lazy registration and its required page-loader prefetch sit in the entry; after #902 the entry budgets are at their limit (CI: entry 25323 B against 25310, entry plus static imports about 197124 B against 197010). Trim, or raise?
+- Options: drop the prefetch (fails page-loader.test: every page starts its reads with its chunk) / trim unrelated entry code / raise the two entry budgets by the measured cost.
+- Decision: owner waiver for the two entry budgets only: entry 25310 to 25410 B and entry plus static imports 197010 to 197200 B, through the `waivers` map; the raise was approved by the owner in the session (asked: raise to 196560 B on the pre-#902 budget), rebased here on #902's budgets by the implementing session; no other budget changes.
+- decided by: owner
+- status: final
+- Reasoning: the route registration is irreducible (about 90 B gzip); the two numbers keep a margin of about 70 B over the CI measurement, as earlier waivers did.
+
 ## 2026-10-23 | Data-status pill PR (#902) | Entry bundle budgets raised by the pill's cost
 - Question: the always-visible data-status pill puts its badge in the entry chunk (the popover and its detail read load on the first click, so no extra request); the entry budgets sit at their limit. Trim elsewhere, or raise the two entry budgets?
 - Options: cut the pill (a lazy badge adds a JS request on every page, over the request budgets) / raise the entry and entry-plus-static-imports budgets by the pill's measured cost / drop the pill.

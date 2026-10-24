@@ -6,7 +6,7 @@ from datetime import date
 
 import pytest
 
-from algotrade.services.read.ops.harness_runs import (
+from algotrade.services.read.ops.admin_runs.harness_runs import (
     load_harness_run,
     load_harness_run_rows,
     load_harness_runs,

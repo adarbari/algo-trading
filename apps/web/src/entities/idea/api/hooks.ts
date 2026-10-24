@@ -13,7 +13,7 @@ import {
   type QueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { toFilterInputs, type AppliedFilter, type FilterInput } from '@/entities/filter';
 import { gql, GraphQLRequestError, graphql, queryKeys } from '@/shared/api';
@@ -204,9 +204,9 @@ export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
   // list is stale: start over from a fresh first page, never append to it.
   // New filters are a new query, pending until its first page arrives: until then the last list
   // (and its counts) stays, so the table and the bar do not blink mid-edit.
-  const settled = useRef(state.data);
-  if (state.data !== undefined) settled.current = state.data;
-  const placeholder = state.data === undefined && settled.current !== undefined;
+  const [settled, setSettled] = useState(state.data);
+  if (state.data !== undefined && state.data !== settled) setSettled(state.data);
+  const placeholder = state.data === undefined && settled !== undefined;
   const { refused, keep, asked } = state;
   // Pages that no longer link up (see `linked`) leave the list for good: the cursors go with them.
   useEffect(() => {
@@ -225,7 +225,7 @@ export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
 
   const { next, laterFailed, refetchLater, refetchFirst } = state;
   return {
-    data: state.data ?? settled.current,
+    data: state.data ?? settled,
     isPlaceholderData: placeholder,
     error: state.error,
     isError: state.isError,

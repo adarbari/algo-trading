@@ -77,6 +77,8 @@ EXEMPT = {
     "and a row whose rank is withheld is not judged (ADR 0081)",
     "services/read/evaluation/runs.py": "run results carry their recorded licence (ADR 0064)",
     "services/read/ops/backtests.py": "backtest results of the user's own runs (ADR 0064)",
+    "services/read/ops/admin_runs/screener_runs.py": "run records and one frozen "
+    "screen_runs row (counts of decisions, run ids): no value",
 }
 
 

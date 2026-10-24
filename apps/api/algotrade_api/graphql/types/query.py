@@ -43,19 +43,20 @@ from algotrade.services.read.guide.screeners import index as screener_index_page
 from algotrade.services.read.guide.screeners import screener as screener_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
+from algotrade.services.read.lists import edges as list_edges
 from algotrade.services.read.lists import screeners as list_screeners
 from algotrade.services.read.market import market
 from algotrade.services.read.ops import (
     backtests,
     configs,
     feature_requests,
-    harness_runs,
     ingestion,
     quality,
     review,
     runs,
     usage,
 )
+from algotrade.services.read.ops.admin_runs import harness_runs, screener_runs
 from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
@@ -99,14 +100,16 @@ from algotrade_api.graphql.types.instruments.distribution import FeatureDistribu
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.instruments.table import FeatureTable
+from algotrade_api.graphql.types.lists.edge_list import EdgeList
 from algotrade_api.graphql.types.lists.screener_list import ScreenerList
 from algotrade_api.graphql.types.market.market import Market
 from algotrade_api.graphql.types.market.regime import MarketRegime
 from algotrade_api.graphql.types.ops.accepted_formulas import AcceptedFormulaList
+from algotrade_api.graphql.types.ops.admin_runs.harness import HarnessRun
+from algotrade_api.graphql.types.ops.admin_runs.screener_run import ScreenerRunEntry
 from algotrade_api.graphql.types.ops.backtest import Backtest, BacktestDetail
 from algotrade_api.graphql.types.ops.config import Config
 from algotrade_api.graphql.types.ops.feature_requests import FeatureRequestList
-from algotrade_api.graphql.types.ops.harness import HarnessRun
 from algotrade_api.graphql.types.ops.ingestion import CellDetail, ChainCoverage, Completeness
 from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
 from algotrade_api.graphql.types.ops.review import ReviewList
@@ -534,6 +537,29 @@ class Query:
         return [Edge.of(e, ctx) for e in found] if ctx is not None else []
 
     @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Edges list: the edges the user sees whose id, name or thesis contains "
+        "`q` (any case) and that pass `filters` (the surface `edges` of `filterSet`: the old "
+        "views are the filters `mine`, `followed` and the status `rejected`), by id, with the "
+        "counts of the filter bar (ADR 0082). A session is read for the live state; null: "
+        "nothing stored",
+        extensions=[MaxItems("filters", MAX_FILTERS), MaxItems("q", MAX_QUERY)],
+    )
+    async def edge_list(
+        self,
+        info: Ctx,
+        filters: list[FilterInput] | None = None,
+        q: str | None = None,
+        date: Day = None,
+    ) -> EdgeList | None:
+        ctx = await info.context.aread(date)
+        found = (
+            await off_loop(list_edges.load_edge_list, ctx, tuple(filters or ()), q)
+            if ctx is not None
+            else None
+        )
+        return EdgeList.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's own edge files `edges` leaves out (or reads only in part), by id, "
         "with the reason; empty: every file of theirs loads"
     )
@@ -867,3 +893,34 @@ class Query:
         ctx = info.context.stores()
         found = harness_runs.load_harness_run(ctx, run_id) if ctx is not None else None
         return HarnessRun.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The `limit` most recent screener runs of any status, newest first: every "
+        "screener of the site and every declared user, narrowed by `user` (whose), `screener` "
+        "(config id) and `status` (the run record's)",
+        extensions=[AdminOnly(), MaxItems("limit", MAX_RUNS)],
+    )
+    def screener_runs(
+        self,
+        info: Ctx,
+        limit: int = 50,
+        user: str | None = None,
+        screener: str | None = None,
+        status: str | None = None,
+    ) -> list[ScreenerRunEntry]:
+        ctx = info.context.stores()
+        found = (
+            screener_runs.load_screener_runs(ctx, limit, user, screener, status)
+            if ctx is not None
+            else ()
+        )
+        return [ScreenerRunEntry.of(r, ctx) for r in found] if ctx is not None else []
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The screener run `runId`; null: no such run",
+        extensions=[AdminOnly()],
+    )
+    def screener_run(self, info: Ctx, run_id: str) -> ScreenerRunEntry | None:
+        ctx = info.context.stores()
+        found = screener_runs.load_screener_run(ctx, run_id) if ctx is not None else None
+        return ScreenerRunEntry.of(found, ctx) if found is not None and ctx is not None else None
