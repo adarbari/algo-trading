@@ -669,3 +669,12 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the cost is the filter bar's shared code adopted by two more lists (ADR 0082), not the lists' own code.
+
+## 2026-10-24 | More filters PR (#941) | FilterFeatures listed in perf_view_coverage.toml
+- Question: how the click-only `FilterFeatures` operation (sent when More filters opens) meets the 1 s page gate's coverage test.
+- Options: A list it with a reason and raise the pin 13 to 14 / B send it on every Ideas load so it is captured / C run the 22-minute crawl / D a static resolver.
+- Decision: A: one `[[operation]]` entry and `max_operation = 14`.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Note: the gate cannot measure a lazy, click-only operation: `web_page_ops.py` does not follow `lazy(() => import(...))`, an uncertain operation is skipped by `fast_bench.op_set`, and views the crawl discovers are not timed.
+- Reasoning: B spends a request and a catalogue-sized read on every Ideas load against the request budget; C buys no measurement. Follow-up: teach the gate to time discovered click views, then shrink the list.

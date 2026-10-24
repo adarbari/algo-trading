@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24 09:39 UTC",
+ "generated": "2026-10-24 10:03 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -220,7 +220,6 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
-    "FilterSet",
     "GuideHelpField"
    ],
    "uncertain": [
@@ -338,7 +337,6 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
-    "FilterSet",
     "GuideHelpField"
    ],
    "uncertain": [
@@ -1580,7 +1578,6 @@
    "clicks": [],
    "params": {},
    "ops": [
-    "FilterSet",
     "MyScreens",
     "ScreenerConfigs",
     "ScreenerListPage",

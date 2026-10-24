@@ -1400,13 +1400,25 @@ enum FilterKind {
 }
 
 """
-The filters of a surface for the viewer: `filters` they may use, in the order a group lists them, and `withheld` the ones they may not
+The filters of a surface for the viewer: `filters` they may use, in the order a group lists them, and `withheld` the ones they may not; `searchable`: the surface takes a filter on any catalogue field (`filterFeatures`, the id `feature:<field>`)
 """
 type FilterSet {
   surface: String!
   label: String!
   filters: [FilterDefinition!]!
   withheld: [WithheldFilter!]!
+  searchable: Boolean!
+}
+
+"""
+A catalogue field the viewer may filter a surface on by search: `kind` the control it gets (the filter's id is `feature:<name>`), `guide` its Guide entry (`field:<name>`), `synonyms` the words a trader uses for it (the phrasebook)
+"""
+type FilterableFeature {
+  name: String!
+  label: String!
+  kind: FilterKind!
+  guide: String!
+  synonyms: [String!]!
 }
 
 """
@@ -2867,9 +2879,14 @@ type Query {
   view(scope: String!, name: String = null): TableView
 
   """
-  The filters of `surface` (ideas, screener_results, universe) for the caller: the ones they may use with their options and bins, and the ones a data licence withholds (ADR 0082). Not found: no such surface
+  The filters of `surface` (ideas, screener_results, universe) for the caller: the ones they may use with their options and bins, and the ones a data licence withholds (ADR 0082). `withFeatures`: catalogue fields (`rollup.<group>@v<N>.<column>`, `feature.<name>`) the caller made filters of (the id `feature:<field>`): each is served too, in the group `more`, when the surface takes features. Not found: no such surface
   """
-  filterSet(surface: String!): FilterSet
+  filterSet(surface: String!, withFeatures: [String!] = null): FilterSet
+
+  """
+  The catalogue fields the caller may filter `surface` on by search (More filters): each with the control it gets, its Guide entry and the words a trader uses for it (the phrasebook); a field a data licence does not cover is not listed. Empty: the surface takes no features. Not found: no such surface
+  """
+  filterFeatures(surface: String!): [FilterableFeature!]!
 
   """
   The caller's feature catalogue (the site's fields plus their own expression features), in catalogue order
