@@ -25,6 +25,8 @@ from algotrade.services.read.evaluation import runs as edge_runs
 from algotrade.services.read.evaluation import versions
 from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
+from algotrade.services.read.filtering import served
+from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.formulas import accepted as accepted_formulas
 from algotrade.services.read.guide import entries as entries_page
 from algotrade.services.read.guide import field as field_page
@@ -60,6 +62,7 @@ from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.limits import (
     MAX_DAYS,
+    MAX_FILTERS,
     MAX_IDEAS_PAGE,
     MAX_NAMES,
     MAX_PAGE,
@@ -76,6 +79,7 @@ from algotrade_api.graphql.types.evaluation.evidence import (
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
 from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
+from algotrade_api.graphql.types.filtering.filter_set import FilterSet
 from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeEntry
 from algotrade_api.graphql.types.guide.edges.index import GuideEdgeIndex
 from algotrade_api.graphql.types.guide.edges.mechanism import GuideMechanism
@@ -225,15 +229,25 @@ class Query:
         "Ideas rule (a screener's first picks, weighted by position and by whose screener it "
         "is; each idea is served from its best pick) (`first` of them from the `after` "
         "cursor, `nextCursor` the next page's); a screener with no run for the session is "
-        "listed NOT_RUN. Null: nothing stored",
-        extensions=[MaxItems("first", MAX_IDEAS_PAGE)],
+        "listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list "
+        "before it is paged: `total` then counts the ideas that pass, `facets` the counts "
+        "(ADR 0082); a cursor is only good for the filters it was issued under. Null: nothing "
+        "stored",
+        extensions=[MaxItems("first", MAX_IDEAS_PAGE), MaxItems("filters", MAX_FILTERS)],
     )
     async def ideas(
-        self, info: Ctx, first: int = IDEAS_FIRST_PAGE, after: str | None = None, date: Day = None
+        self,
+        info: Ctx,
+        first: int = IDEAS_FIRST_PAGE,
+        after: str | None = None,
+        filters: list[FilterInput] | None = None,
+        date: Day = None,
     ) -> Ideas | None:
         ctx = await info.context.aread(date)
+        given = tuple(filters or ())
         # Off the event loop (a whole-run read); the items' `features` loads still batch.
-        found = await off_loop(ideas.load_ideas, ctx, first, after) if ctx is not None else None
+        load = ideas.load_ideas
+        found = await off_loop(load, ctx, first, after, given) if ctx is not None else None
         return Ideas.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -286,6 +300,15 @@ class Query:
         ctx = info.context.read(None)
         found = views.load_view(ctx, scope, name) if ctx is not None else None
         return TableView.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The filters of `surface` (ideas, screener_results, universe) for the "
+        "caller: the ones they may use with their options and bins, and the ones a data "
+        "licence withholds (ADR 0082). Not found: no such surface"
+    )
+    def filter_set(self, info: Ctx, surface: str) -> FilterSet | None:
+        ctx = info.context.stores()
+        return FilterSet.of(served.load_served_filters(ctx, surface)) if ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The caller's feature catalogue (the site's fields plus their own "

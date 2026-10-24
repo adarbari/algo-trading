@@ -47,6 +47,34 @@ source = "graphql:NewerState"
 values = { IN_PROGRESS = "term:last_complete_session", FAILED_RETRYING = "term:last_complete_session", PUBLISHING = "term:publishing_session" }
 
 [[enum]]
+source = "graphql:FilterGroup"
+exempt = "where a filter sits in the filter bar (a layout slot), never shown as a word"
+
+[[enum]]
+source = "graphql:FilterKind"
+exempt = "the control a filter is (pick, range, ...): it decides the widget, never shown as a word; the filter's own Guide entry explains what it filters"
+
+[[enum]]
+source = "graphql:WindowUnit"
+exempt = "the unit of a window filter's input, shown by the control as days / sessions; the filter's Guide entry explains what it counts"
+
+[[enum]]
+source = "graphql:FilterDefinition.label"
+exempt = "the filter's display name from config/site/filters; its Guide entry (`guide`) explains it, and every filter's entry is checked in tests/unit/config/filters"
+
+[[enum]]
+source = "graphql:WithheldFilter.label"
+exempt = "the filter's display name, as FilterDefinition.label"
+
+[[enum]]
+source = "graphql:FilterChoice.label"
+exempt = "the display name of one offered value (an option of a pick); the filter's Guide entry explains the choice"
+
+[[enum]]
+source = "graphql:FilterSet.label"
+exempt = "the surface's display name from its filters file"
+
+[[enum]]
 source = "graphql:UnavailableKind"
 exempt = "covered by GUIDE_TERMS (one glossary term per kind), kept complete by tests/unit/services/read/availability/test_cause.py"
 

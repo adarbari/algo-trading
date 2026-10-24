@@ -1,15 +1,29 @@
 """``load_ideas``: the viewer's screener pool ranked by the rule (services/ideas/rule.py), each
-idea served from its best pick only; the licence rule, NOT_RUN, the PAUSED section, paging."""
+idea served from its best pick only; the licence rule, NOT_RUN, the PAUSED section, paging and the
+filters (ADR 0082, PR 4: they narrow the whole list before it is paged, no count leaks a
+hidden-licence field, UNKNOWN never passes, a cursor is only good for its filters). The filter
+tests use a store with a later ``alpha`` run ``big`` of twelve picks ``S000``.. (dollar volume
+stored for the first eight, days to earnings for the first six, a personal IV for all twelve:
+the field of the leak tests)."""
 
+import copy
+from collections.abc import Callable
 from datetime import timedelta
 
 import pandas as pd
 import pytest
+from hypothesis import given as hypothesis_given
+from hypothesis import settings
+from hypothesis import strategies as st
 
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
+from algotrade.services.read.filtering.definitions import FilterRefusedError
+from algotrade.services.read.filtering.facets import Facets, FilterFacet
+from algotrade.services.read.filtering.masks import FilterInput, WindowUnit, Within
+from algotrade.services.read.filtering.served import load_served_filters
 from algotrade.services.read.screens import results as results_module
 from algotrade.services.read.screens import runs as runs_module
 from algotrade.services.read.screens.ideas import (
@@ -22,9 +36,14 @@ from algotrade.services.read.screens.runs import ScreenerRun
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.writers import StoreWriter
+from tests.helpers.rollup_store import write_rows
 from tests.unit.services.read.screens.conftest import (
     CONFIGS,
     D1,
+    IDEAS_FILTERS,
+    T,
     context,
     screens_store,
     write_big_run,
@@ -343,3 +362,298 @@ def test_a_cursor_from_a_viewer_with_other_licences_is_refused_not_shifted(
 
 def _runs(ctx: ReadContext) -> list[ScreenerRun]:
     return [s.run for s in load_ideas(ctx, 1).screeners if s.run is not None]
+
+
+# ---------------------------------------------------------------------- filters (ADR 0082)
+FPICKS = 12
+VOLUME = "rollup.volume@v1.dollar_volume"
+IV = "rollup.ibkr_iv@v1.iv30_ibkr"
+USERS = {
+    "user": [
+        {"id": "admin", "role": "admin"},
+        {"id": "full", "role": "trader", "licences": ["personal", "yahoo"]},
+        {"id": "bare", "role": "trader"},
+    ]
+}
+IV_FILTER = {
+    "id": "iv", "label": "IV", "group": "tradeable", "kind": "range", "field": IV,
+    "bins": [0, 0.5, 1], "guide": "term:filter_spread",
+}  # fmt: skip
+DOCS = {
+    ("site", "settings", "users"): USERS,
+    ("site", "ranking", "ideas"): {"site_top": 50, "user_top": 50},
+    ("site", "filters", "ideas"): {
+        **IDEAS_FILTERS,
+        "filter": [*IDEAS_FILTERS["filter"], IV_FILTER],
+    },
+}
+
+
+def volume(n: int) -> float | None:
+    return (n + 1) * 10_000_000.0 if n < 8 else None
+
+
+def earnings(n: int) -> int | None:
+    return n if n < 6 else None
+
+
+def filter_store(iv: Callable[[int], float | None] = lambda n: 0.1 + n / 20) -> MemoryBackend:
+    backend = screens_store([f"S{n:03d}" for n in range(FPICKS)])
+    write_big_run(backend, FPICKS, frozen=True)
+    w = StoreWriter(backend)
+    # the run recorded the licences of what it read: instrument facts only, open to everyone
+    w.save_run(RunRecord("big", "screen-alpha-site", D1, T + timedelta(hours=3)).finish(
+        T + timedelta(hours=3), stats={"field_licences": {"instrument.status": "open"}}
+    ))  # fmt: skip
+    ids = [f"EQ:S{n:03d}" for n in range(FPICKS)]
+    for table, column, value in (
+        ("volume", "dollar_volume", volume),
+        ("earnings", "days_to_earnings", earnings),
+        ("ibkr_iv", "iv30_ibkr", iv),
+    ):
+        rows = [{"instrument_id": i, column: value(n)} for n, i in enumerate(ids)]
+        write_rows(w, f"rollups/instrument/{table}@v1", D1, rows)
+    return backend
+
+
+@pytest.fixture(scope="module")
+def filter_backend() -> MemoryBackend:
+    return filter_store()
+
+
+def view(filter_backend: MemoryBackend, user: str = "full") -> ReadContext:
+    from algotrade.data import StoreReader  # noqa: PLC0415
+
+    return context(StoreReader(filter_backend), copy.deepcopy(DOCS), user=user)
+
+
+def walk(ctx: ReadContext, filters: list[FilterInput], size: int = 3) -> list[Ideas]:
+    """Every page of the filtered list, following the cursor."""
+    pages, cursor = [], None
+    while True:
+        page = load_ideas(ctx, size, cursor, filters)
+        pages.append(page)
+        cursor = page.next_cursor
+        if cursor is None:
+            return pages
+
+
+def ids(pages: list[Ideas]) -> list[str]:
+    return [i.instrument_id for p in pages for i in p.items]
+
+
+def facet(result: Ideas, filter_id: str) -> FilterFacet:
+    assert result.facets is not None
+    return next(f for f in result.facets.items if f.id == filter_id)
+
+
+def test_a_filter_narrows_the_whole_list_before_it_is_paged(filter_backend: MemoryBackend) -> None:
+    ctx = view(filter_backend)
+    everything = ids(walk(ctx, []))
+    assert len(everything) > FPICKS  # the other screeners' picks too
+    only = [FilterInput("dollar_volume", min=50_000_000)]
+    pages = walk(ctx, only, size=2)  # S004..S007 sit on later pages than the first
+    assert sorted(ids(pages)) == [f"EQ:S{n:03d}" for n in range(4, 8)]
+    assert ids(pages) == [i for i in everything if i in ids(pages)]  # the rule's order
+    assert {p.total for p in pages} == {4}
+    assert all(p.facets is not None and p.facets.total == len(everything) for p in pages)
+    assert all(p.facets is not None and p.facets.matched == 4 for p in pages)
+    assert [len(p.items) for p in pages] == [2, 2]
+
+
+def test_ranks_stay_the_ideas_place_in_the_unfiltered_list(filter_backend: MemoryBackend) -> None:
+    ctx = view(filter_backend)
+    unfiltered = {i.instrument_id: i.rank for p in walk(ctx, []) for i in p.items}
+    page = load_ideas(ctx, 10, None, [FilterInput("dollar_volume", min=50_000_000)])
+    assert all(i.rank == unfiltered[i.instrument_id] for i in page.items)
+
+
+def test_unknown_never_passes_a_filter_and_is_counted(filter_backend: MemoryBackend) -> None:
+    ctx = view(filter_backend)
+    everything = load_ideas(ctx, 100, None, [])
+    zero = load_ideas(ctx, 100, None, [FilterInput("dollar_volume", min=0)])
+    stored = {f"EQ:S{n:03d}" for n in range(8)}
+    assert {i.instrument_id for i in zero.items} == stored  # a min of 0 admits no null
+    assert facet(zero, "dollar_volume").unknown == everything.total - 8
+    window = load_ideas(
+        ctx, 100, None, [FilterInput("earnings", within=Within(100, WindowUnit.SESSIONS))]
+    )
+    assert {i.instrument_id for i in window.items} == {f"EQ:S{n:03d}" for n in range(6)}
+
+
+def test_a_cursor_from_another_filter_set_is_refused_not_shifted(
+    filter_backend: MemoryBackend,
+) -> None:
+    ctx = view(filter_backend)
+    a = [FilterInput("dollar_volume", min=30_000_000)]
+    b = [FilterInput("dollar_volume", min=40_000_000)]
+    cursor = load_ideas(ctx, 1, None, a).next_cursor
+    assert cursor is not None
+    for other in (b, []):
+        with pytest.raises(ConfigurationError, match="changed since"):
+            load_ideas(ctx, 1, cursor, other)
+    assert load_ideas(ctx, 1, cursor, a).items  # the same narrowing continues
+    # a filter that narrows nothing (switched off, or nothing set) does not change the cursor
+    same = [*a, FilterInput("earnings", active=False), FilterInput("agreeing")]
+    assert load_ideas(ctx, 1, cursor, same).items == load_ideas(ctx, 1, cursor, a).items
+
+
+def test_a_filter_the_viewer_is_not_offered_is_refused_before_any_count(
+    filter_backend: MemoryBackend,
+) -> None:
+    bare = view(filter_backend, "bare")
+    served = load_served_filters(bare, "ideas")
+    assert "iv" not in {f.id for f in served.filters}
+    [held] = [w for w in served.withheld if w.id == "iv"]
+    assert held.unavailable.kind.value == "LICENCE" and held.unavailable.features == (IV,)
+    with pytest.raises(FilterRefusedError):
+        load_ideas(bare, 5, None, [FilterInput("iv", min=0.3)])
+    assert "iv" in {
+        f.id for f in load_served_filters(view(filter_backend, "full"), "ideas").filters
+    }
+
+
+def _shape(result: Ideas) -> tuple[object, ...]:
+    """Everything a viewer is told about the list: total, items, every facet."""
+    assert result.facets is not None
+    return (
+        result.total,
+        [i.instrument_id for i in result.items],
+        result.facets,
+        result.next_cursor,
+    )
+
+
+def test_changing_a_hidden_licence_fields_values_changes_no_count() -> None:
+    """The leak test: two stores differing only in the stored ``iv30_ibkr``. The viewer without
+    the personal licence reads the same total, matched, removes, unknown, options and bins from
+    both, with every offered filter set; the holder's own filter does tell them apart."""
+    low, high = filter_store(lambda n: 0.05), filter_store(lambda n: 0.95)
+    inputs = [
+        FilterInput("dollar_volume", min=20_000_000),
+        FilterInput("earnings", within=Within(4, WindowUnit.SESSIONS)),
+        FilterInput("decision", values=["QUALIFIED"]),
+    ]
+    for given in (inputs, [*inputs, FilterInput("dollar_volume", active=False)][:3], []):
+        bare = [_shape(load_ideas(view(b, "bare"), 100, None, given)) for b in (low, high)]
+        assert bare[0] == bare[1]
+    assert all(f.id != "iv" for f in _shape(load_ideas(view(low, "bare"), 5, None, []))[2].items)
+    narrowed = [FilterInput("iv", min=0.5)]
+    seen = [load_ideas(view(b, "full"), 100, None, narrowed).total for b in (low, high)]
+    assert seen[0] != seen[1]  # the holder of the licence reads the values
+
+
+def test_a_hidden_field_is_not_read_for_a_viewer_without_the_licence(
+    monkeypatch: pytest.MonkeyPatch, filter_backend: MemoryBackend
+) -> None:
+    from algotrade.services.read.screens import ideas as module  # noqa: PLC0415
+
+    asked: list[list[str]] = []
+    real = module.load_feature_values
+
+    def spy(ctx: ReadContext, instrument_ids: object, names: list[str], *args: object) -> object:
+        asked.append(list(names))
+        return real(ctx, instrument_ids, names, *args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(module, "load_feature_values", spy)
+    load_ideas(view(filter_backend, "bare"), 5)
+    assert asked and all(IV not in names for names in asked)
+    assert len([n for n in asked if VOLUME in n]) == 1  # one batch read for every filter field
+    asked.clear()
+    load_ideas(view(filter_backend, "full"), 5)
+    assert IV in asked[0]
+
+
+# ------------------------------------------------------------------------- properties
+inputs_strategy = st.lists(
+    st.one_of(
+        st.builds(
+            FilterInput,
+            st.just("dollar_volume"),
+            min=st.none() | st.sampled_from([0, 20e6, 50e6, 90e6]),
+            max=st.none() | st.sampled_from([30e6, 60e6, 100e6]),
+            active=st.booleans(),
+        ),
+        st.builds(
+            FilterInput,
+            st.just("earnings"),
+            within=st.none()
+            | st.builds(Within, st.sampled_from([0, 2, 5, 9]), st.just(WindowUnit.SESSIONS)),
+            active=st.booleans(),
+        ),
+        st.builds(
+            FilterInput,
+            st.just("decision"),
+            values=st.lists(
+                st.sampled_from(["QUALIFIED", "WATCH", "REJECT"]), max_size=3, unique=True
+            ),
+            active=st.booleans(),
+        ),
+    ),
+    max_size=3,
+    unique_by=lambda i: i.id,
+)
+
+
+def _passes(idea_id: str, given: list[FilterInput]) -> bool:
+    n = int(idea_id[4:]) if idea_id.startswith("EQ:S") and idea_id[4:].isdigit() else None
+    for f in given:
+        if not f.active:
+            continue
+        if f.id == "dollar_volume" and (f.min is not None or f.max is not None):
+            v = None if n is None else volume(n)
+            if v is None or (f.min is not None and v < f.min) or (f.max is not None and v > f.max):
+                return False
+        if f.id == "earnings" and f.within is not None:
+            e = None if n is None else earnings(n)
+            if e is None or e > f.within.amount:
+                return False
+    return True
+
+
+@settings(max_examples=40, deadline=None)
+@hypothesis_given(inputs_strategy, st.integers(1, 5))
+def test_the_facets_and_pages_agree_with_an_oracle_over_the_unfiltered_list(
+    given: list[FilterInput], size: int
+) -> None:
+    ctx = view(BACKEND)
+    unfiltered = [i for p in walk(ctx, [], 50) for i in p.items]
+    pages = walk(ctx, given, size)
+    got = [i for p in pages for i in p.items]
+    decisions = next(
+        (f.values for f in given if f.id == "decision" and f.active and f.values), None
+    )
+    expected = [
+        i for i in unfiltered
+        if _passes(i.instrument_id, given) and (decisions is None or i.best.decision in decisions)
+    ]  # fmt: skip
+    assert [i.instrument_id for i in got] == [i.instrument_id for i in expected]
+    assert all(p.total == len(expected) for p in pages)
+    facets: Facets | None = pages[0].facets
+    assert facets is not None
+    assert (facets.total, facets.matched) == (len(unfiltered), len(expected))
+    for f in facets.items:
+        if f.removes is not None:
+            assert f.removes >= 0
+        assert f.unknown >= 0 and all(o.count >= 0 for o in f.options)
+    assert [len(p.items) for p in pages[:-1]] == [size] * (len(pages) - 1)
+
+
+BACKEND = filter_store()
+
+
+def test_a_cursor_is_refused_when_the_values_a_filter_reads_were_rewritten() -> None:
+    """Fix for a review finding: the filters read stored values a later run may rewrite, which
+    moves the list the offset indexes; the stamp carries the tickers the filters left."""
+    given = [FilterInput("earnings", within=Within(100, WindowUnit.SESSIONS))]
+    cursor = load_ideas(view(filter_store()), 2, None, given).next_cursor
+    assert cursor is not None
+    rewritten = filter_store()
+    write_rows(
+        StoreWriter(rewritten),
+        "rollups/instrument/earnings@v1",
+        D1,
+        [{"instrument_id": "EQ:S000", "days_to_earnings": None}],
+    )
+    with pytest.raises(ConfigurationError, match="changed since"):
+        load_ideas(view(rewritten), 2, cursor, given)

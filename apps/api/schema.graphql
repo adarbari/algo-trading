@@ -93,6 +93,15 @@ type Bin {
 }
 
 """
+One bin of a range's histogram: rows from `lo` up to (not including) `hi`, the last bin including `hi`
+"""
+type BinCount {
+  lo: Float!
+  hi: Float!
+  count: Int!
+}
+
+"""
 A day of the window (every session, and a closed day only when an event falls on it) and its events: the names' first, in name order, then the market-wide ones
 """
 type CalendarDay {
@@ -1238,6 +1247,88 @@ type Fill {
   multiplier: Float
 }
 
+"""One value a pick or select offers"""
+type FilterChoice {
+  value: String!
+  label: String!
+}
+
+"""
+One filter of a surface: `guide` is its Guide entry reference (`term:<id>`); `options` the values of a static or enum pick / select (empty: the stored ones, counted in the result's facets); `bins` a range's histogram edges; `windowUnit` what a window counts
+"""
+type FilterDefinition {
+  id: String!
+  label: String!
+  group: FilterGroup!
+  kind: FilterKind!
+  guide: String!
+  options: [FilterChoice!]!
+  bins: [Float!]!
+  windowUnit: WindowUnit
+}
+
+"""
+What one filter tells over the rows passing the OTHER active filters: `removes` the rows it removes (null: not applied), `unknown` the rows whose value it cannot judge (never passing), `options` / `bins` the counts to choose from
+"""
+type FilterFacet {
+  id: String!
+  active: Boolean!
+  removes: Int
+  unknown: Int!
+  options: [OptionCount!]!
+  bins: [BinCount!]!
+}
+
+"""
+The counts of one filtered list, from one masked pass over every row (not the loaded page): `total` rows before the filters, `matched` after them, `items` one entry per offered filter
+"""
+type FilterFacets {
+  total: Int!
+  matched: Int!
+  items: [FilterFacet!]!
+}
+
+"""Where a filter sits in the filter bar"""
+enum FilterGroup {
+  SETUP
+  CHANGED
+  TRADEABLE
+  COMING_UP
+  MORE
+}
+
+"""
+One filter as the viewer set it: `id` names a filter of the surface's `filterSet`; `values` is for a pick, select or toggle (yes / no), `min` and `max` for a range, `within` for a window; `active` false keeps it echoed in the facets and in no mask
+"""
+input FilterInput {
+  id: String!
+  values: [String!]!
+  min: Float = null
+  max: Float = null
+  within: Within = null
+  active: Boolean! = true
+}
+
+"""The control a filter is: how its input is read"""
+enum FilterKind {
+  PICK
+  SELECT
+  TOGGLE
+  RANGE
+  WINDOW
+  PERCENTILE
+}
+
+"""
+The filters of a surface for the viewer: `filters` they may use, in the order a group lists them, and `withheld` the ones they may not
+"""
+type FilterSet {
+  surface: String!
+  label: String!
+  filters: [FilterDefinition!]!
+  withheld: [WithheldFilter!]!
+}
+
 """
 An edge the user follows (or tries as a new version) and its record. `tonight` is what the nightly did for it on the session, so an empty buy list says why: signalled, no_picks (due, the screen qualified none), not_due, skipped (due but could not be signalled: `tonightReason`), not_recording (the nightly ran but the edge is not evidenced or live) or not_run (no nightly run for the session); `missed` the due sessions since the previous night that nobody signalled
 """
@@ -2041,7 +2132,7 @@ type IdeaScreener {
 }
 
 """
-The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
+The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
 """
 type Ideas {
   session: Date!
@@ -2051,6 +2142,7 @@ type Ideas {
   pausedTotal: Int!
   paused: [PausedIdea!]!
   nextCursor: String
+  facets: FilterFacets
 
   """Whether another page follows this one"""
   hasMore: Boolean!
@@ -2395,6 +2487,12 @@ type OptionChain {
   quotes(expiry: Date!): [OptionQuote!]!
 }
 
+"""One value of a pick, select or toggle and how many rows have it"""
+type OptionCount {
+  value: String!
+  count: Int!
+}
+
 """A listed expiry and its calendar days from the session"""
 type OptionExpiry {
   date: Date!
@@ -2614,11 +2712,12 @@ type Query {
   ): EventCalendar
 
   """
-  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
+  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list before it is paged: `total` then counts the ideas that pass, `facets` the counts (ADR 0082); a cursor is only good for the filters it was issued under. Null: nothing stored
   """
   ideas(
     first: Int! = 50
     after: String = null
+    filters: [FilterInput!] = null
 
     """
     the session to read (default: the latest with bars); every value below is for exactly this date
@@ -2672,6 +2771,11 @@ type Query {
   The user's saved view of the table `scope` (`screener:<id>`: a screener's results; the default view, or the one called `name`); null: a scope of no known kind, a screener the user does not see, or nothing stored yet
   """
   view(scope: String!, name: String = null): TableView
+
+  """
+  The filters of `surface` (ideas, screener_results, universe) for the caller: the ones they may use with their options and bins, and the ones a data licence withholds (ADR 0082). Not found: no such surface
+  """
+  filterSet(surface: String!): FilterSet
 
   """
   The caller's feature catalogue (the site's fields plus their own expression features), in catalogue order
@@ -3856,4 +3960,25 @@ type Viewer {
   name: String!
   role: String!
   workspaces: [String!]!
+}
+
+enum WindowUnit {
+  DAYS
+  SESSIONS
+}
+
+"""
+A filter the viewer is not offered (a field under a data licence they do not hold, `unavailable.kind` LICENCE) and is refused if they send it
+"""
+type WithheldFilter {
+  id: String!
+  label: String!
+  group: FilterGroup!
+  unavailable: Unavailable!
+}
+
+"""A window filter's amount and unit: within `amount` days or sessions"""
+input Within {
+  amount: Float!
+  unit: WindowUnit!
 }

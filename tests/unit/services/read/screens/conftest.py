@@ -8,7 +8,8 @@ read must never show, and ``alpha`` ran (``r-1``: AAA REJECT, BBB and CCC QUALIF
 D1's ``alpha`` is compared with). ``rule_screen_values`` hold ``alpha``'s criteria and a
 display column."""
 
-from collections.abc import Mapping
+import tomllib
+from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -22,6 +23,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.writers import StoreWriter
+from tests.conftest import REPO_ROOT
 from tests.helpers.stored_frames import stamped, write_reference
 
 D0, D1 = date(2026, 9, 30), date(2026, 10, 1)
@@ -42,7 +44,10 @@ def _screen(config_id: str, name: str | None = None, version: int = 1) -> dict[s
 
 
 Docs = Mapping[tuple[str, str, str], Mapping[str, Any]]
+# the shipped filter definitions of the Ideas surface (ADR 0082): the loader reads them
+IDEAS_FILTERS = tomllib.loads((REPO_ROOT / "config/site/filters/ideas.toml").read_text())
 CONFIGS: Docs = {
+    ("site", "filters", "ideas"): IDEAS_FILTERS,
     ("site", "selections", "all_active"): {
         "name": "all_active",
         "where": {"all": [{"field": "instrument.status", "op": "eq", "value": "ACTIVE"}]},
@@ -107,11 +112,12 @@ def backend() -> MemoryBackend:
     return screens_store()
 
 
-def screens_store() -> MemoryBackend:
-    """The small store of this folder's tests (also built by the warm-path test)."""
+def screens_store(extra_symbols: Sequence[str] = ()) -> MemoryBackend:
+    """The small store of this folder's tests (also built by the warm-path test);
+    ``extra_symbols``: more names in the reference snapshot."""
     store = MemoryBackend()
     w = StoreWriter(store)
-    write_reference(w, D0, {s: f"EQ:{s}" for s in SYMBOLS})
+    write_reference(w, D0, {s: f"EQ:{s}" for s in (*SYMBOLS, *extra_symbols)})
     for day in (D0, D1):
         bar = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), "open": 1.0,
                "high": 1.0, "low": 1.0, "close": 1.0, "volume": 1.0}  # fmt: skip
