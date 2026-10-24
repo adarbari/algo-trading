@@ -446,12 +446,10 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
       // The list: each edge's row and the headline of its verdict, as the server's `summary`,
       // narrowed by the search and the `mine` / `followed` / `status` filters, with their counts.
       const all = EDGES as EdgesPageData;
-      const needle = String(body?.variables?.q ?? '').toLowerCase();
+      const needle = (body?.variables?.q ?? '').toLowerCase();
       const found = [...all.data.edges, ...copies].filter((e) =>
         [e['id'], e['name'], e['thesis']].some((t) =>
-          String(t ?? '')
-            .toLowerCase()
-            .includes(needle),
+          (typeof t === 'string' ? t : '').toLowerCase().includes(needle),
         ),
       );
       const filters = (body?.variables?.filters ?? []) as {

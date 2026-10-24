@@ -145,7 +145,8 @@ export async function mockBuilderApi(
       CONFIGS.map((c) => [String(c['configId']), c['scope'] === 'site' ? 'site' : 'mine']),
     );
     for (const id of own) owners.set(id, 'mine');
-    const needle = String(variables['q'] ?? '').toLowerCase();
+    const q = variables['q'];
+    const needle = typeof q === 'string' ? q.toLowerCase() : '';
     const found = [...owners.keys()].filter((id) => id.toLowerCase().includes(needle)).sort();
     const filters = (variables['filters'] ?? []) as {
       id: string;
