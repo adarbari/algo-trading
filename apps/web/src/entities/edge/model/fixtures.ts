@@ -93,6 +93,7 @@ const edge = (over: Record<string, unknown>) => ({
   },
   verdict: verdict({}),
   canonicalRun: null,
+  provenance: null,
   runs: [],
   ...over,
 });
@@ -259,6 +260,11 @@ export const EDGES_FIXTURE = {
         ],
       }),
       canonicalRun: { runId: 'run-frozen', knowledgeTs: '2026-10-05T02:00:00+00:00' },
+      provenance: {
+        state: 'CURRENT',
+        line: 'Evaluated 2 Oct, run 1',
+        runId: null,
+      },
       runs: [
         {
           runId: 'run-frozen',

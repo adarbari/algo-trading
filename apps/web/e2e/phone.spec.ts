@@ -351,8 +351,11 @@ test('Edges: a tapped edge opens its page', async ({ page }) => {
   await page.goto('/edges');
   await page.getByRole('row', { name: /Momentum 12-1/ }).tap();
   await expect(page.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeVisible();
-  await expect(page.getByText('+7.0 pts').first()).toBeVisible();
+  // The evaluation line wraps inside the screen like the rest of the head.
+  await expect(page.getByText(/^Evaluated 2 Oct, 8 sessions ago\./)).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Run backtest' })).toBeVisible();
+  await page.mouse.wheel(0, 400); // the sections load as they are reached
+  await expect(page.getByText('+7.0 pts').first()).toBeVisible();
   const fits = async () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       page.viewportSize()?.width ?? 0,

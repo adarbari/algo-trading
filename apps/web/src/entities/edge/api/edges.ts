@@ -4,7 +4,7 @@
  * files that did not load (`Query.edgeProblems`); no verdict is judged in full for it. One edge
  * (`EdgeDetail`): the edge in full, the verdict (judged by the read model on the official result,
  * the canonical run: the sentence, the figures, the criteria, the year rows, the in-sample decile
- * means and the lift among random-pick backtests), how it is defined, its sources, and every run
+ * means and the lift among random-pick backtests, and the provenance line: which evaluation it rests on and whether it is current), how it is defined, its sources, and every run
  * the user sees so exploratory ones can be listed and labelled. The cache holds the responses.
  */
 import { keepPreviousData, queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
@@ -242,6 +242,11 @@ const EdgeDetail = graphql(`
       canonicalRun {
         runId
         knowledgeTs
+      }
+      provenance {
+        state
+        line
+        runId
       }
       runs {
         runId

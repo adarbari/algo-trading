@@ -1,7 +1,8 @@
 /**
  * The head of an edge's page: its name, verdict (with the server's reason), whose edge it is, its
  * status and live state, the date of the official result and the data it read, the actions, the
- * headline sentence, and what would change the verdict (the evidence collected against the
+ * headline sentence, the evaluation line (which run the verdict rests on and whether it is current),
+ * and what would change the verdict (the evidence collected against the
  * evidence needed, and the checks that the result is real). The first paint of the page: it
  * reads only the edges the page already holds. A site edge has a button to its Guide entry. Each term carries its Guide button; every word and
  * number is the server's.
@@ -24,6 +25,7 @@ import { EdgeActions } from '@/features/edge-follow';
 import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { EdgeOutlook } from './EdgeOutlook';
+import { EdgeProvenance } from './EdgeProvenance';
 
 export interface EdgeHeaderProps {
   /** The chosen edge. */
@@ -112,6 +114,7 @@ export function EdgeHeader({ edge, onBack, onEdit }: EdgeHeaderProps) {
           </Stack>
         </Stack>
         <Text size="base">{v.headline}</Text>
+        {edge.provenance && <EdgeProvenance provenance={edge.provenance} />}
         {v.basisWhy && (
           <Text size="sm" tone="muted">
             {v.basisWhy}
