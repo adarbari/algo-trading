@@ -732,5 +732,14 @@ follow-up PR).
 - Options: raise to 26270 (CI + 95 B margin) / shave by reshuffling chunks (fragile) / drop lazy loading.
 - Decision: raise `bundle.entry_gzip_bytes` 26170 to 26270 through the `waivers` map (ceiling 26270); the entry-plus-static-imports budget is unchanged.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: overruled
 - Reasoning: no code to trim; the same shared filter-bar precedent as #924 and #940 and the noise band of #915 and #902.
+- Note: superseded by the next entry (ceiling 26240, not 26270).
+
+## 2026-10-24 | Views on every filter bar PR (#957) | Entry budget raised by the views route state
+- Question: #957 fails `bundle.entry_gzip_bytes` by 5 B (CI 26175 B vs 26170; local 26142 B vs main 26132 B, +10 B of filter-bar shared code). Trim, or raise?
+- Options: lazy-load the views route state / raise the entry budget under the filter-bar pre-approval.
+- Decision: waiver of the shared rule for the entry budget only: 26170 to 26240 B (+70 B margin for CI), through the `waivers` map. The filter-bar pre-approval (#924) stands for route budgets and, for the entry chunk, only for measured filter-bar route/shared code at measured + 100 B at most, logged each time; 300 B or more in one PR lazy-loads instead.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the cost is the shared filter bar's route state (ADR 0082), the same class the owner waived twice; 5 B is CI/local gzip drift, not weight.
