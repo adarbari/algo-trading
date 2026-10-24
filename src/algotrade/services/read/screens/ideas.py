@@ -26,12 +26,20 @@ state is refused, never a shifted page), ``next_cursor`` says where the next pag
 picks are ranked from each run's ``results/screen_picks`` file (a few columns of the picked rows,
 never the run's every row); a run with no such file but picks (a run before the table) is ranked
 from its ``rule_screen`` rows, never read as having no picks. Only the page's best picks (and the
-screeners' first picks) have their stored values read. The paused section is the first page's."""
+screeners' first picks) have their stored values read. The paused section is the first page's.
+
+Filtered (ADR 0082, surface ``ideas``): the ``filters`` the viewer set narrow the WHOLE ranked list
+before it is paged (never the loaded page), from one masked pass over a frame of every ranked idea
+(the surface's columns from the rule's picks, each catalogue-field filter's values in one batch
+read under the viewer's licences: a field the viewer may not use has no filter and no column, so a
+count never leaks it). ``total`` is then the matched count, ``Ideas.facets`` carries the counts
+(``facets.total`` the unfiltered ones), ``rank`` stays the idea's place in the unfiltered rule, and
+the cursor's fingerprint carries the filters' hash (a cursor from another filter set is refused)."""
 
 import base64
 import binascii
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -40,6 +48,7 @@ import pandas as pd
 from algotrade.config.ranking.ideas import IdeasRule, load_ideas_rule
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.predicates import FieldValue
 from algotrade.services.ideas.rule import (
     NOT_RUN,
     RAN,
@@ -49,11 +58,16 @@ from algotrade.services.ideas.rule import (
     PoolRow,
     PoolRun,
     PoolStanding,
+    RankedIdea,
     pool_standing,
     rank_ideas,
     rank_paused,
 )
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.filtering.definitions import ResolvedFilters
+from algotrade.services.read.filtering.facets import Facets, compute_facets
+from algotrade.services.read.filtering.masks import Cell, FilterInput, filter_hash
+from algotrade.services.read.filtering.served import load_served_filters
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -69,6 +83,7 @@ from algotrade.services.read.screens.screeners import Screener, load_screeners
 from algotrade.services.read.values import Unknown, to_scalar
 from algotrade.services.screening.rule_results import PAUSED
 
+SURFACE = "ideas"  # config/site/filters/ideas.toml
 FIRST_PAGE = 50  # the page the Ideas page loads first and each "more" adds
 LIQUIDITY_RISK = "LIQUIDITY_RISK"  # a decision (ADR 0054) that is also a watch-out id
 WATCH_LIQUIDITY = "liquidity_risk"
@@ -155,7 +170,8 @@ class PausedIdea:
 @dataclass(frozen=True)
 class Ideas:
     """``screeners``: the viewer's screeners (their own first, then by id); ``total``: every
-    ticker the rule listed (``items`` holds one page of it, ``next_cursor`` the next);
+    ticker the rule listed that the filters leave (``items`` holds one page of it,
+    ``next_cursor`` the next; ``facets.total`` counts them before the filters);
     ``paused_total``: every pick the gate held back (``paused`` holds the first ``limit`` of the
     rule's paused section); ``rule_hash``: the ranking rule's parameters' hash."""
 
@@ -167,6 +183,7 @@ class Ideas:
     paused: tuple[PausedIdea, ...] = ()
     next_cursor: str | None = None  # where the next page starts (None: this is the last)
     rule_hash: str = ""
+    facets: Facets | None = None  # None only for a caller that built the object itself
 
 
 def _pool(
@@ -221,11 +238,15 @@ def _rows(frame: pd.DataFrame) -> tuple[PoolRow, ...]:
     )
 
 
-def _fingerprint(session: date, pool: Sequence[PoolRun], rule: IdeasRule) -> str:
+def _fingerprint(
+    session: date, pool: Sequence[PoolRun], rule: IdeasRule, filters: str, matched: Sequence[str]
+) -> str:
     """What a cursor is only good for: the session, the runs with their status (a withheld run
-    is another pool) and the rule's parameters."""
+    is another pool), the rule's parameters, the hash of the filters and the tickers they left
+    (the filters read stored values a later run may rewrite: the offset indexes that list)."""
     runs = sorted(f"{r.run_id}:{r.status}" for r in pool if r.run_id is not None)
-    text = "|".join([session.isoformat(), *runs, "/", rule.hash])
+    left = hashlib.sha256(",".join(matched).encode()).hexdigest()[:12]
+    text = "|".join([session.isoformat(), *runs, "/", rule.hash, filters, left])
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
@@ -311,18 +332,65 @@ def _standing(
     )
 
 
-def load_ideas(ctx: ReadContext, limit: int, after: str | None = None) -> Ideas:
-    """``limit`` ideas of the viewer's screeners' runs for ``ctx.session``, best first, from the
-    ``after`` cursor (none: the first page); ``Ideas.next_cursor`` is the next page's."""
+_COLUMNS: dict[str, Callable[[RankedIdea], FieldValue | tuple[FieldValue, ...]]] = {
+    "decision": lambda i: i.best.decision,
+    "screener": lambda i: tuple(p.config_id for p in i.picked_by),
+    "agreeing": lambda i: len(i.picked_by),
+}  # the [[column]]s of config/site/filters/ideas.toml
+
+
+def _frame(
+    ctx: ReadContext, resolved: ResolvedFilters, ranked: Sequence[RankedIdea]
+) -> dict[str, list[Cell]]:
+    """The columns of every offered filter over ``ranked``: the surface's own columns from the
+    rule's picks, the catalogue fields' values in one batch read (``load_feature_values`` hides
+    a field the viewer's licences do not cover, and ``resolved`` offers none)."""
+    frame: dict[str, list[Cell]] = {}
+    names: list[str] = []
+    for f in resolved.offered:
+        if f.column_id is None:
+            names.append(f.field)
+        elif f.column_id in _COLUMNS:
+            pick = _COLUMNS[f.column_id]
+            frame[f.field] = [pick(i) for i in ranked]
+        else:
+            raise ConfigurationError(f"filters/{SURFACE}.toml: no column {f.column_id!r} is built")
+    names = list(dict.fromkeys(names))
+    if names:
+        found = load_feature_values(ctx, [i.instrument_id for i in ranked], names) if ranked else {}
+        for k, name in enumerate(names):
+            frame[name] = [found[i.instrument_id][k].value for i in ranked]
+    return frame
+
+
+def load_ideas(
+    ctx: ReadContext,
+    limit: int,
+    after: str | None = None,
+    filters: Sequence[FilterInput] = (),
+) -> Ideas:
+    """``limit`` ideas of the viewer's screeners' runs for ``ctx.session`` that pass ``filters``,
+    best first, from the ``after`` cursor (none: the first page); ``Ideas.next_cursor`` is the
+    next page's. ``FilterRefusedError`` for a filter the viewer is not offered."""
     rule = load_ideas_rule(ctx.configs)
+    resolved = load_served_filters(ctx, SURFACE, ctx.session.date).resolved
+    resolved.check(i.id for i in filters)  # before any read: a hidden filter is refused whole
     screeners = load_screeners(ctx)
     latest = load_latest_runs(ctx, [(s.owner, s.id) for s in screeners])
     pool, scores = _pool(ctx, screeners, latest)
-    stamp = _fingerprint(ctx.session.date, pool, rule)
-    start = decode_cursor(after, stamp)
     ranked = rank_ideas(pool, rule)
+    facets = compute_facets(_frame(ctx, resolved, ranked), len(ranked), resolved, filters)
+    matched = [ranked[i] for i in facets.matched_rows]
+    stamp = _fingerprint(
+        ctx.session.date,
+        pool,
+        rule,
+        filter_hash(resolved, filters),
+        [i.instrument_id for i in matched],
+    )
+    start = decode_cursor(after, stamp)
     end = start + max(limit, 0)
-    shown = ranked[start:end]
+    shown = matched[start:end]
     standings = pool_standing(pool, rule)
     held: list[PausedPick] = rank_paused(pool, rule)[: max(limit, 0)] if start == 0 else []
     wanted: dict[str, list[str]] = {}
@@ -371,7 +439,15 @@ def load_ideas(ctx: ReadContext, limit: int, after: str | None = None) -> Ideas:
     )
     read = {p.run_id for p in pool if p.status == RAN}  # a withheld run's held rows are not counted
     paused_total = sum(r.paused for r in runs if r.run_id in read)
-    more = encode_cursor(stamp, end) if end < len(ranked) and shown else None
+    more = encode_cursor(stamp, end) if end < len(matched) and shown else None
     return Ideas(
-        ctx.session.date, listed, len(ranked), tuple(items), paused_total, paused, more, rule.hash
+        ctx.session.date,
+        listed,
+        len(matched),
+        tuple(items),
+        paused_total,
+        paused,
+        more,
+        rule.hash,
+        facets,
     )

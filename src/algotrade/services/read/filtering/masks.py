@@ -7,8 +7,10 @@ A cell may hold a tuple (a row picked by several screeners): the row passes a pi
 them does. A switched-off filter (``active`` false) and one with nothing set are in no mask.
 Pure and deterministic: no clock, no randomness."""
 
+import hashlib
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 
 from algotrade.config.filters.definitions import FilterDefinition
 from algotrade.core.model.predicates import FieldValue, Rule, Truth, evaluate_rule, is_missing
@@ -19,16 +21,32 @@ type Frame = Mapping[str, Sequence[Cell]]  # the rows as columns, by definition 
 YES, NO = "yes", "no"  # a toggle's values
 
 
+class WindowUnit(StrEnum):
+    """What a window filter counts (the definition's ``window_unit``, in upper case)."""
+
+    DAYS = "days"
+    SESSIONS = "sessions"
+
+
+@dataclass(frozen=True)
+class Within:
+    """A window's input: within ``amount`` of ``unit``."""
+
+    amount: float
+    unit: WindowUnit
+
+
 @dataclass(frozen=True)
 class FilterInput:
-    """One filter as the viewer set it (the GraphQL ``FilterInput``): ``values`` for a pick,
-    select or toggle, ``min`` / ``max`` for a range, ``within`` (amount, unit) for a window."""
+    """One filter as the viewer set it (the GraphQL ``FilterInput``, built on this class):
+    ``values`` for a pick, select or toggle, ``min`` / ``max`` for a range, ``within`` for a
+    window; ``active`` false keeps it echoed and in no mask."""
 
     id: str
-    values: tuple[str, ...] = ()
+    values: list[str] = field(default_factory=list)
     min: float | None = None
     max: float | None = None
-    within: tuple[float, str] | None = None
+    within: Within | None = None
     active: bool = True
 
 
@@ -44,7 +62,7 @@ def _range_rule(field: str, given: FilterInput) -> Rule | None:
 def _window_rule(definition: FilterDefinition, given: FilterInput) -> Rule | None:
     if given.within is None:
         return None
-    amount, unit = given.within
+    amount, unit = given.within.amount, given.within.unit.value
     if unit != definition.window_unit:
         raise FilterRefusedError(f"{definition.id}: counts {definition.window_unit}, not {unit}")
     return Rule(definition.field, "between", (0, amount))
@@ -132,3 +150,19 @@ def evaluate_filters(
         cells = [as_text(c) for c in column] if is_text_kind(definition) else column
         out[given.id] = [truth_of(rule, cell) for cell in cells]
     return out
+
+
+def filter_hash(resolved: ResolvedFilters, inputs: Sequence[FilterInput]) -> str:
+    """A short hash of what the inputs do to the rows (ADR 0082 decision 3: a paging cursor
+    carries it). Only an active input that sets something counts, in id order, so the same
+    narrowing hashes the same however it was sent; a switched-off filter, an empty one and the
+    order of the inputs change nothing, and no input is ``""`` (the unfiltered list)."""
+    applied = []
+    for given in sorted(inputs, key=lambda i: i.id):
+        definition = resolved.get(given.id)
+        if definition is None or not given.active or rule_for(definition, given) is None:
+            continue
+        applied.append(repr((given.id, sorted(given.values), given.min, given.max, given.within)))
+    if not applied:
+        return ""
+    return hashlib.sha256("|".join(applied).encode()).hexdigest()[:12]

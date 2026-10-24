@@ -9,7 +9,12 @@ from algotrade.config.filters.definitions import parse_filter_set
 from algotrade.core.model.predicates import is_missing
 from algotrade.services.read.filtering.definitions import ResolvedFilters
 from algotrade.services.read.filtering.facets import compute_facets
-from algotrade.services.read.filtering.masks import FilterInput, evaluate_filters
+from algotrade.services.read.filtering.masks import (
+    FilterInput,
+    WindowUnit,
+    Within,
+    evaluate_filters,
+)
 from tests.unit.services.read.filtering.conftest import SURFACE
 
 FILTER_SET = parse_filter_set("things", SURFACE)
@@ -55,7 +60,7 @@ INPUTS = st.fixed_dictionaries(
         "soon": st.builds(
             FilterInput,
             st.just("soon"),
-            within=st.tuples(st.integers(0, 12).map(float), st.just("sessions")),
+            within=st.builds(Within, st.integers(0, 12).map(float), st.just(WindowUnit.SESSIONS)),
             active=st.booleans(),
         ),
         "grade": st.builds(
@@ -98,7 +103,7 @@ def test_removes_is_the_rows_passing_the_others_minus_matched(frame, inputs) -> 
     matched = passing(frame, inputs)
     assert result.matched == len(matched) and set(result.matched_rows) == matched
     applied = evaluate_filters(frame, n, RESOLVED, inputs)
-    for f in result.filters:
+    for f in result.items:
         if f.id in applied:
             assert f.removes == len(passing(frame, inputs, skip=f.id)) - len(matched)
         else:
@@ -126,7 +131,7 @@ def test_a_switched_off_filter_changes_nothing_but_its_own_echo(frame, inputs) -
     dropped = compute_facets(frame, n, RESOLVED, [])
     result = compute_facets(frame, n, RESOLVED, off)
     assert (result.matched, result.matched_rows) == (dropped.matched, dropped.matched_rows)
-    for f, g in zip(result.filters, dropped.filters, strict=True):
+    for f, g in zip(result.items, dropped.items, strict=True):
         assert (f.removes, f.unknown, f.options, f.bins) == (
             g.removes,
             g.unknown,
