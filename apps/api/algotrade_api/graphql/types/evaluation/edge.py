@@ -346,8 +346,6 @@ class Edge:
     )
     async def provenance(self, info: Info) -> EdgeProvenance | None:
         read = await info.context.aread(None)  # the served session: line, age and in-flight job
-        if read is None:
-            return None
         found = await off_loop(provenance.load_verdict_provenance, read, self.edge)
         return EdgeProvenance.of(found) if found is not None else None
 

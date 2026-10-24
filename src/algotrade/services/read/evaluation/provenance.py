@@ -141,10 +141,13 @@ def _line(
     return text
 
 
-def load_verdict_provenance(ctx: ReadContext, edge: Edge) -> Provenance | None:
+def load_verdict_provenance(ctx: ReadContext | None, edge: Edge) -> Provenance | None:
     """The provenance of ``edge``'s verdict: of the run it is judged on (the canonical run of a
-    site edge, the user's latest of their own); None when there is no run, or when the run is
-    newer than the request's session (a pinned older session: nothing honest to say about it)."""
+    site edge, the user's latest of their own); None when there is no served session (an empty
+    store), no run, or when the run is newer than the request's session (a pinned older session:
+    nothing honest to say about it)."""
+    if ctx is None:
+        return None
     run = versions.own_run(ctx, edge) if edge.mine else runs.load_canonical_run(ctx, edge).run
     if run is None:
         return None

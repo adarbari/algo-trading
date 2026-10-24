@@ -6,8 +6,10 @@
  */
 import { Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
 
-import { provenanceLabel, provenanceTerm, provenanceTone, type Edge } from '@/entities/edge';
+import type { Edge } from '@/entities/edge';
 import { termHelp } from '@/features/guide-help';
+
+import { provenanceLabel, provenanceTerm, provenanceTone } from '../model/provenance';
 
 export interface EdgeProvenanceProps {
   /** The server's provenance of the verdict's evaluation. */
