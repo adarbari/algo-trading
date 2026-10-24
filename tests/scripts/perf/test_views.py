@@ -820,3 +820,25 @@ def test_a_broken_exception_file_or_web_walk_cannot_crash_or_change_the_verdict(
     assert "COVERAGE unavailable" in capsys.readouterr().out
     monkeypatch.setattr(cov.wpo, "all_query_ops", lambda *_: 1 / 0)
     assert fb.report_sets({}, {}, {}, False) == {}
+
+
+def test_every_measured_operation_has_a_resolvable_variable_set(
+    gate_op_set: tuple[dict, dict],
+) -> None:
+    """Fitness: each timed operation either carries every required variable or has a
+    `VARIABLE_RESOLVERS` entry that fills it from the clone; an `empty_ok` name is a real web
+    operation. This would NOT have caught hand run 9b's `EdgeProblems` (a variable-less operation
+    that answers empty by design): an empty answer shows only against the store. Such an answer
+    needs `empty_ok` in benchmarks/perf_bar.toml (owner approval, docs/decisions/log.md); missing
+    variables need a resolver in fast_bench.py."""
+    fb = _load("fast_bench", "fast_bench.py")
+    distinct, _ = gate_op_set
+    gaps = []
+    for d in distinct.values():
+        required = fb.pdocs.required_variables(d["query"])
+        resolved = set(fb.VARIABLE_RESOLVERS.get(d["name"], {}))
+        if missing := sorted(v for v in required if v not in d["variables"] and v not in resolved):
+            gaps.append(f"{d['name']}: no value or resolver for {missing}")
+    assert not gaps, "\n".join(gaps)
+    empty_ok = set(fb.load_bar().get("empty_ok", []))
+    assert empty_ok <= wpo.all_query_ops(WEB_SRC), "empty_ok names an operation the web lacks"
