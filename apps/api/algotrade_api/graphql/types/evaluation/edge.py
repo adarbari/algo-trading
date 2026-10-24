@@ -262,6 +262,13 @@ class Edge:
             cache={} if summary is None else {"summary": summary},
         )
 
+    async def _summary(self) -> verdict_model.EdgeSummary:
+        """The headline: the one a list read and seeded, else read here (off the event loop)."""
+        seeded: verdict_model.EdgeSummary | None = self.cache.get("summary")
+        if seeded is not None:
+            return seeded
+        return await off_loop(versions.load_summary, self.ctx, self.edge)
+
     async def _canonical(self) -> runs.CanonicalRun:
         """The canonical run, read once per Edge object (off the event loop)."""
         if "canonical" not in self.cache:
@@ -316,10 +323,7 @@ class Edge:
         "always equal to those fields of `verdict`, read without the pieces a list never shows"
     )
     async def summary(self, info: Info) -> EdgeSummary:
-        seeded: verdict_model.EdgeSummary | None = self.cache.get("summary")
-        if seeded is not None:
-            return EdgeSummary.of(seeded)
-        return EdgeSummary.of(await off_loop(versions.load_summary, self.ctx, self.edge))
+        return EdgeSummary.of(await self._summary())
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's own edge against the edge it extends and its baselines, "
