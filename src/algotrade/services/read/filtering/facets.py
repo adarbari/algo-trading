@@ -12,9 +12,11 @@ the last, ``[lo, hi]``, so a value outside the first and last edge is in none (a
 not a number: it is in no bin); a toggle's options
 are yes / no; ``unknown`` counts rows whose value for the filter is UNKNOWN (never passing)."""
 
+import math
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 
 from algotrade.config.filters.definitions import FilterDefinition
 from algotrade.core.model.predicates import Truth, is_missing
@@ -92,9 +94,39 @@ def _option_counts(
     )
 
 
+def _numbers(column: Sequence[Cell], rows: Sequence[int]) -> list[float]:
+    return [
+        float(v)
+        for i in rows
+        if not isinstance(v := column[i], bool)
+        and isinstance(v, int | float)
+        and not is_missing(v)
+        and math.isfinite(v)
+    ]
+
+
+def nice_edges(values: Sequence[float], bins: int = 10) -> tuple[float, ...]:
+    """Fixed-looking histogram edges for a range that declares none (a filter made on the fly): a
+    step of 1, 2 or 5 times a power of ten, about ``bins`` of them over the values; the same values
+    give the same edges. Empty (no histogram) for fewer than two distinct values."""
+    if len(set(values)) < 2:
+        return ()
+    low, high = min(values), max(values)
+    raw = (high - low) / bins
+    power = 10 ** math.floor(math.log10(raw))
+    step = next(m * power for m in (1, 2, 5, 10) if m * power >= raw)
+    start = math.floor(low / step)
+    stop = math.ceil(high / step)
+    digits = max(12, 3 - math.floor(math.log10(step)))
+    edges = tuple(round(k * step, digits) for k in range(start, stop + 1))
+    return edges if all(a < b for a, b in pairwise(edges)) else ()
+
+
 def _bin_counts(
     edges: Sequence[float], column: Sequence[Cell], rows: Sequence[int]
 ) -> tuple[BinCount, ...]:
+    if len(edges) < 2:
+        return ()
     counts = [0] * (len(edges) - 1)
     last = len(counts) - 1
     for i in rows:
@@ -141,7 +173,8 @@ def compute_facets(
         if definition.kind in ("pick", "select", "toggle"):
             options = _option_counts(definition, column, rows)
         elif definition.kind == "range":
-            bins = _bin_counts(definition.bins, column, rows)
+            edges = definition.bins or nice_edges(_numbers(column, range(len(column))))
+            bins = _bin_counts(edges, column, rows)
         probe = probe_rule(definition)
         cells = [as_text(c) for c in column] if is_text_kind(definition) else column
         unknown = sum(1 for i in rows if truth_of(probe, cells[i]) is None)

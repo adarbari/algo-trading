@@ -7,34 +7,25 @@
  * Filters sheet ("Show N results"). Every name and count is the server's or the Guide's; the
  * caller supplies only the help button for a Guide entry (a feature cannot import another).
  */
-import { Button, FilterBar, FilterChips, FilterGroupButton, Stack } from '@algotrade/ui';
-import type { ReactNode } from 'react';
+import { Button, FilterBar, FilterChips, FilterGroupButton } from '@algotrade/ui';
+import { lazy, Suspense, useState, type ReactNode } from 'react';
 
 import {
+  FEATURE_FILTER_PREFIX,
   FILTER_GROUPS,
   useFilterSet,
-  type FilterDefinition,
   type FilterFacets,
   type FilterGroup,
 } from '@/entities/filter';
 
 import type { FilterStateApi } from '../api/use-filter-state';
 import { chipItems, countLine, groupCounts, type LabelOf } from '../model/surface';
-import { FilterControl } from './FilterControl';
+import { FilterControls, type GuideRef } from './FilterControls';
 
-/** A Guide entry reference as the definitions carry it (`term:filter_decision`). */
-export interface GuideRef {
-  kind: string;
-  id: string;
-}
+// The search and the catalogue behind it load when "More filters" first opens.
+const MoreFilters = lazy(() => import('./MoreFilters').then((m) => ({ default: m.MoreFilters })));
 
-/** The Guide term that says what an unknown row is (shown beside a range's unknown count). */
-const UNKNOWN_ROWS: GuideRef = { kind: 'term', id: 'filter_unknown_rows' };
-
-export function parseGuideRef(ref: string): GuideRef {
-  const at = ref.indexOf(':');
-  return at < 0 ? { kind: 'term', id: ref } : { kind: ref.slice(0, at), id: ref.slice(at + 1) };
-}
+export { parseGuideRef, type GuideRef } from './FilterControls';
 
 export interface SurfaceFilterBarProps {
   /** The surface name (`ideas`): the key of its definitions. */
@@ -52,42 +43,6 @@ export interface SurfaceFilterBarProps {
   labelOf?: LabelOf;
 }
 
-function Controls({
-  definitions,
-  state,
-  facets,
-  help,
-  labelOf,
-}: {
-  definitions: readonly FilterDefinition[];
-  state: FilterStateApi;
-  facets: FilterFacets | null | undefined;
-  help: SurfaceFilterBarProps['help'];
-  labelOf: LabelOf | undefined;
-}) {
-  return (
-    <Stack gap={3}>
-      {definitions.map((definition) => (
-        <FilterControl
-          key={definition.id}
-          definition={definition}
-          filter={state.filters.find((f) => f.id === definition.id)}
-          facet={facets?.items.find((f) => f.id === definition.id)}
-          onChange={(patch) => {
-            state.set(definition.id, patch);
-          }}
-          onRemove={() => {
-            state.remove(definition.id);
-          }}
-          help={help?.(parseGuideRef(definition.guide))}
-          unknownHelp={help?.(UNKNOWN_ROWS)}
-          {...(labelOf && { labelOf })}
-        />
-      ))}
-    </Stack>
-  );
-}
-
 export function SurfaceFilterBar({
   surface,
   state,
@@ -97,7 +52,15 @@ export function SurfaceFilterBar({
   actions,
   labelOf,
 }: SurfaceFilterBarProps) {
-  const set = useFilterSet(surface);
+  const [pending, setPending] = useState<readonly string[]>([]);
+  const fields = [
+    ...state.filters
+      .filter((f) => f.id.startsWith(FEATURE_FILTER_PREFIX))
+      .map((f) => f.id.slice(FEATURE_FILTER_PREFIX.length)),
+    ...pending,
+  ];
+  const set = useFilterSet(surface, [...new Set(fields)]);
+  const searchable = set.data?.filterSet?.searchable ?? false;
   const definitions = set.data?.filterSet?.filters ?? [];
   const counts = groupCounts(state.filters, definitions);
   const inGroup = (group: FilterGroup) => definitions.filter((d) => d.group === group);
@@ -114,7 +77,7 @@ export function SurfaceFilterBar({
           label={group.label}
           activeCount={counts.get(group.id) ?? 0}
         >
-          <Controls
+          <FilterControls
             definitions={inGroup(group.id)}
             state={state}
             facets={facets}
@@ -123,17 +86,37 @@ export function SurfaceFilterBar({
           />
         </FilterGroupButton>
       ))}
-      {...(more.length > 0 && {
-        more: (
-          <Controls
-            definitions={more}
-            state={state}
-            facets={facets}
-            help={help}
-            labelOf={labelOf}
-          />
-        ),
-      })}
+      {...(searchable
+        ? {
+            more: (
+              <Suspense fallback={null}>
+                <MoreFilters
+                  surface={surface}
+                  definitions={more}
+                  state={state}
+                  facets={facets}
+                  help={help}
+                  labelOf={labelOf}
+                  pending={pending}
+                  onPick={(field) => {
+                    setPending((now) => [...now, field]);
+                  }}
+                />
+              </Suspense>
+            ),
+          }
+        : more.length > 0 && {
+            more: (
+              <FilterControls
+                definitions={more}
+                state={state}
+                facets={facets}
+                help={help}
+                labelOf={labelOf}
+              />
+            ),
+          })}
+      moreLabel="More filters"
       active={
         state.filters.length > 0 ? (
           <FilterChips

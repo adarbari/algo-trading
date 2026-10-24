@@ -32,10 +32,12 @@ export function valueText(
 ): string {
   if (filter.within) return `≤ ${num(filter.within.amount)} ${filter.within.unit}`;
   if (filter.min !== undefined || filter.max !== undefined) {
+    const percent = definition?.unit === 'PERCENT';
+    const n = (v: number) => (percent ? `${num(Number((v * 100).toPrecision(12)))}%` : num(v));
     if (filter.min !== undefined && filter.max !== undefined) {
-      return `${num(filter.min)}–${num(filter.max)}`;
+      return `${n(filter.min)}–${n(filter.max)}`;
     }
-    return filter.min !== undefined ? `≥ ${num(filter.min)}` : `≤ ${num(filter.max ?? 0)}`;
+    return filter.min !== undefined ? `≥ ${n(filter.min)}` : `≤ ${n(filter.max ?? 0)}`;
   }
   const labels = new Map((definition?.options ?? []).map((o) => [o.value, o.label]));
   return (filter.values ?? []).map((v) => labelOf?.(filter.id, v) ?? labels.get(v) ?? v).join(', ');

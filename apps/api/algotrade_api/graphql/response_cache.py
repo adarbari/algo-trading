@@ -256,6 +256,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "FeatureCatalogue",
         "FeatureCatalogueDetail",
         "InstrumentFacts",
+        "FilterFeatures",  # the fields the caller may pick as filters: licence-gated (ADR 0082)
         "FilterSet",  # the filters the caller may use: a data licence withholds some (ADR 0082)
         "InstrumentFeatureValues",
         "InstrumentHistory",

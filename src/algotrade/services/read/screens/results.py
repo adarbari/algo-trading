@@ -86,7 +86,10 @@ SORTS = ("rank", "score", "symbol", "decision", "change")
 _SYMBOL, _NAME = "instrument.symbol", "instrument.name"
 
 ResultKey = tuple[str, str]  # (run id, instrument id)
-Change = tuple[str | None, str | None]  # (new / dropped / None, the previous decision)
+# (new / dropped / None, the previous decision, rank_change)
+Change = tuple[str | None, str | None, int | None]
+NO_CHANGE: Change = (None, None, None)
+GATE_COLUMNS = ("user_id", "config_id", "failed", "near_missed")  # what ``_gate_counts`` reads
 
 
 @dataclass(frozen=True)
@@ -142,6 +145,15 @@ class ScreenResult:
     # What each edge that lists the screener does with the row (``pick_edges``); only a review
     # table page fills it (empty: no edge lists the screener, or a read that does not ask)
     counts_toward: tuple[PickEdge, ...] = ()
+    # Places the row rose in the screener's order since the previous run (previous rank minus
+    # rank; negative: fell). None (UNKNOWN, never 0): no previous run, the name is not in it,
+    # either run's order is withheld, or the config changed between the runs.
+    rank_change: int | None = None
+    # How many gates the row missed by a near miss / failed or near-missed (``rule_screen``
+    # ``near_missed`` / ``failed``); None: the run's outcomes are withheld (they would leak
+    # the hidden fields) or the run stored none. Filled by a review table page.
+    near_misses: int | None = None
+    gates_failing: int | None = None
 
 
 @dataclass(frozen=True)
@@ -191,7 +203,7 @@ def load_instrument_changes(ctx: ReadContext, run: ScreenerRun, ids: Sequence[st
     wanted = set(ids)
     now = _decisions(ctx, run, wanted)
     before = _decisions(at_session(ctx, previous.session), previous, wanted)
-    moved = {i: (change_of(d, before.get(i)), before.get(i)) for i, d in now.items()}
+    moved = {i: (change_of(d, before.get(i)), before.get(i), None) for i, d in now.items()}
     return RunChanges(previous.session, (), moved)
 
 
@@ -493,6 +505,7 @@ def _result(
         columns=columns,
         change=change[0],
         previous_decision=change[1],
+        rank_change=None if withheld else change[2],
         regime=None if (label := to_scalar(row.get("regime"))) is None else str(label),
         size_multiplier=_float(row.get("size_multiplier")),
         groups=_groups(values, hidden),
@@ -505,11 +518,13 @@ def load_results(
     runs: Sequence[ScreenerRun],
     changes: Mapping[str, RunChanges] | None = None,
     keep: bool = True,
+    compare_rank: bool = False,
 ) -> dict[ResultKey, ScreenResult]:
     """The results of ``wanted`` (``{run id: instrument ids}``) among ``runs``, by (run id,
     instrument id); an instrument the run has no row for is left out. ``changes``: each run's
     comparison with its previous run, by run id (absent: not compared). ``keep=False``: the
-    stored values are read, not cached (``_values``)."""
+    stored values are read, not cached (``_values``). ``compare_rank``: fill ``rank_change``
+    from ``changes`` (a review table; other reads do not compare ranks, so it stays None)."""
     ids = sorted({i for found in wanted.values() for i in found})
     if not ids:
         return {}
@@ -529,16 +544,39 @@ def load_results(
         for row in _records(run_row_details(ctx, run, asked)):
             iid = str(row["instrument_id"])
             found = values.get((run.run_id, iid), [])
-            change = moved.get(iid, (None, None))
+            change = moved.get(iid, NO_CHANGE)
+            if not compare_rank:
+                change = (change[0], change[1], None)
             out[(run.run_id, iid)] = _result(run, row, found, instruments.get(iid), change, hidden)
     return out
 
 
-def _compare(now: pd.DataFrame, before: Mapping[str, str]) -> dict[str, Change]:
+def _compare(now: pd.DataFrame, before: pd.DataFrame, comparable: bool) -> dict[str, Change]:
+    """Each row of ``now`` against ``before`` (both ``run_rows``): its ``Change`` and, when
+    ``comparable`` (neither run's order withheld) and the two runs ran the same config version,
+    the places it rose (previous rank minus rank); UNKNOWN (None) otherwise."""
+    was = {
+        str(i): (str(d), r, v)
+        for i, d, r, v in zip(
+            before["instrument_id"], before["decision"], before["rank"], before["config_version"],
+            strict=True,
+        )
+    }  # fmt: skip
     out: dict[str, Change] = {}
-    for iid, decision in zip(now["instrument_id"], now["decision"], strict=True):
-        was = before.get(str(iid))
-        out[str(iid)] = (change_of(str(decision), was), was)
+    for iid, decision, rank, version in zip(
+        now["instrument_id"], now["decision"], now["rank"], now["config_version"], strict=True
+    ):
+        prior = was.get(str(iid))
+        moved: int | None = None
+        if (
+            comparable
+            and prior is not None
+            and not any(pd.isna(v) for v in (version, prior[2], rank, prior[1]))
+            and int(version) == int(prior[2])
+        ):
+            moved = int(prior[1]) - int(rank)
+        out[str(iid)] = (change_of(str(decision), prior[0] if prior else None),
+                         prior[0] if prior else None, moved)  # fmt: skip
     return out
 
 
@@ -560,7 +598,8 @@ def load_run_changes(ctx: ReadContext, run: ScreenerRun) -> RunChanges:
     """``run`` against the screener's run in the previous stored session (cached per run and
     published state): every name's ``Change`` from the two runs' rows, the counts as frozen when
     the run has a ``screen_runs`` row, else counted from those rows."""
-    key = ("run_changes", run.run_id, ctx.session.date, ctx.reader.version())
+    # Per viewer: whether a run's order is withheld follows the viewer's licences.
+    key = ("run_changes", run.run_id, ctx.session.date, ctx.user.user_id, ctx.reader.version())
     found: RunChanges | None = ctx.cache.get(key)
     if found is not None:
         return found
@@ -569,17 +608,15 @@ def load_run_changes(ctx: ReadContext, run: ScreenerRun) -> RunChanges:
         found = RunChanges(None, (), {})
     else:
         # ``previous`` was read in its own session's context; its rows are read there too.
-        before_rows = run_rows(at_session(ctx, previous.session), previous)
-        before = {
-            str(i): str(d)
-            for i, d in zip(before_rows["instrument_id"], before_rows["decision"], strict=True)
-        }
-        moved = _compare(run_rows(ctx, run), before)
+        there = at_session(ctx, previous.session)
+        before_rows = run_rows(there, previous)
+        comparable = not (run_withheld(ctx, run) or run_withheld(there, previous))
+        moved = _compare(run_rows(ctx, run), before_rows, comparable)
         frozen = load_change_summary(ctx, run) if run.frozen is not None else None
         if frozen is not None and frozen.counts:
             counts = frozen.counts
         else:
-            counted = pd.Series([c for c, _ in moved.values() if c], dtype="string").value_counts()
+            counted = pd.Series([c for c, *_ in moved.values() if c], dtype="string").value_counts()
             counts = tuple(ChangeCount(c, int(counted.get(c, 0))) for c in CHANGES)
         found = RunChanges(previous.session, counts, moved)
     ctx.cache.put(key, found)
@@ -613,21 +650,57 @@ def _signature(inputs: Sequence[FilterInput]) -> tuple[object, ...]:
     )
 
 
+def _count(joined: object) -> int | None:
+    """How many gate ids a stored comma-joined list holds (None: the run stored none)."""
+    found = to_scalar(joined)
+    return None if found is None or pd.isna(found) else len([g for g in str(found).split(",") if g])
+
+
+def _gate_counts(ctx: ReadContext, run: ScreenerRun) -> Mapping[str, tuple[int | None, int | None]]:
+    """Each instrument's (``near_misses``, ``gates_failing``) in ``run``: the gates that ended
+    NEAR, and FAIL plus NEAR, from the run's stored ``near_missed`` / ``failed`` lists (cached per
+    run, viewer and published state). Empty when the run is withheld: which gates a row missed
+    would leak the fields the viewer may not see (UNKNOWN, never 0)."""
+    key = ("screen_gate_counts", run.run_id, ctx.session.date, ctx.user.user_id,
+           ctx.reader.version())  # fmt: skip
+    found: Mapping[str, tuple[int | None, int | None]] | None = ctx.cache.get(key)
+    if found is not None:
+        return found
+    out: dict[str, tuple[int | None, int | None]] = {}
+    if not run_withheld(ctx, run):
+        stored = run_rows_of(ctx, RULE_SCREEN, run.run_id, GATE_COLUMNS)
+        if not stored.empty and {"failed", "near_missed"} <= set(stored.columns):
+            mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
+            for i, failed, near in zip(
+                mine["instrument_id"], mine["failed"], mine["near_missed"], strict=True
+            ):
+                n, f = _count(near), _count(failed)
+                out[str(i)] = (n, None if n is None or f is None else n + f)
+    ctx.cache.put(key, out)
+    return out
+
+
 def _column(
     column_id: str,
     rows: pd.DataFrame,
     changes: Mapping[str, Change],
     withheld: bool,
+    gates: Mapping[str, tuple[int | None, int | None]],
 ) -> list[Cell]:
     """The surface's own column ``column_id`` over ``rows``; ``rank`` and ``score`` are UNKNOWN
     when the run's order follows values the viewer may not see."""
     ids = [str(i) for i in rows["instrument_id"]]
     if column_id == "change":
-        return [changes.get(i, (None, None))[0] for i in ids]
+        return [changes.get(i, NO_CHANGE)[0] for i in ids]
+    if column_id == "rank_change":
+        return [None if withheld else changes.get(i, NO_CHANGE)[2] for i in ids]
     if column_id in ("rank", "score"):
         if withheld:
             return [None] * len(ids)
         return [to_scalar(v) for v in rows[column_id]]
+    if column_id in ("near_misses", "gates_failing"):
+        at = 0 if column_id == "near_misses" else 1
+        return [gates.get(i, (None, None))[at] for i in ids]
     if column_id == "decision":
         return [str(d) for d in rows["decision"]]
     raise ConfigurationError(f"filters/{SURFACE}.toml: no column {column_id!r} is built")
@@ -653,18 +726,21 @@ def _filter_run(
     """``run``'s rows (rank order) that pass ``inputs``, the facets over the whole run and the
     tables the SET catalogue-field filters read with nothing for the session.
     ``FilterRefusedError`` for an input the viewer is not offered (refused before any read)."""
-    resolved = load_served_filters(ctx, SURFACE, ctx.session.date).resolved
+    resolved = load_served_filters(ctx, SURFACE, ctx.session.date, [i.id for i in inputs]).resolved
     resolved.check(i.id for i in inputs)
     rows = run_rows(ctx, run)
     changes = load_run_changes(ctx, run).by_instrument
     withheld = bool(run_withheld(ctx, run))
+    gates = _gate_counts(ctx, run) if any(
+        f.column_id in ("near_misses", "gates_failing") for f in resolved.offered
+    ) else {}  # fmt: skip
     frame: dict[str, list[Cell]] = {}
     names: list[str] = []
     for f in resolved.offered:
         if f.column_id is None:
             names.append(f.field)
         else:
-            frame[f.field] = _column(f.column_id, rows, changes, withheld)
+            frame[f.field] = _column(f.column_id, rows, changes, withheld, gates)
     missing: tuple[str, ...] = ()
     if names:
         ids = [str(i) for i in rows["instrument_id"]]
@@ -792,7 +868,7 @@ def _ordered(
                 str(i): to_scalar(v) for i, v in zip(rows["instrument_id"], rows[name], strict=True)
             }
         elif name == "change":
-            values = {i: changes.get(i, (None, None))[0] for i in ids}
+            values = {i: changes.get(i, NO_CHANGE)[0] for i in ids}
         else:
             values = _stored_key(ctx, run, name)
         ids = _sorted(ids, values, sort.startswith("-"))
@@ -830,10 +906,19 @@ def load_result_page(
     order = _ordered(ctx, run, query, _inputs(query, filters), seq)
     shown = list(order.ids[(page - 1) * size : page * size])
     changes = {run.run_id: load_run_changes(ctx, run)}
-    found = load_results(ctx, {run.run_id: shown}, [run], changes)
+    found = load_results(ctx, {run.run_id: shown}, [run], changes, compare_rank=True)
     results = [found[(run.run_id, i)] for i in shown if (run.run_id, i) in found]
     toward = load_pick_edges(ctx, run, [(r.instrument_id, r.decision, r.rank) for r in results])
-    results = [replace(r, counts_toward=toward.get(r.instrument_id, ())) for r in results]
+    gates = _gate_counts(ctx, run)
+    results = [
+        replace(
+            r,
+            counts_toward=toward.get(r.instrument_id, ()),
+            near_misses=gates.get(r.instrument_id, (None, None))[0],
+            gates_failing=gates.get(r.instrument_id, (None, None))[1],
+        )
+        for r in results
+    ]
     cells = load_feature_values(ctx, shown, wanted) if wanted and shown else {}
     codes = cell_codes(cells, [r.instrument_id for r in results])
     return ResultPage(

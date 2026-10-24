@@ -564,6 +564,26 @@ def test_a_hidden_field_is_not_read_for_a_viewer_without_the_licence(
     assert IV in asked[0]
 
 
+def test_a_filter_made_of_a_catalogue_feature_follows_the_licence_gate(
+    filter_backend: MemoryBackend,
+) -> None:
+    """More filters: ``feature:<field>`` narrows the list like a declared filter, and a field the
+    viewer's licences do not cover is refused when sent (never counted, never read)."""
+    open_filter = FilterInput(f"feature:{VOLUME}", min=50_000_000)
+    for user in ("bare", "full"):
+        found = load_ideas(view(filter_backend, user), 100, None, [open_filter])
+        assert found.facets is not None and 0 < found.total < found.facets.total
+        assert facet(found, f"feature:{VOLUME}").removes == found.facets.total - found.total
+    personal = FilterInput(f"feature:{IV}", min=0.5)
+    assert load_ideas(view(filter_backend, "full"), 100, None, [personal]).total > 0
+    with pytest.raises(FilterRefusedError):
+        load_ideas(view(filter_backend, "bare"), 100, None, [personal])
+    with pytest.raises(FilterRefusedError):
+        load_ideas(
+            view(filter_backend, "full"), 100, None, [FilterInput("feature:rollup.nope@v1.x")]
+        )
+
+
 # ------------------------------------------------------------------------- properties
 inputs_strategy = st.lists(
     st.one_of(
