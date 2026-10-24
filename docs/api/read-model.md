@@ -216,6 +216,19 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 `ReadStore` / `open_store` became API wiring (`deps.py`); `services/explore/` was deleted in
 PR 10b.
 
+### The filtering pass (ADR 0082)
+
+`services/read/filtering/` holds one pass for every filterable list: `definitions.py` (a surface's
+filters), `masks.py` (one boolean mask per active filter), `facets.py` (what each filter tells over
+the rows passing the other filters), `rows.py` and `served.py`. `Query.filterSet(surface)` serves the
+definitions (a licence-hidden filter as `Unavailable(LICENCE)`, refused if sent); a list read takes
+`filters: [FilterInput!]` and returns `facets` beside `total`; filters run on the whole list before
+it is paged. Adopted today on origin/main: Ideas (`ideas`), screener results (`ScreenerRun.results`),
+the universe (`Query.table`, surface `universe`), the screener list (`screenerList`) and the Edges list
+(`edgeList`). Edge trades are not adopted yet. Cohort percentile filters (price, days to cover, P/E,
+IV rank) read the `cohort_pct_*` features. Saved views carry the bar's `f` string
+(`TableView.filters`). The web side: `features/filter-bar`, `entities/filter` (ui/architecture.md).
+
 ## Values and UNKNOWN
 
 `services/read/values.py` (ownership `scalar-coercion`) holds the one coercion and the UNKNOWN
