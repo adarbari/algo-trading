@@ -32,11 +32,9 @@ const ran = (over: Partial<RecentRun> = {}): RecentRun => ({
   runId: 'run-9',
   configVersion: 3,
   picked: 12,
-  paused: 0,
   newPicks: 2,
   dropped: 1,
   leftOutShare: 0.08,
-  unavailable: [],
   notRun: null,
   ...over,
 });

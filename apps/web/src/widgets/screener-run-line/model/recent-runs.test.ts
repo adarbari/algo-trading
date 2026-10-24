@@ -10,11 +10,9 @@ const RAN: RecentRun = {
   runId: 'r1',
   configVersion: 3,
   picked: 12,
-  paused: 0,
   newPicks: 2,
   dropped: 1,
   leftOutShare: 0.08,
-  unavailable: [],
   notRun: null,
 };
 const GAP: RecentRun = {

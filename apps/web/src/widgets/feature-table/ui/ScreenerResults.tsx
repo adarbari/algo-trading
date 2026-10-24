@@ -38,7 +38,7 @@ import {
   useTableView,
   ViewControls,
 } from '@/features/table-view';
-import { UnknownNote } from '@/entities/availability';
+import { UnknownNote, type ServedUnavailable } from '@/entities/availability';
 import { useFilterSet } from '@/entities/filter';
 import { byName, useFeatureCatalogue, type CriterionInfo, type TableRow } from '@/entities/feature';
 import { RunRegimeChip } from '@/entities/regime';
@@ -81,7 +81,7 @@ export interface ScreenerResultsProps {
   /** Tickers the unsaved criteria would drop from the picks (marked in the grid). */
   leaving?: ReadonlySet<string>;
   /** The run line and strip above the table, given the screener's recent runs (page-composed). */
-  renderRunLine?: (runs: readonly RecentRun[]) => ReactNode;
+  renderRunLine?: (runs: readonly RecentRun[], gaps: readonly ServedUnavailable[]) => ReactNode;
   /** What to show beside the table for the row under review (its detail, chart, ...). */
   renderDetail?: (focus: {
     row: TableRow;
@@ -311,7 +311,8 @@ export function ScreenerResults({
       }}
     />
   );
-  const line = renderRunLine && screener ? renderRunLine(screener.recentRuns) : null;
+  const line =
+    renderRunLine && screener ? renderRunLine(screener.recentRuns, run?.unavailable ?? []) : null;
   const withLine = (body: ReactNode) =>
     line ? (
       <Stack gap={3}>

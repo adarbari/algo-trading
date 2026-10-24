@@ -9,7 +9,7 @@
  */
 import { Button, SessionStrip, Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
 
-import { UnavailableNote, UnknownNote } from '@/entities/availability';
+import { UnavailableNote, UnknownNote, type ServedUnavailable } from '@/entities/availability';
 import { featureTitle } from '@/entities/feature';
 import { runMessage, useRunScreener, type RecentRun } from '@/entities/screen';
 import { useViewer } from '@/entities/viewer';
@@ -22,12 +22,14 @@ export interface ScreenerRunLineProps {
   id: string;
   /** Its recent runs, oldest first, the last the page's own session. */
   runs: readonly RecentRun[];
+  /** What the served run left out (the page's `latestRun.unavailable`). */
+  gaps?: readonly ServedUnavailable[];
 }
 
 const TONE = { COMPLETE: 'positive', PARTIAL: 'warning', NOT_RUN: 'neutral' } as const;
 const STATE = { COMPLETE: 'Complete', PARTIAL: 'Partial', NOT_RUN: 'Not run' } as const;
 
-export function ScreenerRunLine({ id, runs }: ScreenerRunLineProps) {
+export function ScreenerRunLine({ id, runs, gaps = [] }: ScreenerRunLineProps) {
   const runner = useRunScreener(id);
   const admin = useViewer().data?.role === 'admin';
   const shown = runs.find((run) => run.served) ?? runs.at(-1);
@@ -54,7 +56,7 @@ export function ScreenerRunLine({ id, runs }: ScreenerRunLineProps) {
           </TextLink>
         ) : null}
       </Stack>
-      {ranHere ? <UnavailableNote gaps={shown.unavailable} titleOf={featureTitle} /> : null}
+      {ranHere ? <UnavailableNote gaps={gaps} titleOf={featureTitle} /> : null}
       {!ranHere && shown.notRun ? <UnknownNote unknown={shown.notRun} /> : null}
       {!ranHere ? (
         <Stack direction="row" gap={2} align="center" wrap>

@@ -75,25 +75,9 @@ const ScreenerResults = graphql(`
         runId
         configVersion
         picked
-        paused
         newPicks
         dropped
         leftOutShare
-        unavailable {
-          kind
-          features
-          guideTerm
-          kindText
-          cause {
-            links {
-              level
-              subject
-              status
-              message
-              runId
-            }
-          }
-        }
         notRun {
           code
           kind

@@ -108,7 +108,7 @@ export function ScreenerResultsPage({
         }}
         dismissed={dismissed}
         compared={compared}
-        renderRunLine={(runs) => <ScreenerRunLine id={id} runs={runs} />}
+        renderRunLine={(runs, gaps) => <ScreenerRunLine id={id} runs={runs} gaps={gaps} />}
         onShowDismissed={() => {
           setDismissed(new Set());
         }}

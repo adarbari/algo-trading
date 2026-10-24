@@ -394,11 +394,9 @@ export async function mockBuilderApi(
                   runId: null,
                   configVersion: null,
                   picked: null,
-                  paused: null,
                   newPicks: null,
                   dropped: null,
                   leftOutShare: null,
-                  unavailable: [],
                   notRun: {
                     code: 'NOT_RUN',
                     kind: 'NOT_RUN',
