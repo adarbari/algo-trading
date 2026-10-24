@@ -50,10 +50,12 @@ const definition = (id: string, label: string, kind: string, unit: string | null
   unit,
 });
 
+let written = '';
 let asked: { surface: string; withFeatures?: string[] | null }[] = [];
 
 beforeEach(() => {
   asked = [];
+  written = '';
   vi.mocked(gql).mockImplementation((document, variables) => {
     const text = String(document);
     if (text.includes('query FilterFeatures')) {
@@ -93,11 +95,13 @@ beforeEach(() => {
 
 function Bar({ f = '' }: { f?: string }) {
   const [value, setValue] = useState<string | undefined>(f || undefined);
-  const state = useFilterState(value, setValue);
+  const state = useFilterState(value, (next) => {
+    written = next ?? '';
+    setValue(next);
+  });
   return (
     <TestQueryProvider>
       <SurfaceFilterBar surface="ideas" state={state} facets={null} />
-      <output aria-label="f">{value ?? ''}</output>
     </TestQueryProvider>
   );
 }
@@ -115,7 +119,7 @@ describe('More filters', () => {
     expect(await within(dialog).findByRole('group', { name: 'dollar volume' })).toBeInTheDocument();
     expect(asked.at(-1)?.withFeatures).toEqual([DOLLAR]);
     await user.type(within(dialog).getByRole('spinbutton', { name: 'Min' }), '5{Enter}');
-    expect(screen.getByLabelText('f')).toHaveTextContent(`feature%3A${DOLLAR}:5..`);
+    expect(written).toBe(`feature%3A${DOLLAR}:5..`);
   });
 
   it('asks for the definitions of the features already in the URL', async () => {
@@ -134,6 +138,6 @@ describe('More filters', () => {
     expect(min).toHaveDisplayValue('5');
     await user.clear(min);
     await user.type(min, '10{Enter}');
-    expect(screen.getByLabelText('f')).toHaveTextContent('0.1..0.2');
+    expect(written).toContain(':0.1..0.2');
   });
 });
