@@ -124,6 +124,7 @@ allowed = [
     "src/algotrade/services/read/screens/results.py",  # a run's review table adopts it (ADR 0082)
     "apps/api/algotrade_api/graphql/types/query.py",  # filterSet: one loader call
     "src/algotrade/services/read/lists/*",  # the list loaders adopt the pass (ADR 0082)
+    "src/algotrade/services/read/edge_ledger/trades.py",  # the ledger adopts the pass (ADR 0082)
 ]
 section = "docs/adr/0082-shared-filter-bar.md#decision"
 detect = [{ call = "compute_facets" }, { call = "evaluate_filters" }, { call = "resolve_definitions" }, { call = "load_served_filters" }, { call = "filter_hash" }, { call = "frame_of" }]

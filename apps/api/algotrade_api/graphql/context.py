@@ -215,3 +215,30 @@ def context_getter(
         return RequestContext(opener, caller, stores, None, releases, request.state)
 
     return get_context
+
+
+def _selected(raw: Any, selections: Any, name: str) -> bool:
+    """Whether ``name`` is among ``selections`` (a selection set's nodes), through inline
+    fragments and fragment spreads."""
+    for node in selections or ():
+        kind = type(node).__name__
+        if kind == "FieldNode" and node.name.value == name:
+            return True
+        if kind == "InlineFragmentNode" and _selected(raw, node.selection_set.selections, name):
+            return True
+        if kind == "FragmentSpreadNode":
+            spread = raw.fragments.get(node.name.value)
+            if spread is not None and _selected(raw, spread.selection_set.selections, name):
+                return True
+    return False
+
+
+def selects(info: Any, name: str) -> bool:
+    """Whether the operation selects ``name`` under the field being resolved, directly or through
+    a fragment (a field that costs a whole-list pass is computed only when asked for)."""
+    raw = info._raw_info
+    return any(
+        _selected(raw, f.selection_set.selections, name)
+        for f in raw.field_nodes
+        if f.selection_set is not None
+    )
