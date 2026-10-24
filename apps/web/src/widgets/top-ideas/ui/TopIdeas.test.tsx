@@ -210,6 +210,7 @@ const FILTER_SET = {
   filterSet: {
     surface: 'ideas',
     label: 'Ideas',
+    searchable: false,
     filters: [
       {
         id: 'decision',
@@ -220,6 +221,7 @@ const FILTER_SET = {
         options: [option('QUALIFIED', 'Qualified'), option('WATCH', 'Watch')],
         bins: [],
         windowUnit: null,
+        unit: null,
       },
       {
         id: 'agreeing',
@@ -230,6 +232,7 @@ const FILTER_SET = {
         options: [],
         bins: [1, 2, 3],
         windowUnit: null,
+        unit: null,
       },
       {
         id: 'earnings',
@@ -240,6 +243,7 @@ const FILTER_SET = {
         options: [],
         bins: [],
         windowUnit: 'SESSIONS',
+        unit: null,
       },
     ],
   },

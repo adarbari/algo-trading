@@ -7,12 +7,13 @@ refused if sent (``ResolvedFilters.check``). Session-free: a definition does not
 session."""
 
 import importlib
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 
 from algotrade.config.filters.definitions import FilterColumn, FilterDefinition, load_filter_set
-from algotrade.config.site.settings import load_users
+from algotrade.config.site.settings import load_phrasebook, load_users
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
 from algotrade.services.licences import held_by, licence_of
@@ -23,6 +24,14 @@ from algotrade.services.read.availability.cause import (
 )
 from algotrade.services.read.context import NotFoundError, Stores
 from algotrade.services.read.filtering.definitions import ResolvedFilters, resolve_definitions
+from algotrade.services.read.filtering.feature_filters import (
+    FilterableFeature,
+    feature_filter_id,
+    filterable_features,
+    picked_feature_filters,
+    requested_fields,
+    takes_features,
+)
 from algotrade.services.read.filtering.masks import WindowUnit
 
 
@@ -101,6 +110,7 @@ class ServedFilters:
     filters: tuple[ServedFilter, ...]
     withheld: tuple[WithheldFilter, ...]
     columns: tuple[FilterColumn, ...] = ()
+    searchable: bool = False
 
 
 def site_catalogue(ctx: Stores) -> FeatureSet:
@@ -144,18 +154,62 @@ def _why(definition: FilterDefinition, site: FeatureSet, day: date | None) -> Un
     return Unavailable(kind, (field,), feature_cause(field, detail, kind.value, day))
 
 
-def load_served_filters(ctx: Stores, surface: str, day: date | None = None) -> ServedFilters:
-    """``surface``'s filters for ``ctx``'s user. ``NotFoundError`` for a surface with no file."""
+def load_served_filters(
+    ctx: Stores, surface: str, day: date | None = None, wanted: Iterable[str] = ()
+) -> ServedFilters:
+    """``surface``'s filters for ``ctx``'s user. ``NotFoundError`` for a surface with no file.
+    ``wanted``: the filter ids of the request; each ``feature:<field>`` one is offered too when
+    the surface takes features and the viewer's licences cover the field (else it is withheld, or
+    left for ``check`` to refuse), ``feature_filters.py``."""
     filter_set = load_filter_set(ctx.configs, surface)
     if not filter_set.filters and not filter_set.columns:
         raise NotFoundError(f"filters: no surface {surface!r}")
     site = site_catalogue(ctx)
     held = held_by(load_users(ctx.configs), ctx.user.user_id)
     resolved = resolve_definitions(filter_set, site, held)
+    extra_on, extra_off = (
+        picked_feature_filters(site, held, requested_fields(wanted))
+        if takes_features(filter_set)
+        else ((), ())
+    )
+    if extra_on or extra_off:
+        resolved = ResolvedFilters(
+            surface,
+            (*resolved.offered, *extra_on),
+            resolved.withheld | {f.id for f in extra_off},
+        )
     withheld = tuple(
         WithheldFilter(f.id, f.label, FilterGroup(f.group), _why(f, site, day))
-        for f in filter_set.filters
+        for f in (*filter_set.filters, *extra_off)
         if f.id in resolved.withheld
     )
     offered = tuple(_served(f) for f in resolved.offered)
-    return ServedFilters(surface, filter_set.label, resolved, offered, withheld, filter_set.columns)
+    return ServedFilters(
+        surface,
+        filter_set.label,
+        resolved,
+        offered,
+        withheld,
+        filter_set.columns,
+        takes_features(filter_set),
+    )
+
+
+def load_filter_set_with(
+    ctx: Stores, surface: str, fields: Iterable[str] | None = None
+) -> ServedFilters:
+    """``surface``'s filters plus the ones made of the catalogue ``fields`` (``filterSet``'s
+    ``withFeatures``), each served when the surface takes features and the licences cover it."""
+    return load_served_filters(ctx, surface, None, [feature_filter_id(f) for f in fields or ()])
+
+
+def load_filterable_features(ctx: Stores, surface: str) -> tuple[FilterableFeature, ...]:
+    """The catalogue fields the user may filter ``surface`` on by search (``More filters``): none
+    for a surface that takes no features; a field their data licences do not cover never appears.
+    """
+    filter_set = load_filter_set(ctx.configs, surface)
+    if not takes_features(filter_set):
+        return ()
+    held = held_by(load_users(ctx.configs), ctx.user.user_id)
+    phrases = load_phrasebook(ctx.configs).phrases
+    return filterable_features(site_catalogue(ctx), held, phrases)

@@ -82,7 +82,7 @@ from algotrade_api.graphql.types.evaluation.evidence import (
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
 from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
-from algotrade_api.graphql.types.filtering.filter_set import FilterSet
+from algotrade_api.graphql.types.filtering.filter_set import FilterableFeature, FilterSet
 from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeEntry
 from algotrade_api.graphql.types.guide.edges.index import GuideEdgeIndex
 from algotrade_api.graphql.types.guide.edges.mechanism import GuideMechanism
@@ -335,11 +335,31 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The filters of `surface` (ideas, screener_results, universe) for the "
         "caller: the ones they may use with their options and bins, and the ones a data "
-        "licence withholds (ADR 0082). Not found: no such surface"
+        "licence withholds (ADR 0082). `withFeatures`: catalogue fields (`rollup.<group>@v<N>."
+        "<column>`, `feature.<name>`) the caller made filters of (the id `feature:<field>`): each "
+        "is served too, in the group `more`, when the surface takes features. Not found: no such "
+        "surface",
+        extensions=[MaxItems("withFeatures", MAX_FILTERS)],
     )
-    def filter_set(self, info: Ctx, surface: str) -> FilterSet | None:
+    def filter_set(
+        self, info: Ctx, surface: str, with_features: list[str] | None = None
+    ) -> FilterSet | None:
         ctx = info.context.stores()
-        return FilterSet.of(served.load_served_filters(ctx, surface)) if ctx is not None else None
+        found = (
+            served.load_filter_set_with(ctx, surface, with_features) if ctx is not None else None
+        )
+        return FilterSet.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The catalogue fields the caller may filter `surface` on by search (More "
+        "filters): each with the control it gets, its Guide entry and the words a trader uses "
+        "for it (the phrasebook); a field a data licence does not cover is not listed. Empty: "
+        "the surface takes no features. Not found: no such surface"
+    )
+    def filter_features(self, info: Ctx, surface: str) -> list[FilterableFeature]:
+        ctx = info.context.stores()
+        found = served.load_filterable_features(ctx, surface) if ctx is not None else ()
+        return [FilterableFeature.of(f) for f in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The caller's feature catalogue (the site's fields plus their own "

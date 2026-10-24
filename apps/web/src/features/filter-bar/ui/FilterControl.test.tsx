@@ -17,6 +17,7 @@ const base: FilterDefinition = {
   options: [],
   bins: [],
   windowUnit: null,
+  unit: null,
 };
 
 const facet = {
