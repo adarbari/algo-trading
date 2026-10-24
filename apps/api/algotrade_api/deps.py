@@ -16,6 +16,7 @@ Settings come from the environment through ``algotrade.config.env`` (the one rea
 shared by every request; every read is for the caller.
 """
 
+import datetime as dt
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, cast
@@ -188,6 +189,21 @@ def get_serving(request: Request) -> Serving | None:
 
 
 Followed = Annotated[Serving | None, Depends(get_serving)]
+
+
+def dated_context(
+    store: ReadStore, caller: UserRecord, serving: Serving | None, date: dt.date | None
+) -> ReadContext:
+    """A file route's context: the caller's, for ``date`` or, when none is given, the session the
+    pages show (the serving release's, else the latest complete one), over the result cache."""
+    return open_context(
+        store.reader,
+        store.configs,
+        UserContext(caller.user_id),
+        date,
+        cache=store.cache,
+        serving=serving,
+    )
 
 
 def get_context(store: Store, caller: Caller, serving: Followed) -> ReadContext:
