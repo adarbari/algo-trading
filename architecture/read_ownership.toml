@@ -125,7 +125,7 @@ description = "The lists of read objects that adopt the shared filter pass (ADR 
 owner = ["src/algotrade/services/read/lists/*"]
 allowed = ["apps/api/algotrade_api/graphql/types/query.py"]  # the list fields: one loader call each
 section = "docs/adr/0082-shared-filter-bar.md#decision"
-detect = [{ call = "load_screener_list" }]
+detect = [{ call = "load_screener_list" }, { call = "load_edge_list" }]
 
 [[responsibility]]
 id = "graphql-schema"

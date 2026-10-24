@@ -652,6 +652,15 @@ type EdgeHorizons {
 }
 
 """
+The edges the user sees that pass the search `q` (id, name or thesis) and the `filters` (the surface `edges` of `filterSet`), by id: `total` counts them, `facets` the counts of the filter bar over the search's matches (`facets.total` before the filters). A figure an edge's verdict does not hold never passes a filter on it. Views: Mine is the filter `mine`, Following `followed`, Rejected the status `rejected`
+"""
+type EdgeList {
+  total: Int!
+  items: [Edge!]!
+  facets: FilterFacets!
+}
+
+"""
 The live stroke: the edge's settled paper trades on the basis, as the session knew them, laid on the curve. `state`: recorded (trades have settled; `points` can be fewer than `sessions`), none (no settled trade yet) or oos_hidden (a copy's out-of-sample result is withheld). `since` the first signal session, `anchor` the backtest's cumulative value it starts from (added by the server), `closed` settled trades over `sessions` signal sessions
 """
 type EdgeLive {
@@ -1300,7 +1309,7 @@ type FilterChoice {
 }
 
 """
-One filter of a surface: `guide` is its Guide entry reference (`term:<id>`); `options` the values of a static or enum pick / select (empty: the stored ones, counted in the result's facets); `bins` a range's histogram edges; `windowUnit` what a window counts
+One filter of a surface: `guide` is its Guide entry reference (`term:<id>`); `options` the values of a static or enum pick / select (empty: the stored ones, counted in the result's facets); `bins` a range's histogram edges; `windowUnit` what a window counts; `unit` PERCENT: a range's stored 0..1 value is shown and entered as 0..100, its limits are sent as 0..1
 """
 type FilterDefinition {
   id: String!
@@ -1311,6 +1320,7 @@ type FilterDefinition {
   options: [FilterChoice!]!
   bins: [Float!]!
   windowUnit: WindowUnit
+  unit: ValueUnit
 }
 
 """
@@ -2944,6 +2954,19 @@ type Query {
   edges(ids: [String!] = null): [Edge!]!
 
   """
+  The Edges list: the edges the user sees whose id, name or thesis contains `q` (any case) and that pass `filters` (the surface `edges` of `filterSet`: the old views are the filters `mine`, `followed` and the status `rejected`), by id, with the counts of the filter bar (ADR 0082). A session is read for the live state; null: nothing stored
+  """
+  edgeList(
+    filters: [FilterInput!] = null
+    q: String = null
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): EdgeList
+
+  """
   The user's own edge files `edges` leaves out (or reads only in part), by id, with the reason; empty: every file of theirs loads
   """
   edgeProblems: [EdgeProblem!]!
@@ -4002,6 +4025,11 @@ type UsePass {
   intent: String!
   count: Int!
   bins: [Int!]!
+}
+
+"""How a range shows its stored value"""
+enum ValueUnit {
+  PERCENT
 }
 
 """

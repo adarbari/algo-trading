@@ -69,4 +69,4 @@ def test_check_refuses_a_filter_that_is_not_offered() -> None:
 
 def test_the_shipped_ideas_surface_is_offered_to_an_open_viewer() -> None:
     got = resolve_definitions(load_filter_set(CONFIGS, "ideas"), FEATURES, {OPEN})
-    assert got.withheld == frozenset() and len(got.offered) == 12
+    assert got.withheld == frozenset() and len(got.offered) == 17

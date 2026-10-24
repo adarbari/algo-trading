@@ -28,7 +28,8 @@ largest). The same `removes` pass supplies them.
 
 ## Control kinds
 `pick` multi-select with counts; `select` one value; `toggle` yes / no / either; `range` min and
-max numbers with a histogram of the candidates (fixed bin edges); `window` within N days or
+max numbers with a histogram of the candidates (fixed bin edges; with `unit = "percent"` the stored 0..1 value is shown and entered as
+0..100 and the limits are sent as 0..1); `window` within N days or
 sessions; `percentile` (later) top or bottom N% of a named cohort. An unknown value never passes
 a filter; the control says how many rows are unknown, with a Guide term.
 

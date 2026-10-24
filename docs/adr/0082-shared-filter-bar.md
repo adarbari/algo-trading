@@ -19,7 +19,7 @@ the caller computes itself, and the browser may not compute counts or percentile
 1. **Definitions are server-declared.** `config/site/filters/<surface>.toml` (a `FiltersSettings`
    model) lists each filter: `id`, `label`, `group` (`setup`, `changed`, `tradeable`,
    `coming_up`, `more`), `kind` (`pick`, `select`, `toggle`, `range`, `window`, later
-   `percentile`), `field` (a catalogue `name@version` or a column of the surface), `options`
+   `percentile`), `unit` (`percent` on a range: shown 0..100, sent 0..1), `field` (a catalogue `name@version` or a column of the surface), `options`
    (`static`, `values` stored for the session, or an `enum`), `bins` (fixed histogram edges,
    required for a range), `guide` (an entry reference, required). A fitness test checks the
    field exists, the kind fits its dtype, and the Guide entry and coverage row exist. Licence is

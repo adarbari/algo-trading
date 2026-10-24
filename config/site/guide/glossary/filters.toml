@@ -283,16 +283,6 @@ next = "Choose yes to see only the edges you watch."
 see_also = ["follow_edge", "filter_toggle", "paper_trading"]
 
 [[term]]
-id = "filter_edge_hit_rate"
-term = "Out-of-sample hit rate filter"
-short = "Keeps the edges whose share of winning picks, measured out of sample, lies between a minimum and a maximum."
-body = """
-The hit rate is the share of the edge's picks that beat what it is judged against, on the period the edge was not tuned on. 0.60 means six picks in ten. Read it against the base rate, which is what any pick would have scored. An edge with no out-of-sample result is unknown and never passes.
-"""
-next = "Set a minimum of 0.55 to leave out the edges near a coin flip."
-see_also = ["win_rate", "base_rate", "out_of_sample", "filter_range", "filter_unknown_rows"]
-
-[[term]]
 id = "filter_edge_lift"
 term = "Out-of-sample lift filter"
 short = "Keeps the edges whose out-of-sample hit rate beats the base rate by a range of percentage points."
@@ -541,3 +531,53 @@ Dollar volume is the money that changed hands, averaged over 20 sessions, so a s
 """
 next = "Set a minimum of 0.5 to stay with the more heavily traded half of the universe."
 see_also = ["cohort", "percentile", "filter_dollar_volume", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_days_to_cover_pct_sector"
+term = "Days to cover in sector filter"
+short = "Keeps the stocks whose short interest, in days of volume, ranks within a range among their sector."
+body = """
+Days to cover is the short position divided by the daily volume: how long the shorts would need to buy back. The filter ranks it among the stocks of the same sector, from 0 (the least) to 1 (the most). A high rank means crowded shorts, which can fuel a squeeze or warn of a weak stock. The short position is published twice a month, so it can be two weeks old. A sector with fewer than 20 stocks that have a value gives none, and an ETF or fund has no rank. Those rows are unknown and never pass.
+"""
+next = "Set a minimum of 0.9 to list the most heavily shorted stocks of each sector."
+see_also = ["cohort", "percentile", "top_pct_of_cohort", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_pe_pct_sector"
+term = "P/E in sector filter"
+short = "Keeps the stocks whose price to earnings ranks within a range among their sector."
+body = """
+The price to earnings multiple is ranked among the stocks of the same sector, from 0 (the cheapest) to 1 (the dearest). A low rank is cheap against peers, which is not the same as a bargain: it can reflect weak growth. A company that loses money has no multiple, so it has no rank. Nor has a stock in a sector with fewer than 20 ranked stocks, or any ETF or fund. Those rows are unknown and never pass, so the filter never lists loss-making names.
+"""
+next = "Set a maximum of 0.25 to see the cheapest quarter of each sector, then check why."
+see_also = ["cohort", "percentile", "filter_pe_pct_industry", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_pe_pct_industry"
+term = "P/E in industry filter"
+short = "Keeps the stocks whose price to earnings ranks within a range among their industry."
+body = """
+The same rank as the sector filter, among the closer peers of the same industry. An industry has fewer stocks, so the ranks are coarser: fewer than 10 ranked stocks gives none. A loss-making company, an ETF or fund, and a stock with no industry on record have no rank. Those rows are unknown and never pass.
+"""
+next = "Use it with the sector filter: cheap against both is a stronger sign."
+see_also = ["cohort", "percentile", "filter_pe_pct_sector", "filter_sector", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_iv_rank_pct_sector"
+term = "IV rank in sector filter"
+short = "Keeps the stocks whose option volatility rank ranks within a range among their sector."
+body = """
+IV rank is where the current 30-day implied volatility sits in its own 252-session range. The filter ranks that among the stocks of the same sector, from 0 to 1, so it finds names whose options are dear against their peers. It is built from our own stored volatility history. A stock whose history is too short, a sector with fewer than 20 stocks that have a value, and any ETF or fund have no rank. Those rows are unknown and never pass.
+"""
+next = "Set a minimum of 0.8 to see where option premium is rich against the sector."
+see_also = ["cohort", "percentile", "filter_iv_rank_pct_industry", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_iv_rank_pct_industry"
+term = "IV rank in industry filter"
+short = "Keeps the stocks whose option volatility rank ranks within a range among their industry."
+body = """
+The same rank as the sector filter, among the closer peers of the same industry. Fewer than 10 ranked stocks in the industry gives none. A stock with a short volatility history, an ETF or fund, and a stock with no industry on record have no rank. Those rows are unknown and never pass.
+"""
+next = "Use it with the sector filter to find premium that is rich against the closest peers."
+see_also = ["cohort", "percentile", "filter_iv_rank_pct_sector", "filter_sector", "filter_unknown_rows"]

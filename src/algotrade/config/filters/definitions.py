@@ -22,6 +22,7 @@ GROUPS = ("setup", "changed", "tradeable", "coming_up", "more")
 KINDS = ("pick", "select", "toggle", "range", "window", "percentile")
 OPTIONS = ("static", "values", "enum")
 WINDOW_UNITS = ("days", "sessions")
+UNITS = ("percent",)  # how a range shows its stored value; none = as stored
 DTYPES = ("str", "int", "float", "bool", "date")
 COLUMN = "column:"  # a ``field`` that names a column of the surface, not a catalogue feature
 GUIDE_KINDS = ("term", "field", "situation", "start")
@@ -74,7 +75,9 @@ class FilterColumn:
 class FilterDefinition:
     """One filter. ``options``: how a pick / select gets its values (``static`` lists them,
     ``values`` are the ones stored for the session, ``enum`` names ``module:Name``); ``bins``:
-    a range's fixed histogram edges; ``window_unit``: what a window counts; ``guide``: the
+    a range's fixed histogram edges; ``window_unit``: what a window counts; ``unit``: how a
+    range shows its stored value (``percent``: a 0..1 value is shown and entered as 0..100, the
+    limits are sent and stored as 0..1); ``guide``: the
     entry that explains it (``<kind>:<id>``)."""
 
     id: str
@@ -88,6 +91,7 @@ class FilterDefinition:
     enum: str | None = None
     bins: tuple[float, ...] = ()
     window_unit: str | None = None
+    unit: str | None = None
 
     @property
     def column_id(self) -> str | None:
@@ -137,13 +141,16 @@ def _bins(t: Table) -> tuple[float, ...]:
 
 def _filter(t: Table) -> FilterDefinition:
     t.only(("id", "label", "group", "kind", "field", "guide", "options", "enum", "bins",
-            "window_unit", "option"))  # fmt: skip
+            "window_unit", "unit", "option"))  # fmt: skip
     kind = t.choice("kind", "", KINDS)
     options = t.choice("options", "", OPTIONS) if t.raw("options") is not None else None
     static = tuple(_option(o) for o in t.tables("option"))
     enum = t.line("enum") if t.raw("enum") is not None else None
     bins = _bins(t)
     unit = t.choice("window_unit", "", WINDOW_UNITS) if t.raw("window_unit") is not None else None
+    unit_of = t.choice("unit", "", UNITS) if t.raw("unit") is not None else None
+    if unit_of is not None and kind != "range":
+        raise ConfigurationError(f"{t.where} unit: only on a range (got {kind})")
     guide = t.line("guide")
     if not _REF.match(guide) or guide.split(":")[0] not in GUIDE_KINDS:
         raise ConfigurationError(f"{t.where} guide: expected <kind>:<id> of {GUIDE_KINDS}")
@@ -153,7 +160,7 @@ def _filter(t: Table) -> FilterDefinition:
     _check_kind(t, kind, options, static, enum, bins, unit)
     return FilterDefinition(
         _id(t), t.line("label"), t.choice("group", "", GROUPS), kind, field, guide,
-        options, static, enum, bins, unit,
+        options, static, enum, bins, unit, unit_of,
     )  # fmt: skip
 
 
