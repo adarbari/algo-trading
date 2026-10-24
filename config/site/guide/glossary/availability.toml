@@ -209,11 +209,11 @@ see_also = ["known_gap"]
 [[term]]
 id = "known_gap_no_facts"
 term = "No share count filed"
-short = "The company was fetched and its filings carry no share count the app can use."
+short = "A row is stored with no count, because the filings carry none or the facts were not fetched."
 body = """
-The app reads the cover-page count, then the weighted average of basic shares. Foreign private issuers that file 20-F or 40-F carry neither, and some multi-class issuers tag them differently. A row is stored, with an empty count.
+The app reads the cover-page count, then the weighted average of basic shares. Foreign private issuers that file 20-F or 40-F carry neither, and some multi-class issuers tag them differently. A row is stored, with an empty count. The facts may also not have been fetched yet.
 """
-next = "Nothing is needed: the count appears when the company files a usable one."
+next = "The count appears when the company files a usable one or the next facts fetch finds it; a long list is for the owner to check."
 see_also = ["known_gap"]
 
 [[term]]

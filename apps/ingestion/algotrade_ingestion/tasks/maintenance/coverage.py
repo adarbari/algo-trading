@@ -21,6 +21,7 @@ session's shares are recomputed from its stored partitions (no new table); the n
 this as the acceptance check of ``rollups`` and ``run_quality`` runs it with the rest.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -34,10 +35,10 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import UNIVERSE_TABLE, companies, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import (
-    BLANK_CHECK_SIC,
-    OPERATING_TYPES,
     Feature,
     NullReason,
+    is_blank_check,
+    is_operating_type,
     not_applicable,
 )
 from algotrade.services.features import site_features, site_store
@@ -193,9 +194,11 @@ def cells(
     priority_symbols: tuple[str, ...],
     fs: FeatureSet,
     pop: pd.DataFrame | None = None,
+    frames: dict[str, pd.DataFrame | None] | None = None,
 ) -> list[Cell] | None:
     """Every rule's cells (core, rest) for ``day`` over ``pop`` (``_population``, read when not
-    given); ``None`` without a universe to measure."""
+    given); ``None`` without a universe to measure. ``frames`` collects each rule's stored frame
+    for ``day`` (``known_breakdown`` reads it again otherwise)."""
     pop = _population(reader, day) if pop is None else pop
     if pop is None:
         return None
@@ -209,9 +212,10 @@ def cells(
     out: list[Cell] = []
     for rule in rules:
         table, column, feat = _locate(fs, rule.feature)
-        have, scope, stale, core_gaps = _covered(
-            reader, reader.table(table, day), column, feat, rule, day
-        )
+        stored = reader.table(table, day)
+        if frames is not None:
+            frames[rule.feature] = stored
+        have, scope, stale, core_gaps = _covered(reader, stored, column, feat, rule, day)
         applies = [
             not not_applicable([feat.applies_to], opt, kind, sic, lev, inv)
             for opt, kind, sic, lev, inv in zip(
@@ -247,6 +251,11 @@ def cells(
     return out
 
 
+def _flag(column: "pd.Series[Any]", test: Callable[[str], bool]) -> "pd.Series[bool]":
+    """``test`` of each value of ``column``, decided once per distinct value (columnar)."""
+    return column.map({v: test(v) for v in column.unique()}).astype(bool)
+
+
 def known_breakdown(pop: pd.DataFrame, stored: pd.DataFrame | None, column: str) -> dict[str, Any]:
     """Rows stored against values known for ``column``, over EVERY name of the universe ``pop``
     (not only the names the feature applies to), so a table with a row for each name and a null
@@ -274,10 +283,10 @@ def known_breakdown(pop: pd.DataFrame, stored: pd.DataFrame | None, column: str)
         {"security_type": str(t), "names": int(r.names), "rows": int(r.rows), "known": int(r.known)}
         for t, r in grouped.iterrows()
     ]
-    operating = (pop["security_type"].isin(OPERATING_TYPES) | (pop["security_type"] == "")) & ~known
+    operating = _flag(pop["security_type"], is_operating_type) & ~known
     cause = pd.Series("NO_FACTS", index=pop.index)
     cause = cause.mask(~held, "NO_ROW").mask(pop["cik"] == "", "NO_CIK")
-    cause = cause.mask(pop["sic"].str.strip() == BLANK_CHECK_SIC, "BLANK_CHECK")
+    cause = cause.mask(_flag(pop["sic"], is_blank_check), "BLANK_CHECK")
     counts = cause[operating].value_counts()
     return {
         "by_type": by_type,
@@ -304,7 +313,8 @@ def check_coverage(reader: StoreReader, session: date, s: SourcesSettings) -> li
     else PASS. ``data`` carries the cells (and the previous shares) for the report."""
     fs = site_features(site_store(None))
     pop = _population(reader, session)
-    today = cells(reader, session, s.coverage, s.cboe_priority_symbols, fs, pop)
+    frames: dict[str, pd.DataFrame | None] = {}
+    today = cells(reader, session, s.coverage, s.cboe_priority_symbols, fs, pop, frames)
     if pop is None or today is None:
         return [Check("coverage", "FAIL", "no universe or reference snapshot to measure against")]
     days = {r.feature: _previous(reader, session, fs, r) for r in s.coverage}
@@ -356,7 +366,7 @@ def check_coverage(reader: StoreReader, session: date, s: SourcesSettings) -> li
             "previous_session": str(before_day) if before_day else "",
         }
         if rule.feature == BREAKDOWN_FEATURE:
-            table, column, _ = _locate(fs, rule.feature)
-            data["breakdown"] = known_breakdown(pop, reader.table(table, session), column)
+            column = _locate(fs, rule.feature)[1]
+            data["breakdown"] = known_breakdown(pop, frames[rule.feature], column)
         checks.append(Check(f"coverage_{rule.feature}", status, detail, data=data))
     return checks

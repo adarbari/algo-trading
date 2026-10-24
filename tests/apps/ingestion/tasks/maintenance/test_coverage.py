@@ -11,9 +11,9 @@ from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input
 from algotrade.features.framework.feature import (
-    BLANK_CHECK_SIC,
-    OPERATING_TYPES,
     Feature,
+    is_blank_check,
+    is_operating_type,
     not_applicable,
 )
 from algotrade.storage.backends.memory import MemoryBackend
@@ -305,12 +305,11 @@ def test_a_table_with_no_partition_has_every_name_without_a_row() -> None:
 
 
 def test_the_breakdown_operating_company_is_the_one_applies_to_decides() -> None:
-    """known_breakdown reads the constants columnar; ``not_applicable`` is the definition."""
+    """The breakdown and ``not_applicable`` share the helpers: they never disagree."""
     for kind in ("COMMON_STOCK", "ADR", "ETF", "CLOSED_END_FUND", ""):
         for sic in ("6770", "3571", ""):
             ruled_out = bool(not_applicable(["operating_company"], None, kind, sic))
-            columnar = not ((kind in OPERATING_TYPES or kind == "") and sic != BLANK_CHECK_SIC)
-            assert ruled_out == columnar
+            assert ruled_out == (not is_operating_type(kind) or is_blank_check(sic))
 
 
 def _explaining() -> FeatureSet:
