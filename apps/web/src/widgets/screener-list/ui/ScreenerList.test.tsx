@@ -305,6 +305,16 @@ describe('ScreenerList', () => {
     expect(screen.queryByRole('button', { name: /edges of/ })).toBeNull();
   });
 
+  it('opens the screener page when its row is clicked, but not when a control in it is', async () => {
+    const { onOpen, onEdit } = setup();
+    await userEvent.click(screen.getByText('Name of my-vrp'));
+    expect(onOpen).toHaveBeenCalledWith('my-vrp');
+    onOpen.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: 'Add a description' }));
+    expect(onEdit).toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('opens one evidence block at a time, in place', async () => {
     const { onOpenEdge } = setup();
     const mine = screen.getByRole('button', { name: 'Win of my-vrp' });

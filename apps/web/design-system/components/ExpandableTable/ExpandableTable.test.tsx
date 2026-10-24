@@ -78,6 +78,29 @@ describe('ExpandableTable', () => {
     expect(screen.queryByText('detail of b')).toBeNull();
   });
 
+  it('activates a row clicked outside its own controls, not one clicked on a control', async () => {
+    const onActivate = vi.fn();
+    render(
+      <ExpandableTable
+        label="Screeners"
+        columns={COLUMNS}
+        rowToggle={false}
+        rows={[
+          {
+            ...row('a'),
+            onActivate,
+            cells: { name: 'plain text', picks: <button type="button">inner</button> },
+          },
+        ]}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'inner' }));
+    expect(onActivate).not.toHaveBeenCalled();
+    await user.click(screen.getByText('plain text'));
+    expect(onActivate).toHaveBeenCalledTimes(1);
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <ExpandableTable label="Screeners" columns={COLUMNS} rows={[row('a', true), row('b')]} />,

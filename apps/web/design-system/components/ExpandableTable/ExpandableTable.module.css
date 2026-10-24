@@ -22,6 +22,10 @@
   border-bottom: var(--border-width-thin) solid var(--color-border-soft);
 }
 
+.row[data-activatable]:not(.head) {
+  cursor: pointer;
+}
+
 .row[data-open] {
   border-bottom-color: transparent;
 }
