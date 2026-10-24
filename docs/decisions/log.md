@@ -662,7 +662,21 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: one filter bar for every table, list and feed (ADR 0082) is the owner's design; the cost is the shared code itself, and later surfaces adopt it without raising anything again.
+## 2026-10-24 | Filter bar on Screeners and Edges lists PR (#940) | Entry and list budgets raised by the filter bar's route state
+- Question: the Screeners and Edges routes validate `f` and `q` in the entry chunk, and the two list pages load the bar's components and reads; the two entry budgets and the Screeners, Edges and Ideas first-load budgets sit below the measured size. Trim, or raise?
+- Options: cut the validation (an unvalidated `f` reaches the page) / raise the entry budgets and the list route budgets by the measured cost.
+- Decision: waiver of the shared rule for the two entry budgets only: entry 25880 to 26170 B and entry plus static imports 197700 to 197900 B (measured locally 25998 and 197731 B, +170 B margin for CI), through the `waivers` map; Screeners page chunk 17966 to 32520 B, Edges page chunk 48000 to 61100 B, Edge sections 82100 to 92850 B, Ideas first-load JS 240000 to 240800 B and Screeners first-load JS 209900 to 216100 B, each with a reason in `perf-budgets.json`. The owner pre-approved raises that come from the filter bar's shared code (2026-10-23, #924).
+- decided by: owner
+- status: final
+- Reasoning: the cost is the filter bar's shared code adopted by two more lists (ADR 0082), not the lists' own code.
 
+## 2026-10-24 | Streak filters PR (#942) | Ship the results-page history filters; hold the Ideas ones until precompute
+- Question: `days_picked` and `new_today` walk the chain of previous runs lazily, only when the filter is set. Cold on the real store: a screener's results 20-480 ms, Ideas with a history filter set 3.9 s (0.89 s plain). Ship all, results only, or hold until the nightly precomputes the streak into `screen_runs`?
+- Options: (A) ship as is (opt-in cost, cached per publish) / (B) ship the results-page filters, hold the Ideas filters / (C) hold the whole PR until precompute.
+- Decision: B. Keep `screener_results.toml`, `results.py`, `streaks.py`, the Guide terms and their tests. Remove from Ideas: the two `[[column]]`s and the two `changed` `[[filter]]`s in `config/site/filters/ideas.toml` (restore `new_today` / `days_picked` under the header's "needs new data" list, with "precompute into screen_runs" as the reason); in `services/read/screens/ideas.py` the `streaks` import, `Idea.days_picked` / `Idea.new_today`, `_days`, `_new`, `_history`, the `history` parameter and its two branches in `_frame`, and the `history_wanted` / `without_idle` / `_history` lines in `load_ideas`; the Ideas streak tests in `test_screeners.py`; the `ideas.py` file and the "Ideas takes the longest streak" clause in the `read_ownership.toml` entry; the "On Ideas it is the longest count" sentence of `filter_days_picked` and the multi-screener wording of `filter_new_today` in `config/site/guide/glossary/filters.toml`. The Ideas filters return in the precompute PR, where they read a stored column at plain cost.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the owner's bar (2026-10-09) is every page under 1 s cold, warm and first visit, no hacks, and the 1 s gate now covers every declared operation (2026-10-23): an opt-in filter is still the page, and a 3.9 s cold read is four times the bar, so Ideas would either fail the gate or need a coverage exception for a known-slow path. The results page is within the bar, so holding it too (C) delays a measured-good feature for no gain; precompute is already the agreed follow-up and gives Ideas the filter at plain cost.
 ## 2026-10-24 | More filters PR (#941) | FilterFeatures listed in perf_view_coverage.toml
 - Question: how the click-only `FilterFeatures` operation (sent when More filters opens) meets the 1 s page gate's coverage test.
 - Options: A list it with a reason and raise the pin 13 to 14 / B send it on every Ideas load so it is captured / C run the 22-minute crawl / D a static resolver.

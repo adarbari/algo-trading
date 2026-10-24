@@ -134,6 +134,28 @@ function narrowed(results: Json, filters: FilterIn[]): Json {
   };
 }
 
+
+/** The definitions of the Screeners list's filters (config/site/filters/screeners.toml), trimmed. */
+const SCREENER_FILTER_SET = {
+  surface: 'screeners',
+  label: 'Screeners',
+  filters: [
+    {
+      id: 'owner',
+      label: 'Owner',
+      group: 'SETUP',
+      kind: 'PICK',
+      guide: 'term:filter_owner',
+      options: [
+        { value: 'mine', label: 'Mine' },
+        { value: 'site', label: 'Presets' },
+      ],
+      bins: [],
+      windowUnit: null,
+    },
+  ],
+};
+
 export interface BuilderMockOptions {
   /** Answer POST /screeners/preview with a 400 naming this criterion. */
   failPreviewOn?: string;
@@ -219,6 +241,50 @@ export async function mockBuilderApi(
       version,
       document: { id, extends: 'vrp_scanner@1', version, criteria: { iv30: { value: 0.4 } } },
     }));
+  /**
+   * `screenerList`: the finalised screeners (a draft is not listed) that match the search and the
+   * `owner` filter, with the filter bar's counts (the server's, here only for `owner`).
+   */
+  const screenerListAnswer = (variables: Json): Json => {
+    const owners = new Map<string, string>(
+      CONFIGS.map((c) => [String(c['configId']), c['scope'] === 'site' ? 'site' : 'mine']),
+    );
+    for (const id of own) owners.set(id, 'mine');
+    const q = variables['q'];
+    const needle = typeof q === 'string' ? q.toLowerCase() : '';
+    const found = [...owners.keys()].filter((id) => id.toLowerCase().includes(needle)).sort();
+    const filters = (variables['filters'] ?? []) as {
+      id: string;
+      values: string[];
+      active: boolean;
+    }[];
+    const owner = filters.find((f) => f.id === 'owner' && f.active);
+    const kept = found.filter((id) => !owner || owner.values.includes(owners.get(id) ?? ''));
+    const count = (value: string) => found.filter((id) => owners.get(id) === value).length;
+    return {
+      screenerList: {
+        total: kept.length,
+        items: kept.map((id) => ({ id })),
+        facets: {
+          total: found.length,
+          matched: kept.length,
+          items: [
+            {
+              id: 'owner',
+              active: owner !== undefined,
+              removes: owner ? found.length - kept.length : null,
+              unknown: 0,
+              options: [
+                { value: 'mine', count: count('mine') },
+                { value: 'site', count: count('site') },
+              ],
+              bins: [],
+            },
+          ],
+        },
+      },
+    };
+  };
   /** The screens' GraphQL reads, by operation name; null: not one of them. */
   const graphqlAnswer = (operation: { query?: string; variables?: Json }): Json | null => {
     const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
@@ -228,6 +294,10 @@ export async function mockBuilderApi(
       return RESULT_FILTERS;
     }
     if (name === 'ScreenerConfigs') return { configs: CONFIGS };
+    if (name === 'FilterSet' && operation.variables?.['surface'] === 'screeners') {
+      return { filterSet: SCREENER_FILTER_SET };
+    }
+    if (name === 'ScreenerListPage') return screenerListAnswer(operation.variables ?? {});
     if (name === 'MyScreens') return { myScreens: listing() };
     if (name === 'ScreenerRuns') {
       const ran12 = {

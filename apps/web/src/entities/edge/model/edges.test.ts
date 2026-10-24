@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { EDGES_FIXTURE } from './fixtures';
 import {
-  inView,
   labelText,
   stateLabel,
   stateOrStatus,
@@ -44,13 +43,7 @@ describe('verdict words', () => {
 });
 
 describe("the user's state about an edge", () => {
-  const [momentum, , mine, , rejected] = [
-    ...EDGES_FIXTURE.edges.slice(0, 1),
-    undefined,
-    ...EDGES_FIXTURE.edges.slice(1, 2),
-    undefined,
-    ...EDGES_FIXTURE.edges.slice(-1),
-  ];
+  const momentum = EDGES_FIXTURE.edges[0];
 
   it('words the states and the permanent warnings', () => {
     expect(stateLabel('following')).toBe('Following');
@@ -60,12 +53,7 @@ describe("the user's state about an edge", () => {
     expect(labelText('new_label')).toBe('new_label');
   });
 
-  it('files an edge under a view, and shows the site status until the user has a state', () => {
-    expect(momentum && inView(momentum, 'mine')).toBe(false);
-    expect(mine && inView(mine, 'mine')).toBe(true);
-    expect(rejected && inView(rejected, 'rejected')).toBe(true); // the site rejected it
-    expect(momentum && inView({ ...momentum, state: 'following' }, 'following')).toBe(true);
-    expect(momentum && inView(momentum, 'all')).toBe(true);
+  it('shows the site status until the user has a state', () => {
     expect(momentum && stateOrStatus(momentum)).toBe('Candidate');
     expect(momentum && stateOrStatus({ ...momentum, state: 'retired' })).toBe('Retired');
   });

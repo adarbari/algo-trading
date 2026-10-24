@@ -50,6 +50,11 @@ id = "gates_failing"
 dtype = "int"
 source = "gates_failing"
 
+[[column]]
+id = "days_picked"
+dtype = "int"
+source = "days_picked"
+
 # ------------------------------------------------------------------------------------ setup
 
 [[filter]]
@@ -125,6 +130,15 @@ kind = "range"
 field = "column:rank_change"
 bins = [1, 5, 20, 100]
 guide = "term:filter_rank_moved_up"
+
+[[filter]]
+id = "days_picked"
+label = "Days on the list"
+group = "changed"
+kind = "range"
+field = "column:days_picked"
+bins = [1, 2, 3, 5, 10, 20]
+guide = "term:filter_days_picked"
 
 [[filter]]
 id = "mom_pct_sector"

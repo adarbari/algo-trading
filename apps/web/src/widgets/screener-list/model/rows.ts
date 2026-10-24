@@ -1,17 +1,9 @@
 /**
  * The Screeners list's rows: the user's own screeners and the site presets as one list, each with
- * its kind, and the segment and search that narrow it. Pure; it chooses among served rows and
- * derives nothing from run data.
+ * its kind, and the narrowing the server answered for the filters and the search. Pure; it chooses
+ * among served rows and derives nothing from run data.
  */
 import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
-
-export type Segment = 'all' | 'mine' | 'presets';
-
-export const SEGMENTS: readonly { value: Segment; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'mine', label: 'Mine' },
-  { value: 'presets', label: 'Presets' },
-];
 
 export interface ListRow {
   id: string;
@@ -54,12 +46,11 @@ export function toRows(
   return [...own.sort(byId), ...presets.sort(byId)];
 }
 
-/** The rows of a segment whose name contains the search (any case). */
-export function filterRows(rows: readonly ListRow[], segment: Segment, query: string): ListRow[] {
-  const needle = query.trim().toLowerCase();
-  return rows.filter(
-    (row) =>
-      (segment === 'all' || (segment === 'mine') === (row.kind === 'mine')) &&
-      row.id.toLowerCase().includes(needle),
-  );
+/**
+ * The rows the server's narrowing keeps. With none in force (`ids` null) every row stays,
+ * drafts and screeners that do not resolve included; with one, only the ids it names (a draft has
+ * no facts to filter on, so none passes).
+ */
+export function narrowRows(rows: readonly ListRow[], ids: ReadonlySet<string> | null): ListRow[] {
+  return ids === null ? [...rows] : rows.filter((row) => ids.has(row.id));
 }

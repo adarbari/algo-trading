@@ -16,9 +16,7 @@
 # A path that no longer renders a data surface fails too (delete the line).
 
 [migrating]
-"src/widgets/edge-list/ui/EdgeList.tsx" = "migrating: Edges list onto the bar (ADR 0082, session filter-web-lists)"
 "src/widgets/edge-trades/ui/EdgeTrades.tsx" = "migrating: edge trades onto the bar (ADR 0082, session filter-web-lists)"
-"src/widgets/screener-list/ui/ScreenerList.tsx" = "migrating: screener list onto the bar (ADR 0082, session filter-web-lists)"
 
 [exempt]
 "src/entities/run/ui/RunRecordDrawer.tsx" = "detail drawer: the steps of one run, fixed rows"

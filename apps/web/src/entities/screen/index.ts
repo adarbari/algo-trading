@@ -20,6 +20,7 @@ export {
   useScreenerPicks,
   type ScreenerPicksResponse,
 } from './api/picks';
+export { prefetchScreenerList, useScreenerList } from './api/list';
 export { prefetchScreenerRuns, useScreenerRuns, type ScreenerRunSummary } from './api/runs';
 export { prefetchScreenerHits, useScreenerHits, type ScreenerHitsResponse } from './api/hits';
 export {

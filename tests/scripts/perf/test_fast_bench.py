@@ -432,7 +432,7 @@ GUIDE_FIXTURE = {
         "catalogue": [{"name": "a", "guide": None}, {"name": "b", "guide": {"theme": "t"}}]
     },
     "GuideIndex": {"guideIndex": {"situations": [{"slug": "sit-1"}]}},
-    "EdgesPage": {"edges": [{"screeners": []}, {"screeners": ["scr-1", "scr-2"]}]},
+    "EdgesPage": {"edgeList": {"items": [{"screeners": []}, {"screeners": ["scr-1", "scr-2"]}]}},
     "GuideScreenerIndex": {"guideScreenerIndex": {"categories": [{"id": "cat-1"}]}},
     "HarnessRuns": {"harnessRuns": [{"runId": "run-9"}]},
 }

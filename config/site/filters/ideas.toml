@@ -6,8 +6,11 @@
 #
 # Owner-approved filters not here, because the Ideas read does not store the fact yet (listed in
 # the PR that added this file as "needs new data"):
-#   changed:   new_today (a pick of this session that the screener's previous run did not make:
-#              an Idea carries no comparison), rank_moved_up (the previous session's rank)
+#   changed:   new_today and days_picked (decided 2026-10-24: walking each screener's previous
+#              runs costs about 3 s cold on the real store, so they wait for the streaks to be
+#              precomputed into screen_runs at ingestion, then are re-added; the walk is
+#              services/read/screens/streaks.py, live on a screener's results),
+#              rank_moved_up (the previous session's rank)
 #   tradeable: optionable (no stored yes / no; option_chain_known says the chain run knew the
 #              answer, not that the name has options)
 
