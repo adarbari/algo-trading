@@ -28,9 +28,7 @@ export function screenerRunsRoute<P extends AnyRoute>(parent: P) {
   return createRoute({
     getParentRoute: () => parent,
     path: 'screener-runs',
-    ...pageRoute(AdminScreenerRunsPage, (page, client) => {
-      page.prefetchScreenerRunsReads(client);
-    }),
+    ...pageRoute(AdminScreenerRunsPage),
     component: ScreenerRunsRoute,
   });
 }
