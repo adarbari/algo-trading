@@ -407,7 +407,7 @@ Sources: FINRA, Short interest reports
 
 Sources: FINRA, Short interest reports
 
-### `rollup.cohort_pct_fundamental@v1.pe_ratio_pct_universe`
+### `rollup.cohort_pct_valuation@v1.pe_ratio_pct_universe`
 
 **How to read it.** Where the trailing price to earnings ratio ranks among the universe's stocks: 0 the cheapest earnings, 1 the dearest. A rank that adapts to the market's level, where a P/E threshold does not.
 
@@ -425,7 +425,7 @@ Sources: FINRA, Short interest reports
 
 Sources: Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance
 
-### `rollup.cohort_pct_fundamental@v1.pe_ratio_pct_sector`
+### `rollup.cohort_pct_valuation@v1.pe_ratio_pct_sector`
 
 **How to read it.** Where the trailing price to earnings ratio ranks among the stocks of the name's sector: 1 the dearest earnings of its sector. Sectors price earnings differently, so this is the fairer comparison.
 
@@ -433,7 +433,7 @@ Sources: Basu (1977), Investment performance of common stocks in relation to the
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a rich valuation among the stocks of the name's sector | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_fundamental@v1.pe_ratio_pct_universe gte 0.5 |
+| a rich valuation among the stocks of the name's sector | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_valuation@v1.pe_ratio_pct_universe gte 0.5 |
 
 **When the reading lies**
 
@@ -442,7 +442,7 @@ Sources: Basu (1977), Investment performance of common stocks in relation to the
 
 Sources: Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance
 
-### `rollup.cohort_pct_fundamental@v1.pe_ratio_pct_industry`
+### `rollup.cohort_pct_valuation@v1.pe_ratio_pct_industry`
 
 **How to read it.** Where the trailing price to earnings ratio ranks among the stocks of the name's industry: 1 the dearest earnings of its industry.
 
@@ -450,7 +450,7 @@ Sources: Basu (1977), Investment performance of common stocks in relation to the
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a rich valuation among the stocks of the name's industry | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_fundamental@v1.pe_ratio_pct_sector gte 0.6 |
+| a rich valuation among the stocks of the name's industry | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_valuation@v1.pe_ratio_pct_sector gte 0.6 |
 
 **When the reading lies**
 

@@ -1,4 +1,4 @@
-# L3 site setting: the field guide entries of the cohort percentile columns (cohort_pct_price@v1, cohort_pct_fundamental@v1, cohort_pct_options@v1: a feature
+# L3 site setting: the field guide entries of the cohort percentile columns (cohort_pct_price@v1, cohort_pct_fundamental@v1, cohort_pct_valuation@v1, cohort_pct_options@v1: a feature
 # ranked among the universe's stocks, the name's sector and its industry). Keys as chart/momentum.toml.
 
 [[field]]
@@ -196,7 +196,7 @@ tolerance = 0.05
 note = "with rollup.cohort_pct_fundamental@v1.days_to_cover_pct_sector gte 0.6"
 
 [[field]]
-name = "rollup.cohort_pct_fundamental@v1.pe_ratio_pct_universe"
+name = "rollup.cohort_pct_valuation@v1.pe_ratio_pct_universe"
 theme = "instrument gates"
 reads = "Where the trailing price to earnings ratio ranks among the universe's stocks: 0 the cheapest earnings, 1 the dearest. A rank that adapts to the market's level, where a P/E threshold does not."
 caveats = [
@@ -214,7 +214,7 @@ tolerance = 0.05
 note = "with the raw figure so the size is read too"
 
 [[field]]
-name = "rollup.cohort_pct_fundamental@v1.pe_ratio_pct_sector"
+name = "rollup.cohort_pct_valuation@v1.pe_ratio_pct_sector"
 theme = "instrument gates"
 reads = "Where the trailing price to earnings ratio ranks among the stocks of the name's sector: 1 the dearest earnings of its sector. Sectors price earnings differently, so this is the fairer comparison."
 caveats = [
@@ -228,10 +228,10 @@ op = "gte"
 value = 0.8
 mode = "soft"
 tolerance = 0.05
-note = "with rollup.cohort_pct_fundamental@v1.pe_ratio_pct_universe gte 0.5"
+note = "with rollup.cohort_pct_valuation@v1.pe_ratio_pct_universe gte 0.5"
 
 [[field]]
-name = "rollup.cohort_pct_fundamental@v1.pe_ratio_pct_industry"
+name = "rollup.cohort_pct_valuation@v1.pe_ratio_pct_industry"
 theme = "instrument gates"
 reads = "Where the trailing price to earnings ratio ranks among the stocks of the name's industry: 1 the dearest earnings of its industry."
 caveats = [
@@ -245,7 +245,7 @@ op = "gte"
 value = 0.8
 mode = "soft"
 tolerance = 0.05
-note = "with rollup.cohort_pct_fundamental@v1.pe_ratio_pct_sector gte 0.6"
+note = "with rollup.cohort_pct_valuation@v1.pe_ratio_pct_sector gte 0.6"
 
 [[field]]
 name = "rollup.cohort_pct_options@v1.iv_rank_252d_pct_universe"

@@ -496,7 +496,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 [[table]]
 name = "rollups/instrument/cohort_pct_fundamental@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "percentile ranks of days to cover (a FINRA source: a rule screen may read it, a learned scorer may not, as events/short_interest) and the trailing P/E"
+note = "percentile ranks of days to cover (a FINRA source: a rule screen may read it, a learned scorer may not, as events/short_interest)"
+
+[[table]]
+name = "rollups/instrument/cohort_pct_valuation@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
 name = "rollups/instrument/cohort_pct_options@v1"

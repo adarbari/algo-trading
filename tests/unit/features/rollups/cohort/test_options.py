@@ -6,6 +6,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
+from algotrade.features.framework.feature import strictest
 from algotrade.features.registry import GROUPS
 from algotrade.features.rollups.cohort import options
 from algotrade.features.rollups.cohort.members import CohortParams
@@ -44,9 +45,10 @@ def test_a_missing_source_or_a_later_session_gives_no_rows() -> None:
     assert options.compute(inputs([0.1] * 5, date(2026, 10, 1)), DAY, P).empty
 
 
-def test_the_columns_are_open_and_read_the_open_rank() -> None:
-    origin = next(f for f in GROUPS["iv_history@v2"].features if f.name == "iv_rank_252d")
-    assert origin.licence == "open"
+def test_every_column_carries_the_strictest_licence_of_its_source() -> None:
     for feature in options.FEATURES:
-        assert feature.licence == origin.licence
-        assert feature.inputs[0] == "iv_history.iv_rank_252d@v2"
+        group, rest = feature.inputs[0].split(".", 1)
+        column, version = rest.split("@")
+        licence = next(f.licence for f in GROUPS[f"{group}@{version}"].features if f.name == column)
+        assert feature.licence == strictest([licence]), feature.name
+        assert feature.licence == "open"  # the open iv_rank_252d, not the coalesced iv_rank

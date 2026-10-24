@@ -263,6 +263,11 @@ min_members_universe = 200
 min_members_sector = 20
 min_members_industry = 10
 
+["cohort_pct_valuation@v1"]   # percentile ranks within universe, sector and industry (P/E)
+min_members_universe = 200
+min_members_sector = 20
+min_members_industry = 10
+
 ["cohort_pct_options@v1"]   # percentile ranks within universe, sector and industry (IV rank)
 min_members_universe = 200
 min_members_sector = 20
