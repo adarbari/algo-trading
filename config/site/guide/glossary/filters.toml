@@ -471,3 +471,73 @@ body = """
 A row where the fact is not known passes neither yes nor no; only either lets it through.
 """
 see_also = ["filter_unknown_rows"]
+
+[[term]]
+id = "cohort"
+term = "Cohort"
+short = "The group of stocks an instrument is ranked against: the whole universe, its sector or its industry."
+body = """
+A rank only means something against peers. The cohort is that peer group: all the stocks of the universe, the stocks of the same sector, or the stocks of the same industry. Membership is as of the session you are reading, from the company data stored for it, so a company that changed sector later does not move back. A cohort too small to rank fairly, fewer than 20 stocks for a sector or 10 for an industry, gives no value. ETFs and funds belong to no cohort and have no value, so a filter on a cohort rank leaves them out.
+"""
+next = "Pick the sector rank to compare a name with its direct peers, the universe rank to compare it with everything."
+see_also = ["percentile", "top_pct_of_cohort", "filter_unknown_rows"]
+
+[[term]]
+id = "percentile"
+term = "Percentile"
+short = "Where a value stands in its cohort, from 0 (the lowest) to 1 (the highest)."
+body = """
+0.9 means the value is above 90% of the stocks in the cohort that have one. 0.5 is the middle. Names with the same value share one rank. It tells you the order, not the distance: the top name can be far ahead or barely ahead of the second. It is a rank for one session and moves as the cohort moves, so a name can fall in rank without its own value changing. A stock with no value, or in a cohort too small to rank, has no percentile and never passes a filter on it.
+"""
+next = "Set a minimum of 0.8 to keep the top fifth of the cohort."
+see_also = ["cohort", "top_pct_of_cohort", "filter_range"]
+
+[[term]]
+id = "top_pct_of_cohort"
+term = "Top N% of its sector"
+short = "A percentile filter read as a share: a minimum of 0.9 is the top 10% of the cohort."
+body = """
+The filters work on the percentile from 0 to 1. The top N% of a cohort is a minimum of 1 minus N/100: 0.9 for the top 10%, 0.75 for the top quarter. The bottom N% is a maximum of N/100. The top 10% of a sector of 40 stocks is only four names, so a small cohort gives a coarse answer. Stocks without a value are never counted in the top or the bottom.
+"""
+next = "Set the minimum to 0.9 on the sector rank to see the leaders of each sector."
+see_also = ["cohort", "percentile", "filter_range"]
+
+[[term]]
+id = "filter_mom_pct_sector"
+term = "Momentum in sector filter"
+short = "Keeps the stocks whose 12-1 momentum ranks within a range of the percentile of their sector."
+body = """
+12-1 momentum is the return over the past year leaving out the latest month. The filter ranks it among the stocks of the same sector, from 0 (the weakest) to 1 (the strongest). 0.9 or more is the top tenth of its sector. A high rank says the stock trended better than its peers, not that the trend continues. A sector with fewer than 20 stocks that have a value gives none, and an ETF or fund has no sector rank. Those rows are unknown and never pass, even when you only set a maximum.
+"""
+next = "Set a minimum of 0.8 to see the strongest trends within each sector."
+see_also = ["cohort", "percentile", "top_pct_of_cohort", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_rs_pct_sector"
+term = "Relative strength in sector filter"
+short = "Keeps the stocks whose 63-session strength against the market ranks within a range among their sector."
+body = """
+Relative strength is the 63-session return against SPY. The filter ranks it among the stocks of the same sector, from 0 to 1, 1 the strongest. Three months is a short window: one burst of news can lift a stock to the top for a while. A sector with fewer than 20 stocks that have a value gives none, and an ETF or fund has no sector rank. Those rows are unknown and never pass.
+"""
+next = "Set a minimum of 0.8 to find the stocks leading their sector over the last three months."
+see_also = ["cohort", "percentile", "filter_rs_pct_industry", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_rs_pct_industry"
+term = "Relative strength in industry filter"
+short = "Keeps the stocks whose 63-session strength against the market ranks within a range among their industry."
+body = """
+The same rank as the sector filter, among the narrower group of the stocks of the same industry, so the peers are closer. An industry has fewer stocks, so the ranks are coarser: fewer than 10 stocks with a value gives none. An ETF or fund, and a stock with no industry on record, have no rank. Those rows are unknown and never pass.
+"""
+next = "Use it with the sector filter: leaders of both are the strongest."
+see_also = ["cohort", "percentile", "filter_rs_pct_sector", "filter_sector", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_dollar_volume_pct_universe"
+term = "Dollar volume in universe filter"
+short = "Keeps the stocks whose 20-session dollar volume ranks within a range among all the stocks of the universe."
+body = """
+Dollar volume is the money that changed hands, averaged over 20 sessions, so a single busy day moves it little. The rank runs from 0 (the least traded) to 1 (the most). It says how liquid the stock is next to the others, not whether you can trade your size: for that read the dollar volume itself. An ETF or fund has no rank, and the whole rank is missing on a day the price data came in partial. Those rows are unknown and never pass.
+"""
+next = "Set a minimum of 0.5 to stay with the more heavily traded half of the universe."
+see_also = ["cohort", "percentile", "filter_dollar_volume", "filter_unknown_rows"]
