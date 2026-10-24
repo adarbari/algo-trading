@@ -5,7 +5,8 @@ real), then the loader's shape checks."""
 
 import dataclasses
 import importlib
-from typing import Any, get_args, get_origin, get_type_hints
+from types import UnionType
+from typing import Any, Union, get_args, get_origin, get_type_hints
 
 import pytest
 
@@ -25,13 +26,11 @@ from algotrade.services.read.context import open_stores
 from algotrade.services.read.edge_desk.states import LiveState
 from algotrade.services.read.evaluation.edges import Edge
 from algotrade.services.read.evaluation.runs import TradeRow
-from algotrade.services.read.evaluation.track_record import TrackRecord
 from algotrade.services.read.evaluation.verdict.model import EdgeVerdict
 from algotrade.services.read.instruments.table import FeatureTable, UniverseFilter
+from algotrade.services.read.lists.screeners import ScreenerRow
 from algotrade.services.read.screens.ideas import Idea
 from algotrade.services.read.screens.results import ScreenResult
-from algotrade.services.read.screens.runs import ScreenerRun
-from algotrade.services.read.screens.screeners import Screener
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from tests.conftest import REPO_ROOT
@@ -41,14 +40,13 @@ SURFACES = {
     "ideas": Idea,
     "screener_results": ScreenResult,
     "universe": FeatureTable,
-    "screeners": Screener,
+    "screeners": ScreenerRow,
     "edges": Edge,
     "edge_trades": TradeRow,
 }  # surface -> the read object its columns come from
 # A row's facts that sit beside its read object (the list reads them with the row): the first
 # part of a column source names the object they come from.
 JOINS: dict[str, dict[str, Any]] = {
-    "screeners": {"latest_run": ScreenerRun, "track_records": TrackRecord},
     "edges": {"verdict": EdgeVerdict, "live": LiveState},
 }
 NUMERIC = {"int", "float", "float32", "float64", "int32", "int64"}
@@ -84,6 +82,8 @@ def _walk(root: type, path: str, joins: dict[str, Any] | None = None) -> bool:
         }:
             return False
         cls = get_type_hints(cls)[part]
+        if get_origin(cls) in (UnionType, Union):  # X | None: X
+            cls = next(a for a in get_args(cls) if a is not type(None))
         if get_origin(cls) is tuple:
             cls = get_args(cls)[0]
     return True
