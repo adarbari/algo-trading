@@ -288,7 +288,7 @@ class Query:
         description="The Screeners list: the screeners the user sees whose id, name or "
         "description contains `q` (any case) and that pass `filters` (the surface `screeners` "
         "of `filterSet`), by id, with the counts of the filter bar (ADR 0082)",
-        extensions=[MaxItems("filters", MAX_FILTERS)],
+        extensions=[MaxItems("filters", MAX_FILTERS), MaxItems("q", MAX_QUERY)],
     )
     async def screener_list(
         self,

@@ -123,3 +123,14 @@ def load_track_records_for(
 def load_track_records(ctx: Stores, screener_id: str) -> tuple[TrackRecord, ...]:
     """One entry per edge (by id) that lists ``screener_id``; none when no edge does."""
     return load_track_records_for(ctx, [screener_id])[screener_id]
+
+
+def load_listing_edge_ids(ctx: Stores, screener_ids: Sequence[str]) -> dict[str, tuple[str, ...]]:
+    """The ids of the edges that list each of ``screener_ids`` (by edge id): the count the
+    Screeners list filters on, without reading any edge's run rows."""
+    wanted = set(screener_ids)
+    out: dict[str, list[str]] = {i: [] for i in wanted}
+    for edge in load_edges(ctx):
+        for screener_id in wanted.intersection(edge.screeners):
+            out[screener_id].append(edge.id)
+    return {i: tuple(sorted(ids)) for i, ids in out.items()}
