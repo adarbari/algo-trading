@@ -14,23 +14,18 @@ Parameters: ``CohortParams`` (``config/site/rollups.toml`` ``["cohort_pct_price@
 
 from datetime import date
 
-import numpy as np
 import pandas as pd
 
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
-from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.cohort.members import (
     COMPANY,
-    INDUSTRY,
     LEVELS,
-    MEMBERS,
-    SECTOR,
     UNIVERSE,
     CohortParams,
-    cohorts,
     member_ids,
+    percentile_features,
+    percentile_frame,
 )
-from algotrade.quant.cross_section import cohort_percentile
 
 NAME = "cohort_pct_price"
 VERSION = 1
@@ -48,82 +43,24 @@ _WHAT = {
     "adv_usd_20d": "20-session average dollar volume",
     "rs_spy_63d": "63-session relative strength against SPY",
 }
-_COHORT = {
-    "universe": "the universe's stocks",
-    "sector": "the stocks of the instrument's sector",
-    "industry": "the stocks of the instrument's industry",
-}
-_INPUTS = {"universe": (MEMBERS,), "sector": (MEMBERS, SECTOR), "industry": (MEMBERS, INDUSTRY)}
+_COVERAGE = (
+    ", or fewer than min_coverage of the universe's stocks have a price_stats row (a partial day)"
+)
 
-
-def _source(table: str, column: str) -> str:
-    """``price_stats.adv_usd_20d@v2`` for ``rollups/instrument/price_stats@v2``."""
-    group, version = table.rsplit("/", maxsplit=1)[-1].split("@")
-    return f"{group}.{column}@v{version.lstrip('v')}"
-
-
-def _null(table: str, column: str, level: str) -> str:
-    return (
-        "the instrument is not a STOCK of the universe snapshot the session sees (an ETF, fund "
-        "or trust, or no snapshot yet)"
-        + ("" if level == "universe" else f", or its company snapshot has no {level}")
-        + f", its {column} is null or missing, fewer than "
-        f"min_members_{level} stocks of its cohort have a known one, or fewer than min_coverage "
-        "of the universe's stocks have a price_stats row (a partial day)"
-    )
-
-
-FEATURES = tuple(
-    Feature(
-        f"{column}_pct_{level}", "float32", "decimal",
-        f"The percentile rank of {column} ({_WHAT[column]}) among {_COHORT[level]} with a known "
-        f"one: 0 the lowest, 1 the highest, ties share their average rank; 0.9 is above 90% of "
-        "the cohort",
-        _null(table, column, level),
-        kind="cross_section", valid_range=(0, 1),
-        inputs=(_source(table, column), *_INPUTS[level]),
-    )
-    for table, column, levels in SOURCES
-    for level in LEVELS
-    if level in levels
-)  # fmt: skip
+FEATURES = percentile_features(SOURCES, _WHAT, _COVERAGE)
 COLUMNS = column_types(FEATURES)
 
 
-def _today(inputs: Inputs, table: str, session: date) -> pd.DataFrame | None:
-    frame = inputs.get(table)
-    if frame is None:
-        return None
-    return frame[frame["session_date"] == session]
-
-
-def compute(inputs: Inputs, session: date, p: CohortParams) -> pd.DataFrame:
-    today = {t: _today(inputs, t, session) for t, _, _ in SOURCES}
-    ids = sorted({str(i) for f in today.values() if f is not None for i in f["instrument_id"]})
-    out = pd.DataFrame({"instrument_id": ids})
+def _covered(inputs: Inputs, today: dict[str, pd.DataFrame | None], p: CohortParams) -> bool:
+    """At least ``min_coverage`` of the universe's stocks have a price_stats row."""
     members = member_ids(inputs)
     stats = today[STATS]
     have = set(stats["instrument_id"].astype(str)) if stats is not None else set()
-    covered = bool(members) and len(members & have) / len(members) >= p.min_coverage
-    codes = cohorts(inputs, ids)
-    for table, column, levels in SOURCES:
-        frame = today[table]
-        values = (
-            pd.Series(frame[column].to_numpy(dtype=float), index=frame["instrument_id"].astype(str))
-            .groupby(level=0)
-            .last()
-            .reindex(ids)
-            .to_numpy()
-            if frame is not None and len(frame)
-            else np.full(len(ids), np.nan)
-        )
-        for level in levels:
-            out[f"{column}_pct_{level}"] = (
-                cohort_percentile(values, codes[level], p.minimum(level))
-                if covered
-                else np.full(len(ids), np.nan)
-            )
-    return out[["instrument_id", *COLUMNS]]
+    return bool(members) and len(members & have) / len(members) >= p.min_coverage
+
+
+def compute(inputs: Inputs, session: date, p: CohortParams) -> pd.DataFrame:
+    return percentile_frame(inputs, session, p, SOURCES, COLUMNS, _covered)
 
 
 GROUP = FeatureGroup(

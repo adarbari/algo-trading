@@ -1,5 +1,5 @@
-# L3 site setting: the field guide entries of the cohort percentile columns (cohort_pct_price@v1: a price
-# feature ranked among the universe's stocks, the name's sector and its industry). Keys as chart/momentum.toml.
+# L3 site setting: the field guide entries of the cohort percentile columns (cohort_pct_price@v1, cohort_pct_fundamental@v1, cohort_pct_options@v1: a feature
+# ranked among the universe's stocks, the name's sector and its industry). Keys as chart/momentum.toml.
 
 [[field]]
 name = "rollup.cohort_pct_price@v1.mom_12_1_pct_universe"
@@ -139,3 +139,162 @@ value = 0.8
 mode = "soft"
 tolerance = 0.05
 note = "with rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector gte 0.6"
+
+# cohort_pct_fundamental@v1 and cohort_pct_options@v1, in the shape of the price columns above.
+
+[[field]]
+name = "rollup.cohort_pct_fundamental@v1.days_to_cover_pct_universe"
+theme = "instrument gates"
+reads = "Where FINRA's days to cover ranks among the universe's stocks: 0 the least crowded short, 1 the most days to cover of any stock. It says how crowded the short is next to the market."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 200 stocks have a known value.",
+  "The report is the settlement date's and about two weeks old when public: the rank is as old. Read rollup.short_interest@v1.short_interest_date.",
+  "A high rank is crowding, not a squeeze: it says nothing about a catalyst, and a thin float ranks high without any pressure.",
+  "FINRA's terms bar machine learning over its data: a rule screen may use this column, a learned scorer may not.",
+]
+sources = ["FINRA, Short interest reports"]
+[[field.use]]
+for = "a crowded short among the universe's stocks"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with the raw figure so the size is read too"
+
+[[field]]
+name = "rollup.cohort_pct_fundamental@v1.days_to_cover_pct_sector"
+theme = "instrument gates"
+reads = "Where FINRA's days to cover ranks among the stocks of the name's sector: 1 the most days to cover of its sector. A sector with a heavy short base lifts every name's raw figure, so this rank shows the name that stands out among its peers."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 20 stocks of the sector have a known value. With no sector in the company snapshot it is null, but the universe rank is kept.",
+  "The report is the settlement date's and about two weeks old when public: the rank is as old. Read rollup.short_interest@v1.short_interest_date.",
+]
+sources = ["FINRA, Short interest reports"]
+[[field.use]]
+for = "a crowded short among the stocks of the name's sector"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_fundamental@v1.days_to_cover_pct_universe gte 0.5"
+
+[[field]]
+name = "rollup.cohort_pct_fundamental@v1.days_to_cover_pct_industry"
+theme = "instrument gates"
+reads = "Where FINRA's days to cover ranks among the stocks of the name's industry: 1 the most days to cover of its industry."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 10 stocks of the industry have a known value. With no industry in the company snapshot it is null, but the universe rank is kept.",
+  "The report is the settlement date's and about two weeks old when public: the rank is as old. Read rollup.short_interest@v1.short_interest_date.",
+]
+sources = ["FINRA, Short interest reports"]
+[[field.use]]
+for = "a crowded short among the stocks of the name's industry"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_fundamental@v1.days_to_cover_pct_sector gte 0.6"
+
+[[field]]
+name = "rollup.cohort_pct_fundamental@v1.pe_ratio_pct_universe"
+theme = "instrument gates"
+reads = "Where the trailing price to earnings ratio ranks among the universe's stocks: 0 the cheapest earnings, 1 the dearest. A rank that adapts to the market's level, where a P/E threshold does not."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 200 stocks have a known value.",
+  "Loss-making names, ADRs and names with stale earnings have no P/E and are not counted, so the rank is among profitable companies only.",
+  "A high P/E can come from depressed earnings rather than a rich price: read feature.pe_ratio and the earnings trend beside the rank.",
+]
+sources = ["Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance"]
+[[field.use]]
+for = "a rich valuation among the universe's stocks"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with the raw figure so the size is read too"
+
+[[field]]
+name = "rollup.cohort_pct_fundamental@v1.pe_ratio_pct_sector"
+theme = "instrument gates"
+reads = "Where the trailing price to earnings ratio ranks among the stocks of the name's sector: 1 the dearest earnings of its sector. Sectors price earnings differently, so this is the fairer comparison."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 20 stocks of the sector have a known value. With no sector in the company snapshot it is null, but the universe rank is kept.",
+  "Loss-making names, ADRs and names with stale earnings have no P/E and are not counted, so the rank is among profitable companies only.",
+]
+sources = ["Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance"]
+[[field.use]]
+for = "a rich valuation among the stocks of the name's sector"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_fundamental@v1.pe_ratio_pct_universe gte 0.5"
+
+[[field]]
+name = "rollup.cohort_pct_fundamental@v1.pe_ratio_pct_industry"
+theme = "instrument gates"
+reads = "Where the trailing price to earnings ratio ranks among the stocks of the name's industry: 1 the dearest earnings of its industry."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 10 stocks of the industry have a known value. With no industry in the company snapshot it is null, but the universe rank is kept.",
+  "Loss-making names, ADRs and names with stale earnings have no P/E and are not counted, so the rank is among profitable companies only.",
+]
+sources = ["Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance"]
+[[field.use]]
+for = "a rich valuation among the stocks of the name's industry"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_fundamental@v1.pe_ratio_pct_sector gte 0.6"
+
+[[field]]
+name = "rollup.cohort_pct_options@v1.iv_rank_252d_pct_universe"
+theme = "instrument gates"
+reads = "Where the 252-session IV rank ranks among the universe's stocks: 0 the calmest options, 1 the richest. It shows which names have expensive options next to the market, where the raw IV rank only says where a name sits against its own year."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 200 stocks have a known value.",
+  "It ranks our own IV rank (from our open IV30), never the blended rank that may carry an IBKR value, so it stays open to every viewer.",
+  "A name with too little IV history, or a thin chain, has no IV rank and is not counted in its cohort.",
+]
+sources = ["Natenberg (1994), Option Volatility and Pricing: volatility rank"]
+[[field.use]]
+for = "rich options among the universe's stocks"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with the raw figure so the size is read too"
+
+[[field]]
+name = "rollup.cohort_pct_options@v1.iv_rank_252d_pct_sector"
+theme = "instrument gates"
+reads = "Where the 252-session IV rank ranks among the stocks of the name's sector: 1 the richest IV rank of its sector."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 20 stocks of the sector have a known value. With no sector in the company snapshot it is null, but the universe rank is kept.",
+  "It ranks our own IV rank (from our open IV30), never the blended rank that may carry an IBKR value, so it stays open to every viewer.",
+]
+sources = ["Natenberg (1994), Option Volatility and Pricing: volatility rank"]
+[[field.use]]
+for = "rich options among the stocks of the name's sector"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_options@v1.iv_rank_252d_pct_universe gte 0.5"
+
+[[field]]
+name = "rollup.cohort_pct_options@v1.iv_rank_252d_pct_industry"
+theme = "instrument gates"
+reads = "Where the 252-session IV rank ranks among the stocks of the name's industry: 1 the richest IV rank of its industry."
+caveats = [
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 10 stocks of the industry have a known value. With no industry in the company snapshot it is null, but the universe rank is kept.",
+  "It ranks our own IV rank (from our open IV30), never the blended rank that may carry an IBKR value, so it stays open to every viewer.",
+]
+sources = ["Natenberg (1994), Option Volatility and Pricing: volatility rank"]
+[[field.use]]
+for = "rich options among the stocks of the name's industry"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_options@v1.iv_rank_252d_pct_sector gte 0.6"

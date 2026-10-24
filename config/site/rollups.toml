@@ -258,6 +258,16 @@ min_members_sector = 20     # known values a sector percentile needs
 min_members_industry = 10   # known values an industry percentile needs
 min_coverage = 0.9          # share of universe stocks with a price_stats row, else every column is null
 
+["cohort_pct_fundamental@v1"]   # percentile ranks within universe, sector and industry (days to cover, P/E)
+min_members_universe = 200
+min_members_sector = 20
+min_members_industry = 10
+
+["cohort_pct_options@v1"]   # percentile ranks within universe, sector and industry (IV rank)
+min_members_universe = 200
+min_members_sector = 20
+min_members_industry = 10
+
 ["trend_stats@v2"]        # streaks and the base length (docs/data/technical.md)
 tight_range_pct = 0.15   # a 20-session high-low range at most this share of the close is tight
 
