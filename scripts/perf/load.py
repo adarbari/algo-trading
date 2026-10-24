@@ -110,9 +110,13 @@ PAGES: dict[str, list[Op]] = {
             },
         ),
     ],
-    "edges": [Op("EdgesPage", _static())],
+    "edges": [
+        Op("EdgesPage", _static(filters=None, q=None)),
+        Op("EdgeProblems", _static()),
+    ],
     "screeners": [
         Op("ScreenerConfigs", _static()),
+        Op("ScreenerListPage", _static(filters=None, q=None)),
         Op("ScreenerRuns", _static()),
         Op("ScreenerTrackRecords", _static()),
     ],

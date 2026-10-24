@@ -1,17 +1,25 @@
 import { render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ScreenerListItem, ScreenerRunSummary, ScreenerSummary } from '@/entities/screen';
-import { TestQueryProvider } from '@/shared/api';
+import { filterSearch } from '@/features/filter-bar';
+import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
-import { ScreenerList } from './ScreenerList';
+import { ScreenerList, type ScreenerListSearch } from './ScreenerList';
+
+vi.mock('@/shared/api', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  gql: vi.fn(),
+}));
 
 const hooks = vi.hoisted(() => ({
   useScreeners: vi.fn(),
   useMyScreeners: vi.fn(),
   useScreenerRuns: vi.fn(),
+  useScreenerList: vi.fn(),
 }));
 vi.mock('@/entities/screen', async (importOriginal) => {
   return {
@@ -19,6 +27,7 @@ vi.mock('@/entities/screen', async (importOriginal) => {
     useScreeners: hooks.useScreeners,
     useMyScreeners: hooks.useMyScreeners,
     useScreenerRuns: hooks.useScreenerRuns,
+    useScreenerList: hooks.useScreenerList,
   };
 });
 vi.mock('@/entities/edge', async () => {
@@ -144,7 +153,35 @@ const summary = (
         },
 });
 
+const FILTER_SET = {
+  filterSet: {
+    surface: 'screeners',
+    label: 'Screeners',
+    filters: [
+      {
+        id: 'owner',
+        label: 'Owner',
+        group: 'SETUP',
+        kind: 'PICK',
+        guide: 'term:filter_owner',
+        options: [
+          { value: 'mine', label: 'Mine' },
+          { value: 'site', label: 'Presets' },
+        ],
+        bins: [],
+        windowUnit: null,
+      },
+    ],
+  },
+};
+const facets = (matched: number) => ({ total: 4, matched, items: [] });
+/** The server's answer for the narrowing: the ids that stay. */
+const narrowing = (ids: string[]) => fakeQuery({ ids: new Set(ids), facets: facets(ids.length) });
+
 beforeEach(() => {
+  hooks.useScreenerList.mockReset();
+  hooks.useScreenerList.mockReturnValue(narrowing(['vrp_scanner', 'short_premium', 'my-vrp']));
+  vi.mocked(gql).mockResolvedValue(FILTER_SET);
   hooks.useScreeners.mockReturnValue(
     fakeQuery([
       config('vrp_scanner', 'site'),
@@ -172,17 +209,48 @@ beforeEach(() => {
   );
 });
 
-const setup = () => {
+/** The page's job: the search params held in state, a patch applied to them. */
+function Held({
+  handlers,
+  initial,
+}: {
+  handlers: { onOpen: () => void; onEdit: () => void; onOpenEdge: () => void };
+  initial: ScreenerListSearch;
+}) {
+  const [search, setSearch] = useState(initial);
+  return (
+    <ScreenerList
+      {...handlers}
+      search={search}
+      onSearchChange={(patch) => {
+        setSearch((previous) => {
+          const next = Object.fromEntries(
+            Object.entries({ ...previous, ...patch }).filter(([, v]) => v !== undefined),
+          );
+          return {
+            ...filterSearch(next),
+            ...(typeof next['q'] === 'string' ? { q: next['q'] } : {}),
+          };
+        });
+      }}
+    />
+  );
+}
+
+const setup = (initial: ScreenerListSearch = {}) => {
   const onOpen = vi.fn();
   const onEdit = vi.fn();
   const onOpenEdge = vi.fn();
   const view = render(
     <TestQueryProvider>
-      <ScreenerList onOpen={onOpen} onEdit={onEdit} onOpenEdge={onOpenEdge} />
+      <Held handlers={{ onOpen, onEdit, onOpenEdge }} initial={initial} />
     </TestQueryProvider>,
   );
   return { onOpen, onEdit, onOpenEdge, ...view };
 };
+
+/** What the narrowing read last asked: the filters in force and the search text. */
+const lastAsked = () => hooks.useScreenerList.mock.calls.at(-1) as [{ id: string }[], string];
 
 const rowOf = (text: string) =>
   within(screen.getByRole('table', { name: 'Screeners' }))
@@ -252,15 +320,36 @@ describe('ScreenerList', () => {
     expect(onOpenEdge).toHaveBeenCalledWith('edge-of-vrp_scanner');
   });
 
-  it('narrows by segment and by search', async () => {
+  it('keeps the rows the server names for the filters in the URL, with the filter bar', async () => {
+    hooks.useScreenerList.mockReturnValue(narrowing(['vrp_scanner', 'short_premium']));
+    setup({ f: 'owner:site' });
+    expect(lastAsked()[0]).toEqual([expect.objectContaining({ id: 'owner' })]);
+    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
+    expect(rowOf('Name of my-vrp')).toBeUndefined();
+    expect(await screen.findByRole('button', { name: /Setup/ })).toBeInTheDocument();
+  });
+
+  it('shows every row, drafts too, when nothing narrows, and asks for the typed search', async () => {
     setup();
-    await userEvent.click(screen.getByRole('radio', { name: 'Presets' }));
-    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
-    await userEvent.click(screen.getByRole('radio', { name: 'All' }));
+    expect(rowOf('idea')).toBeDefined();
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'vrp');
-    expect(screen.getAllByRole('button', { name: /^Win of/ })).toHaveLength(2);
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search screeners' }), 'zzz');
-    expect(screen.getByText('No screener matches')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search screeners' })).toHaveValue('vrp');
+    await vi.waitFor(() => {
+      expect(lastAsked()[1]).toBe('vrp');
+    });
+  });
+
+  it('offers the way back when the filters leave nothing, and when only the search does', async () => {
+    hooks.useScreenerList.mockReturnValue(narrowing([]));
+    const { unmount } = setup({ f: 'owner:mine', q: 'zzz' });
+    expect(await screen.findByText('No screeners match this filter')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear the search' }));
+    expect(screen.getByRole('searchbox', { name: 'Search screeners' })).toHaveValue('');
+    unmount();
+    setup({ q: 'zzz' });
+    expect(screen.getByText('No screener matches "zzz"')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear the search' }));
+    expect(screen.queryByText(/No screener matches/)).not.toBeInTheDocument();
   });
 
   it('opens the screener from the picks link, or "Not run" when there is no run, for every screener', async () => {

@@ -316,6 +316,47 @@ export interface EdgesMock {
   saves: { id: string; document: Record<string, unknown> }[];
 }
 
+/** The definitions of the Edges list's filters (config/site/filters/edges.toml), trimmed. */
+const EDGE_FILTER_SET = {
+  surface: 'edges',
+  label: 'Edges',
+  filters: [
+    {
+      id: 'status',
+      label: 'Status',
+      group: 'SETUP',
+      kind: 'PICK',
+      guide: 'term:filter_edge_status',
+      options: [
+        { value: 'candidate', label: 'Candidate' },
+        { value: 'rejected', label: 'Rejected' },
+      ],
+      bins: [],
+      windowUnit: null,
+    },
+    {
+      id: 'mine',
+      label: 'Mine',
+      group: 'SETUP',
+      kind: 'TOGGLE',
+      guide: 'term:filter_edge_mine',
+      options: [],
+      bins: [],
+      windowUnit: null,
+    },
+    {
+      id: 'followed',
+      label: 'Following',
+      group: 'SETUP',
+      kind: 'TOGGLE',
+      guide: 'term:filter_edge_followed',
+      options: [],
+      bins: [],
+      windowUnit: null,
+    },
+  ],
+};
+
 type EdgesPageData = { data: { edges: Record<string, unknown>[] } };
 
 /** The user's copy of the first edge, as the list serves it after the copy was made. */
@@ -372,7 +413,13 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as {
       query?: string;
-      variables?: { ids?: string[]; id?: string };
+      variables?: {
+        ids?: string[];
+        id?: string;
+        surface?: string;
+        q?: string | null;
+        filters?: unknown[] | null;
+      };
     } | null;
     const query = body?.query ?? '';
     if (/query\s+EdgeDocument\b/.test(query)) {
@@ -390,10 +437,36 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
       await route.fulfill({
         json: { data: { edges: all.filter((e) => ids.includes(String(e['id']))) } },
       });
-    } else if (/query\s+EdgesPage\b/.test(query)) {
-      // The list: each edge's row and the headline of its verdict, as the server's `summary`.
+    } else if (/query\s+FilterSet\b/.test(query) && body?.variables?.surface === 'edges') {
+      await route.fulfill({ json: { data: { filterSet: EDGE_FILTER_SET } } });
+    } else if (/query\s+EdgeProblems\b/.test(query)) {
       const all = EDGES as EdgesPageData & { data: { edgeProblems?: unknown[] } };
-      const rows = [...all.data.edges, ...copies].map((e) => {
+      await route.fulfill({ json: { data: { edgeProblems: all.data.edgeProblems ?? [] } } });
+    } else if (/query\s+EdgesPage\b/.test(query)) {
+      // The list: each edge's row and the headline of its verdict, as the server's `summary`,
+      // narrowed by the search and the `mine` / `followed` / `status` filters, with their counts.
+      const all = EDGES as EdgesPageData;
+      const needle = (body?.variables?.q ?? '').toLowerCase();
+      const found = [...all.data.edges, ...copies].filter((e) =>
+        [e['id'], e['name'], e['thesis']].some((t) =>
+          (typeof t === 'string' ? t : '').toLowerCase().includes(needle),
+        ),
+      );
+      const filters = (body?.variables?.filters ?? []) as {
+        id: string;
+        values: string[];
+        active: boolean;
+      }[];
+      const passes = (e: Record<string, unknown>, f: { id: string; values: string[] }) =>
+        f.id === 'mine'
+          ? e['mine'] === true
+          : f.id === 'followed'
+            ? e['state'] === 'following'
+            : f.id === 'status'
+              ? f.values.includes(String(e['status']))
+              : true;
+      const kept = found.filter((e) => filters.every((f) => !f.active || passes(e, f)));
+      const rows = kept.map((e) => {
         const verdict = (e['verdict'] ?? {}) as Record<string, unknown>;
         return {
           id: e['id'],
@@ -409,8 +482,38 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
           },
         };
       });
+      const statusCount = (value: string) => found.filter((e) => e['status'] === value).length;
       await route.fulfill({
-        json: { ...all, data: { edgeProblems: all.data.edgeProblems ?? [], edges: rows } },
+        json: {
+          data: {
+            edgeList: {
+              total: rows.length,
+              items: rows,
+              facets: {
+                total: found.length,
+                matched: rows.length,
+                items: filters.map((f) => ({
+                  id: f.id,
+                  active: f.active,
+                  removes: f.active
+                    ? found.filter((e) =>
+                        filters.every((g) => g === f || !g.active || passes(e, g)),
+                      ).length - rows.length
+                    : null,
+                  unknown: 0,
+                  options:
+                    f.id === 'status'
+                      ? ['candidate', 'rejected'].map((value) => ({
+                          value,
+                          count: statusCount(value),
+                        }))
+                      : [],
+                  bins: [],
+                })),
+              },
+            },
+          },
+        },
       });
     } else if (/query\s+EdgeBuilder\b/.test(query)) {
       await route.fulfill({ json: { data: { edge: BUILDER } } });

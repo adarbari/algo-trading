@@ -1,6 +1,7 @@
 /**
  * The screeners as one list: your own (finalized and draft-only) and the site presets, narrowed
- * by a segment (All / Mine / Presets) and a search. A row is not expandable as a whole: it shows
+ * by the shared filter bar (ADR 0082: owner, last run, candidates, edges that list it, in the
+ * URL's `f`) and a search over name and description, both answered by the server. A row is not expandable as a whole: it shows
  * the screener (kind, last run), its evidence (the strongest edge's name first, opening in place
  * whenever it has edges to one block per edge, one row at a time), today's picks (a link to the
  * screener, "Not run" without a run: the one way into the screener page, for presets and Python
@@ -16,7 +17,6 @@ import {
   LinkButton,
   Panel,
   SearchInput,
-  SegmentedControl,
   Stack,
   StatusBadge,
   Text,
@@ -26,23 +26,42 @@ import {
 } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
+import { useDebounced } from '@/shared/lib';
+
 import { ScreenerEvidenceCell, ScreenerEvidenceDetail } from '@/entities/edge';
 import {
   DecisionBadge,
   ScreenerDescription,
   useMyScreeners,
+  useScreenerList,
   useScreenerRuns,
   useScreeners,
   type ScreenerRunSummary,
 } from '@/entities/screen';
 import { CopyPresetDialog } from '@/features/screener-copy';
+import {
+  SurfaceFilterBar,
+  SurfaceZeroResults,
+  useFilterState,
+  type FilterSearch,
+} from '@/features/filter-bar';
 import { termHelp } from '@/features/guide-help';
 import { DeleteScreenerDialog } from '@/features/screener-delete';
 
-import { filterRows, SEGMENTS, toRows, type ListRow, type Segment } from '../model/rows';
+import { narrowRows, toRows, type ListRow } from '../model/rows';
 import { changesOf } from '../model/summary';
 
+/** The surface of the filter bar: its definitions are `config/site/filters/screeners.toml`. */
+const SURFACE = 'screeners';
+
+/** The list's search params: the filter bar's `f` and the search text `q`. */
+export type ScreenerListSearch = FilterSearch & { q?: string };
+export type ScreenerListSearchPatch = { f?: string | undefined; q?: string | undefined };
+
 export interface ScreenerListProps {
+  /** The filters in force and the search text (the URL's search params). */
+  search: ScreenerListSearch;
+  onSearchChange: (patch: ScreenerListSearchPatch) => void;
   /** Open a screener's results. */
   onOpen: (id: string) => void;
   /** Open a screener in the Builder (a new copy opens there: it has no run yet). */
@@ -77,37 +96,64 @@ const COLUMNS: readonly ExpandableTableColumn[] = [
   { id: 'actions', label: withHelp('Actions', 'screener_actions'), grow: 2.2, narrow: true },
 ];
 
-export function ScreenerList({ onOpen, onEdit, onOpenEdge }: ScreenerListProps) {
+export function ScreenerList({
+  search,
+  onSearchChange,
+  onOpen,
+  onEdit,
+  onOpenEdge,
+}: ScreenerListProps) {
   const configs = useScreeners();
   const mine = useMyScreeners();
   const runs = useScreenerRuns();
-  const [segment, setSegment] = useState<Segment>('all');
-  const [query, setQuery] = useState('');
+  const filters = useFilterState(search.f, (f) => {
+    onSearchChange({ f });
+  });
+  const text = search.q ?? '';
+  const narrowed = filters.filters.length > 0 || text.trim() !== '';
+  const narrowing = useScreenerList(filters.filters, useDebounced(text, 250));
   const [openId, setOpenId] = useState<string | null>(null);
   const [copying, setCopying] = useState<ListRow | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const rows = useMemo(
-    () => filterRows(toRows(configs.data ?? [], mine.data ?? []), segment, query),
-    [configs.data, mine.data, segment, query],
-  );
+  const all = useMemo(() => toRows(configs.data ?? [], mine.data ?? []), [configs.data, mine.data]);
+  const kept = narrowing.data?.ids ?? null;
+  const rows = useMemo(() => narrowRows(all, narrowed ? kept : null), [all, narrowed, kept]);
   const failed = (configs.isError && !configs.data) || (mine.isError && !mine.data);
-  const state = failed ? 'error' : configs.isPending || mine.isPending ? 'loading' : 'ready';
+  const waiting = narrowed && narrowing.isPending && !narrowing.isError;
+  const state = failed
+    ? 'error'
+    : configs.isPending || mine.isPending || waiting
+      ? 'loading'
+      : 'ready';
+  const clearSearch = (
+    <Button
+      size="sm"
+      variant="secondary"
+      onClick={() => {
+        onSearchChange({ q: undefined });
+      }}
+    >
+      Clear the search
+    </Button>
+  );
   return (
     <Stack gap={3}>
-      <Stack direction="row" gap={3} align="center" wrap>
-        <SegmentedControl
-          aria-label="Show screeners"
-          options={SEGMENTS}
-          value={segment}
-          onValueChange={setSegment}
-        />
-        <SearchInput
-          aria-label="Search screeners"
-          placeholder="Search screeners"
-          value={query}
-          onValueChange={setQuery}
-        />
-      </Stack>
+      <SurfaceFilterBar
+        surface={SURFACE}
+        state={filters}
+        facets={narrowing.data?.facets}
+        help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
+        search={
+          <SearchInput
+            aria-label="Search screeners"
+            placeholder="Search screeners"
+            value={text}
+            onValueChange={(q) => {
+              onSearchChange({ q: q || undefined });
+            }}
+          />
+        }
+      />
       {runs.isError && <Banner tone="warning">Today's runs failed to load.</Banner>}
       <Panel
         title="Screeners"
@@ -121,7 +167,20 @@ export function ScreenerList({ onOpen, onEdit, onOpenEdge }: ScreenerListProps) 
         }}
       >
         {rows.length === 0 ? (
-          <EmptyState title="No screener matches" />
+          filters.filters.length > 0 ? (
+            <Stack gap={2} align="start">
+              <SurfaceZeroResults
+                surface={SURFACE}
+                state={filters}
+                facets={narrowing.data?.facets}
+              />
+              {text && clearSearch}
+            </Stack>
+          ) : narrowed ? (
+            <EmptyState compact title={`No screener matches "${text}"`} action={clearSearch} />
+          ) : (
+            <EmptyState title="No screener yet" />
+          )
         ) : (
           <ExpandableTable
             label="Screeners"
