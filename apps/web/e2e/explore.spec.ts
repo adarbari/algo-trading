@@ -222,7 +222,7 @@ test('the features tab loads with one values read, one history read and no per-f
     .first()
     .click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  expect(count('GuideHelpField')).toBe(1);
+  await expect.poll(() => count('GuideHelpField')).toBe(1); // the read follows the open
 });
 
 test('a ticker Ideas opened shows why it is an idea, from the screener that surfaced it', async ({
