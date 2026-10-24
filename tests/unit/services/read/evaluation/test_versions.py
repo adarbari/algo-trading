@@ -1,7 +1,9 @@
 """A user's copy against the edge it extends (ADR 0053 amendment 2026-10-09): its out-of-sample
 result is withheld SERVER SIDE until the user shows it, its verdict is then judged on in-sample
 figures with the reason saying so, and the comparison and the published document are the
-server's."""
+server's. The provenance line of a verdict (``provenance.py``): CURRENT, STALE (too many sessions
+behind or a screener changed since the run) or RE_EVALUATING (a newer run of the owner is
+running); a run before the screener hashes were recorded is never claimed changed."""
 
 import tomllib
 from datetime import UTC, date, datetime, timedelta
@@ -14,10 +16,20 @@ from algotrade.data import StoreReader
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.evaluation import runs, versions
 from algotrade.services.read.evaluation.edges import Edge, load_edge, load_edge_problems, load_edges
+from algotrade.services.read.evaluation.provenance import (
+    CURRENT,
+    RE_EVALUATING,
+    STALE,
+    STALE_AFTER_SESSIONS,
+    Provenance,
+    load_verdict_provenance,
+    short_id,
+)
 from algotrade.services.read.evaluation.verdict import NOT_ENOUGH, NOT_WORKING, WAITING
+from algotrade.services.read.screens.screeners import load_screener
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
-from algotrade.storage.runs import RunRecord
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.evaluation.conftest import (
@@ -27,6 +39,8 @@ from tests.unit.services.read.evaluation.conftest import (
     START,
     row,
     series_row,
+    session_ctx,
+    stores,
     write_run,
 )
 
@@ -383,3 +397,83 @@ def test_a_copy_serves_the_settings_the_builder_edits_and_its_own_document() -> 
     }
     site = edges["drift"].settings
     assert site is not None and site.top_k == 5 and dict(site.own) == {}
+
+
+# The provenance line under the verdict (CURRENT / STALE / RE_EVALUATING).
+
+
+def _provenance(backend: MemoryBackend, day: date) -> Provenance | None:
+    ctx = session_ctx(stores(backend), day)
+    edge = load_edge(ctx, "drift")
+    assert edge is not None
+    return load_verdict_provenance(ctx, edge)
+
+
+def _current_hash(backend: MemoryBackend) -> str:
+    found = load_screener(session_ctx(stores(backend), END), "momo")
+    assert found is not None
+    return found.hash
+
+
+def test_a_run_of_the_served_session_is_current_with_today_s_data(backend: MemoryBackend) -> None:
+    write_run(backend, "r", FROZEN, 0.6, trials_counted=2,
+              screener_hashes={"momo": _current_hash(backend)})  # fmt: skip
+    found = _provenance(backend, END)
+    assert found is not None and found.state == CURRENT and found.sessions_behind == 0
+    assert found.line == ("Evaluated on the 30 Sep session, today's data. Run r, 2 variants tried.")
+    assert found.short_id == short_id(found.run_id) and not found.re_evaluating
+
+
+def test_the_short_id_is_the_write_instant_the_run_id_ends_with() -> None:
+    assert short_id("edge-eval:drift:site-2026-10-22-20261022T235000Z") == "20261022T235000Z"
+
+
+def test_a_run_more_than_the_limit_behind_is_stale(backend: MemoryBackend) -> None:
+    write_run(backend, "r", FROZEN, 0.6, screener_hashes={"momo": _current_hash(backend)})
+    held = _provenance(backend, date(2026, 10, 7))
+    assert held is not None and held.state == CURRENT
+    found = _provenance(backend, date(2026, 10, 8))
+    assert (
+        found is not None and found.state == STALE and found.sessions_behind > STALE_AFTER_SESSIONS
+    )
+    assert found.line.startswith("Evaluated 30 Sep, 6 sessions ago.")
+    assert not found.screener_changed
+
+
+def test_a_screener_that_changed_since_the_run_makes_it_stale(backend: MemoryBackend) -> None:
+    write_run(backend, "r", FROZEN, 0.6, screener_hashes={"momo": "an-older-config"})
+    found = _provenance(backend, END)
+    assert found is not None and found.state == STALE and found.screener_changed
+    assert found.screener_version == 1
+    assert found.line.endswith(
+        "The screener changed since: this verdict is for the earlier version."
+    )
+
+
+def test_a_run_without_recorded_hashes_is_not_claimed_changed(backend: MemoryBackend) -> None:
+    write_run(backend, "r", FROZEN, 0.6)
+    found = _provenance(backend, END)
+    assert found is not None and found.state == CURRENT and not found.screener_changed
+
+
+def test_a_newer_running_evaluation_is_re_evaluating(backend: MemoryBackend) -> None:
+    write_run(backend, "r", FROZEN, 0.6, screener_hashes={"momo": _current_hash(backend)})
+    write_run(backend, "next", FROZEN, 0.6, minutes=30, status=RunStatus.RUNNING)
+    found = _provenance(backend, END)
+    assert found is not None and found.state == RE_EVALUATING and found.re_evaluating
+    assert found.re_evaluation_started is not None
+    assert found.line == (
+        f"A new evaluation started 2 Oct {found.re_evaluation_started:%H:%M}. "
+        "Showing the 30 Sep verdict until it finishes."
+    )
+
+
+def test_a_crashed_running_record_of_an_older_session_is_ignored(backend: MemoryBackend) -> None:
+    write_run(backend, "r", FROZEN, 0.6, screener_hashes={"momo": _current_hash(backend)})
+    write_run(backend, "dead", FROZEN, 0.6, minutes=30, status=RunStatus.RUNNING)
+    found = _provenance(backend, date(2026, 10, 1))  # the record's session (30 Sep) is past
+    assert found is not None and found.state == CURRENT and not found.re_evaluating
+
+
+def test_no_run_has_no_provenance(backend: MemoryBackend) -> None:
+    assert _provenance(backend, END) is None
