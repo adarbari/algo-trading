@@ -725,3 +725,4 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: CI noise and main's drift, not the run line's behaviour; the owner chose to raise it in chat on 2026-10-24.
+- Superseded the same day: main's #945 raised the same budget to 217130 B, so this PR keeps main's value and adds no raise of its own.
