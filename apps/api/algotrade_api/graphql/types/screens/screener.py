@@ -14,10 +14,11 @@ from strawberry.types import Info
 
 from algotrade.services.read.availability.cause import public_audit
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.instruments.table import DEFAULT_SIZE
 from algotrade.services.read.screens import pick_history as picks
 from algotrade.services.read.screens import results, runs, screeners
-from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.limits import MAX_FILTERS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.scalars import FeatureName
@@ -131,13 +132,19 @@ class ScreenerRun:
         return PickIds.of(await off_loop(runs.load_pick_ids, self.ctx, self.run, size))
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="Its rows as a review table: `decisions` (none: all; any case), `change` "
-        "(`new` / `dropped`) and `q` (the symbol or name contains it) filtered, sorted by "
+        description="Its rows as a review table: `filters` (the surface `screener_results` of "
+        "`filterSet`) and `q` (the symbol or name contains it) filtered, `decisions` and "
+        "`change` (deprecated: the `decision` and `change` filters; `new` / `dropped`) "
+        "likewise, over the whole run, with the counts in `facets` (ADR 0082), sorted by "
         "`sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, "
         "`column:<name>` or a catalogue name; `-` prefix: descending; missing values last; "
         "default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` "
         "for the page's rows",
-        extensions=[MaxItems("columns", MAX_NAMES), MaxItems("size", MAX_PAGE)],
+        extensions=[
+            MaxItems("columns", MAX_NAMES),
+            MaxItems("size", MAX_PAGE),
+            MaxItems("filters", MAX_FILTERS),
+        ],
     )
     async def results(
         self,
@@ -149,11 +156,19 @@ class ScreenerRun:
         columns: list[FeatureName] | None = None,
         page: int = 1,
         size: int = DEFAULT_SIZE,
+        filters: list[FilterInput] | None = None,
     ) -> ScreenResultPage:
         query = results.ResultQuery(tuple(decisions or ()), change, q, sort)
         # Off the event loop: the whole run is filtered and sorted (about 11k rows).
         found = await off_loop(
-            results.load_result_page, self.ctx, self.run, query, columns or [], page, size
+            results.load_result_page,
+            self.ctx,
+            self.run,
+            query,
+            columns or [],
+            page,
+            size,
+            tuple(filters or ()),
         )
         return ScreenResultPage.of(found, self.ctx)
 

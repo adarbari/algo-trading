@@ -44,10 +44,14 @@ def _screen(config_id: str, name: str | None = None, version: int = 1) -> dict[s
 
 
 Docs = Mapping[tuple[str, str, str], Mapping[str, Any]]
-# the shipped filter definitions of the Ideas surface (ADR 0082): the loader reads them
+# the shipped filter definitions of the Ideas and results surfaces (ADR 0082): the loader reads them
 IDEAS_FILTERS = tomllib.loads((REPO_ROOT / "config/site/filters/ideas.toml").read_text())
+RESULTS_FILTERS = tomllib.loads(
+    (REPO_ROOT / "config/site/filters/screener_results.toml").read_text()
+)
 CONFIGS: Docs = {
     ("site", "filters", "ideas"): IDEAS_FILTERS,
+    ("site", "filters", "screener_results"): RESULTS_FILTERS,
     ("site", "selections", "all_active"): {
         "name": "all_active",
         "where": {"all": [{"field": "instrument.status", "op": "eq", "value": "ACTIVE"}]},
