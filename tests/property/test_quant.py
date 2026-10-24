@@ -11,6 +11,7 @@ from algotrade.quant import black_scholes as bs
 from algotrade.quant import covariance as cv
 from algotrade.quant import realized_vol as rv
 from algotrade.quant import turning_points as tp
+from algotrade.quant.cross_section import cohort_percentile
 from algotrade.quant.implied_vol import IVStatus, implied_vol
 from algotrade.quant.rates import YieldCurve, par_to_continuous
 
@@ -158,3 +159,58 @@ def test_dated_phases_alternate_and_respect_the_rules(seed: int) -> None:
         assert phase.end - phase.start >= 4 or abs(phase.change) > 0.20
     for before, after in pairwise(dated):
         assert after.end - before.start >= 16  # every cycle (peak to peak, trough to trough)
+
+
+# cohort_percentile: values with some unknowns, an int cohort code per element (-1: none)
+_cells = st.lists(
+    st.tuples(st.one_of(st.floats(-1e6, 1e6), st.just(float("nan"))), st.integers(-1, 2)),
+    min_size=2,
+    max_size=40,
+)
+
+
+def _split(cells: list[tuple[float, int]]) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+    return np.array([c[0] for c in cells]), np.array([c[1] for c in cells])
+
+
+@given(_cells, st.integers(2, 6))
+def test_cohort_percentile_is_in_range_and_nan_only_where_unranked(
+    cells: list[tuple[float, int]], floor: int
+) -> None:
+    values, codes = _split(cells)
+    out = cohort_percentile(values, codes, floor)
+    assert np.all((out[~np.isnan(out)] >= 0) & (out[~np.isnan(out)] <= 1))
+    assert np.isnan(out[np.isnan(values) | (codes < 0)]).all()
+    for code in set(codes[codes >= 0].tolist()):
+        known = int((~np.isnan(values) & (codes == code)).sum())
+        ranked = ~np.isnan(out[codes == code])
+        assert ranked.sum() == (known if known >= floor else 0)
+
+
+@given(_cells, st.randoms(use_true_random=False))
+def test_cohort_percentile_ignores_row_order_and_is_deterministic(
+    cells: list[tuple[float, int]], rng: object
+) -> None:
+    values, codes = _split(cells)
+    order = np.arange(len(cells))
+    rng.shuffle(order)  # type: ignore[attr-defined]
+    out = cohort_percentile(values, codes, 2)
+    assert np.array_equal(out, cohort_percentile(values, codes, 2), equal_nan=True)
+    shuffled = cohort_percentile(values[order], codes[order], 2)
+    assert np.array_equal(shuffled, out[order], equal_nan=True)
+
+
+@given(_cells, st.floats(-1e6, 1e6))
+def test_cohort_percentile_is_monotone_and_blind_to_other_cohorts(
+    cells: list[tuple[float, int]], extra: float
+) -> None:
+    values, codes = _split(cells)
+    out = cohort_percentile(values, codes, 2)
+    for code in set(codes[codes >= 0].tolist()):
+        mine = (codes == code) & ~np.isnan(out)
+        order = np.argsort(values[mine], kind="stable")
+        assert np.all(np.diff(out[mine][order]) >= 0)
+    # a member added to another cohort leaves this one's ranks unchanged
+    more = cohort_percentile(np.append(values, extra), np.append(codes, 7), 2)
+    keep = codes >= 0
+    assert np.array_equal(more[:-1][keep], out[keep], equal_nan=True)

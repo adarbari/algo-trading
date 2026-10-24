@@ -45,6 +45,7 @@ from algotrade.features.rollups.statements.lines import (
     STATEMENTS,
 )
 from algotrade.features.rollups.statements.ttm import TtmParams
+from algotrade.quant.cross_section import cohort_percentile
 
 NAME = "mispricing"
 VERSION = 1
@@ -301,10 +302,10 @@ def _assets_a_year_ago(
 def percentile(values: pd.Series, p: MispricingParams) -> pd.Series:
     """The percentile rank (0 lowest, 1 highest, ties share the average) of each known value
     among the known ones; all NaN when fewer than ``min_members`` are known."""
-    known = values.notna()
-    if known.sum() < p.min_members:
-        return pd.Series(np.nan, index=values.index, dtype=float)
-    return (values.rank(method="average") - 1) / (known.sum() - 1)
+    ranks = cohort_percentile(
+        values.to_numpy(dtype=float), np.zeros(len(values), dtype=int), p.min_members
+    )
+    return pd.Series(ranks, index=values.index, dtype=float)
 
 
 def _mean_rank(ranks: pd.DataFrame, minimum: int) -> tuple[pd.Series, pd.Series]:

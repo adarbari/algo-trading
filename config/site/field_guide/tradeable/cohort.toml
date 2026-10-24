@@ -1,0 +1,141 @@
+# L3 site setting: the field guide entries of the cohort percentile columns (cohort_pct_price@v1: a price
+# feature ranked among the universe's stocks, the name's sector and its industry). Keys as chart/momentum.toml.
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.mom_12_1_pct_universe"
+theme = "instrument gates"
+reads = "Where the 12-1 momentum (the 12-month return without the last month) ranks among the universe's stocks: 0 the weakest, 1 the strongest, 0.9 a top-decile year. A rank is comparable across market regimes where the raw return is not."
+caveats = [
+  "A rank hides magnitude: in a flat year the top decile may have gained little. Read rollup.trend_stats@v2.mom_12_1 for the size.",
+  "Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null.",
+  "Every name is null when fewer than 200 stocks have a known value, or when fewer than 90% of the universe's stocks have a price_stats row (a partial day).",
+  "The strongest year-long winners are the most extended names: add feature.stretch_sma50_atr lte 4 to avoid chasing.",
+]
+sources = ["Jegadeesh and Titman (1993), Returns to buying winners and selling losers, Journal of Finance"]
+[[field.use]]
+for = "a top-decile year of momentum"
+op = "gte"
+value = 0.9
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_price@v1.mom_12_1_pct_sector gte 0.8 so the lead is also within its own sector"
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.mom_12_1_pct_sector"
+theme = "instrument gates"
+reads = "Where the 12-1 momentum ranks among the stocks of the name's sector: 0 the weakest of its sector, 1 the strongest. It says whether the name leads its peers, which a universe rank cannot when the whole sector is moving."
+caveats = [
+  "A name with no sector in the company snapshot on or before the session is null here but keeps its universe rank (rollup.cohort_pct_price@v1.mom_12_1_pct_universe).",
+  "Null when fewer than 20 stocks of the sector have a known value: a small sector gives no rank, never a coarse one.",
+  "The sector is the coarse SEC SIC heuristic's: Technology mixes hardware and software. Read the industry rank (mom_12_1_pct_industry) for the closer peers.",
+]
+sources = ["Moskowitz and Grinblatt (1999), Do industries explain momentum?, Journal of Finance"]
+[[field.use]]
+for = "a leader among its sector peers"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_price@v1.mom_12_1_pct_universe gte 0.5 so the sector itself is not the laggard"
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.mom_12_1_pct_industry"
+theme = "instrument gates"
+reads = "Where the 12-1 momentum ranks among the stocks of the name's industry (the SEC's own SIC description): the closest peer comparison the data supports. 1 is the strongest of its industry."
+caveats = [
+  "Industries are small: null when fewer than 10 stocks of the industry have a known value, and with 10 to 15 stocks one name moves the rank a lot.",
+  "A name with no industry in the company snapshot is null here but keeps its universe rank.",
+]
+sources = ["Moskowitz and Grinblatt (1999), Do industries explain momentum?, Journal of Finance"]
+[[field.use]]
+for = "the strongest of its industry"
+op = "gte"
+value = 0.9
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_price@v1.mom_12_1_pct_sector gte 0.7 so the industry is not a corner of a weak sector"
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.adv_usd_20d_pct_universe"
+theme = "instrument gates"
+reads = "Where the 20-session average dollar volume ranks among the universe's stocks: 0 the thinnest, 1 the most traded. A liquidity rank that adapts to the market's level, where a dollar threshold on rollup.price_stats@v2.adv_usd_20d does not."
+caveats = [
+  "A rank is not tradability: the median stock can still be too thin for the size you trade. Keep an absolute floor on rollup.price_stats@v2.adv_usd_20d.",
+  "Null for ETFs, funds and trusts, and for every name on a partial day (fewer than 90% of the universe's stocks with a price_stats row).",
+]
+sources = ["Amihud (2002), Illiquidity and stock returns, Journal of Financial Markets"]
+[[field.use]]
+for = "among the most liquid half of stocks"
+op = "gte"
+value = 0.5
+mode = "soft"
+tolerance = 0.05
+note = "with an absolute floor on rollup.price_stats@v2.adv_usd_20d"
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.adv_usd_20d_pct_sector"
+theme = "instrument gates"
+reads = "Where the 20-session average dollar volume ranks among the stocks of the name's sector: 1 the most traded of its sector. Low values flag the sector's thin names, a better floor than the universe rank in a sector that trades light as a whole."
+caveats = [
+  "Null with no sector in the company snapshot, or fewer than 20 stocks of the sector with a known value; the universe rank (rollup.cohort_pct_price@v1.adv_usd_20d_pct_universe) is kept.",
+  "Dollar volume grows with price and size: a large-cap sector ranks its mid caps low although they trade freely.",
+]
+sources = ["Amihud (2002), Illiquidity and stock returns, Journal of Financial Markets"]
+[[field.use]]
+for = "not among its sector's thin names"
+op = "gte"
+value = 0.3
+mode = "soft"
+tolerance = 0.05
+note = "with an absolute floor on rollup.price_stats@v2.adv_usd_20d"
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.adv_usd_20d_pct_industry"
+theme = "instrument gates"
+reads = "Where the 20-session average dollar volume ranks among the stocks of the name's industry: 1 the most traded of its industry."
+caveats = [
+  "Null with no industry in the company snapshot, or fewer than 10 stocks of the industry with a known value; the universe rank is kept.",
+  "A rank among 10 to 15 names is coarse: read the dollar figure (rollup.price_stats@v2.adv_usd_20d) before relying on a small industry.",
+]
+sources = ["Amihud (2002), Illiquidity and stock returns, Journal of Financial Markets"]
+[[field.use]]
+for = "not the thinnest of its industry"
+op = "gte"
+value = 0.3
+mode = "soft"
+tolerance = 0.05
+note = "with an absolute floor on rollup.price_stats@v2.adv_usd_20d"
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector"
+theme = "instrument gates"
+reads = "Where the 63-session relative strength against SPY ranks among the stocks of the name's sector: 1 the strongest of its sector over the quarter. It separates a name that leads its sector from one carried by it."
+caveats = [
+  "Relative strength is already measured against the market, so there is no universe rank of it: read rollup.relative_strength@v1.mom_pctile_63d for the quarter's return rank.",
+  "Null with no sector, or fewer than 20 stocks of the sector with a known rs_spy_63d, or on a partial day.",
+]
+sources = ["O'Neil (1988), How to Make Money in Stocks: relative price strength rank"]
+[[field.use]]
+for = "a quarter's leader within its sector"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.relative_strength@v1.rs_spy_63d gt 0 so it also beat the market"
+
+[[field]]
+name = "rollup.cohort_pct_price@v1.rs_spy_63d_pct_industry"
+theme = "instrument gates"
+reads = "Where the 63-session relative strength against SPY ranks among the stocks of the name's industry: 1 the strongest of its industry over the quarter."
+caveats = [
+  "Null with no industry, or fewer than 10 stocks of the industry with a known rs_spy_63d, or on a partial day.",
+  "A small industry gives a coarse rank: pair with rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector.",
+]
+sources = ["O'Neil (1988), How to Make Money in Stocks: relative price strength rank"]
+[[field.use]]
+for = "a quarter's leader within its industry"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector gte 0.6"
