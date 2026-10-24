@@ -28,6 +28,9 @@ from algotrade.services.read.evaluation.pick_edges import (
     UNJUDGED,
     PickEdge,
 )
+from algotrade.services.read.filtering.definitions import FilterRefusedError
+from algotrade.services.read.filtering.masks import FilterInput, WindowUnit, Within
+from algotrade.services.read.filtering.served import load_served_filters
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.results import (
@@ -52,12 +55,14 @@ from tests.helpers.stored_frames import stamped
 from tests.unit.services.read.screens.conftest import (
     D0,
     D1,
+    RESULTS_FILTERS,
     Docs,
     T,
     context,
     write_gated,
     write_run,
 )
+from tests.unit.services.read.screens.test_ideas import DOCS, IV_FILTER, filter_store
 
 
 def test_results_carry_criteria_columns_flags_and_identity(ctx: ReadContext) -> None:
@@ -718,3 +723,141 @@ def test_a_viewers_own_run_is_not_judged_by_the_sites_picks(
     _store(backend, PICKED, ["BBB"])
     found = _toward(context(reader, _edge("drift", "beta", top_k=2)), "me", "beta")  # me's beta
     assert {e.code for edges in found.values() for e in edges} == {NOT_STORED}
+
+
+# ---------------------------------------------------------------------- filters (ADR 0082)
+def _big(docs: Docs | None = None, user: str = "full", store: MemoryBackend | None = None) -> Any:
+    """The twelve-pick run ``big`` (dollar volume on S000..S007, IV on all) as ``user`` reads it."""
+    reader = StoreReader(store or filter_store())
+    ctx = context(reader, {**FILTER_DOCS, **(docs or {})}, user=user)
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    return ctx, run
+
+
+FILTER_DOCS: Docs = {
+    **DOCS,
+    ("site", "filters", "screener_results"): {
+        **RESULTS_FILTERS,
+        "filter": [*RESULTS_FILTERS["filter"], IV_FILTER],
+    },
+}
+BIG = 13  # twelve picks and a reject
+
+
+def _ids(page: ResultPage) -> list[str]:
+    return [r.instrument_id for r in page.results]
+
+
+def test_filters_narrow_the_whole_run_before_it_is_paged() -> None:
+    ctx, run = _big()
+    only = [FilterInput("dollar_volume", min=50_000_000)]
+    pages = [load_result_page(ctx, run, None, (), n, 2, only) for n in (1, 2, 3)]
+    assert [_ids(p) for p in pages] == [["EQ:S004", "EQ:S005"], ["EQ:S006", "EQ:S007"], []]
+    assert {p.total for p in pages} == {4}  # S004..S007 sit past the first page
+    assert all(
+        p.facets is not None and (p.facets.total, p.facets.matched) == (BIG, 4) for p in pages
+    )
+    plain = load_result_page(ctx, run, None, (), 1, 100)
+    assert plain.total == BIG and plain.facets is not None and plain.facets.matched == BIG
+
+
+def test_the_old_arguments_equal_the_filters_they_map_onto() -> None:
+    ctx, run = _big()
+    old = load_result_page(ctx, run, ResultQuery(decisions=("qualified",), change="new"))
+    new = load_result_page(
+        ctx, run, None, (), 1, 100,
+        [FilterInput("decision", ["QUALIFIED"]), FilterInput("change", ["new"])],
+    )  # fmt: skip
+    assert old.total == new.total == len(old.results) > 0
+    assert old == new
+    assert load_result_page(ctx, run, ResultQuery(decisions=("reject",))).total == 1
+    with pytest.raises(FilterRefusedError, match="twice"):  # set both ways
+        load_result_page(ctx, run, ResultQuery(change="new"), (), 1, 5, [FilterInput("change")])
+
+
+def test_unknown_never_passes_a_filter_and_is_counted() -> None:
+    ctx, run = _big()
+    zero = load_result_page(ctx, run, None, (), 1, 100, [FilterInput("dollar_volume", min=0)])
+    assert zero.total == 8  # a min of 0 admits no null
+    assert zero.facets is not None
+    [volume] = [f for f in zero.facets.items if f.id == "dollar_volume"]
+    assert (volume.unknown, volume.removes) == (BIG - 8, BIG - 8)
+    window = [FilterInput("earnings", within=Within(100, WindowUnit.SESSIONS))]
+    assert load_result_page(ctx, run, None, (), 1, 100, window).total == 6
+
+
+def test_pages_of_a_filtered_run_partition_it_with_q_applied_after() -> None:
+    ctx, run = _big()
+    only = [FilterInput("dollar_volume", min=30_000_000)]
+    seen = [i for n in (1, 2, 3) for i in _ids(load_result_page(ctx, run, None, (), n, 3, only))]
+    assert seen == [f"EQ:S{n:03d}" for n in range(2, 8)]
+    searched = load_result_page(ctx, run, ResultQuery(q="S00"), (), 1, 100, only)
+    assert searched.total == 6 and searched.facets is not None
+    assert searched.facets.total == BIG  # the counts are of the run, not of the search
+    assert [
+        r.instrument_id
+        for r in load_result_page(ctx, run, ResultQuery(q="S003"), (), 1, 9, only).results
+    ] == ["EQ:S003"]
+
+
+def test_a_filter_the_viewer_is_not_offered_is_refused() -> None:
+    ctx, run = _big(user="bare")
+    with pytest.raises(FilterRefusedError):
+        load_result_page(ctx, run, None, (), 1, 5, [FilterInput("iv", min=0.3)])
+    assert "iv" not in {f.id for f in load_served_filters(ctx, "screener_results").filters}
+
+
+def test_changing_a_hidden_licence_fields_values_changes_no_count() -> None:
+    """The leak test: two stores differing only in the stored ``iv30_ibkr``; the viewer without
+    the personal licence reads the same page, total and every facet from both."""
+    low, high = filter_store(lambda n: 0.05), filter_store(lambda n: 0.95)
+    given = [FilterInput("dollar_volume", min=20_000_000), FilterInput("decision", ["QUALIFIED"])]
+    shapes = []
+    for store in (low, high):
+        ctx, run = _big(user="bare", store=store)
+        shapes.append(load_result_page(ctx, run, None, (), 1, 100, given))
+    assert shapes[0] == shapes[1]
+    assert shapes[0].facets is not None and all(f.id != "iv" for f in shapes[0].facets.items)
+    seen = []
+    for store in (low, high):
+        ctx, run = _big(store=store)
+        seen.append(
+            load_result_page(ctx, run, None, (), 1, 100, [FilterInput("iv", min=0.5)]).total
+        )
+    assert seen[0] != seen[1]  # the holder of the licence reads the values
+
+
+def test_a_withheld_rank_is_unknown_to_a_filter(ctx: ReadContext, reader: StoreReader) -> None:
+    trader = context(reader, user="trader")  # the run read personal fields: rank is withheld
+    run = latest_run(trader, "site", "alpha").run
+    assert run is not None and run_withheld(trader, run)
+    page = load_result_page(trader, run, None, (), 1, 100, [FilterInput("rank", min=1)])
+    assert page.total == 0 and page.facets is not None
+    [rank] = [f for f in page.facets.items if f.id == "rank"]
+    assert rank.unknown == page.facets.total == 3
+
+
+def test_a_gap_is_disclosed_only_for_the_tables_of_a_set_filter(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The small store has no volume or earnings tables: they are read for the facets, and
+    named in ``missing`` only when a filter on them is set; a decision filter names none."""
+    assert _page(ctx, ResultQuery(decisions=("qualified",))).missing == ()
+    assert _page(ctx).missing == ()
+    page = load_result_page(
+        ctx, latest_run(ctx, "site", "alpha").run, None, (), 1, 5,  # type: ignore[arg-type]
+        [FilterInput("dollar_volume", min=1)],
+    )  # fmt: skip
+    assert page.missing == ("rollups/instrument/volume@v1",)
+
+
+def test_a_new_search_or_sort_reads_the_filter_pass_once(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ran: list[int] = []
+    real = results._filter_run
+    monkeypatch.setattr(results, "_filter_run", lambda *a: ran.append(1) or real(*a))
+    for query in (ResultQuery(), ResultQuery(q="a"), ResultQuery(sort="-score")):
+        _page(ctx, query)
+    assert ran == [1]

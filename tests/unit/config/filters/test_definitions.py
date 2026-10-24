@@ -274,3 +274,14 @@ def test_a_pick_needs_exactly_the_options_its_source_names(extra: dict[str, Any]
 
 def test_a_column_prefix_is_the_documented_one() -> None:
     assert COLUMN == "column:"
+
+
+@pytest.mark.parametrize("surface", ("ideas", "screener_results", "universe"))
+def test_cohort_percentile_filters_are_ranges_over_the_zero_to_one_features(surface: str) -> None:
+    """The pass does not serve kind ``percentile`` yet, so a cohort rank is a range over the
+    stored 0..1 feature, one definition per cohort, its bins spanning exactly 0..1."""
+    ranks = [f for f in shipped(surface).filters if "cohort_pct_" in f.field]
+    assert {f.id for f in ranks} >= {"mom_pct_sector", "rs_pct_sector", "rs_pct_industry",
+                                     "dollar_volume_pct_universe"}  # fmt: skip
+    for f in ranks:
+        assert f.kind == "range" and f.bins[0] == 0 and f.bins[-1] == 1, f.id

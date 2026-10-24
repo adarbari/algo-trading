@@ -16,6 +16,7 @@ from algotrade.services.read.evaluation import pick_edges
 from algotrade.services.read.screens import results as stored
 from algotrade.services.read.screens import screeners as stored_screeners
 from algotrade_api.graphql.types.availability import KindText, Unavailable
+from algotrade_api.graphql.types.filtering.facets import FilterFacets
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 
@@ -199,6 +200,7 @@ class ScreenResultPage:
     reasons: list[list[values.NullReason | None]]
     kinds: list[list[UnavailableKind | None]]
     unavailable: list[Unavailable]
+    facets: FilterFacets | None
 
     @classmethod
     def of(cls, d: stored.ResultPage, ctx: ReadContext) -> Self:
@@ -215,6 +217,7 @@ class ScreenResultPage:
             reasons=[list(row) for row in d.reasons],
             kinds=[list(row) for row in d.kinds],
             unavailable=[Unavailable.of(u) for u in d.unavailable],
+            facets=FilterFacets.of(d.facets) if d.facets is not None else None,
         )
 
     @strawberry.field(  # type: ignore[untyped-decorator]
