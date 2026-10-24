@@ -1,0 +1,58 @@
+# Every table, list or feed renders the shared filter bar (ADR 0082; docs/ui/filtering.md;
+# .claude/skills/add-ui-component step 7). A "data surface" is a file under apps/web/src that
+# renders DataTable, ExpandableTable, FeatureTable or MasterDetail.
+#
+# Checked by tests/architecture/test_layout_web.py::test_data_surfaces_use_the_filter_bar. A
+# surface passes when its file renders SurfaceFilterBar or FilterBar, or is listed below with
+# a reason. [ADR 0025 rule 12]
+#
+#   [migrating]  surfaces that WILL get the bar. Shrink-only: the PR that puts the bar on a
+#                surface deletes its line (the test fails on a line whose file now has the
+#                bar, naming this file). Never add a line: build the surface on the bar.
+#   [exempt]     surfaces that stay without it, each with its reason (a fixed handful of
+#                rows, a drill-down of one thing, a detail panel). A new line needs an
+#                owner-visible reason in the PR; a table of many rows is never exempt.
+#
+# A path that no longer renders a data surface fails too (delete the line).
+
+[migrating]
+"src/pages/trader-explore/ui/OtherTabs.tsx" = "migrating: Explore tabs onto the bar (ADR 0082, session filter-web-results-explore)"
+"src/widgets/edge-list/ui/EdgeList.tsx" = "migrating: Edges list onto the bar (ADR 0082, session filter-web-lists)"
+"src/widgets/edge-trades/ui/EdgeTrades.tsx" = "migrating: edge trades onto the bar (ADR 0082, session filter-web-lists)"
+"src/widgets/feature-table/ui/ScreenerResults.tsx" = "migrating: screener results onto the bar (ADR 0082, session filter-web-results-explore)"
+"src/widgets/feature-table/ui/TableFrame.tsx" = "migrating: the shared table frame of screener results and Explore (ADR 0082, session filter-web-results-explore)"
+"src/widgets/screener-list/ui/ScreenerList.tsx" = "migrating: screener list onto the bar (ADR 0082, session filter-web-lists)"
+
+[exempt]
+"src/entities/run/ui/RunRecordDrawer.tsx" = "detail drawer: the steps of one run, fixed rows"
+"src/pages/admin-harness-runs/ui/AdminHarnessRunsPage.tsx" = "list beside its detail over HarnessRunList; admin run history, not yet on the bar (follow-up: a harness-runs surface)"
+"src/pages/admin-ingestion/ui/AdminIngestionPage.tsx" = "list of ingestion workflows (a handful of fixed rows) beside its detail"
+"src/pages/admin-llm-usage/ui/CallsSection.tsx" = "list beside its detail over UsageCallsPanel; admin usage log, not yet on the bar"
+"src/pages/admin-screener-runs/ui/AdminScreenerRunsPage.tsx" = "the filter bar is in ScreenerRunList, which this page renders beside its detail"
+"src/widgets/accepted-formula-list/ui/AcceptedFormulaList.tsx" = "per-user accepted formulas, a short list (admin review)"
+"src/widgets/edge-detail/ui/EdgeCompare.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-detail/ui/EdgeDetailsBody.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-detail/ui/EdgeLive.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-diagnostics/ui/EdgeMonthly.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-diagnostics/ui/EdgeVariants.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-evidence/ui/EdgeFigures.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-performance/ui/EdgeDrawdown.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-performance/ui/EdgeHorizons.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-performance/ui/EdgeRegimes.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-performance/ui/EdgeYears.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/edge-signals/ui/EdgeSignals.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
+"src/widgets/event-study-panel/ui/EventStudyPanel.tsx" = "one instrument's event-study statistics, a few fixed classes"
+"src/widgets/events-panel/ui/EventsPanel.tsx" = "one instrument's events, a short drill-down list"
+"src/widgets/feature-request-list/ui/FeatureRequestList.tsx" = "admin review queue, a short list"
+"src/widgets/features-panel/ui/FeaturesPanel.tsx" = "one instrument's stored features, the Explore field table with its own search"
+"src/widgets/guide-screener/ui/GuideScreener.tsx" = "Guide page: the criteria of one screener, fixed rows"
+"src/widgets/harness-run-detail/ui/HarnessRunDetail.tsx" = "detail of one harness run: its checks, fixed rows"
+"src/widgets/harness-run-list/ui/HarnessRunList.tsx" = "admin harness run history, not yet on the bar (follow-up: a harness-runs surface)"
+"src/widgets/holdings-panel/ui/HoldingsPanel.tsx" = "one fund's top holdings, a fixed top-N list"
+"src/widgets/options-panel/ui/OptionsPanel.tsx" = "one instrument's option chain tables (strike ladder), not a browsable list"
+"src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx" = "detail panel: the fixed list of quality checks of one run"
+"src/widgets/regime-episodes/ui/RegimeEpisodes.tsx" = "a handful of named regime episodes"
+"src/widgets/review-items-panel/ui/ReviewItemsPanel.tsx" = "admin review queue, a short list"
+"src/widgets/usage-breakdown-panel/ui/UsageBreakdownPanel.tsx" = "aggregate breakdown by a few fixed groups"
+"src/widgets/usage-calls-panel/ui/UsageCallsPanel.tsx" = "admin LLM call log, not yet on the bar (follow-up: a usage-calls surface)"
+"src/widgets/verification-panel/ui/VerificationPanel.tsx" = "detail panel: the fixed list of verification checks"

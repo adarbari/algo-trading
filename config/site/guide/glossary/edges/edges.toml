@@ -399,3 +399,64 @@ before the trigger was recorded shows none, and the app does not guess one.
 """
 next = "Judge a run by its measures, not its trigger; press Run on an edge you own to start a fresh one."
 see_also = ["edge_run_rights", "edge_owner"]
+
+[[term]]
+id = "edge_provenance"
+term = "Evaluation line"
+short = "Which evaluation the verdict rests on, how old it is, and whether it is still current."
+body = """
+Under an edge's verdict the app says which evaluation the verdict is judged on. It names the
+session evaluated, how many trading sessions ago that was, the run's short id and how many
+variants were tried. The app decides all of it on the server; nothing is worked out in your
+browser. A verdict describes one evaluation, so an old one can be right about the past and wrong
+about today. The line tells you which of three cases you are in: current, stale, or being
+re-evaluated. Example: "Evaluated 12 Oct, 8 sessions ago. The screener changed since: this
+verdict is for the earlier version." The verdict was judged on the old screener. Do not read it
+as a verdict on the screener you see now.
+"""
+next = "If the line says stale, run the evaluation again or wait for the nightly run; the verdict updates when the new run commits."
+see_also = ["provenance_current", "provenance_stale", "provenance_re_evaluating", "official_result", "variants_tried"]
+
+[[term]]
+id = "provenance_current"
+term = "Current evaluation"
+short = "The verdict rests on a recent evaluation of the screeners as they are now."
+body = """
+The evaluation is no more than five trading sessions behind and none of the edge's screeners has
+changed since it ran. The line says "today's data" when the evaluation ran on the latest
+session. Current is not the same as good: a Not working verdict can be current. It only says the
+verdict has not aged. Example: "Evaluated on the 22 Oct session, today's data. Run
+20261022T235000Z, 2 variants tried."
+"""
+next = "Read the verdict as it stands; if the line later says stale, the evaluation needs running again."
+see_also = ["edge_provenance", "provenance_stale", "variants_tried"]
+
+[[term]]
+id = "provenance_stale"
+term = "Stale evaluation"
+short = "The verdict is older than five trading sessions, or a screener changed after it ran."
+body = """
+Two things make an evaluation stale. It is more than five trading sessions behind the latest
+session, or a screener that implements the edge has a different definition from the one the run
+used. The verdict still describes that old evaluation correctly, but it may no longer describe
+the edge you would trade today. The app does not hide or rewrite the verdict. It tells you the
+verdict's age and the reason. A run recorded before the app kept each screener's definition is
+never called stale for a changed screener, because the app cannot know. Example: the screener
+was edited on 20 Oct and the last evaluation ran on 12 Oct, so the verdict is for the earlier
+version.
+"""
+next = "Run the evaluation again, or wait for the nightly run; the verdict updates when the new run commits."
+see_also = ["edge_provenance", "provenance_current", "provenance_re_evaluating"]
+
+[[term]]
+id = "provenance_re_evaluating"
+term = "Re-evaluating"
+short = "A newer evaluation is running; the verdict shown is still the previous one."
+body = """
+A new evaluation of this edge has started and has not finished. Until it commits, the page keeps
+showing the verdict from the previous evaluation, and the line says which one. When the new run
+commits the verdict can change, including from Works to Not working. Example: "A new evaluation
+started 22 Oct 23:50. Showing the 15 Oct verdict until it finishes."
+"""
+next = "Wait for the run to finish; the page shows the new verdict when it commits."
+see_also = ["edge_provenance", "provenance_stale", "official_result"]
