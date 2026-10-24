@@ -428,7 +428,7 @@ export async function mockBuilderApi(
           names: namesOf(viewId),
           named: namesOf(viewId).map((n) => ({
             name: n,
-            filters: String((saved[`${viewId}|${n}`] ?? {})['filters'] ?? ''),
+            filters: ((saved[`${viewId}|${n}`] ?? {})['filters'] as string | undefined) ?? '',
           })),
         },
       };

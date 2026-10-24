@@ -211,8 +211,8 @@ export async function mockIdeasApi(
       };
     } | null;
     if (/query\s+TableView\b/.test(body?.query ?? '')) {
-      const scope = String(body?.variables?.scope ?? '');
-      const name = (body?.variables?.name as string | null | undefined) ?? null;
+      const scope = body?.variables?.scope ?? '';
+      const name = body?.variables?.name ?? null;
       const found = store.get(viewKey(scope, name));
       await route.fulfill({
         json: {

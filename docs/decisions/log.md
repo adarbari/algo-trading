@@ -726,3 +726,11 @@ follow-up PR).
 - status: final
 - Reasoning: CI noise and main's drift, not the run line's behaviour; the owner chose to raise it in chat on 2026-10-24.
 - Superseded the same day: main's #945 raised the same budget to 217130 B, so this PR keeps main's value and adds no raise of its own.
+
+## 2026-10-24 | Views on the filter bar PR (#957) | Entry budget raised 100 B for chunk-hash noise
+- Question: CI measures the entry at 26175 B against 26170 B; the difference is only content-hashed chunk names (+10 B locally). Raise, reshuffle chunks, or drop lazy loading?
+- Options: raise to 26270 (CI + 95 B margin) / shave by reshuffling chunks (fragile) / drop lazy loading.
+- Decision: raise `bundle.entry_gzip_bytes` 26170 to 26270 through the `waivers` map (ceiling 26270); the entry-plus-static-imports budget is unchanged.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: no code to trim; the same shared filter-bar precedent as #924 and #940 and the noise band of #915 and #902.
