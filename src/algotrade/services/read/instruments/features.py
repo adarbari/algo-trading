@@ -407,8 +407,7 @@ def known_fields(ctx: ReadContext, names: Sequence[str]) -> dict[str, tuple[bool
     ``None``), without building a ``FeatureValue`` or reading a reason. Same rules: the licence
     gate first (a barred field is never read and never known), a table with no partition for
     the session (or a company snapshot taken after it) makes the field unknown, no reference
-    snapshot makes every field unknown over an empty population. One difference: a ``pd.NA``
-    cell is unknown here (``to_scalar`` made it the text ``<NA>``, a known value)."""
+    snapshot makes every field unknown over an empty population."""
     asked = list(dict.fromkeys(names))
     infos = feature_infos(ctx.features, asked)
     wanted = [n for n in asked if infos[n].licence in ctx.licences]
