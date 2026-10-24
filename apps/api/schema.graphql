@@ -490,6 +490,11 @@ type Edge {
   runs: [EdgeRun!]!
 
   """
+  Which evaluation the verdict rests on and whether it is current (the canonical run of a site edge, the user's latest run of their own); null: no run
+  """
+  provenance: EdgeProvenance
+
+  """
   The most variants any run of the edge recorded as tried (the multiple-testing disclosure the builder shows); 0: none. Reads this edge's run records only
   """
   variantsTried: Int!
@@ -743,6 +748,23 @@ One of the user's own edge files that does not load (or loads only in part), wit
 type EdgeProblem {
   edgeId: String!
   reason: String!
+}
+
+"""
+Which evaluation a verdict rests on and whether it is current, decided by the server: `state` (CURRENT, STALE or RE_EVALUATING), the `evaluatedSession` and how many exchange `sessionsBehind` the served session it is, `screenerChanged` (a screener of the edge changed since the run; `screenerVersion` its current version), the run's `shortId` and `variantsTried`, `reEvaluating` with its start `reEvaluationStarted`, and the `line` to show. `runId` (the full id) is for admins only: null for anyone else
+"""
+type EdgeProvenance {
+  state: String!
+  evaluatedSession: Date!
+  sessionsBehind: Int!
+  screenerChanged: Boolean!
+  screenerVersion: Int
+  shortId: String!
+  variantsTried: Int
+  reEvaluating: Boolean!
+  reEvaluationStarted: DateTime
+  line: String!
+  runId: String
 }
 
 """

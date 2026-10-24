@@ -73,6 +73,14 @@ describe('EdgeHeader', () => {
     }
   });
 
+  it('shows the evaluation line under the verdict, and none for an edge with no run', () => {
+    header();
+    expect(screen.getByText('Evaluated 2 Oct, run 1')).toBeInTheDocument();
+    cleanup();
+    header(waiting);
+    expect(screen.queryByText(/^Evaluated /)).toBeNull();
+  });
+
   it('says what would change the verdict: the sentence, the meters with the projected date and the checks', () => {
     header();
     expect(
