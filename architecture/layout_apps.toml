@@ -81,6 +81,11 @@ purpose = "GraphQL types about events (mirrors services/read/events): Event, Ins
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
+path = "apps/api/algotrade_api/graphql/types/filtering"
+purpose = "GraphQL types of the shared filter bar (mirrors services/read/filtering): FilterInput, FilterFacets, FilterSet"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/graphql/types/guide"
 purpose = "GraphQL types of the Guide (mirrors services/read/guide, ADR 0051): GuideIndex, GuideField with its screener uses and situations, GuideSituationDetail and GuideProse (prose split at catalogue names and source markers); at its module cap: the Edges section's types are in edges/, the Screeners section's in screeners/"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
@@ -98,6 +103,11 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types/instruments"
 purpose = "GraphQL types at instrument grain (mirrors services/read/instruments): Instrument, FeatureValue / FeatureInfo / Unknown and the instrument's detail objects (its events: types/events)"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/lists"
+purpose = "GraphQL types of the filtered lists (mirrors services/read/lists): the Screeners list and the Edges list with their filter-bar counts"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]

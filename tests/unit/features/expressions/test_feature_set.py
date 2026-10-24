@@ -31,6 +31,8 @@ def define(name: str, expr: str, dtype: str = "float", **kw: object) -> FeatureD
 DEFS = [
     define("div_yield", "if(price_stats.close > 0, dividends.div_ttm / price_stats.close, null)",
            dtype="float32", materialise=True),
+    # cohort_pct_valuation@v1 reads the materialised pe_ratio (any expression stands in for it)
+    define("pe_ratio", "price_stats.close / price_stats.sma_20", materialise=True),
     define("double_yield", "div_yield * 2"),
     define("ret", "price_stats.close / price_stats.sma_20 - 1"),
     define("listed", "exists(option_liquidity)", dtype="bool", unit="flag"),

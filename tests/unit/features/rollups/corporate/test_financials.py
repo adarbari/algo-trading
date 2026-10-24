@@ -374,7 +374,9 @@ def _expressions(rows: pd.DataFrame, close: float = 100.0) -> pd.DataFrame:
         if flag not in rows.columns:
             rows[flag] = False
     frames = {price_stats.GROUP.table: stats, GROUP.table: rows}
-    return fs.evaluate(frames, ["pe_ratio", "revenue_growth_yoy"]).set_index("instrument_id")
+    return fs.evaluate(frames, ["pe_ratio", "revenue_growth_yoy"], compute=["pe_ratio"]).set_index(
+        "instrument_id"
+    )
 
 
 def test_pe_ratio_and_revenue_growth_expression_features() -> None:

@@ -1,7 +1,7 @@
 # L3 site setting: the filters of the Screeners list (ADR 0082, docs/ui/filtering.md). Typed by
 # src/algotrade/config/filters/definitions.py; fitness tests: tests/unit/config/filters/.
 # The row is a Screener (services/read/screens/screeners.py) with the facts the list reads beside
-# it: `latest_run` (its ScreenerRun for the session) and `track_records` (one per edge that lists
+# it: `latest_run` (its ScreenerRun for the session) and `edge_ids` (the edges that list
 # it). The search by name and description is the table's `q`, not a filter. Every filter's
 # `guide` entry is in config/site/guide/glossary/filters.toml.
 #
@@ -33,7 +33,7 @@ source = "latest_run.picked"
 [[column]]
 id = "edges"
 dtype = "int"
-source = "len(track_records)"
+source = "len(edge_ids)"
 
 # ------------------------------------------------------------------------------------ setup
 

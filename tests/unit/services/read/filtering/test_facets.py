@@ -13,7 +13,7 @@ def facets(filter_set, *inputs: FilterInput):
 
 
 def by_id(result, filter_id: str):
-    return next(f for f in result.filters if f.id == filter_id)
+    return next(f for f in result.items if f.id == filter_id)
 
 
 def test_no_input_matches_every_row_and_counts_every_option(filter_set) -> None:
@@ -79,7 +79,7 @@ def test_a_pick_on_a_number_column_matches_its_text_options(filter_set) -> None:
     resolved = ResolvedFilters("things", filter_set.filters)
     result = compute_facets(frame, SIZE, resolved, [FilterInput("tag", values=("3",))])
     assert result.matched_rows == (0, 2, 5)
-    assert next(f for f in result.filters if f.id == "tag").options[0] == OptionCount("3", 3)
+    assert next(f for f in result.items if f.id == "tag").options[0] == OptionCount("3", 3)
 
 
 def test_unknown_is_the_rows_the_filter_cannot_judge(filter_set) -> None:
@@ -90,8 +90,8 @@ def test_unknown_is_the_rows_the_filter_cannot_judge(filter_set) -> None:
     }
     resolved = ResolvedFilters("things", filter_set.filters)
     result = compute_facets(frame, SIZE, resolved, [])
-    assert next(f for f in result.filters if f.id == "tag").unknown == 2  # a missing part; empty
-    assert next(f for f in result.filters if f.id == "ok").unknown == 2  # the two nulls
+    assert next(f for f in result.items if f.id == "tag").unknown == 2  # a missing part; empty
+    assert next(f for f in result.items if f.id == "ok").unknown == 2  # the two nulls
 
 
 def test_a_select_or_toggle_with_two_values_is_refused(filter_set) -> None:

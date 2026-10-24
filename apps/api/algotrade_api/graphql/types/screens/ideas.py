@@ -11,6 +11,7 @@ from strawberry.scalars import JSON
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import ideas
+from algotrade_api.graphql.types.filtering.facets import FilterFacets
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.screens.result import ScreenResult
@@ -157,7 +158,8 @@ class PausedIdea:
 
 @strawberry.type(
     description="The ideas for the session: `screeners` (the user's own first, then by id), "
-    "`items` one page of the `total` ideas (`nextCursor`, for the `after` "
+    "`items` one page of the `total` ideas that pass the filters (`facets`: the counts of the "
+    "whole list, `facets.total` before the filters) (`nextCursor`, for the `after` "
     "argument, starts the next; null on the last page, `hasMore` false), `paused` the first "
     "`first` of `pausedTotal` picks the regime gate held back on the first page only (never "
     "counted in `total`)"
@@ -170,6 +172,7 @@ class Ideas:
     paused_total: int
     paused: list[PausedIdea]
     next_cursor: str | None
+    facets: FilterFacets | None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Whether another page follows this one"
@@ -187,4 +190,5 @@ class Ideas:
             paused_total=d.paused_total,
             paused=[PausedIdea.of(p, ctx) for p in d.paused],
             next_cursor=d.next_cursor,
+            facets=FilterFacets.of(d.facets) if d.facets is not None else None,
         )

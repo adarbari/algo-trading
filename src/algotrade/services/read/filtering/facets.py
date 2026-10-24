@@ -65,7 +65,7 @@ class Facets:
     total: int
     matched: int
     matched_rows: tuple[int, ...]
-    filters: tuple[FilterFacet, ...]
+    items: tuple[FilterFacet, ...]
 
 
 def _values(cell: Cell) -> tuple[object, ...]:

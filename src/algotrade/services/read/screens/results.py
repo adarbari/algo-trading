@@ -14,7 +14,16 @@ here, and the page carries the catalogue ``columns`` the reader adds (a ``Featur
 columnar cells: a value, or the UNKNOWN code saying why not). The filtered, sorted order is
 cached per query and published state. ``change`` compares the run with the screener's run in
 the previous stored session (``runs.load_previous_run``): a ticker is *picked* when
-``runs.is_picked`` says so (the Ideas rule)."""
+``runs.is_picked`` says so (the Ideas rule).
+
+Filtered (ADR 0082, surface ``screener_results``): the ``filters`` the viewer set, and the older
+``decisions`` / ``change`` arguments mapped onto the ``decision`` / ``change`` filters, narrow the
+WHOLE run before it is sorted and paged, from one masked pass over a frame of every row (the
+surface's columns from the run's rows, each catalogue-field filter's values in one batch read
+under the viewer's licences: a field the viewer may not use has no filter and no value, so a
+count never leaks it; a run whose ``rank`` / ``score`` are withheld has them UNKNOWN). ``total``
+counts the rows passing the filters and ``q``; ``ResultPage.facets`` the counts of the run
+before ``q`` (``facets.total``: the run's every row). The pass is cached per run and filters."""
 
 from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -38,6 +47,9 @@ from algotrade.services.read.context import (
     run_rows_of,
 )
 from algotrade.services.read.evaluation.pick_edges import PickEdge, load_pick_edges
+from algotrade.services.read.filtering.facets import Facets, compute_facets
+from algotrade.services.read.filtering.masks import Cell, FilterInput, rule_for
+from algotrade.services.read.filtering.served import load_served_filters
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -67,6 +79,7 @@ VALUE_COLUMNS = (
     "distance", "group_id",
 )  # fmt: skip
 CHANGES = ("new", "dropped")
+SURFACE = "screener_results"  # config/site/filters/screener_results.toml
 # The typed sort keys (the web's column factory ids); also ``criterion:<id>``,
 # ``column:<name>`` and a catalogue name.
 SORTS = ("rank", "score", "symbol", "decision", "change")
@@ -187,7 +200,8 @@ class ResultQuery:
     """Which rows of a run a review table shows: ``decisions`` (none: all; any case),
     ``change`` (``new`` / ``dropped``), ``q`` (the symbol or name contains it) and the order
     (``sort``: a ``SORTS`` key, ``criterion:<id>``, ``column:<name>`` or a catalogue name;
-    ``-`` prefix: descending; missing values last; None: by rank)."""
+    ``-`` prefix: descending; missing values last; None: by rank). ``decisions`` and ``change``
+    are deprecated: they are the ``decision`` and ``change`` filters (ADR 0082)."""
 
     decisions: tuple[str, ...] = ()
     change: str | None = None
@@ -217,6 +231,7 @@ class ResultPage:
     kinds: tuple[tuple[UnavailableKind | None, ...], ...]  # the public kind of each UNKNOWN cell
     missing: tuple[str, ...]
     unavailable: tuple[Unavailable, ...] = ()
+    facets: Facets | None = None  # the run's counts under the filters (before ``q``)
 
 
 def _records(frame: pd.DataFrame) -> list[Mapping[str, Any]]:
@@ -575,6 +590,99 @@ def load_run_changes(ctx: ReadContext, run: ScreenerRun) -> RunChanges:
 class _Order:
     ids: tuple[str, ...]
     missing: tuple[str, ...]
+    facets: Facets
+
+
+def _inputs(query: ResultQuery, filters: Sequence[FilterInput]) -> tuple[FilterInput, ...]:
+    """The filters of a read: the deprecated ``decisions`` / ``change`` arguments as the
+    ``decision`` / ``change`` filters (stored decisions are upper case; a name set both ways
+    is refused as set twice), then ``filters``."""
+    mapped: list[FilterInput] = []
+    if query.decisions:
+        mapped.append(FilterInput("decision", sorted({d.upper() for d in query.decisions})))
+    if query.change:
+        mapped.append(FilterInput("change", [query.change]))
+    return (*mapped, *filters)
+
+
+def _signature(inputs: Sequence[FilterInput]) -> tuple[object, ...]:
+    """What the inputs are, hashable, in id order (a cache key)."""
+    return tuple(
+        (i.id, tuple(i.values), i.min, i.max, i.within, i.active)
+        for i in sorted(inputs, key=lambda i: i.id)
+    )
+
+
+def _column(
+    column_id: str,
+    rows: pd.DataFrame,
+    changes: Mapping[str, Change],
+    withheld: bool,
+) -> list[Cell]:
+    """The surface's own column ``column_id`` over ``rows``; ``rank`` and ``score`` are UNKNOWN
+    when the run's order follows values the viewer may not see."""
+    ids = [str(i) for i in rows["instrument_id"]]
+    if column_id == "change":
+        return [changes.get(i, (None, None))[0] for i in ids]
+    if column_id in ("rank", "score"):
+        if withheld:
+            return [None] * len(ids)
+        return [to_scalar(v) for v in rows[column_id]]
+    if column_id == "decision":
+        return [str(d) for d in rows["decision"]]
+    raise ConfigurationError(f"filters/{SURFACE}.toml: no column {column_id!r} is built")
+
+
+def _passing(
+    ctx: ReadContext, run: ScreenerRun, inputs: Sequence[FilterInput], seq: Hashable
+) -> tuple[pd.DataFrame, Facets, tuple[str, ...]]:
+    """``_filter_run``, cached per run, filters, viewer and published state ``seq`` (a new
+    ``q`` or sort re-reads nothing)."""
+    key = ("screen_passing", run.run_id, ctx.session.date, _signature(inputs), ctx.user.user_id,
+           catalogue_key(ctx), seq)  # fmt: skip
+    found: tuple[pd.DataFrame, Facets, tuple[str, ...]] | None = ctx.cache.get(key)
+    if found is None:
+        found = _filter_run(ctx, run, inputs)
+        ctx.cache.put(key, found)
+    return found
+
+
+def _filter_run(
+    ctx: ReadContext, run: ScreenerRun, inputs: Sequence[FilterInput]
+) -> tuple[pd.DataFrame, Facets, tuple[str, ...]]:
+    """``run``'s rows (rank order) that pass ``inputs``, the facets over the whole run and the
+    tables the SET catalogue-field filters read with nothing for the session.
+    ``FilterRefusedError`` for an input the viewer is not offered (refused before any read)."""
+    resolved = load_served_filters(ctx, SURFACE, ctx.session.date).resolved
+    resolved.check(i.id for i in inputs)
+    rows = run_rows(ctx, run)
+    changes = load_run_changes(ctx, run).by_instrument
+    withheld = bool(run_withheld(ctx, run))
+    frame: dict[str, list[Cell]] = {}
+    names: list[str] = []
+    for f in resolved.offered:
+        if f.column_id is None:
+            names.append(f.field)
+        else:
+            frame[f.field] = _column(f.column_id, rows, changes, withheld)
+    missing: tuple[str, ...] = ()
+    if names:
+        ids = [str(i) for i in rows["instrument_id"]]
+        names = list(dict.fromkeys(names))
+        values, _ = catalogue_values(ctx, names, ids) if ids else (pd.DataFrame(), ())
+        set_fields = [  # the facets alone are no reason to disclose a gap: only a set filter's
+            d.field
+            for i in inputs
+            if i.active and (d := resolved.get(i.id)) is not None and d.column_id is None
+            and rule_for(d, i) is not None
+        ]  # fmt: skip
+        if set_fields and ids:
+            missing = catalogue_values(ctx, list(dict.fromkeys(set_fields)), ids)[1]
+        for name in names:
+            column: Sequence[object] = values[name].reindex(ids).tolist() if ids else []
+            frame[name] = [to_scalar(v) for v in column]
+    facets = compute_facets(frame, len(rows), resolved, inputs)
+    return rows.iloc[list(facets.matched_rows)], facets, missing
 
 
 def _check_sort(ctx: ReadContext, sort: str) -> str | None:
@@ -639,9 +747,15 @@ def _sorted(ids: list[str], values: Mapping[str, Any], descending: bool) -> list
     return [i for i, _ in have] + lacking
 
 
-def _ordered(ctx: ReadContext, run: ScreenerRun, query: ResultQuery, seq: Hashable) -> _Order:
+def _ordered(
+    ctx: ReadContext,
+    run: ScreenerRun,
+    query: ResultQuery,
+    inputs: Sequence[FilterInput],
+    seq: Hashable,
+) -> _Order:
     user = (ctx.user.user_id, catalogue_key(ctx))  # a sort on an edited feature: a new order
-    key = ("screen_results", run.run_id, ctx.session.date, query, user, seq)
+    key = ("screen_results", run.run_id, ctx.session.date, query, _signature(inputs), user, seq)
     found: _Order | None = ctx.cache.get(key)
     if found is not None:
         return found
@@ -649,20 +763,15 @@ def _ordered(ctx: ReadContext, run: ScreenerRun, query: ResultQuery, seq: Hashab
     if sort.removeprefix("-") in ("rank", "score") and run_withheld(ctx, run):
         sort = ("-" if sort.startswith("-") else "") + "symbol"  # no order by hidden values
     catalogue_field = _check_sort(ctx, sort)
-    rows = run_rows(ctx, run)  # rank order
+    rows, facets, filtered_missing = _passing(ctx, run, inputs, seq)  # rank order
     changes = load_run_changes(ctx, run).by_instrument
-    if query.decisions:
-        wanted = {d.casefold() for d in query.decisions}
-        rows = rows[rows["decision"].astype(str).str.casefold().isin(wanted)]
-    if query.change:
-        moved = [changes.get(str(i), (None, None))[0] for i in rows["instrument_id"]]
-        rows = rows[[c == query.change for c in moved]]
     ids = [str(i) for i in rows["instrument_id"]]
     fields = [_SYMBOL, _NAME, *([catalogue_field] if catalogue_field else [])]
-    missing: tuple[str, ...] = ()
+    missing = filtered_missing
     frame = None
     if ids and (query.q or catalogue_field):
-        frame, missing = catalogue_values(ctx, list(dict.fromkeys(fields)), ids)
+        frame, read = catalogue_values(ctx, list(dict.fromkeys(fields)), ids)
+        missing = tuple(sorted({*missing, *read}))
     if query.q and frame is not None:
         text = (
             frame[_SYMBOL].astype("string").fillna("")
@@ -689,7 +798,7 @@ def _ordered(ctx: ReadContext, run: ScreenerRun, query: ResultQuery, seq: Hashab
         ids = _sorted(ids, values, sort.startswith("-"))
     elif sort.startswith("-"):
         ids = ids[::-1]
-    found = _Order(tuple(ids), missing)
+    found = _Order(tuple(ids), missing, facets)
     ctx.cache.put(key, found)
     return found
 
@@ -701,11 +810,13 @@ def load_result_page(
     columns: Sequence[str] = (),
     page: int = 1,
     size: int = DEFAULT_SIZE,
+    filters: Sequence[FilterInput] = (),
 ) -> ResultPage:
-    """Page ``page`` (1-based, ``size`` rows) of ``run``'s rows matching ``query``, with the
-    catalogue ``columns`` (in order, repeats dropped) for its rows. ``ConfigurationError`` for
-    an unknown ``change`` or sort key; ``UnknownFeatureError`` for a column or sort field
-    outside the caller's catalogue."""
+    """Page ``page`` (1-based, ``size`` rows) of ``run``'s rows matching ``query`` and
+    ``filters``, with the catalogue ``columns`` (in order, repeats dropped) for its rows.
+    ``ConfigurationError`` for an unknown ``change`` or sort key; ``UnknownFeatureError`` for a
+    column or sort field outside the caller's catalogue; ``FilterRefusedError`` for a filter the
+    viewer is not offered."""
     query = query or ResultQuery()
     if query.change is not None and query.change not in CHANGES:
         raise ConfigurationError(f"change: {query.change!r} is not one of {', '.join(CHANGES)}")
@@ -716,7 +827,7 @@ def load_result_page(
     query = ResultQuery(
         tuple(sorted({d.casefold() for d in query.decisions})), query.change, query.q, query.sort
     )
-    order = _ordered(ctx, run, query, seq)
+    order = _ordered(ctx, run, query, _inputs(query, filters), seq)
     shown = list(order.ids[(page - 1) * size : page * size])
     changes = {run.run_id: load_run_changes(ctx, run)}
     found = load_results(ctx, {run.run_id: shown}, [run], changes)
@@ -739,4 +850,5 @@ def load_result_page(
         kinds=codes[2],
         missing=order.missing,
         unavailable=unavailable_tables(order.missing, ctx.session.date),
+        facets=order.facets,
     )

@@ -27,6 +27,7 @@ unit = "ratio"
 description = "Trailing P/E: close / diluted EPS over the trailing twelve months. Null when the company lost money (EPS <= 0: a negative P/E is not shown), when the EPS is stale, and for an ADR (its EPS is per ordinary share and the ADR ratio is not stored). Every share class of a company uses the company's EPS: only meaningful when the classes have equal economics"
 null_meaning = "financials eps_diluted_ttm is null or not positive (a loss; ETFs and funds have none), the close is not positive, eps_stale (the EPS TTM ended more than stale_days before the session), or the instrument is an ADR"
 valid_range = [0, inf]
+materialise = true  # cohort_pct_valuation@v1 ranks it: stored as rollups/instrument/pe_ratio@v1
 version = 1
 
 [revenue_growth_yoy]

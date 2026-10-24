@@ -4,7 +4,12 @@ empty input in no mask."""
 import pytest
 
 from algotrade.services.read.filtering.definitions import FilterRefusedError, ResolvedFilters
-from algotrade.services.read.filtering.masks import FilterInput, evaluate_filters
+from algotrade.services.read.filtering.masks import (
+    FilterInput,
+    WindowUnit,
+    Within,
+    evaluate_filters,
+)
 from tests.unit.services.read.filtering.conftest import FRAME, SIZE
 
 
@@ -42,10 +47,10 @@ def test_a_range_is_closed_and_min_zero_never_admits_null(filter_set) -> None:
 
 
 def test_a_window_counts_from_zero_in_the_definitions_unit(filter_set) -> None:
-    masks = run(filter_set, FilterInput("soon", within=(3, "sessions")))
+    masks = run(filter_set, FilterInput("soon", within=Within(3, WindowUnit.SESSIONS)))
     assert passes(masks, "soon") == [0, 1, 5] and masks["soon"][2] is None
     with pytest.raises(FilterRefusedError, match="sessions"):
-        run(filter_set, FilterInput("soon", within=(3, "days")))
+        run(filter_set, FilterInput("soon", within=Within(3, WindowUnit.DAYS)))
 
 
 def test_a_switched_off_input_is_in_no_mask(filter_set) -> None:

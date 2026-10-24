@@ -27,6 +27,9 @@ COLUMN = "column:"  # a ``field`` that names a column of the surface, not a cata
 GUIDE_KINDS = ("term", "field", "situation", "start")
 _ID = re.compile(r"^[a-z][a-z0-9_]*$")  # also a key of the URL parameter ``f``
 _ENUM = re.compile(r"^[a-z_][a-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")  # module:Name
+_SOURCE = re.compile(
+    r"^(?:(len)\(([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\)|([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*))$"
+)  # a dotted path, or len(path)
 _REF = re.compile(r"^[a-z_]+:[a-z0-9_]+$")
 
 
@@ -52,6 +55,19 @@ class FilterColumn:
     id: str
     dtype: str
     source: str
+    path: tuple[str, ...] = ()
+    count: bool = False
+
+    @classmethod
+    def parse(cls, column_id: str, dtype: str, source: str, where: str) -> "FilterColumn":
+        """``source`` is ``a.b.c`` or ``len(a.b.c)`` (how many elements the path holds)."""
+        found = _SOURCE.match(source)
+        if found is None:
+            raise ConfigurationError(
+                f"{where} source: expected a.b.c or len(a.b.c), got {source!r}"
+            )
+        count, path = found.group(1) is not None, found.group(2) or found.group(3)
+        return cls(column_id, dtype, source, tuple(path.split(".")), count)
 
 
 @dataclass(frozen=True)
@@ -97,7 +113,7 @@ class FilterSet:
 
 def _column(t: Table) -> FilterColumn:
     t.only(("id", "dtype", "source"))
-    return FilterColumn(_id(t), t.choice("dtype", "", DTYPES), t.line("source"))
+    return FilterColumn.parse(_id(t), t.choice("dtype", "", DTYPES), t.line("source"), t.where)
 
 
 def _id(t: Table) -> str:

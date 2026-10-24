@@ -108,11 +108,24 @@ detect = [{ call = "source_link" }, { call = "filing_url" }, { call = "load_even
 
 [[responsibility]]
 id = "filter-pass"
-description = "The one filtering pass of every table, list and feed (ADR 0082 decision 2-3, services/read/filtering/): a surface's definitions (config/site/filters, config/filters) resolved against the catalogue and the viewer's licences (a filter on a field the viewer's licences do not cover is not offered and is refused if sent, before any count: ADR 0069), the truth of each active filter on each row through core.model.predicates (the operator from the kind; UNKNOWN never passes; a min of 0 admits no null; a switched-off or empty input is in no mask), and from that one pass matched, removes(f) (rows passing every other active filter minus matched), option counts by count then value, fixed-edge bins and the unknown count; pure and deterministic; no loader adopts it before its measure (Ideas, screener results, the universe table follow)"
+description = "The one filtering pass of every table, list and feed (ADR 0082 decision 2-3, services/read/filtering/): a surface's definitions (config/site/filters, config/filters) resolved against the catalogue and the viewer's licences (a filter on a field the viewer's licences do not cover is not offered and is refused if sent, before any count: ADR 0069), the truth of each active filter on each row through core.model.predicates (the operator from the kind; UNKNOWN never passes; a min of 0 admits no null; a switched-off or empty input is in no mask), and from that one pass matched, removes(f) (rows passing every other active filter minus matched), option counts by count then value, fixed-edge bins and the unknown count; the definitions as a viewer is served them (filterSet: options, withheld filters as Unavailable) and the hash of the filters a paging cursor carries; pure and deterministic; Ideas adopts it (ADR 0082 PR 4), so do screener results (the old decisions / change arguments map onto the decision / change filters); the universe table follows"
 owner = ["src/algotrade/services/read/filtering/*"]
-allowed = []
+allowed = [
+    "src/algotrade/services/read/screens/ideas.py",  # the loader adopts the pass (ADR 0082)
+    "src/algotrade/services/read/screens/results.py",  # a run's review table adopts it (ADR 0082)
+    "apps/api/algotrade_api/graphql/types/query.py",  # filterSet: one loader call
+    "src/algotrade/services/read/lists/*",  # the list loaders adopt the pass (ADR 0082)
+]
 section = "docs/adr/0082-shared-filter-bar.md#decision"
-detect = [{ call = "compute_facets" }, { call = "evaluate_filters" }, { call = "resolve_definitions" }]
+detect = [{ call = "compute_facets" }, { call = "evaluate_filters" }, { call = "resolve_definitions" }, { call = "load_served_filters" }, { call = "filter_hash" }, { call = "frame_of" }]
+
+[[responsibility]]
+id = "filtered-lists-read"
+description = "The lists of read objects that adopt the shared filter pass (ADR 0082, services/read/lists/): each is a row dataclass (the object with the facts its filters read beside it: a screener with its run and track records) whose fields are the roots of the column sources its filter file declares, a search (q) before the filters, and the one pass over the frame services/read/filtering/rows.py builds from those sources; no per-list masking code"
+owner = ["src/algotrade/services/read/lists/*"]
+allowed = ["apps/api/algotrade_api/graphql/types/query.py"]  # the list fields: one loader call each
+section = "docs/adr/0082-shared-filter-bar.md#decision"
+detect = [{ call = "load_screener_list" }]
 
 [[responsibility]]
 id = "graphql-schema"
