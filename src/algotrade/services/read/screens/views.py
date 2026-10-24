@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from algotrade.config.filters.definitions import Documents, load_filter_set
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens.screeners import load_screener
 from algotrade.storage.configs.store import ConfigStore
@@ -69,7 +70,10 @@ def scope_parts(scope: str) -> tuple[str, str]:
 
 def surface_exists(configs: Documents, name: str) -> bool:
     """Whether ``name`` is a surface with a filters file (its views are its filter bar's)."""
-    found = load_filter_set(configs, name)
+    try:
+        found = load_filter_set(configs, name)
+    except ConfigurationError:  # not an id a file could have (the store's id check refuses it)
+        return False
     return bool(found.filters or found.columns)
 
 

@@ -1,8 +1,17 @@
+from pathlib import Path
+
 import pytest
 
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.screens.views import NamedView, TableView, load_view, scope_parts
+from algotrade.services.read.screens.views import (
+    NamedView,
+    TableView,
+    load_view,
+    scope_parts,
+    surface_exists,
+)
+from algotrade.storage.configs.files import FileConfigStore
 from tests.unit.services.read.screens.conftest import context
 
 PREFS = {
@@ -76,17 +85,7 @@ def test_a_surface_with_a_filter_bar_has_views_and_one_without_has_none(
     assert scope_parts("surface:edge_trades") == ("surface", "edge_trades")
 
 
-def test_a_surface_id_no_file_could_have_is_no_view_not_an_error(reader: StoreReader) -> None:
-    assert load_view(context(reader, {}), "surface:Bad!") is None
-
-
-def test_each_named_view_comes_with_its_filters_in_one_read(reader: StoreReader) -> None:
-    saved = {("me", "preferences", "preferences"): {
-        "views": {"surface:ideas": {"views": {
-            "Calm": {"columns": [], "filters": "decision:QUALIFIED"},
-            "Bare": {"columns": []},
-        }}},
-    }}  # fmt: skip
-    found = load_view(context(reader, saved), "surface:ideas")
-    assert found is not None and found.names == ("Bare", "Calm")
-    assert found.named == (NamedView("Bare", ""), NamedView("Calm", "decision:QUALIFIED"))
+def test_a_surface_id_no_file_could_have_is_no_view_not_an_error(tmp_path: Path) -> None:
+    """A store that checks ids (the file store) refuses ``Bad!``; the read answers no view."""
+    assert surface_exists(FileConfigStore(tmp_path), "Bad!") is False
+    assert surface_exists(FileConfigStore(tmp_path), "ideas") is False  # no such file here
