@@ -35,33 +35,31 @@ export function SessionStrip({ items, label }: SessionStripProps) {
   const [open, setOpen] = useState<number | null>(null);
   const shown = open === null ? undefined : items[open];
   return (
-    <div className={styles.root}>
-      <div className={styles.list} role="group" aria-label={label}>
-        {items.map((item, index) => (
-          <button
-            type="button"
-            className={styles.cell}
-            data-tone={item.tone}
-            data-current={item.current ? 'true' : undefined}
-            aria-label={item.label}
-            onMouseEnter={() => {
-              setOpen(index);
-            }}
-            onMouseLeave={() => {
-              setOpen(null);
-            }}
-            onFocus={() => {
-              setOpen(index);
-            }}
-            onBlur={() => {
-              setOpen(null);
-            }}
-            onClick={() => {
-              setOpen(index);
-            }}
-          />
-        ))}
-      </div>
+    <div className={styles.root} role="group" aria-label={label}>
+      {items.map((item, index) => (
+        <button
+          type="button"
+          className={styles.cell}
+          data-tone={item.tone}
+          data-current={item.current ? 'true' : undefined}
+          aria-label={item.label}
+          onMouseEnter={() => {
+            setOpen(index);
+          }}
+          onMouseLeave={() => {
+            setOpen(null);
+          }}
+          onFocus={() => {
+            setOpen(index);
+          }}
+          onBlur={() => {
+            setOpen(null);
+          }}
+          onClick={() => {
+            setOpen(index);
+          }}
+        />
+      ))}
       {shown ? (
         <Text size="sm" tone="secondary" aria-live="polite">
           {shown.label}

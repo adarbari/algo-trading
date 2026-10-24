@@ -151,7 +151,14 @@ def _frozen_changes(
     counts its newest run of each (owner, config) froze, keyed with the run id (a record of
     another run of the session never takes them): one small row per run, once per publish
     (ADR 0022). A session without the partition has none (the counts were not stored)."""
-    key = ("recent_runs_changes", days[0], days[-1], ctx.reader.own_run, ctx.reader.version())
+    key = (
+        "recent_runs_changes",
+        days[0],
+        days[-1],
+        ctx.reader.own_run,
+        ctx.reader.version(),
+        ctx.reader.runs_generation(),
+    )
 
     def build() -> dict[date, dict[tuple[str, str, str], tuple[int | None, int | None]]]:
         out: dict[date, dict[tuple[str, str, str], tuple[int | None, int | None]]] = {}
