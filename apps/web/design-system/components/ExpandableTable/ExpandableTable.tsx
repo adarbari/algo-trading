@@ -7,7 +7,8 @@
  * rendered only while open, so it can load lazily. With `rowToggle={false}` the rows carry no
  * toggle: a control inside a cell (a link, an `ExpandLink`) opens the row's detail, the other
  * cells keep their own links and buttons, and a narrow container shows each row as a card of
- * stacked cells under no header. For a flat list of rows use ExpandableRow;
+ * stacked cells under no header. A row with `onActivate` also opens its page when clicked outside
+ * its own controls (the pointer shows it). For a flat list of rows use ExpandableRow;
  * for sortable, virtualised data DataTable.
  */
 import { useId, type CSSProperties, type ReactNode } from 'react';
@@ -35,6 +36,11 @@ export interface ExpandableTableRow {
   onOpenChange: (open: boolean) => void;
   /** Shown in place under the row while open. */
   detail: ReactNode;
+  /**
+   * Choosing the row (a click on a part of it that is not itself a link, button or field) goes to
+   * the row's page. The keyboard way in stays a control inside a cell, so the row adds no tab stop.
+   */
+  onActivate?: () => void;
 }
 
 export interface ExpandableTableProps {
@@ -45,6 +51,9 @@ export interface ExpandableTableProps {
   /** `false`: no row toggle, cells hold their own controls and a phone shows cards (default `true`). */
   rowToggle?: boolean;
 }
+
+/** What inside a row handles its own click. */
+const INTERACTIVE = 'a, button, input, select, textarea, label, [role="button"], [role="link"]';
 
 const track = (column: ExpandableTableColumn) => `minmax(0, ${String(column.grow ?? 1)}fr)`;
 
@@ -60,7 +69,21 @@ function TableRow({
   const id = useId();
   return (
     <>
-      <div role="row" className={styles.row} data-open={row.open || undefined}>
+      {/* A pointer shortcut: the keyboard way in is the control inside a cell (a link to the page). */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus */}
+      <div
+        role="row"
+        className={styles.row}
+        data-open={row.open || undefined}
+        data-activatable={row.onActivate ? true : undefined}
+        onClick={
+          row.onActivate
+            ? (event) => {
+                if (!(event.target as Element).closest(INTERACTIVE)) row.onActivate?.();
+              }
+            : undefined
+        }
+      >
         {columns.map((column, index) => (
           <div
             key={column.id}
