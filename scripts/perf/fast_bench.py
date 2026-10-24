@@ -389,10 +389,10 @@ _FEATURE = ("FeatureCatalogue", {}, _first_feature)
 
 def _edge_screener(d: dict) -> str:
     """A screener an edge implements: any other has no edges in the guide."""
-    return next(sc for e in d["edges"] for sc in e["screeners"])
+    return next(sc for e in d["edgeList"]["items"] for sc in e["screeners"])
 
 
-_SCREENER = ("EdgesPage", {}, _edge_screener)
+_SCREENER = ("EdgesPage", {"filters": None, "q": None}, _edge_screener)
 VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object]]]] = {
     "HarnessRun": {"runId": ("HarnessRuns", {"limit": 1}, lambda d: d["harnessRuns"][0]["runId"])},
     "AdminScreenerRun": {
