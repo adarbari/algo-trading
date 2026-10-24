@@ -677,6 +677,8 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the two extra requests and the nodes are the strip and its help button, which the Guide rule requires; the owner chose to raise the budgets in chat on 2026-10-24.
+- Update 2026-10-24: after main raised the route to scripts 267500 and requests 103, CI measured scripts 268153; raised to 268300 (owner-approved, same decision).
+
 ## 2026-10-24 | ADR 0082 filter-bar Export | May personal-licence values leave as a file
 - Question: may the filter bar export the rows a viewer filtered, and what may the file hold?
 - Options: (a) none until the owner decides / (b) hybrid: files carry what the viewer can see, built server-side through the gated loader / (c) browser rows saved as a file.
