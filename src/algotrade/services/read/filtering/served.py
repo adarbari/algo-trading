@@ -22,7 +22,7 @@ from algotrade.services.read.availability.cause import (
     UnavailableKind,
     feature_cause,
 )
-from algotrade.services.read.context import NotFoundError, Stores
+from algotrade.services.read.context import NotFoundError, ReadContext, Stores
 from algotrade.services.read.filtering.definitions import ResolvedFilters, resolve_definitions
 from algotrade.services.read.filtering.feature_filters import (
     FilterableFeature,
@@ -33,6 +33,9 @@ from algotrade.services.read.filtering.feature_filters import (
     takes_features,
 )
 from algotrade.services.read.filtering.masks import WindowUnit
+from algotrade.services.read.filtering.no_data import fields_without_data
+
+NO_DATA_TERM = "term:filter_withheld_no_data"
 
 
 class FilterGroup(StrEnum):
@@ -96,6 +99,7 @@ class WithheldFilter:
     label: str
     group: FilterGroup
     unavailable: Unavailable
+    guide: str | None = None  # the entry that says why, when the kind's own term is too generic
 
 
 @dataclass(frozen=True)
@@ -143,8 +147,31 @@ def _served(f: FilterDefinition) -> ServedFilter:
     )
 
 
-def _why(definition: FilterDefinition, site: FeatureSet, day: date | None) -> Unavailable:
+def _without_data(
+    ctx: Stores, filters: Iterable[FilterDefinition], offered: Iterable[str]
+) -> frozenset[str]:
+    """The ids of the offered catalogue-field filters no instrument has a known value for in the
+    read session (a context with no session has nothing to look at). They are only left out of
+    what ``filterSet`` serves as controls: an input naming one is still read by the lists (never
+    refused, so a shared link opens), and as UNKNOWN never passes it matches nothing and the gap
+    is disclosed as before; a screen echoes it switched off (``active`` false: in no mask)."""
+    if not isinstance(ctx, ReadContext):
+        return frozenset()
+    live = set(offered)
+    wanted = [f for f in filters if f.column_id is None and f.id in live]
+    empty = fields_without_data(ctx, [f.field for f in wanted])
+    return frozenset(f.id for f in wanted if f.field in empty)
+
+
+def _why(
+    definition: FilterDefinition, site: FeatureSet, day: date | None, no_data: bool = False
+) -> Unavailable:
     field = definition.field
+    if no_data:
+        detail = f"no known value for session {day}"
+        return Unavailable(
+            UnavailableKind.NOT_STORED, (field,), feature_cause(field, detail, "NOT_STORED", day)
+        )
     if site.feature(field) is None:
         kind, detail = UnavailableKind.NOT_STORED, f"{field} is not in the catalogue"
     else:
@@ -178,12 +205,19 @@ def load_served_filters(
             (*resolved.offered, *extra_on),
             resolved.withheld | {f.id for f in extra_off},
         )
+    stale = _without_data(ctx, filter_set.filters, (f.id for f in resolved.offered))
     withheld = tuple(
-        WithheldFilter(f.id, f.label, FilterGroup(f.group), _why(f, site, day))
+        WithheldFilter(
+            f.id,
+            f.label,
+            FilterGroup(f.group),
+            _why(f, site, day, f.id in stale),
+            NO_DATA_TERM if f.id in stale else None,
+        )
         for f in (*filter_set.filters, *extra_off)
-        if f.id in resolved.withheld
+        if f.id in resolved.withheld or f.id in stale
     )
-    offered = tuple(_served(f) for f in resolved.offered)
+    offered = tuple(_served(f) for f in resolved.offered if f.id not in stale)
     return ServedFilters(
         surface,
         filter_set.label,
@@ -200,7 +234,8 @@ def load_filter_set_with(
 ) -> ServedFilters:
     """``surface``'s filters plus the ones made of the catalogue ``fields`` (``filterSet``'s
     ``withFeatures``), each served when the surface takes features and the licences cover it."""
-    return load_served_filters(ctx, surface, None, [feature_filter_id(f) for f in fields or ()])
+    day = ctx.session.date if isinstance(ctx, ReadContext) else None
+    return load_served_filters(ctx, surface, day, [feature_filter_id(f) for f in fields or ()])
 
 
 def load_filterable_features(ctx: Stores, surface: str) -> tuple[FilterableFeature, ...]:

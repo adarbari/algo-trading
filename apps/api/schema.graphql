@@ -2885,9 +2885,17 @@ type Query {
   view(scope: String!, name: String = null): TableView
 
   """
-  The filters of `surface` (ideas, screener_results, universe) for the caller: the ones they may use with their options and bins, and the ones a data licence withholds (ADR 0082). `withFeatures`: catalogue fields (`rollup.<group>@v<N>.<column>`, `feature.<name>`) the caller made filters of (the id `feature:<field>`): each is served too, in the group `more`, when the surface takes features. Not found: no such surface
+  The filters of `surface` (ideas, screener_results, universe) for the caller: the ones they may use with their options and bins, and the ones a data licence withholds (ADR 0082). `withFeatures`: catalogue fields (`rollup.<group>@v<N>.<column>`, `feature.<name>`) the caller made filters of (the id `feature:<field>`): each is served too, in the group `more`, when the surface takes features. A filter whose field has no known value for the session is in `withheld` (NOT_STORED) until it has data. Not found: no such surface
   """
-  filterSet(surface: String!, withFeatures: [String!] = null): FilterSet
+  filterSet(
+    surface: String!
+    withFeatures: [String!] = null
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): FilterSet
 
   """
   The catalogue fields the caller may filter `surface` on by search (More filters): each with the control it gets, its Guide entry and the words a trader uses for it (the phrasebook); a field a data licence does not cover is not listed. Empty: the surface takes no features. Not found: no such surface
@@ -4228,13 +4236,14 @@ enum WindowUnit {
 }
 
 """
-A filter the viewer is not offered (a field under a data licence they do not hold, `unavailable.kind` LICENCE) and is refused if they send it
+A filter the viewer is not offered (a field under a data licence they do not hold, `unavailable.kind` LICENCE) and is refused if they send it; or a field with no known value for the session, NOT_STORED, `guide` the entry that says it returns by itself, and an input naming it is ignored, never refused)
 """
 type WithheldFilter {
   id: String!
   label: String!
   group: FilterGroup!
   unavailable: Unavailable!
+  guide: String
 }
 
 """A window filter's amount and unit: within `amount` days or sessions"""
