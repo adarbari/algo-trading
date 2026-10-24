@@ -71,6 +71,11 @@ purpose = "GraphQL object types, one module per domain read object, split by are
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
+path = "apps/api/algotrade_api/graphql/types/coverage"
+purpose = "GraphQL types over the coverage the nightly measured (mirrors services/read/coverage): KnownCoverage, the values known against the rows stored by security type, admin only"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/graphql/types/evaluation"
 purpose = "GraphQL types over the edge evaluation (mirrors services/read/evaluation): Edge, EdgeRun, EdgeRow, TrackRecord"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]

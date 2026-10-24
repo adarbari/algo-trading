@@ -2381,6 +2381,42 @@ type KindText {
   text: String!
 }
 
+"""
+One security type: `names` of the universe, `rows` stored of them and the `known` values among those rows; `share` is `known` of `names` (0 to 1)
+"""
+type KnownByType {
+  securityType: String!
+  names: Int!
+  rows: Int!
+  known: Int!
+  share: Float
+}
+
+"""
+The fundamentals share count of the session by security type (`byType`, largest first) and the `gaps` of its operating companies, from the nightly's coverage check; `unknown` NOT_RUN when no record of the session holds it
+"""
+type KnownCoverage {
+  session: Date!
+  runId: String
+  byType: [KnownByType!]!
+  gaps: [KnownGapCount!]!
+  unknown: Unknown
+}
+
+"""Why an operating company has no value"""
+enum KnownGap {
+  BLANK_CHECK
+  NO_CIK
+  NO_FACTS
+  NO_ROW
+}
+
+"""`names` operating companies without a value for the one `gap`"""
+type KnownGapCount {
+  gap: KnownGap!
+  names: Int!
+}
+
 """New positions are sized at `multiplier` of the normal size in `label`"""
 type LabelSize {
   label: RegimeLabel!
@@ -3139,6 +3175,16 @@ type Query {
     """
     date: Date = null
   ): QualityReport
+
+  """
+  The session's fundamentals share count known against the rows stored, by security type, with the causes of an operating company's gap (NOT_RUN when no nightly record of the session holds it); null: nothing stored
+  """
+  knownCoverage(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): KnownCoverage
 
   """
   The session's live verification vs IBKR (NO_PARTITION when it did not run for the session); null: nothing stored

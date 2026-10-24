@@ -133,6 +133,7 @@ PAGES: dict[str, list[Op]] = {
         Op("IngestionCompleteness", _static(sessions=10)),
         Op("NightlyRuns", _static(limit=10)),
         Op("QualityChecks", _static()),
+        Op("KnownCoverage", _static()),
     ],
 }
 

@@ -106,3 +106,122 @@ more than fifty. It is a warning only: the chain acceptance checks and what they
 unchanged. The share can mislead when the optionable list itself changes, so check the counts.
 """
 see_also = ["unavailable_system", "session"]
+
+# ------------------------------------------------------------- known values (Admin Ingestion)
+# The fundamentals share count known against the rows stored, by security type, and why an
+# operating company has none (services/read/coverage/known_values.py). Admin only.
+
+[[term]]
+id = "known_value_coverage"
+term = "Known-value coverage"
+short = "How many names have an actual value for the fundamentals share count, against how many only have a stored row."
+body = """
+The completeness grid counts rows. Fundamentals stores a row for every name, with an empty share count for names that report none, so the grid can read complete while most values are missing. This panel counts the values themselves, by security type, for the session the page shows.
+Funds and ETFs report no share count, so a low share for them is expected. For stocks and ADRs the share should stay near the minimum in the sources settings, about 95% of operating companies. The table under it counts the operating companies without a value, by cause.
+The counts come from the nightly coverage check, saved with the run, so a session whose run predates this panel has none. They can mislead when the universe changes: compare the names column first.
+"""
+next = "If stocks fall under their usual share, read the causes below the table, then check the shares step in the nightly run."
+see_also = ["dataset_status", "unknown", "known_gap", "known_security_type"]
+
+[[term]]
+id = "known_security_type"
+term = "Share count by security type"
+short = "The kind of instrument the row counts: common stock, ADR, ETF, closed-end fund and so on."
+body = """
+The type comes from the reference snapshot of the session. Only common stocks and ADRs are operating companies, which are the names that file a share count. A name with no type counts as an operating company until the reference data says otherwise.
+"""
+see_also = ["known_value_coverage", "known_names"]
+
+[[term]]
+id = "known_names"
+term = "Names"
+short = "How many names of this security type are in the universe for the session."
+body = """
+It counts every name of the type in the session's universe snapshot, whether or not fundamentals stored a row for it. Compare it with the rows and known columns. When it changes a lot from one session to the next, the universe changed, not the data.
+"""
+see_also = ["known_rows", "known_values", "known_security_type"]
+
+[[term]]
+id = "known_rows"
+term = "Rows stored"
+short = "How many of the names have a fundamentals row stored, whether or not the row holds a share count."
+body = """
+This is the figure the completeness grid shows. A row with an empty share count still counts here. Example: 4,000 ETFs with 4,000 rows and none known reads as complete on the grid and as 0% known here.
+"""
+see_also = ["known_values", "known_value_coverage"]
+
+[[term]]
+id = "known_values"
+term = "Known"
+short = "How many of the stored rows hold an actual share count, not an empty one."
+body = """
+A value is known when the stored share count is present. Missing is never counted as zero and never filled from an earlier day. A screen treats a name without it as missing data.
+"""
+see_also = ["known_rows", "known_share"]
+
+[[term]]
+id = "known_share"
+term = "Known share"
+short = "Known values as a share of the names of the type."
+body = """
+The server divides the known values by the names, so a stored but empty row lowers it. Read it by type. Funds sit near 0% by design. Stocks and ADRs sit near 95%: the rest are foreign filers, multi-class issuers and new registrants.
+"""
+see_also = ["known_values", "known_names"]
+
+[[term]]
+id = "known_gap"
+term = "Why no value"
+short = "The cause behind an operating company with no share count, one count per cause."
+body = """
+Each operating company without a value is counted once, under the first cause that fits: blank-check company, no CIK, no share count filed, then no row stored. Funds and ETFs are not listed, because they have no share count by design.
+"""
+see_also = ["known_gap_names", "known_gap_blank_check", "known_gap_no_cik", "known_gap_no_facts", "known_gap_no_row"]
+
+[[term]]
+id = "known_gap_names"
+term = "Operating companies without a count"
+short = "How many operating companies have no share count for this cause."
+body = """
+The counts add up to every stock and ADR with an empty share count. A cause that is empty is not listed.
+"""
+see_also = ["known_gap"]
+
+[[term]]
+id = "known_gap_blank_check"
+term = "Blank-check shell, SIC 6770"
+short = "A shell company with no operations, so no share count is expected."
+body = """
+These names carry the SEC industry code 6770. They are left out of the fundamentals coverage by design, like earnings. The count is a fact, not a fault.
+"""
+next = "Nothing is needed: these names never have a share count."
+see_also = ["known_gap"]
+
+[[term]]
+id = "known_gap_no_cik"
+term = "No CIK"
+short = "The company has no SEC identifier in the company snapshot, so no filings could be fetched for it."
+body = """
+The share count comes from the company's SEC filings, found by its CIK. Without one the shares step has nothing to fetch. It usually means a new listing or a name the company snapshot has not resolved yet.
+"""
+next = "The next company snapshot may add the CIK; a name that stays here for weeks is for the owner to check."
+see_also = ["known_gap"]
+
+[[term]]
+id = "known_gap_no_facts"
+term = "No share count filed"
+short = "The company was fetched and its filings carry no share count the app can use."
+body = """
+The app reads the cover-page count, then the weighted average of basic shares. Foreign private issuers that file 20-F or 40-F carry neither, and some multi-class issuers tag them differently. A row is stored, with an empty count.
+"""
+next = "Nothing is needed: the count appears when the company files a usable one."
+see_also = ["known_gap"]
+
+[[term]]
+id = "known_gap_no_row"
+term = "No row stored"
+short = "The company is in the universe, but fundamentals stored no row for it on the session."
+body = """
+Fundamentals stores a row for every name with a close or a share count. A company with a CIK and no row had neither on the session, which is usually a name that did not trade.
+"""
+next = "It clears when the name trades or files; a long list is a problem for the owner to check."
+see_also = ["known_gap"]

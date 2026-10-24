@@ -33,7 +33,13 @@ from algotrade.core.model.fields import REFERENCE_TABLE, ROLLUP_TABLE_PREFIX
 from algotrade.data import StoreReader
 from algotrade.data.reference import UNIVERSE_TABLE, companies, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import Feature, NullReason, not_applicable
+from algotrade.features.framework.feature import (
+    BLANK_CHECK_SIC,
+    OPERATING_TYPES,
+    Feature,
+    NullReason,
+    not_applicable,
+)
 from algotrade.services.features import site_features, site_store
 from algotrade_ingestion.tasks.maintenance.quality import Check
 from algotrade_ingestion.tasks.market.tiers import CORE, REST, load_tiers
@@ -45,6 +51,8 @@ ETF = "ETF"
 _FACTS = ("symbol", "security_type", "optionable", "is_leveraged", "is_inverse")
 # Explained absences that still count as a gap for a core name (ADR 0046): a large stock with
 # no bar is far likelier a dropped bar than a day without a trade.
+KNOWN_CAUSES = ("BLANK_CHECK", "NO_CIK", "NO_FACTS", "NO_ROW")  # known_breakdown's causes
+BREAKDOWN_FEATURE = "fundamentals.shares_outstanding"  # the rule whose check carries it
 GAP_IN_CORE = frozenset({NullReason.NO_TRADE.value})
 
 
@@ -86,11 +94,12 @@ def _population(reader: StoreReader, session: date) -> pd.DataFrame | None:
     )
     pop["is_etf"] = pop["security_type"].astype(str) == ETF
     company = companies(reader, session)  # on or before the session, never a later snapshot
-    sic = {}
-    if company is not None and "sic" in company.columns:
-        sic = dict(zip(company["instrument_id"].astype(str), company["sic"], strict=True))
-    pop["sic"] = [sic.get(str(i)) for i in pop["instrument_id"]]
-    for fact in ("security_type", "sic"):  # "" is null (not_applicable never rules it out)
+    for fact in ("sic", "cik"):  # company facts by instrument_id (null when not stored)
+        stored = {}
+        if company is not None and fact in company.columns:
+            stored = dict(zip(company["instrument_id"].astype(str), company[fact], strict=True))
+        pop[fact] = [stored.get(str(i)) for i in pop["instrument_id"]]
+    for fact in ("security_type", "sic", "cik"):  # "" is null (not_applicable never rules it out)
         pop[fact] = pop[fact].map(lambda v: "" if v is None or pd.isna(v) else str(v))
     for flag in ("optionable", "is_leveraged", "is_inverse"):  # a null flag is unknown, not "no"
         pop[flag] = pop[flag].map(lambda v: None if pd.isna(v) else bool(v))
@@ -183,9 +192,11 @@ def cells(
     rules: tuple[CoverageRule, ...],
     priority_symbols: tuple[str, ...],
     fs: FeatureSet,
+    pop: pd.DataFrame | None = None,
 ) -> list[Cell] | None:
-    """Every rule's cells (core, rest) for ``day``; ``None`` without a universe to measure."""
-    pop = _population(reader, day)
+    """Every rule's cells (core, rest) for ``day`` over ``pop`` (``_population``, read when not
+    given); ``None`` without a universe to measure."""
+    pop = _population(reader, day) if pop is None else pop
     if pop is None:
         return None
     tiers = load_tiers(reader, day, priority_symbols)
@@ -236,6 +247,44 @@ def cells(
     return out
 
 
+def known_breakdown(pop: pd.DataFrame, stored: pd.DataFrame | None, column: str) -> dict[str, Any]:
+    """Rows stored against values known for ``column``, over EVERY name of the universe ``pop``
+    (not only the names the feature applies to), so a table with a row for each name and a null
+    for most of them does not read as complete (fundamentals: a row per name, no shares for an
+    ETF). ``by_type``: per security type (``""`` is ``UNKNOWN``) its ``names``, the ``rows`` it
+    has stored and the ``known`` values, largest first. ``causes``: why an operating company
+    (``OPERATING_TYPES``, or no type; ``not_applicable``'s rule) has no value: BLANK_CHECK (SIC
+    ``BLANK_CHECK_SIC``, by design), NO_CIK (no company CIK), NO_ROW (nothing stored for it),
+    else NO_FACTS (a row, and the CIK's facts carry no count). Columnar; counts only."""
+    ids = pop["instrument_id"].astype(str)
+    held = pd.Series(False, index=pop.index)
+    known = held.copy()
+    if stored is not None:
+        stored_ids = stored["instrument_id"].astype(str)
+        held = ids.isin(stored_ids)
+        if column in stored.columns:
+            known = ids.isin(stored_ids[stored[column].notna()])
+    kind = pop["security_type"].where(pop["security_type"] != "", "UNKNOWN")
+    frame = pd.DataFrame({"security_type": kind, "row": held, "known": known})
+    grouped = frame.groupby("security_type").agg(
+        names=("row", "size"), rows=("row", "sum"), known=("known", "sum")
+    )
+    grouped = grouped.sort_values("names", ascending=False, kind="stable")
+    by_type = [
+        {"security_type": str(t), "names": int(r.names), "rows": int(r.rows), "known": int(r.known)}
+        for t, r in grouped.iterrows()
+    ]
+    operating = (pop["security_type"].isin(OPERATING_TYPES) | (pop["security_type"] == "")) & ~known
+    cause = pd.Series("NO_FACTS", index=pop.index)
+    cause = cause.mask(~held, "NO_ROW").mask(pop["cik"] == "", "NO_CIK")
+    cause = cause.mask(pop["sic"].str.strip() == BLANK_CHECK_SIC, "BLANK_CHECK")
+    counts = cause[operating].value_counts()
+    return {
+        "by_type": by_type,
+        "causes": {c: int(counts.get(c, 0)) for c in KNOWN_CAUSES if counts.get(c, 0)},
+    }
+
+
 def _previous(
     reader: StoreReader, session: date, fs: FeatureSet, rule: CoverageRule
 ) -> date | None:
@@ -254,8 +303,9 @@ def check_coverage(reader: StoreReader, session: date, s: SourcesSettings) -> li
     share is under its minimum or fell more than ``max_drop`` since the previous session,
     else PASS. ``data`` carries the cells (and the previous shares) for the report."""
     fs = site_features(site_store(None))
-    today = cells(reader, session, s.coverage, s.cboe_priority_symbols, fs)
-    if today is None:
+    pop = _population(reader, session)
+    today = cells(reader, session, s.coverage, s.cboe_priority_symbols, fs, pop)
+    if pop is None or today is None:
         return [Check("coverage", "FAIL", "no universe or reference snapshot to measure against")]
     days = {r.feature: _previous(reader, session, fs, r) for r in s.coverage}
     prev: dict[tuple[str, str], float | None] = {}
@@ -301,12 +351,12 @@ def check_coverage(reader: StoreReader, session: date, s: SourcesSettings) -> li
         if before_day is None:
             notes.append("no earlier partition: drop not checked")
         detail = f"{figures}" + (f" ({'; '.join(notes)})" if notes else "")
-        checks.append(
-            Check(
-                f"coverage_{rule.feature}",
-                status,
-                detail,
-                data={"cells": rows, "previous_session": str(before_day) if before_day else ""},
-            )
-        )
+        data: dict[str, Any] = {
+            "cells": rows,
+            "previous_session": str(before_day) if before_day else "",
+        }
+        if rule.feature == BREAKDOWN_FEATURE:
+            table, column, _ = _locate(fs, rule.feature)
+            data["breakdown"] = known_breakdown(pop, reader.table(table, session), column)
+        checks.append(Check(f"coverage_{rule.feature}", status, detail, data=data))
     return checks

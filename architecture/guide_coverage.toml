@@ -43,6 +43,10 @@ source = "graphql:RegimeLabel"
 values = { CALM = "term:regime", CAUTION = "term:regime", STRESS = "term:regime", CRISIS = "term:regime", UNKNOWN = "term:regime" }
 
 [[enum]]
+source = "graphql:KnownGap"
+values = { BLANK_CHECK = "term:known_gap_blank_check", NO_CIK = "term:known_gap_no_cik", NO_FACTS = "term:known_gap_no_facts", NO_ROW = "term:known_gap_no_row" }
+
+[[enum]]
 source = "graphql:NewerState"
 values = { IN_PROGRESS = "term:last_complete_session", FAILED_RETRYING = "term:last_complete_session", PUBLISHING = "term:publishing_session" }
 
