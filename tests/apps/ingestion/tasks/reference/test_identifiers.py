@@ -208,3 +208,32 @@ def test_universe_build_with_identifiers_and_a_rename() -> None:
     assert second.stats["identifiers"]["ids_by_figi"] == 2
     assert second.stats["identifiers"]["ids_by_symbol"] == 1
     assert reference.loc["ZZZ", "security_type_source"] == "name_rule"  # not in the vendor list
+
+
+CLOSED_END_FUNDS = (
+    "Calamos Convertible and High Income Fund - Closed End Fund",  # CHY
+    "Calamos Strategic Total Return Fund - Closed End Fund",  # CSQ
+    "Sprott Focus Trust, Inc. - Closed End Fund",  # FUND
+    "Herzfeld Credit Income Fund, Inc.  - Closed End Fund",  # HERZ
+    "Daxor Corporation - Closed End Fund",  # DXR
+)
+NOT_FUNDS = (  # operating entities by SIC: royalty trusts (6792) and REITs (6798) stay common
+    "San Juan Basin Royalty Trust Common Stock",
+    "Permian Basin Royalty Trust Common Stock",
+    "Sabine Royalty Trust Common Stock",
+    "Cross Timbers Royalty Trust Common Stock",
+    "Mesa Royalty Trust Common Stock",
+    "Marine Petroleum Trust - Units of Beneficial Interest",
+    "Camden Property Trust Common Stock",
+)
+
+
+def test_a_closed_end_fund_typed_common_by_the_vendor_becomes_cef() -> None:
+    for name in CLOSED_END_FUNDS:
+        assert type_after_precedence(name, "CS") == ("CEF", "name_over_vendor"), name
+        assert type_after_precedence(name, "FUND") == ("CEF", "vendor"), name
+
+
+def test_royalty_trusts_and_reits_are_not_closed_end_funds() -> None:
+    for name in NOT_FUNDS:
+        assert type_after_precedence(name, "CS") == ("COMMON_STOCK", "vendor"), name

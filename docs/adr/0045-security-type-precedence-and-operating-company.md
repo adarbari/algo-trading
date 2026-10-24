@@ -38,3 +38,13 @@ shell with a ticker; it stays common stock and in the universe, but it has no ea
   catches it; the check measures the disagreement, it does not find these.
 - A new vendor type is mapped in `MASSIVE_TYPES`; a new generic one is added to
   `GENERIC_VENDOR_TYPES` (`universe_build.py`).
+
+## Amendment 2026-10-24: closed-end funds
+Massive types about 31 "- Closed End Fund" names (Calamos CHY / CSQ, Sprott FUND, Herzfeld HERZ,
+Daxor, and 18 BDCs such as ARCC) `CS`, so they counted as operating companies and had no share
+count (2 of 31 have one). `classify.security_type` gains a `CEF` rule on the Nasdaq Trader name
+suffix "- Closed End Fund"; as a specific name result it overrides the generic vendor type
+(`name_over_vendor`). Royalty trusts (SIC 6792 / 6795) and REITs stay `COMMON_STOCK`: 10-K
+filers with operating income, no such suffix. Measured 0.59% of ACTIVE rows (2026-10-23), inside
+`max_name_over_vendor`. A `CEF` is a fund in `asset_class` (ADR 0013): the BDCs leave the stock
+populations; FIGI ids are unchanged.

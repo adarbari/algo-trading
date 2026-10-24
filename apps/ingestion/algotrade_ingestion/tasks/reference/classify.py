@@ -16,6 +16,10 @@ from algotrade.config.site.universe.etf_category import Phrases
 
 _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ETN", re.compile(r"\bETNs?\b|exchange[- ]traded notes?", re.I)),
+    # Nasdaq Trader suffixes a closed-end fund (and a BDC) "- Closed End Fund"; Massive types some
+    # of them "CS", and a generic vendor type yields to this rule (ADR 0045). Royalty trusts and
+    # REITs carry no such suffix and are operating entities (SIC 6792 / 6798), so they stay common.
+    ("CEF", re.compile(r"-\s*closed end fund\s*$", re.I)),
     # not a name that ends "Common Stock" / "Ordinary Shares" ("Preferred Bank - Common Stock")
     (
         "PREFERRED",
