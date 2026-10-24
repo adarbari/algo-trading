@@ -259,7 +259,7 @@ def _passing(
     found = ctx.cache.get(key)
     if found is not None:
         return found  # type: ignore[no-any-return]
-    resolved = load_served_filters(ctx, SURFACE, ctx.session.date).resolved
+    resolved = load_served_filters(ctx, SURFACE, ctx.session.date, [i.id for i in inputs]).resolved
     resolved.check(i.id for i in inputs)
     ids = population.ids if keyed else None
     offered = list(dict.fromkeys(d.field for d in resolved.offered))

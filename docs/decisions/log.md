@@ -670,3 +670,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the owner's bar (2026-10-09) is every page under 1 s cold, warm and first visit, no hacks, and the 1 s gate now covers every declared operation (2026-10-23): an opt-in filter is still the page, and a 3.9 s cold read is four times the bar, so Ideas would either fail the gate or need a coverage exception for a known-slow path. The results page is within the bar, so holding it too (C) delays a measured-good feature for no gain; precompute is already the agreed follow-up and gives Ideas the filter at plain cost.
+## 2026-10-24 | More filters PR (#941) | FilterFeatures listed in perf_view_coverage.toml
+- Question: how the click-only `FilterFeatures` operation (sent when More filters opens) meets the 1 s page gate's coverage test.
+- Options: A list it with a reason and raise the pin 13 to 14 / B send it on every Ideas load so it is captured / C run the 22-minute crawl / D a static resolver.
+- Decision: A: one `[[operation]]` entry and `max_operation = 14`.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Note: the gate cannot measure a lazy, click-only operation: `web_page_ops.py` does not follow `lazy(() => import(...))`, an uncertain operation is skipped by `fast_bench.op_set`, and views the crawl discovers are not timed.
+- Reasoning: B spends a request and a catalogue-sized read on every Ideas load against the request budget; C buys no measurement. Follow-up: teach the gate to time discovered click views, then shrink the list.

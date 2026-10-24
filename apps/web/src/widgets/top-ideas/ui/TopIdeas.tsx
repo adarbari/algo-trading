@@ -15,7 +15,7 @@ import {
   type FilterSearch,
   type LabelOf,
 } from '@/features/filter-bar';
-import { helped, termHelp } from '@/features/guide-help';
+import { GuideHelp, helped, termHelp } from '@/features/guide-help';
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
 import {
   IDEA_COLUMN_SETS,
@@ -105,7 +105,13 @@ export function TopIdeas({
         surface={SURFACE}
         state={filters}
         facets={facets}
-        help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
+        help={(entry) =>
+          entry.kind === 'term' ? (
+            termHelp(entry.id)
+          ) : entry.kind === 'field' ? (
+            <GuideHelp entry={{ kind: 'field', id: entry.id }} />
+          ) : null
+        }
         labelOf={labelOf}
       />
       <Panel
