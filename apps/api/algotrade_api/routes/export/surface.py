@@ -13,11 +13,9 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 
-from algotrade.config.user import UserContext
-from algotrade.services.read.context import open_context
 from algotrade.services.read.export.file import export_file
 from algotrade.services.read.export.surfaces import MAX_COLUMNS, Params
-from algotrade_api.deps import Caller, Followed, Store
+from algotrade_api.deps import Caller, Followed, Store, dated_context
 
 router = APIRouter(prefix="/files", tags=["files"])
 audit = logging.getLogger("algotrade_api.export")
@@ -59,14 +57,7 @@ def surface_csv(
         dt.date | None, Query(description="the session to read (default: the one pages show)")
     ] = None,
 ) -> StreamingResponse:
-    ctx = open_context(
-        store.reader,
-        store.configs,
-        UserContext(caller.user_id),
-        date,
-        cache=store.cache,
-        serving=serving,
-    )
+    ctx = dated_context(store, caller, serving, date)
     found = export_file(ctx, surface, f, Params(screener, tuple(columns or ())))
     audit.info(
         "export viewer=%s surface=%s filters=%s rows=%d licences=%s",
