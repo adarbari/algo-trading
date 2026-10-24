@@ -45,7 +45,7 @@ SOURCES = (
 )
 _WHAT = {
     "mom_12_1": "12-1 momentum (the 12-month return without the last month)",
-    "adv_usd_20d": "20-session average dollar volume",
+    "adv_usd_20d": "20-session dollar volume",
     "rs_spy_63d": "63-session relative strength against SPY",
 }
 _COHORT = {
@@ -69,7 +69,7 @@ def _null(table: str, column: str, level: str) -> str:
         + ("" if level == "universe" else f", or its company snapshot has no {level}")
         + f", its {column} is null or missing, fewer than "
         f"min_members_{level} stocks of its cohort have a known one, or fewer than min_coverage "
-        "of the universe's stocks have a price_stats row (a partial day)"
+        "of the universe's stocks have a source row (a partial day)"
     )
 
 
@@ -77,7 +77,7 @@ FEATURES = tuple(
     Feature(
         f"{column}_pct_{level}", "float32", "decimal",
         f"The percentile rank of {column} ({_WHAT[column]}) among {_COHORT[level]} with a known "
-        f"one: 0 the lowest, 1 the highest, ties share their average rank; 0.9 is above 90% of "
+        f"one: 0 the lowest, 1 the highest, ties share one rank; 0.9 is above 90% of "
         "the cohort",
         _null(table, column, level),
         kind="cross_section", valid_range=(0, 1),
