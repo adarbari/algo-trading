@@ -70,3 +70,55 @@ def test_a_cursor_is_only_good_for_its_filters(graph: Graph) -> None:
         },
     )
     assert body["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
+
+
+FEATURE = "rollup.volume@v1.dollar_volume"
+FEATURE_ID = f"feature:{FEATURE}"
+WITH_FEATURES = """query($surface: String!, $names: [String!]) {
+  filterSet(surface: $surface, withFeatures: $names) {
+    searchable filters { id group kind guide bins }
+    withheld { id }
+  }
+  filterFeatures(surface: $surface) { name label kind guide synonyms }
+}"""
+
+
+def test_a_surface_with_catalogue_fields_is_searchable_and_lists_the_features(
+    graph: Graph,
+) -> None:
+    body = graph(WITH_FEATURES, {"surface": "ideas"})
+    assert "errors" not in body, body
+    assert body["data"]["filterSet"]["searchable"] is True
+    found = {f["name"]: f for f in body["data"]["filterFeatures"]}
+    assert found[FEATURE]["kind"] == "RANGE" and found[FEATURE]["guide"] == f"field:{FEATURE}"
+
+
+def test_a_surface_of_its_own_columns_takes_no_features(graph: Graph) -> None:
+    body = graph(WITH_FEATURES, {"surface": "screeners"})
+    assert body["data"]["filterSet"]["searchable"] is False
+    assert body["data"]["filterFeatures"] == []
+
+
+def test_a_requested_feature_is_served_as_a_filter_of_the_more_group(graph: Graph) -> None:
+    body = graph(WITH_FEATURES, {"surface": "ideas", "names": [FEATURE]})
+    [made] = [f for f in body["data"]["filterSet"]["filters"] if f["id"] == FEATURE_ID]
+    assert (made["group"], made["kind"], made["guide"]) == ("MORE", "RANGE", f"field:{FEATURE}")
+    plain = graph(WITH_FEATURES, {"surface": "ideas"})
+    assert FEATURE_ID not in {f["id"] for f in plain["data"]["filterSet"]["filters"]}
+
+
+def test_ideas_filter_on_a_feature_made_on_the_fly_and_count_it(graph: Graph) -> None:
+    everything = graph(IDEAS, {"first": 10, "filters": []})["data"]["ideas"]
+    body = graph(IDEAS, {"first": 10, "filters": [{"id": FEATURE_ID, "values": [], "min": 1e30}]})
+    assert "errors" not in body, body
+    ideas = body["data"]["ideas"]
+    assert (ideas["total"], ideas["items"]) == (0, [])
+    [made] = [f for f in ideas["facets"]["items"] if f["id"] == FEATURE_ID]
+    assert made["active"] and made["removes"] == everything["total"]
+
+
+def test_a_feature_filter_for_an_unknown_field_is_refused(graph: Graph) -> None:
+    body = graph(
+        IDEAS, {"first": 10, "filters": [{"id": "feature:rollup.nope@v1.x", "values": []}]}
+    )
+    assert body["errors"][0]["extensions"]["code"] == "FORBIDDEN"

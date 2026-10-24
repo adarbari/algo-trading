@@ -515,7 +515,7 @@ def test_a_previous_run_before_the_table_is_read_from_the_frozen_run_id() -> Non
     assert before is not None and (before.run_id, before.session) == ("r-1", D0)
     assert before.frozen is None
     changes = results.load_run_changes(ctx, run)
-    assert changes.by_instrument["EQ:AAA"] == ("new", "REJECT")
+    assert changes.by_instrument["EQ:AAA"] == ("new", "REJECT", 2)
 
 
 # ------------------------------------------------- the previous run of every screener, one read

@@ -10,6 +10,10 @@ export type FilterKind = gqlTypes.FilterKind;
 export type FilterGroup = gqlTypes.FilterGroup;
 export type FilterInput = gqlTypes.FilterInput;
 export type FilterSetResponse = gqlTypes.FilterSetQuery;
+export type FilterableFeature = gqlTypes.FilterFeaturesQuery['filterFeatures'][number];
+
+/** The id prefix of a filter made of a catalogue field (`feature:<field>`). */
+export const FEATURE_FILTER_PREFIX = 'feature:';
 export type FilterDefinition = NonNullable<FilterSetResponse['filterSet']>['filters'][number];
 
 /** The counts of one filtered list, as the read serves them (`facets` of a list field). */

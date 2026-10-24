@@ -75,6 +75,10 @@ source = "graphql:FilterChoice.label"
 exempt = "the display name of one offered value (an option of a pick); the filter's Guide entry explains the choice"
 
 [[enum]]
+source = "graphql:FilterableFeature.label"
+exempt = "the display name of a catalogue field offered by More filters (its column name); the field's own Guide entry (`guide`, field:<name>) explains it"
+
+[[enum]]
 source = "graphql:FilterSet.label"
 exempt = "the surface's display name from its filters file"
 

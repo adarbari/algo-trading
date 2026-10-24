@@ -16,11 +16,51 @@ const FIXTURE: unknown = JSON.parse(
   readFileSync(fileURLToPath(new URL('./fixtures/ideas/ideas-page.json', import.meta.url)), 'utf8'),
 );
 
+const DOLLAR = 'rollup.option_liquidity@v1.stock_volume';
+
+/** The `filterFeatures` answer: two catalogue fields the viewer may filter on. */
+const FILTER_FEATURES = {
+  data: {
+    filterFeatures: [
+      {
+        name: DOLLAR,
+        label: 'stock volume',
+        kind: 'RANGE',
+        guide: `field:${DOLLAR}`,
+        synonyms: ['liquid', 'turnover'],
+      },
+    ],
+  },
+};
+
+const filterSet = (withFeatures: string[] | null | undefined) => ({
+  data: {
+    filterSet: {
+      ...FILTER_SET.data.filterSet,
+      filters: [
+        ...FILTER_SET.data.filterSet.filters,
+        ...(withFeatures ?? []).map((f) => ({
+          id: `feature:${f}`,
+          label: 'stock volume',
+          group: 'MORE',
+          kind: 'RANGE',
+          guide: `field:${f}`,
+          options: [],
+          bins: [],
+          windowUnit: null,
+          unit: null,
+        })),
+      ],
+    },
+  },
+});
+
 const FILTER_SET = {
   data: {
     filterSet: {
       surface: 'ideas',
       label: 'Ideas',
+      searchable: true,
       filters: [
         {
           id: 'decision',
@@ -35,6 +75,7 @@ const FILTER_SET = {
           ],
           bins: [],
           windowUnit: null,
+          unit: null,
         },
         {
           id: 'agreeing',
@@ -45,6 +86,7 @@ const FILTER_SET = {
           options: [],
           bins: [1, 2, 3],
           windowUnit: null,
+          unit: null,
         },
       ],
     },
@@ -64,6 +106,7 @@ interface Input {
 }
 
 const passes = (item: Item, f: Input): boolean => {
+  if (f.id.startsWith('feature:')) return true; // the fixture holds no catalogue values
   if (f.id === 'decision') return f.values.includes(item.best.decision);
   const n = item.pickedBy.length;
   return (f.min === null || n >= f.min) && (f.max === null || n <= f.max);
@@ -109,14 +152,18 @@ export async function mockIdeasApi(page: Page, edgeDesk: unknown = NO_EDGE_DESK)
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as {
       query?: string;
-      variables?: { filters?: Input[] | null; surface?: string };
+      variables?: { filters?: Input[] | null; withFeatures?: string[] | null; surface?: string };
     } | null;
     if (/query\s+EdgeDesk\b/.test(body?.query ?? '')) {
       await route.fulfill({ json: edgeDesk });
       return;
     }
     if (/query\s+FilterSet\b/.test(body?.query ?? '') && body?.variables?.surface === 'ideas') {
-      await route.fulfill({ json: FILTER_SET });
+      await route.fulfill({ json: filterSet(body?.variables?.withFeatures) });
+      return;
+    }
+    if (/query\s+FilterFeatures\b/.test(body?.query ?? '')) {
+      await route.fulfill({ json: FILTER_FEATURES });
       return;
     }
     if (!/query\s+IdeasPage\b/.test(body?.query ?? '')) {
