@@ -16,11 +16,15 @@ export interface ExportButtonProps {
   f: string;
   /** The session the page shows (`2026-10-01`): the file is for that session, not the latest. */
   session?: string | null | undefined;
+  /** screener_results: the screener whose run the page shows. */
+  screener?: string | undefined;
+  /** The catalogue columns the table shows beyond the default set (screener_results, universe). */
+  columns?: readonly string[] | undefined;
   /** The help button of the Export Guide entry (the caller's `termHelp('export')`). */
   help?: ReactNode;
 }
 
-export function ExportButton({ surface, f, session, help }: ExportButtonProps) {
+export function ExportButton({ surface, f, session, screener, columns, help }: ExportButtonProps) {
   const file = useSurfaceExport(surface);
   return (
     <Stack direction="row" gap={1} align="center">
@@ -29,7 +33,7 @@ export function ExportButton({ surface, f, session, help }: ExportButtonProps) {
         variant="secondary"
         loading={file.isPending}
         onClick={() => {
-          file.mutate({ f, session });
+          file.mutate({ f, session, screener, columns });
         }}
       >
         Export

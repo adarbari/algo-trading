@@ -50,7 +50,7 @@ export interface FeatureTableProps {
   /** Rows per page (server mode). */
   pageSize?: number;
   /** Above the table: filters (given the server's counts when a function). */
-  header?: ReactNode | ((facets: FilterFacets | null) => ReactNode);
+  header?: ReactNode | ((facets: FilterFacets | null, session: string | null) => ReactNode);
   /** Ticked rows (tickers); absent: no checkboxes. */
   selected?: readonly string[];
   onSelectedChange?: (symbols: string[]) => void;
@@ -128,7 +128,7 @@ export function FeatureTable({
         onRetry: () => void table.refetch(),
       }}
       notes={server ? data : null}
-      header={typeof header === 'function' ? header(facets) : header}
+      header={typeof header === 'function' ? header(facets, data?.session ?? null) : header}
       summary={summary}
       pager={
         server && data ? { page, pages: pageCount(data.total, data.size), onPage: setPage } : null

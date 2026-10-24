@@ -11,12 +11,29 @@ import { api, unwrap } from '@/shared/api';
 
 export function useSurfaceExport(surface: string) {
   return useMutation({
-    mutationFn: async ({ f, session }: { f: string; session?: string | null | undefined }) => {
+    mutationFn: async ({
+      f,
+      session,
+      screener,
+      columns,
+    }: {
+      f: string;
+      session?: string | null | undefined;
+      /** screener_results: the screener whose run is exported. */
+      screener?: string | undefined;
+      /** screener_results, universe: the catalogue columns the table shows beyond the default set. */
+      columns?: readonly string[] | undefined;
+    }) => {
       const text = await unwrap(
         api.GET('/files/{surface}.csv', {
           params: {
             path: { surface },
-            query: { ...(f && { f }), ...(session && { date: session }) },
+            query: {
+              ...(f && { f }),
+              ...(session && { date: session }),
+              ...(screener && { screener }),
+              ...(columns && columns.length > 0 && { columns: [...columns] }),
+            },
           },
           parseAs: 'text',
         }),
