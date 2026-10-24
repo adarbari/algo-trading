@@ -215,6 +215,7 @@ function view(patch: Record<string, unknown> = {}) {
     scope: 'screener:vrp',
     name: null,
     names: [],
+    named: [] as { name: string; filters: string }[],
     droppedFilters: [] as string[],
     ready: true,
     columns: [CLOSE],

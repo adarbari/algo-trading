@@ -227,6 +227,10 @@ export async function mockIdeasApi(
               sort: null,
               decisions: [],
               names: namesOf(store, scope),
+              named: namesOf(store, scope).map((n) => ({
+                name: n,
+                filters: store.get(viewKey(scope, n))?.filters ?? '',
+              })),
             },
           },
         },

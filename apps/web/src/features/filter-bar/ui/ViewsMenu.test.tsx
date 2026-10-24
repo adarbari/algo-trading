@@ -1,19 +1,13 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { FilterDefinition } from '@/entities/filter';
 import type { TableViewState } from '@/entities/saved-view';
-import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, stubElementSize } from '@/shared/lib/testing';
 
 import type { FilterStateApi } from '../api/use-filter-state';
 import { ViewsMenu } from './ViewsMenu';
-
-vi.mock('@/shared/api', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  gql: vi.fn(),
-}));
 
 const DEFINITIONS: FilterDefinition[] = [
   {
@@ -39,6 +33,7 @@ function fakeView(patch: Partial<TableViewState> = {}): TableViewState {
     scope: 'surface:ideas',
     name: null,
     names: ['Calm', 'Stale'],
+    named: Object.entries(HELD).map(([name, filters]) => ({ name, filters })),
     ready: true,
     columns: [],
     narrowColumns: [],
@@ -61,32 +56,11 @@ const state = {
   f: 'decision:QUALIFIED',
 } as unknown as FilterStateApi;
 
-beforeEach(() => {
-  vi.mocked(gql).mockImplementation((_doc, variables) => {
-    const name = (variables as { name: string | null }).name;
-    return Promise.resolve({
-      view: {
-        scope: 'surface:ideas',
-        name,
-        saved: true,
-        columns: [],
-        narrowColumns: [],
-        filters: HELD[name ?? ''] ?? '',
-        sort: null,
-        decisions: [],
-        names: ['Calm', 'Stale'],
-      },
-    });
-  });
-});
-
 stubElementSize();
 
 function setup(view: TableViewState) {
   const done = render(
-    <TestQueryProvider>
-      <ViewsMenu view={view} state={state} definitions={DEFINITIONS} labelOf={undefined} />
-    </TestQueryProvider>,
+    <ViewsMenu view={view} state={state} definitions={DEFINITIONS} labelOf={undefined} />,
   );
   return done;
 }
@@ -126,7 +100,6 @@ describe('ViewsMenu', () => {
     setup(view);
     await user.click(screen.getByRole('button', { name: 'Views · 2' }));
     const menu = await screen.findByRole('dialog', { name: 'Views' });
-    await within(menu).findByRole('button', { name: /^Calm\s*Decision/ });
     await user.type(within(menu).getByRole('textbox', { name: 'Name of the view' }), 'Fresh');
     expect(within(menu).getAllByText('Decision Qualified').length).toBeGreaterThan(0);
     await user.click(within(menu).getByRole('button', { name: 'Save view' }));

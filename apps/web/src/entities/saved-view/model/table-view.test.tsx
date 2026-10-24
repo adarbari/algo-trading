@@ -30,6 +30,7 @@ const view = (patch: Record<string, unknown> = {}) => ({
   decisions: ['QUALIFIED'],
   filters: 'decision:QUALIFIED;gone:1..2',
   names: ['Earnings'],
+  named: [{ name: 'Earnings', filters: '' }],
   ...patch,
 });
 
@@ -51,6 +52,26 @@ beforeEach(() => {
 });
 
 describe('useTableView', () => {
+  it('reads and restores nothing until it is enabled, then lists the named views with their filters', async () => {
+    GQL.mockResolvedValue({
+      view: view({ names: ['Calm'], named: [{ name: 'Calm', filters: 'decision:QUALIFIED' }] }),
+    });
+    const onChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ on }) => useTableView(SCOPE, { f: undefined, onChange, known: ['decision'] }, on),
+      { wrapper, initialProps: { on: false } },
+    );
+    await act(() => Promise.resolve());
+    expect(GQL).not.toHaveBeenCalled();
+    expect(result.current.names).toEqual([]);
+    rerender({ on: true });
+    await waitFor(() => {
+      expect(result.current.named).toEqual([{ name: 'Calm', filters: 'decision:QUALIFIED' }]);
+    });
+    expect(GQL).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled(); // the default view is not restored over the URL
+  });
+
   it('starts from the saved view and saves every change into the view in use', async () => {
     GQL.mockResolvedValue({ view: view() });
     PUT.mockResolvedValue(ok(restView({ sort: 'symbol' })));

@@ -9,7 +9,7 @@ import { Button, Field, IconButton, Input, NoticeLine, Popover, Stack, Text } fr
 import { useState } from 'react';
 
 import type { FilterDefinition } from '@/entities/filter';
-import { useSavedView, type TableViewState } from '@/entities/saved-view';
+import type { TableViewState } from '@/entities/saved-view';
 import { errorDetail } from '@/shared/api';
 
 import type { FilterStateApi } from '../api/use-filter-state';
@@ -23,23 +23,26 @@ export interface ViewsMenuProps {
   state: FilterStateApi;
   definitions: readonly FilterDefinition[];
   labelOf: LabelOf | undefined;
+  /** The menu opened or closed (a surface that keeps its own views reads them on first open). */
+  onOpenChange?: (open: boolean) => void;
 }
 
 function ViewRow({
   view,
   name,
+  filters,
   definitions,
   labelOf,
   onDone,
 }: {
   view: TableViewState;
   name: string;
+  filters: string;
   definitions: readonly FilterDefinition[];
   labelOf: LabelOf | undefined;
   onDone: () => void;
 }) {
-  const saved = useSavedView(view.scope, name);
-  const held = filtersSummary(decodeFilters(saved.data?.filters), definitions, labelOf);
+  const held = filtersSummary(decodeFilters(filters), definitions, labelOf);
   return (
     <Stack direction="row" gap={1} align="center" justify="between">
       <Button
@@ -72,8 +75,12 @@ function ViewRow({
   );
 }
 
-export function ViewsMenu({ view, state, definitions, labelOf }: ViewsMenuProps) {
-  const [open, setOpen] = useState(false);
+export function ViewsMenu({ view, state, definitions, labelOf, onOpenChange }: ViewsMenuProps) {
+  const [open, setOpened] = useState(false);
+  const setOpen = (next: boolean) => {
+    setOpened(next);
+    onOpenChange?.(next);
+  };
   const [name, setName] = useState('');
   const trimmed = name.trim();
   const current = filtersSummary(state.filters, definitions, labelOf);
@@ -115,6 +122,7 @@ export function ViewsMenu({ view, state, definitions, labelOf }: ViewsMenuProps)
                   key={n}
                   view={view}
                   name={n}
+                  filters={view.named.find((v) => v.name === n)?.filters ?? ''}
                   definitions={definitions}
                   labelOf={labelOf}
                   onDone={() => {

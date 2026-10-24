@@ -2,7 +2,7 @@ import pytest
 
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.screens.views import TableView, load_view, scope_parts
+from algotrade.services.read.screens.views import NamedView, TableView, load_view, scope_parts
 from tests.unit.services.read.screens.conftest import context
 
 PREFS = {
@@ -23,7 +23,7 @@ def test_the_default_and_a_named_view(reader: StoreReader) -> None:
     ctx = context(reader, PREFS)
     assert load_view(ctx, "screener:alpha") == TableView(
         "screener:alpha", None, True, ("rollup.iv30@v1.iv30",), "-score", ("QUALIFIED",),
-        ("Earnings",), ("name", "criterion:a"),
+        ("Earnings",), ("name", "criterion:a"), "", (NamedView("Earnings"),),
     )  # fmt: skip
     named = load_view(ctx, "screener:alpha", "Earnings")
     assert named is not None
@@ -78,3 +78,15 @@ def test_a_surface_with_a_filter_bar_has_views_and_one_without_has_none(
 
 def test_a_surface_id_no_file_could_have_is_no_view_not_an_error(reader: StoreReader) -> None:
     assert load_view(context(reader, {}), "surface:Bad!") is None
+
+
+def test_each_named_view_comes_with_its_filters_in_one_read(reader: StoreReader) -> None:
+    saved = {("me", "preferences", "preferences"): {
+        "views": {"surface:ideas": {"views": {
+            "Calm": {"columns": [], "filters": "decision:QUALIFIED"},
+            "Bare": {"columns": []},
+        }}},
+    }}  # fmt: skip
+    found = load_view(context(reader, saved), "surface:ideas")
+    assert found is not None and found.names == ("Bare", "Calm")
+    assert found.named == (NamedView("Bare", ""), NamedView("Calm", "decision:QUALIFIED"))

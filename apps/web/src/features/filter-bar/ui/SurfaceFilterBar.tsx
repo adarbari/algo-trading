@@ -67,13 +67,28 @@ function ScopedViews({
   definitions: readonly FilterDefinition[];
   labelOf: LabelOf | undefined;
 }) {
-  const view = useTableView(scope, {
-    f: state.f,
-    onChange: state.replace,
-    ...(known && { known }),
-    knownPrefix: FEATURE_FILTER_PREFIX,
-  });
-  return <ViewsMenu view={view} state={state} definitions={definitions} labelOf={labelOf} />;
+  const [opened, setOpened] = useState(false);
+  const view = useTableView(
+    scope,
+    {
+      f: state.f,
+      onChange: state.replace,
+      ...(known && { known }),
+      knownPrefix: FEATURE_FILTER_PREFIX,
+    },
+    opened,
+  );
+  return (
+    <ViewsMenu
+      view={view}
+      state={state}
+      definitions={definitions}
+      labelOf={labelOf}
+      onOpenChange={(open) => {
+        if (open) setOpened(true);
+      }}
+    />
+  );
 }
 
 export function SurfaceFilterBar({

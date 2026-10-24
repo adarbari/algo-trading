@@ -38,6 +38,8 @@ export interface TableViewState {
   name: string | null;
   /** The user's named views of the table, sorted. */
   names: readonly string[];
+  /** Each named view with the `f` string it holds (one read lists them all). */
+  named: readonly { name: string; filters: string }[];
   /** The saved view has been read, and with a filter binding its `f` restored (the table can ask for its rows). */
   ready: boolean;
   columns: readonly string[];
@@ -62,14 +64,22 @@ export interface TableViewState {
   error: unknown;
 }
 
-export function useTableView(scope: string, filters?: FilterBinding): TableViewState {
+/**
+ * `enabled` false (a menu not opened yet) reads nothing and restores nothing: no request fires
+ * on a page's load for a view nobody asked for; turning it on later reads the views.
+ */
+export function useTableView(
+  scope: string,
+  filters?: FilterBinding,
+  enabled = true,
+): TableViewState {
   const [name, setName] = useState<string | null>(null);
   const [edits, setEdits] = useState<Edits>({});
-  const saved = useSavedView(scope, name);
+  const saved = useSavedView(scope, name, enabled);
   const save = useSaveView(scope);
   const removal = useDeleteView(scope);
   const view = saved.data;
-  const restore = useRef<'initial' | 'switched' | null>('initial');
+  const restore = useRef<'initial' | 'switched' | null>(enabled ? 'initial' : null);
   // With a filter binding the table waits for the view's `f` to be in the URL before it reads.
   const [restoredF, setRestoredF] = useState(false);
   const restored = restorableFilters(view?.filters ?? '', filters?.known, filters?.knownPrefix);
@@ -106,7 +116,8 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
     scope,
     name,
     names: view?.names ?? [],
-    ready: !saved.isPending && (!filters || restoredF),
+    named: view?.named ?? [],
+    ready: enabled && !saved.isPending && (!filters || restoredF),
     columns: current.columns,
     narrowColumns: current.narrowColumns,
     sort: current.sort,

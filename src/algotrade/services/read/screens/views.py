@@ -29,12 +29,22 @@ LEGACY_SCREENERS = "screeners"  # where PR 5-7 saved a screener's views (``scree
 
 
 @dataclass(frozen=True)
+class NamedView:
+    """One of the user's named views of a scope with its ``f`` string (the Views menu lists them
+    without a read per view)."""
+
+    name: str
+    filters: str = ""
+
+
+@dataclass(frozen=True)
 class TableView:
     """``scope``: the table the view is of (``screener:<id>``); ``name``: None for the default
     view; ``names``: the user's named views of the scope, sorted; ``sort``: a column id, ``-``
     first for descending (None: the table's default); ``narrow_columns``: the table column ids
     the user added back on a narrow (phone) table; ``filters``: the ``f`` string of the filter
-    bar (ADR 0082; empty: none, and for a view saved before it)."""
+    bar (ADR 0082; empty: none, and for a view saved before it); ``named``: each named view with
+    its ``f`` (one read lists them all)."""
 
     scope: str
     name: str | None
@@ -45,6 +55,7 @@ class TableView:
     names: tuple[str, ...]
     narrow_columns: tuple[str, ...] = ()
     filters: str = ""
+    named: tuple[NamedView, ...] = ()
 
 
 def scope_parts(scope: str) -> tuple[str, str]:
@@ -80,8 +91,9 @@ def table_view(configs: ConfigStore, user: str, scope: str, name: str | None = N
     named = dict(entry.get("views") or {})
     names = tuple(sorted(named))
     view = entry.get("view") if name is None else named.get(name)
+    summaries = tuple(NamedView(n, str((named[n] or {}).get("filters") or "")) for n in names)
     if not view:
-        return TableView(scope, name, False, (), None, (), names)
+        return TableView(scope, name, False, (), None, (), names, named=summaries)
     sort = view.get("sort")
     return TableView(
         scope=scope,
@@ -93,6 +105,7 @@ def table_view(configs: ConfigStore, user: str, scope: str, name: str | None = N
         names=names,
         narrow_columns=tuple(str(c) for c in view.get("narrow_columns") or []),
         filters=str(view.get("filters") or ""),
+        named=summaries,
     )
 
 

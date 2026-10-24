@@ -84,6 +84,7 @@ type Documents = {
     "\n  query RunRecord($runId: String!) {\n    run(runId: $runId) {\n      runId\n      job\n      session\n      status\n      startedAt\n      finishedAt\n      durationS\n      itemsTotal\n      itemsByStatus\n      stats\n      failures {\n        reason\n        count\n        examples\n        statuses\n      }\n    }\n  }\n": typeof types.RunRecordDocument,
     "\n  query RunItems($runId: String!) {\n    runItems(runId: $runId) {\n      key\n      code\n      status\n    }\n  }\n": typeof types.RunItemsDocument,
     "\n  query QualityChecks {\n    quality {\n      session\n      runId\n      status\n      finishedAt\n      checks {\n        name\n        status\n        detail\n      }\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n    }\n  }\n": typeof types.QualityChecksDocument,
+    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      filters\n      sort\n      decisions\n      names\n      named {\n        name\n        filters\n      }\n    }\n  }\n": typeof types.TableViewDocument,
     "\n  query InstrumentScreenerHits($key: String!) {\n    session {\n      date\n    }\n    instrument(key: $key) {\n      instrumentId\n      symbol\n      screenerHits {\n        screener {\n          id\n          name\n        }\n        result {\n          rank\n          decision\n          score\n          reasons\n          flags\n          change\n          criteria {\n            id\n            field\n            mode\n            outcome\n            value\n            distance\n          }\n        }\n      }\n    }\n  }\n": typeof types.InstrumentScreenerHitsDocument,
     "\n  query ScreenerConfigs {\n    configs(kind: \"screener\") {\n      configId\n      scope\n      kind\n      impl\n      selection\n      hash\n      error\n    }\n  }\n": typeof types.ScreenerConfigsDocument,
     "\n  query MyScreens {\n    myScreens {\n      screenerId\n      status\n      latest\n      hasDraft\n      presetId\n    }\n  }\n": typeof types.MyScreensDocument,
@@ -103,7 +104,6 @@ type Documents = {
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": typeof types.GuideHelpFieldDocument,
     "\n  query GuideSearch($q: String!, $limit: Int!) {\n    guideSearch(q: $q, limit: $limit) {\n      query\n      groups {\n        kind\n        hits {\n          kind\n          id\n          title\n          snippet\n        }\n      }\n    }\n  }\n": typeof types.GuideSearchDocument,
     "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n": typeof types.MyFeatureRequestsDocument,
-    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      filters\n      sort\n      decisions\n      names\n    }\n  }\n": typeof types.TableViewDocument,
 };
 const documents: Documents = {
     "\n  query AcceptedFormulas {\n    acceptedFormulas {\n      today\n      days\n      rows {\n        fingerprint\n        canonical\n        expression\n        unit\n        description\n        acceptedCount\n        users\n        firstAccepted\n        lastAccepted\n        duplicateOf\n        backlogKey\n      }\n    }\n  }\n": types.AcceptedFormulasDocument,
@@ -174,6 +174,7 @@ const documents: Documents = {
     "\n  query RunRecord($runId: String!) {\n    run(runId: $runId) {\n      runId\n      job\n      session\n      status\n      startedAt\n      finishedAt\n      durationS\n      itemsTotal\n      itemsByStatus\n      stats\n      failures {\n        reason\n        count\n        examples\n        statuses\n      }\n    }\n  }\n": types.RunRecordDocument,
     "\n  query RunItems($runId: String!) {\n    runItems(runId: $runId) {\n      key\n      code\n      status\n    }\n  }\n": types.RunItemsDocument,
     "\n  query QualityChecks {\n    quality {\n      session\n      runId\n      status\n      finishedAt\n      checks {\n        name\n        status\n        detail\n      }\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n    }\n  }\n": types.QualityChecksDocument,
+    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      filters\n      sort\n      decisions\n      names\n      named {\n        name\n        filters\n      }\n    }\n  }\n": types.TableViewDocument,
     "\n  query InstrumentScreenerHits($key: String!) {\n    session {\n      date\n    }\n    instrument(key: $key) {\n      instrumentId\n      symbol\n      screenerHits {\n        screener {\n          id\n          name\n        }\n        result {\n          rank\n          decision\n          score\n          reasons\n          flags\n          change\n          criteria {\n            id\n            field\n            mode\n            outcome\n            value\n            distance\n          }\n        }\n      }\n    }\n  }\n": types.InstrumentScreenerHitsDocument,
     "\n  query ScreenerConfigs {\n    configs(kind: \"screener\") {\n      configId\n      scope\n      kind\n      impl\n      selection\n      hash\n      error\n    }\n  }\n": types.ScreenerConfigsDocument,
     "\n  query MyScreens {\n    myScreens {\n      screenerId\n      status\n      latest\n      hasDraft\n      presetId\n    }\n  }\n": types.MyScreensDocument,
@@ -193,7 +194,6 @@ const documents: Documents = {
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": types.GuideHelpFieldDocument,
     "\n  query GuideSearch($q: String!, $limit: Int!) {\n    guideSearch(q: $q, limit: $limit) {\n      query\n      groups {\n        kind\n        hits {\n          kind\n          id\n          title\n          snippet\n        }\n      }\n    }\n  }\n": types.GuideSearchDocument,
     "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n": types.MyFeatureRequestsDocument,
-    "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      filters\n      sort\n      decisions\n      names\n    }\n  }\n": types.TableViewDocument,
 };
 
 /**
@@ -471,6 +471,10 @@ export function graphql(source: "\n  query QualityChecks {\n    quality {\n     
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      filters\n      sort\n      decisions\n      names\n      named {\n        name\n        filters\n      }\n    }\n  }\n"): typeof import('./graphql').TableViewDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "\n  query InstrumentScreenerHits($key: String!) {\n    session {\n      date\n    }\n    instrument(key: $key) {\n      instrumentId\n      symbol\n      screenerHits {\n        screener {\n          id\n          name\n        }\n        result {\n          rank\n          decision\n          score\n          reasons\n          flags\n          change\n          criteria {\n            id\n            field\n            mode\n            outcome\n            value\n            distance\n          }\n        }\n      }\n    }\n  }\n"): typeof import('./graphql').InstrumentScreenerHitsDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -544,10 +548,6 @@ export function graphql(source: "\n  query GuideSearch($q: String!, $limit: Int!
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n"): typeof import('./graphql').MyFeatureRequestsDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      filters\n      sort\n      decisions\n      names\n    }\n  }\n"): typeof import('./graphql').TableViewDocument;
 
 
 export function graphql(source: string) {

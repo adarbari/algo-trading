@@ -426,6 +426,10 @@ export async function mockBuilderApi(
         view: {
           ...(saved[key] ?? { ...fixture('view.json'), scope, name: viewName }),
           names: namesOf(viewId),
+          named: namesOf(viewId).map((n) => ({
+            name: n,
+            filters: String((saved[`${viewId}|${n}`] ?? {})['filters'] ?? ''),
+          })),
         },
       };
     }

@@ -2515,6 +2515,12 @@ type MyFeatureRequest {
   askedBeforeToday: Boolean!
 }
 
+"""One named view of a table with the filter bar's `f` string it holds"""
+type NamedView {
+  name: String!
+  filters: String!
+}
+
 """
 The newest session after the one served that is still processing, failing (ADR 0062) or complete but not yet published (`PUBLISHING`, ADR 0077): its `date`, its `state`, and for a failure the public `kind` only (never the step or its cause: ADR 0056)
 """
@@ -3830,6 +3836,7 @@ type TableView {
   names: [String!]!
   narrowColumns: [String!]!
   filters: String!
+  named: [NamedView!]!
 }
 
 """A run of a sentence: plain text, or a term linked to `url`"""
