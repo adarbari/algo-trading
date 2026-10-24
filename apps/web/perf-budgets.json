@@ -106,9 +106,9 @@
     "bundle.routes.src/pages/admin-llm-usage/ui/CallsSection.tsx": "2026-10-23 #909 owner decision: route budgets at measured + 5 % headroom (docs/decisions/log.md)",
     "bundle.routes.src/pages/admin-screener-runs/index.ts": "2026-10-23 first budget: the Admin Screener runs page (list with filters, run detail), measured locally 38.9 kB gzip + 5 % headroom (route budgets at measured + 5 %, #909 owner decision, docs/decisions/log.md)",
     "e2e./explore?focus=AAPL&tab=features.first_load_js_gzip_bytes": "2026-10-24 #939 Explore features: shared filter-bar chunk graph (measured locally, CI-equivalent build, +~500 B margin); owner pre-approved raises caused only by shared filter-bar code; then, before it: 2026-10-24 #941 the shared filter bar code moves a few bytes (measured locally 270020 B against 270000 B)",
-    "network./ideas.wire_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #941 More filters: the percent presentation and the lazy search's loader in the Ideas chunk (measured locally 369895 B against 369700 B, +1.1 kB margin for CI; owner pre-approved raises from the filter bar's shared code)",
+    "network./ideas.wire_gzip_bytes": "2026-10-24 #939 Ideas: CI measured 372245 B on the wire (shared filter-bar chunk graph), +~500 B margin; owner pre-approved raises caused only by shared filter-bar code; then, before it: 2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #941 More filters: the percent presentation and the lazy search's loader in the Ideas chunk (measured locally 369895 B against 369700 B, +1.1 kB margin for CI; owner pre-approved raises from the filter bar's shared code)",
     "network./screeners.wire_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk and the lists' components and reads (measured 343198 B, +~200 B margin); then, before it: previous budget",
-    "network./edges.wire_gzip_bytes": "2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk's growth (CI measured 370093 B, +~300 B margin); then, before it: previous budget",
+    "network./edges.wire_gzip_bytes": "2026-10-24 #939 Edges: CI measured 371313 B on the wire (shared filter-bar chunk graph moves ~200 B), +~500 B margin; owner pre-approved raises caused only by shared filter-bar code; then, before it: 2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk's growth (CI measured 370093 B, +~300 B margin); then, before it: previous budget",
     "bundle.routes.src/pages/trader-explore/ui/UniverseTable.tsx": "2026-10-24 #939 first budget: Explore's universe table (bar, feature table, column picker, compare ticks), a lazy chunk loaded only when no ticker is open (86512 B measured locally, 5 % headroom)",
     "e2e./explore?focus=AAPL&tab=features.requests": "2026-10-24 #939 Explore features: shared filter-bar chunks add preloaded chunks (measured locally); owner pre-approved raises caused only by shared filter-bar code",
     "network./explore.wire_gzip_bytes": "2026-10-24 #939 Explore with no ticker open is now the universe table: its lazy chunk (86.5 kB gzip) loads with the page, +23 kB wire (409.7 kB measured locally, +3 kB margin); the table is the feature, not a shared-code move"
@@ -126,7 +126,7 @@
   "network": {
     "/ideas": {
       "round_trip_depth": 5,
-      "wire_gzip_bytes": 371800,
+      "wire_gzip_bytes": 372800,
       "settled_ms": 3200
     },
     "/screeners": {
@@ -136,7 +136,7 @@
     },
     "/edges": {
       "round_trip_depth": 6,
-      "wire_gzip_bytes": 371100,
+      "wire_gzip_bytes": 371900,
       "settled_ms": 3400
     },
     "/regime": {
