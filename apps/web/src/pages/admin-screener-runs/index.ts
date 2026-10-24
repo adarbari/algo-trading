@@ -1,7 +1,11 @@
 /** Page: Admin › Screener runs (every run of any status and one run's record). */
 import { prefetchScreenerRuns, type ScreenerRunFilters } from '@/entities/screener-run';
 
-export { AdminScreenerRunsPage, type AdminScreenerRunsPageProps } from './ui/AdminScreenerRunsPage';
+export {
+  AdminScreenerRunsPage,
+  readSearch,
+  type AdminScreenerRunsPageProps,
+} from './ui/AdminScreenerRunsPage';
 
 /** Start the page's reads before it mounts (the route's loader); the widgets' hooks join them. */
 export function prefetchScreenerRunsReads(
