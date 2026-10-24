@@ -471,7 +471,7 @@ def test_a_template_with_no_resolvable_id_fails_the_gate_not_skipped() -> None:
 
 def test_first_render_defaults_equal_what_the_webs_edge_trades_sends() -> None:
     src = (ROOT / "apps/web/src/widgets/edge-trades/ui/EdgeTrades.tsx").read_text()
-    period = re.search(r"useState<TradePeriod>\('(\w+)'\)", src)
+    period = re.search(r"period: '(\w+)',\s*filters:", src)  # the legacy default the read keeps
     page = re.search(r"const \[page, setPage\] = useState\((\d+)\)", src)
     column = re.search(r"columnId: '(\w+)',\s*direction: '(\w+)'", src)
     assert period and page and column
