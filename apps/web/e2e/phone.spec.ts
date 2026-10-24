@@ -242,6 +242,31 @@ test('Screeners: each row is a card with evidence, picks and labelled actions, a
   await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
 });
 
+test('Screeners: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({
+  page,
+}) => {
+  await page.goto('/screeners');
+  await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filters' }).tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  await sheet.getByRole('button', { name: 'Setup' }).tap();
+  await page
+    .getByRole('list', { name: 'Owner' })
+    .getByRole('button', { name: /^Presets/ })
+    .tap();
+  await page.keyboard.press('Escape');
+  await sheet.getByRole('button', { name: /^Show \d+ results/ }).tap();
+  await expect(page).toHaveURL(/f=owner(%3A|:)site/);
+  await expect(page.getByRole('row').filter({ hasText: 'vrp_scanner' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.goto('/screeners?f=owner:mine&q=scanner');
+  await expect(page.getByText('No screeners match this filter')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear the search' }).tap();
+  await expect(page.getByRole('row').filter({ hasText: 'my-vrp' })).toBeVisible();
+});
+
 test('Screener results: the pick actions are icon buttons named by their label', async ({
   page,
 }) => {
@@ -306,6 +331,20 @@ test('Guide Edges: a tapped card opens its mechanism, a tapped edge its page, th
   expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
   await evidence.tap();
   await expect(page).toHaveURL(/\/edges\?edge=earnings_date_advance$/);
+});
+
+test('Edges: the filter bar is one Filters button and a sheet, and an old ?view= link still narrows', async ({
+  page,
+}) => {
+  await page.goto('/edges?view=rejected');
+  await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+  await expect(page.getByRole('row', { name: /S&P 500 index changes/ })).toBeVisible();
+  await expect(page.getByRole('row', { name: /Momentum 12-1/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.getByRole('button', { name: 'Filters' }).tap();
+  await expect(page.getByRole('dialog', { name: 'Filters' })).toBeVisible();
 });
 
 test('Edges: a tapped edge opens its page', async ({ page }) => {

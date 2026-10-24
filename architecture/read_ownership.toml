@@ -182,6 +182,16 @@ section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
 detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
+id = "pick-streaks"
+description = "How long a ticker has stayed on a screener's pick list and whether it is new to it (services/read/screens/streaks.py, ADR 0082 filter days_picked): a walk back through the chain of a run's previous runs (runs.load_previous_run: each run's own previous run, never the screener's latest, so a later run never changes an earlier session's value) over each run's picked rows, ending at the first run that did not pick the ticker and capped at 20; UNKNOWN (None, never 0 or a short streak) when the walk reaches a run withheld from the viewer or the end of the chain before the streak ends; a screener's results use it (Ideas is held until the streaks are precomputed at ingestion, decided 2026-10-24); new_today is the one-step form"
+owner = ["src/algotrade/services/read/screens/streaks.py"]
+allowed = [
+    "src/algotrade/services/read/screens/results.py",  # the results column days_picked
+]
+section = "docs/adr/0082-shared-filter-bar.md#decision"
+detect = [{ call = "days_picked" }, { call = "new_today" }]
+
+[[responsibility]]
 id = "release-reads"
 description = "Which operations the API answers from the current serving release and how (ADR 0077 decision 23): the listed shared operations (architecture/release_shared_ops.toml, RELEASE_SHARED_OPERATIONS), one decision per request (the verified current release, the kill switch serving.release_reads), reads pinned at the release's sequence with its session as the default, the response key (release id, role, document, variables, licences), and the fallback to the live path (no release, an unsupported format, a hash or epoch mismatch, a lost pin) whose answer is never kept"
 owner = ["apps/api/algotrade_api/graphql/context.py"]

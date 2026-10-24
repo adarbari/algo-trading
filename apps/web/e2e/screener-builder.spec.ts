@@ -53,11 +53,20 @@ test('the list shows your screeners and the site presets in one list', async ({ 
     'Picks today',
     'Actions',
   ]);
-  // The segments and the search narrow the list.
-  await page.getByRole('radio', { name: 'Presets' }).click();
+  // The owner filter and the search narrow the list on the server, and the URL keeps them.
+  await page.getByRole('button', { name: 'Setup' }).click();
+  await page
+    .getByRole('list', { name: 'Owner' })
+    .getByRole('button', { name: /^Presets/ })
+    .click();
+  await expect(page).toHaveURL(/f=owner(%3A|:)site/);
+  await page.keyboard.press('Escape');
   await expect(list.getByText('Mine', { exact: true })).toHaveCount(0);
-  await page.getByRole('radio', { name: 'All' }).click();
-  await page.getByRole('searchbox', { name: 'Search screeners' }).fill('idea');
+  await expect(rowOf('vrp_scanner')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear all' }).click();
+  await expect(page).not.toHaveURL(/f=/);
+  await page.getByRole('searchbox', { name: 'Search screeners' }).fill('my-vrp');
+  await expect(page).toHaveURL(/q=my-vrp/);
   await expect(list.getByRole('row').filter({ hasText: /Mine|Preset/ })).toHaveCount(1);
   await expectAccessible(page);
   expect(errors).toEqual([]);
@@ -394,4 +403,24 @@ test('a new screener starts with the base gates as criteria', async ({ page }) =
   await expectAccessible(page);
   await page.getByRole('button', { name: '+ Add criterion' }).click();
   await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(4);
+});
+
+test('a link with filters opens the narrowed list, and an empty result offers the way back', async ({
+  page,
+}) => {
+  await page.goto('/screeners?f=owner:mine');
+  const list = page.getByRole('table', { name: 'Screeners' });
+  await expect(list.getByRole('row').filter({ hasText: 'my-vrp' })).toBeVisible();
+  await expect(list.getByRole('row').filter({ hasText: 'vrp_scanner' })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('group', { name: 'Applied filters' })
+      .getByRole('button', { name: /^Owner Mine/ }),
+  ).toBeVisible();
+  await page.goto('/screeners?f=owner:mine&q=scanner');
+  await expect(page.getByText('No screeners match this filter')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear the search' }).click();
+  await expect(page).not.toHaveURL(/q=/);
+  await expect(list.getByRole('row').filter({ hasText: 'my-vrp' })).toBeVisible();
+  await expectAccessible(page);
 });

@@ -5,9 +5,7 @@
  */
 import { Button, Heading, Stack, Text } from '@algotrade/ui';
 
-import type { EdgeView } from '@/entities/edge';
-
-import { EdgeList } from '@/widgets/edge-list';
+import { EdgeList, type EdgeListSearch, type EdgeListSearchPatch } from '@/widgets/edge-list';
 
 import { EdgePage } from './EdgePage';
 
@@ -19,9 +17,9 @@ export interface EdgesPageProps {
   onBuild: (id: string | null) => void;
   /** Back to the list: the route clears the choice. */
   onClear: () => void;
-  /** The list's view (from the URL) and its change. */
-  view?: EdgeView;
-  onViewChange?: (view: EdgeView) => void;
+  /** The list's filters and search (from the URL) and their change. */
+  search: EdgeListSearch;
+  onSearchChange: (patch: EdgeListSearchPatch) => void;
 }
 
 export function EdgesPage({
@@ -29,8 +27,8 @@ export function EdgesPage({
   onSelect,
   onBuild,
   onClear,
-  view,
-  onViewChange,
+  search,
+  onSearchChange,
 }: EdgesPageProps) {
   if (selected !== null) return <EdgePage id={selected} onBack={onClear} onEdit={onBuild} />;
   return (
@@ -51,11 +49,7 @@ export function EdgesPage({
           New edge
         </Button>
       </Stack>
-      <EdgeList
-        onSelect={onSelect}
-        {...(view ? { view } : {})}
-        {...(onViewChange ? { onViewChange } : {})}
-      />
+      <EdgeList onSelect={onSelect} search={search} onSearchChange={onSearchChange} />
     </Stack>
   );
 }

@@ -8,39 +8,58 @@ import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
 import { pageRoute } from '../page-loader';
-import type { EdgeView } from '@/entities/edge';
+import { decodeFilters, filterSearch } from '@/features/filter-bar';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const EdgesPage = lazyPage(() => import('@/pages/trader-edges'), 'EdgesPage');
 const BuilderRoute = lazyPage(() => import('./edge-builder-route'), 'BuilderRoute');
 
-// The views a link may name (`all` is the bare list); a type import only keeps the entity out of
-// the entry chunk.
-const VIEWS: readonly EdgeView[] = ['mine', 'following', 'rejected'];
+/**
+ * The list's old views (`?view=`) as the filter bar's `f` says them, so a saved link still opens
+ * the same narrowing. (The old "rejected" view also held edges the user rejected themselves; the
+ * status filter says the site's.)
+ */
+const LEGACY_VIEWS: Record<string, string> = {
+  mine: 'mine:',
+  following: 'followed:',
+  rejected: 'status:rejected',
+};
 
-interface EdgesSearch {
+export interface EdgesSearch {
   edge?: string;
-  view?: EdgeView;
+  f?: string;
+  q?: string;
 }
 
 export function validateEdgesSearch(search: Record<string, unknown>): EdgesSearch {
-  const { edge, view } = search;
-  const found = VIEWS.find((v) => v === view);
+  const { edge, view, q } = search;
+  const legacy = typeof view === 'string' ? LEGACY_VIEWS[view] : undefined;
+  const { f } = filterSearch(search.f === undefined && legacy ? { f: legacy } : search);
   return {
     ...(typeof edge === 'string' && edge ? { edge } : {}),
-    ...(found ? { view: found } : {}),
+    ...(f ? { f } : {}),
+    ...(typeof q === 'string' && q.trim() ? { q } : {}),
   };
 }
 
 function EdgesIndex() {
-  const { edge, view } = validateEdgesSearch(useSearch({ strict: false }));
+  const search = validateEdgesSearch(useSearch({ strict: false }));
   const navigate = useNavigate();
   return (
     <EdgesPage
-      selected={edge ?? null}
-      {...(view ? { view } : {})}
-      onViewChange={(next) =>
-        void navigate({ to: '/edges', search: next === 'all' ? {} : { view: next }, replace: true })
+      selected={search.edge ?? null}
+      search={search}
+      onSearchChange={(patch) =>
+        void navigate({
+          to: '/edges',
+          search: (previous) =>
+            validateEdgesSearch(
+              Object.fromEntries(
+                Object.entries({ ...previous, ...patch }).filter(([, v]) => v !== undefined),
+              ),
+            ),
+          replace: true,
+        })
       }
       onSelect={(id) => void navigate({ to: '/edges', search: { edge: id }, replace: true })}
       onBuild={(id) =>
@@ -55,10 +74,13 @@ export const edgesRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'edges',
   validateSearch: validateEdgesSearch,
-  loaderDeps: ({ search }) => ({ edge: search.edge ?? null }),
-  ...pageRoute(EdgesPage, (page, client, deps: { edge: string | null }) => {
-    page.prefetchEdgesReads(client, deps.edge);
-  }),
+  loaderDeps: ({ search }) => ({ edge: search.edge ?? null, f: search.f, q: search.q ?? '' }),
+  ...pageRoute(
+    EdgesPage,
+    (page, client, deps: { edge: string | null; f: string | undefined; q: string }) => {
+      page.prefetchEdgesReads(client, deps.edge, decodeFilters(deps.f), deps.q);
+    },
+  ),
   component: EdgesIndex,
 });
 

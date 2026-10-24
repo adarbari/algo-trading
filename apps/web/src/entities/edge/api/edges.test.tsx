@@ -28,7 +28,7 @@ beforeEach(() => {
 
 describe('useEdges', () => {
   it('asks the list operation: the headline of each verdict, never the whole verdict, runs or definition', async () => {
-    GQL.mockResolvedValue(EDGE_ROWS_FIXTURE);
+    GQL.mockResolvedValue({ edgeList: EDGE_ROWS_FIXTURE });
     const { result } = renderHook(() => useEdges(), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -37,7 +37,27 @@ describe('useEdges', () => {
     expect(document).toContain('query EdgesPage');
     expect(document).toContain('summary');
     expect(document).not.toMatch(/\bverdict \{|runs|canonicalRun|definition|haircut|decay/);
-    expect(result.current.data?.[0]?.summary.verdict).toBe('promising');
+    expect(result.current.data?.items[0]?.summary.verdict).toBe('promising');
+  });
+
+  it('sends the filters and the search text to the server, and none when there are none', async () => {
+    GQL.mockResolvedValue({ edgeList: EDGE_ROWS_FIXTURE });
+    const plain = renderHook(() => useEdges(), { wrapper });
+    await waitFor(() => {
+      expect(plain.result.current.isSuccess).toBe(true);
+    });
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ filters: null, q: null });
+    const applied = [{ id: 'status', values: ['rejected'], active: true }];
+    const narrowed = renderHook(() => useEdges(applied, 'drift'), { wrapper });
+    await waitFor(() => {
+      expect(narrowed.result.current.isSuccess).toBe(true);
+    });
+    expect(GQL.mock.calls[1]?.[1]).toEqual({
+      filters: [
+        { id: 'status', values: ['rejected'], min: null, max: null, within: null, active: true },
+      ],
+      q: 'drift',
+    });
   });
 });
 
@@ -95,13 +115,13 @@ describe('refreshEdges', () => {
     const spy = vi.spyOn(client, 'invalidateQueries');
     await refreshEdges(client);
     const names = spy.mock.calls.map((c) => (c[0]?.queryKey as unknown[] | undefined)?.[1]);
-    expect(names.sort()).toEqual(['EdgeDetail', 'EdgeDocument', 'EdgesPage']);
+    expect(names.sort()).toEqual(['EdgeDetail', 'EdgeDocument', 'EdgeProblems', 'EdgesPage']);
   });
 });
 
 describe('useEdgeProblems', () => {
-  it('serves the files that did not load from the same read', async () => {
-    GQL.mockResolvedValue(EDGE_ROWS_FIXTURE);
+  it('serves the files that did not load from their own read, not the list', async () => {
+    GQL.mockResolvedValue({ edgeProblems: EDGES_FIXTURE.edgeProblems });
     const { result } = renderHook(() => useEdgeProblems(), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);

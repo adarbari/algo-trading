@@ -303,10 +303,18 @@ export type EdgeVariantGridQueryVariables = Exact<{
 
 export type EdgeVariantGridQuery = { edgeVariants: { basis: string | null, trials: number | null, oosHidden: boolean, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ edgeVariant: string, variant: string, horizonSessions: number, official: boolean, notPreChosen: boolean, modelFit: boolean, inSample: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null, outOfSample: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null, all: { winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null } | null }> } | null };
 
-export type EdgesPageQueryVariables = Exact<{ [key: string]: never; }>;
+export type EdgesPageQueryVariables = Exact<{
+  filters?: Array<FilterInput> | FilterInput | null | undefined;
+  q?: string | null | undefined;
+}>;
 
 
-export type EdgesPageQuery = { edgeProblems: Array<{ edgeId: string, reason: string }>, edges: Array<{ id: string, name: string, status: string, state: string, mine: boolean, screeners: Array<string>, summary: { verdict: string, result: string, trades: number | null } }> };
+export type EdgesPageQuery = { edgeList: { total: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> }, items: Array<{ id: string, name: string, status: string, state: string, mine: boolean, screeners: Array<string>, summary: { verdict: string, result: string, trades: number | null } }> } | null };
+
+export type EdgeProblemsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type EdgeProblemsQuery = { edgeProblems: Array<{ edgeId: string, reason: string }> };
 
 export type EdgeDetailQueryVariables = Exact<{
   ids: Array<string> | string;
@@ -713,6 +721,14 @@ export type ScreenVersionsQueryVariables = Exact<{
 
 
 export type ScreenVersionsQuery = { screenVersions: Array<{ version: number, document: unknown }> };
+
+export type ScreenerListPageQueryVariables = Exact<{
+  filters?: Array<FilterInput> | FilterInput | null | undefined;
+  q?: string | null | undefined;
+}>;
+
+
+export type ScreenerListPageQuery = { screenerList: { total: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> }, items: Array<{ id: string }> } | null };
 
 export type ScreenerPicksQueryVariables = Exact<{
   id: string;
@@ -1325,26 +1341,52 @@ export const EdgeVariantGridDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<EdgeVariantGridQuery, EdgeVariantGridQueryVariables>;
 export const EdgesPageDocument = new TypedDocumentString(`
-    query EdgesPage {
-  edgeProblems {
-    edgeId
-    reason
-  }
-  edges {
-    id
-    name
-    status
-    state
-    mine
-    screeners
-    summary {
-      verdict
-      result
-      trades
+    query EdgesPage($filters: [FilterInput!], $q: String) {
+  edgeList(filters: $filters, q: $q) {
+    total
+    facets {
+      total
+      matched
+      items {
+        id
+        active
+        removes
+        unknown
+        options {
+          value
+          count
+        }
+        bins {
+          lo
+          hi
+          count
+        }
+      }
+    }
+    items {
+      id
+      name
+      status
+      state
+      mine
+      screeners
+      summary {
+        verdict
+        result
+        trades
+      }
     }
   }
 }
     `) as unknown as TypedDocumentString<EdgesPageQuery, EdgesPageQueryVariables>;
+export const EdgeProblemsDocument = new TypedDocumentString(`
+    query EdgeProblems {
+  edgeProblems {
+    edgeId
+    reason
+  }
+}
+    `) as unknown as TypedDocumentString<EdgeProblemsQuery, EdgeProblemsQueryVariables>;
 export const EdgeDetailDocument = new TypedDocumentString(`
     query EdgeDetail($ids: [String!]!) {
   edges(ids: $ids) {
@@ -4190,6 +4232,35 @@ export const ScreenVersionsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenVersionsQuery, ScreenVersionsQueryVariables>;
+export const ScreenerListPageDocument = new TypedDocumentString(`
+    query ScreenerListPage($filters: [FilterInput!], $q: String) {
+  screenerList(filters: $filters, q: $q) {
+    total
+    facets {
+      total
+      matched
+      items {
+        id
+        active
+        removes
+        unknown
+        options {
+          value
+          count
+        }
+        bins {
+          lo
+          hi
+          count
+        }
+      }
+    }
+    items {
+      id
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenerListPageQuery, ScreenerListPageQueryVariables>;
 export const ScreenerPicksDocument = new TypedDocumentString(`
     query ScreenerPicks($id: String!, $size: Int) {
   screener(id: $id) {

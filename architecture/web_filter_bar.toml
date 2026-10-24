@@ -17,10 +17,8 @@
 
 [migrating]
 "src/pages/trader-explore/ui/OtherTabs.tsx" = "migrating: Explore tabs onto the bar (ADR 0082, session filter-web-results-explore)"
-"src/widgets/edge-list/ui/EdgeList.tsx" = "migrating: Edges list onto the bar (ADR 0082, session filter-web-lists)"
 "src/widgets/feature-table/ui/ScreenerResults.tsx" = "migrating: screener results onto the bar (ADR 0082, session filter-web-results-explore)"
 "src/widgets/feature-table/ui/TableFrame.tsx" = "migrating: the shared table frame of screener results and Explore (ADR 0082, session filter-web-results-explore)"
-"src/widgets/screener-list/ui/ScreenerList.tsx" = "migrating: screener list onto the bar (ADR 0082, session filter-web-lists)"
 
 [exempt]
 "src/entities/run/ui/RunRecordDrawer.tsx" = "detail drawer: the steps of one run, fixed rows"

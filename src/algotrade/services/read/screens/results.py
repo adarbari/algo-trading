@@ -63,6 +63,11 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.screens.screeners import ScreenGroup
+from algotrade.services.read.screens.streaks import (
+    days_picked,
+    history_wanted,
+    without_idle,
+)
 from algotrade.services.read.values import UnknownCode, to_scalar
 from algotrade.services.screening.rule_results import change_of
 from algotrade.storage.tables.schemas import (
@@ -154,6 +159,9 @@ class ScreenResult:
     # the hidden fields) or the run stored none. Filled by a review table page.
     near_misses: int | None = None
     gates_failing: int | None = None
+    # How many runs in a row (``streaks.CAP`` at most) picked it, 0 when this run did not; None:
+    # not known, or a read that does not ask (only a review table page that filters on it fills it)
+    days_picked: int | None = None
 
 
 @dataclass(frozen=True)
@@ -680,24 +688,31 @@ def _gate_counts(ctx: ReadContext, run: ScreenerRun) -> Mapping[str, tuple[int |
     return out
 
 
+def _days_cell(iid: str, withheld: bool, streaks: Mapping[str, int | None]) -> int | None:
+    """``iid``'s ``days_picked``: UNKNOWN for a withheld run, the run's streak of a pick, 0 else."""
+    return None if withheld else streaks.get(iid, 0)
+
+
 def _column(
     column_id: str,
     rows: pd.DataFrame,
     changes: Mapping[str, Change],
     withheld: bool,
+    streaks: Mapping[str, int | None],
     gates: Mapping[str, tuple[int | None, int | None]],
 ) -> list[Cell]:
     """The surface's own column ``column_id`` over ``rows``; ``rank`` and ``score`` are UNKNOWN
-    when the run's order follows values the viewer may not see."""
+    when the run's order follows values the viewer may not see. ``days_picked``: ``streaks`` of
+    the run's picks (UNKNOWN where it cannot be said), 0 for a row it did not pick."""
     ids = [str(i) for i in rows["instrument_id"]]
+    if column_id == "days_picked":
+        return [_days_cell(i, withheld, streaks) for i in ids]
     if column_id == "change":
         return [changes.get(i, NO_CHANGE)[0] for i in ids]
     if column_id == "rank_change":
         return [None if withheld else changes.get(i, NO_CHANGE)[2] for i in ids]
     if column_id in ("rank", "score"):
-        if withheld:
-            return [None] * len(ids)
-        return [to_scalar(v) for v in rows[column_id]]
+        return [None] * len(ids) if withheld else [to_scalar(v) for v in rows[column_id]]
     if column_id in ("near_misses", "gates_failing"):
         at = 0 if column_id == "near_misses" else 1
         return [gates.get(i, (None, None))[at] for i in ids]
@@ -731,6 +746,9 @@ def _filter_run(
     rows = run_rows(ctx, run)
     changes = load_run_changes(ctx, run).by_instrument
     withheld = bool(run_withheld(ctx, run))
+    wanted = history_wanted(resolved, inputs)
+    streaks = days_picked(ctx, run, run_withheld) if "days_picked" in wanted else {}
+    resolved = without_idle(resolved, wanted)  # no walk, and no facet, until its filter is set
     gates = _gate_counts(ctx, run) if any(
         f.column_id in ("near_misses", "gates_failing") for f in resolved.offered
     ) else {}  # fmt: skip
@@ -740,7 +758,7 @@ def _filter_run(
         if f.column_id is None:
             names.append(f.field)
         else:
-            frame[f.field] = _column(f.column_id, rows, changes, withheld, gates)
+            frame[f.field] = _column(f.column_id, rows, changes, withheld, streaks, gates)
     missing: tuple[str, ...] = ()
     if names:
         ids = [str(i) for i in rows["instrument_id"]]
@@ -909,11 +927,17 @@ def load_result_page(
     found = load_results(ctx, {run.run_id: shown}, [run], changes, compare_rank=True)
     results = [found[(run.run_id, i)] for i in shown if (run.run_id, i) in found]
     toward = load_pick_edges(ctx, run, [(r.instrument_id, r.decision, r.rank) for r in results])
+    walk = "days_picked" in history_wanted(
+        load_served_filters(ctx, SURFACE, ctx.session.date).resolved, _inputs(query, filters)
+    )  # the walk back through the previous runs is read only for a request that filters on it
+    streaks = days_picked(ctx, run, run_withheld) if walk else {}
     gates = _gate_counts(ctx, run)
+    hidden = bool(run_withheld(ctx, run))
     results = [
         replace(
             r,
             counts_toward=toward.get(r.instrument_id, ()),
+            days_picked=_days_cell(r.instrument_id, hidden, streaks) if walk else None,
             near_misses=gates.get(r.instrument_id, (None, None))[0],
             gates_failing=gates.get(r.instrument_id, (None, None))[1],
         )

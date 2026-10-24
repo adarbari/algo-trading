@@ -34,8 +34,6 @@ export { prefetchEdgeDesk, useEdgeDesk, useEdgeLiveStates, useEdgePaper } from '
 export { useScreenerEdges } from './api/screener-edges';
 export { prefetchTrackRecords, useTrackRecords } from './api/track-records';
 export {
-  EDGE_VIEWS,
-  inView,
   labelText,
   sideLabel,
   stateLabel,
@@ -50,7 +48,6 @@ export {
   type EdgeRow,
   type EdgeDocument,
   type EdgeProblem,
-  type EdgeView,
   type EdgesResponse,
   type EdgeVerdict,
   type VerdictCriterion,

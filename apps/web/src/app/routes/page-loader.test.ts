@@ -73,10 +73,13 @@ describe('every page route loads its chunk in a loader', () => {
 describe('the reads each page starts with its chunk', () => {
   const tree = routeTree as unknown as AnyRoute;
   const cases: [string, string[]][] = [
-    ['/screeners', ['MyScreens', 'ScreenerConfigs', 'ScreenerRuns', 'ScreenerTrackRecords']],
+    [
+      '/screeners',
+      ['MyScreens', 'ScreenerConfigs', 'ScreenerListPage', 'ScreenerRuns', 'ScreenerTrackRecords'],
+    ],
     ['/regime', ['RegimeEpisodes', 'RegimeSignals']],
     ['/calendar', ['EventCalendar', 'ScreenerConfigs']],
-    ['/edges', ['EdgeDesk', 'EdgesPage']],
+    ['/edges', ['EdgeDesk', 'EdgeProblems', 'EdgesPage']],
     // an edge named by the URL reads that one edge in full, not the list
     ['/edges?edge=x', ['EdgeDesk', 'EdgeDetail']],
     [
