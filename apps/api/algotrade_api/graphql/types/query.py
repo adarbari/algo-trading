@@ -57,6 +57,7 @@ from algotrade.services.read.ops import (
     usage,
 )
 from algotrade.services.read.ops.admin_runs import harness_runs, screener_runs
+from algotrade.services.read.ops.admin_runs.screener_runs import RunStatus
 from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
@@ -897,7 +898,11 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The `limit` most recent screener runs of any status, newest first: every "
         "screener of the site and every declared user, narrowed by `user` (whose), `screener` "
-        "(config id) and `status` (the run record's)",
+        "(config id) and `status` (the run record's). Ordered by the session a run screened (then "
+        "its start), not by when it started: a backfill started today for an old session sorts "
+        "below newer sessions and falls outside `limit` once that many newer runs match. Only the "
+        f"latest {screener_runs.HISTORY_DAYS} days of sessions are searched: an older run is not "
+        "returned, however few match",
         extensions=[AdminOnly(), MaxItems("limit", MAX_RUNS)],
     )
     def screener_runs(
@@ -906,7 +911,7 @@ class Query:
         limit: int = 50,
         user: str | None = None,
         screener: str | None = None,
-        status: str | None = None,
+        status: RunStatus | None = None,
     ) -> list[ScreenerRunEntry]:
         ctx = info.context.stores()
         found = (

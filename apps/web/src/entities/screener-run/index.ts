@@ -10,6 +10,6 @@ export {
   summary as summaryFixture,
   SUMMARIES_FIXTURE,
 } from './model/fixtures';
-export { parseFilters, RUN_STATUSES, type ScreenerRunFilters } from './model/filters';
-export { stamp, statusTone } from './model/labels';
+export { parseFilters, type ScreenerRunFilters } from './model/filters';
+export { RUN_STATUSES, stamp, statusText, statusTone, type RunStatus } from './model/labels';
 export type { ScreenerRunDecision, ScreenerRunRecord, ScreenerRunSummary } from './model/types';

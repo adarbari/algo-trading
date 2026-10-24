@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 
 import {
   RUN_STATUSES,
+  statusText,
   useScreenerRuns,
   type ScreenerRunFilters,
   type ScreenerRunSummary,
@@ -98,11 +99,11 @@ export function ScreenerRunList({
               <Select
                 value={filters.status ?? ANY}
                 onValueChange={(status) => {
-                  commit({ status: status || undefined });
+                  commit({ status: RUN_STATUSES.find((s) => s === status) });
                 }}
                 options={[
                   { value: ANY, label: 'Any status' },
-                  ...RUN_STATUSES.map((s) => ({ value: s, label: s })),
+                  ...RUN_STATUSES.map((s) => ({ value: s, label: statusText(s) })),
                 ]}
               />
             </Field>

@@ -12,7 +12,7 @@ import type { ScreenerRunFilters } from '../model/filters';
 export const RUN_LIMIT = 100;
 
 const AdminScreenerRunsQuery = graphql(`
-  query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: String) {
+  query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: RunStatus) {
     screenerRuns(limit: $limit, user: $user, screener: $screener, status: $status) {
       runId
       configId
