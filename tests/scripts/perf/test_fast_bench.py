@@ -534,7 +534,9 @@ def test_every_resolver_picks_an_id_the_real_api_answers_with_content(
 ) -> None:
     """Fitness: run every resolver against the real API app (in process) and replay each
     resolved operation: none may answer empty (an entry that is legitimately empty would fail the
-    gate every night). HarnessRun is excepted: the fixture store has no harness runs."""
+    gate every night). HarnessRun is excepted: the fixture store has no harness runs; so is
+    AdminScreenerRun: its list reads the last 91 days (HISTORY_DAYS), newer than the fixture's
+    runs."""
     client = TestClient(
         create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user())
     )
@@ -546,7 +548,7 @@ def test_every_resolver_picks_an_id_the_real_api_answers_with_content(
         return raw(query, variables).json()["data"]
 
     docs = fb.pdocs.web_documents()
-    names = sorted(set(fb.VARIABLE_RESOLVERS) - {"HarnessRun"})
+    names = sorted(set(fb.VARIABLE_RESOLVERS) - {"HarnessRun", "AdminScreenerRun"})
     ops = {f"{n}#1": {"name": n, "query": docs[n], "variables": {}} for n in names}
     assert fb.resolve_variables(post, ops) == []
     for d in ops.values():
