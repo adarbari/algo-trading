@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-23 23:41 UTC",
+ "generated": "2026-10-24 00:25 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -159,6 +159,44 @@
    "interaction": [
     "GuideEntries"
    ],
+   "source": "static"
+  },
+  "/admin/screener-runs": {
+   "route": "/admin/screener-runs",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "AdminScreenerRun",
+    "AdminScreenerRuns",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "AdminScreenerRun",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/admin/screener-runs?run={run}": {
+   "route": "/admin/screener-runs",
+   "search": {
+    "run": "{run}"
+   },
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "AdminScreenerRun",
+    "AdminScreenerRuns",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "AdminScreenerRun",
+    "GuideHelpField"
+   ],
+   "interaction": [],
    "source": "static"
   },
   "/calendar": {

@@ -800,6 +800,14 @@
      "admin": true
     },
     "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+   },
+   {
+    "kind": "graphql",
+    "op": "AdminScreenerRuns",
+    "variables": {
+     "limit": 100
+    },
+    "query": "\n  query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: String) {\n    screenerRuns(limit: $limit, user: $user, screener: $screener, status: $status) {\n      runId\n      configId\n      owner\n      session\n      status\n      startedAt\n      finishedAt\n      knowledgeTs\n      picked\n      paused\n      regime\n      coverage\n    }\n  }\n"
    }
   ],
   "/admin/users": [
