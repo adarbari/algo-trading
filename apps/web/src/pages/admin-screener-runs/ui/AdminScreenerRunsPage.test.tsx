@@ -40,7 +40,7 @@ describe('AdminScreenerRunsPage', () => {
       readSearch({ run: 'r1', user: 'abhi', screener: ' trend ', status: 'failed', x: 1 }),
     ).toEqual({
       selected: 'r1',
-      filters: { user: 'abhi', screener: 'trend', status: 'failed' },
+      filters: { user: 'abhi', screener: 'trend', status: 'FAILED' },
     });
     expect(readSearch({ run: '', user: '', status: 3 })).toEqual({ selected: null, filters: {} });
   });

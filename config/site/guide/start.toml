@@ -558,7 +558,8 @@ links = [
 [[page.section]]
 title = "What the page lists"
 body = """
-Each row is one run of one screener for one owner and one session, newest first, of any status. Narrow the list by user, screener or status. The server applies the filters; the page only shows the rows it sends.
+Each row is one run of one screener for one owner and one session, of any status. Narrow the list by user, screener or status. The server applies the filters; the page only shows the rows it sends.
+The list is ordered by the session a run screened, newest first, and by start time within a session, not by when the run started. A backfill started today for an old session sorts below the newer sessions. It drops off the list once enough newer runs fill it. Only the latest 91 days of sessions are searched. A run of an older session is not listed, however few runs match a filter. An empty result means none in those 91 days.
 """
 
 [[page.section]]

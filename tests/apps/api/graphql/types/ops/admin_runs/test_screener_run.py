@@ -52,7 +52,7 @@ def test_an_admin_reads_the_runs_and_one_runs_changes() -> None:
     assert "errors" not in body, body
     [run] = body["data"]["screenerRuns"]
     assert (run["runId"], run["configId"], run["owner"], run["status"]) == (
-        "r1", "momo", "site", "complete",
+        "r1", "momo", "site", "COMPLETE",
     )  # fmt: skip
     assert (run["picked"], run["paused"], run["regime"], run["configVersion"]) == (4, 2, "CALM", 3)
     assert run["decisions"][0] == {"decision": "REJECT", "count": 9}
@@ -67,6 +67,14 @@ def test_the_admin_sees_a_users_run_that_never_finished() -> None:
     assert [(r["runId"], r["owner"]) for r in everyone] == [("r2", "local"), ("r1", "site")]
     live = post(NO_ROW)["data"]["screenerRun"]
     assert live == {"runId": "r2", "decisions": None, "changes": None}
+
+
+def test_the_status_is_a_graphql_enum_the_argument_filters_by_and_a_bad_word_is_refused() -> None:
+    post = _graph(Role.ADMIN)
+    running = post("{ screenerRuns(status: RUNNING) { runId status } }")
+    assert running["data"]["screenerRuns"] == [{"runId": "r2", "status": "RUNNING"}]
+    assert post("{ screenerRuns(status: FAILED) { runId } }")["data"]["screenerRuns"] == []
+    assert "errors" in post('{ screenerRuns(status: "running") { runId } }')
 
 
 def test_a_trader_is_refused() -> None:
