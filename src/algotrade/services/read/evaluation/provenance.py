@@ -16,12 +16,13 @@ is served to admins only (``AdminCause`` on the field), with no step or table na
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from algotrade.config.edges.document import job_name
+from algotrade.config.user import UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_to
-from algotrade.services.read.context import ReadContext, Stores
+from algotrade.services.configs import latest_screen_version, resolve_config
+from algotrade.services.read.context import ReadContext
 from algotrade.services.read.evaluation import runs, versions
 from algotrade.services.read.evaluation.edges import Edge
-from algotrade.services.read.screens.screeners import load_screener
 from algotrade.storage.runs import RunStatus
 
 CURRENT = "CURRENT"
@@ -34,6 +35,10 @@ STATES = (CURRENT, STALE, RE_EVALUATING)
 # not a verdict.toml key: that file's settings are part of the stored headline's fingerprint, and
 # a new key would re-judge every stored verdict for a wording threshold.
 STALE_AFTER_SESSIONS = 5
+# The run record of an ``edge-eval`` job (services/jobs writes it: ``job:<kind>``, the owner in
+# ``stats["user"]``, the edge in ``stats["params"]["edge"]``, ``started_at`` its submission). The
+# read model never imports the jobs package (ADR 0037), so the shape is read here.
+EDGE_EVAL_JOB = "job:edge-eval"
 
 
 @dataclass(frozen=True)
@@ -73,29 +78,39 @@ def _count(n: int, noun: str) -> str:
     return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
 
 
-def _changed(ctx: Stores, edge: Edge, hashes: dict[str, str]) -> tuple[bool, int | None]:
+def _changed(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> tuple[bool, int | None]:
     """Whether a screener of the edge now has another config than the run recorded, and the
-    version of the first that does. A screener the run did not record is not claimed changed."""
-    if not isinstance(ctx, ReadContext) or edge.mine:
-        return False, None
+    version of the first that does. Each is resolved as the run resolved it (as the run's owner,
+    never as the viewer: a trader's own same-id config must not make a site edge look stale); a
+    screener the run did not record, or that no longer resolves, is not claimed changed."""
+    hashes = dict(run.screener_hashes)
+    owner = UserContext(run.owner)
     for screener in edge.screeners:
         before = hashes.get(screener)
-        found = load_screener(ctx, screener) if before else None
-        if found is not None and found.hash != before:
-            return True, found.version
+        if not before:
+            continue
+        try:
+            now = resolve_config(ctx.configs, screener, owner)
+        except ConfigurationError:
+            continue
+        if now.hash != before:
+            return True, latest_screen_version(ctx.configs, run.owner, screener)
     return False, None
 
 
-def _running_since(ctx: Stores, edge: Edge, run: runs.EdgeRun) -> datetime | None:
-    """When a newer evaluation of the run's owner started, if one is running for the session."""
-    job = job_name(edge.id, run.owner)
-    session = ctx.session.date if isinstance(ctx, ReadContext) else run.range_to
+def _running_since(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> datetime | None:
+    """When a newer evaluation of this edge by the run's owner started: an ``edge-eval`` job
+    queued or running (the jobs record the pool fails when its process stops, so a crash does not
+    stay running) submitted after the run committed, on the request's session or later. The run
+    record itself is written once, already COMPLETE, so it never shows an evaluation in flight."""
     started = [
-        r.started_at
-        for r in ctx.reader.runs(job)
-        if r.status is RunStatus.RUNNING
-        and r.started_at > run.knowledge_ts
-        and r.session_date >= session
+        job.started_at
+        for job in ctx.reader.runs(EDGE_EVAL_JOB)
+        if job.stats.get("user") == run.owner
+        and (job.stats.get("params") or {}).get("edge") == edge.id
+        and job.status in (RunStatus.QUEUED, RunStatus.RUNNING)
+        and job.started_at > run.knowledge_ts
+        and job.started_at.date() >= ctx.session.date
     ]
     return max(started, default=None)
 
@@ -126,15 +141,17 @@ def _line(
     return text
 
 
-def load_verdict_provenance(ctx: Stores, edge: Edge) -> Provenance | None:
+def load_verdict_provenance(ctx: ReadContext, edge: Edge) -> Provenance | None:
     """The provenance of ``edge``'s verdict: of the run it is judged on (the canonical run of a
-    site edge, the user's latest of their own); None when there is no run."""
+    site edge, the user's latest of their own); None when there is no run, or when the run is
+    newer than the request's session (a pinned older session: nothing honest to say about it)."""
     run = versions.own_run(ctx, edge) if edge.mine else runs.load_canonical_run(ctx, edge).run
     if run is None:
         return None
-    served = ctx.session.date if isinstance(ctx, ReadContext) else run.range_to
-    behind = max(sessions_to(run.range_to, served), 0)
-    changed, version = _changed(ctx, edge, dict(run.screener_hashes))
+    if run.range_to > ctx.session.date:
+        return None
+    behind = sessions_to(run.range_to, ctx.session.date)
+    changed, version = _changed(ctx, edge, run)
     started = _running_since(ctx, edge, run)
     if started is not None:
         state = RE_EVALUATING

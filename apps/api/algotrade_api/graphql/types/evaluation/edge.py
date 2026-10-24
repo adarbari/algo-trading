@@ -345,7 +345,10 @@ class Edge:
         "canonical run of a site edge, the user's latest run of their own); null: no run"
     )
     async def provenance(self, info: Info) -> EdgeProvenance | None:
-        found = await off_loop(provenance.load_verdict_provenance, self.ctx, self.edge)
+        read = await info.context.aread(None)  # the served session: line, age and in-flight job
+        if read is None:
+            return None
+        found = await off_loop(provenance.load_verdict_provenance, read, self.edge)
         return EdgeProvenance.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
