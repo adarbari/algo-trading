@@ -104,7 +104,8 @@
     "bundle.routes.src/pages/admin-feature-requests/ui/AcceptedFormulasSection.tsx": "2026-10-23 #909 owner decision: route budgets at measured + 5 % headroom (docs/decisions/log.md); earlier: 2026-10-23 #884 the Screeners list's ExpandLink and new icons (pencil, copy, trash) change the shared design-system chunks this section imports: measured 3952 B on CI and locally, +68 B margin (owner approved raising both budgets)",
     "bundle.routes.src/pages/admin-llm-usage/ui/CallsSection.tsx": "2026-10-23 #909 owner decision: route budgets at measured + 5 % headroom (docs/decisions/log.md)",
     "bundle.routes.src/pages/admin-screener-runs/index.ts": "2026-10-23 first budget: the Admin Screener runs page (list with filters, run detail), measured locally 38.9 kB gzip + 5 % headroom (route budgets at measured + 5 %, #909 owner decision, docs/decisions/log.md)",
-    "e2e./explore?focus=AAPL&tab=features.first_load_js_gzip_bytes": "2026-10-24 #941 the shared filter bar code moves a few bytes (measured locally 270020 B against 270000 B)"
+    "e2e./explore?focus=AAPL&tab=features.first_load_js_gzip_bytes": "2026-10-24 #941 the shared filter bar code moves a few bytes (measured locally 270020 B against 270000 B)",
+    "network./ideas.wire_gzip_bytes": "2026-10-24 #941 More filters: the percent presentation and the lazy search's loader in the Ideas chunk (measured locally 369895 B against 369700 B, +1.1 kB margin for CI; owner pre-approved raises from the filter bar's shared code)"
   },
   "waivers": {
     "bundle.entry_closure_gzip_bytes": {
@@ -119,7 +120,7 @@
   "network": {
     "/ideas": {
       "round_trip_depth": 5,
-      "wire_gzip_bytes": 369700,
+      "wire_gzip_bytes": 371000,
       "settled_ms": 3200
     },
     "/screeners": {
