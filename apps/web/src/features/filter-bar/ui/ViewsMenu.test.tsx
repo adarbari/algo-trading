@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -100,6 +100,10 @@ describe('ViewsMenu', () => {
     setup(view);
     await user.click(screen.getByRole('button', { name: 'Views · 2' }));
     const menu = await screen.findByRole('dialog', { name: 'Views' });
+    // the popover moves focus in when it opens; typing before that is lost
+    await waitFor(() => {
+      expect(menu.contains(document.activeElement)).toBe(true);
+    });
     await user.type(within(menu).getByRole('textbox', { name: 'Name of the view' }), 'Fresh');
     expect(within(menu).getAllByText('Decision Qualified').length).toBeGreaterThan(0);
     await user.click(within(menu).getByRole('button', { name: 'Save view' }));
