@@ -27,7 +27,7 @@ beforeEach(() => {
 describe('screener run hooks', () => {
   it('asks AdminScreenerRuns for the runs and sends the filters to the server', async () => {
     GQL.mockResolvedValue({ screenerRuns: SUMMARIES_FIXTURE });
-    const { result } = renderHook(() => useScreenerRuns({ user: 'abhi', status: 'failed' }), {
+    const { result } = renderHook(() => useScreenerRuns({ user: 'abhi', status: 'FAILED' }), {
       wrapper,
     });
     await waitFor(() => {
@@ -38,7 +38,7 @@ describe('screener run hooks', () => {
       limit: 100,
       user: 'abhi',
       screener: null,
-      status: 'failed',
+      status: 'FAILED',
     });
     expect(result.current.data).toHaveLength(2);
   });

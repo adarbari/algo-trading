@@ -163,9 +163,9 @@ source = "graphql:CauseLink.status"
 exempt = "admin-only cause chain (ADR 0056): the state recorded for a step, table or feature"
 
 [[enum]]
-source = "graphql:ScreenerRunEntry.status"
-values_from = "python:algotrade.storage.runs:RunStatus"
-values = { queued = "term:screener_run_status", running = "term:screener_run_status", complete = "term:screener_run_status", partial = "term:screener_run_status", waiting = "term:screener_run_status", failed = "term:screener_run_status" }
+source = "graphql:RunStatus"
+values = { QUEUED = "term:screener_run_status", RUNNING = "term:screener_run_status", COMPLETE = "term:screener_run_status", PARTIAL = "term:screener_run_status", WAITING = "term:screener_run_status", FAILED = "term:screener_run_status" }
+names = { QUEUED = "queued", RUNNING = "running", COMPLETE = "complete", PARTIAL = "partial", WAITING = "waiting", FAILED = "failed" }
 
 [[enum]]
 source = "graphql:GuideLink.kind"

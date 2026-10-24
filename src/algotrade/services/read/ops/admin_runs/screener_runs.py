@@ -31,11 +31,19 @@ from algotrade.services.read.screens.runs import (
 from algotrade.services.screening.rule_results import PAUSED, is_picked
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.configs.files import SCREENERS
-from algotrade.storage.runs import RunRecord
+from algotrade.storage.runs import RunRecord, RunStatus
 
+__all__ = [
+    "HISTORY_DAYS",
+    "RunStatus",  # the record's own enum: the GraphQL status enum serves it as is
+    "ScreenerRunEntry",
+    "load_screener_run",
+    "load_screener_run_changes",
+    "load_screener_runs",
+]
 PREFIX = "screen-"
-FIRST = date.min  # a run is read as its record left it, whatever its session
-WINDOW_DAYS, WINDOWS = 7, 8  # the list reads a week of sessions at a time, newest first
+WINDOW_DAYS = 7  # the list reads a week of sessions at a time, newest first
+HISTORY_DAYS = 91  # ...and no further back than this: a run of an older session is not searched
 
 
 @dataclass(frozen=True)
@@ -53,7 +61,7 @@ class ScreenerRunEntry:
     config_id: str
     owner: str
     session: date
-    status: str
+    status: RunStatus
     started_at: datetime
     finished_at: datetime | None
     knowledge_ts: datetime
@@ -87,7 +95,7 @@ def _entry(record: RunRecord, config_id: str, owner: str) -> ScreenerRunEntry:
         config_id=config_id,
         owner=owner,
         session=record.session_date,
-        status=record.status.value,
+        status=record.status,
         started_at=record.started_at,
         finished_at=record.finished_at,
         knowledge_ts=record.finished_at or record.started_at,
@@ -128,11 +136,14 @@ def load_screener_runs(
     limit: int = 50,
     user: str | None = None,
     screener: str | None = None,
-    status: str | None = None,
+    status: RunStatus | None = None,
 ) -> tuple[ScreenerRunEntry, ...]:
     """The ``limit`` most recent screen runs of any status, newest session first (then newest
-    start), read a window of sessions at a time, stopping once ``limit`` match: ``user`` (whose),
-    ``screener`` (config id) and ``status`` (the record's) narrow it."""
+    start), read a window of sessions at a time, stopping once ``limit`` match or ``HISTORY_DAYS``
+    of sessions are read: ``user`` (whose), ``screener`` (config id) and ``status`` (the record's)
+    narrow it. The order is by the session a run screened, not by when it started: a backfill of
+    an old session started today sorts below newer sessions and, once ``limit`` newer runs match,
+    is not listed."""
     jobs = {
         job: key
         for job, key in _jobs(ctx).items()
@@ -144,7 +155,7 @@ def load_screener_runs(
         found.extend(
             _entry(r, *jobs[r.job])
             for r in ctx.reader.runs_of(set(jobs), first, last)
-            if status in (None, r.status.value)
+            if status in (None, r.status)
         )
         if len(found) >= want:
             break  # the older windows hold only older sessions: never read
@@ -153,14 +164,13 @@ def load_screener_runs(
 
 
 def _windows(today: date) -> Iterator[tuple[date, date]]:
-    """Session windows newest first: ``WINDOWS`` of ``WINDOW_DAYS`` back from ``today``, then one
-    window for every session before them (a small ``limit`` stops at the first that fills it)."""
+    """Session windows newest first: ``WINDOW_DAYS`` each, back from ``today`` to ``HISTORY_DAYS``
+    (a small ``limit`` stops at the first that fills it; no window reads a session before them)."""
     last = today
-    for _ in range(WINDOWS):
+    for _ in range(-(-HISTORY_DAYS // WINDOW_DAYS)):
         first = last - timedelta(days=WINDOW_DAYS - 1)
         yield first, last
         last = first - timedelta(days=1)
-    yield FIRST, last
 
 
 def load_screener_run(ctx: Stores, run_id: str) -> ScreenerRunEntry | None:

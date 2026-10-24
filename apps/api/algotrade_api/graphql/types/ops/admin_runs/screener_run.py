@@ -14,6 +14,10 @@ from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.availability import Unavailable
 from algotrade_api.graphql.types.screens.screener import DecisionCount
 
+strawberry.enum(
+    screener_runs.RunStatus, description="Where a run record stands: how far the run got"
+)
+
 
 @strawberry.type(
     description="What a run froze when it wrote: the whole run's `picked` and `paused` counts, "
@@ -56,7 +60,7 @@ class ScreenerRunEntry:
     config_id: str
     owner: str
     session: dt.date
-    status: str
+    status: screener_runs.RunStatus
     started_at: dt.datetime
     finished_at: dt.datetime | None
     knowledge_ts: dt.datetime

@@ -3164,9 +3164,9 @@ type Query {
   harnessRun(runId: String!): HarnessRun
 
   """
-  The `limit` most recent screener runs of any status, newest first: every screener of the site and every declared user, narrowed by `user` (whose), `screener` (config id) and `status` (the run record's)
+  The `limit` most recent screener runs of any status, newest first: every screener of the site and every declared user, narrowed by `user` (whose), `screener` (config id) and `status` (the run record's). Ordered by the session a run screened (then its start), not by when it started: a backfill started today for an old session sorts below newer sessions and falls outside `limit` once that many newer runs match. Only the latest 91 days of sessions are searched: an older run is not returned, however few match
   """
-  screenerRuns(limit: Int! = 50, user: String = null, screener: String = null, status: String = null): [ScreenerRunEntry!]!
+  screenerRuns(limit: Int! = 50, user: String = null, screener: String = null, status: RunStatus = null): [ScreenerRunEntry!]!
 
   """The screener run `runId`; null: no such run"""
   screenerRun(runId: String!): ScreenerRunEntry
@@ -3357,6 +3357,16 @@ type RunItem {
   key: String!
   code: String!
   status: String!
+}
+
+"""Where a run record stands: how far the run got"""
+enum RunStatus {
+  QUEUED
+  RUNNING
+  COMPLETE
+  PARTIAL
+  WAITING
+  FAILED
 }
 
 """
@@ -3612,7 +3622,7 @@ type ScreenerRunEntry {
   configId: String!
   owner: String!
   session: Date!
-  status: String!
+  status: RunStatus!
   startedAt: DateTime!
   finishedAt: DateTime
   knowledgeTs: DateTime!

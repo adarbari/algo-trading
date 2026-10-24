@@ -91,6 +91,15 @@ export type RiskDirection =
   | 'HIGHER_IS_RISK'
   | 'LOWER_IS_RISK';
 
+/** Where a run record stands: how far the run got */
+export type RunStatus =
+  | 'COMPLETE'
+  | 'FAILED'
+  | 'PARTIAL'
+  | 'QUEUED'
+  | 'RUNNING'
+  | 'WAITING';
+
 /** A fast (market) or slow (macro) indicator, or the screener gate (GATE) */
 export type SignalKind =
   | 'FAST'
@@ -678,18 +687,18 @@ export type AdminScreenerRunsQueryVariables = Exact<{
   limit: number;
   user?: string | null | undefined;
   screener?: string | null | undefined;
-  status?: string | null | undefined;
+  status?: RunStatus | null | undefined;
 }>;
 
 
-export type AdminScreenerRunsQuery = { screenerRuns: Array<{ runId: string, configId: string, owner: string, session: string, status: string, startedAt: string, finishedAt: string | null, knowledgeTs: string, picked: number | null, paused: number | null, regime: string | null, coverage: string | null }> };
+export type AdminScreenerRunsQuery = { screenerRuns: Array<{ runId: string, configId: string, owner: string, session: string, status: RunStatus, startedAt: string, finishedAt: string | null, knowledgeTs: string, picked: number | null, paused: number | null, regime: string | null, coverage: string | null }> };
 
 export type AdminScreenerRunQueryVariables = Exact<{
   runId: string;
 }>;
 
 
-export type AdminScreenerRunQuery = { screenerRun: { runId: string, configId: string, owner: string, session: string, status: string, startedAt: string, finishedAt: string | null, knowledgeTs: string, configVersion: number | null, configHash: string | null, picked: number | null, paused: number | null, regime: string | null, coverage: string | null, missingTables: Array<string>, missingOptionalTables: Array<string>, decisions: Array<{ decision: string, count: number }> | null, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, changes: { picked: number, paused: number, previousRunId: string | null, previousSession: string | null, previousVersion: number | null, newPicks: number | null, dropped: number | null } | null } | null };
+export type AdminScreenerRunQuery = { screenerRun: { runId: string, configId: string, owner: string, session: string, status: RunStatus, startedAt: string, finishedAt: string | null, knowledgeTs: string, configVersion: number | null, configHash: string | null, picked: number | null, paused: number | null, regime: string | null, coverage: string | null, missingTables: Array<string>, missingOptionalTables: Array<string>, decisions: Array<{ decision: string, count: number }> | null, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, changes: { picked: number, paused: number, previousRunId: string | null, previousSession: string | null, previousVersion: number | null, newPicks: number | null, dropped: number | null } | null } | null };
 
 export type StatusStripQueryVariables = Exact<{
   admin: boolean;
@@ -4283,7 +4292,7 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<ScreenerRunsQuery, ScreenerRunsQueryVariables>;
 export const AdminScreenerRunsDocument = new TypedDocumentString(`
-    query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: String) {
+    query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: RunStatus) {
   screenerRuns(limit: $limit, user: $user, screener: $screener, status: $status) {
     runId
     configId
