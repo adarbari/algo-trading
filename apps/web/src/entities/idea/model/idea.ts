@@ -105,6 +105,10 @@ export interface ScreenerSummary {
   notRun: ServedUnknown | null;
   /** The run's order follows values the viewer's licences do not cover: it adds no idea. */
   withheld: boolean;
+  /** The run record's own coverage (`COMPLETE`, `PARTIAL`), null: no run or not recorded. */
+  coverage: string | null;
+  /** What the run went without, in the server's public words (never a table or step name). */
+  gaps: { kind: string; kindText: string; guideTerm: string }[];
   /** Its first picks that count towards the ideas, best first. */
   top: { symbol: string; score: number | null }[];
 }
@@ -192,6 +196,12 @@ function toScreener(entry: ServedScreener): ScreenerSummary {
     picked: entry.picked,
     notRun: entry.notRun ?? null,
     withheld: entry.withheld,
+    coverage: entry.run?.coverage ?? null,
+    gaps: (entry.run?.unavailable ?? []).map((u) => ({
+      kind: u.kind,
+      kindText: u.kindText,
+      guideTerm: u.guideTerm,
+    })),
     top: entry.top.map((t) => ({
       symbol: t.instrument?.symbol ?? t.instrumentId,
       score: t.score ?? null,

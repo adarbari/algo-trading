@@ -109,7 +109,7 @@ const item = (
 };
 const screener = (id: string, name: string) => ({
   screener: { id, name, owner: 'abhinav', version: 1 },
-  run: { runId: `run-${id}`, configVersion: 1, paused: 0 },
+  run: { runId: `run-${id}`, configVersion: 1, paused: 0, coverage: 'COMPLETE', unavailable: [] },
   notRun: null,
   picked: 3,
   withheld: false,

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24 06:31 UTC",
+ "generated": "2026-10-24 07:10 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -1598,6 +1598,7 @@
    "params": {},
    "ops": [
     "EdgeDesk",
+    "FilterSet",
     "GuideHelpField",
     "IdeasPage"
    ],
@@ -1609,65 +1610,9 @@
    ],
    "source": "static"
   },
-  "/ideas?liq=ok": {
+  "/ideas > expand:Paused by regime": {
    "route": "/ideas",
-   "search": {
-    "liq": "ok"
-   },
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeDesk",
-    "GuideHelpField",
-    "IdeasPage"
-   ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
-   "interaction": [],
-   "source": "static"
-  },
-  "/ideas?liq=risk": {
-   "route": "/ideas",
-   "search": {
-    "liq": "risk"
-   },
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeDesk",
-    "GuideHelpField",
-    "IdeasPage"
-   ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
-   "interaction": [],
-   "source": "static"
-  },
-  "/ideas?screener={screener}": {
-   "route": "/ideas",
-   "search": {
-    "screener": "{screener}"
-   },
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeDesk",
-    "GuideHelpField",
-    "IdeasPage"
-   ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
-   "interaction": [],
-   "source": "static"
-  },
-  "/ideas?screener={screener} > expand:Paused by regime": {
-   "route": "/ideas",
-   "search": {
-    "screener": "{screener}"
-   },
+   "search": {},
    "clicks": [
     {
      "kind": "expand",
@@ -1680,7 +1625,7 @@
    "uncertain": [],
    "interaction": [],
    "source": "static",
-   "parent": "/ideas?screener={screener}"
+   "parent": "/ideas"
   },
   "/login": {
    "route": "/login",
