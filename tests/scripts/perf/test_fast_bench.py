@@ -644,3 +644,15 @@ def test_a_recorder_write_error_never_fails_the_bench(tmp_path: Path) -> None:
     assert rs.requests == 1
     # an unwritable folder at start-up is not fatal either
     fb.RequestStream(tmp_path / "does-not-exist").close()
+
+
+def test_the_coverage_flag_is_printed_never_fails_and_is_skipped_for_a_subset(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The nightly drift flag: operations the web sends that no timed operation covers."""
+    measured = {"a#1": {"name": "Viewer"}}
+    flag = fb.report_sets(measured, {"/": ["a#1"]}, {}, False)
+    out = capsys.readouterr().out
+    assert flag["all"] and "COVERAGE " in out and "not in the exception list" in out
+    assert fb.report_sets(measured, {"/": ["a#1"]}, {}, True) == {}
+    assert "COVERAGE" not in capsys.readouterr().out

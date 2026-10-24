@@ -1,0 +1,71 @@
+# The 1 s page gate's coverage exceptions (owner decision 2026-10-23, docs/decisions/log.md):
+# every web route / view and every GraphQL query operation the web sends is measured by the gate
+# (scripts/perf/fast_bench.py, from benchmarks/api_latency_views.captured.json) or listed here
+# with a reason. Read by tests/scripts/perf/test_views.py
+# (`test_every_web_view_and_operation_is_measured_or_listed`), which fails with the one-line fix
+# for a new route, tab or operation that is in neither.
+#
+# SHRINK-ONLY, like architecture/guide_coverage.toml [baseline]: a gap not listed here fails (cover
+# it: `make api-latency-views`, docs/perf/page-latency-bar.md "Cover a new page"; never add to this
+# list); an entry that becomes covered fails until its line is removed. A view needs an operation
+# on its own to be measured (a tab or section that only shows its parent's data has none).
+#
+# The first baseline (2026-10-23) is the operations the web sends today that the gate's
+# committed capture does not measure: follow-up work, each to be captured or resolved.
+
+[baseline]
+# The pins: the size of each list; a PR only lowers them (adding an entry fails the test).
+max_operation = 13
+max_view = 0
+
+[[operation]]
+name = "ComparePrices"
+reason = "not yet captured"
+
+[[operation]]
+name = "EdgeBuilder"
+reason = "not yet captured"
+
+[[operation]]
+name = "EdgeResultBasis"
+reason = "not yet captured"
+
+[[operation]]
+name = "EtfHoldings"
+reason = "not yet captured"
+
+[[operation]]
+name = "FeatureTable"
+reason = "not yet captured"
+
+[[operation]]
+name = "GuideSearch"
+reason = "not yet captured"
+
+[[operation]]
+name = "InstrumentEventList"
+reason = "not yet captured"
+
+[[operation]]
+name = "MyFeatureRequests"
+reason = "not yet captured"
+
+[[operation]]
+name = "PublishedEdge"
+reason = "not yet captured"
+
+[[operation]]
+name = "RunItems"
+reason = "not yet captured"
+
+[[operation]]
+name = "RunRecord"
+reason = "not yet captured"
+
+[[operation]]
+name = "ScreenVersions"
+reason = "not yet captured"
+
+[[operation]]
+name = "ScreenerPicks"
+reason = "not yet captured"

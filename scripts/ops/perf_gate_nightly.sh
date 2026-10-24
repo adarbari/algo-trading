@@ -173,7 +173,7 @@ finish_evidence() {
   STOP_REASON=$1 RUNDIR=$rundir SUMMARY=$logs/perf_gate/summary.csv TODAY=$today SHA=${sha:-unknown} \
     CODE=${code:-3} WAIT_S=${wait_s:-0} SNAPSHOT_S=${snapshot_s:-0} BENCH_S=${bench_s:-0} \
     CLEANUP_S=${cleanup_s:-0} TOTAL_S=$(( $(date +%s) - t_start )) VIEWS_OVER=${views_over:-} \
-    ABOVE=${above:-} KEEP=$keep_runs NOTE=${kr_note:-} python3 - <<'PY'
+    ABOVE=${above:-} COV_N=${cov_n:-} COV_NEW=${cov_new:-} KEEP=$keep_runs NOTE=${kr_note:-} python3 - <<'PY'
 import csv, json, os, re, shutil
 from pathlib import Path
 e = os.environ
@@ -191,6 +191,8 @@ status = {
     "passes": meta.get("passes"), "budget_s": meta.get("budget_s"),
     "bench_elapsed_s": meta.get("elapsed_s"), "noisy": meta.get("noisy"),
     "views_over_bar": e["VIEWS_OVER"], "seconds_above": e["ABOVE"],
+    # drift flag: web operations the gate does not measure (never part of the verdict)
+    "uncovered_ops": int(e["COV_N"] or 0), "uncovered_ops_new": int(e["COV_NEW"] or 0),
 }
 (run / "status.json").write_text(json.dumps(status, indent=1) + "\n")
 summary = Path(e["SUMMARY"])
@@ -587,6 +589,8 @@ bench_s=$((t_benched - t_bench))
 top_procs >"$rundir/procs-end.txt"
 over=$(sed -n 's/^\([0-9]*\) views over.*(\([0-9.]*\) s above the bar).*/\1 \2/p' "$out" | tail -1)
 views_over=${over%% *}; above=${over##* }
+cov=$(sed -n 's/^COVERAGE \([0-9]*\) operations not covered.*(\([0-9]*\) not in the exception list).*/\1 \2/p' "$out" | tail -1)
+cov_n=${cov%% *}; cov_new=${cov##* }
 # every outcome after the copy is a finished day (no endless re-copy of the store at every retry)
 finished=yes; overtime=no; outcome=ok
 if [ "$code" -eq 124 ]; then overtime=yes; code=4; outcome=over-time
@@ -654,7 +658,7 @@ reason=""; [ "$overtime" = yes ] && reason=over-time
 [ "$outcome" = paused ] && reason=paused; [ "$outcome" = code-changed ] && reason=code-changed; [ "$outcome" = sampled ] && reason=sampled
 finish_evidence "$reason"
 
-if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$outcome" = sampled ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ]; then
+if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ] || [ "$outcome" = sampled ] || [ "$bench_s" -gt "$bench_limit" ] || [ "$total_s" -gt "$total_limit" ] || [ "$overtime" = yes ] || [ "${cov_new:-0}" -gt 0 ]; then
   msg="1 s page gate: ${views_over:-?} views over the bar (${above:-?} s above); snapshot ${snapshot_s}s, bench ${bench_s}s, total ${total_s}s; evidence in var/logs/perf_gate/$today/"
   if [ "$outcome" = integrity ]; then
     why=$(grep '^INTEGRITY ' "$out_copy" | cut -c11-160 | head -3 | tr '\n' ';')
@@ -667,6 +671,7 @@ if [ "$code" -ne 0 ] || [ "$outcome" = paused ] || [ "$outcome" = code-changed ]
   [ "$outcome" = crashed ] && msg="1 s page gate CRASHED (no result): $msg"
   [ "$outcome" = refused ] && msg="1 s page gate REFUSED by the bench (no result): $msg"
   [ "$overtime" = yes ] && msg="1 s page gate OVER-TIME: bench killed at ${bench_limit}s (not recorded); $msg"
+  [ "${cov_n:-0}" -gt 0 ] && msg="$msg; ${cov_n} operations not covered by the gate (${cov_new:-0} new: docs/perf/page-latency-bar.md, Cover a new page)"
   if [ -n "${PERF_NOTIFY:-}" ]; then "$PERF_NOTIFY" "$msg" || true
   else osascript -e "display notification \"${msg//[\"\\]/}\" with title \"algotrade perf gate\"" || true; fi
 fi
