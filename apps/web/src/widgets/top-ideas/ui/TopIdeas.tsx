@@ -1,33 +1,54 @@
 /**
  * "Top ideas": one row per ticker with the screeners that picked it, ranked by the Ideas rule
- * (on the server: score, then consensus), under the preset views and filter chips (the
- * page's search params). Tick tickers to compare them in Explore, or click one to open it there
+ * (on the server: score, then consensus), under the shared filter bar (ADR 0082): the filters in
+ * force are the page's `f` search param and narrow the whole list on the server before it is
+ * paged; a change of filters starts again from the first page. Tick tickers to compare them in Explore, or click one to open it there
  * with the screener that surfaced it. The server sends the first page; "Show more" adds the next.
  */
-import { Button, DataTable, Panel, ShowMore, Stack, Text } from '@algotrade/ui';
+import { Button, DataTable, Panel, SegmentedControl, ShowMore, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
+import {
+  SurfaceFilterBar,
+  SurfaceZeroResults,
+  useFilterState,
+  type FilterSearch,
+  type LabelOf,
+} from '@/features/filter-bar';
 import { helped, termHelp } from '@/features/guide-help';
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
 import {
-  activeFilterKeys,
-  IDEA_VIEWS,
+  IDEA_COLUMN_SETS,
   IDEAS_PAGE,
   useIdeas,
   type Idea,
   type IdeasSearch,
   type IdeasSearchPatch,
 } from '@/entities/idea';
+import { decisionLabel } from '@/entities/screen';
 
 import { ideaColumns } from '../model/columns';
-import { FILTER_TITLES, filterIdeas, optionLabel } from '../model/filters';
 
-import { IdeaFilters } from './IdeaFilters';
+/** The surface of the filter bar: its definitions are `config/site/filters/ideas.toml`. */
+const SURFACE = 'ideas';
+
+/** The names of the stored values the definitions do not label: a decision's, a screener's. */
+function labelsOf(screeners: readonly { id: string; name: string }[]): LabelOf {
+  const names = new Map(screeners.map((s) => [s.id, s.name]));
+  return (filterId, value) => {
+    if (filterId === 'decision') return decisionLabel(value);
+    return filterId === 'screener' ? names.get(value) : undefined;
+  };
+}
+
+/** The page's search params: the column set and the filter bar's `f`. */
+export type TopIdeasSearch = IdeasSearch & FilterSearch;
+export type TopIdeasSearchPatch = IdeasSearchPatch & { f?: string | undefined };
 
 export interface TopIdeasProps {
-  /** The page's search params: the view in use and the filter chips. */
-  search: IdeasSearch;
-  onSearchChange: (patch: IdeasSearchPatch) => void;
+  /** The page's search params: the column set and the filters in force. */
+  search: TopIdeasSearch;
+  onSearchChange: (patch: TopIdeasSearchPatch) => void;
   onCompare: (search: IdeaCompareSearch) => void;
   /** Open a ticker in Explore, with the screener (config id) that surfaced it. */
   onOpen: (symbol: string, via: string) => void;
@@ -42,11 +63,15 @@ export function TopIdeas({
   onOpen,
   onScreeners,
 }: TopIdeasProps) {
-  const ideas = useIdeas();
+  const filters = useFilterState(search.f, (f) => {
+    onSearchChange({ f });
+  });
+  const ideas = useIdeas(filters.filters);
+  const facets = ideas.data?.facets;
+  const labelOf = useMemo(() => labelsOf(ideas.data?.screeners ?? []), [ideas.data?.screeners]);
   const [selected, setSelected] = useState<string[]>([]);
   const all = useMemo(() => ideas.data?.ideas ?? [], [ideas.data]);
   const columns = useMemo(() => ideaColumns(all, search.columns), [all, search.columns]);
-  const rows = useMemo(() => filterIdeas(all, search), [all, search]);
   const symbols = selected.flatMap((id) => {
     const symbol = all.find((idea) => idea.instrumentId === id)?.symbol;
     return symbol ? [symbol] : [];
@@ -65,38 +90,27 @@ export function TopIdeas({
           : 'ready';
 
   const withheld = ideas.data?.screeners.filter((s) => s.withheld) ?? [];
-  const active = activeFilterKeys(search);
-  const viewLabel = IDEA_VIEWS.find((v) => v.id === search.view)?.label;
-  const because = [
-    ...(viewLabel ? [viewLabel] : []),
-    ...active.map((key) => `${FILTER_TITLES[key]}: ${optionLabel(all, key, search[key] ?? '')}`),
-  ].join(' · ');
-  const filteredEmpty = (
-    <Stack gap={2} align="start">
-      <Text tone="muted">{`No idea matches ${because}.`}</Text>
-      <Button
-        onClick={() => {
-          onSearchChange({
-            view: undefined,
-            ...Object.fromEntries(active.map((key) => [key, undefined])),
-          });
-        }}
-      >
-        Clear filters
-      </Button>
-    </Stack>
-  );
-
   return (
     <Stack gap={3}>
-      <IdeaFilters ideas={all} search={search} onSearchChange={onSearchChange} />
+      <SegmentedControl
+        aria-label="Columns"
+        size="sm"
+        options={IDEA_COLUMN_SETS.map((c) => ({ value: c.id, label: c.label }))}
+        value={search.columns ?? 'stocks'}
+        onValueChange={(columns) => {
+          onSearchChange({ columns });
+        }}
+      />
+      <SurfaceFilterBar
+        surface={SURFACE}
+        state={filters}
+        facets={facets}
+        help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
+        labelOf={labelOf}
+      />
       <Panel
         title="Top ideas · across all your screeners"
-        description={
-          ideas.data?.session
-            ? `Session ${ideas.data.session} · ${rows.length} of ${ideas.data.total}`
-            : undefined
-        }
+        description={ideas.data?.session ? `Session ${ideas.data.session}` : undefined}
         flush
         state={state}
         loadingLabel="Loading ideas…"
@@ -133,7 +147,7 @@ export function TopIdeas({
           <DataTable<Idea>
             label="Top ideas"
             columns={columns.map(helped)}
-            rows={rows}
+            rows={all}
             getRowId={(idea) => idea.instrumentId}
             getRowLabel={(idea) => idea.symbol ?? idea.instrumentId}
             defaultSort={{ columnId: 'rank', direction: 'asc' }}
@@ -145,7 +159,11 @@ export function TopIdeas({
             }}
             canActivate={(idea) => Boolean(idea.symbol)}
             emptyMessage={
-              all.length === 0 ? 'No screener picked anything in this session.' : filteredEmpty
+              filters.filters.some((f) => f.active) ? (
+                <SurfaceZeroResults surface={SURFACE} state={filters} facets={facets} />
+              ) : (
+                'No screener picked anything in this session.'
+              )
             }
             rowLines={search.columns === 'options' ? 2 : 3}
             visibleRows={14}

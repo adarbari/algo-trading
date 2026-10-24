@@ -1,5 +1,6 @@
 /** Page: Trader > Ideas (the ticker-level ideas table with its views and filters). */
 import { prefetchEdgeDesk } from '@/entities/edge';
+import { prefetchFilterSet } from '@/entities/filter';
 import { prefetchIdeas } from '@/entities/idea';
 import { prefetchRegime } from '@/entities/regime';
 
@@ -9,5 +10,6 @@ export { IdeasPage, preloadEdgeSignals, type IdeasPageProps } from './ui/IdeasPa
 export function prefetchIdeasReads(client: Parameters<typeof prefetchIdeas>[0]): void {
   prefetchRegime(client);
   prefetchIdeas(client);
+  prefetchFilterSet(client, 'ideas');
   prefetchEdgeDesk(client);
 }

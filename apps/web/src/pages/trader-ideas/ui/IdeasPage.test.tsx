@@ -78,8 +78,8 @@ vi.mock('@/widgets/top-ideas', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
     TopIdeas: (props: {
-      search: { view?: string };
-      onSearchChange: (patch: { view: string }) => void;
+      search: { f?: string };
+      onSearchChange: (patch: { f: string }) => void;
       onCompare: (s: { sel: string; focus: string }) => void;
       onOpen: (s: string, via: string) => void;
       onScreeners: () => void;
@@ -97,7 +97,7 @@ vi.mock('@/widgets/top-ideas', async () => {
           <Button onClick={props.onScreeners}>screeners</Button>
           <Button
             onClick={() => {
-              props.onSearchChange({ view: 'conviction' });
+              props.onSearchChange({ f: 'decision:QUALIFIED' });
             }}
           >
             conviction
@@ -128,7 +128,7 @@ describe('IdeasPage', () => {
     const onOpenEdges = vi.fn();
     const { container } = render(
       <IdeasPage
-        search={{ view: 'no-earnings' }}
+        search={{ f: 'earnings:..5s' }}
         onSearchChange={onSearchChange}
         onCompare={onCompare}
         onOpen={onOpen}
@@ -141,12 +141,12 @@ describe('IdeasPage', () => {
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
     expect(widgets.top).toHaveBeenCalledWith(
-      expect.objectContaining({ search: { view: 'no-earnings' } }),
+      expect.objectContaining({ search: { f: 'earnings:..5s' } }),
     );
     await user.click(screen.getByRole('button', { name: 'regime strip' }));
     expect(onOpenRegime).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'conviction' }));
-    expect(onSearchChange).toHaveBeenCalledWith({ view: 'conviction' });
+    expect(onSearchChange).toHaveBeenCalledWith({ f: 'decision:QUALIFIED' });
     await user.click(screen.getByRole('button', { name: 'compare' }));
     expect(onCompare).toHaveBeenCalledWith({ sel: 'AAPL,MSFT', focus: 'AAPL' });
     await user.click(screen.getByRole('button', { name: 'open' }));

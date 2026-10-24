@@ -1,5 +1,5 @@
 /**
- * Trader > Ideas: the route validates the search params (the view in use and the filter chips,
+ * Trader > Ideas: the route validates the search params (the column set and the filter bar's `f`,
  * so a view of the table is a shareable link) and hands them to the page with a setter that
  * replaces the URL. Tickers open in Explore, one or as a compare set (Explore's search params,
  * a single ticker with `via`, the screener that surfaced it); a screener chip opens that
@@ -7,7 +7,9 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
-import { parseIdeasSearch, type IdeasSearch, type IdeasSearchPatch } from '@/entities/idea';
+import { filterSearch } from '@/features/filter-bar';
+import { parseIdeasSearch } from '@/entities/idea';
+import type { TopIdeasSearch, TopIdeasSearchPatch } from '@/widgets/top-ideas';
 
 import { traderRoute } from './layout-route';
 import { pageRoute } from '../page-loader';
@@ -23,11 +25,16 @@ const loading = pageRoute(IdeasPage, (page, client) => {
 });
 
 /** The search params after a patch: `undefined` removes a key. */
-function patched(previous: IdeasSearch, patch: IdeasSearchPatch): IdeasSearch {
+function patched(previous: TopIdeasSearch, patch: TopIdeasSearchPatch): TopIdeasSearch {
   const merged: Record<string, unknown> = { ...previous, ...patch };
-  return parseIdeasSearch(
+  return validateSearch(
     Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)),
   );
+}
+
+/** The page's own params (the column set) and the filter bar's `f`. */
+function validateSearch(raw: Record<string, unknown>): TopIdeasSearch {
+  return { ...parseIdeasSearch(raw), ...filterSearch(raw) };
 }
 
 function IdeasRoute() {
@@ -55,7 +62,7 @@ function IdeasRoute() {
 export const ideasRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'ideas',
-  validateSearch: parseIdeasSearch,
+  validateSearch,
   ...loading,
   component: IdeasRoute,
 });
