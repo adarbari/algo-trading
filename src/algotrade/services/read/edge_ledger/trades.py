@@ -9,8 +9,21 @@ the edge's paper record (``edge_desk.paper.load_trades``: the rows as the sessio
 them, never re-derived); an edge that records no paper trades has no live period
 (``Unknown(NOT_RECORDING)``, said, not an empty list). The GraphQL page and the CSV file both
 call it, so they cannot differ; an excluded pick keeps its public reason, the causes stay in the
-``Unknown`` for admins."""
+``Unknown`` for admins.
 
+Filtered (ADR 0082, surface ``edge_trades``): ``load_filtered_trades`` reads the whole ledger of the
+basis (backtest, live or both), builds the surface's frame from the rows (a per-name figure the
+viewer's licence hides is already ``Unknown`` on its ``TradeCell``: missing, never passing, never
+counted; the sector is the one catalogue field, read in one batch under the viewer's licences),
+runs the one pass, then sorts and pages what passes: filters before paging, so ``total`` is the
+matched count and ``facets`` count the whole ledger. The filters are never applied on the stored
+frame (a licence-hidden value would leak through a count). ``period`` is the older argument mapped
+onto the definition (``period_filters``): a period given adds the filters it stands for
+(``record`` / ``in_sample``) unless the viewer set that filter, so a viewer's own ``record`` wins
+over the default ``all``; no period reads backtest and live rows together. Names are read for
+the page only (the ticker sort names every matched row first)."""
+
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
@@ -25,7 +38,18 @@ from algotrade.services.read.edge_desk.states import is_recording
 from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edge
-from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow, TradeText
+from algotrade.services.read.evaluation.runs import (
+    SORTABLE,
+    TRADE_SURFACE,
+    TradeCell,
+    TradeRow,
+    TradeText,
+)
+from algotrade.services.read.filtering.facets import Facets, compute_facets
+from algotrade.services.read.filtering.masks import NO, YES, FilterInput
+from algotrade.services.read.filtering.rows import frame_of
+from algotrade.services.read.filtering.served import load_served_filters
+from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.session import reference_snapshot_on, reference_snapshots
 from algotrade.services.read.values import Unknown, UnknownCode
 
@@ -82,6 +106,7 @@ class EdgeTradePage:
     oos_hidden: bool = False
     page_size: int = PAGE_SIZE
     symbols_snapshot: date | None = None
+    facets: Facets | None = None  # the filter bar's counts (a filtered read only)
 
 
 def _backtest(
@@ -322,3 +347,140 @@ def load_trades_of(
     """``load_edge_trades`` for the edge ``edge_id`` the user sees (None: they see no such edge)."""
     edge = load_edge(ctx, edge_id)
     return None if edge is None else load_edge_trades(ctx, edge, period, page, sort, descending)
+
+
+SECTOR = "instrument.sector"
+BACKTEST, LIVE_RECORD = "backtest", "live"  # a ledger row's `source`
+
+
+def period_filters(period: Period | None) -> list[FilterInput]:
+    """The filters the older ``period`` stands for (None: none, every trade)."""
+    if period is None:
+        return []
+    if period is Period.LIVE:
+        return [FilterInput("record", [LIVE_RECORD])]
+    backtest = FilterInput("record", [BACKTEST])
+    sides = {Period.IN_SAMPLE: YES, Period.OUT_OF_SAMPLE: NO}
+    if period in sides:
+        return [backtest, FilterInput("in_sample", [sides[period]])]
+    return [backtest]
+
+
+def _sector_cells(ctx: ReadContext, rows: Sequence[TradeRow]) -> list[str | None]:
+    ids = list(dict.fromkeys(r.instrument_id for r in rows))
+    found = load_feature_values(ctx, ids, [SECTOR]) if ids else {}
+    out: list[str | None] = []
+    for r in rows:
+        value = found[r.instrument_id][0].value
+        out.append(None if value is None else str(value))
+    return out
+
+
+def _sorted(rows: list[TradeRow], sort: str | None, descending: bool) -> list[TradeRow]:
+    if sort not in SORTABLE:
+        return rows
+    present = [r for r in rows if _sort_value(r, sort) is not None]
+    missing = [r for r in rows if _sort_value(r, sort) is None]  # a missing value is last
+    present.sort(key=lambda r: _sort_value(r, sort), reverse=descending)  # type: ignore[arg-type,return-value]
+    return present + missing
+
+
+def _chosen(inputs: Sequence[FilterInput]) -> dict[str, list[str]]:
+    """The values of each active ``record`` / ``in_sample`` input (the ones that pick the rows to
+    read; an input that sets nothing is not there)."""
+    return {
+        i.id: i.values for i in inputs if i.id in ("record", "in_sample") and i.active and i.values
+    }
+
+
+def _unknown(why: str, code: UnknownCode) -> Unknown:
+    return Unknown(code, Cause((CauseLink(CauseLevel.STEP, PAPER_STEP, code.value, why),)))
+
+
+def load_filtered_trades(
+    ctx: ReadContext,
+    edge: Edge,
+    period: Period | None,
+    page: int,
+    sort: str | None,
+    descending: bool,
+    filters: Sequence[FilterInput],
+    limit: int | None = PAGE_SIZE,
+) -> EdgeTradePage:
+    """Page ``page`` of the trades of ``edge``'s verdict basis for ``period`` that pass
+    ``filters``, with the filter bar's counts. ``FilterRefusedError`` for a filter the viewer is
+    not offered (before any read)."""
+    served = load_served_filters(ctx, TRADE_SURFACE, ctx.session.date)
+    given = {i.id for i in filters}
+    inputs = [*filters, *(f for f in period_filters(period) if f.id not in given)]
+    served.resolved.check(i.id for i in inputs)  # before any read
+    page = max(page, 1)
+    basis = official_basis(ctx, edge)
+    shown = period or Period.ALL
+    if basis.key is None or basis.run is None:
+        return EdgeTradePage(shown, page, basis.unknown)
+    words = f"{basis.key[0]}, {basis.key[1]} trading days"
+    chosen = _chosen(inputs)  # what the inputs say, the viewer's over the period's
+    record, sample = chosen.get("record"), chosen.get("in_sample")
+    backtest = record is None or BACKTEST in record
+    live = record is None or LIVE_RECORD in record
+    recording = is_recording(edge)
+    withheld = basis.run.oos_hidden and backtest and sample != [YES]  # OOS rows are never served
+    if withheld and sample == [NO] and not given & {"record", "in_sample"}:
+        return EdgeTradePage(shown, page, None, words, oos_hidden=True)  # the out-of-sample period
+    if live and not backtest and not recording:
+        why = "paper trades are recorded once the edge is evidenced or followed"
+        return EdgeTradePage(shown, page, _unknown(why, UnknownCode.NOT_RECORDING), words)
+    hidden = withheld
+    rows: list[TradeRow] = []
+    licence = None
+    if backtest:
+        found = _backtest(ctx, basis, Period.ALL, 0, None, None, False)
+        if found.unknown is not None:
+            return EdgeTradePage(shown, page, found.unknown, words)
+        rows.extend(found.rows)
+        licence = found.licence
+    if live and recording:
+        rows.extend(_live(ctx, edge, basis, None, False))
+    wanted = SECTOR in {f.field for f in served.resolved.offered}
+    catalogue = {SECTOR: _sector_cells(ctx, rows)} if wanted else None
+    frame = frame_of(rows, served.resolved, served.columns, catalogue)
+    facets = compute_facets(frame, len(rows), served.resolved, inputs)
+    matched = [rows[i] for i in facets.matched_rows]
+    if sort == SYMBOL:  # the tickers are read after the rows: name every matched one
+        named = _named(ctx, EdgeTradePage(shown, page, None, rows=tuple(matched)))
+        known = [r for r in named.rows if r.symbol.value is not None]
+        known.sort(key=lambda r: (r.symbol.value or "").casefold(), reverse=descending)
+        ordered = [*known, *(r for r in named.rows if r.symbol.value is None)]
+    else:
+        ordered = _sorted(matched, sort, descending)
+    offset = 0 if limit is None else (page - 1) * limit
+    part = tuple(ordered[offset : None if limit is None else offset + limit])
+    result = EdgeTradePage(
+        shown, page, None, words, part, len(matched), licence, hidden, facets=facets
+    )
+    if sort == SYMBOL:
+        newest = max((r.symbol_as_of for r in part if r.symbol_as_of), default=None)
+        return replace(result, symbols_snapshot=newest)
+    return _named(ctx, result)
+
+
+def load_trades_page(
+    ctx: ReadContext,
+    edge_id: str,
+    period: Period | None,
+    page: int,
+    sort: str | None,
+    descending: bool,
+    filters: Sequence[FilterInput] = (),
+    with_facets: bool = False,
+) -> EdgeTradePage | None:
+    """The page of the edge ``edge_id`` the user sees (None: no such edge). A read with no
+    filters, a period and no counts asked for pages the ledger as it always did (one page is read
+    and named); any other reads the whole ledger and filters it (``load_filtered_trades``)."""
+    edge = load_edge(ctx, edge_id)
+    if edge is None:
+        return None
+    if period is not None and not filters and not with_facets:
+        return load_edge_trades(ctx, edge, period, page, sort, descending)
+    return load_filtered_trades(ctx, edge, period, page, sort, descending, filters)
