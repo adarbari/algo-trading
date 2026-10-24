@@ -673,7 +673,7 @@ follow-up PR).
 ## 2026-10-24 | Screener run line PR (#932) | Screener results route budgets raised by the run line's cost
 - Question: the run line and ten-session strip put the Screener results route over its script, request and DOM budgets (CI 256892 B scripts, 88 requests, 287 DOM nodes). Trim or raise?
 - Options: drop the strip's help button and its own CSS (breaks the Guide coverage rule) / raise the three route budgets by the measured cost plus a small margin / drop the strip.
-- Decision: `/screeners/vrp_scanner` scripts 256400 to 257250 B (CI measured 257161 after merging main), requests 86 to 90 (CI measured 89), dom_nodes 272 to 292; no other budget changes.
+- Decision: `/screeners/vrp_scanner` scripts 256400 to 257500 B (CI measured 256892, then 257161 and 257322 as main's shared chunks shifted), requests 86 to 90 (CI measured 89), dom_nodes 272 to 292; no other budget changes.
 - decided by: owner
 - status: final
 - Reasoning: the two extra requests and the nodes are the strip and its help button, which the Guide rule requires; the owner chose to raise the budgets in chat on 2026-10-24.
