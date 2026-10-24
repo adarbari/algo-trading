@@ -40,6 +40,7 @@ class Rig:
             **os.environ,
             "PERF_SRC": str(self.tmp / "var" / "data"),
             "PERF_CLONE_ROOT": str(self.root / "data"),
+            "PERF_SPOTLIGHT_DIR": str(self.tmp),  # the clone is inside the Spotlight-excluded dir
             "PERF_STATUS": str(self.status),
             "PERF_NOW_DATE": "2026-10-23",
             "PERF_NOW_HM": "0310",
