@@ -125,7 +125,24 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   await nav.getByRole('link', { name: 'Trades' }).click();
   const ledger = page.getByRole('grid', { name: 'Trade ledger' });
   await expect(ledger).toContainText('AAA');
-  await page.getByRole('radio', { name: 'Out-of-sample' }).last().click();
+  await expect(ledger.getByRole('row')).toHaveCount(3); // the header and two trades
+  await page.getByRole('button', { name: 'Setup' }).click();
+  await page.getByRole('list', { name: 'Result' }).getByRole('button', { name: /^Lost/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(ledger.getByRole('row')).toHaveCount(2); // narrowed on the server
+  await expect(ledger).not.toContainText('AAA');
+  await expect(page.getByText('1 of 2').first()).toBeVisible();
+  // The lost trade is in sample, so out of sample matches nothing: the way back is on the page.
+  await page.getByRole('button', { name: /^Setup\s*, 1 active/ }).click();
+  await page
+    .getByRole('radiogroup', { name: 'In sample' })
+    .getByRole('radio', { name: 'No' })
+    .click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('No edge trades match all 2 filters')).toBeVisible();
+  await page.getByRole('button', { name: /^Switch off In sample gives 1/ }).click();
+  await expect(ledger).toContainText('BBB');
+  await page.getByRole('button', { name: 'Clear all' }).click();
   await expect(page.getByRole('button', { name: 'CSV' })).toBeVisible();
   // Details: the variant grid with its basis marked.
   await nav.getByRole('link', { name: 'Details' }).click();

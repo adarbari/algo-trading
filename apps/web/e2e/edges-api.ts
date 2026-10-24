@@ -253,6 +253,63 @@ const TRADES = {
     touch: { value: null, unknown: null },
   })),
 };
+
+const TRADE_FILTER_SET = {
+  filterSet: {
+    surface: 'edge_trades',
+    label: 'Edge trades',
+    filters: [
+      ['result', 'Result', 'PICK', 'term:filter_trade_result', ['won', 'Won'], ['lost', 'Lost']],
+      ['in_sample', 'In sample', 'TOGGLE', 'term:filter_trade_in_sample'],
+      ['record', 'Backtest or live', 'PICK', 'term:filter_trade_record', ['backtest', 'Backtest']],
+    ].map(([id, label, kind, guide, ...options]) => ({
+      id,
+      label,
+      group: 'SETUP',
+      kind,
+      guide,
+      options: (options as string[][]).map(([value, text]) => ({ value, label: text })),
+      bins: [],
+      windowUnit: null,
+    })),
+  },
+};
+interface TradeInput {
+  id: string;
+  values: string[];
+  active: boolean;
+}
+type TradeRowShape = (typeof TRADES.rows)[number];
+const tradePasses = (row: TradeRowShape, f: TradeInput): boolean => {
+  if (f.id === 'result') return f.values.includes(String(row.status));
+  if (f.id === 'in_sample') return f.values.includes(row.beforeSplit ? 'yes' : 'no');
+  return f.values.includes(row.source);
+};
+
+/** The ledger as the server serves it under `filters`: the rows that pass, and the counts. */
+function tradesServed(filters: TradeInput[] | null) {
+  const active = (filters ?? []).filter((f) => f.active);
+  const passing = (others: TradeInput[]) =>
+    TRADES.rows.filter((r) => others.every((f) => tradePasses(r, f)));
+  const rows = passing(active);
+  return {
+    ...TRADES,
+    total: rows.length,
+    rows,
+    facets: {
+      total: TRADES.rows.length,
+      matched: rows.length,
+      items: (filters ?? []).map((f) => ({
+        id: f.id,
+        active: f.active,
+        removes: f.active ? passing(active.filter((o) => o !== f)).length - rows.length : null,
+        unknown: 0,
+        options: [],
+        bins: [],
+      })),
+    },
+  };
+}
 const FIGS = (liftPts: number, trades: number) => ({
   winRate: 0.6,
   baseRate: 0.55,
@@ -284,7 +341,6 @@ const SECTIONS: [RegExp, Record<string, unknown>][] = [
   [/query\s+EdgeResultCapacity\b/, { edgeResult: { capacity: CAPACITY } }],
   [/query\s+EdgeResultRollingStarts\b/, { edgeResult: { rollingStarts: ROLLING } }],
   [/query\s+EdgeResultMonthly\b/, { edgeResult: { monthly: MONTHLY } }],
-  [/query\s+EdgeTrades\b/, { edgeTrades: TRADES }],
   [/query\s+EdgeVariantGrid\b/, { edgeVariants: VARIANTS }],
 ];
 
@@ -372,9 +428,19 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as {
       query?: string;
-      variables?: { ids?: string[]; id?: string };
+      variables?: { ids?: string[]; id?: string; surface?: string; filters?: TradeInput[] | null };
     } | null;
     const query = body?.query ?? '';
+    if (/query\s+FilterSet\b/.test(query) && body?.variables?.surface === 'edge_trades') {
+      await route.fulfill({ json: { data: TRADE_FILTER_SET } });
+      return;
+    }
+    if (/query\s+EdgeTrades\b/.test(query)) {
+      await route.fulfill({
+        json: { data: { edgeTrades: tradesServed(body?.variables?.filters ?? null) } },
+      });
+      return;
+    }
     if (/query\s+EdgeDocument\b/.test(query)) {
       // The builder's document-only read: the listed edges (the user's copies too), no runs.
       const ids = body?.variables?.ids ?? [];

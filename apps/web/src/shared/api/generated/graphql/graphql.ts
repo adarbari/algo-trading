@@ -324,10 +324,11 @@ export type EdgeTradesQueryVariables = Exact<{
   page: number;
   sort: TradeSort;
   descending: boolean;
+  filters?: Array<FilterInput> | FilterInput | null | undefined;
 }>;
 
 
-export type EdgeTradesQuery = { edgeTrades: { period: TradePeriod, page: number, pageSize: number, total: number, basis: string | null, licence: string | null, oosHidden: boolean, symbolsSnapshot: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ variant: string, horizonSessions: number, decisionSession: string, entrySession: string | null, exitSession: string | null, instrumentId: string, symbolAsOf: string | null, rank: number | null, status: string, excludedReason: string | null, hit: boolean | null, delisted: boolean, beforeSplit: boolean, source: string, maxDrawdown: number | null, symbol: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, company: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, score: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, value: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, grossValue: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, advUsd: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, reference: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, touch: { value: boolean | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }> } | null };
+export type EdgeTradesQuery = { edgeTrades: { period: TradePeriod, page: number, pageSize: number, total: number, basis: string | null, licence: string | null, oosHidden: boolean, symbolsSnapshot: string | null, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ variant: string, horizonSessions: number, decisionSession: string, entrySession: string | null, exitSession: string | null, instrumentId: string, symbolAsOf: string | null, rank: number | null, status: string, excludedReason: string | null, hit: boolean | null, delisted: boolean, beforeSplit: boolean, source: string, maxDrawdown: number | null, symbol: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, company: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, score: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, value: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, grossValue: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, advUsd: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, reference: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, touch: { value: boolean | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }> } | null };
 
 export type ScreenerEdgesQueryVariables = Exact<{
   id: string;
@@ -1557,14 +1558,34 @@ export const EdgeDocumentDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<EdgeDocumentQuery, EdgeDocumentQueryVariables>;
 export const EdgeTradesDocument = new TypedDocumentString(`
-    query EdgeTrades($edgeId: String!, $period: TradePeriod!, $page: Int!, $sort: TradeSort!, $descending: Boolean!) {
+    query EdgeTrades($edgeId: String!, $period: TradePeriod!, $page: Int!, $sort: TradeSort!, $descending: Boolean!, $filters: [FilterInput!]) {
   edgeTrades(
     edgeId: $edgeId
     period: $period
     page: $page
     sort: $sort
     descending: $descending
+    filters: $filters
   ) {
+    facets {
+      total
+      matched
+      items {
+        id
+        active
+        removes
+        unknown
+        options {
+          value
+          count
+        }
+        bins {
+          lo
+          hi
+          count
+        }
+      }
+    }
     period
     page
     pageSize

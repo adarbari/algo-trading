@@ -349,6 +349,15 @@ test('Edges: a tapped edge opens its page', async ({ page }) => {
     .tap();
   await expect(page.getByRole('grid', { name: 'Trade ledger' })).toBeVisible();
   await fits(); // the ledger scrolls sideways inside its own box, never the page
+  // The ledger's filter bar is the one Filters button and a sheet; "Show N results" narrows it.
+  await page.getByRole('button', { name: 'Filters' }).tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  await sheet.getByRole('button', { name: 'Setup' }).tap();
+  await page.getByRole('list', { name: 'Result' }).getByRole('button', { name: /^Lost/ }).tap();
+  await page.keyboard.press('Escape');
+  await sheet.getByRole('button', { name: 'Show 1 results' }).tap();
+  await expect(page.getByRole('grid', { name: 'Trade ledger' })).not.toContainText('AAA');
+  await fits();
   await expectAccessible(page);
 });
 
