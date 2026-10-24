@@ -204,11 +204,179 @@ next = "Choose yes before looking for an options trade."
 see_also = ["filter_toggle", "filter_option_tier"]
 
 [[term]]
+id = "filter_owner"
+term = "Owner filter"
+short = "Keeps the screeners that are yours, or the site's presets."
+body = """
+Mine are the screeners you built or copied. Presets are the site's own, shared by everyone, and only the site changes them. Tick both to see the whole list.
+"""
+next = "Tick Mine to see the screeners you can edit."
+see_also = ["preset", "screener"]
+
+[[term]]
+id = "filter_edges_implemented"
+term = "Edges that list it filter"
+short = "Keeps the screeners that at least, or at most, a number of edges list as an implementation."
+body = """
+An edge is a claim about the market, and its screeners are the rules that try to catch it. A screener that no edge lists has no frozen-period record behind it. Set the minimum to 1 to see the screeners an edge stands on. The bars show how many screeners sit at each count among those that pass your other filters.
+"""
+next = "Set the minimum to 1 to leave out screeners with no edge."
+see_also = ["edge", "filter_range", "screener_track_record"]
+
+[[term]]
+id = "filter_picked"
+term = "Candidates in the latest run filter"
+short = "Keeps the screeners whose latest run for the session picked a number of names between a minimum and a maximum."
+body = """
+The count is the names the screener picked in its run for the session you are reading. Set the minimum to 1 to see only screeners that found something. A screener with no run for the session has no count: it is unknown and never passes, even with a minimum of 0.
+"""
+next = "Set the minimum to 1 to see what has candidates today."
+see_also = ["screener_picks", "not_run", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_run_status"
+term = "Last run filter"
+short = "Keeps the screeners whose latest run for the session ended in the states you tick."
+body = """
+Complete means the run had all the data it needed. Partial means it ran without some table, so its picks may be incomplete. Failed, queued, running and waiting say where a run stands. A screener with no run for the session has no state: it never passes this filter.
+"""
+next = "Tick Partial to find the screeners whose picks need a second look."
+see_also = ["run", "not_run", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_edge_verdict"
+term = "Verdict filter"
+short = "Keeps the edges whose verdict is one you tick."
+body = """
+The verdict is the server's one word for how the evidence stands: works, promising, not working, not enough data, waiting on data, or diagnostic only. It is judged on the out-of-sample result, so an edge the data cannot yet judge is not counted as failing. The number beside each counts the edges with it among those that pass your other filters.
+"""
+next = "Tick Works and Promising to see the edges worth reading first."
+see_also = ["verdict", "verdict_works", "verdict_promising", "verdict_not_working", "verdict_not_enough_data", "verdict_waiting_on_data", "verdict_diagnostic_only"]
+
+[[term]]
+id = "filter_edge_status"
+term = "Status filter"
+short = "Keeps the edges at the stages of their life you tick, from researching to retired or rejected."
+body = """
+Status is the one stage an edge is in: researching, candidate, evidenced, live, retired, rejected or blocked. Rejected edges stay on the list with their reason, so a finding is not forgotten. Status says where the edge stands in your process. The verdict says what the numbers show.
+"""
+next = "Tick Rejected to read what failed and why."
+see_also = ["edge_status", "verdict"]
+
+[[term]]
+id = "filter_edge_mine"
+term = "Mine filter"
+short = "Keeps the edges that are your own documents, or only the site's."
+body = """
+Yes keeps the edges you wrote or copied. No keeps the site's edges. Either applies nothing.
+"""
+see_also = ["edge_owner", "filter_toggle"]
+
+[[term]]
+id = "filter_edge_followed"
+term = "Following filter"
+short = "Keeps the edges you follow, or the ones you do not."
+body = """
+Following an edge puts it on your desk and starts its paper record. Yes keeps the edges you follow. No keeps the rest. Either applies nothing.
+"""
+next = "Choose yes to see only the edges you watch."
+see_also = ["follow_edge", "filter_toggle", "paper_trading"]
+
+[[term]]
+id = "filter_edge_hit_rate"
+term = "Out-of-sample hit rate filter"
+short = "Keeps the edges whose share of winning picks, measured out of sample, lies between a minimum and a maximum."
+body = """
+The hit rate is the share of the edge's picks that beat what it is judged against, on the period the edge was not tuned on. 0.60 means six picks in ten. Read it against the base rate, which is what any pick would have scored. An edge with no out-of-sample result is unknown and never passes.
+"""
+next = "Set a minimum of 0.55 to leave out the edges near a coin flip."
+see_also = ["win_rate", "base_rate", "out_of_sample", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_edge_lift"
+term = "Out-of-sample lift filter"
+short = "Keeps the edges whose out-of-sample hit rate beats the base rate by a range of percentage points."
+body = """
+Lift is the hit rate minus the base rate, in points. 5 means the edge won five points more often than a random pick would. A negative lift is worse than the base rate. An edge with no out-of-sample result is unknown and never passes.
+"""
+next = "Set a minimum of 3 to see the edges that beat the base rate by a margin."
+see_also = ["lift", "base_rate", "out_of_sample", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_edge_sample"
+term = "Out-of-sample trades filter"
+short = "Keeps the edges that have a number of out-of-sample trades between a minimum and a maximum."
+body = """
+A rate means little on a few trades. The count is the trades of the edge's basis on the period it was not tuned on. Set a minimum to leave out the edges whose result rests on too few picks. An edge with no out-of-sample trades never passes.
+"""
+next = "Set a minimum of 100 to leave out thin evidence."
+see_also = ["trades", "evidence_needed", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_edge_live_state"
+term = "Live state filter"
+short = "Keeps the edges whose paper record is in the live states you tick, such as on track or below range."
+body = """
+The state compares the edge's settled paper trades with the range its backtest led you to expect. On track means inside the range. Below range is the one to look at: the edge is doing worse than the backtest, and a fall that lasts is a sign it has decayed. An edge with no paper record has a state that says why, and it passes only if you tick that state.
+"""
+next = "Tick Below range to see the edges that may have stopped working."
+see_also = ["live_state", "decay", "usual_range", "paper_trading"]
+
+[[term]]
+id = "filter_trade_result"
+term = "Result filter"
+short = "Keeps the trades that won, lost, were excluded or are still open."
+body = """
+A trade won when it beat what the edge is judged against and lost when it did not. Excluded trades could not be measured, and each carries its reason. Open trades are paper trades not yet settled. Open and excluded trades are never counted as losses.
+"""
+next = "Tick Lost to read the picks that went wrong."
+see_also = ["trade_status", "trade_excluded_reason"]
+
+[[term]]
+id = "filter_trade_in_sample"
+term = "In sample filter"
+short = "Keeps the trades from the period the edge was tuned on, or from the period it was not."
+body = """
+Yes keeps the in-sample trades, the ones the edge's rules were chosen on. No keeps the out-of-sample trades, which are the fair test. Either applies nothing. A live paper trade is out of sample by definition.
+"""
+next = "Choose no to read only the trades that count as evidence."
+see_also = ["in_sample", "out_of_sample", "trade_period", "filter_toggle"]
+
+[[term]]
+id = "filter_trade_record"
+term = "Backtest or live filter"
+short = "Keeps the trades of the backtest, or the live paper record."
+body = """
+Backtest trades come from the edge's run over history. Live trades are the paper trades the edge has recorded since it began, as each session knew them. An edge that records no paper trades has no live ones.
+"""
+see_also = ["trade_ledger", "paper_trading", "live_record"]
+
+[[term]]
+id = "filter_trade_return"
+term = "Trade return filter"
+short = "Keeps the trades whose return lies between a minimum and a maximum."
+body = """
+The return is the trade's result in the edge's own measure, as a fraction: 0.05 is five percent and -0.10 a loss of ten percent. It is the stored figure before you apply your own costs. A trade whose value is not stored, or that you may not see under a data licence, never passes.
+"""
+next = "Set a maximum of -0.1 to read the worst trades."
+see_also = ["outcome_excess_return", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_trade_adv"
+term = "Average dollar volume filter"
+short = "Keeps the trades in names whose average daily dollar volume at the decision lies in a range."
+body = """
+It is the average dollars traded a day over the twenty sessions before the decision. It says whether a trade could have been done in size. A name with no stored figure is unknown and never passes.
+"""
+next = "Set a minimum of 5,000,000 to leave out names too thin to trade."
+see_also = ["capacity", "filter_range", "filter_unknown_rows"]
+
+[[term]]
 id = "filter_group_setup"
 term = "Setup"
 short = "The filters that say what a row is or how it was found: its decision, rank and score, its type and size."
 body = """
-A group button opens the filters it holds and shows how many are in use. On Ideas, Setup holds the decision, the screener and how many screeners agree. On a screener's results it holds the decision, the rank and the score. On Explore it holds the security type, the sector, index membership, leverage, market cap and price.
+A group button opens the filters it holds and shows how many are in use. On Ideas, Setup holds the decision, the screener and how many screeners agree. On a screener's results it holds the decision, the rank and the score. On Explore it holds the security type, the sector, index membership, leverage, market cap and price. On the Screeners, Edges and trade lists it holds the owner, the evidence and the result of each row.
 """
 see_also = ["filter_decision", "filter_result_decision", "filter_rank", "filter_security_type"]
 

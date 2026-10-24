@@ -149,7 +149,7 @@ class Query:
     )
     def session(self, info: Ctx, date: Day = None) -> Session | None:
         ctx = info.context.read(date)
-        return Session.of(ctx.session) if ctx is not None else None
+        return Session.of(ctx.session, ctx) if ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The instrument `key` (an instrument id or a ticker) names in the "

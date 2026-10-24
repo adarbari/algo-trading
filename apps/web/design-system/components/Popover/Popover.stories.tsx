@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Stack } from '../../primitives/Stack';
+import { narrow } from '../../testing';
 import { Text } from '../../primitives/Text';
 import { Button } from '../Button';
 import { Checkbox } from '../Checkbox';
@@ -92,5 +93,12 @@ export const Dense: Story = {
     width: 'wide',
     placement: 'bottom-start',
   },
+  play: open,
+};
+
+/** At phone width the panel stays inside the screen (its width is capped by the viewport). */
+export const Narrow: Story = {
+  args: { placement: 'bottom-end', width: 'wide' },
+  decorators: [narrow],
   play: open,
 };

@@ -31,6 +31,7 @@ from algotrade.core.time.calendar import last_closed_session, sessions_ending
 from algotrade.data.chains import CHAIN_STATUS, OPTION_QUOTES
 from algotrade.data.reference import UNIVERSE_TABLE, Snapshot, load_universe
 from algotrade.features.registry import GROUPS
+from algotrade.services.read.availability.data_status import share_status
 from algotrade.services.read.context import (
     ReadContext,
     Stores,
@@ -50,7 +51,6 @@ from algotrade.services.run_items import (
     status_code,
 )
 
-COMPLETE_SHARE = 0.98
 MAX_SESSIONS = 60
 LOOKBACK_DAYS = 31  # how far before a window a cell looks for the session it compares with
 
@@ -157,20 +157,12 @@ class _Counts:
         return self._seen[(table, day)]
 
 
-def _share_status(present: int, expected: int | None) -> str:
-    if present == 0:
-        return "MISSING"
-    if expected and present < COMPLETE_SHARE * expected:
-        return "PARTIAL"
-    return "COMPLETE"
-
-
 def _session_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
     is_stored, previous = counts.around(d.name, day)
     expected = counts.of(d.name, previous)[0] if previous else None
     basis = f"rows on {previous}" if previous else "no earlier session"
     present, runs, _ = counts.of(d.name, day) if is_stored else (0, (), ())
-    return Cell(d.name, day, _share_status(present, expected), present, expected, basis, runs)
+    return Cell(d.name, day, share_status(present, expected), present, expected, basis, runs)
 
 
 def _chains_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
@@ -181,7 +173,7 @@ def _chains_cell(counts: _Counts, d: Dataset, day: date) -> Cell:
     except MissingDataError:  # no universe snapshot: nothing to compare with
         expected = None
     present = sum(1 for s in statuses if s == "OK")
-    status = _share_status(present, expected) if rows else "MISSING"
+    status = share_status(present, expected) if rows else "MISSING"
     return Cell(d.name, day, status, present, expected, "optionable universe, fetch OK", runs)
 
 

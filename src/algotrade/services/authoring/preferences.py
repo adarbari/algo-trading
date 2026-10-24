@@ -74,12 +74,26 @@ def forget_screener(writer: ConfigWriter, user: str, name: str) -> None:
 MAX_COLUMNS = 40
 MAX_VIEW_NAME = 40
 MAX_DECISIONS = 12
+MAX_FILTERS_LENGTH = 2000  # the ``f`` string (ADR 0082, decision 4)
 DECISION = re.compile(r"[A-Z][A-Z_]*")
+
+
+def _checked_filters(filters: str) -> str:
+    """The ``f`` string of ADR 0082's grammar: ``;``-joined ``[!]id:body`` entries, grammar and
+    length only. An id no definition names is kept (a view outlives a definition change; the
+    web drops it and says so)."""
+    if len(filters) > MAX_FILTERS_LENGTH or not filters.isprintable():
+        raise ConfigurationError(f"view.filters: at most {MAX_FILTERS_LENGTH} printable characters")
+    for entry in filters.split(";"):
+        head, colon, _ = entry.partition(":")
+        if not colon or not head.removeprefix("!"):
+            raise ConfigurationError(f"view.filters: {entry!r} is not [!]id:value")
+    return filters
 
 
 def _checked_view(
     writer: ConfigWriter, who: str, columns: Sequence[str], sort: str | None,
-    decisions: Sequence[str], narrow_columns: Sequence[str] = (),
+    decisions: Sequence[str], narrow_columns: Sequence[str] = (), filters: str | None = None,
 ) -> dict[str, Any]:  # fmt: skip
     if len(set(columns)) != len(columns) or len(columns) > MAX_COLUMNS:
         raise ConfigurationError(f"view.columns: each column once, at most {MAX_COLUMNS}")
@@ -107,6 +121,8 @@ def _checked_view(
     }
     if sort is not None:  # the read side validates it against the table's columns
         view["sort"] = sort
+    if filters:  # absent: no filters (a view saved before ADR 0082 has none)
+        view["filters"] = _checked_filters(filters)
     return view
 
 
@@ -140,11 +156,12 @@ def view_scope(writer: ConfigWriter, who: str, scope: str) -> str:
 def save_view(
     writer: ConfigWriter, user: str, scope: str, columns: Sequence[str], sort: str | None,
     decisions: Sequence[str], name: str | None = None,
-    narrow_columns: Sequence[str] | None = None,
+    narrow_columns: Sequence[str] | None = None, filters: str | None = None,
 ) -> tuple[dict[str, Any], list[str]]:  # fmt: skip
     """Replace ``user``'s view of the table ``scope``: the default one, or the one called
     ``name`` (other views and preferences are kept); returns it and the names of the named
-    views. ``narrow_columns`` None (a client from before the field): the saved ones are kept."""
+    views. ``narrow_columns`` None (a client from before the field): the saved ones are kept;
+    ``filters`` is the ``f`` string (None or empty: none saved)."""
     who = author(user).user_id
     key = view_scope(writer, who, scope)
     named = view_name(name)
@@ -154,7 +171,7 @@ def save_view(
     if narrow_columns is None:
         before = entry.get("view") if named is None else dict(entry.get("views") or {}).get(named)
         narrow_columns = [str(c) for c in (before or {}).get("narrow_columns") or []]
-    view = _checked_view(writer, who, columns, sort, decisions, narrow_columns)
+    view = _checked_view(writer, who, columns, sort, decisions, narrow_columns, filters)
     if named is None:
         entry["view"] = view
     else:
