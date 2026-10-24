@@ -140,6 +140,20 @@ class ScreenResult:
     regime: str | None
     size_multiplier: float | None
     groups: list[ScreenGroup]
+    rank_change: int | None = strawberry.field(
+        description="Places the row rose in the screener's order since the previous run "
+        "(previous rank minus rank; negative: fell); null when unknown (no previous run, not in "
+        "it, an order withheld, the config changed between the runs); filled on "
+        "`ScreenerRun.results` only"
+    )
+    near_misses: int | None = strawberry.field(
+        description="How many gates the row narrowly missed; null when the run's outcomes are "
+        "withheld; filled on `ScreenerRun.results` only"
+    )
+    gates_failing: int | None = strawberry.field(
+        description="How many gates the row failed or narrowly missed; null when the run's "
+        "outcomes are withheld; filled on `ScreenerRun.results` only"
+    )
     counts_toward: list[PickEdge] = strawberry.field(
         description="Each edge that lists the screener and whether it counts this row (empty: "
         "none does); filled on `ScreenerRun.results` only"
@@ -165,6 +179,9 @@ class ScreenResult:
             regime=d.regime,
             size_multiplier=d.size_multiplier,
             groups=[ScreenGroup.of(g) for g in d.groups],
+            rank_change=d.rank_change,
+            near_misses=d.near_misses,
+            gates_failing=d.gates_failing,
             counts_toward=[PickEdge.of(e) for e in d.counts_toward],
         )
 
