@@ -6,8 +6,11 @@
 #
 # Owner-approved filters not here, because the Ideas read does not store the fact yet (listed in
 # the PR that added this file as "needs new data"):
-#   changed:   rank_moved_up (an idea's rank follows the whole pool and the viewer's screener set:
-#              the per-screener move is on the screener's results; decided 2026-10-24)
+#   changed:   new_today and days_picked (decided 2026-10-24: walking each screener's previous
+#              runs costs about 3 s cold on the real store, so they wait for the streaks to be
+#              precomputed into screen_runs at ingestion, then are re-added; the walk is
+#              services/read/screens/streaks.py, live on a screener's results),
+#              rank_moved_up (the previous session's rank)
 #   tradeable: optionable (no stored yes / no; option_chain_known says the chain run knew the
 #              answer, not that the name has options)
 
@@ -28,16 +31,6 @@ source = "picked_by.config_id"
 id = "agreeing"
 dtype = "int"
 source = "len(picked_by)"
-
-[[column]]
-id = "days_picked"
-dtype = "int"
-source = "days_picked"
-
-[[column]]
-id = "new_today"
-dtype = "bool"
-source = "new_today"
 
 # ------------------------------------------------------------------------------------ setup
 
@@ -148,25 +141,6 @@ field = "rollup.cohort_pct_options@v1.iv_rank_252d_pct_industry"
 unit = "percent"
 bins = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 guide = "term:filter_iv_rank_pct_industry"
-
-# ------------------------------------------------------------------------------------ changed
-
-[[filter]]
-id = "new_today"
-label = "New today"
-group = "changed"
-kind = "toggle"
-field = "column:new_today"
-guide = "term:filter_new_today"
-
-[[filter]]
-id = "days_picked"
-label = "Days on the list"
-group = "changed"
-kind = "range"
-field = "column:days_picked"
-bins = [1, 2, 3, 5, 10, 20]
-guide = "term:filter_days_picked"
 
 # ------------------------------------------------------------------------------------ tradeable
 

@@ -1,6 +1,7 @@
 """How long a ticker has stayed on a screener's pick list (``days_picked``) and whether it is new
 to it (``new_today``): read-time facts over a run and the chain of previous runs it names, for the
-filters of the Ideas and screener-results surfaces (ADR 0082).
+filter of the screener-results surface (ADR 0082; Ideas waits for the streaks to be precomputed
+at ingestion, decided 2026-10-24).
 
 ``days_picked`` of a ticker the run picks is 1 plus the consecutive earlier runs of the screener
 that also picked it (``runs.load_previous_run``: each run's previous run, never the screener's

@@ -34,24 +34,14 @@ next = "Set the minimum to 2 to see only the names more than one screener agrees
 see_also = ["filter_screener", "picked_by", "filter_range"]
 
 [[term]]
-id = "filter_new_today"
-term = "New today filter"
-short = "Keeps the ideas that none of their screeners picked in its previous run."
-body = """
-An idea is new today when none of the screeners that picked it in this session picked it in their previous run. Each screener is compared with its own earlier run, not with yesterday's market. Some screener may have no previous run, or one you cannot see. If another screener did pick the idea before, it is not new. Otherwise the answer is unknown, and the idea does not pass this filter.
-"""
-next = "Choose Yes to see only the names that turned up today."
-see_also = ["filter_days_picked", "filter_change", "filter_unknown_rows"]
-
-[[term]]
 id = "filter_days_picked"
 term = "Days on the list filter"
 short = "Keeps the rows by how many runs in a row the screener has picked them, up to 20."
 body = """
-The count starts at 1 for a row the screener picks now. It grows by one for each earlier run of the same screener, going back one after another, that also picked it. It stops at the first run that did not, and at 20, so a row that has stayed for 20 runs or more counts as 20. On Ideas it is the longest count among the screeners that picked the idea. A row the screener did not pick is 0. The count is unknown when it reaches a run you cannot see, or a session where the screener did not run, before it could end. An unknown row does not pass this filter.
+The count starts at 1 for a row the screener picks now. It grows by one for each earlier run of the same screener, going back one after another, that also picked it. It stops at the first run that did not, and at 20, so a row that has stayed for 20 runs or more counts as 20. A row the screener did not pick is 0. The count is unknown when it reaches a run you cannot see, or a session where the screener did not run, before it could end. An unknown row does not pass this filter.
 """
 next = "Set the minimum to 5 to see the names that have stayed on the list for a week."
-see_also = ["filter_new_today", "filter_change", "filter_unknown_rows"]
+see_also = ["filter_change", "filter_unknown_rows"]
 
 [[term]]
 id = "filter_option_tier"
@@ -142,6 +132,36 @@ New means the screener picked the row in this run and did not in its previous ru
 """
 next = "Tick New to see what the screener found since last time."
 see_also = ["screener_last_run", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_rank_moved_up"
+term = "Places moved up filter"
+short = "Keeps the rows that rose in the screener's order since its previous run, by at least a number of places."
+body = """
+Places moved up is the row's rank in the screener's previous run minus its rank in this one, so 5 means it rose five places. A row that fell has a negative number. It compares the screener's last two stored runs, not two days of the market. A row has no number in four cases. The screener has no earlier run, or the previous run did not rank it. You may not see a run's order, or the settings changed between the runs. Such a row never passes this filter.
+"""
+next = "Set the minimum to 5 to see the names climbing the order fastest."
+see_also = ["filter_rank", "filter_change", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_near_misses"
+term = "Near misses filter"
+short = "Keeps the rows that narrowly missed a number of the screener's gates."
+body = """
+A gate is a rule the row must pass. A near miss is a gate the row missed by only a little, close enough that the screener lists the row as Watch rather than Reject. The number counts them for the row. Zero means none, which is not the same as unknown: a run whose values you may not see has no count, and its rows never pass this filter.
+"""
+next = "Set the minimum to 1 to see the rows that are one small step from qualifying."
+see_also = ["watch", "near_miss", "filter_gates_failing", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_gates_failing"
+term = "Gates not passed filter"
+short = "Keeps the rows that missed a number of the screener's gates, narrowly or clearly."
+body = """
+A gate is a rule the row must pass. The number counts the gates the row missed, near misses included, so a row with 0 passed every gate it could be judged on. A gate with no data to judge is not counted here. A run whose values you may not see has no count, and its rows never pass this filter.
+"""
+next = "Set the maximum to 1 to see the rows that missed at most one gate."
+see_also = ["filter_near_misses", "filter_range", "filter_unknown_rows"]
 
 [[term]]
 id = "filter_security_type"
@@ -395,9 +415,9 @@ id = "filter_group_changed"
 term = "What changed"
 short = "The filters that compare the session with the one before it."
 body = """
-A group button opens the filters it holds and shows how many are in use. On a screener's results, What changed holds the rows new or dropped since the screener's previous run. A list offers more here once it stores the comparison, such as how far a row moved up the ranking.
+A group button opens the filters it holds and shows how many are in use. On a screener's results, What changed holds the rows new or dropped since the screener's previous run. It also holds how many places a row rose in the screener's order.
 """
-see_also = ["filter_change", "filter_group_setup"]
+see_also = ["filter_change", "filter_rank_moved_up", "filter_group_setup"]
 
 [[term]]
 id = "filter_group_tradeable"

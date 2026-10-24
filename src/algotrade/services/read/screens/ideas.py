@@ -80,13 +80,6 @@ from algotrade.services.read.screens.runs import (
     run_picks,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
-from algotrade.services.read.screens.streaks import (
-    CAP,
-    days_picked,
-    history_wanted,
-    new_today,
-    without_idle,
-)
 from algotrade.services.read.values import Unknown, to_scalar
 from algotrade.services.screening.rule_results import PAUSED
 
@@ -162,11 +155,6 @@ class Idea:
     size_multiplier: float | None
     metrics: tuple[IdeaMetric, ...]
     watch_out: tuple[str, ...]
-    # The longest streak of runs in a row that picked it among its screeners, and whether none of
-    # them picked it in their previous run (None: not known, or its filter is not set: only a
-    # request that filters on them reads the previous runs; ``streaks``)
-    days_picked: int | None = None
-    new_today: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -348,55 +336,11 @@ _COLUMNS: dict[str, Callable[[RankedIdea], FieldValue | tuple[FieldValue, ...]]]
     "decision": lambda i: i.best.decision,
     "screener": lambda i: tuple(p.config_id for p in i.picked_by),
     "agreeing": lambda i: len(i.picked_by),
-}  # the [[column]]s of config/site/filters/ideas.toml read off the idea alone
-RunStreaks = dict[tuple[str, str], dict[str, int | None]]  # by (owner, config id), then ticker
-RunNew = dict[tuple[str, str], dict[str, bool | None]]
-
-
-def _days(idea: RankedIdea, streaks: RunStreaks) -> int | None:
-    """The longest streak among the screeners that picked the idea; None when one of them cannot
-    say and the others do not already reach the cap (the unknown could be longer)."""
-    found = [
-        streaks.get((p.owner, p.config_id), {}).get(idea.instrument_id) for p in idea.picked_by
-    ]
-    known = [d for d in found if d is not None]
-    best = max(known, default=None)
-    return best if None not in found or best == CAP else None
-
-
-def _new(idea: RankedIdea, news: RunNew) -> bool | None:
-    """True when no screener that picked the idea picked it in its previous run; None when one
-    of them has no previous run to compare with and the others did not pick it before."""
-    found = [news.get((p.owner, p.config_id), {}).get(idea.instrument_id) for p in idea.picked_by]
-    if False in found:
-        return False
-    return None if None in found else True
-
-
-def _history(
-    ctx: ReadContext, runs: Sequence[ScreenerRun], pool: Sequence[PoolRun], wanted: frozenset[str]
-) -> tuple[RunStreaks, RunNew]:
-    """The streak and the newness of each pick of each run read (a withheld run is not read),
-    for the history columns ``wanted`` only (none: nothing is walked)."""
-    streaks: RunStreaks = {}
-    news: RunNew = {}
-    read = {p.run_id for p in pool if p.status == RAN}
-    for run in runs:
-        if run.run_id not in read:
-            continue
-        key = (run.owner, run.config_id)
-        if "days_picked" in wanted:
-            streaks[key] = days_picked(ctx, run, run_withheld)
-        if "new_today" in wanted:
-            news[key] = new_today(ctx, run, run_withheld)
-    return streaks, news
+}  # the [[column]]s of config/site/filters/ideas.toml
 
 
 def _frame(
-    ctx: ReadContext,
-    resolved: ResolvedFilters,
-    ranked: Sequence[RankedIdea],
-    history: tuple[RunStreaks, RunNew] = ({}, {}),
+    ctx: ReadContext, resolved: ResolvedFilters, ranked: Sequence[RankedIdea]
 ) -> dict[str, list[Cell]]:
     """The columns of every offered filter over ``ranked``: the surface's own columns from the
     rule's picks, the catalogue fields' values in one batch read (``load_feature_values`` hides
@@ -409,10 +353,6 @@ def _frame(
         elif f.column_id in _COLUMNS:
             pick = _COLUMNS[f.column_id]
             frame[f.field] = [pick(i) for i in ranked]
-        elif f.column_id == "days_picked":
-            frame[f.field] = [_days(i, history[0]) for i in ranked]
-        elif f.column_id == "new_today":
-            frame[f.field] = [_new(i, history[1]) for i in ranked]
         else:
             raise ConfigurationError(f"filters/{SURFACE}.toml: no column {f.column_id!r} is built")
     names = list(dict.fromkeys(names))
@@ -439,11 +379,7 @@ def load_ideas(
     latest = load_latest_runs(ctx, [(s.owner, s.id) for s in screeners])
     pool, scores = _pool(ctx, screeners, latest)
     ranked = rank_ideas(pool, rule)
-    runs = [r for s in screeners if (r := latest[(s.owner, s.id)].run) is not None]
-    columns = history_wanted(resolved, filters)  # the walk is read only for a filter that is set
-    history = _history(ctx, runs, pool, columns)
-    served = without_idle(resolved, columns)  # an idle history filter has no facet until it is set
-    facets = compute_facets(_frame(ctx, served, ranked, history), len(ranked), served, filters)
+    facets = compute_facets(_frame(ctx, resolved, ranked), len(ranked), resolved, filters)
     matched = [ranked[i] for i in facets.matched_rows]
     stamp = _fingerprint(
         ctx.session.date,
@@ -463,6 +399,7 @@ def load_ideas(
     for h in held:
         wanted.setdefault(h.pick.run_id, []).append(h.instrument_id)
     wanted = {run_id: list(dict.fromkeys(ids)) for run_id, ids in wanted.items()}  # each read once
+    runs = [r for s in screeners if (r := latest[(s.owner, s.id)].run) is not None]
     results = load_results(ctx, wanted, runs)
     top_ids = sorted({p.instrument_id for st in standings for p in st.top})
     instruments = load_instruments(ctx, top_ids)
@@ -482,8 +419,6 @@ def load_ideas(
                 size_multiplier=best.size_multiplier,
                 metrics=display_metrics(best),
                 watch_out=_watch_out(best, idea.instrument_id in early),
-                days_picked=_days(idea, history[0]),
-                new_today=_new(idea, history[1]),
             )
         )
     paused = tuple(

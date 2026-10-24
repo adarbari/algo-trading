@@ -162,10 +162,9 @@ def test_the_control_words_have_guide_entries() -> None:
 
 def test_the_shipped_files_leave_out_what_is_not_stored() -> None:
     ids = {f.id for f in shipped("ideas").filters}
-    assert not ids & {"rank_moved_up", "optionable"}, "needs new data first"
-    assert {"new_today", "days_picked"} <= ids  # built from the screeners' earlier runs
+    assert not ids & {"new_today", "days_picked", "rank_moved_up", "optionable"}, "needs data first"
     results = {f.id for f in shipped("screener_results").filters}
-    assert not results & {"rank_moved_up", "optionable", "score_components"}, "needs new data first"
+    assert not results & {"optionable", "score_components"}, "needs new data first"
     leaving = {
         "screeners": {"asset_type", "style", "has_candidates"},
         "edges": {"thesis_type", "asset_class", "horizon"},
@@ -289,3 +288,21 @@ def test_every_cohort_percentile_range_is_shown_as_a_percent(surface: str) -> No
     for f in shipped(surface).filters:
         assert (f.unit == "percent") == ("cohort_pct_" in f.field), f.id
         assert f.unit is None or f.kind == "range", f.id
+
+
+def test_the_results_surface_offers_the_stored_comparison_and_gate_filters() -> None:
+    """``rank_moved_up`` (read-time, the previous run's rank), ``near_misses`` and
+    ``gates_failing`` (the stored gate lists) are range filters over columns of the result row."""
+    fs = shipped("screener_results")
+    columns = {c.id: c for c in fs.columns}
+    terms = {t.id for t in load_guide_glossary(SHIPPED).terms}
+    for fid, group in (("rank_moved_up", "changed"), ("near_misses", "setup"),
+                       ("gates_failing", "setup")):  # fmt: skip
+        f = fs.get(fid)
+        assert (f.kind, f.group, f.column_id) == (
+            "range",
+            group,
+            fid.replace("rank_moved_up", "rank_change"),
+        )
+        assert columns[f.column_id].dtype == "int" and f.guide == f"term:filter_{fid}"
+        assert f"filter_{fid}" in terms
