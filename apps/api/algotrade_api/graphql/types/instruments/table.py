@@ -13,6 +13,7 @@ from algotrade.services.read.availability.cause import UnavailableKind, kind_tex
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments import table
 from algotrade_api.graphql.types.availability import KindText, Unavailable
+from algotrade_api.graphql.types.filtering.facets import FilterFacets
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.session import Session
@@ -25,7 +26,8 @@ from algotrade_api.graphql.types.session import Session
     "(`reasons[i][j]`: its NullReason when EXPLAINED; `kinds[i][j]`: its public kind, "
     "how a cell is drawn). "
     "`unavailable`: what the tables the filters and sort read have nothing for the session "
-    "leave out (no row passes a filter on them)"
+    "leave out (no row passes a filter on them); `facets` the counts of the whole list under "
+    "the filters (null for `keys` with no filter set), ADR 0082"
 )
 class FeatureTable:
     session: Session
@@ -42,6 +44,7 @@ class FeatureTable:
     page: int
     size: int
     unavailable: list[Unavailable]
+    facets: FilterFacets | None
 
     @classmethod
     def of(cls, d: table.FeatureTable, ctx: ReadContext) -> Self:
@@ -60,6 +63,7 @@ class FeatureTable:
             page=d.page,
             size=d.size,
             unavailable=[Unavailable.of(u) for u in d.unavailable],
+            facets=FilterFacets.of(d.facets) if d.facets is not None else None,
         )
 
     @strawberry.field(  # type: ignore[untyped-decorator]

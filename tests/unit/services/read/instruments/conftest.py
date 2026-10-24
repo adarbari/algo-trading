@@ -3,6 +3,7 @@ reference and company snapshots taken on D0 only (so a read for D1 sees D0's), a
 ``price_stats@v2`` for both sessions (D1: AAA only, ``hv20`` null) and ``earnings@v1`` only on
 D0 (an older partition a D1 read must never show)."""
 
+import tomllib
 from collections.abc import Callable
 from datetime import date
 
@@ -15,6 +16,7 @@ from algotrade.services.read.context import ReadContext, open_context
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
+from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import write_rows
 
 D0, D1 = date(2026, 9, 30), date(2026, 10, 1)
@@ -69,9 +71,17 @@ def store_with(*writes: Callable[[StoreWriter], None]) -> StoreReader:
     return StoreReader(backend)
 
 
+# the shipped filter definitions of the Explore table (ADR 0082): the loader reads them
+FILTERS = {
+    ("site", "filters", "universe"): tomllib.loads(
+        (REPO_ROOT / "config/site/filters/universe.toml").read_text()
+    )
+}
+
+
 def context(reader: StoreReader, day: date | None = None) -> ReadContext:
     """The read context of ``reader`` for ``day`` (None: the latest session, D1)."""
-    return open_context(reader, MemoryConfigStore({}), UserContext("local"), day)
+    return open_context(reader, MemoryConfigStore(FILTERS), UserContext("local"), day)
 
 
 @pytest.fixture
@@ -105,5 +115,5 @@ def with_ibkr(writer: StoreWriter) -> None:
 def context_as(reader: StoreReader, user: str, day: date | None = None) -> ReadContext:
     """The read context of ``reader`` for ``user`` of ``USERS`` (the registry says who holds
     the personal licence)."""
-    configs = MemoryConfigStore({("site", "settings", "users"): USERS})
+    configs = MemoryConfigStore({**FILTERS, ("site", "settings", "users"): USERS})
     return open_context(reader, configs, UserContext(user), day)

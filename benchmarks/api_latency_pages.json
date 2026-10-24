@@ -807,7 +807,7 @@
     "variables": {
      "limit": 100
     },
-    "query": "\n  query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: String) {\n    screenerRuns(limit: $limit, user: $user, screener: $screener, status: $status) {\n      runId\n      configId\n      owner\n      session\n      status\n      startedAt\n      finishedAt\n      knowledgeTs\n      picked\n      paused\n      regime\n      coverage\n    }\n  }\n"
+    "query": "\n  query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: RunStatus) {\n    screenerRuns(limit: $limit, user: $user, screener: $screener, status: $status) {\n      runId\n      configId\n      owner\n      session\n      status\n      startedAt\n      finishedAt\n      knowledgeTs\n      picked\n      paused\n      regime\n      coverage\n    }\n  }\n"
    }
   ],
   "/admin/users": [

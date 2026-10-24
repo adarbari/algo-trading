@@ -469,7 +469,29 @@ body = """
 New picks are names picked now and not in the previous run. Dropped are names picked then and not now. The previous run and its session are named so you can open it. A run with no earlier run, or one that wrote no comparison, shows not recorded, never zero.
 A large change right after a new config version is the config, not the market. Check the config version first.
 """
-see_also = ["screener_run_config", "screener_run_picked"]
+see_also = ["screener_run_new_picks", "screener_run_dropped", "screener_run_config", "screener_run_picked"]
+
+[[term]]
+id = "screener_run_new_picks"
+term = "Screener run new picks"
+short = "How many names this run picked that the run before it did not."
+body = """
+New picks counts the names picked now and not in the previous run of the same screener and owner. The previous run is named beside it, so you can open it and compare.
+A run with no earlier run, or one that wrote no comparison, shows not recorded, never zero. After a new config version, new picks reflect the changed rules as much as the market.
+"""
+next = "Check the config version of both runs before reading a large number as a market move."
+see_also = ["screener_run_dropped", "screener_run_changes", "screener_run_config"]
+
+[[term]]
+id = "screener_run_dropped"
+term = "Screener run dropped"
+short = "How many names the run before it picked that this run did not."
+body = """
+Dropped counts the names picked in the previous run of the same screener and owner and not picked now. A name drops because it no longer meets the rules, because the regime gate held it back, or because the data it needed was missing.
+A run with no earlier run, or one that wrote no comparison, shows not recorded, never zero.
+"""
+next = "Open the previous run and compare its missing tables with this one's."
+see_also = ["screener_run_new_picks", "screener_run_changes", "screener_run_missing_tables"]
 
 [[term]]
 id = "cohort_percentile"

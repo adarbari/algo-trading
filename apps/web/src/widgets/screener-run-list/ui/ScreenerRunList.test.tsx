@@ -55,12 +55,12 @@ describe('ScreenerRunList', () => {
       <ScreenerRunList
         selected={null}
         onSelect={vi.fn()}
-        filters={{ status: 'failed' }}
+        filters={{ status: 'FAILED' }}
         onFiltersChange={onFiltersChange}
       />,
     );
     await userEvent.type(screen.getByRole('searchbox', { name: 'Screener' }), 'trend{Enter}');
-    expect(onFiltersChange).toHaveBeenCalledWith({ status: 'failed', screener: 'trend' });
+    expect(onFiltersChange).toHaveBeenCalledWith({ status: 'FAILED', screener: 'trend' });
   });
 
   it('shows the loading, error and empty states', () => {

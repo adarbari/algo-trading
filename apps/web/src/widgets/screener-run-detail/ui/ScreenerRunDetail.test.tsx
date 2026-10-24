@@ -53,7 +53,7 @@ describe('ScreenerRunDetail', () => {
     hooks.useScreenerRun.mockReturnValue(
       fakeQuery(
         record({
-          status: 'failed',
+          status: 'FAILED',
           picked: null,
           paused: null,
           regime: null,
