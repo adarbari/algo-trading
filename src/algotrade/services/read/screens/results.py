@@ -63,7 +63,11 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.screens.screeners import ScreenGroup
-from algotrade.services.read.screens.streaks import days_picked
+from algotrade.services.read.screens.streaks import (
+    days_picked,
+    history_wanted,
+    without_idle,
+)
 from algotrade.services.read.values import UnknownCode, to_scalar
 from algotrade.services.screening.rule_results import change_of
 from algotrade.storage.tables.schemas import (
@@ -144,7 +148,7 @@ class ScreenResult:
     # table page fills it (empty: no edge lists the screener, or a read that does not ask)
     counts_toward: tuple[PickEdge, ...] = ()
     # How many runs in a row (``streaks.CAP`` at most) picked it, 0 when this run did not; None:
-    # not known, or a read that does not ask (only a review table page fills it)
+    # not known, or a read that does not ask (only a review table page that filters on it fills it)
     days_picked: int | None = None
 
 
@@ -671,11 +675,9 @@ def _filter_run(
     rows = run_rows(ctx, run)
     changes = load_run_changes(ctx, run).by_instrument
     withheld = bool(run_withheld(ctx, run))
-    streaks = (
-        days_picked(ctx, run, run_withheld)
-        if any(f.column_id == "days_picked" for f in resolved.offered)
-        else {}
-    )  # the walk back through the previous runs is read only when its filter is offered
+    wanted = history_wanted(resolved, inputs)
+    streaks = days_picked(ctx, run, run_withheld) if "days_picked" in wanted else {}
+    resolved = without_idle(resolved, wanted)  # no walk, and no facet, until its filter is set
     frame: dict[str, list[Cell]] = {}
     names: list[str] = []
     for f in resolved.offered:
@@ -851,13 +853,16 @@ def load_result_page(
     found = load_results(ctx, {run.run_id: shown}, [run], changes)
     results = [found[(run.run_id, i)] for i in shown if (run.run_id, i) in found]
     toward = load_pick_edges(ctx, run, [(r.instrument_id, r.decision, r.rank) for r in results])
-    streaks = days_picked(ctx, run, run_withheld)
+    walk = "days_picked" in history_wanted(
+        load_served_filters(ctx, SURFACE, ctx.session.date).resolved, _inputs(query, filters)
+    )  # the walk back through the previous runs is read only for a request that filters on it
+    streaks = days_picked(ctx, run, run_withheld) if walk else {}
     hidden = bool(run_withheld(ctx, run))
     results = [
         replace(
             r,
             counts_toward=toward.get(r.instrument_id, ()),
-            days_picked=_days_cell(r.instrument_id, hidden, streaks),
+            days_picked=_days_cell(r.instrument_id, hidden, streaks) if walk else None,
         )
         for r in results
     ]

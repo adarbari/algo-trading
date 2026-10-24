@@ -17,11 +17,13 @@ it did, None when there is no previous run or it is withheld. Both are cached pe
 licences and published state (ADR 0022). Whether a run is withheld is the caller's ``withheld``
 (``results.run_withheld``, which this module cannot import: it reads streaks)."""
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, replace
 from typing import Final
 
 from algotrade.services.read.context import ReadContext, at_session
+from algotrade.services.read.filtering.definitions import ResolvedFilters
+from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.screens.runs import (
     ScreenerRun,
     load_previous_run,
@@ -29,9 +31,26 @@ from algotrade.services.read.screens.runs import (
     run_picks,
 )
 
+HISTORY: Final = frozenset({"days_picked", "new_today"})  # the filter columns read from this walk
 CAP: Final = 20  # a streak this long or longer is reported as this (the filter's last bin)
 
 Withheld = Callable[[ReadContext, ScreenerRun], object]  # truthy: the viewer may not see the run
+
+
+def history_wanted(resolved: ResolvedFilters, inputs: Sequence[FilterInput]) -> frozenset[str]:
+    """The history columns (``HISTORY``) a request needs: those of the offered filters the viewer
+    has set active. The walk is read for these alone: a request without them never walks."""
+    active = {i.id for i in inputs if i.active}
+    return frozenset(
+        f.column_id for f in resolved.offered if f.id in active and f.column_id in HISTORY
+    )
+
+
+def without_idle(resolved: ResolvedFilters, wanted: frozenset[str]) -> ResolvedFilters:
+    """``resolved`` without the history filters ``wanted`` does not name: their facets are not
+    served until the filter is set (counting them would need the walk on every request)."""
+    kept = tuple(f for f in resolved.offered if f.column_id not in HISTORY or f.column_id in wanted)
+    return replace(resolved, offered=kept)
 
 
 @dataclass(frozen=True)

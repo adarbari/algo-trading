@@ -12,6 +12,8 @@ import pytest
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, at_session
 from algotrade.services.read.filtering.masks import FilterInput
+from algotrade.services.read.screens import ideas as ideas_module
+from algotrade.services.read.screens import results as results_module
 from algotrade.services.read.screens.ideas import load_ideas
 from algotrade.services.read.screens.results import load_result_page, run_withheld
 from algotrade.services.read.screens.runs import ScreenerRun, latest_run
@@ -227,7 +229,8 @@ def test_the_walk_is_read_once_per_run_and_published_state() -> None:
 
 
 def test_ideas_carry_new_today_and_days_picked_from_each_pick_screeners_runs() -> None:
-    ideas = load_ideas(context(StoreReader(screens_store())), 10)
+    both = [FilterInput("new_today"), FilterInput("days_picked")]  # set, nothing chosen yet
+    ideas = load_ideas(context(StoreReader(screens_store())), 10, None, both)
     got = {i.instrument_id: (i.new_today, i.days_picked) for i in ideas.items}
     # AAA: site alpha picked it on D1 and did not on D0 (a run that day: 1 known). BBB: alpha
     # picked it on D0 too (not new), its D0 history starts there, and me's beta has no earlier
@@ -250,7 +253,11 @@ def test_the_ideas_filters_keep_known_rows_only() -> None:
 def test_a_name_one_screener_picked_before_is_not_new_whatever_the_other_knows() -> None:
     # BBB: alpha picked it before (False) and beta has no previous run (None): not new, known
     ctx = context(StoreReader(screens_store()))
-    [bbb] = [i for i in load_ideas(ctx, 10).items if i.instrument_id == "EQ:BBB"]
+    [bbb] = [
+        i
+        for i in load_ideas(ctx, 10, None, [FilterInput("new_today")]).items
+        if i.instrument_id == "EQ:BBB"
+    ]
     assert bbb.new_today is False
 
 
@@ -258,7 +265,7 @@ def test_a_results_page_carries_days_picked_and_filters_on_it() -> None:
     ctx = context(StoreReader(screens_store()))
     run = latest_run(ctx, "site", "alpha").run
     assert run is not None
-    page = load_result_page(ctx, run, None, (), 1, 10)
+    page = load_result_page(ctx, run, None, (), 1, 10, [FilterInput("days_picked")])
     # AAA 1; BBB reaches alpha's first run (unknown); CCC rejected today: 0, a known value
     assert {r.instrument_id: r.days_picked for r in page.results} == {
         "EQ:AAA": 1, "EQ:BBB": None, "EQ:CCC": 0
@@ -268,3 +275,36 @@ def test_a_results_page_carries_days_picked_and_filters_on_it() -> None:
     assert one.facets is not None
     [facet] = [f for f in one.facets.items if f.id == "days_picked"]
     assert facet.unknown == 1  # BBB: counted as unknown, never as a short streak
+
+
+def _count_walks(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    calls: list[str] = []
+    for module in (ideas_module, results_module):
+        for name in ("days_picked", "new_today"):
+            if hasattr(module, name):
+                real = getattr(module, name)
+
+                def spy(*a: object, _real: object = real, _name: str = name, **k: object) -> object:
+                    calls.append(_name)
+                    return _real(*a, **k)  # type: ignore[operator]
+
+                monkeypatch.setattr(module, name, spy)
+    return calls
+
+
+def test_a_request_without_the_history_filters_never_walks(monkeypatch: pytest.MonkeyPatch) -> None:
+    ctx = context(StoreReader(screens_store()))
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    calls = _count_walks(monkeypatch)
+    plain = load_ideas(ctx, 10)
+    unrelated = load_ideas(ctx, 10, None, [FilterInput("agreeing", min=1)])
+    page = load_result_page(ctx, run, None, (), 1, 10, [FilterInput("rank", min=1)])
+    assert calls == []
+    assert {i.days_picked for i in plain.items} == {None} and plain.total == 3 == unrelated.total
+    assert plain.facets is not None
+    assert not {"new_today", "days_picked"} & {f.id for f in plain.facets.items}
+    assert {r.days_picked for r in page.results} == {None}
+    assert page.facets is not None and "days_picked" not in {f.id for f in page.facets.items}
+    load_ideas(ctx, 10, None, [FilterInput("days_picked", min=1)])
+    assert "days_picked" in calls and "new_today" not in calls  # only the column asked for

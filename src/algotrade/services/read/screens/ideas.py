@@ -80,7 +80,13 @@ from algotrade.services.read.screens.runs import (
     run_picks,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
-from algotrade.services.read.screens.streaks import CAP, days_picked, new_today
+from algotrade.services.read.screens.streaks import (
+    CAP,
+    days_picked,
+    history_wanted,
+    new_today,
+    without_idle,
+)
 from algotrade.services.read.values import Unknown, to_scalar
 from algotrade.services.screening.rule_results import PAUSED
 
@@ -157,7 +163,8 @@ class Idea:
     metrics: tuple[IdeaMetric, ...]
     watch_out: tuple[str, ...]
     # The longest streak of runs in a row that picked it among its screeners, and whether none of
-    # them picked it in their previous run (None: not known; ``streaks``)
+    # them picked it in their previous run (None: not known, or its filter is not set: only a
+    # request that filters on them reads the previous runs; ``streaks``)
     days_picked: int | None = None
     new_today: bool | None = None
 
@@ -367,9 +374,10 @@ def _new(idea: RankedIdea, news: RunNew) -> bool | None:
 
 
 def _history(
-    ctx: ReadContext, runs: Sequence[ScreenerRun], pool: Sequence[PoolRun]
+    ctx: ReadContext, runs: Sequence[ScreenerRun], pool: Sequence[PoolRun], wanted: frozenset[str]
 ) -> tuple[RunStreaks, RunNew]:
-    """The streak and the newness of each pick of each run read (a withheld run is not read)."""
+    """The streak and the newness of each pick of each run read (a withheld run is not read),
+    for the history columns ``wanted`` only (none: nothing is walked)."""
     streaks: RunStreaks = {}
     news: RunNew = {}
     read = {p.run_id for p in pool if p.status == RAN}
@@ -377,8 +385,10 @@ def _history(
         if run.run_id not in read:
             continue
         key = (run.owner, run.config_id)
-        streaks[key] = days_picked(ctx, run, run_withheld)
-        news[key] = new_today(ctx, run, run_withheld)
+        if "days_picked" in wanted:
+            streaks[key] = days_picked(ctx, run, run_withheld)
+        if "new_today" in wanted:
+            news[key] = new_today(ctx, run, run_withheld)
     return streaks, news
 
 
@@ -430,8 +440,10 @@ def load_ideas(
     pool, scores = _pool(ctx, screeners, latest)
     ranked = rank_ideas(pool, rule)
     runs = [r for s in screeners if (r := latest[(s.owner, s.id)].run) is not None]
-    history = _history(ctx, runs, pool)
-    facets = compute_facets(_frame(ctx, resolved, ranked, history), len(ranked), resolved, filters)
+    columns = history_wanted(resolved, filters)  # the walk is read only for a filter that is set
+    history = _history(ctx, runs, pool, columns)
+    served = without_idle(resolved, columns)  # an idle history filter has no facet until it is set
+    facets = compute_facets(_frame(ctx, served, ranked, history), len(ranked), served, filters)
     matched = [ranked[i] for i in facets.matched_rows]
     stamp = _fingerprint(
         ctx.session.date,
