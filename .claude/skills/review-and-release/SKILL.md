@@ -78,3 +78,20 @@ merges on green; never `gh pr merge`. The sweep runs on CI completion and every 
   never remove it. `scripts/auto_merge.sh` skips a PR carrying it, as it skips `no-automerge`.
 - Push rules are unchanged (rule 9: `make changed`, merge origin/main right before, never
   force-push).
+
+## 4. Orchestrating a multi-PR plan
+
+Owner rule 2026-10-24: do not make the owner ask "can anything else start in parallel?".
+
+- Keep a **dependency map** (slice, depends on, files it touches), in the session notes folder.
+- After every child-session note, merge or CI event, re-read it. Start each newly unblocked slice
+  at once: a new session when it is a task of its own, or a message (`SendMessage`) to the
+  session that already has the context.
+- **Two sessions never touch the same files**: serialise them or give them disjoint folders.
+  Shared generated files (`apps/api/schema.graphql`, `apps/api/openapi.json`,
+  `architecture/guide_coverage.toml`) are where conflicts are expected: name one session that
+  regenerates them after the others land (`scripts/merge_main.sh` regenerates on conflict).
+- Say in one line what started and what still waits on what.
+- Event-driven only: never poll CI (`docs/ci.md`, "Watching CI"), never merge.
+- Owner-decision items are listed once, not repeated every turn.
+- The 2-agent cap lifts for file-disjoint work when the owner asks for speed (CLAUDE.md, Shared machine).
