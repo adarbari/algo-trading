@@ -215,3 +215,9 @@ def context_getter(
         return RequestContext(opener, caller, stores, None, releases, request.state)
 
     return get_context
+
+
+def selects(info: Any, name: str) -> bool:
+    """Whether the operation selects ``name`` directly under the field being resolved (a field
+    that costs a whole-list pass is computed only when asked for)."""
+    return any(sel.name == name for f in info.selected_fields for sel in f.selections)
