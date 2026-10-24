@@ -16,6 +16,12 @@ from algotrade.services.read.screens.pick_history import (
     load_pick_histories,
     record_decisions,
 )
+from algotrade.services.read.screens.recent_runs import (
+    DEFAULT_LIMIT,
+    MAX_LIMIT,
+    RunState,
+    load_recent_runs,
+)
 from algotrade.services.read.screens.runs import latest_run
 from algotrade.services.read.values import UnknownCode
 from algotrade.services.screening.rule_results import PAUSED, is_picked
@@ -178,7 +184,14 @@ GAMMA = ("me", "gamma")
 ALPHA = ("site", "alpha")
 
 
-def _freeze(backend: MemoryBackend, day: date, run_id: str, config: str, rows: Rows) -> None:
+def _freeze(
+    backend: MemoryBackend,
+    day: date,
+    run_id: str,
+    config: str,
+    rows: Rows,
+    changes: tuple[int, int] | None = None,
+) -> None:
     counts = Counter(decision for _, decision, _, _ in rows)
     picked = sum(n for d, n in counts.items() if is_picked(d))
     frame = pd.DataFrame(
@@ -189,7 +202,8 @@ def _freeze(backend: MemoryBackend, day: date, run_id: str, config: str, rows: R
                 "paused": counts.get(PAUSED, 0), "decision_names": sorted(counts),
                 "decision_counts": [counts[d] for d in sorted(counts)], "regime": None,
                 "size_multiplier": 1.0, "previous_run_id": None, "previous_session": None,
-                "previous_version": None, "new_picks": None, "dropped": None,
+                "previous_version": None, "new_picks": changes and changes[0],
+                "dropped": changes and changes[1],
             }
         ]
     )  # fmt: skip
@@ -272,3 +286,77 @@ def test_a_framed_session_reads_one_screen_runs_partition_and_no_record(
     frozen_reads = [r for r in reads if r[0].endswith("screen_runs") and r[1] != D1]
     assert sorted(frozen_reads) == sorted({(t, d) for t, d in frozen_reads})  # once per session
     assert {d for _, d in frozen_reads} == {s0, s1, s2}
+
+
+# ---------------------------------------------------------------- recent runs
+# ``Screener.recentRuns`` (recent_runs.py) reads the same records and frozen rows.
+
+
+def test_recent_runs_one_entry_per_session_oldest_first_and_a_gap_is_not_run_never_zero(
+    backend: MemoryBackend, ctx: ReadContext
+) -> None:
+    _screen(backend, D0, "d0", ROWS[:1], 0)
+    _screen(backend, D1, "d1", ROWS, 24)
+    found = load_recent_runs(ctx, [DELTA], 3)[DELTA]
+    assert [e.session for e in found] == sessions_ending(D1, 3)
+    gap, earlier, today = found
+    assert gap.state is RunState.NOT_RUN and gap.not_run is not None
+    assert gap.not_run.code is UnknownCode.NOT_RUN
+    assert (gap.picked, gap.paused, gap.run_id, gap.new_picks) == (None, None, None, None)
+    assert (earlier.state, earlier.picked, earlier.served) == (RunState.COMPLETE, 1, False)
+    assert (today.state, today.picked, today.served, today.run_id) == (
+        RunState.COMPLETE,
+        2,
+        True,
+        "d1",
+    )
+
+
+def test_recent_runs_only_the_served_session_is_served_and_the_window_is_cut_to_ten(
+    ctx: ReadContext,
+) -> None:
+    found = load_recent_runs(ctx, [DELTA])[DELTA]
+    assert len(found) == DEFAULT_LIMIT == MAX_LIMIT == 10
+    assert [e.served for e in found] == [False] * 9 + [True]
+    assert len(load_recent_runs(ctx, [DELTA], 500)[DELTA]) == 10
+    assert len(load_recent_runs(ctx, [DELTA], 0)[DELTA]) == 1
+
+
+def test_recent_runs_a_partial_record_is_partial_and_a_frozen_run_carries_its_changes(
+    backend: MemoryBackend, ctx: ReadContext
+) -> None:
+    _screen(backend, D0, "a", GATED, 0)
+    when = T0 + timedelta(hours=1)
+    partial = RunRecord("p", "screen-delta-me", D0, when)
+    stats = {
+        "summary": {"decisions": {"QUALIFIED": 1, "UNKNOWN": 3}},
+        "coverage": "PARTIAL",
+        "config_version": 4,
+        "missing_tables": ["rollups/options/iv_surface"],
+    }
+    StoreWriter(backend).save_run(partial.finish(when, complete=False, stats=stats))
+    _freeze(backend, D0, "p", "delta", GATED, changes=(2, 1))
+    entry = load_recent_runs(ctx, [DELTA], 2)[DELTA][0]
+    assert entry.state is RunState.PARTIAL and entry.run_id == "p"
+    assert (entry.picked, entry.config_version, entry.left_out_share) == (1, 4, 0.75)
+    assert (entry.new_picks, entry.dropped) == (2, 1)
+    assert [u.kind.value for u in entry.unavailable] == ["SYSTEM"]
+
+
+def test_recent_runs_a_count_that_was_not_stored_is_none_never_zero(
+    backend: MemoryBackend, ctx: ReadContext
+) -> None:
+    _screen(backend, D0, "a", ROWS, 0)  # a run before the screen_runs table
+    entry = load_recent_runs(ctx, [DELTA], 2)[DELTA][0]
+    assert entry.state is RunState.COMPLETE
+    assert (entry.new_picks, entry.dropped) == (None, None)
+
+
+def test_recent_runs_a_list_of_screeners_is_one_read_each_with_its_own_window(
+    backend: MemoryBackend, ctx: ReadContext
+) -> None:
+    _screen(backend, D0, "a", ROWS, 0)
+    found = load_recent_runs(ctx, [DELTA, ("site", "alpha")], 2)
+    assert found[DELTA][0].state is RunState.COMPLETE
+    today = found[("site", "alpha")][1]  # the served run: its changes as `changes` serves them
+    assert (today.served, today.picked, today.new_picks, today.dropped) == (True, 2, 1, 1)

@@ -386,6 +386,26 @@ export async function mockBuilderApi(
             screener: {
               ...screener,
               latestRun: null,
+              recentRuns: [
+                {
+                  session: '2026-10-02',
+                  state: 'NOT_RUN',
+                  served: true,
+                  runId: null,
+                  configVersion: null,
+                  picked: null,
+                  newPicks: null,
+                  dropped: null,
+                  leftOutShare: null,
+                  notRun: {
+                    code: 'NOT_RUN',
+                    kind: 'NOT_RUN',
+                    guideTerm: 'not_run',
+                    kindText: 'not run for this session',
+                    cause: null,
+                  },
+                },
+              ],
               notRun: {
                 code: 'NOT_RUN',
                 kind: 'NOT_RUN',

@@ -7,7 +7,8 @@ per distinct ``names``), off the event loop. A loader's error is the result of e
 call. ``screener_latest_run``: keyed ``(owner, config_id)``; one ``load_latest_runs`` call (one
 read of the session's screen results) per batch. ``screener_pick_history``: keyed
 ``(owner, config_id, sessions)``; one ``load_pick_histories`` call (one ranged read of the
-window's screen results) per distinct ``sessions`` of a batch."""
+window's screen results) per distinct ``sessions`` of a batch. ``screener_recent_runs``: keyed
+``(owner, config_id, limit)``; one ``load_recent_runs`` call per distinct ``limit`` of a batch."""
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import date
@@ -36,6 +37,7 @@ from algotrade.services.read.instruments.prices import Adjustment, PriceSeries, 
 from algotrade.services.read.instruments.series import FeatureSeries, load_series
 from algotrade.services.read.screens.hits import ScreenerHit, load_screener_hits
 from algotrade.services.read.screens.pick_history import PickCount, load_pick_histories
+from algotrade.services.read.screens.recent_runs import RecentRun, load_recent_runs
 from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_runs
 from algotrade_api.graphql.offload import off_loop
 
@@ -46,6 +48,7 @@ QuoteKey = tuple[str, date]  # (underlying_id, expiry)
 HoldingsKey = tuple[str, int]  # (fund_id, top)
 PriceKey = tuple[str, date, date | None, Adjustment]  # (instrument_id, start, end, adjustment)
 PickHistoryKey = tuple[str, str, int]  # (owner, config_id, sessions)
+RecentRunsKey = tuple[str, str, int]  # (owner, config_id, limit)
 SeriesKey = tuple[str, tuple[str, ...], date, date | None]  # (instrument_id, names, start, end)
 
 # load(ctx, instrument_ids, *arguments) -> {instrument_id: value} (absent: None)
@@ -108,6 +111,24 @@ async def _pick_histories(
     return [found[key] for key in keys]
 
 
+async def _recent_runs(
+    ctx: ReadContext, keys: Sequence[RecentRunsKey]
+) -> list[tuple[RecentRun, ...] | BaseException]:
+    """One ``load_recent_runs`` call per distinct ``limit`` for every screener that asked."""
+    by_limit: dict[int, list[RunKey]] = {}
+    for owner, config_id, limit in keys:
+        by_limit.setdefault(limit, []).append((owner, config_id))
+    found: dict[RecentRunsKey, tuple[RecentRun, ...] | BaseException] = {}
+    for limit, run_keys in by_limit.items():
+        try:
+            recent = await off_loop(partial(load_recent_runs, ctx, run_keys, limit))
+        except Exception as error:  # the error is the result of each key that asked
+            found.update({(o, c, limit): error for o, c in run_keys})
+        else:
+            found.update({(o, c, limit): recent[(o, c)] for o, c in run_keys})
+    return [found[key] for key in keys]
+
+
 class Loaders:
     """The dataloaders of one request, over its ``ReadContext`` (one session)."""
 
@@ -150,4 +171,13 @@ class Loaders:
 
         self.screener_pick_history: DataLoader[PickHistoryKey, tuple[PickCount, ...]] = DataLoader(
             load_fn=pick_histories
+        )
+
+        async def recent_runs(
+            keys: list[RecentRunsKey],
+        ) -> list[tuple[RecentRun, ...] | BaseException]:
+            return await _recent_runs(ctx, keys)
+
+        self.screener_recent_runs: DataLoader[RecentRunsKey, tuple[RecentRun, ...]] = DataLoader(
+            load_fn=recent_runs
         )

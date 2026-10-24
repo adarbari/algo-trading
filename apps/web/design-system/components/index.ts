@@ -172,6 +172,12 @@ export {
   type ConditionGroupKind,
   type ConditionGroupProps,
 } from './ConditionGroup';
+export {
+  SessionStrip,
+  type SessionStripItem,
+  type SessionStripProps,
+  type SessionTone,
+} from './SessionStrip';
 export { Panel, type PanelProps, type PanelState } from './Panel';
 export { PendingRow, type PendingRowProps } from './PendingRow';
 export {
