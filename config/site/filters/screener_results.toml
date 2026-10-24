@@ -35,6 +35,11 @@ id = "score"
 dtype = "float"
 source = "score"
 
+[[column]]
+id = "days_picked"
+dtype = "int"
+source = "days_picked"
+
 # ------------------------------------------------------------------------------------ setup
 
 [[filter]]
@@ -83,6 +88,15 @@ label = "New"
 [[filter.option]]
 value = "dropped"
 label = "Dropped"
+
+[[filter]]
+id = "days_picked"
+label = "Days on the list"
+group = "changed"
+kind = "range"
+field = "column:days_picked"
+bins = [1, 2, 3, 5, 10, 20]
+guide = "term:filter_days_picked"
 
 [[filter]]
 id = "mom_pct_sector"
