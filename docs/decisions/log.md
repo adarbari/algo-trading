@@ -740,5 +740,14 @@ follow-up PR).
 - Options: a resolver / `empty_ok` / drop the operation from the measured set.
 - Decision: `empty_ok`: the operation lists the viewer's own edge files that failed to load; the benchmark viewer's all load, so `[]` is correct (no variables, nothing to resolve). A fitness test now checks every timed operation has its variables.
 - decided by: orchestrator (design call)
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-24
 - Reasoning: the gate must not end every night as an integrity failure; the answer is correct, only empty.
+
+## 2026-10-24 | 1 s page gate | Owner approves EdgeProblems in empty_ok
+- Question: may `EdgeProblems` join `empty_ok` in `benchmarks/perf_bar.toml`?
+- Options: yes / no (resolver or drop the operation).
+- Decision: yes. It reports only the viewer's own broken edge files under `config/users/<id>/`; `[]` is the normal answer; site-file faults raise and still fail the gate.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-10-24 ("Yes, i approve"), as relayed by the coordinator.
