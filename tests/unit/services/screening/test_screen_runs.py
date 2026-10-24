@@ -111,10 +111,11 @@ def test_the_changes_are_frozen_at_write_against_the_previous_run() -> None:
     assert (row["previous_version"], row["config_version"]) == (4, 4)
     assert (row["new_picks"], row["dropped"]) == (1, 1)  # AAA is new, ETF1 dropped
     # the same counts the read model derives from the two runs' rows
-    now = table(reader, "rule_screen")[["instrument_id", "decision"]]
-    was = table(reader, "rule_screen", PREVIOUS)
-    moved = _compare(now, dict(zip(was["instrument_id"], was["decision"], strict=True)))
-    assert sorted(c for c, _ in moved.values() if c) == ["dropped", "new"]
+    columns = ["instrument_id", "decision", "rank", "config_version"]
+    now = table(reader, "rule_screen")[columns]
+    was = table(reader, "rule_screen", PREVIOUS)[columns]
+    moved = _compare(now, was, True)
+    assert sorted(m[0] for m in moved.values() if m[0]) == ["dropped", "new"]
     assert second.run_id != first.run_id
     assert "started_at" not in row and "finished_at" not in row  # the duration is the run record's
 

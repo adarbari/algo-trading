@@ -60,6 +60,10 @@ function choices(definition: FilterDefinition, facet: Facet | undefined, labelOf
   }));
 }
 
+/** A range's stored 0..1 limit as the control shows it (a percent: 0..100) and back; trimmed of float noise. */
+const shown = (value: number, scale: number): number => Number((value * scale).toPrecision(12));
+const sent = (value: number, scale: number): number => Number((value / scale).toPrecision(12));
+
 export function FilterControl({
   definition,
   filter,
@@ -124,24 +128,35 @@ export function FilterControl({
         />
       );
       break;
-    case 'RANGE':
+    case 'RANGE': {
+      const scale = definition.unit === 'PERCENT' ? 100 : 1;
       control = (
         <RangeFilter
           label={definition.label}
+          {...(scale === 100 && { unit: '%' })}
           value={{
-            ...(filter?.min !== undefined && { min: filter.min }),
-            ...(filter?.max !== undefined && { max: filter.max }),
+            ...(filter?.min !== undefined && { min: shown(filter.min, scale) }),
+            ...(filter?.max !== undefined && { max: shown(filter.max, scale) }),
           }}
-          bins={(facet?.bins ?? []).map((b) => ({ start: b.lo, end: b.hi, count: b.count }))}
+          bins={(facet?.bins ?? []).map((b) => ({
+            start: shown(b.lo, scale),
+            end: shown(b.hi, scale),
+            count: b.count,
+          }))}
           {...(facet && { unknownCount: facet.unknown })}
           unknownHelp={unknownHelp}
           onChange={(range) => {
             if (range.min === undefined && range.max === undefined) onRemove();
-            else onChange({ min: range.min, max: range.max });
+            else
+              onChange({
+                min: range.min === undefined ? undefined : sent(range.min, scale),
+                max: range.max === undefined ? undefined : sent(range.max, scale),
+              });
           }}
         />
       );
       break;
+    }
     case 'WINDOW': {
       const unit = definition.windowUnit === 'DAYS' ? 'days' : 'sessions';
       control = (

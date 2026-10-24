@@ -385,6 +385,15 @@ def test_the_run_record_names_its_owner_trigger_and_job(world: World) -> None:
     assert (stats["owner"], stats["trigger"], stats["job_id"]) == ("site", "cli", None)
 
 
+def test_the_run_record_names_each_screeners_config_hash(world: World) -> None:
+    """The provenance line compares these with the screeners' current configs."""
+    ev = evaluate(world)
+    record = write_edge_eval(world.results, ev, NOW)
+    stats = world.results.load_run(record.run_id).stats  # type: ignore[union-attr]
+    assert stats["screener_hashes"] == dict(ev.screener_hashes) and ev.screener_hashes
+    assert all(len(h) == 64 for h in stats["screener_hashes"].values())
+
+
 def test_the_all_row_carries_the_projected_exits_and_the_decision_session_counts(
     world: World,
 ) -> None:

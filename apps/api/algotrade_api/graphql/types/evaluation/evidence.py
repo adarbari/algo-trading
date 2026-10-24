@@ -11,6 +11,7 @@ import strawberry
 
 from algotrade.services.read.edge_ledger import trades, variants
 from algotrade.services.read.evaluation import runs, versions
+from algotrade_api.graphql.types.filtering.facets import FilterFacets
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
 strawberry.enum(
@@ -132,7 +133,8 @@ class EdgeTradeRow:
     "run; PRUNED: re-run the backtest; NOT_STORED: the run is older than the ledger); "
     "`oosHidden`: a copy's out-of-sample trades are withheld, so none is served; `licence`: the "
     "trial licence of the rows; `symbolsSnapshot`: the newest reference snapshot a ticker on the "
-    "page was read from"
+    "page was read from; `facets`: the filter bar's counts over the whole ledger (null unless "
+    "asked for; `total` is then the trades that pass the filters)"
 )
 class EdgeTradePage:
     period: trades.Period
@@ -145,6 +147,7 @@ class EdgeTradePage:
     symbols_snapshot: dt.date | None
     unknown: Unknown | None
     rows: list[EdgeTradeRow]
+    facets: FilterFacets | None
 
     @classmethod
     def of(cls, d: trades.EdgeTradePage) -> Self:
@@ -159,6 +162,7 @@ class EdgeTradePage:
             symbols_snapshot=d.symbols_snapshot,
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
             rows=[EdgeTradeRow.of(r) for r in d.rows],
+            facets=FilterFacets.of(d.facets) if d.facets is not None else None,
         )
 
 

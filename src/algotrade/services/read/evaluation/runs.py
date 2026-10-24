@@ -72,7 +72,9 @@ class EdgeRun:
     it (ADR 0053 amendment 2026-10-09): its rows are served in-sample only (``load_run_rows``);
     ``legacy_owner``: a site run recorded under an older owner (``LEGACY_SITE_OWNERS``, the
     ``local`` fallback), read as the site's and never rewritten; ``trigger``: what started it
-    (``nightly`` | ``ui`` | ``cli``; None for a run from before it was recorded)."""
+    (``nightly`` | ``ui`` | ``cli``; None for a run from before it was recorded);
+    ``screener_hashes``: each screener's config hash as the run resolved it (empty for a run from
+    before it was recorded), what the provenance line compares the current configs with."""
 
     run_id: str
     edge_id: str
@@ -90,6 +92,7 @@ class EdgeRun:
     oos_hidden: bool = False
     legacy_owner: str | None = None
     trigger: str | None = None
+    screener_hashes: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -252,6 +255,7 @@ def run_of_record(
         oos_hidden=edge.oos_hidden and owner != SITE_USER,
         legacy_owner=legacy_owner,
         trigger=stats.get("trigger"),
+        screener_hashes=tuple(sorted((stats.get("screener_hashes") or {}).items())),
     )
 
 
@@ -653,6 +657,7 @@ LICENSED: Final = {
     "score_licence": ("score",),
     "adv_licence": ("adv_usd_20d",),
 }
+TRADE_SURFACE = "edge_trades"  # config/site/filters/edge_trades.toml: the ledger's filters
 LEDGER_ORDER = ["variant", "horizon_sessions", "decision_session", "rank"]
 SORTABLE: Final = (
     "decision_session", "exit_session", "instrument_id", "rank", "status", "value", "score",

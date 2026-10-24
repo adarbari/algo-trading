@@ -11,9 +11,10 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
-from algotrade.services.read.evaluation import edges, runs, versions
+from algotrade.services.read.evaluation import edges, provenance, runs, versions
 from algotrade.services.read.evaluation.verdict import model as verdict_model
 from algotrade_api.graphql.offload import off_loop
+from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.types.evaluation.compare import EdgeCompare
 from algotrade_api.graphql.types.evaluation.verdict import (
     EdgeDefinition,
@@ -174,6 +175,44 @@ class EdgeEvidence:
 
 
 @strawberry.type(
+    description="Which evaluation a verdict rests on and whether it is current, decided by the "
+    "server: `state` (CURRENT, STALE or RE_EVALUATING), the `evaluatedSession` and how many "
+    "exchange `sessionsBehind` the served session it is, `screenerChanged` (a screener of the edge "
+    "changed since the run; `screenerVersion` its current version), the run's `shortId` and "
+    "`variantsTried`, `reEvaluating` with its start `reEvaluationStarted`, and the `line` to "
+    "show. `runId` (the full id) is for admins only: null for anyone else"
+)
+class EdgeProvenance:
+    state: str
+    evaluated_session: dt.date
+    sessions_behind: int
+    screener_changed: bool
+    screener_version: int | None
+    short_id: str
+    variants_tried: int | None
+    re_evaluating: bool
+    re_evaluation_started: dt.datetime | None
+    line: str
+    run_id: str | None = strawberry.field(extensions=[AdminCause()])
+
+    @classmethod
+    def of(cls, d: provenance.Provenance) -> Self:
+        return cls(
+            state=d.state,
+            evaluated_session=d.evaluated_session,
+            sessions_behind=d.sessions_behind,
+            screener_changed=d.screener_changed,
+            screener_version=d.screener_version,
+            short_id=d.short_id,
+            variants_tried=d.variants_tried,
+            re_evaluating=d.re_evaluating,
+            re_evaluation_started=d.re_evaluation_started,
+            line=d.line,
+            run_id=d.run_id,
+        )
+
+
+@strawberry.type(
     description="An edge document (ADR 0053): status, thesis, the screeners and baselines that "
     "implement it, its `frozenFrom` (null: no frozen period) and the run it cites; `status` is "
     "the one status (a site edge's the site's, the user's own edge's theirs, with `statusSince` "
@@ -300,6 +339,15 @@ class Edge:
     async def runs(self, info: Info) -> list[EdgeRun]:
         found = await off_loop(runs.load_edge_runs, self.ctx, self.edge)
         return [EdgeRun.of(r, self.ctx) for r in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Which evaluation the verdict rests on and whether it is current (the "
+        "canonical run of a site edge, the user's latest run of their own); null: no run"
+    )
+    async def provenance(self, info: Info) -> EdgeProvenance | None:
+        read = await info.context.aread(None)  # the served session: line, age and in-flight job
+        found = await off_loop(provenance.load_verdict_provenance, read, self.edge)
+        return EdgeProvenance.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The most variants any run of the edge recorded as tried (the multiple-testing "

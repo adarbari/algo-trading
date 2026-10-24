@@ -124,6 +124,30 @@ test('a group popover narrows the list on the server, the chips show what each r
   await expect(page).not.toHaveURL(/f=/);
 });
 
+test('More filters finds a catalogue feature by a phrasebook word and filters on it', async ({
+  page,
+}) => {
+  await page.goto('/ideas');
+  await page.getByRole('button', { name: 'More filters' }).click();
+  await page.getByRole('combobox', { name: 'Find a filter' }).fill('turnover');
+  await page.getByRole('option', { name: /stock_volume/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'More filters' });
+  await expect(dialog.getByRole('group', { name: 'stock volume' })).toBeVisible();
+  await dialog.getByRole('spinbutton', { name: 'Min' }).fill('1000');
+  await dialog.getByRole('spinbutton', { name: 'Min' }).press('Enter');
+  await expect(page).toHaveURL(
+    /f=feature%253Arollup\.option_liquidity%40v1\.stock_volume%3A1000\.\./,
+  );
+  await page.keyboard.press('Escape');
+  await expect(
+    page
+      .getByRole('group', { name: 'Applied filters' })
+      .getByRole('button', { name: /stock volume/ })
+      .first(),
+  ).toBeVisible();
+  await expectAccessible(page);
+});
+
 test('a link with filters opens the filtered table', async ({ page }) => {
   await page.goto('/ideas?f=decision:EVENT_RISK');
   await expect(grid(page).getByRole('row', { name: /TSLA/ })).toBeVisible();

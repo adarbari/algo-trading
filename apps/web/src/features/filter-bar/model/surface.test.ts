@@ -14,6 +14,7 @@ const def = (id: string, label: string, group: FilterDefinition['group']): Filte
   options: id === 'decision' ? [{ value: 'QUALIFIED', label: 'Qualified' }] : [],
   bins: [],
   windowUnit: null,
+  unit: null,
 });
 const DEFS = [def('decision', 'Decision', 'SETUP'), def('earnings', 'Earnings', 'COMING_UP')];
 const facet = (id: string, removes: number | null, unknown = 0) => ({

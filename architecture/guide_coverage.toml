@@ -75,6 +75,10 @@ source = "graphql:FilterChoice.label"
 exempt = "the display name of one offered value (an option of a pick); the filter's Guide entry explains the choice"
 
 [[enum]]
+source = "graphql:FilterableFeature.label"
+exempt = "the display name of a catalogue field offered by More filters (its column name); the field's own Guide entry (`guide`, field:<name>) explains it"
+
+[[enum]]
 source = "graphql:FilterSet.label"
 exempt = "the surface's display name from its filters file"
 
@@ -156,6 +160,11 @@ values = { researching = "term:edge_state", following = "term:follow_edge", reje
 source = "graphql:FollowedEdge.state"
 values_from = "python:algotrade.config.edges.follow:LEGACY"
 values = { researching = "term:edge_state", following = "term:follow_edge", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:forward_test" }
+
+[[enum]]
+source = "graphql:EdgeProvenance.state"
+values_from = "python:algotrade.services.read.evaluation.provenance:STATES"
+values = { CURRENT = "term:provenance_current", STALE = "term:provenance_stale", RE_EVALUATING = "term:provenance_re_evaluating" }
 
 [[enum]]
 source = "graphql:Edge.labels"

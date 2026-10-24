@@ -62,7 +62,7 @@ from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
 from algotrade.services.read.users.viewer import load_viewer
-from algotrade_api.graphql.context import RequestContext
+from algotrade_api.graphql.context import RequestContext, selects
 from algotrade_api.graphql.limits import (
     MAX_DAYS,
     MAX_FILTERS,
@@ -82,7 +82,7 @@ from algotrade_api.graphql.types.evaluation.evidence import (
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
 from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
-from algotrade_api.graphql.types.filtering.filter_set import FilterSet
+from algotrade_api.graphql.types.filtering.filter_set import FilterableFeature, FilterSet
 from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeEntry
 from algotrade_api.graphql.types.guide.edges.index import GuideEdgeIndex
 from algotrade_api.graphql.types.guide.edges.mechanism import GuideMechanism
@@ -335,11 +335,31 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The filters of `surface` (ideas, screener_results, universe) for the "
         "caller: the ones they may use with their options and bins, and the ones a data "
-        "licence withholds (ADR 0082). Not found: no such surface"
+        "licence withholds (ADR 0082). `withFeatures`: catalogue fields (`rollup.<group>@v<N>."
+        "<column>`, `feature.<name>`) the caller made filters of (the id `feature:<field>`): each "
+        "is served too, in the group `more`, when the surface takes features. Not found: no such "
+        "surface",
+        extensions=[MaxItems("withFeatures", MAX_FILTERS)],
     )
-    def filter_set(self, info: Ctx, surface: str) -> FilterSet | None:
+    def filter_set(
+        self, info: Ctx, surface: str, with_features: list[str] | None = None
+    ) -> FilterSet | None:
         ctx = info.context.stores()
-        return FilterSet.of(served.load_served_filters(ctx, surface)) if ctx is not None else None
+        found = (
+            served.load_filter_set_with(ctx, surface, with_features) if ctx is not None else None
+        )
+        return FilterSet.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The catalogue fields the caller may filter `surface` on by search (More "
+        "filters): each with the control it gets, its Guide entry and the words a trader uses "
+        "for it (the phrasebook); a field a data licence does not cover is not listed. Empty: "
+        "the surface takes no features. Not found: no such surface"
+    )
+    def filter_features(self, info: Ctx, surface: str) -> list[FilterableFeature]:
+        ctx = info.context.stores()
+        found = served.load_filterable_features(ctx, surface) if ctx is not None else ()
+        return [FilterableFeature.of(f) for f in found]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The caller's feature catalogue (the site's fields plus their own "
@@ -598,25 +618,43 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The trades of the verdict's basis of the edge `edgeId` (the screen and "
         "holding "
-        "period its verdict rests on: never chosen here), one `page` (from 1) for `period`, sorted "
-        "by the server (`descending`); `LIVE` reads the paper record as the session knew it. A "
-        "per-name value under a licence the viewer lacks is Unknown(LICENCE); a copy's "
-        "out-of-sample trades are withheld; null: no such edge"
+        "period its verdict rests on: never chosen here), one `page` (from 1) of the trades that "
+        "pass `filters` (the surface `edge_trades` of `filterSet`, applied to the whole ledger "
+        "before it is sorted and paged: `total` counts the matches, `facets` the counts, ADR "
+        "0082), sorted by the server (`descending`). `period` (deprecated: the filters "
+        "`record` and `in_sample`) adds the filters it stands for unless they are set: `ALL` "
+        "(the default) is the backtest's trades, `LIVE` the paper record as the session knew "
+        "it; null reads backtest and live together. A per-name value under a licence the viewer "
+        "lacks is Unknown(LICENCE) and never passes a filter on it; a copy's out-of-sample "
+        "trades are withheld; null: no such edge",
+        extensions=[MaxItems("filters", MAX_FILTERS)],
     )
     async def edge_trades(
         self,
         info: Ctx,
         edge_id: str,
-        period: edge_trade_reads.Period = edge_trade_reads.Period.ALL,
+        period: Annotated[
+            edge_trade_reads.Period | None,
+            strawberry.argument(deprecation_reason="use the filters record and in_sample"),
+        ] = edge_trade_reads.Period.ALL,
         page: int = 1,
         sort: edge_trade_reads.Sort = edge_trade_reads.Sort.DECISION,
         descending: bool = False,
+        filters: list[FilterInput] | None = None,
         date: Day = None,
     ) -> EdgeTradePage | None:
         ctx = await info.context.aread(date)
         found = (
             await off_loop(
-                edge_trade_reads.load_trades_of, ctx, edge_id, period, page, sort.value, descending
+                edge_trade_reads.load_trades_page,
+                ctx,
+                edge_id,
+                period,
+                page,
+                sort.value,
+                descending,
+                tuple(filters or ()),
+                selects(info, "facets"),
             )
             if ctx is not None
             else None
