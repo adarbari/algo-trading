@@ -485,7 +485,7 @@ def test_the_committed_feature_files_load() -> None:
     ]
     definitions = load_features(store)
     assert {d.name for d in definitions} >= {"liquidity_class", "div_yield", "near_52w"}
-    assert [d.name for d in definitions if d.materialise] == ["div_yield"]
+    assert [d.name for d in definitions if d.materialise] == ["div_yield", "pe_ratio"]
 
 
 def test_pacing_settings_are_typed() -> None:

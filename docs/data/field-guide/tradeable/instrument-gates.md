@@ -354,6 +354,163 @@ Sources: O'Neil (1988), How to Make Money in Stocks: relative price strength ran
 
 Sources: O'Neil (1988), How to Make Money in Stocks: relative price strength rank
 
+### `rollup.cohort_pct_fundamental@v1.days_to_cover_pct_universe`
+
+**How to read it.** Where FINRA's days to cover ranks among the universe's stocks: 0 the least crowded short, 1 the most days to cover of any stock. It says how crowded the short is next to the market.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a crowded short among the universe's stocks | `gte 0.8` | soft | 0.05 | with the raw figure so the size is read too |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 200 stocks have a known value.
+- The report is the settlement date's and about two weeks old when public: the rank is as old. Read rollup.short_interest@v1.short_interest_date.
+- A high rank is crowding, not a squeeze: it says nothing about a catalyst, and a thin float ranks high without any pressure.
+- FINRA's terms bar machine learning over its data: a rule screen may use this column, a learned scorer may not.
+
+Sources: FINRA, Short interest reports
+
+### `rollup.cohort_pct_fundamental@v1.days_to_cover_pct_sector`
+
+**How to read it.** Where FINRA's days to cover ranks among the stocks of the name's sector: 1 the most days to cover of its sector. A sector with a heavy short base lifts every name's raw figure, so this rank shows the name that stands out among its peers.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a crowded short among the stocks of the name's sector | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_fundamental@v1.days_to_cover_pct_universe gte 0.5 |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 20 stocks of the sector have a known value. With no sector in the company snapshot it is null, but the universe rank is kept.
+- The report is the settlement date's and about two weeks old when public: the rank is as old. Read rollup.short_interest@v1.short_interest_date.
+
+Sources: FINRA, Short interest reports
+
+### `rollup.cohort_pct_fundamental@v1.days_to_cover_pct_industry`
+
+**How to read it.** Where FINRA's days to cover ranks among the stocks of the name's industry: 1 the most days to cover of its industry.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a crowded short among the stocks of the name's industry | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_fundamental@v1.days_to_cover_pct_sector gte 0.6 |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 10 stocks of the industry have a known value. With no industry in the company snapshot it is null, but the universe rank is kept.
+- The report is the settlement date's and about two weeks old when public: the rank is as old. Read rollup.short_interest@v1.short_interest_date.
+
+Sources: FINRA, Short interest reports
+
+### `rollup.cohort_pct_valuation@v1.pe_ratio_pct_universe`
+
+**How to read it.** Where the trailing price to earnings ratio ranks among the universe's stocks: 0 the cheapest earnings, 1 the dearest. A rank that adapts to the market's level, where a P/E threshold does not.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a rich valuation among the universe's stocks | `gte 0.8` | soft | 0.05 | with the raw figure so the size is read too |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 200 stocks have a known value.
+- Loss-making names, ADRs and names with stale earnings have no P/E and are not counted, so the rank is among profitable companies only.
+- A high P/E can come from depressed earnings rather than a rich price: read feature.pe_ratio and the earnings trend beside the rank.
+
+Sources: Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance
+
+### `rollup.cohort_pct_valuation@v1.pe_ratio_pct_sector`
+
+**How to read it.** Where the trailing price to earnings ratio ranks among the stocks of the name's sector: 1 the dearest earnings of its sector. Sectors price earnings differently, so this is the fairer comparison.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a rich valuation among the stocks of the name's sector | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_valuation@v1.pe_ratio_pct_universe gte 0.5 |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 20 stocks of the sector have a known value. With no sector in the company snapshot it is null, but the universe rank is kept.
+- Loss-making names, ADRs and names with stale earnings have no P/E and are not counted, so the rank is among profitable companies only.
+
+Sources: Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance
+
+### `rollup.cohort_pct_valuation@v1.pe_ratio_pct_industry`
+
+**How to read it.** Where the trailing price to earnings ratio ranks among the stocks of the name's industry: 1 the dearest earnings of its industry.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a rich valuation among the stocks of the name's industry | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_valuation@v1.pe_ratio_pct_sector gte 0.6 |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 10 stocks of the industry have a known value. With no industry in the company snapshot it is null, but the universe rank is kept.
+- Loss-making names, ADRs and names with stale earnings have no P/E and are not counted, so the rank is among profitable companies only.
+
+Sources: Basu (1977), Investment performance of common stocks in relation to their price-earnings ratios, Journal of Finance
+
+### `rollup.cohort_pct_options@v1.iv_rank_252d_pct_universe`
+
+**How to read it.** Where the 252-session IV rank ranks among the universe's stocks: 0 the calmest options, 1 the richest. It shows which names have expensive options next to the market, where the raw IV rank only says where a name sits against its own year.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| rich options among the universe's stocks | `gte 0.8` | soft | 0.05 | with the raw figure so the size is read too |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 200 stocks have a known value.
+- It ranks our own IV rank (from our open IV30), never the blended rank that may carry an IBKR value, so it stays open to every viewer.
+- A name with too little IV history, or a thin chain, has no IV rank and is not counted in its cohort.
+
+Sources: Natenberg (1994), Option Volatility and Pricing: volatility rank
+
+### `rollup.cohort_pct_options@v1.iv_rank_252d_pct_sector`
+
+**How to read it.** Where the 252-session IV rank ranks among the stocks of the name's sector: 1 the richest IV rank of its sector.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| rich options among the stocks of the name's sector | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_options@v1.iv_rank_252d_pct_universe gte 0.5 |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 20 stocks of the sector have a known value. With no sector in the company snapshot it is null, but the universe rank is kept.
+- It ranks our own IV rank (from our open IV30), never the blended rank that may carry an IBKR value, so it stays open to every viewer.
+
+Sources: Natenberg (1994), Option Volatility and Pricing: volatility rank
+
+### `rollup.cohort_pct_options@v1.iv_rank_252d_pct_industry`
+
+**How to read it.** Where the 252-session IV rank ranks among the stocks of the name's industry: 1 the richest IV rank of its industry.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| rich options among the stocks of the name's industry | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_options@v1.iv_rank_252d_pct_sector gte 0.6 |
+
+**When the reading lies**
+
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null. Null too when fewer than 10 stocks of the industry have a known value. With no industry in the company snapshot it is null, but the universe rank is kept.
+- It ranks our own IV rank (from our open IV30), never the blended rank that may carry an IBKR value, so it stays open to every viewer.
+
+Sources: Natenberg (1994), Option Volatility and Pricing: volatility rank
+
 ### `rollup.short_interest@v1.short_position`
 
 **How to read it.** Shares sold short at the latest settlement date whose report was public by the session (FINRA, all markets). 2,000,000 against a share count of 40 million is 5% of the company short. The figure is a stock, not a flow: it says how large the bet is, not whether it is growing.
@@ -730,165 +887,3 @@ Sources: SPDR Select Sector ETFs: https://www.sectorspdrs.com
 - Null when sector_ret_63d is null or the name's own 64 closes have a gap.
 
 Sources: Levy (1967), Relative strength as a criterion for investment selection, Journal of Finance
-
-### `rollup.relative_strength@v1.sector_rank_63d`
-
-**How to read it.** The rank of the name's sector ETF among the eleven sector ETFs by 63-session return: 1 the strongest sector of the quarter, 11 the weakest, ties sharing the better rank. 1 to 3 is a leading sector, 9 to 11 a lagging one; it is the same number for every name of a sector.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a name in a leading sector | `lte 3` | soft | 1 | feature.sector_leader is the same gate as a flag; with rollup.relative_strength@v1.rs_sector_63d gt 0 for a leader within it |
-
-**When the reading lies**
-
-- A rank hides the gap: first and second can be a point apart, or ten. Check rollup.relative_strength@v1.sector_ret_63d for the size.
-- Eleven sectors hold thousands of names: the top three sectors pass many of them, so 'sector leader' is not a scarce filter. Add rollup.relative_strength@v1.mom_pctile_63d gte 0.8 for the leader within it.
-- Null when sector_ret_63d is null, or fewer than 6 of the 11 ETFs have a complete window (min_sector_etfs).
-
-Sources: Sector rotation by relative strength: https://school.stockcharts.com/doku.php?id=market_analysis:sector_rotation_analysis
-
-### `feature.rs_spy_positive`
-
-**How to read it.** True when the name beat SPY over the last 63 sessions (rs_spy_63d above 0), False when it matched or lagged it. The flag form of 'outperforming SPY' for a quarter; the size of the lead is rollup.relative_strength@v1.rs_spy_63d.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| outperforming SPY over the quarter | `eq true` | hard | - | with feature.rs_improving eq true for relative strength that is still rising |
-
-**When the reading lies**
-
-- A flag hides how far ahead: 0.1 points ahead and 30 points ahead are both True. Check rollup.relative_strength@v1.rs_spy_63d for a minimum lead.
-- Null when rs_spy_63d is null (a gap in the quarter, or SPY not in the symbol map); a hard criterion then rejects the name.
-
-Sources: Levy (1967), Relative strength as a criterion for investment selection, Journal of Finance
-
-### `feature.rs_improving`
-
-**How to read it.** True when relative strength against SPY is improving: rs_spy_trend_20d above 0, i.e. the 63-session relative strength is higher than it was 20 sessions ago. The flag form of 'RS improving'; it says nothing about the level.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| relative strength improving | `eq true` | soft | 0 | with feature.rs_spy_positive eq true so a recovering laggard does not qualify |
-
-**When the reading lies**
-
-- A laggard that stopped falling reads True while still behind the market. Pair with feature.rs_spy_positive eq true for improving and ahead.
-- Null when rs_spy_trend_20d is null (a gap in either 63-session window, or SPY not in the symbol map).
-
-Sources: Relative-strength line slope: https://school.stockcharts.com/doku.php?id=technical_indicators:price_relative
-
-### `feature.sector_leader`
-
-**How to read it.** True when the name's sector is one of the three strongest of the eleven sector ETFs over 63 sessions (sector_rank_63d at most 3), False for any other sector. The flag form of 'strong sector'; the rank and the return are rollup.relative_strength@v1.sector_rank_63d and rollup.relative_strength@v1.sector_ret_63d.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a name in a strong sector | `eq true` | hard | - | with rollup.relative_strength@v1.rs_sector_63d gt 0 for a leader within it |
-
-**When the reading lies**
-
-- It describes the sector, not the name: a laggard in a leading sector is True. Add rollup.relative_strength@v1.rs_sector_63d gt 0 for a name that is itself leading.
-- Null when sector_rank_63d is null (no sector or ETF for the name, the ETF has no complete window, or fewer than 6 ETFs do).
-
-Sources: Sector rotation by relative strength: https://school.stockcharts.com/doku.php?id=market_analysis:sector_rotation_analysis
-
-### `instrument.exchange`
-
-**How to read it.** The exchange the stock is listed on, as the symbol directory gives it: NASDAQ for Nasdaq-listed names (the Nasdaq Trader directory is the universe's source). Identity, not a measure, so hard, never soft or scored.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| Nasdaq-listed names | `eq "NASDAQ"` | hard | - | - |
-
-**When the reading lies**
-
-- Names listed on other exchanges carry other codes (the directory's other-listed file); a 'Nasdaq stocks' gate drops every NYSE and NYSE American name, including S&P 500 members that are not on Nasdaq.
-- A company that moves its listing changes value on the snapshot after the move; a backtest reads the snapshot of its own session.
-
-Sources: Site convention (docs/data/instruments.md; Nasdaq Trader symbol directory)
-
-### `rollup.cef_nav@v1.cef_discount_to_nav`
-
-**How to read it.** How far a closed-end fund's price sits from the value of the assets behind it. It is the close on the NAV's own date over that NAV, minus 1. -0.10 is a 10% discount, 0 is level, 0.10 a 10% premium.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a wide discount | `lte -0.1` | hard | - | the closed-end fund discount edge reads the widest first |
-| a premium | `gte 0.1` | hard | - | the distribution trap filter asks a premium of at least 10% |
-
-**When the reading lies**
-
-- Part of a discount is fair: fees, leverage and a high payout all widen it. A fund that is always 10% down is not cheap against itself; read rollup.cef_nav@v1.cef_discount_zscore.
-- The NAV is the issuer's own, struck once a day. A fund holding foreign or thinly traded assets is priced against a stale NAV, and its discount moves with the next day's gap.
-- Null when the latest NAV is more than five sessions old, so a fund whose NAV stopped is not read as current. A hard 'lte' drops it.
-- The NAV is put in the closes' split terms from the stored splits, the same table the bars are adjusted with. A split the issuer made but the vendor never reported shifts both alike, so the discount holds.
-
-Sources: Lee, Shleifer and Thaler (1991), Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance
-
-### `rollup.cef_nav@v1.cef_discount_zscore`
-
-**How to read it.** How unusual a closed-end fund's discount is against its own year. It is today's discount minus its mean over the last 252 sessions, over their standard deviation. -2 is a discount two standard deviations wider than the fund's norm.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a discount wider than the fund's own year | `lte -1.5` | hard | - | - |
-
-**When the reading lies**
-
-- A wide z-score on a fund that cut its payout or changed manager is a new level, not a stretch that will close. Read the fund's distribution history before acting.
-- Null with fewer than 120 discounts in the year, so a young fund drops out. A hard 'lte' drops it.
-- It shares the NAV caveats of rollup.cef_nav@v1.cef_discount_to_nav: stale NAVs and splits both move it.
-
-Sources: Patro, Piccotti and Wu, Closed-end fund discounts (Quantpedia summary of the strategy)
-
-### `rollup.etf_flows@v1.etf_shares_chg_21d`
-
-**How to read it.** How many more or fewer shares an iShares fund has than 21 sessions ago. It is the latest count over the earlier one, minus 1. 0.10 means 10% net creation, money coming in. -0.10 means 10% net redemption.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| heavy net creation | `gte 0.05` | hard | - | the edge shorts the heaviest creations, ranked by this field |
-| heavy net redemption | `lte -0.05` | hard | - | - |
-
-**When the reading lies**
-
-- It holds for iShares funds only. SPDR, Vanguard and other issuers' funds have no count, so a screen on it silently leaves them out.
-- Null until the fund has a count from a month earlier, and when the latest count is more than seven days old. The history starts on 2026-10-17.
-- A share change is not a price effect: a fund can create shares because its price rose. Read it beside the fund's own return.
-
-Sources: Brown, Davies and Ringgenberg (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance
-
-### `rollup.share_classes@v1.spread_z_252d`
-
-**How to read it.** How far today's price ratio to the issuer's other share class is from its own last year, in standard deviations. Negative means this class is cheap against its sibling; positive means rich. -2 is two standard deviations cheaper than usual. The sibling's value is the exact mirror.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| the cheap class of a share class pair | `lt -2` | soft | 0.5 | rank on it ascending; the pair_spread outcome shorts the sibling |
-
-**When the reading lies**
-
-- A class with different voting rights or dividend can keep a gap for years; a year's z-score then only measures drift inside that gap. Check rollup.share_classes@v1.sibling_status is PAIRED first.
-- Sessions before the first stored reference snapshot use the earliest snapshot's pairs, so history carries today's pairs (survivorship bias). The result shows the count of such sessions.
-- Null with fewer than 200 sessions of both classes, a flat ratio, or a sibling that is not PAIRED. A hard criterion then rejects the name.
-- Few issuers qualify, about 15 to 25, so one rule shows a handful of names per session. Judge it over many independent windows.
-
-Sources: Site convention (docs/edge-ideas/harness-design.md section 5, pair spread)
