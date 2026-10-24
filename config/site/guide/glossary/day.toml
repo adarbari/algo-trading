@@ -180,7 +180,7 @@ id = "dataset_status"
 term = "Dataset status"
 short = "How much of one kind of data (prices, option chains, fundamentals) the shown day has."
 body = """
-Each dataset is the share of names with a good value against the names it applies to: closing prices, option chains, and company share counts for fundamentals.
+Each dataset is the share of names with a good value against the names it applies to: closing prices, option chains, and company share counts for fundamentals. Fundamentals count operating companies only (stocks and ADRs, not funds, ETFs or blank-check shells), because most funds report no share count.
 Complete means every group of names is within its expected coverage. Partial means a group fell
 short. Missing means the update ran and got none. Not measured means the update left no record for the day, so the share is unknown,
 which is different from 0%. Example: option chains at 90% of 3,000 names is partial (they need 98%), and the

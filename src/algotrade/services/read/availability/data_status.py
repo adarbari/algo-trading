@@ -9,8 +9,9 @@ are the chains task's coverage of the session (``run_items.chain_coverage``, the
 function). Each is a ``DatasetStatus``: chains are graded by ``share_status`` (the admin
 completeness grid's rule), a coverage dataset by its rule's own verdict (every tier within its
 minimums and the check PASS: COMPLETE; a breach or a WARN / FAIL: PARTIAL; nothing covered:
-MISSING), since a tier's minimum is not 98% (fundamentals cover about 47%); a dataset whose
-record is missing is ``UNKNOWN`` with a ``NOT_RUN`` ``Unavailable``, never 0%. ``DataState`` is
+MISSING), since a tier's minimum is not 98% (fundamentals cover about 95% of operating
+companies); a dataset whose record is missing is ``UNKNOWN`` with a ``NOT_RUN``
+``Unavailable``, never 0%. ``DataState`` is
 decided here, on the server, from the session
 (``Session.complete``, ``Session.newer``) and the datasets; ``affected_screeners`` counts the
 viewer's screeners whose run for the session is missing, PARTIAL or went without a required

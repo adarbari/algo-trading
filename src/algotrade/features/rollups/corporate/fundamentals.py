@@ -276,4 +276,5 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     FundamentalsParams(),
+    applies_to="operating_company",
 )
