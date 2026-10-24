@@ -283,8 +283,12 @@ def test_cohort_percentile_filters_are_ranges_over_the_zero_to_one_features(surf
     """The pass does not serve kind ``percentile`` yet, so a cohort rank is a range over the
     stored 0..1 feature, one definition per cohort, its bins spanning exactly 0..1."""
     ranks = [f for f in shipped(surface).filters if "cohort_pct_" in f.field]
-    assert {f.id for f in ranks} >= {"mom_pct_sector", "rs_pct_sector", "rs_pct_industry",
-                                     "dollar_volume_pct_universe"}  # fmt: skip
+    expected = {
+        "mom_pct_sector", "rs_pct_sector", "rs_pct_industry", "dollar_volume_pct_universe",
+        "days_to_cover_pct_sector", "pe_pct_sector", "pe_pct_industry",
+        "iv_rank_pct_sector", "iv_rank_pct_industry",
+    }  # fmt: skip
+    assert {f.id for f in ranks} >= expected
     for f in ranks:
         assert f.kind == "range" and f.bins[0] == 0 and f.bins[-1] == 1, f.id
 
