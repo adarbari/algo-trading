@@ -159,7 +159,7 @@ export async function mockIdeasApi(page: Page, edgeDesk: unknown = NO_EDGE_DESK)
       return;
     }
     if (/query\s+FilterSet\b/.test(body?.query ?? '') && body?.variables?.surface === 'ideas') {
-      await route.fulfill({ json: filterSet(body?.variables?.withFeatures) });
+      await route.fulfill({ json: filterSet(body.variables?.withFeatures) });
       return;
     }
     if (/query\s+FilterFeatures\b/.test(body?.query ?? '')) {
