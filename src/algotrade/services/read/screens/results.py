@@ -653,7 +653,7 @@ def _signature(inputs: Sequence[FilterInput]) -> tuple[object, ...]:
 def _count(joined: object) -> int | None:
     """How many gate ids a stored comma-joined list holds (None: the run stored none)."""
     found = to_scalar(joined)
-    return None if found is None else len([g for g in str(found).split(",") if g])
+    return None if found is None or pd.isna(found) else len([g for g in str(found).split(",") if g])
 
 
 def _gate_counts(ctx: ReadContext, run: ScreenerRun) -> Mapping[str, tuple[int | None, int | None]]:
