@@ -9,7 +9,11 @@ import strawberry
 
 from algotrade.services.read import session
 from algotrade.services.read.availability.cause import UnavailableKind
+from algotrade.services.read.availability.data_status import load_data_status
+from algotrade.services.read.context import ReadContext
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.availability import Unavailable
+from algotrade_api.graphql.types.data_status import DataStatus
 
 strawberry.enum(session.NewerState, description="What a session newer than the one served is doing")
 
@@ -49,9 +53,10 @@ class Session:
     unavailable: list[Unavailable]
     complete: bool
     newer: NewerSession | None
+    ctx: strawberry.Private[ReadContext]
 
     @classmethod
-    def of(cls, d: session.Session) -> Self:
+    def of(cls, d: session.Session, ctx: ReadContext) -> Self:
         return cls(
             date=d.date,
             requested=d.requested,
@@ -62,4 +67,13 @@ class Session:
             unavailable=[Unavailable.of(u) for u in d.unavailable],
             complete=d.complete,
             newer=NewerSession.of(d.newer) if d.newer else None,
+            ctx=ctx,
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="How complete this session's data is (prices, option chains, fundamentals) "
+        "and how many of the viewer's screeners it touches: for every viewer, from run records "
+        "alone; a dataset with no record is UNKNOWN, never 0%"
+    )
+    async def data_status(self) -> DataStatus:
+        return DataStatus.of(await off_loop(load_data_status, self.ctx))

@@ -68,3 +68,25 @@ failed session-date read leaves the record until its queries refetch.
 
 ## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
 See [0077](0077-serving-release.md): the default session is the current serving release's session, not the latest complete one; `Session.newer` gains `PUBLISHING`; `newer` and `complete` key on a `workflow_generation`, and `served_token` leaves other keys.
+
+## Amendment 2026-10-23: the data status every viewer reads
+
+`Session.dataStatus` (`services/read/availability/data_status.py`, `load_data_status`) tells every
+viewer, trader included, how complete the served session is, so the top bar's pill answers "can I
+trust today and did my screeners run" without the admin's ops pages. It describes exactly
+`Session.date` from run records alone (no partition read): Prices (the cells of the
+`coverage_price_stats.close` check the nightly's `rollups` step stored: names with a close, by
+tier; a `daily_bars` record is keyed by day, not name), Options chains (`run_items.chain_coverage`,
+the admin read's function) and Fundamentals (the cells of `coverage_fundamentals.shares_outstanding`,
+a new WARN rule in `sources.toml` measured on 2026-10-22: core 98.5%, rest 44.7%; UNKNOWN until a
+nightly has run with it). The newest nightly record whose `rollups` step holds the check answers (a
+retry carries the step over without its checks). Option chains are graded by `share_status` (COMPLETE at 98% or more, PARTIAL, MISSING; the admin
+completeness grid's rule); Prices and Fundamentals by their coverage rule's own verdict (every tier
+within its minimums and the check PASS: COMPLETE; a breach, WARN or FAIL: PARTIAL; nothing covered:
+MISSING), because a tier's minimum is not 98% (fundamentals cover about 47%). A dataset with no record is UNKNOWN with a public NOT_RUN gap, never 0%.
+`DataState` is decided on the server: COMPLETE, PARTIAL, NEXT_PROCESSING (`Session.newer` is
+IN_PROGRESS or PUBLISHING) or NEXT_FAILED_SHOWING_PREVIOUS (FAILED_RETRYING); a newer session wins
+over the served session's own datasets. `affectedScreeners` counts the viewer's screeners with no
+run, a PARTIAL run or a run without a required table (a gap in an optional table alone does not
+count) over `totalScreeners`; `knowledgeTs` is `Session.cutoff`. The cause behind an UNKNOWN stays
+admin-only (ADR 0056): a trader's response holds the public kind and no step or table name.

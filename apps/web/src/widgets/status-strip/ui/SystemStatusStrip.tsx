@@ -12,6 +12,8 @@ import { StatusStrip, TextLink, type StatusIssue } from '@algotrade/ui';
 import { useSystemIssues, type SystemIssue } from '@/entities/system-status';
 import { useSnooze } from '@/features/issue-snooze';
 
+import { DataStatusPill } from './DataStatusPill';
+
 const SessionNoticeBanner = lazy(() => import('./SessionNoticeBanner'));
 
 export interface SystemStatusStripProps {
@@ -41,6 +43,7 @@ export function SystemStatusStrip({ admin }: SystemStatusStripProps) {
           <SessionNoticeBanner notice={notice} />
         </Suspense>
       )}
+      <DataStatusPill admin={admin} />
       <StatusStrip issues={visible(issues).map(toIssue)} onSnooze={snooze} />
     </>
   );

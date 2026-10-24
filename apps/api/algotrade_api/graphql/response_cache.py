@@ -282,6 +282,7 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
     {
         "IdeasPage",
         "StatusStrip",
+        "DataStatus",
         "ScreenerConfigs",
         "ScreenerRuns",
         "ScreenerTrackRecords",

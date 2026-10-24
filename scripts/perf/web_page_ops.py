@@ -34,6 +34,10 @@ CLASS_NAMES = {LOAD: "on-load", MAYBE: "uncertain", HANDLER: "interaction"}
 SHELL_ROOTS = (
     ("app/layouts/WorkspaceLayout.tsx", "WorkspaceLayout"),
     ("app/layouts/GuideLayout.tsx", "GuideLayout"),
+    (
+        "entities/system-status/api/use-data-status-detail.ts",
+        "useDataStatusDetail",
+    ),  # the pill's lazy detail
     ("app/workspaces/guard.ts", "workspaceGuard"),
     ("app/workspaces/guard.ts", "viewerGuard"),
     ("entities/page-cache/api/query-persistence.ts", "defaultDeps"),  # the session stamp

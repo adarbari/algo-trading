@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24 01:03 UTC",
+ "generated": "2026-10-24 02:25 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -7,6 +7,7 @@
    "clicks": [],
    "params": {},
    "ops": [
+    "DataStatus",
     "GuideSearch",
     "Regime",
     "SessionDate",

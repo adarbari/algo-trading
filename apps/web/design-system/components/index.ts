@@ -205,6 +205,7 @@ export { ShareBar, type ShareBarProps } from './ShareBar';
 export { ShowMore, type ShowMoreProps } from './ShowMore';
 export { LazySection, type LazySectionProps, type LazySectionSize } from './LazySection';
 export { Skeleton, type SkeletonProps } from './Skeleton';
+export { ShortLabel, type ShortLabelProps } from './ShortLabel';
 export { SourceLine, type SourceLineItem, type SourceLineProps } from './SourceLine';
 export { SortableList, type SortableItemState, type SortableListProps } from './SortableList';
 export { Sparkline, type SparklineProps, type SparklineTone } from './Sparkline';

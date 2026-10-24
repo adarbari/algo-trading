@@ -7,7 +7,7 @@ name never joins the user-keyed set and a write from another tab leaves its quer
 import re
 from pathlib import Path
 
-from algotrade_api.graphql.response_cache import SHARED_OPERATIONS
+from algotrade_api.graphql.response_cache import RUN_OPERATIONS, SHARED_OPERATIONS
 from tests.conftest import REPO_ROOT
 
 WEB_SRC = REPO_ROOT / "apps/web/src"
@@ -63,3 +63,30 @@ def test_every_gql_call_of_a_user_keyed_operation_passes_its_query_key() -> None
         "pass the queryFn context's queryKey as gql's third argument (or null outside a "
         f"query): {missing}"
     )
+
+
+# ``Session.dataStatus`` depends on the viewer's screeners and on run records, so a web operation
+# that selects it is a ``RUN_OPERATIONS`` entry (user-keyed, runs generation in the key), never a
+# ``SHARED_OPERATIONS`` one (role-keyed: a trader would read another viewer's counts).
+STATUS_DOCUMENT = re.compile(r"query\s+(\w+)[^`'\"]*", re.S)
+
+
+def _selecting(text: str) -> list[str]:
+    """The names of the queries in ``text`` whose document selects ``dataStatus``."""
+    return [m.group(1) for m in STATUS_DOCUMENT.finditer(text) if "dataStatus" in m.group(0)]
+
+
+def test_the_parse_finds_a_query_that_selects_the_field() -> None:
+    sample = "const D = graphql(`\n query Pill { session { dataStatus { state } } }\n`)"
+    assert _selecting(sample) == ["Pill"]
+
+
+def test_an_operation_selecting_data_status_is_a_run_operation() -> None:
+    found = {
+        name
+        for path in sorted(WEB_SRC.rglob("*.ts*"))
+        if "generated" not in path.parts
+        for name in _selecting(path.read_text())
+    }
+    wrong = sorted(n for n in found if n not in RUN_OPERATIONS or n in SHARED_OPERATIONS)
+    assert not wrong, f"add to RUN_OPERATIONS (response_cache.py), not SHARED_OPERATIONS: {wrong}"

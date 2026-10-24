@@ -47,6 +47,21 @@ source = "graphql:NewerState"
 values = { IN_PROGRESS = "term:last_complete_session", FAILED_RETRYING = "term:last_complete_session", PUBLISHING = "term:publishing_session" }
 
 [[enum]]
+source = "graphql:DataState"
+values = { COMPLETE = "term:data_state", PARTIAL = "term:data_state", NEXT_PROCESSING = "term:data_state", NEXT_FAILED_SHOWING_PREVIOUS = "term:data_state" }
+names = { COMPLETE = "Data complete", PARTIAL = "Data partial", NEXT_PROCESSING = "Next day processing", NEXT_FAILED_SHOWING_PREVIOUS = "Next day failed, showing previous" }
+
+[[enum]]
+source = "graphql:DatasetState"
+values = { COMPLETE = "term:dataset_status", PARTIAL = "term:dataset_status", MISSING = "term:dataset_status", UNKNOWN = "term:dataset_status" }
+names = { COMPLETE = "complete", PARTIAL = "partial", MISSING = "missing", UNKNOWN = "not measured" }
+
+[[enum]]
+source = "graphql:DatasetName"
+values = { PRICES = "term:dataset_status", OPTIONS_CHAINS = "term:dataset_status", FUNDAMENTALS = "term:dataset_status" }
+names = { PRICES = "Prices", OPTIONS_CHAINS = "Option chains", FUNDAMENTALS = "Fundamentals" }
+
+[[enum]]
 source = "graphql:UnavailableKind"
 exempt = "covered by GUIDE_TERMS (one glossary term per kind), kept complete by tests/unit/services/read/availability/test_cause.py"
 

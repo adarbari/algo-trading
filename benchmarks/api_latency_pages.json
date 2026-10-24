@@ -25,7 +25,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -84,7 +84,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -130,7 +130,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -196,7 +196,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -242,7 +242,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -295,7 +295,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    }
   ],
   "/explore?sel=AAPL": [
@@ -317,7 +317,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -408,7 +408,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -585,7 +585,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -622,7 +622,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -693,7 +693,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -744,7 +744,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -799,7 +799,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -829,7 +829,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    }
   ],
   "/guide": [
@@ -851,7 +851,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -885,7 +885,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -919,7 +919,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -953,7 +953,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -987,7 +987,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -1141,7 +1141,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -1175,7 +1175,7 @@
     "variables": {
      "admin": true
     },
-    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
+    "query": "\n  query StatusStrip($admin: Boolean!) {\n    session {\n      date\n      newer {\n        date\n        state\n      }\n      dataStatus {\n        state\n      }\n    }\n    screeners {\n      id\n      name\n      notRun {\n        code\n        kindText\n      }\n    }\n    nightlyRuns(limit: 1) @include(if: $admin) {\n      runId\n      session\n      status\n      problems\n      steps {\n        name\n        status\n      }\n    }\n    completeness(sessions: 1) @include(if: $admin) {\n      sessions\n      lastClosed\n    }\n  }\n"
    },
    {
     "kind": "graphql",
