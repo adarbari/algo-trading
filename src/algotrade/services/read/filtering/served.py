@@ -236,7 +236,8 @@ def load_served_filters(
     ``wanted``: the filter ids of the request; each ``feature:<field>`` one is offered too when
     the surface takes features and the viewer's licences cover the field (else it is withheld, or
     left for ``check`` to refuse), ``feature_filters.py``. Runs the no-data check: only
-    ``filterSet`` calls it (``tests/architecture``); lists use ``load_list_filters``."""
+    ``filterSet`` calls it (guarded by ``tests/unit/services/read/filtering/test_served.py``);
+    lists use ``load_list_filters``."""
     filter_set, site, resolved, extra_off = _resolve(ctx, surface, wanted)
     stale = _without_data(ctx, filter_set.filters, (f.id for f in resolved.offered))
     withheld = tuple(

@@ -73,19 +73,33 @@ def test_list_filters_equal_the_served_ones(user, surface, wanted) -> None:
     assert lists.columns == full.columns
 
 
-def _calls(path) -> list[tuple[str, str]]:
-    """``(file, enclosing function)`` of each use of ``load_served_filters`` outside its def and
-    imports."""
+NAME = "load_served_filters"
+
+
+def _uses(source: str) -> list[str]:
+    """The functions of ``source`` that use ``load_served_filters``, by bare name or as an
+    attribute (``served.load_served_filters``)."""
     found = []
-    for file in path.rglob("*.py"):
-        tree = ast.parse(file.read_text())
-        for fn in ast.walk(tree):
-            if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
-                continue
-            for node in ast.walk(fn):
-                if isinstance(node, ast.Name) and node.id == "load_served_filters":
-                    found.append((file.name, fn.name))
+    for fn in ast.walk(ast.parse(source)):
+        if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        for node in ast.walk(fn):
+            bare = isinstance(node, ast.Name) and node.id == NAME
+            attr = isinstance(node, ast.Attribute) and node.attr == NAME
+            if bare or attr:
+                found.append(fn.name)
     return found
+
+
+def _calls(path) -> list[tuple[str, str]]:
+    """``(file, enclosing function)`` of each use of ``load_served_filters``."""
+    return [(f.name, fn) for f in path.rglob("*.py") for fn in _uses(f.read_text())]
+
+
+def test_the_caller_scan_catches_the_attribute_form() -> None:
+    assert _uses("def f():\n    return served.load_served_filters(ctx, 's')\n") == ["f"]
+    assert _uses("def g():\n    return load_served_filters(ctx, 's')\n") == ["g"]
+    assert _uses("def h():\n    return load_list_filters(ctx, 's')\n") == []
 
 
 def test_filter_set_is_the_only_caller_of_the_full_loader() -> None:
