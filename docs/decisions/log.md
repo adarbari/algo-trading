@@ -662,7 +662,7 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: one filter bar for every table, list and feed (ADR 0082) is the owner's design; the cost is the shared code itself, and later surfaces adopt it without raising anything again.
-## 2026-10-24 | Filter bar on Screeners and Edges lists PR (#938) | Entry and list budgets raised by the filter bar's route state
+## 2026-10-24 | Filter bar on Screeners and Edges lists PR (#939) | Entry and list budgets raised by the filter bar's route state
 - Question: the Screeners and Edges routes validate `f` and `q` in the entry chunk, and the two list pages load the bar's components and reads; the two entry budgets and the Screeners, Edges and Ideas first-load budgets sit below the measured size. Trim, or raise?
 - Options: cut the validation (an unvalidated `f` reaches the page) / raise the entry budgets and the list route budgets by the measured cost.
 - Decision: waiver of the shared rule for the two entry budgets only: entry 25880 to 26170 B and entry plus static imports 197700 to 197900 B (measured locally 25998 and 197731 B, +170 B margin for CI), through the `waivers` map; Screeners page chunk 17966 to 32520 B, Edges page chunk 48000 to 61100 B, Edge sections 82100 to 92850 B, Ideas first-load JS 240000 to 240800 B and Screeners first-load JS 209900 to 216100 B, each with a reason in `perf-budgets.json`. The owner pre-approved raises that come from the filter bar's shared code (2026-10-23, #924).
