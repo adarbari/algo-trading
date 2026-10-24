@@ -50,7 +50,12 @@ def resolve_definitions(
     """``filter_set`` against the catalogue ``features`` and the licences ``held``."""
     catalogue = [f for f in filter_set.filters if f.column_id is None]
     hidden = hidden_fields(features, (f.field for f in catalogue), held)
-    unresolved = {f.field for f in catalogue if features.feature(f.field) is None}
+    # an ``instrument.*`` reference fact is open and read from the snapshot, not the catalogue
+    unresolved = {
+        f.field
+        for f in catalogue
+        if features.feature(f.field) is None and f.field.partition(".")[0] != "instrument"
+    }
     out = {f.id for f in catalogue if f.field in hidden or f.field in unresolved}
     offered = tuple(f for f in filter_set.filters if f.id not in out)
     return ResolvedFilters(filter_set.surface, offered, frozenset(out))

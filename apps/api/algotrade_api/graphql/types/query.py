@@ -171,7 +171,9 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Instruments x `columns` (catalogue fields, in order) for the session: "
         "the universe, or the instruments `keys` (ids or tickers) name in that order; "
-        "filtered (security type, sector, liquidity class, leveraged, optionable: "
+        "filtered (`filters`: the surface `universe` of `filterSet`, over the whole list, "
+        "with the counts in the result's `facets`; `securityType`, `sector`, `liquidityClass`, "
+        "`leveraged` and `optionable` are deprecated, they are those filters, text "
         "case-insensitive; `q`: the symbol or name contains it), sorted by `sort` (`symbol` "
         "or a catalogue field, `-` prefix: descending, missing values last) and paged "
         "(`page` from 1, `size` rows). Null: nothing stored",
@@ -179,6 +181,7 @@ class Query:
             MaxItems("columns", MAX_NAMES),
             MaxItems("keys", MAX_PAGE),
             MaxItems("size", MAX_PAGE),
+            MaxItems("filters", MAX_FILTERS),
         ],
     )
     def table(
@@ -195,14 +198,15 @@ class Query:
         sort: str | None = None,
         page: int = 1,
         size: int = tables.DEFAULT_SIZE,
+        filters: list[FilterInput] | None = None,
         date: Day = None,
     ) -> FeatureTable | None:
         ctx = info.context.read(date)
-        filters = tables.UniverseFilter(
+        old = tables.UniverseFilter(
             security_type, leveraged, sector, liquidity_class, q, optionable
         )
         found = (
-            tables.load_table(ctx, columns, filters, sort, page, size, keys)
+            tables.load_table(ctx, columns, old, sort, page, size, keys, tuple(filters or ()))
             if ctx is not None
             else None
         )
