@@ -92,7 +92,7 @@ export function FilterBar({
     body = (
       <Stack gap={2}>
         <Stack direction="row" gap={2} align="center" wrap>
-          <div className={styles.grow}>{search}</div>
+          {search ? <div className={styles.grow}>{search}</div> : null}
           {groups}
           {trigger}
         </Stack>

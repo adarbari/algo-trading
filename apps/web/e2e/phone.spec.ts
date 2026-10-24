@@ -91,7 +91,7 @@ test('Explore: the search adds a ticker as a tab and the tab strip stays on the 
   await expect(page).toHaveURL(/focus=MSFT/);
 });
 
-test('Ideas: the views and filter chips fit the screen and a tapped view narrows the table', async ({
+test('Ideas: the filter bar is one Filters button and a sheet, "Show N results" narrows the table, and an empty result offers the way back', async ({
   page,
 }) => {
   await page.goto('/ideas');
@@ -99,11 +99,30 @@ test('Ideas: the views and filter chips fit the screen and a tapped view narrows
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     innerWidth,
   );
-  await page.getByRole('button', { name: 'High conviction' }).tap();
-  await expect(page).toHaveURL(/view=conviction/);
-  const chip = page.getByRole('button', { name: 'Liquidity', exact: true });
-  const box = await chip.boundingBox();
+  await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filters' }).tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  await sheet.getByRole('button', { name: 'Setup' }).tap();
+  await page
+    .getByRole('list', { name: 'Decision' })
+    .getByRole('button', { name: /^Event risk/ })
+    .tap();
+  await page.keyboard.press('Escape');
+  await expect(sheet.getByRole('button', { name: 'Show 1 results' })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Show 1 results' }).tap();
+  await expect(page).toHaveURL(/f=decision(%3A|:)EVENT_RISK/);
+  await expect(
+    page.getByRole('grid', { name: 'Top ideas' }).getByRole('row', { name: /TSLA/ }),
+  ).toBeVisible();
+  const chips = page.getByRole('group', { name: 'Applied filters' });
+  const box = await chips.boundingBox();
   expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  await page.goto('/ideas?f=decision:EVENT_RISK;agreeing:3..');
+  await expect(page.getByText('No ideas match all 2 filters')).toBeVisible();
+  await page.getByRole('button', { name: /^Switch off Agreeing screeners gives 1/ }).tap();
+  await expect(
+    page.getByRole('grid', { name: 'Top ideas' }).getByRole('row', { name: /TSLA/ }),
+  ).toBeVisible();
 });
 
 test('Ideas: a phone row keeps the ticker, who picked it, decision and score', async ({ page }) => {

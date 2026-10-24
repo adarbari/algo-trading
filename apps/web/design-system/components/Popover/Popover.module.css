@@ -1,6 +1,7 @@
-/* Popover: a bordered surface over the page (borders, never shadows), sized to fit the viewport. */
+/* Popover: a bordered surface over the page (borders, never shadows), sized to fit the viewport.
+   Layered with the modal, so a popover opened inside a sheet (a filter group on a phone) shows above it. */
 .popover {
-  z-index: var(--z-dropdown);
+  z-index: var(--z-modal);
   box-sizing: border-box;
   overflow-y: auto;
   min-width: var(--size-popover);

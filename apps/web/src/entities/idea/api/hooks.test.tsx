@@ -92,7 +92,7 @@ describe('useIdeas pages link up', () => {
     const { client, wrap } = held();
     client.setQueryData(pageKey(), page([1, 2], 'c2'), { updatedAt: 1 });
     client.setQueryData(pageKey('c3'), page([5, 6], null), { updatedAt: 1 });
-    client.setQueryData(['ideas-more'], ['c2', 'c3']);
+    client.setQueryData(['ideas-more', null], ['c2', 'c3']);
     GQL.mockImplementation((_doc, variables) => {
       const after = (variables as { after: string | null }).after;
       if (after === 'c2') return Promise.reject(new GraphQLRequestError([{ message: 'boom' }]));
@@ -104,7 +104,7 @@ describe('useIdeas pages link up', () => {
     });
     expect(result.current.data?.ideas.map((i) => i.rank)).toEqual([1, 2]);
     await waitFor(() => {
-      expect(client.getQueryData(['ideas-more'])).toEqual(['c2']);
+      expect(client.getQueryData(['ideas-more', null])).toEqual(['c2']);
     });
   });
 });
@@ -164,10 +164,47 @@ describe('useIdeas', () => {
     });
     const [document, variables] = GQL.mock.calls[0] ?? [];
     expect(String(document)).toContain('query IdeasPage');
-    expect(variables).toEqual({ first: IDEAS_PAGE, after: null, names: IDEA_FEATURES });
+    expect(variables).toEqual({
+      first: IDEAS_PAGE,
+      after: null,
+      names: IDEA_FEATURES,
+      filters: null,
+    });
     expect(result.current.data?.screeners.map((s) => [s.id, s.notRun?.kind])).toEqual([
       ['vrp', 'NOT_RUN'],
     ]);
+  });
+
+  it('sends the filters in force, and pages each filter list from its own first page', async () => {
+    GQL.mockImplementation((_doc, variables) => {
+      const { after, filters } = variables as { after: string | null; filters: unknown };
+      if (filters === null) return Promise.resolve(page([1, 2], 'c2'));
+      return Promise.resolve(after === null ? page([9], 'f2') : page([10], null));
+    });
+    const decision = [{ id: 'decision', values: ['WATCH'], active: true }];
+    const { client, wrap } = held();
+    const { result, rerender } = renderHook(({ f }) => useIdeas(f), {
+      wrapper: wrap,
+      initialProps: { f: [] as typeof decision },
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    await result.current.fetchNextPage();
+    await waitFor(() => {
+      expect(client.getQueryData(['ideas-more', null])).toEqual(['c2']);
+    });
+    rerender({ f: decision });
+    await waitFor(() => {
+      expect(result.current.data?.ideas.map((i) => i.rank)).toEqual([9]);
+    });
+    const sent = GQL.mock.calls.map((call) => call[1] as { filters: unknown });
+    expect(sent.at(-1)?.filters).toEqual([
+      { id: 'decision', values: ['WATCH'], min: null, max: null, within: null, active: true },
+    ]);
+    // The cursor of the plain list is not the filtered list's: it starts on page one again.
+    expect(result.current.hasNextPage).toBe(true);
+    expect(client.getQueryData(['ideas-more', null])).toEqual(['c2']);
   });
 
   it('starts over from a fresh first page when the server refuses the cursor', async () => {
