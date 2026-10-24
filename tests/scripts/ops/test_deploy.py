@@ -31,6 +31,7 @@ esac
 """
 INGEST_STUB = """#!/bin/sh
 echo "ingest $*" >> "$STUB_LOG"
+echo "config_dir=$ALGOTRADE_CONFIG_DIR" >> "$STUB_LOG.env"
 shift
 case " $* " in
   *" --deploy-only "*) ;;
@@ -417,6 +418,20 @@ def test_a_deploy_during_a_held_ingest_lock_deploys(site: Site) -> None:
     assert holds and "--ingest-apply" not in holds[0]  # serving: the deploy lock alone
     assert _git(site.repo, "rev-parse", "HEAD") != sha  # the busy ingest lock kept main back
     assert not any("--locks" in c for c in site.called())  # the plan no longer decides locks
+
+
+def test_every_deploy_hold_reads_the_release_trees_config(site: Site) -> None:
+    """The regression (2026-10-24): deploy-hold ran the tree's code with the main checkout's
+    ./config, so a lagging main failed the tree's import and the ingest sync never ran."""
+    site.seed()
+    _advance(site.repo, "src/algotrade/x.py")
+    # an ingest-sync cycle too: main lacks the target
+    out = site.run("--auto", STUB_PLAN="restart")
+    assert out.returncode == 0, out.stdout + out.stderr
+    seen = (site.calls.parent / "calls.log.env").read_text().splitlines()
+    holds = [c for c in site.called() if c.startswith("ingest deploy-hold")]
+    assert len(seen) == len(holds) >= 1
+    assert set(seen) == {f"config_dir={site.tree}/config"}
 
 
 def test_a_busy_deploy_lock_skips_and_names_the_deploy(site: Site) -> None:
