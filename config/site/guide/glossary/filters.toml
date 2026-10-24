@@ -641,3 +641,15 @@ Some values come from a source licensed for one person's own use, such as the br
 """
 next = "Keep a file that holds personal-licence values to yourself."
 see_also = ["export", "unavailable_licence"]
+
+[[term]]
+id = "filter_withheld_no_data"
+term = "Filter not available yet"
+short = "A filter is listed as unavailable when no row has a value for it on this session."
+body = """
+A filter whose value is unknown for every row can only match nothing, so it is not offered as a control. More filters lists it as unavailable and links here. It comes back by itself on the first session that has data for it.
+
+A percentile of IV rank needs about 60 sessions of IV history. A percentile within a sector, an industry or the universe needs the universe and company snapshots, which start on 2026-10-02. A link that already carries the filter still opens, and the filter is switched off until it returns.
+"""
+next = "Use a filter that is on offer, or come back after the next sessions have been processed."
+see_also = ["filter_unknown_rows", "unavailable_not_stored", "filter_group_more"]

@@ -337,14 +337,15 @@ class Query:
         "caller: the ones they may use with their options and bins, and the ones a data "
         "licence withholds (ADR 0082). `withFeatures`: catalogue fields (`rollup.<group>@v<N>."
         "<column>`, `feature.<name>`) the caller made filters of (the id `feature:<field>`): each "
-        "is served too, in the group `more`, when the surface takes features. Not found: no such "
-        "surface",
+        "is served too, in the group `more`, when the surface takes features. A filter whose "
+        "field has no known value for the session is in `withheld` (NOT_STORED) until it has "
+        "data. Not found: no such surface",
         extensions=[MaxItems("withFeatures", MAX_FILTERS)],
     )
     def filter_set(
-        self, info: Ctx, surface: str, with_features: list[str] | None = None
+        self, info: Ctx, surface: str, with_features: list[str] | None = None, date: Day = None
     ) -> FilterSet | None:
-        ctx = info.context.stores()
+        ctx = info.context.read(date) or info.context.stores()
         found = (
             served.load_filter_set_with(ctx, surface, with_features) if ctx is not None else None
         )

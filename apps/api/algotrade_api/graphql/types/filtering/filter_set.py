@@ -60,17 +60,26 @@ class FilterDefinition:
 
 @strawberry.type(
     description="A filter the viewer is not offered (a field under a data licence they do not "
-    "hold, `unavailable.kind` LICENCE) and is refused if they send it"
+    "hold, `unavailable.kind` LICENCE) and is refused if they send it; or a field with no known "
+    "value for the session, NOT_STORED, `guide` the entry that says it returns by itself, and "
+    "an input naming it is ignored, never refused)"
 )
 class WithheldFilter:
     id: str
     label: str
     group: served.FilterGroup
     unavailable: Unavailable
+    guide: str | None
 
     @classmethod
     def of(cls, d: served.WithheldFilter) -> Self:
-        return cls(id=d.id, label=d.label, group=d.group, unavailable=Unavailable.of(d.unavailable))
+        return cls(
+            id=d.id,
+            label=d.label,
+            group=d.group,
+            unavailable=Unavailable.of(d.unavailable),
+            guide=d.guide,
+        )
 
 
 @strawberry.type(

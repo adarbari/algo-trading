@@ -62,6 +62,7 @@ EXEMPT = {
     "services/screening/regime.py": "reads the regime label only (open: see the test below)",
     "services/read/context.py": "the partition helper itself; ReadContext.licences lives here",
     "services/read/events/ahead.py": GATED_LOADERS,
+    "services/read/filtering/no_data.py": GATED_LOADERS,
     "services/read/events/reference.py": GATED_LOADERS,
     "services/read/market/features.py": GATED_LOADERS,
     "services/read/market/history.py": GATED_LOADERS,
