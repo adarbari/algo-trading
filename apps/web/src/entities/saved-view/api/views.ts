@@ -24,6 +24,10 @@ const TableView = graphql(`
       sort
       decisions
       names
+      named {
+        name
+        filters
+      }
     }
   }
 `);
@@ -34,8 +38,9 @@ const keyOf = (scope: string, name: string | null) =>
   queryKeys.gql(TABLE_VIEW_OPERATION, { scope, name });
 
 /** The user's view of the table `scope`: the default one, or the one called `name`. */
-export function useSavedView(scope: string, name: string | null) {
+export function useSavedView(scope: string, name: string | null, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: keyOf(scope, name),
     queryFn: ({ queryKey }) => gql(TableView, { scope, name }, queryKey),
     select: (data) => data.view,
@@ -69,8 +74,22 @@ export function useSaveView(scope: string) {
       ),
     onSuccess: (saved, { name }) => {
       const { narrow_columns: narrowColumns, ...rest } = saved;
+      // The named views' filters the page already read, with this one's now.
+      const before = new Map(
+        client
+          .getQueriesData<gqlTypes.TableViewQuery>({
+            queryKey: queryKeys.gqlAll(TABLE_VIEW_OPERATION),
+            predicate: viewsOf(scope),
+          })
+          .flatMap(([, data]) => data?.view?.named ?? [])
+          .map((v) => [v.name, v.filters]),
+      );
+      const named = rest.names.map((n) => ({
+        name: n,
+        filters: n === name ? rest.filters : (before.get(n) ?? ''),
+      }));
       client.setQueryData<gqlTypes.TableViewQuery>(keyOf(scope, name), {
-        view: { ...rest, narrowColumns },
+        view: { ...rest, narrowColumns, named },
       });
       void client.invalidateQueries({
         queryKey: queryKeys.gqlAll(TABLE_VIEW_OPERATION),

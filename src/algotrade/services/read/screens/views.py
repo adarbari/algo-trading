@@ -1,8 +1,9 @@
 """A user's saved view of a table (ADR 0032, ``TableView``): the catalogue columns they added,
 the sort and the decisions they show, from ``views.<scope>.view`` (the default view) or
 ``views.<scope>.views.<name>`` of their ``preferences.toml`` (read-model PR 8 generalised it
-from ``screeners.<id>``). A scope names a table: ``screener:<id>`` is a screener's results
-(``SCOPE_KINDS``). A view saved before PR 8 under ``screeners.<id>`` is still read as
+from ``screeners.<id>``). A scope names a table: ``screener:<id>`` is a screener's results,
+``surface:<name>`` a list with a filter bar (Ideas, the Screeners list, ...; ``SCOPE_KINDS``).
+A view saved before PR 8 under ``screeners.<id>`` is still read as
 ``screener:<id>``'s until the user's next preferences write moves it
 (``services.authoring.preferences``).
 
@@ -14,14 +15,27 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from algotrade.config.filters.definitions import Documents, load_filter_set
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens.screeners import load_screener
 from algotrade.storage.configs.store import ConfigStore
 
 PREFERENCES = "preferences"
 SCREENER_SCOPE = "screener"  # ``screener:<id>``: a screener's results
-SCOPE_KINDS = (SCREENER_SCOPE,)
+# ``surface:<name>``: a list with a filter bar (config/site/filters/<name>)
+SURFACE_SCOPE = "surface"
+SCOPE_KINDS = (SCREENER_SCOPE, SURFACE_SCOPE)
 LEGACY_SCREENERS = "screeners"  # where PR 5-7 saved a screener's views (``screeners.<id>``)
+
+
+@dataclass(frozen=True)
+class NamedView:
+    """One of the user's named views of a scope with its ``f`` string (the Views menu lists them
+    without a read per view)."""
+
+    name: str
+    filters: str = ""
 
 
 @dataclass(frozen=True)
@@ -30,7 +44,8 @@ class TableView:
     view; ``names``: the user's named views of the scope, sorted; ``sort``: a column id, ``-``
     first for descending (None: the table's default); ``narrow_columns``: the table column ids
     the user added back on a narrow (phone) table; ``filters``: the ``f`` string of the filter
-    bar (ADR 0082; empty: none, and for a view saved before it)."""
+    bar (ADR 0082; empty: none, and for a view saved before it); ``named``: each named view with
+    its ``f`` (one read lists them all)."""
 
     scope: str
     name: str | None
@@ -41,6 +56,7 @@ class TableView:
     names: tuple[str, ...]
     narrow_columns: tuple[str, ...] = ()
     filters: str = ""
+    named: tuple[NamedView, ...] = ()
 
 
 def scope_parts(scope: str) -> tuple[str, str]:
@@ -50,6 +66,15 @@ def scope_parts(scope: str) -> tuple[str, str]:
     if kind not in SCOPE_KINDS or not ident:
         raise ValueError(f"view scope {scope!r}: expected one of {', '.join(SCOPE_KINDS)}:<id>")
     return kind, ident
+
+
+def surface_exists(configs: Documents, name: str) -> bool:
+    """Whether ``name`` is a surface with a filters file (its views are its filter bar's)."""
+    try:
+        found = load_filter_set(configs, name)
+    except ConfigurationError:  # not an id a file could have (the store's id check refuses it)
+        return False
+    return bool(found.filters or found.columns)
 
 
 def view_entry(doc: Mapping[str, Any], scope: str) -> Mapping[str, Any]:
@@ -70,8 +95,9 @@ def table_view(configs: ConfigStore, user: str, scope: str, name: str | None = N
     named = dict(entry.get("views") or {})
     names = tuple(sorted(named))
     view = entry.get("view") if name is None else named.get(name)
+    summaries = tuple(NamedView(n, str((named[n] or {}).get("filters") or "")) for n in names)
     if not view:
-        return TableView(scope, name, False, (), None, (), names)
+        return TableView(scope, name, False, (), None, (), names, named=summaries)
     sort = view.get("sort")
     return TableView(
         scope=scope,
@@ -83,6 +109,7 @@ def table_view(configs: ConfigStore, user: str, scope: str, name: str | None = N
         names=names,
         narrow_columns=tuple(str(c) for c in view.get("narrow_columns") or []),
         filters=str(view.get("filters") or ""),
+        named=summaries,
     )
 
 
@@ -94,5 +121,7 @@ def load_view(ctx: ReadContext, scope: str, name: str | None = None) -> TableVie
     except ValueError:
         return None
     if kind == SCREENER_SCOPE and load_screener(ctx, ident) is None:
+        return None
+    if kind == SURFACE_SCOPE and not surface_exists(ctx.configs, ident):
         return None
     return table_view(ctx.configs, ctx.user.user_id, scope, name)

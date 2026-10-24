@@ -1,4 +1,5 @@
 /** Page: Trader > Edges (the Edges Lab: the edges by verdict, and the chosen edge's page). */
+import { decodeFilters } from '@/features/filter-bar';
 import { prefetchEdge, prefetchEdgeDesk, prefetchEdges } from '@/entities/edge';
 
 export { EdgesPage, type EdgesPageProps } from './ui/EdgesPage';
@@ -10,10 +11,10 @@ export { EdgesPage, type EdgesPageProps } from './ui/EdgesPage';
 export function prefetchEdgesReads(
   client: Parameters<typeof prefetchEdges>[0],
   edge?: string | null,
-  filters: Parameters<typeof prefetchEdges>[1] = [],
+  f?: string,
   q = '',
 ): void {
   if (edge) prefetchEdge(client, edge);
-  else prefetchEdges(client, filters, q);
+  else prefetchEdges(client, decodeFilters(f), q);
   prefetchEdgeDesk(client);
 }

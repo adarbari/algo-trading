@@ -693,6 +693,14 @@ export type QualityChecksQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type QualityChecksQuery = { quality: { session: string, runId: string | null, status: string | null, finishedAt: string | null, checks: Array<{ name: string, status: string, detail: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
 
+export type TableViewQueryVariables = Exact<{
+  scope: string;
+  name?: string | null | undefined;
+}>;
+
+
+export type TableViewQuery = { view: { scope: string, name: string | null, saved: boolean, columns: Array<string>, narrowColumns: Array<string>, filters: string, sort: string | null, decisions: Array<string>, names: Array<string>, named: Array<{ name: string, filters: string }> } | null };
+
 export type InstrumentScreenerHitsQueryVariables = Exact<{
   key: string;
 }>;
@@ -825,14 +833,6 @@ export type MyFeatureRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type MyFeatureRequestsQuery = { myFeatureRequests: Array<{ ref: string, description: string, status: string, unmapped: boolean, firstAsked: string, lastAsked: string, timesAsked: number, promotedTo: string, feasibility: string, span: string | null, askedBeforeToday: boolean }> };
-
-export type TableViewQueryVariables = Exact<{
-  scope: string;
-  name?: string | null | undefined;
-}>;
-
-
-export type TableViewQuery = { view: { scope: string, name: string | null, saved: boolean, columns: Array<string>, narrowColumns: Array<string>, filters: string, sort: string | null, decisions: Array<string>, names: Array<string> } | null };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -4163,6 +4163,25 @@ export const QualityChecksDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<QualityChecksQuery, QualityChecksQueryVariables>;
+export const TableViewDocument = new TypedDocumentString(`
+    query TableView($scope: String!, $name: String) {
+  view(scope: $scope, name: $name) {
+    scope
+    name
+    saved
+    columns
+    narrowColumns
+    filters
+    sort
+    decisions
+    names
+    named {
+      name
+      filters
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<TableViewQuery, TableViewQueryVariables>;
 export const InstrumentScreenerHitsDocument = new TypedDocumentString(`
     query InstrumentScreenerHits($key: String!) {
   session {
@@ -4830,18 +4849,3 @@ export const MyFeatureRequestsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<MyFeatureRequestsQuery, MyFeatureRequestsQueryVariables>;
-export const TableViewDocument = new TypedDocumentString(`
-    query TableView($scope: String!, $name: String) {
-  view(scope: $scope, name: $name) {
-    scope
-    name
-    saved
-    columns
-    narrowColumns
-    filters
-    sort
-    decisions
-    names
-  }
-}
-    `) as unknown as TypedDocumentString<TableViewQuery, TableViewQueryVariables>;

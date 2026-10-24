@@ -124,6 +124,36 @@ test('a group popover narrows the list on the server, the chips show what each r
   await expect(page).not.toHaveURL(/f=/);
 });
 
+test('Views: save the filters under a name, reopen it, and apply a view that holds a filter the page dropped', async ({
+  page,
+}) => {
+  const mock = await mockIdeasApi(page);
+  mock.saved.set('surface:ideas|Old', { name: 'Old', filters: 'gone:x;decision:EVENT_RISK' });
+  await page.goto('/ideas?f=decision:QUALIFIED');
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
+  await page.getByRole('button', { name: /^Views/ }).click();
+  const menu = page.getByRole('dialog', { name: 'Views' });
+  await expect(menu).toContainText('Decision Qualified');
+  await menu.getByLabel('Name of the view').fill('Qualified only');
+  await menu.getByRole('button', { name: 'Save view' }).click();
+  await expect
+    .poll(() => mock.saved.get('surface:ideas|Qualified only')?.filters)
+    .toBe('decision:QUALIFIED');
+  await page.getByRole('button', { name: 'Clear all' }).click();
+  await expect(page).not.toHaveURL(/f=/);
+  await page.getByRole('button', { name: /^Views/ }).click();
+  const reopened = page.getByRole('dialog', { name: 'Views' });
+  await expect(reopened.getByRole('button', { name: /^Qualified only/ })).toContainText(
+    'Decision Qualified',
+  );
+  await reopened.getByRole('button', { name: /^Old/ }).click();
+  await expect(page).toHaveURL(/f=decision(%3A|:)EVENT_RISK/);
+  await expect(grid(page).getByRole('row', { name: /TSLA/ })).toBeVisible();
+  await expect(page.getByText('Not applied · 1')).toBeVisible();
+  await expect(page.getByText('gone')).toBeVisible();
+  await expectAccessible(page);
+});
+
 test('More filters finds a catalogue feature by a phrasebook word and filters on it', async ({
   page,
 }) => {

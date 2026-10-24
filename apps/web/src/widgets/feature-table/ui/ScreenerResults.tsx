@@ -32,13 +32,7 @@ import {
   type LabelOf,
 } from '@/features/filter-bar';
 import { termHelp } from '@/features/guide-help';
-import {
-  formatSort,
-  parseSort,
-  screenerScope,
-  useTableView,
-  ViewControls,
-} from '@/features/table-view';
+import { formatSort, parseSort, screenerScope, useTableView } from '@/entities/saved-view';
 import { UnknownNote, type ServedUnavailable } from '@/entities/availability';
 import { useFilterSet } from '@/entities/filter';
 import { byName, useFeatureCatalogue, type CriterionInfo, type TableRow } from '@/entities/feature';
@@ -239,6 +233,7 @@ export function ScreenerResults({
             facets={facets}
             help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}
             labelOf={labelOf}
+            views={view}
             actions={
               <ExportButton
                 surface={SURFACE}
@@ -278,7 +273,6 @@ export function ScreenerResults({
               {`${count(dismissed.size)} hidden · Show`}
             </Button>
           ) : null}
-          <ViewControls view={view} />
           <FeaturePicker
             label="Add column"
             icon="plus"

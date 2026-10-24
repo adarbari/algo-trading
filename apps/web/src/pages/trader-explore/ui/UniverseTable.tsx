@@ -88,6 +88,7 @@ export function UniverseTable({
         <Stack gap={2}>
           <SurfaceFilterBar
             surface={SURFACE}
+            views
             state={filters}
             facets={facets}
             help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}

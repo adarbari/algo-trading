@@ -1,8 +1,17 @@
+from pathlib import Path
+
 import pytest
 
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.screens.views import TableView, load_view, scope_parts
+from algotrade.services.read.screens.views import (
+    NamedView,
+    TableView,
+    load_view,
+    scope_parts,
+    surface_exists,
+)
+from algotrade.storage.configs.files import FileConfigStore
 from tests.unit.services.read.screens.conftest import context
 
 PREFS = {
@@ -23,7 +32,7 @@ def test_the_default_and_a_named_view(reader: StoreReader) -> None:
     ctx = context(reader, PREFS)
     assert load_view(ctx, "screener:alpha") == TableView(
         "screener:alpha", None, True, ("rollup.iv30@v1.iv30",), "-score", ("QUALIFIED",),
-        ("Earnings",), ("name", "criterion:a"),
+        ("Earnings",), ("name", "criterion:a"), "", (NamedView("Earnings"),),
     )  # fmt: skip
     named = load_view(ctx, "screener:alpha", "Earnings")
     assert named is not None
@@ -61,3 +70,22 @@ def test_scope_parts() -> None:
     for bad in ("screener:", "vrp_scanner", "other:x"):
         with pytest.raises(ValueError, match="view scope"):
             scope_parts(bad)
+
+
+def test_a_surface_with_a_filter_bar_has_views_and_one_without_has_none(
+    reader: StoreReader,
+) -> None:
+    saved = {("me", "preferences", "preferences"): {
+        "views": {"surface:ideas": {"view": {"columns": [], "filters": "decision:QUALIFIED"}}},
+    }}  # fmt: skip
+    ctx = context(reader, saved)
+    found = load_view(ctx, "surface:ideas")
+    assert found is not None and (found.saved, found.filters) == (True, "decision:QUALIFIED")
+    assert load_view(ctx, "surface:no_such_surface") is None
+    assert scope_parts("surface:edge_trades") == ("surface", "edge_trades")
+
+
+def test_a_surface_id_no_file_could_have_is_no_view_not_an_error(tmp_path: Path) -> None:
+    """A store that checks ids (the file store) refuses ``Bad!``; the read answers no view."""
+    assert surface_exists(FileConfigStore(tmp_path), "Bad!") is False
+    assert surface_exists(FileConfigStore(tmp_path), "ideas") is False  # no such file here

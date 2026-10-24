@@ -120,6 +120,7 @@ export function EdgeList({ onSelect, search, onSearchChange }: EdgeListProps) {
       ))}
       <SurfaceFilterBar
         surface={SURFACE}
+        views
         state={filters}
         facets={facets}
         help={(entry) => (entry.kind === 'term' ? termHelp(entry.id) : null)}

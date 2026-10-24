@@ -65,6 +65,17 @@ export function chipItems(
   });
 }
 
+/** The filters as one line of text ("Decision Qualified · Spread ≤ 5%"): what a saved view holds. */
+export function filtersSummary(
+  filters: readonly FilterState[],
+  definitions: readonly FilterDefinition[],
+  labelOf?: LabelOf,
+): string {
+  return chipItems(filters, definitions, null, labelOf)
+    .map((item) => `${item.label} ${item.valueText}`.trim())
+    .join(' · ');
+}
+
 /**
  * The best ways back from an empty list: the filters in force with the most rows they remove (with
  * nothing matching, the rows the list would show without them), largest first.

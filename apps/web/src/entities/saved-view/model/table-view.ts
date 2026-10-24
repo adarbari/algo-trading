@@ -23,6 +23,8 @@ export interface FilterBinding {
   onChange: (next: string | undefined) => void;
   /** The filter ids the surface defines now; undefined: not loaded yet (nothing is dropped). */
   known?: readonly string[];
+  /** Ids starting with it are defined too (`feature:`: made on the fly, the server gates them). */
+  knownPrefix?: string;
   /**
    * The `f` for a view that holds none: nothing saved yet, or one saved with only the decisions
    * it showed (before filters existed; `decisions` is what it held, maybe none).
@@ -36,6 +38,8 @@ export interface TableViewState {
   name: string | null;
   /** The user's named views of the table, sorted. */
   names: readonly string[];
+  /** Each named view with the `f` string it holds (one read lists them all). */
+  named: readonly { name: string; filters: string }[];
   /** The saved view has been read, and with a filter binding its `f` restored (the table can ask for its rows). */
   ready: boolean;
   columns: readonly string[];
@@ -52,25 +56,33 @@ export interface TableViewState {
   select: (name: string | null) => void;
   /** Save the current choice as the view `name` (replacing one of that name), then use it. */
   saveAs: (name: string, onDone?: () => void) => void;
-  /** Remove the named view in use and go back to the default view. */
-  remove: () => void;
+  /** Remove the named view `target` (default: the one in use; removing that goes back to the default view). */
+  remove: (target?: string) => void;
   saving: boolean;
   removing: boolean;
   /** Why the last save was refused. */
   error: unknown;
 }
 
-export function useTableView(scope: string, filters?: FilterBinding): TableViewState {
+/**
+ * `enabled` false (a menu not opened yet) reads nothing and restores nothing: no request fires
+ * on a page's load for a view nobody asked for; turning it on later reads the views.
+ */
+export function useTableView(
+  scope: string,
+  filters?: FilterBinding,
+  enabled = true,
+): TableViewState {
   const [name, setName] = useState<string | null>(null);
   const [edits, setEdits] = useState<Edits>({});
-  const saved = useSavedView(scope, name);
+  const saved = useSavedView(scope, name, enabled);
   const save = useSaveView(scope);
   const removal = useDeleteView(scope);
   const view = saved.data;
-  const restore = useRef<'initial' | 'switched' | null>('initial');
+  const restore = useRef<'initial' | 'switched' | null>(enabled ? 'initial' : null);
   // With a filter binding the table waits for the view's `f` to be in the URL before it reads.
   const [restoredF, setRestoredF] = useState(false);
-  const restored = restorableFilters(view?.filters ?? '', filters?.known);
+  const restored = restorableFilters(view?.filters ?? '', filters?.known, filters?.knownPrefix);
   const decided = view?.saved ? view.decisions : [];
   const seeded =
     restored.f ||
@@ -104,7 +116,8 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
     scope,
     name,
     names: view?.names ?? [],
-    ready: !saved.isPending && (!filters || restoredF),
+    named: view?.named ?? [],
+    ready: enabled && !saved.isPending && (!filters || restoredF),
     columns: current.columns,
     narrowColumns: current.narrowColumns,
     sort: current.sort,
@@ -127,11 +140,11 @@ export function useTableView(scope: string, filters?: FilterBinding): TableViewS
         },
       );
     },
-    remove: () => {
-      if (name === null) return;
-      removal.mutate(name, {
+    remove: (target = name ?? undefined) => {
+      if (target === undefined) return;
+      removal.mutate(target, {
         onSuccess: () => {
-          select(null);
+          if (target === name) select(null);
         },
       });
     },

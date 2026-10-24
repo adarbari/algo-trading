@@ -1,9 +1,10 @@
 /**
- * The filter list's one search parameter, `f`, for a route's `validateSearch`: a string that
- * decodes to at least one filter, written back in its canonical form (so a hand-edited or
- * stale link settles to one spelling); anything else is dropped.
+ * The filter list's one search parameter, `f`, for a route's `validateSearch`: a non-empty
+ * string with at least one `id:body` entry is kept as written, anything else is dropped. The
+ * route's validator runs in the app's entry chunk on every page, so it stays this small: the
+ * codec (`decodeFilters` / `encodeFilters`) loads with the page that reads the filters, which
+ * ignores malformed entries when it decodes and writes the canonical spelling with its next change.
  */
-import { decodeFilters, encodeFilters } from './codec';
 
 /** The raw search params the filter bar owns. */
 export interface FilterSearch {
@@ -13,7 +14,6 @@ export interface FilterSearch {
 /** Validates the router's parsed search params; merge the result into a route's own validator. */
 export function filterSearch(raw: Record<string, unknown>): FilterSearch {
   const value = raw['f'];
-  if (typeof value !== 'string') return {};
-  const canonical = encodeFilters(decodeFilters(value));
-  return canonical ? { f: canonical } : {};
+  const f = typeof value === 'string' ? value.trim() : '';
+  return f.includes(':') ? { f } : {};
 }

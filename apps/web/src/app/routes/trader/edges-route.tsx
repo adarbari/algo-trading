@@ -8,7 +8,7 @@ import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
 import { pageRoute } from '../page-loader';
-import { decodeFilters, filterSearch } from '@/features/filter-bar';
+import { filterSearch } from '@/features/filter-bar';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const EdgesPage = lazyPage(() => import('@/pages/trader-edges'), 'EdgesPage');
@@ -78,7 +78,7 @@ export const edgesRoute = createRoute({
   ...pageRoute(
     EdgesPage,
     (page, client, deps: { edge: string | null; f: string | undefined; q: string }) => {
-      page.prefetchEdgesReads(client, deps.edge, decodeFilters(deps.f), deps.q);
+      page.prefetchEdgesReads(client, deps.edge, deps.f, deps.q);
     },
   ),
   component: EdgesIndex,
