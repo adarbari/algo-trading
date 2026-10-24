@@ -23,11 +23,11 @@ def test_the_definitions_of_a_surface_are_served(graph: Graph) -> None:
     assert "errors" not in body, body
     found = body["data"]["filterSet"]
     by_id = {f["id"]: f for f in found["filters"]}
-    assert found["surface"] == "ideas" and {"decision", "dollar_volume", "earnings"} <= set(by_id)
-    assert by_id["dollar_volume"]["kind"] == "RANGE" and by_id["dollar_volume"]["bins"]
-    assert by_id["earnings"]["windowUnit"] == "SESSIONS"
-    assert by_id["dollar_volume_pct_universe"]["unit"] == "PERCENT"
-    assert by_id["dollar_volume"]["unit"] is None
+    every = set(by_id) | {w["id"] for w in found["withheld"]}  # a field with no data is withheld
+    assert found["surface"] == "ideas" and {"decision", "dollar_volume", "earnings"} <= every
+    assert {"decision", "agreeing"} <= set(by_id)  # columns of the list itself
+    assert by_id["agreeing"]["kind"] == "RANGE" and by_id["agreeing"]["bins"]
+    assert by_id["agreeing"]["unit"] is None
     assert {o["value"] for o in by_id["decision"]["options"]} >= {"QUALIFIED", "WATCH"}
 
 
@@ -122,3 +122,25 @@ def test_a_feature_filter_for_an_unknown_field_is_refused(graph: Graph) -> None:
         IDEAS, {"first": 10, "filters": [{"id": "feature:rollup.nope@v1.x", "values": []}]}
     )
     assert body["errors"][0]["extensions"]["code"] == "FORBIDDEN"
+
+
+def test_a_filter_with_no_known_value_is_withheld_and_the_input_is_ignored(graph: Graph) -> None:
+    """The golden store has no dollar volume for the session: `filterSet` (a request context the
+    production opener hands out) must withhold it, and a list must not refuse it."""
+    body = graph(
+        FILTER_SET.replace("surface label", "surface label").replace(
+            "withheld { id", "withheld { id guide"
+        ),
+        {"surface": "ideas"},
+    )
+    assert "errors" not in body, body
+    found = body["data"]["filterSet"]
+    withheld = {w["id"]: w for w in found["withheld"]}
+    offered = {f["id"] for f in found["filters"]}
+    for filter_id, w in withheld.items():
+        if w["unavailable"]["kind"] == "NOT_STORED":
+            assert w["guide"] == "term:filter_withheld_no_data" and filter_id not in offered
+            ideas = graph(
+                IDEAS, {"first": 5, "filters": [{"id": filter_id, "values": [], "min": 1}]}
+            )
+            assert "errors" not in ideas, ideas

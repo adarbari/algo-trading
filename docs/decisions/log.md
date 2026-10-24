@@ -726,3 +726,11 @@ follow-up PR).
 - status: final
 - Reasoning: CI noise and main's drift, not the run line's behaviour; the owner chose to raise it in chat on 2026-10-24.
 - Superseded the same day: main's #945 raised the same budget to 217130 B, so this PR keeps main's value and adds no raise of its own.
+
+## 2026-10-24 | Cohort / IV-rank percentile filters | Withhold a filter with no known value for the session
+- Question: IV-rank percentile filters match zero rows for every session until about Jan 2027 (60-session history); cohort percentile filters are UNKNOWN before 2026-10-02: offer with the unknown count, hide generically, or remove the IV-rank ones from config until then?
+- Options: (1) keep offering / (2) generic rule: withhold when every row is UNKNOWN for the read session / (3) remove the IV-rank filters from config, re-add in January.
+- Decision: (2). A catalogue-field filter whose field has no known value for any row of the read session is served in `withheld` as Unavailable (NOT_STORED, cause "no known value for session <S>", Guide term `filter_withheld_no_data`), listed in More filters with that reason, and an input naming it is never refused (a shared link opens; the lists still read it, and as UNKNOWN never passes it matches nothing with the gap disclosed; a screen echoes it switched off, `active` false, which is in no mask). No config change.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: a control that can only return 0 erodes trust; the rule is generic (covers both cases and any future late-starting feature), costs little (one cached population read per field and published version) and reverses itself when data arrives. Implementation note: the check reads the whole population for the session once per field (`filtering/no_data.py`), not the facets of one list, because `filterSet` serves definitions before any list is loaded and every surface must agree.
