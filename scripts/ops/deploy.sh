@@ -71,6 +71,10 @@ main() {
   local api="${ALGOTRADE_DEPLOY_API:-$tree/.venv/bin/algotrade-api}"
   # deploy-hold runs from the tree's venv: the ingest sync below may `uv sync` the main venv
   local ingest="${ALGOTRADE_DEPLOY_INGEST:-$tree/.venv/bin/algotrade-ingest}"
+  # The cwd is the main checkout, but the code is the tree's: read the tree's config too (site/ is
+  # tracked, users/ is the overlay link to main's), else a lagging main config fails the tree's
+  # import (2026-10-24: pe_ratio materialise) and deadlocks the ingest sync that would advance main.
+  export ALGOTRADE_CONFIG_DIR="$tree/config"
   mkdir -p "$state" var/logs
 
   if [ "$clear" = 1 ]; then
