@@ -87,6 +87,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_cover.cover_shares import SecCoverShares
 from algotrade_sources.vendors.sec_prospectus.prospectus import SecProspectus
 from algotrade_sources.vendors.sec_prospectus.prospectus_search import SecProspectusSearch
 from algotrade_sources.vendors.sec_text.filing_text import SecFilingText
@@ -307,6 +308,7 @@ SOURCES: dict[str, SourceSpec] = {
         _sec("sec_submissions", SecSubmissions),
         _sec("sec_filings", SecFilings),
         _sec("sec_filing_text", SecFilingText),
+        _sec("sec_cover_shares", SecCoverShares),
         _sec("sec_daily_index", SecDailyIndex, not_found=missing_index),
         _sec("sec_prospectus_search", SecProspectusSearch),
         _sec("sec_prospectus", SecProspectus),

@@ -272,6 +272,19 @@ comparator; a filing re-extracted by a later parser version is read from the ses
 ran, never earlier; a text re-extracted from a filing older than the five recent sessions is not
 read as news.
 
+### Filing cover shares per class (SEC EDGAR)
+
+A multi-class filer (GOOGL / GOOG, ERIE and its unlisted Class B, BRK) states each class's shares
+outstanding on the cover of its periodic report, tagged `dei:EntityCommonStockSharesOutstanding`
+on a context whose one dimension is `us-gaap:StatementClassOfStockAxis` (a company's own member,
+`goog:CapitalClassAMember`, included); the same member's context carries `dei:TradingSymbol` and
+`dei:Security12bTitle`. `vendors/sec_cover/cover_shares.py` reads them from the filing's XBRL
+instance (`<primary document stem>_htm.xml`, used only when the filing's `index.json` lists it):
+two requests a filing on the shared `sec` limiter (10 requests a second at most, the contact
+`User-Agent`). A class with no symbol (unlisted) keeps a null symbol, a single-class filer has a
+null class member, a filing with no cover tags (most 40-F) is an empty answer, malformed XML a
+`CoverParseError`. Adapter only: the table and the task that stores it follow.
+
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 
 `sp500_ticker_start_end.csv` of https://github.com/fja05680/sp500 (MIT licence, free, no key):
