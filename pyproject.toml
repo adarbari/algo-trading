@@ -582,6 +582,7 @@ modules = [
     "algotrade_sources.vendors.proshares",
     "algotrade_sources.vendors.published",
     "algotrade_sources.vendors.sec",
+    "algotrade_sources.vendors.sec_cover",
     "algotrade_sources.vendors.sec_text",
     "algotrade_sources.vendors.ssga",
     "algotrade_sources.vendors.tiingo",

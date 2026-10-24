@@ -59,6 +59,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_cover.cover_shares import SecCoverShares
 from algotrade_sources.vendors.sec_prospectus.prospectus import SecProspectus
 from algotrade_sources.vendors.sec_prospectus.prospectus_search import SecProspectusSearch
 from algotrade_sources.vendors.sec_text.filing_text import SecFilingText
@@ -281,6 +282,20 @@ def sec_filing_text() -> Adapter:
     return SecFilingText(http_for(lambda url: payload)), request
 
 
+def sec_cover_shares() -> Adapter:
+    base = "https://www.sec.gov/Archives/edgar/data/1652044/000165204424000022/"
+    listing = b'{"directory":{"item":[{"name":"goog-20231231_htm.xml"}]}}'
+    xml = (FIXTURES / "sec" / "cover_multiclass_synthetic.xml").read_bytes()
+    request = FilingTextRequest(
+        key="0001652044-24-000022",
+        cik="1652044",
+        form="10-K",
+        primary_document="goog-20231231.htm",
+    )
+    files = {base + "index.json": listing, base + "goog-20231231_htm.xml": xml}
+    return SecCoverShares(http_for(lambda url: files[url])), request
+
+
 def sec_daily_index() -> Adapter:
     payload = (FIXTURES / "sec" / "daily_index_form_20260930_trimmed.idx").read_bytes()
     request = DailyIndexRequest(key="2026-09-30", day=date(2026, 9, 30))
@@ -357,6 +372,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "sec_filings": sec_filings,
     "sec_daily_index": sec_daily_index,
     "sec_filing_text": sec_filing_text,
+    "sec_cover_shares": sec_cover_shares,
     "sec_prospectus_search": sec_prospectus_search,
     "sec_prospectus": sec_prospectus,
     "sec_form4_xml": sec_form4_xml,

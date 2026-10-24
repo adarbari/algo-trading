@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SYNTHETIC: hand-written to the shape of a multi-class filer's cover (Alphabet-style); not fetched from EDGAR. -->
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xbrldi="http://xbrl.org/2006/xbrldi" xmlns:dei="http://xbrl.sec.gov/dei/2024" xmlns:us-gaap="http://fasb.org/us-gaap/2024" xmlns:goog="http://abc.xyz/20231231" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <xbrli:context id="c-1"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0001652044</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2023-12-31</xbrli:instant></xbrli:period></xbrli:context>
+  <xbrli:context id="c-2"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0001652044</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementClassOfStockAxis">goog:CapitalClassAMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>2024-01-24</xbrli:instant></xbrli:period></xbrli:context>
+  <xbrli:context id="c-3"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0001652044</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:CommonClassBMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>2024-01-24</xbrli:instant></xbrli:period></xbrli:context>
+  <xbrli:context id="c-4"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0001652044</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementClassOfStockAxis">goog:CapitalClassCMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>2024-01-24</xbrli:instant></xbrli:period></xbrli:context>
+  <xbrli:context id="c-5"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">0001652044</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:CommonClassBMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>2023-12-31</xbrli:instant></xbrli:period></xbrli:context>
+  <dei:DocumentPeriodEndDate contextRef="c-1">2023-12-31</dei:DocumentPeriodEndDate>
+  <dei:TradingSymbol contextRef="c-2">GOOGL</dei:TradingSymbol>
+  <dei:Security12bTitle contextRef="c-2">Class A Common Stock, $0.001 par value</dei:Security12bTitle>
+  <dei:TradingSymbol contextRef="c-4">GOOG</dei:TradingSymbol>
+  <dei:Security12bTitle contextRef="c-4">Class C Capital Stock, $0.001 par value</dei:Security12bTitle>
+  <dei:EntityCommonStockSharesOutstanding contextRef="c-4" decimals="INF" unit="shares">5,000,000</dei:EntityCommonStockSharesOutstanding>
+  <dei:EntityCommonStockSharesOutstanding contextRef="c-2" decimals="INF" unit="shares">5800000000</dei:EntityCommonStockSharesOutstanding>
+  <dei:EntityCommonStockSharesOutstanding contextRef="c-3" decimals="INF" unit="shares">870000000</dei:EntityCommonStockSharesOutstanding>
+  <dei:EntityCommonStockSharesOutstanding contextRef="c-5" decimals="INF" unit="shares">871000000</dei:EntityCommonStockSharesOutstanding>
+</xbrli:xbrl>
