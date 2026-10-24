@@ -143,6 +143,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/files/{surface}.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Surface Csv */
+        get: operations["surface_csv_files__surface__csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/files/edges/{edge_id}/trades.csv": {
         parameters: {
             query?: never;
@@ -2134,6 +2151,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SavedFeature"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    surface_csv_files__surface__csv_get: {
+        parameters: {
+            query?: {
+                /** @description catalogue columns to add (screener_results, universe) */
+                columns?: string[] | null;
+                /** @description the session to read (default: the one pages show) */
+                date?: string | null;
+                /** @description the page's filter string (ADR 0082) */
+                f?: string | null;
+                /** @description screener_results: the screener whose run to export */
+                screener?: string | null;
+            };
+            header?: never;
+            path: {
+                surface: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

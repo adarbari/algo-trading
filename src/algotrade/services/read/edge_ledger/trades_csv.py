@@ -2,7 +2,7 @@
 
 The file is the page's rows with no paging: every column the GraphQL row has, in its order, a
 value the viewer may not read, or a ticker not known, as its public kind (``LICENCE``), one not
-stored empty, never 0.
+stored empty, never 0; a text cell a spreadsheet would run as a formula starts with `'` (``cell``).
 It renders the rows the loader already redacted, so the file and the graph cannot disagree: same
 basis, same licence rule, same hidden copy rule. Lines are yielded one at a time for streaming."""
 
@@ -11,6 +11,7 @@ import io
 from collections.abc import Iterator
 
 from algotrade.services.read.evaluation.runs import TradeCell, TradeRow, TradeText
+from algotrade.services.read.export.cells import cell
 
 COLUMNS = (
     "source", "variant", "horizon_sessions", "decision_session", "entry_session", "exit_session",
@@ -36,7 +37,7 @@ def csv_lines(rows: tuple[TradeRow, ...]) -> Iterator[str]:
     """The header, then one line per row of ``rows``."""
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
-    for record in (COLUMNS, *([_cell(getattr(r, c)) for c in COLUMNS] for r in rows)):
+    for record in (COLUMNS, *([cell(_cell(getattr(r, c))) for c in COLUMNS] for r in rows)):
         writer.writerow(record)
         yield buffer.getvalue()
         buffer.seek(0)

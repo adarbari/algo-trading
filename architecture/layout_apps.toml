@@ -157,6 +157,10 @@ path = "apps/api/algotrade_api/routes/edges"
 purpose = "the edges area's routes that stay REST (ADR 0059): run an edge evaluation on request and poll its job; its reads are GraphQL (Query.edges)"
 
 [[dir]]
+path = "apps/api/algotrade_api/routes/export"
+purpose = "the filter bar's file route (ADR 0082 decision 6): a surface's filtered rows as CSV, one call of services.read.export, one audit line per export"
+
+[[dir]]
 path = "apps/api/algotrade_api/routes/preview"
 purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.preview dry run"
 

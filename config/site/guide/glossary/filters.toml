@@ -581,3 +581,23 @@ The same rank as the sector filter, among the closer peers of the same industry.
 """
 next = "Use it with the sector filter to find premium that is rich against the closest peers."
 see_also = ["cohort", "percentile", "filter_iv_rank_pct_sector", "filter_sector", "filter_unknown_rows"]
+
+[[term]]
+id = "export"
+term = "Export"
+short = "Saves the rows your filters leave as a CSV file, with what you can see and nothing more."
+body = """
+Export writes the list you are looking at, with the filters in force, as a CSV file. The server builds it the way it builds the page, so the file has the same rows in the same order. A value you cannot see on the page reads LICENCE in the file. A value that is not known shows its reason the same way, and one that is not stored is empty. The first line of the file is a notice; see the export notice. A list longer than 50,000 rows is cut there, and a second line says so.
+"""
+next = "Narrow the filters first if the file says it was cut."
+see_also = ["export_notice", "unavailable_licence", "unknown"]
+
+[[term]]
+id = "export_notice"
+term = "Export notice"
+short = "The first line of an exported file: the session, who exported it and which data licences they hold."
+body = """
+Some values come from a source licensed for one person's own use, such as the broker feed. The notice names the session the file reads, your user and the licences you hold, and says those values are for the holder's own use and not for redistribution. A person who does not hold the licence sees LICENCE in those cells and never the value. Each export is logged with your user, the list, the filters, the number of rows and the licences held.
+"""
+next = "Keep a file that holds personal-licence values to yourself."
+see_also = ["export", "unavailable_licence"]

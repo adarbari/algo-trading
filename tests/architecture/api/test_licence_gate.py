@@ -45,6 +45,7 @@ GATED = {
     "services/screening/run.py": "held=held",  # a screener run, so the results it stores
     "services/live/quotes.py": "ctx.licences",  # live IBKR quotes
     "services/read/edge_ledger/trades.py": "load_feature_values(",  # the sector filter's values
+    "services/read/export/surfaces.py": "run_withheld(",  # a file's cells: as the page
 }
 # Callers that must hand the user's licences to a gated function or key.
 CALLERS = {

@@ -38,6 +38,20 @@ See ADR 0082 decisions 1-4: `config/site/filters/<surface>.toml` -> `filterSet(s
 `filters: [FilterInput!]` in, `facets` out; URL parameter `f` =
 `decision:QUALIFIED,WATCH;dte:..14;rsi_14@v1:30..70;!liq:risk`.
 
+## Export
+The bar's `actions` slot may hold `ExportButton` (`features/filter-export`, Guide terms `export` and
+`export_notice`): it saves the rows the filters in force leave as `GET /files/<surface>.csv?f=<f>`
+(ADR 0082 decision 6). The rule: **a file carries what the viewer can see and nothing more.** The
+server builds it through the surface's own gated loader and the same filtering pass as the page
+(`services/read/export/`), so the rows and order are the page's for the same `f`; a value under a
+licence the viewer does not hold is `LICENCE` (never the value), an unknown one its public kind,
+a hidden filter's field is not offered or refused as on the page. The first line is the notice
+(session, viewer, licences held, own-use wording); more than 50,000 rows are cut and the second
+line says so; each export logs one audit line. A new surface adds one entry to
+`services/read/export/surfaces.py` (its loader and text cells) and puts the button in its bar. Wired on Ideas;
+screener results and the universe are served by the route and take the button with their page
+migrations.
+
 ## Components (`@algotrade/ui`)
 `FilterBar` (search, groups, chips, actions, count, narrow sheet), `FilterGroupButton`,
 `RangeFilter` (with an `unknownHelp` slot for the Guide term), `WindowFilter`, `ZeroResults`, `FilterChips` (structured items; `onClear` only when the bar does not own Clear all). Pick uses `OptionList`, toggle

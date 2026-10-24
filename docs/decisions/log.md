@@ -662,3 +662,27 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: one filter bar for every table, list and feed (ADR 0082) is the owner's design; the cost is the shared code itself, and later surfaces adopt it without raising anything again.
+
+## 2026-10-24 | ADR 0082 filter-bar Export | May personal-licence values leave as a file
+- Question: may the filter bar export the rows a viewer filtered, and what may the file hold?
+- Options: (a) none until the owner decides / (b) hybrid: files carry what the viewer can see, built server-side through the gated loader / (c) browser rows saved as a file.
+- Decision: option (b) hybrid. Files carry what the viewer can see, via the gated loader (ADR 0069), personal cells LICENCE for non-holders as the ledger CSV (ADR 0064 d.10), a stamped licence notice and an audit line. Reversible by removing the route; nothing a non-holder sees today changes.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the ledger CSV already serves personal cells as LICENCE to a non-holder through the page's loader, so a file built the same way cannot show more than the page; browser rows would bypass the gate. Decided by a Fable agent on the owner's behalf while the owner was away (owner instruction 2026-10-24).
+
+## 2026-10-24 | ADR 0082 filter-bar Export (architect review) | Hybrid export confirmed after review
+- Question: the architect's review found no licence leak and three details (CSV-injection prefix, audit line, file built from the viewer's resolved session): confirm the hybrid, restrict personal cells to holders, or withdraw Export?
+- Options: confirm the hybrid / restrict personal cells to holders / withdraw Export.
+- Decision: (a) confirmed: the file is exactly what the viewer sees, via the gated loader with the viewer's ReadContext and session; personal cells LICENCE to non-holders as the ledger CSV (ADR 0064 d.10); `#` notice; one audit line per export; the CSV prefix stays.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: no finding showed the file holding more than the page; a holders-only variant would make the export disagree with the page and the ledger precedent; the injection fix and same-session build are safety, not scope.
+
+## 2026-10-24 | ADR 0082 filter-bar Export | Export audit is a log line, not a table
+- Question: keep the per-export audit (viewer, surface, filter hash, row count, licences) a log line, or persist it in a new table with a new writer (ADR 0005)?
+- Options: (i) a log line / (ii) a new table and writer.
+- Decision: (i) one INFO line per export on the `algotrade_api.export` logger under var/logs/ (stderr, `api.err.log`), carrying viewer id, surface, filter hash (never filter values), row count and licences held, no cell values; erasure of a user is covered by ADR 0066's existing manual step for API logs; reconsider a table when a third real trader is registered or an admin page needs to read exports.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: a hash and a count carry no content, so a table, writer and retention registration cost with no reader.
