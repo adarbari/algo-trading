@@ -46,7 +46,7 @@ class FeatureTable:
     @classmethod
     def of(cls, d: table.FeatureTable, ctx: ReadContext) -> Self:
         return cls(
-            session=Session.of(d.session),
+            session=Session.of(d.session, ctx),
             universe_snapshot=d.universe_snapshot,
             pre_snapshot=d.pre_snapshot,
             columns=[FeatureInfo.of(c) for c in d.columns],

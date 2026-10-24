@@ -415,6 +415,14 @@ follow-up PR).
 - status: final
 - Reasoning: a gate that cannot be read on the launch day would leave the edge with no events; the established O2 gate keeps the short side a liquid-name test, at the cost of a small count, which the edge's notes disclose.
 
+## 2026-10-23 | Data-status pill PR (#902) | Entry bundle budgets raised by the pill's cost
+- Question: the always-visible data-status pill puts its badge in the entry chunk (the popover and its detail read load on the first click, so no extra request); the entry budgets sit at their limit. Trim elsewhere, or raise the two entry budgets?
+- Options: cut the pill (a lazy badge adds a JS request on every page, over the request budgets) / raise the entry and entry-plus-static-imports budgets by the pill's measured cost / drop the pill.
+- Decision: owner waiver of the shared rule for the two entry budgets only: entry 24900 to 25310 B and entry plus static imports 196367 to 197010 B (measured locally 25140 and 196840 B, CI about 100 B higher, +70 B margin), through the `waivers` map; no request, DOM or route budget changes.
+- decided by: owner
+- status: final
+- Reasoning: traders need to see which session's data they are reading on every page without a click or an extra request; the badge is about 650 B gzip.
+
 ## 2026-10-21 | Remote-client load PR (early start) | Entry-static-imports waiver of 200 B
 - Question: starting a trader page's reads at start-up beside the viewer (one round trip less for a distant client) puts a one-line dynamic import in the entry, about 90 B gzip over a static-imports budget with about 35 B of margin; cut elsewhere or waive?
 - Options: cut elsewhere in the entry / waive the shared rule for this PR by up to 200 B / drop the early start.
@@ -615,3 +623,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: a bar nobody measures a page against is not a bar; static parsing keeps the check in CI without the clone.
+
+## 2026-10-23 | Data-status pill PR (#902) | Two e2e route budgets raised by the pill's cost
+- Question: with the badge in the entry chunk, CI's perf e2e fails two route budgets (Explore chart tab first-load JS, Admin ingestion DOM nodes). Trim, or raise those two?
+- Options: trim the badge further (about 295 B and 5 nodes, no honest cut left) / raise the two route budgets by the measured overage plus a small margin / drop the pill.
+- Decision: Explore chart tab `first_load_js_gzip_bytes` 304630 to 305000 B (CI 304925) and Admin ingestion `dom_nodes` 646 to 654 (CI 651); no other budget changes.
+- decided by: owner
+- status: final
+- Reasoning: the badge is on every page by design; the overage is the badge itself, and the route budgets sit at measured size.

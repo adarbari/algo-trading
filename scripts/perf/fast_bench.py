@@ -335,6 +335,9 @@ def resolve_views_file(arg: str | None, captured: Path = CAPTURED_FILE) -> tuple
 EDGE_VARS = ("id", "edgeId")  # the variables an edge operation takes: the one edge the capture uses
 # the first-render values of the edge trades ledger (widgets/edge-trades/ui/EdgeTrades.tsx)
 FIRST_RENDER = {"period": "ALL", "page": 1, "sort": "DECISION", "descending": False}
+# the shell's own variable: the bench viewer is the admin, as the status strip's capture (`admin`)
+# and the data-status pill's lazy detail read (entities/system-status/api/use-data-status-detail.ts)
+SHELL_VARS = {"admin": True}
 
 
 def edge_id_of(doc: dict) -> str | None:
@@ -364,11 +367,12 @@ def web_fallback(name: str, edge: str | None) -> dict | None:
         return None
     required = pdocs.required_variables(query)
     resolved = set(VARIABLE_RESOLVERS.get(name, {}))  # filled at run time from the clone
-    if not required <= set(EDGE_VARS) | set(FIRST_RENDER) | resolved:
+    if not required <= set(EDGE_VARS) | set(FIRST_RENDER) | set(SHELL_VARS) | resolved:
         return None
     declared = pdocs.declared_variables(query)
     variables = {v: edge for v in declared if v in EDGE_VARS}
     variables |= {v: x for v, x in FIRST_RENDER.items() if v in declared}
+    variables |= {v: x for v, x in SHELL_VARS.items() if v in declared}
     return {"query": query, "variables": variables}
 
 

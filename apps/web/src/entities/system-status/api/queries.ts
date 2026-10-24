@@ -24,6 +24,9 @@ const StatusStrip = graphql(`
         date
         state
       }
+      dataStatus {
+        state
+      }
     }
     screeners {
       id
@@ -59,7 +62,7 @@ export interface StatusStripState {
 }
 
 /** What the strip draws from; `admin` adds the nightly run and the grid to the same request. */
-function statusStripQuery(admin: boolean) {
+export function statusStripQuery(admin: boolean) {
   return queryOptions({
     queryKey: queryKeys.gql('StatusStrip', { admin }),
     queryFn: ({ queryKey }) => gql(StatusStrip, { admin }, queryKey),

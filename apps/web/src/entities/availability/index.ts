@@ -28,3 +28,4 @@ export {
 } from './model/words';
 export { UnavailableNote, type UnavailableNoteProps } from './ui/UnavailableNote';
 export { UnknownNote, type UnknownNoteProps } from './ui/UnknownNote';
+export { GapCauses } from './ui/GapCauses';

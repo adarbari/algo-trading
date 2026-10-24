@@ -1460,6 +1460,17 @@ Source: `design-system/components/ShareBar`
 | `size` | `'sm' \| 'md'` | no | Bar thickness: `sm` 6 px (lists, default) or `md` 10 px (a headline bar). |
 | `loading` | `boolean` | no | Placeholder track while the value loads. |
 
+### ShortLabel
+
+ShortLabel: a label with a shorter wording for a narrow container (a phone's top bar): the full text shows where the container is 720 px or wider, `short` below it, by container query (no measuring). `short` is decorative: the caller names the control with the full wording (`aria-label`), so a screen reader hears the same on every width.
+
+Source: `design-system/components/ShortLabel`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `string` | yes | The full wording. |
+| `short` | `string` | yes | The wording under 720 px of container width. |
+
 ### ShowMore
 
 ShowMore: the control under a list that loads in pages. It says how far the list has come ("Showing 50 of 312", a polite live region) and offers the next page; while it loads the button is busy, when it failed the line says so and the button retries, and when everything is shown it is a line only. The caller owns the data: this renders what it is told and calls `onMore`. Wraps under its own line on a narrow container; touch sizing from Button.

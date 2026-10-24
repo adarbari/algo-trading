@@ -38,6 +38,11 @@ export async function mockViewer(page: Page, options: ViewerMockOptions = {}): P
       await route.fulfill({ json: { data: { ideas: null } } });
       return;
     }
+    // The data-status pill's own read: no session, so no pill (e2e/phone.spec.ts mocks the states).
+    if (/query\s+DataStatus\b/.test(body?.query ?? '')) {
+      await route.fulfill({ json: { data: { session: null } } });
+      return;
+    }
     // The saved page cache asks which session the API reads (entities/page-cache).
     if (/query\s+SessionDate\b/.test(body?.query ?? '')) {
       await route.fulfill({ json: { data: { session: { date: '2026-10-07' } } } });
