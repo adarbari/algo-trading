@@ -734,3 +734,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: a control that can only return 0 erodes trust; the rule is generic (covers both cases and any future late-starting feature), costs little (one cached population read per field and published version) and reverses itself when data arrives. Implementation note: the check reads the whole population for the session once per field (`filtering/no_data.py`), not the facets of one list, because `filterSet` serves definitions before any list is loaded and every surface must agree.
+
+## 2026-10-24 | 1 s page gate | EdgeProblems answers empty by design (empty_ok)
+- Question: hand run 9b failed integrity on `EdgeProblems` (answered empty); a stale capture, or a legitimate empty answer?
+- Options: a resolver / `empty_ok` / drop the operation from the measured set.
+- Decision: `empty_ok`: the operation lists the viewer's own edge files that failed to load; the benchmark viewer's all load, so `[]` is correct (no variables, nothing to resolve). A fitness test now checks every timed operation has its variables.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the gate must not end every night as an integrity failure; the answer is correct, only empty.

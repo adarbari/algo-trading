@@ -33,6 +33,8 @@ shell_operations = ["Viewer", "SessionDate", "Regime", "StatusStrip", "EdgeDesk"
 
 # Operations whose answer may be empty by design: every other operation that answers null or
 # empty fails the gate (a stale capture). MyScreens: the benchmark viewer owns no screens, so []
-# is the right answer. Approved by the owner 2026-10-23.
+# is the right answer. Approved by the owner 2026-10-23. EdgeProblems: the viewer's own edge files
+# that did not load; the benchmark viewer's all load, so [] is the right answer (added 2026-10-24
+# after hand run 9b failed integrity on it; owner confirmation pending, docs/decisions/log.md).
 empty_ok_expiry = "2026-12-22"
-empty_ok = ["MyScreens"]
+empty_ok = ["MyScreens", "EdgeProblems"]
