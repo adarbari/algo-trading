@@ -13,8 +13,9 @@ import {
   type QueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
+import { toFilterInputs, type AppliedFilter, type FilterInput } from '@/entities/filter';
 import { gql, GraphQLRequestError, graphql, queryKeys } from '@/shared/api';
 
 import { IDEA_FEATURES } from '../model/facts';
@@ -27,12 +28,31 @@ export const IDEAS_PAGE = 50;
 export const IDEAS_OPERATION = 'IdeasPage';
 
 const IdeasPage = graphql(`
-  query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!) {
-    ideas(first: $first, after: $after) {
+  query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!, $filters: [FilterInput!]) {
+    ideas(first: $first, after: $after, filters: $filters) {
       session
       total
       hasMore
       nextCursor
+      facets {
+        total
+        matched
+        items {
+          id
+          active
+          removes
+          unknown
+          options {
+            value
+            count
+          }
+          bins {
+            lo
+            hi
+            count
+          }
+        }
+      }
       pausedTotal
       paused {
         instrumentId
@@ -152,9 +172,14 @@ const IdeasPage = graphql(`
   }
 `);
 
-/** The cursors of the pages loaded after the first, in order (shared by every widget). */
-const MORE_KEY = ['ideas-more'] as const;
+/**
+ * The cursors of the pages loaded after the first, in order (shared by every widget reading the
+ * same filters). A cursor is only good for the filters it was issued under, so each filter list
+ * has its own: changing the filters starts over from the first page.
+ */
+const moreKey = (filters: readonly FilterInput[] | null) => ['ideas-more', filters] as const;
 const NO_CURSORS: readonly string[] = [];
+const NO_FILTERS: readonly AppliedFilter[] = [];
 
 /**
  * The latest session's ideas (null `ideas`: nothing stored): the first page, and `fetchNextPage`
@@ -164,10 +189,12 @@ const NO_CURSORS: readonly string[] = [];
  * screeners and the paused picks are the first page's. (Not `useInfiniteQuery`: its observer
  * would sit in the entry's static graph, which is at its budget.)
  */
-export function useIdeas() {
+export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
   const client = useQueryClient();
+  const filters = useMemo(() => toFilterInputs(applied), [applied]);
+  const moreQueryKey = useMemo(() => moreKey(filters), [filters]);
   const more = useQuery({
-    queryKey: MORE_KEY,
+    queryKey: moreQueryKey,
     queryFn: () => NO_CURSORS,
     initialData: NO_CURSORS,
     staleTime: Infinity,
@@ -175,38 +202,44 @@ export function useIdeas() {
   });
   const cursors = more.data;
   const state = useQueries({
-    queries: [null, ...cursors].map((after) => pageOptions(after)),
+    queries: [null, ...cursors].map((after) => pageOptions(after, filters)),
     combine: (results) => joinPages(results, cursors),
   });
 
   // A cursor the server refuses (BAD_REQUEST: the runs behind the loaded pages changed) means the
   // list is stale: start over from a fresh first page, never append to it.
+  // New filters are a new query, pending until its first page arrives: until then the last list
+  // (and its counts) stays, so the table and the bar do not blink mid-edit.
+  const [settled, setSettled] = useState(state.data);
+  if (state.data !== undefined && state.data !== settled) setSettled(state.data);
+  const placeholder = state.data === undefined && settled !== undefined;
   const { refused, keep, asked } = state;
   // Pages that no longer link up (see `linked`) leave the list for good: the cursors go with them.
   useEffect(() => {
-    if (keep < asked) client.setQueryData(MORE_KEY, cursors.slice(0, keep - 1));
-  }, [client, keep, asked, cursors]);
+    if (keep < asked) client.setQueryData(moreQueryKey, cursors.slice(0, keep - 1));
+  }, [client, moreQueryKey, keep, asked, cursors]);
   useEffect(() => {
     if (refused) {
-      client.setQueryData(MORE_KEY, NO_CURSORS);
+      client.setQueryData(moreQueryKey, NO_CURSORS);
       client.removeQueries({
         queryKey: queryKeys.gqlAll(IDEAS_OPERATION),
         predicate: (q) => 'after' in (q.queryKey[2] as object),
       });
-      void client.resetQueries({ queryKey: pageOptions(null).queryKey, exact: true });
+      void client.resetQueries({ queryKey: pageOptions(null, filters).queryKey, exact: true });
     }
-  }, [client, refused]);
+  }, [client, refused, moreQueryKey, filters]);
 
   const { next, laterFailed, refetchLater, refetchFirst } = state;
   return {
-    data: state.data,
+    data: state.data ?? settled,
+    isPlaceholderData: placeholder,
     error: state.error,
     isError: state.isError,
-    isPending: state.isPending,
+    isPending: state.isPending && !placeholder,
     isSuccess: state.isSuccess,
     isFetching: state.isFetching,
     refetch: () => {
-      client.setQueryData(MORE_KEY, NO_CURSORS);
+      client.setQueryData(moreQueryKey, NO_CURSORS);
       return refetchFirst();
     },
     hasNextPage: next !== null,
@@ -214,7 +247,7 @@ export function useIdeas() {
     isFetchNextPageError: laterFailed,
     fetchNextPage: () => {
       if (laterFailed) return refetchLater();
-      if (next !== null) client.setQueryData(MORE_KEY, [...cursors, next]);
+      if (next !== null) client.setQueryData(moreQueryKey, [...cursors, next]);
       return Promise.resolve();
     },
   };
@@ -280,11 +313,17 @@ function toPagedIdeas(pages: IdeasResponse[]) {
 }
 
 /** One page: the first (no cursor) keeps the key the page cache and the route prefetch know. */
-function pageOptions(after: string | null) {
-  const variables = { first: IDEAS_PAGE, names: [...IDEA_FEATURES] };
+function pageOptions(after: string | null, filters: readonly FilterInput[] | null = null) {
+  const variables = {
+    first: IDEAS_PAGE,
+    names: [...IDEA_FEATURES],
+    ...(filters && { filters: [...filters] }),
+  };
   return queryOptions({
     queryKey: queryKeys.gql(IDEAS_OPERATION, after === null ? variables : { ...variables, after }),
-    queryFn: ({ queryKey }) => gql(IdeasPage, { ...variables, after }, queryKey),
+    queryFn: ({ queryKey }) =>
+      gql(IdeasPage, { ...variables, after, filters: variables.filters ?? null }, queryKey),
+    // The first page of new filters shows the previous list (and its counts) until it arrives.
   });
 }
 

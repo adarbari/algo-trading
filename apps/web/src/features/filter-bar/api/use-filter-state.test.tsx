@@ -18,6 +18,14 @@ describe('useFilterState', () => {
     ]);
   });
 
+  it('clears one end of a range when the patch leaves it undefined', () => {
+    const { result, onChange } = setup('r:5..10');
+    act(() => {
+      result.current.set('r', { min: undefined, max: 10 });
+    });
+    expect(onChange).toHaveBeenLastCalledWith('r:..10');
+  });
+
   it('sets, adds, toggles, removes and clears through onChange', () => {
     const { result, onChange } = setup('a:x;b:1..2');
     act(() => {

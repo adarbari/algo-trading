@@ -93,6 +93,7 @@ const response: IdeasResponse = {
     total: 3,
     hasMore: false,
     nextCursor: null,
+    facets: null,
     pausedTotal: 1,
     paused: [
       {

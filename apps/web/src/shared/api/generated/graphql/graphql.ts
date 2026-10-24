@@ -44,6 +44,33 @@ export type FeatureFormat =
   | 'PERCENT'
   | 'TEXT';
 
+/** Where a filter sits in the filter bar */
+export type FilterGroup =
+  | 'CHANGED'
+  | 'COMING_UP'
+  | 'MORE'
+  | 'SETUP'
+  | 'TRADEABLE';
+
+/** One filter as the viewer set it: `id` names a filter of the surface's `filterSet`; `values` is for a pick, select or toggle (yes / no), `min` and `max` for a range, `within` for a window; `active` false keeps it echoed in the facets and in no mask */
+export type FilterInput = {
+  active?: boolean;
+  id: string;
+  max?: number | null | undefined;
+  min?: number | null | undefined;
+  values: Array<string>;
+  within?: Within | null | undefined;
+};
+
+/** The control a filter is: how its input is read */
+export type FilterKind =
+  | 'PERCENTILE'
+  | 'PICK'
+  | 'RANGE'
+  | 'SELECT'
+  | 'TOGGLE'
+  | 'WINDOW';
+
 /** The kinds of Guide entry `guideEntries` reads */
 export type GuideEntryKind =
   | 'EDGE'
@@ -159,6 +186,16 @@ export type UnknownCode =
   | 'NULL'
   | 'PRE_SNAPSHOT'
   | 'PRUNED';
+
+export type WindowUnit =
+  | 'DAYS'
+  | 'SESSIONS';
+
+/** A window filter's amount and unit: within `amount` days or sessions */
+export type Within = {
+  amount: number;
+  unit: WindowUnit;
+};
 
 export type AcceptedFormulasQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -366,6 +403,13 @@ export type FeatureTableQueryVariables = Exact<{
 
 export type FeatureTableQuery = { table: { universeSnapshot: string | null, preSnapshot: boolean, sort: string | null, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> }, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, instruments: Array<{ instrumentId: string, symbol: string, name: string }>, kindTexts: Array<{ kind: UnavailableKind, text: string }> } | null };
 
+export type FilterSetQueryVariables = Exact<{
+  surface: string;
+}>;
+
+
+export type FilterSetQuery = { filterSet: { surface: string, label: string, filters: Array<{ id: string, label: string, group: FilterGroup, kind: FilterKind, guide: string, bins: Array<number>, windowUnit: WindowUnit | null, options: Array<{ value: string, label: string }> }> } | null };
+
 export type GuideEntriesQueryVariables = Exact<{
   refs: Array<GuideRef> | GuideRef;
 }>;
@@ -468,10 +512,11 @@ export type IdeasPageQueryVariables = Exact<{
   first: number;
   after?: string | null | undefined;
   names: Array<string> | string;
+  filters?: Array<FilterInput> | FilterInput | null | undefined;
 }>;
 
 
-export type IdeasPageQuery = { ideas: { session: string, total: number, hasMore: boolean, nextCursor: string | null, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, withheld: boolean, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number, coverage: string | null, unavailable: Array<{ kind: UnavailableKind, guideTerm: string, kindText: string }> } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, score: number, regime: string | null, sizeMultiplier: number | null, watchOut: Array<string>, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, best: { configId: string, decision: string, score: number | null, reasons: string, criteria: Array<{ id: string, outcome: string }> }, pickedBy: Array<{ configId: string, own: boolean, position: number, score: number, decision: string }>, metrics: Array<{ name: string, value: unknown }> }> } | null };
+export type IdeasPageQuery = { ideas: { session: string, total: number, hasMore: boolean, nextCursor: string | null, pausedTotal: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, withheld: boolean, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number, coverage: string | null, unavailable: Array<{ kind: UnavailableKind, guideTerm: string, kindText: string }> } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, score: number, regime: string | null, sizeMultiplier: number | null, watchOut: Array<string>, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, best: { configId: string, decision: string, score: number | null, reasons: string, criteria: Array<{ id: string, outcome: string }> }, pickedBy: Array<{ configId: string, own: boolean, position: number, score: number, decision: string }>, metrics: Array<{ name: string, value: unknown }> }> } | null };
 
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
@@ -2067,6 +2112,27 @@ export const FeatureTableDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<FeatureTableQuery, FeatureTableQueryVariables>;
+export const FilterSetDocument = new TypedDocumentString(`
+    query FilterSet($surface: String!) {
+  filterSet(surface: $surface) {
+    surface
+    label
+    filters {
+      id
+      label
+      group
+      kind
+      guide
+      options {
+        value
+        label
+      }
+      bins
+      windowUnit
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<FilterSetQuery, FilterSetQueryVariables>;
 export const GuideEntriesDocument = new TypedDocumentString(`
     query GuideEntries($refs: [GuideRef!]!) {
   guideEntries(refs: $refs) {
@@ -2804,12 +2870,31 @@ export const EtfHoldingsDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<EtfHoldingsQuery, EtfHoldingsQueryVariables>;
 export const IdeasPageDocument = new TypedDocumentString(`
-    query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!) {
-  ideas(first: $first, after: $after) {
+    query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!, $filters: [FilterInput!]) {
+  ideas(first: $first, after: $after, filters: $filters) {
     session
     total
     hasMore
     nextCursor
+    facets {
+      total
+      matched
+      items {
+        id
+        active
+        removes
+        unknown
+        options {
+          value
+          count
+        }
+        bins {
+          lo
+          hi
+          count
+        }
+      }
+    }
     pausedTotal
     paused {
       instrumentId

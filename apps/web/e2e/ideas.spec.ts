@@ -2,7 +2,7 @@
  * Trader > Ideas end to end, against the production build with the API mocked from
  * fixtures shaped like the `IdeasPage` GraphQL response (ideas-api.ts): the ranked table with
  * its screener chips, earnings (next, else the last date) and earnings-before-expiry flag,
- * the preset views and filter chips (kept in the URL), opening tickers in Explore with the
+ * the shared filter bar (group popovers, chips, zero-result recovery; kept in the URL), opening tickers in Explore with the
  * screener that surfaced them, accessibility.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -97,38 +97,53 @@ test('a field header in Top ideas opens its Guide drawer', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('a preset view and the filter chips narrow the table and live in the URL', async ({
+test('a group popover narrows the list on the server, the chips show what each removes, and the URL keeps it', async ({
   page,
 }) => {
   await page.goto('/ideas');
-  await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'High conviction' }).click();
-  await expect(page).toHaveURL(/view=conviction/);
-  await expect(grid(page).getByRole('row', { name: /KO/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Top today' }).click();
-
-  await page.getByRole('button', { name: 'Liquidity', exact: true }).click();
-  await page.getByRole('button', { name: 'Liquidity risk', exact: true }).click();
-  await expect(page).toHaveURL(/liq=risk/);
   await expect(grid(page).getByRole('row', { name: /KO/ })).toBeVisible();
-  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'Screener', exact: true }).click();
-  await page.getByRole('button', { name: 'VRP scanner', exact: true }).click();
-  await expect(
-    page.getByText(/No idea matches Screener: VRP scanner · Liquidity: Liquidity risk/),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Remove Screener: VRP scanner' }).click();
-  await page.getByRole('button', { name: 'Clear filters' }).first().click();
-  await expect(page).not.toHaveURL(/liq=/);
+  await expect(page.getByRole('group', { name: 'Applied filters' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Setup' }).click();
+  await page
+    .getByRole('list', { name: 'Decision' })
+    .getByRole('button', { name: /^Qualified/ })
+    .click();
+  await expect(page).toHaveURL(/f=decision(%3A|:)QUALIFIED/);
+  // The popover holds focus and hides the page behind it: close it to read the table.
+  await page.keyboard.press('Escape');
+  await expect(grid(page).getByRole('row', { name: /KO/ })).toHaveCount(0);
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
+  const chips = page.getByRole('group', { name: 'Applied filters' });
+  await expect(chips).toContainText('Decision Qualified');
+  await expect(chips).toContainText('removes 2');
+  await expect(page.getByText('4 of 6').first()).toBeVisible();
+  await chips.getByRole('button', { name: /^Decision Qualified/ }).click();
+  await expect(page).toHaveURL(/f=(%21|!)decision/);
+  await expect(grid(page).getByRole('row', { name: /KO/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear all' }).click();
+  await expect(page).not.toHaveURL(/f=/);
 });
 
 test('a link with filters opens the filtered table', async ({ page }) => {
-  await page.goto('/ideas?decision=EVENT_RISK');
+  await page.goto('/ideas?f=decision:EVENT_RISK');
   await expect(grid(page).getByRole('row', { name: /TSLA/ })).toBeVisible();
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Remove Decision: Event risk' })).toBeVisible();
+  await expect(
+    page
+      .getByRole('group', { name: 'Applied filters' })
+      .getByRole('button', { name: /^Decision Event risk, removes 5/ }),
+  ).toBeVisible();
+});
+
+test('an empty result says what to switch off, and switching it off brings the rows back', async ({
+  page,
+}) => {
+  await page.goto('/ideas?f=decision:EVENT_RISK;agreeing:3..');
+  await expect(page.getByText('No ideas match all 2 filters')).toBeVisible();
+  await page.getByRole('button', { name: /^Switch off Agreeing screeners gives 1/ }).click();
+  await expect(page).toHaveURL(/(%21|!)agreeing/);
+  await expect(grid(page).getByRole('row', { name: /TSLA/ })).toBeVisible();
+  await expectAccessible(page);
 });
 
 test('the column switch swaps the stock columns for the options set, kept in the URL', async ({

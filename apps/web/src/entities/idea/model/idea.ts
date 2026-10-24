@@ -10,6 +10,7 @@
  */
 import type { ServedUnknown } from '@/entities/availability';
 import type { ServedValue } from '@/entities/feature';
+import type { FilterFacets } from '@/entities/filter';
 import type { gqlTypes } from '@/shared/api';
 
 import { IDEA_FACTS } from './facts';
@@ -124,6 +125,8 @@ export interface IdeasData {
   paused: PausedIdea[];
   /** The viewer's screeners (their own first, then the site presets by id). */
   screeners: ScreenerSummary[];
+  /** The server's counts for the filters in force (null: none sent or nothing stored). */
+  facets: FilterFacets | null;
 }
 
 const FLAG_LABELS: Record<string, string> = {
@@ -214,6 +217,7 @@ export const NO_IDEAS: IdeasData = {
   pausedTotal: 0,
   paused: [],
   screeners: [],
+  facets: null,
 };
 
 function toPaused(entry: ServedPaused, names: ReadonlyMap<string, string>): PausedIdea {
@@ -240,5 +244,6 @@ export function toIdeasData(response: IdeasResponse): IdeasData {
     pausedTotal: found.pausedTotal,
     paused: found.paused.map((entry) => toPaused(entry, names)),
     screeners: found.screeners.map(toScreener),
+    facets: found.facets ?? null,
   };
 }

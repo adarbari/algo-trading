@@ -3,18 +3,19 @@ import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { filterSearch } from '@/features/filter-bar';
+import type { FilterFacets } from '@/entities/filter';
 import {
   IDEA_FACTS,
   parseIdeasSearch,
   toIdeasData,
   type IdeasData,
   type IdeasResponse,
-  type IdeasSearch,
 } from '@/entities/idea';
 import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
-import { TopIdeas, type TopIdeasProps } from './TopIdeas';
+import { TopIdeas, type TopIdeasProps, type TopIdeasSearch } from './TopIdeas';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -121,6 +122,7 @@ const response: IdeasResponse = {
     total: 4,
     hasMore: false,
     nextCursor: null,
+    facets: null,
     pausedTotal: 0,
     paused: [],
     screeners: [screener('vrp', 'VRP scanner'), screener('liq', 'Liquidity')],
@@ -170,7 +172,7 @@ function Held({
   initial,
 }: {
   handlers: Omit<TopIdeasProps, 'search' | 'onSearchChange'>;
-  initial: IdeasSearch;
+  initial: TopIdeasSearch;
 }) {
   const [search, setSearch] = useState(initial);
   return (
@@ -178,19 +180,18 @@ function Held({
       {...handlers}
       search={search}
       onSearchChange={(patch) => {
-        setSearch((previous) =>
-          parseIdeasSearch(
-            Object.fromEntries(
-              Object.entries({ ...previous, ...patch }).filter(([, value]) => value !== undefined),
-            ),
-          ),
-        );
+        setSearch((previous) => {
+          const next = Object.fromEntries(
+            Object.entries({ ...previous, ...patch }).filter(([, value]) => value !== undefined),
+          );
+          return { ...parseIdeasSearch(next), ...filterSearch(next) };
+        });
       }}
     />
   );
 }
 
-function setup(initial: IdeasSearch = {}) {
+function setup(initial: TopIdeasSearch = {}) {
   const handlers = {
     onCompare: vi.fn(),
     onOpen: vi.fn(),
@@ -204,10 +205,86 @@ function setup(initial: IdeasSearch = {}) {
   return { ...view, ...handlers, grid: () => screen.getByRole('grid', { name: 'Top ideas' }) };
 }
 
+const option = (value: string, label: string) => ({ value, label });
+const FILTER_SET = {
+  filterSet: {
+    surface: 'ideas',
+    label: 'Ideas',
+    filters: [
+      {
+        id: 'decision',
+        label: 'Decision',
+        group: 'SETUP',
+        kind: 'PICK',
+        guide: 'term:filter_decision',
+        options: [option('QUALIFIED', 'Qualified'), option('WATCH', 'Watch')],
+        bins: [],
+        windowUnit: null,
+      },
+      {
+        id: 'agreeing',
+        label: 'Agreeing screeners',
+        group: 'SETUP',
+        kind: 'RANGE',
+        guide: 'term:filter_agreeing',
+        options: [],
+        bins: [1, 2, 3],
+        windowUnit: null,
+      },
+      {
+        id: 'earnings',
+        label: 'Earnings within',
+        group: 'COMING_UP',
+        kind: 'WINDOW',
+        guide: 'term:filter_earnings',
+        options: [],
+        bins: [],
+        windowUnit: 'SESSIONS',
+      },
+    ],
+  },
+};
+const FACETS: FilterFacets = {
+  total: 4,
+  matched: 3,
+  items: [
+    {
+      id: 'decision',
+      active: true,
+      removes: 1,
+      unknown: 0,
+      options: [
+        { value: 'QUALIFIED', count: 3 },
+        { value: 'WATCH', count: 1 },
+      ],
+      bins: [],
+    },
+    {
+      id: 'agreeing',
+      active: true,
+      removes: null,
+      unknown: 2,
+      options: [],
+      bins: [
+        { lo: 1, hi: 2, count: 3 },
+        { lo: 2, hi: 3, count: 1 },
+      ],
+    },
+  ],
+};
+const filtered = (facets: FilterFacets, ideas = data.ideas) =>
+  fakeQuery<IdeasData>({ ...data, ideas, facets });
+
 stubElementSize();
 
 beforeEach(() => {
+  hooks.useIdeas.mockReset();
   hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(data));
+  vi.mocked(gql).mockImplementation((document) =>
+    Promise.resolve(
+      String(document).includes('query FilterSet') ? FILTER_SET : { guideField: null },
+    ),
+  );
 });
 
 describe('TopIdeas', () => {
@@ -315,7 +392,7 @@ describe('TopIdeas', () => {
     expect(within(aapl).getByText('36')).toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
     expect(within(ko).queryByText('Earnings first')).not.toBeInTheDocument();
-    expect(screen.getByText('Session 2026-10-02 · 4 of 4')).toBeInTheDocument();
+    expect(screen.getByText('Session 2026-10-02')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
@@ -373,14 +450,20 @@ describe('TopIdeas', () => {
     expect(screen.queryByRole('button', { name: /Show .* more/ })).toBeNull();
   });
 
-  it('keeps "Show more" while the server has more, even when a filter hides every loaded row', async () => {
+  it('keeps "Show more" while the server has more, even when the filters match nothing so far', async () => {
     const fetchNextPage = vi.fn(() => Promise.resolve());
     hooks.useIdeas.mockReturnValue({
-      ...fakeQuery<IdeasData>({ ...data, total: 312, hasMore: true }),
+      ...fakeQuery<IdeasData>({
+        ...data,
+        ideas: [],
+        total: 312,
+        hasMore: true,
+        facets: { ...FACETS, matched: 0 },
+      }),
       fetchNextPage,
     });
-    setup({ screener: 'no-such-screener' });
-    expect(screen.getByText(/No idea matches/)).toBeInTheDocument();
+    setup({ f: 'decision:WATCH' });
+    expect(await screen.findByText('No ideas match this filter')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Show 50 more' }));
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
@@ -394,47 +477,85 @@ describe('TopIdeas', () => {
     expect(within(ko).getByText('Leveraged / inverse')).toBeInTheDocument();
   });
 
-  it('switches the preset view', async () => {
-    const user = userEvent.setup();
-    setup();
-    expect(screen.getByRole('button', { name: 'Top today' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await user.click(screen.getByRole('button', { name: 'High conviction' }));
-    expect(screen.queryByRole('row', { name: /KO/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('row', { name: /AAPL/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'No earnings soon' }));
-    expect(screen.queryByRole('row', { name: /KO/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('row', { name: /SPY/ })).toBeInTheDocument();
+  it('asks for the ideas under the filters in the URL, and shows the server rows as they come', () => {
+    hooks.useIdeas.mockReturnValue(filtered(FACETS, data.ideas.slice(0, 3)));
+    const { grid } = setup({ f: 'decision:QUALIFIED;!agreeing:2..' });
+    expect(hooks.useIdeas).toHaveBeenLastCalledWith([
+      { id: 'decision', values: ['QUALIFIED'], active: true },
+      { id: 'agreeing', min: 2, active: false },
+    ]);
+    expect(within(grid()).queryByRole('row', { name: /MRVL/ })).not.toBeInTheDocument();
+    expect(within(grid()).getByRole('row', { name: /KO/ })).toBeInTheDocument();
   });
 
-  it('adds a filter chip, says why nothing matches, and clears the filters', async () => {
-    const user = userEvent.setup();
-    setup();
-    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Decision' })[0] as HTMLElement);
-    await user.click(screen.getByRole('button', { name: 'Watch' }));
-    expect(screen.queryByRole('row', { name: /AAPL/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('row', { name: /KO/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'High conviction' }));
-    expect(screen.getByText('No idea matches High conviction · Decision: Watch.')).toBeVisible();
-    await user.click(
-      screen.getAllByRole('button', { name: 'Clear filters' }).at(-1) as HTMLElement,
-    );
-    expect(screen.getByRole('row', { name: /AAPL/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Top today' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+  it('shows the applied chips with the rows each removes, and the count line', async () => {
+    hooks.useIdeas.mockReturnValue(filtered(FACETS));
+    setup({ f: 'decision:QUALIFIED,WATCH;!agreeing:2..' });
+    await screen.findByRole('button', { name: 'Setup, 2 active' });
+    const chips = screen.getByRole('group', { name: 'Applied filters' });
+    expect(within(chips).getByText('Decision Qualified, Watch')).toBeInTheDocument();
+    expect(chips).toHaveTextContent('removes 1');
+    expect(within(chips).getByText('Agreeing screeners ≥ 2')).toBeInTheDocument();
+    expect(chips).toHaveTextContent('2 unknown');
+    expect(screen.getAllByText('3 of 4')[0]).toBeInTheDocument();
   });
 
-  it('removes one filter chip with its x', async () => {
+  it('switches a chip off and back on, removes it, and clears all, through the URL state', async () => {
     const user = userEvent.setup();
-    setup({ screener: 'vrp' });
-    expect(screen.queryByRole('row', { name: /KO/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove Screener: VRP scanner' }));
-    expect(screen.getByRole('row', { name: /KO/ })).toBeInTheDocument();
+    hooks.useIdeas.mockReturnValue(filtered(FACETS));
+    setup({ f: 'decision:QUALIFIED;agreeing:2..' });
+    await screen.findByRole('button', { name: 'Setup, 2 active' });
+    await user.click(screen.getByRole('button', { name: /^Decision Qualified/ }));
+    expect(hooks.useIdeas).toHaveBeenLastCalledWith([
+      { id: 'decision', values: ['QUALIFIED'], active: false },
+      { id: 'agreeing', min: 2, active: true },
+    ]);
+    await user.click(screen.getByRole('button', { name: /Remove Agreeing screeners/ }));
+    expect(hooks.useIdeas).toHaveBeenLastCalledWith([
+      { id: 'decision', values: ['QUALIFIED'], active: false },
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(hooks.useIdeas).toHaveBeenLastCalledWith([]);
+    expect(screen.queryByRole('group', { name: 'Applied filters' })).not.toBeInTheDocument();
+  });
+
+  it('picks a value in a group popover, with the server counts beside the options', async () => {
+    const user = userEvent.setup();
+    hooks.useIdeas.mockReturnValue(filtered(FACETS));
+    setup();
+    await user.click(await screen.findByRole('button', { name: 'Setup' }));
+    const list = await screen.findByRole('list', { name: 'Decision' });
+    expect(within(list).getByRole('button', { name: /Qualified\s*3/ })).toBeInTheDocument();
+    await user.click(within(list).getByRole('button', { name: /Watch/ }));
+    expect(hooks.useIdeas).toHaveBeenLastCalledWith([
+      { id: 'decision', values: ['WATCH'], active: true },
+    ]);
+  });
+
+  it('says what each recovery chip gives when nothing matches, and switches that filter off', async () => {
+    const user = userEvent.setup();
+    hooks.useIdeas.mockReturnValue(
+      filtered(
+        {
+          ...FACETS,
+          matched: 0,
+          items: FACETS.items.map((i) => ({ ...i, removes: i.id === 'decision' ? 31 : 4 })),
+        },
+        [],
+      ),
+    );
+    setup({ f: 'decision:WATCH;agreeing:5..' });
+    expect(await screen.findByText('No ideas match all 2 filters')).toBeInTheDocument();
+    const chips = screen.getAllByRole('button', { name: /Switch off .* gives/ });
+    expect(chips.map((c) => c.textContent)).toEqual([
+      expect.stringContaining('Switch off Decision gives 31'),
+      expect.stringContaining('Switch off Agreeing screeners gives 4'),
+    ]);
+    await user.click(chips[0] as HTMLElement);
+    expect(hooks.useIdeas).toHaveBeenLastCalledWith([
+      { id: 'decision', values: ['WATCH'], active: false },
+      { id: 'agreeing', min: 5, active: true },
+    ]);
   });
 
   it('opens a ticker, and the selected ones, in Explore', async () => {
@@ -495,7 +616,6 @@ describe('TopIdeas', () => {
 
 describe('TopIdeas field headers', () => {
   it('puts the Guide help button in the field headers and every Ideas column, not in the rank or ticker', async () => {
-    vi.mocked(gql).mockResolvedValue({ guideField: null });
     const { grid } = setup({ columns: 'options' });
     const help = (name: RegExp) =>
       within(within(grid()).getAllByRole('columnheader', { name })[0] as HTMLElement).queryByRole(

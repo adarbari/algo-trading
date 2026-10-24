@@ -34,8 +34,9 @@ function merged(previous: FilterState | undefined, id: string, patch: FilterPatc
   const kept = Object.entries({ ...previous }).filter(
     ([key]) => !(key in KIND_OF) || touched.size === 0 || touched.has(KIND_OF[key as Kind]),
   );
+  // The patch wins key by key, an `undefined` in it removes the key (an emptied end of a range).
   const next = Object.fromEntries(
-    [...kept, ...Object.entries(patch)].filter(([, v]) => v !== undefined),
+    Object.entries({ ...Object.fromEntries(kept), ...patch }).filter(([, v]) => v !== undefined),
   );
   return { active: true, ...next, id };
 }
