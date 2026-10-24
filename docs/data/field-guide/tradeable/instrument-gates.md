@@ -215,6 +215,145 @@ Sources: iShares fund files (issuer's daily shares outstanding), edge build D4
 
 Sources: Site convention over the instrument reference (issuer CIK and share-class FIGI)
 
+### `rollup.cohort_pct_price@v1.mom_12_1_pct_universe`
+
+**How to read it.** Where the 12-1 momentum (the 12-month return without the last month) ranks among the universe's stocks: 0 the weakest, 1 the strongest, 0.9 a top-decile year. A rank is comparable across market regimes where the raw return is not.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a top-decile year of momentum | `gte 0.9` | soft | 0.05 | with rollup.cohort_pct_price@v1.mom_12_1_pct_sector gte 0.8 so the lead is also within its own sector |
+
+**When the reading lies**
+
+- A rank hides magnitude: in a flat year the top decile may have gained little. Read rollup.trend_stats@v2.mom_12_1 for the size.
+- Only STOCKS of the universe snapshot are ranked, so an ETF, fund or trust is null.
+- Every name is null when fewer than 200 stocks have a known value, or when fewer than 90% of the universe's stocks have a price_stats row (a partial day).
+- The strongest year-long winners are the most extended names: add feature.stretch_sma50_atr lte 4 to avoid chasing.
+
+Sources: Jegadeesh and Titman (1993), Returns to buying winners and selling losers, Journal of Finance
+
+### `rollup.cohort_pct_price@v1.mom_12_1_pct_sector`
+
+**How to read it.** Where the 12-1 momentum ranks among the stocks of the name's sector: 0 the weakest of its sector, 1 the strongest. It says whether the name leads its peers, which a universe rank cannot when the whole sector is moving.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a leader among its sector peers | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_price@v1.mom_12_1_pct_universe gte 0.5 so the sector itself is not the laggard |
+
+**When the reading lies**
+
+- A name with no sector in the company snapshot on or before the session is null here but keeps its universe rank (rollup.cohort_pct_price@v1.mom_12_1_pct_universe).
+- Null when fewer than 20 stocks of the sector have a known value: a small sector gives no rank, never a coarse one.
+- The sector is the coarse SEC SIC heuristic's: Technology mixes hardware and software. Read the industry rank (mom_12_1_pct_industry) for the closer peers.
+
+Sources: Moskowitz and Grinblatt (1999), Do industries explain momentum?, Journal of Finance
+
+### `rollup.cohort_pct_price@v1.mom_12_1_pct_industry`
+
+**How to read it.** Where the 12-1 momentum ranks among the stocks of the name's industry (the SEC's own SIC description): the closest peer comparison the data supports. 1 is the strongest of its industry.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the strongest of its industry | `gte 0.9` | soft | 0.05 | with rollup.cohort_pct_price@v1.mom_12_1_pct_sector gte 0.7 so the industry is not a corner of a weak sector |
+
+**When the reading lies**
+
+- Industries are small: null when fewer than 10 stocks of the industry have a known value, and with 10 to 15 stocks one name moves the rank a lot.
+- A name with no industry in the company snapshot is null here but keeps its universe rank.
+
+Sources: Moskowitz and Grinblatt (1999), Do industries explain momentum?, Journal of Finance
+
+### `rollup.cohort_pct_price@v1.adv_usd_20d_pct_universe`
+
+**How to read it.** Where the 20-session average dollar volume ranks among the universe's stocks: 0 the thinnest, 1 the most traded. A liquidity rank that adapts to the market's level, where a dollar threshold on rollup.price_stats@v2.adv_usd_20d does not.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| among the most liquid half of stocks | `gte 0.5` | soft | 0.05 | with an absolute floor on rollup.price_stats@v2.adv_usd_20d |
+
+**When the reading lies**
+
+- A rank is not tradability: the median stock can still be too thin for the size you trade. Keep an absolute floor on rollup.price_stats@v2.adv_usd_20d.
+- Null for ETFs, funds and trusts, and for every name on a partial day (fewer than 90% of the universe's stocks with a price_stats row).
+
+Sources: Amihud (2002), Illiquidity and stock returns, Journal of Financial Markets
+
+### `rollup.cohort_pct_price@v1.adv_usd_20d_pct_sector`
+
+**How to read it.** Where the 20-session average dollar volume ranks among the stocks of the name's sector: 1 the most traded of its sector. Low values flag the sector's thin names, a better floor than the universe rank in a sector that trades light as a whole.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| not among its sector's thin names | `gte 0.3` | soft | 0.05 | with an absolute floor on rollup.price_stats@v2.adv_usd_20d |
+
+**When the reading lies**
+
+- Null with no sector in the company snapshot, or fewer than 20 stocks of the sector with a known value; the universe rank (rollup.cohort_pct_price@v1.adv_usd_20d_pct_universe) is kept.
+- Dollar volume grows with price and size: a large-cap sector ranks its mid caps low although they trade freely.
+
+Sources: Amihud (2002), Illiquidity and stock returns, Journal of Financial Markets
+
+### `rollup.cohort_pct_price@v1.adv_usd_20d_pct_industry`
+
+**How to read it.** Where the 20-session average dollar volume ranks among the stocks of the name's industry: 1 the most traded of its industry.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| not the thinnest of its industry | `gte 0.3` | soft | 0.05 | with an absolute floor on rollup.price_stats@v2.adv_usd_20d |
+
+**When the reading lies**
+
+- Null with no industry in the company snapshot, or fewer than 10 stocks of the industry with a known value; the universe rank is kept.
+- A rank among 10 to 15 names is coarse: read the dollar figure (rollup.price_stats@v2.adv_usd_20d) before relying on a small industry.
+
+Sources: Amihud (2002), Illiquidity and stock returns, Journal of Financial Markets
+
+### `rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector`
+
+**How to read it.** Where the 63-session relative strength against SPY ranks among the stocks of the name's sector: 1 the strongest of its sector over the quarter. It separates a name that leads its sector from one carried by it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a quarter's leader within its sector | `gte 0.8` | soft | 0.05 | with rollup.relative_strength@v1.rs_spy_63d gt 0 so it also beat the market |
+
+**When the reading lies**
+
+- Relative strength is already measured against the market, so there is no universe rank of it: read rollup.relative_strength@v1.mom_pctile_63d for the quarter's return rank.
+- Null with no sector, or fewer than 20 stocks of the sector with a known rs_spy_63d, or on a partial day.
+
+Sources: O'Neil (1988), How to Make Money in Stocks: relative price strength rank
+
+### `rollup.cohort_pct_price@v1.rs_spy_63d_pct_industry`
+
+**How to read it.** Where the 63-session relative strength against SPY ranks among the stocks of the name's industry: 1 the strongest of its industry over the quarter.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a quarter's leader within its industry | `gte 0.8` | soft | 0.05 | with rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector gte 0.6 |
+
+**When the reading lies**
+
+- Null with no industry, or fewer than 10 stocks of the industry with a known rs_spy_63d, or on a partial day.
+- A small industry gives a coarse rank: pair with rollup.cohort_pct_price@v1.rs_spy_63d_pct_sector.
+
+Sources: O'Neil (1988), How to Make Money in Stocks: relative price strength rank
+
 ### `rollup.short_interest@v1.short_position`
 
 **How to read it.** Shares sold short at the latest settlement date whose report was public by the session (FINRA, all markets). 2,000,000 against a share count of 40 million is 5% of the company short. The figure is a stock, not a flow: it says how large the bet is, not whether it is growing.
@@ -753,133 +892,3 @@ Sources: Brown, Davies and Ringgenberg (2021), ETF Arbitrage, Non-Fundamental De
 - Few issuers qualify, about 15 to 25, so one rule shows a handful of names per session. Judge it over many independent windows.
 
 Sources: Site convention (docs/edge-ideas/harness-design.md section 5, pair spread)
-
-### `rollup.share_classes@v1.sibling_status`
-
-**How to read it.** PAIRED means the issuer has exactly two share classes with one listed id each, so the sibling is named. AMBIGUOUS means three or more classes, or a class listed under several ids, so no sibling is named.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| only names whose share class pair is unambiguous | `eq "PAIRED"` | hard | - | a pair_spread outcome excludes the other statuses anyway; this keeps the screen honest |
-
-**When the reading lies**
-
-- Only operating companies count; a fund or a preferred share is not a class. Check rollup.share_classes@v1.sibling_id before reading a pair.
-- Sessions before the first stored reference snapshot use the earliest snapshot's status, so history carries today's classes. The result shows the count of such sessions.
-
-Sources: Site convention (ADR 0053 amendment, EB H9)
-
-### `rollup.share_classes@v1.sibling_id`
-
-**How to read it.** The instrument id of the issuer's other listed share class, read from the reference snapshot the session sees. The pair_spread outcome reads it on the decision session, so a later reclassification never changes a past result.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| names that have a named sibling class | `not_null` | hard | - | the pair_spread outcome needs it; a name without one is excluded with the reason |
-
-**When the reading lies**
-
-- Null when the issuer has one class or the status is AMBIGUOUS; a pair pick is then excluded with the reason no_sibling, never counted as zero. Check rollup.share_classes@v1.sibling_status.
-- Sessions before the first stored reference snapshot use the earliest snapshot's sibling, so history carries today's pairs. The result shows the count of such sessions.
-
-Sources: Site convention (ADR 0018, ADR 0053 amendment, EB H9)
-
-### `rollup.etf_launches@v1.sessions_since_etf_launch`
-
-**How to read it.** Exchange sessions from the launch of a thematic or sector ETF up to the session. 0 means it started trading today. 250 is about a year old. The read goes back five years, the first 60 months in which the research finds such funds fall behind.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a thematic or sector fund younger than three years | `lte 750` | hard | - | an avoid filter; null means not a specialised fund, not an old one |
-
-**When the reading lies**
-
-- The launch is the first day the ticker was listed in the Tiingo history, not the day the fund was set up, so it can be a few days late. A fund that changed ticker, or listed before the history starts, reads too young. Only thematic and sector funds have a value. It is null for every other fund, and for a fund whose category is unknown.
-
-Sources: Ben-David, Franzoni, Kim and Moussawi (2023), Competition for Attention in the ETF Space, Review of Financial Studies
-
-### `rollup.etf_launches@v1.last_etf_launch_date`
-
-**How to read it.** The first day the ETF was listed in the Tiingo history: its launch date for this site. Only launches on or before the session count, so a fund that lists tomorrow is not read today.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| funds with a known launch date | `not_null` | hard | - | null means no thematic or sector launch in the window, not that the fund is old |
-
-**When the reading lies**
-
-- A ticker change or a relisting can move it, and a fund older than the history is dated at the history's start. Null for funds that are not thematic or sector funds, or launched more than five years ago.
-
-Sources: Site convention over the Tiingo listing history (ADR 0076)
-
-### `rollup.etf_launches@v1.etf_category`
-
-**How to read it.** Whether the ETF is thematic, tied to a story that spans several industries such as clean energy or robotics, or sector, tied to one industry such as technology or banks. Both count as specialised funds in the research.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| thematic funds only | `eq "thematic"` | hard | - | sector funds drop out; null means not a specialised fund |
-
-**When the reading lies**
-
-- Read from the fund's name by keyword rules and a curated list, as of the latest build, so a fund renamed since launch carries today's category on its launch date. Funds the rules could not settle have no category and no row.
-
-Sources: Ben-David, Franzoni, Kim and Moussawi (2023), Competition for Attention in the ETF Space, Review of Financial Studies
-
-### `rollup.etf_launches@v1.etf_theme`
-
-**How to read it.** The theme group of a thematic ETF, such as clean_energy, technology or health, or the industry of a sector ETF, such as financials or energy.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| clean energy funds | `eq "clean_energy"` | hard | - | illustrative; null means not a specialised fund |
-
-**When the reading lies**
-
-- A fund that fits two themes carries one, chosen by the curated list or by the first matching keyword group. Null when the fund has no category.
-
-Sources: Site convention over the ETF names (ADR 0076)
-
-### `rollup.etf_launches@v1.launch_date_source`
-
-**How to read it.** Where the launch date comes from. The only value is tiingo_listing: the first day the ticker appears in the Tiingo listing history.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| funds dated from the Tiingo listing | `eq "tiingo_listing"` | hard | - | null means no launch date is stored |
-
-**When the reading lies**
-
-- It is the ticker's first listing, not the fund's inception, which the site does not store. Checked against fourteen well-known funds, it was 0 to 7 days late.
-
-Sources: Site convention (ADR 0076)
-
-### `rollup.ipo_lockups@v1.sessions_to_lockup_expiry`
-
-**How to read it.** Exchange sessions from the session to the lock-up expiry of a recent IPO. 5 means the lock-up ends in five sessions. 0 means today. -3 means it ended three sessions ago; the earliest read is -20.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a lock-up ending within the next ten sessions | `lte 10` | hard | - | illustrative screen for an avoid list; names with no lock-up date drop out, and a negative value is a lock-up already over |
-
-**When the reading lies**
-
-- The date comes from the prospectus text. A prospectus that states no term has no value, so the name is unknown, not free of a lock-up. An early-release lock-up can end for part of the shares sooner.
-
-Sources: Field and Hanke (2001), The Effect of Lockup Provisions on the Pricing of IPOs; Brav and Gompers (2003), The Role of Lockups in Initial Public Offerings, Review of Financial Studies

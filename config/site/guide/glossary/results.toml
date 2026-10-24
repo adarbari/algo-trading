@@ -368,3 +368,16 @@ Each night the edge's picks are stored for the session. This one has none. The n
 """
 next = "Check the session date, then look again after the next nightly run."
 see_also = ["counts_toward"]
+
+[[term]]
+id = "cohort_percentile"
+term = "Cohort percentile"
+short = "Where a value ranks among the stocks it is compared with: 0 the lowest, 1 the highest."
+body = """
+A cohort percentile ranks one value against the same value of the other stocks in a group. The group is all the stocks of the universe, the stocks of the name's sector, or those of its industry.
+
+The rank is the average position among the stocks that have a value. It is scaled so the lowest is 0 and the highest is 1, and stocks with equal values share their position. 0.9 means the name is above nine tenths of its group, whatever the size of the numbers behind it.
+
+A percentile is null for an ETF, fund or trust, because only stocks count as the group. It is also null for a name with no sector or industry at that level, and for a group too small to rank (a site setting for each level). A sector or industry percentile says how the name stands against its peers. That can differ a lot from its rank against the whole universe.
+"""
+see_also = ["near_miss"]
