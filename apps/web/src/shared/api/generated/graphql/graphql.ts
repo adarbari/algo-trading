@@ -187,6 +187,10 @@ export type UnknownCode =
   | 'PRE_SNAPSHOT'
   | 'PRUNED';
 
+/** How a range shows its stored value */
+export type ValueUnit =
+  | 'PERCENT';
+
 export type WindowUnit =
   | 'DAYS'
   | 'SESSIONS';
@@ -406,10 +410,18 @@ export type FeatureTableQuery = { table: { universeSnapshot: string | null, preS
 
 export type FilterSetQueryVariables = Exact<{
   surface: string;
+  withFeatures?: Array<string> | string | null | undefined;
 }>;
 
 
-export type FilterSetQuery = { filterSet: { surface: string, label: string, filters: Array<{ id: string, label: string, group: FilterGroup, kind: FilterKind, guide: string, bins: Array<number>, windowUnit: WindowUnit | null, options: Array<{ value: string, label: string }> }> } | null };
+export type FilterSetQuery = { filterSet: { surface: string, label: string, searchable: boolean, filters: Array<{ id: string, label: string, group: FilterGroup, kind: FilterKind, guide: string, bins: Array<number>, windowUnit: WindowUnit | null, unit: ValueUnit | null, options: Array<{ value: string, label: string }> }> } | null };
+
+export type FilterFeaturesQueryVariables = Exact<{
+  surface: string;
+}>;
+
+
+export type FilterFeaturesQuery = { filterFeatures: Array<{ name: string, label: string, kind: FilterKind, guide: string, synonyms: Array<string> }> };
 
 export type GuideEntriesQueryVariables = Exact<{
   refs: Array<GuideRef> | GuideRef;
@@ -2139,10 +2151,11 @@ export const FeatureTableDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<FeatureTableQuery, FeatureTableQueryVariables>;
 export const FilterSetDocument = new TypedDocumentString(`
-    query FilterSet($surface: String!) {
-  filterSet(surface: $surface) {
+    query FilterSet($surface: String!, $withFeatures: [String!]) {
+  filterSet(surface: $surface, withFeatures: $withFeatures) {
     surface
     label
+    searchable
     filters {
       id
       label
@@ -2155,10 +2168,22 @@ export const FilterSetDocument = new TypedDocumentString(`
       }
       bins
       windowUnit
+      unit
     }
   }
 }
     `) as unknown as TypedDocumentString<FilterSetQuery, FilterSetQueryVariables>;
+export const FilterFeaturesDocument = new TypedDocumentString(`
+    query FilterFeatures($surface: String!) {
+  filterFeatures(surface: $surface) {
+    name
+    label
+    kind
+    guide
+    synonyms
+  }
+}
+    `) as unknown as TypedDocumentString<FilterFeaturesQuery, FilterFeaturesQueryVariables>;
 export const GuideEntriesDocument = new TypedDocumentString(`
     query GuideEntries($refs: [GuideRef!]!) {
   guideEntries(refs: $refs) {

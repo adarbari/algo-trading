@@ -3,8 +3,14 @@
  * (`useFilterSet`), the counts served with a filtered list (`FilterFacets`) and the `filters`
  * argument a list read takes (`toFilterInputs`).
  */
-export { FILTER_SET_OPERATION, prefetchFilterSet, useFilterSet } from './api/hooks';
 export {
+  FILTER_SET_OPERATION,
+  prefetchFilterSet,
+  useFilterFeatures,
+  useFilterSet,
+} from './api/hooks';
+export {
+  FEATURE_FILTER_PREFIX,
   FILTER_GROUPS,
   toFilterInputs,
   type AppliedFilter,
@@ -12,6 +18,7 @@ export {
   type FilterFacets,
   type FilterGroup,
   type FilterInput,
+  type FilterableFeature,
   type FilterKind,
   type FilterSetResponse,
 } from './model/filter';

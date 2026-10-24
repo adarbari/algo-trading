@@ -18,7 +18,7 @@ from algotrade.services.evaluation.edge_picks.night import (
 )
 from algotrade.services.features import catalogue
 from algotrade.services.licences import hidden_stored
-from algotrade.services.read.context import ReadContext
+from algotrade.services.read.context import ReadContext, at_session
 from algotrade.services.read.evaluation.pick_edges import (
     COUNTS,
     NOT_A_DECISION_DAY,
@@ -176,8 +176,8 @@ def test_changes_against_the_previous_run(ctx: ReadContext) -> None:
     assert changes.counts == (ChangeCount("new", 1), ChangeCount("dropped", 1))
     # AAA: REJECT then QUALIFIED (new); BBB: QUALIFIED then WATCH (still picked); CCC: dropped
     assert dict(changes.by_instrument) == {
-        "EQ:AAA": ("new", "REJECT"), "EQ:BBB": (None, "QUALIFIED"),
-        "EQ:CCC": ("dropped", "QUALIFIED"),
+        "EQ:AAA": ("new", "REJECT", 2), "EQ:BBB": (None, "QUALIFIED", -1),
+        "EQ:CCC": ("dropped", "QUALIFIED", -1),
     }  # fmt: skip
     assert load_run_changes(ctx, run) is changes  # cached per run and published state
     beta = latest_run(ctx, "me", "beta").run
@@ -285,7 +285,7 @@ def test_a_paused_pick_is_dropped_against_the_previous_run_and_filters_by_decisi
     ctx = context(reader)
     run = latest_run(ctx, "site", "alpha").run
     assert run is not None
-    assert load_run_changes(ctx, run).by_instrument["EQ:BBB"] == ("dropped", "QUALIFIED")
+    assert load_run_changes(ctx, run).by_instrument["EQ:BBB"] == ("dropped", "QUALIFIED", -1)
     page = load_result_page(ctx, run, ResultQuery(decisions=("paused",)))
     assert page.total == 2
     assert [(r.instrument_id, r.decision) for r in page.results] == [
@@ -861,3 +861,125 @@ def test_a_new_search_or_sort_reads_the_filter_pass_once(
     for query in (ResultQuery(), ResultQuery(q="a"), ResultQuery(sort="-score")):
         _page(ctx, query)
     assert ran == [1]
+
+
+# ---------------------------------------------------- rank_change and gate counts (ADR 0082)
+D2 = D1 + timedelta(days=1)
+
+
+def _stage(
+    backend: MemoryBackend,
+    day: Any,
+    run_id: str,
+    owner: str,
+    config_id: str,
+    rows: list[tuple[str, str, int]],
+    version: int = 1,
+    gates: tuple[str, str] = ("", ""),
+) -> None:
+    """A run of ``rows`` (symbol, decision, rank); ``gates``: the stored (failed, near_missed)."""
+    frame = [
+        {"instrument_id": f"EQ:{s}", "user_id": owner, "config_id": config_id,
+         "config_version": version, "config_hash": "h", "decision": d, "score": 1.0,
+         "rank": n, "tie_break": None, "flags": "", "reasons": "", "failed": gates[0],
+         "near_missed": gates[1], "missing": ""}
+        for s, d, n in rows
+    ]  # fmt: skip
+    when = T + timedelta(days=(day - D1).days, hours=5)
+    bar = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), "open": 1.0, "high": 1.0,
+           "low": 1.0, "close": 1.0, "volume": 1.0}  # fmt: skip
+    if day == D2:  # a session needs its bars to be read
+        StoreWriter(backend).write_table("bars/1d", day, f"bars-{day}", stamped([bar], day, "b"))
+    StoreWriter(backend).write_result("rule_screen", day, run_id, stamped(frame, day, run_id, when))
+
+
+def _moved(ctx: ReadContext, owner: str = "site", config_id: str = "alpha") -> dict[str, Any]:
+    run = latest_run(ctx, owner, config_id).run
+    assert run is not None
+    page = load_result_page(ctx, run, None, (), 1, 100)
+    return {r.instrument_id: r.rank_change for r in page.results}
+
+
+def test_rank_change_is_the_previous_rank_minus_the_rank(ctx: ReadContext) -> None:
+    # r-1 (D0): BBB 1, CCC 2, AAA 3; r1 (D1): AAA 1, BBB 2, CCC 3
+    assert _moved(ctx) == {"EQ:AAA": 2, "EQ:BBB": -1, "EQ:CCC": -1}
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    up = load_result_page(ctx, run, None, (), 1, 100, [FilterInput("rank_moved_up", min=1)])
+    assert _ids(up) == ["EQ:AAA"] and up.total == 1
+
+
+def test_rank_change_is_unknown_never_zero(backend: MemoryBackend, reader: StoreReader) -> None:
+    # no previous run: me's beta ran only in D1
+    assert _moved(context(reader), "me", "beta") == {
+        "EQ:BBB": None, "EQ:DDD": None, "EQ:AAA": None,
+    }  # fmt: skip
+    # the ticker is missing from the previous run: DDD joins alpha's later D1 run
+    _stage(backend, D1, "r9", "site", "alpha", [("AAA", "QUALIFIED", 1), ("DDD", "QUALIFIED", 2)])
+    found = _moved(context(StoreReader(backend)))
+    assert found == {"EQ:AAA": 2, "EQ:DDD": None}
+    # a viewer who may not see the order has no change, and the filter keeps no row
+    trader = context(reader, user="trader")
+    assert set(_moved(trader).values()) == {None}
+    run = latest_run(trader, "site", "alpha").run
+    assert run is not None
+    page = load_result_page(trader, run, None, (), 1, 100, [FilterInput("rank_moved_up", min=1)])
+    assert page.total == 0 and page.facets is not None
+
+
+def test_rank_change_is_unknown_when_the_previous_run_is_withheld(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    # the viewer reads today's run in full (no personal field) but D0's r-1 stored none, so it
+    # is withheld whole for a viewer without every licence: the places moved are not comparable
+    _stage(backend, D1, "r9", "site", "alpha", [("AAA", "QUALIFIED", 1), ("BBB", "WATCH", 2)])
+    ctx = context(StoreReader(backend), user="trader")
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    previous = runs.load_previous_run(ctx, run)
+    assert previous is not None and run_withheld(at_session(ctx, previous.session), previous)
+    assert set(_moved(ctx).values()) == {None}
+
+
+def test_rank_change_is_unknown_across_a_config_version_change(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    _stage(backend, D1, "g1", "me", "gamma", [("CCC", "QUALIFIED", 1), ("AAA", "QUALIFIED", 2)], 2)
+    assert _moved(context(StoreReader(backend)), "me", "gamma") == {"EQ:CCC": None, "EQ:AAA": None}
+    _stage(backend, D1, "g2", "me", "gamma", [("CCC", "QUALIFIED", 1)], 1)  # same version
+    assert _moved(context(StoreReader(backend)), "me", "gamma") == {"EQ:CCC": 0}
+
+
+def test_the_previous_run_is_the_one_before_the_session_not_the_latest(
+    backend: MemoryBackend,
+) -> None:
+    before = _moved(context(StoreReader(backend)))
+    _stage(backend, D2, "r5", "site", "alpha", [("CCC", "QUALIFIED", 1), ("AAA", "QUALIFIED", 2)])
+    after = StoreReader(backend)
+    # D1's value is unchanged by the later run; D2 is compared with D1's run
+    assert _moved(at_session(context(after), D1)) == before
+    assert _moved(context(after)) == {"EQ:CCC": 2, "EQ:AAA": -1}
+
+
+def test_gate_counts_are_stored_counts_and_unknown_when_withheld(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    # r1 stored no failed / near-missed gates: 0, which is not unknown, for a viewer who sees it
+    run = latest_run(context(reader), "site", "alpha").run
+    assert run is not None
+    page = load_result_page(context(reader), run, None, (), 1, 100)
+    assert {(r.near_misses, r.gates_failing) for r in page.results} == {(0, 0)}
+    # a viewer who may not see the run's values gets no count: which gates a row missed leaks them
+    trader = context(reader, user="trader")
+    hidden = load_result_page(trader, run, None, (), 1, 100)
+    assert {(r.near_misses, r.gates_failing) for r in hidden.results} == {(None, None)}
+    assert load_result_page(
+        trader, run, None, (), 1, 100, [FilterInput("near_misses", min=0)]
+    ).total == 0  # fmt: skip
+    # a run that stored lists: near-missed ones count in both, failed ones only in gates_failing
+    _stage(backend, D2, "r6", "me", "gamma", [("AAA", "WATCH", 1)], gates=("a,b", "c"))
+    ctx = context(StoreReader(backend))
+    own = latest_run(ctx, "me", "gamma").run
+    assert own is not None
+    seen = load_result_page(ctx, own, None, (), 1, 100, [FilterInput("gates_failing", min=3)])
+    assert [(r.near_misses, r.gates_failing) for r in seen.results] == [(1, 3)]
