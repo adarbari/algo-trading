@@ -5,7 +5,7 @@
  */
 import { Mono, StatusBadge, type DataTableColumn } from '@algotrade/ui';
 
-import { stamp, statusTone, type ScreenerRunSummary } from '@/entities/screener-run';
+import { stamp, statusText, statusTone, type ScreenerRunSummary } from '@/entities/screener-run';
 import { termHelp } from '@/features/guide-help';
 
 const COUNT = { kind: 'number' } as const;
@@ -39,9 +39,11 @@ export function runColumns(): DataTableColumn<ScreenerRunSummary>[] {
       id: 'status',
       header: 'Status',
       headerAction: termHelp('screener_run_status'),
-      value: (r) => r.status,
+      value: (r) => statusText(r.status),
       essential: true,
-      cell: ({ row }) => <StatusBadge tone={statusTone(row.status)}>{row.status}</StatusBadge>,
+      cell: ({ row }) => (
+        <StatusBadge tone={statusTone(row.status)}>{statusText(row.status)}</StatusBadge>
+      ),
     },
     {
       id: 'picked',

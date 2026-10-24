@@ -16,7 +16,7 @@ const RUNS = [
     configId: 'trend_pullback',
     owner: 'site',
     session: '2026-10-22',
-    status: 'complete',
+    status: 'COMPLETE',
     startedAt: '2026-10-22T22:05:00+00:00',
     finishedAt: '2026-10-22T22:07:00+00:00',
     knowledgeTs: '2026-10-22T22:07:00+00:00',
@@ -30,7 +30,7 @@ const RUNS = [
     configId: 'value_dip',
     owner: 'abhi',
     session: '2026-10-21',
-    status: 'failed',
+    status: 'FAILED',
     startedAt: '2026-10-21T22:05:00+00:00',
     finishedAt: null,
     knowledgeTs: '2026-10-21T22:05:00+00:00',
@@ -117,7 +117,7 @@ test('a status filter is sent to the server and kept in the URL', async ({ page 
   });
   await page.goto('/admin/screener-runs?status=failed');
   await expect(page.getByRole('grid', { name: 'Screener runs' })).toBeVisible();
-  expect(asked).toContain('failed');
+  expect(asked).toContain('FAILED');
 });
 
 test('a failed read shows its error with a retry', async ({ page }) => {

@@ -9,13 +9,15 @@ import pandas as pd
 import pytest
 
 from algotrade.services.read.ops.admin_runs.screener_runs import (
+    HISTORY_DAYS,
+    WINDOW_DAYS,
     load_screener_run,
     load_screener_run_changes,
     load_screener_runs,
 )
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.runs import RunRecord
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.unit.services.read.evaluation.conftest import DOCS, stores
 
@@ -85,8 +87,8 @@ def test_filters_by_owner_screener_and_status(backend: MemoryBackend) -> None:
     assert ids(user="local") == ["d", "c", "b"]
     assert ids(user="site") == ["a"]
     assert ids(screener="mine") == ["b"]
-    assert ids(status="running") == ["c"]
-    assert ids(user="local", screener="momo", status="partial") == ["d"]
+    assert ids(status=RunStatus.RUNNING) == ["c"]
+    assert ids(user="local", screener="momo", status=RunStatus.PARTIAL) == ["d"]
 
 
 def test_what_the_record_says_and_a_run_that_never_finished_has_no_decisions(
@@ -183,7 +185,7 @@ def test_a_frozen_run_with_no_previous_run_has_no_counts(backend: MemoryBackend)
 
 def test_a_small_limit_does_not_read_the_older_windows(backend: MemoryBackend) -> None:
     today = datetime.now(UTC).date()
-    for n, back in enumerate((1, 3, 200)):
+    for n, back in enumerate((1, 3, 60)):
         day = today - timedelta(days=back)
         at = datetime.combine(day, T.timetz())
         record = RunRecord(f"r{n}", run_job_name("momo", "site"), day, at)
@@ -202,3 +204,43 @@ def test_a_small_limit_does_not_read_the_older_windows(backend: MemoryBackend) -
     asked.clear()
     assert [r.run_id for r in load_screener_runs(ctx, 3)] == ["r0", "r1", "r2"]
     assert len(asked) > 1  # a bigger limit walks back to the old run
+
+
+def _on(backend: MemoryBackend, run_id: str, session: date, started: datetime, **kw: Any) -> None:
+    record = RunRecord(run_id, run_job_name("momo", "site"), session, started)
+    ResultWriter(backend).save_run(record.finish(started, **kw))
+
+
+def test_the_order_is_the_session_screened_so_a_backfill_started_today_sorts_below_newer_sessions(
+    backend: MemoryBackend,
+) -> None:
+    today = datetime.now(UTC).date()
+    now = datetime.combine(today, T.timetz())
+    _on(backend, "newer-early", today - timedelta(days=1), now - timedelta(hours=5), stats=GOOD)
+    _on(backend, "older-late", today - timedelta(days=2), now - timedelta(hours=1), stats=GOOD)
+    _on(backend, "backfill", today - timedelta(days=30), now, stats=GOOD)  # started last of all
+    ctx = stores(backend)
+    assert [r.run_id for r in load_screener_runs(ctx)] == ["newer-early", "older-late", "backfill"]
+    assert [r.run_id for r in load_screener_runs(ctx, 2)] == ["newer-early", "older-late"]
+
+
+def test_a_filter_that_matches_little_stops_at_the_history_cap_and_never_reads_older_runs(
+    backend: MemoryBackend,
+) -> None:
+    today = datetime.now(UTC).date()
+    for run_id, back in (("inside", HISTORY_DAYS - 1), ("outside", HISTORY_DAYS + 5)):
+        day = today - timedelta(days=back)
+        _on(backend, run_id, day, datetime.combine(day, T.timetz()), complete=False)
+    ctx = stores(backend)
+    asked: list[tuple[date, date]] = []
+    real = ctx.reader.runs_of
+
+    def spy(jobs: Any, first: date, last: date) -> Any:
+        asked.append((first, last))
+        return real(jobs, first, last)
+
+    ctx.reader.runs_of = spy  # type: ignore[method-assign]
+    assert [r.run_id for r in load_screener_runs(ctx, 50, status=RunStatus.PARTIAL)] == ["inside"]
+    assert [r.run_id for r in load_screener_runs(ctx, 50, status=RunStatus.FAILED)] == []
+    assert min(first for first, _ in asked) >= today - timedelta(days=HISTORY_DAYS + WINDOW_DAYS)
+    assert len(asked) == 2 * -(-HISTORY_DAYS // WINDOW_DAYS)  # the walk ended, twice

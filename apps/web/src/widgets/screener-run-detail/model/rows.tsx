@@ -6,7 +6,7 @@
  */
 import { Mono, StatusBadge, type KeyValueItem } from '@algotrade/ui';
 
-import { stamp, statusTone, type ScreenerRunRecord } from '@/entities/screener-run';
+import { stamp, statusText, statusTone, type ScreenerRunRecord } from '@/entities/screener-run';
 import { Labelled } from '@/features/guide-help';
 
 const NOT_RECORDED = 'Not recorded';
@@ -27,7 +27,7 @@ export function factRows(run: ScreenerRunRecord): KeyValueItem[] {
     {
       id: 'status',
       label: <Labelled text="Status" help="screener_run_status" />,
-      value: <StatusBadge tone={statusTone(run.status)}>{run.status}</StatusBadge>,
+      value: <StatusBadge tone={statusTone(run.status)}>{statusText(run.status)}</StatusBadge>,
     },
     {
       id: 'owner',
@@ -108,7 +108,15 @@ export function changeRows(run: ScreenerRunRecord): KeyValueItem[] {
     : 'None';
   return [
     { id: 'previous', label, value: previous, mono: true },
-    { id: 'new', label: 'New picks', value: count(changes.newPicks) },
-    { id: 'dropped', label: 'Dropped', value: count(changes.dropped) },
+    {
+      id: 'new',
+      label: <Labelled text="New picks" help="screener_run_new_picks" />,
+      value: count(changes.newPicks),
+    },
+    {
+      id: 'dropped',
+      label: <Labelled text="Dropped" help="screener_run_dropped" />,
+      value: count(changes.dropped),
+    },
   ];
 }
