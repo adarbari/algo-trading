@@ -115,10 +115,7 @@ export async function mockIdeasApi(page: Page, edgeDesk: unknown = NO_EDGE_DESK)
       await route.fulfill({ json: edgeDesk });
       return;
     }
-    if (
-      /query\s+FilterSet\b/.test(body?.query ?? '') &&
-      (body?.variables)?.surface === 'ideas'
-    ) {
+    if (/query\s+FilterSet\b/.test(body?.query ?? '') && body?.variables?.surface === 'ideas') {
       await route.fulfill({ json: FILTER_SET });
       return;
     }
