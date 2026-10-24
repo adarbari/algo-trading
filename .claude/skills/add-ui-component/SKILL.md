@@ -57,7 +57,12 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
    counts, URL state, zero-result recovery, export, keyboard, phone. Anything left out needs a
    one-line reason in the PR. Filtering is server-side (counts, the licence gate ADR 0069,
    UNKNOWN never passes); the browser derives no counts or percentiles (ADR 0038). Use the
-   shared filter bar (ADR 0082, once accepted); a new visual pattern such as a filter bar
+   shared filter bar (ADR 0082): `SurfaceFilterBar` in the file that renders the table; the check
+   `test_data_surfaces_use_the_filter_bar` ([ADR 0025 rule 12]) fails a new table without it.
+   A surface that cannot (a fixed handful of rows) gets an `[exempt]` line with its reason in
+   `architecture/web_filter_bar.toml`. **When you put the bar on a `[migrating]` surface, delete
+   its line in the same PR** (the baseline only shrinks; CI fails and names the file otherwise);
+   a new visual pattern such as a filter bar
    needs an owner-approved mockup (mockup gate, step 2).
 8. A component that adds a tab or panel with its own read: `make api-latency-views` and commit
    `benchmarks/api_latency_views*.json` (the 1 s page gate; CI fails otherwise; `add-web-page` step 12).
