@@ -70,3 +70,12 @@ def test_check_refuses_a_filter_that_is_not_offered() -> None:
 def test_the_shipped_ideas_surface_is_offered_to_an_open_viewer() -> None:
     got = resolve_definitions(load_filter_set(CONFIGS, "ideas"), FEATURES, {OPEN})
     assert got.withheld == frozenset() and len(got.offered) == 12
+
+
+def test_an_instrument_reference_fact_is_offered_to_every_viewer() -> None:
+    """Fix for: ``instrument.*`` fields are no catalogue feature, so the Explore filters on them
+    were all withheld as not stored."""
+    got = resolve_definitions(surface("instrument.sector", "instrument.nope_x"), FEATURES, {OPEN})
+    assert got.get("f0") is not None and got.withheld == frozenset()
+    shipped = resolve_definitions(load_filter_set(CONFIGS, "universe"), FEATURES, {OPEN})
+    assert {"security_type", "sector", "leveraged", "optionable"} <= {f.id for f in shipped.offered}

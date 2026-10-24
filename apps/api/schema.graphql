@@ -1225,7 +1225,7 @@ type FeatureSeries {
 }
 
 """
-Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED; `kinds[i][j]`: its public kind, how a cell is drawn). `unavailable`: what the tables the filters and sort read have nothing for the session leave out (no row passes a filter on them)
+Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED; `kinds[i][j]`: its public kind, how a cell is drawn). `unavailable`: what the tables the filters and sort read have nothing for the session leave out (no row passes a filter on them); `facets` the counts of the whole list under the filters (null for `keys` with no filter set), ADR 0082
 """
 type FeatureTable {
   session: Session!
@@ -1242,6 +1242,7 @@ type FeatureTable {
   page: Int!
   size: Int!
   unavailable: [Unavailable!]!
+  facets: FilterFacets
 
   """The words of each kind `kinds` uses: how a cell's kind reads"""
   kindTexts: [KindText!]!
@@ -2722,7 +2723,7 @@ type Query {
   ): Instrument
 
   """
-  Instruments x `columns` (catalogue fields, in order) for the session: the universe, or the instruments `keys` (ids or tickers) name in that order; filtered (security type, sector, liquidity class, leveraged, optionable: case-insensitive; `q`: the symbol or name contains it), sorted by `sort` (`symbol` or a catalogue field, `-` prefix: descending, missing values last) and paged (`page` from 1, `size` rows). Null: nothing stored
+  Instruments x `columns` (catalogue fields, in order) for the session: the universe, or the instruments `keys` (ids or tickers) name in that order; filtered (`filters`: the surface `universe` of `filterSet`, over the whole list, with the counts in the result's `facets`; `securityType`, `sector`, `liquidityClass`, `leveraged` and `optionable` are deprecated, they are those filters, text case-insensitive; `q`: the symbol or name contains it), sorted by `sort` (`symbol` or a catalogue field, `-` prefix: descending, missing values last) and paged (`page` from 1, `size` rows). Null: nothing stored
   """
   table(
     columns: [FeatureName!]!
@@ -2736,6 +2737,7 @@ type Query {
     sort: String = null
     page: Int! = 1
     size: Int! = 100
+    filters: [FilterInput!] = null
 
     """
     the session to read (default: the latest with bars); every value below is for exactly this date
