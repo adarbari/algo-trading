@@ -299,6 +299,9 @@ class EdgeEvaluation:
     # The share of an in-sample Sharpe ratio to expect lost out of sample (``verdict.toml
     # [oos_haircut]`` of the edge's ``oos_class``; None: the edge has none), for the report.
     oos_haircut: float | None = None
+    # Each screener's config hash as the run resolved it (``Variant.hash``), recorded in the run
+    # record's stats so the provenance line can tell a screener changed since (empty: none).
+    screener_hashes: Mapping[str, str] = field(default_factory=dict)
 
 
 def _random_sets(
@@ -644,6 +647,7 @@ def evaluate_edge(
     return EdgeEvaluation(
         edge_id=edge.id,
         run_hash=hashed,
+        screener_hashes={v.id: v.hash for v in variants if v.role != BASELINE},
         user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,
