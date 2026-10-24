@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24 07:34 UTC",
+ "generated": "2026-10-24 09:39 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -207,6 +207,7 @@
     "EdgeDesk",
     "EdgeDetail",
     "EdgePaper",
+    "EdgeProblems",
     "EdgeResultCapacity",
     "EdgeResultCosts",
     "EdgeResultCurve",
@@ -219,6 +220,7 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
+    "FilterSet",
     "GuideHelpField"
    ],
    "uncertain": [
@@ -323,6 +325,7 @@
     "EdgeDesk",
     "EdgeDetail",
     "EdgePaper",
+    "EdgeProblems",
     "EdgeResultCapacity",
     "EdgeResultCosts",
     "EdgeResultCurve",
@@ -335,6 +338,7 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
+    "FilterSet",
     "GuideHelpField"
    ],
    "uncertain": [
@@ -471,111 +475,6 @@
    "source": "static",
    "parent": "/edges?edge={edge}",
    "target": true
-  },
-  "/edges?view=following": {
-   "route": "/edges",
-   "search": {
-    "view": "following"
-   },
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeCompare",
-    "EdgeDesk",
-    "EdgeDetail",
-    "EdgePaper",
-    "EdgeResultCapacity",
-    "EdgeResultCosts",
-    "EdgeResultCurve",
-    "EdgeResultDecay",
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultMonthly",
-    "EdgeResultRegimes",
-    "EdgeResultRollingStarts",
-    "EdgeTrades",
-    "EdgeVariantGrid",
-    "EdgesPage",
-    "GuideHelpField"
-   ],
-   "uncertain": [
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultRegimes",
-    "GuideHelpField"
-   ],
-   "interaction": [],
-   "source": "static"
-  },
-  "/edges?view=mine": {
-   "route": "/edges",
-   "search": {
-    "view": "mine"
-   },
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeCompare",
-    "EdgeDesk",
-    "EdgeDetail",
-    "EdgePaper",
-    "EdgeResultCapacity",
-    "EdgeResultCosts",
-    "EdgeResultCurve",
-    "EdgeResultDecay",
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultMonthly",
-    "EdgeResultRegimes",
-    "EdgeResultRollingStarts",
-    "EdgeTrades",
-    "EdgeVariantGrid",
-    "EdgesPage",
-    "GuideHelpField"
-   ],
-   "uncertain": [
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultRegimes",
-    "GuideHelpField"
-   ],
-   "interaction": [],
-   "source": "static"
-  },
-  "/edges?view=rejected": {
-   "route": "/edges",
-   "search": {
-    "view": "rejected"
-   },
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeCompare",
-    "EdgeDesk",
-    "EdgeDetail",
-    "EdgePaper",
-    "EdgeResultCapacity",
-    "EdgeResultCosts",
-    "EdgeResultCurve",
-    "EdgeResultDecay",
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultMonthly",
-    "EdgeResultRegimes",
-    "EdgeResultRollingStarts",
-    "EdgeTrades",
-    "EdgeVariantGrid",
-    "EdgesPage",
-    "GuideHelpField"
-   ],
-   "uncertain": [
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultRegimes",
-    "GuideHelpField"
-   ],
-   "interaction": [],
-   "source": "static"
   },
   "/explore": {
    "route": "/explore",
@@ -1681,13 +1580,18 @@
    "clicks": [],
    "params": {},
    "ops": [
+    "FilterSet",
     "MyScreens",
     "ScreenerConfigs",
+    "ScreenerListPage",
     "ScreenerRuns",
     "ScreenerTrackRecords"
    ],
    "uncertain": [],
-   "interaction": [],
+   "interaction": [
+    "GuideEntries",
+    "GuideHelpField"
+   ],
    "source": "static"
   },
   "/screeners/:id": {
