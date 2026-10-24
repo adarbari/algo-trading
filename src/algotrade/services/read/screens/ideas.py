@@ -67,7 +67,7 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.filtering.definitions import ResolvedFilters
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import Cell, FilterInput, filter_hash
-from algotrade.services.read.filtering.served import load_served_filters
+from algotrade.services.read.filtering.served import load_list_filters
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -373,7 +373,7 @@ def load_ideas(
     best first, from the ``after`` cursor (none: the first page); ``Ideas.next_cursor`` is the
     next page's. ``FilterRefusedError`` for a filter the viewer is not offered."""
     rule = load_ideas_rule(ctx.configs)
-    resolved = load_served_filters(ctx, SURFACE, ctx.session.date, [i.id for i in filters]).resolved
+    resolved = load_list_filters(ctx, SURFACE, [i.id for i in filters]).resolved
     resolved.check(i.id for i in filters)  # before any read: a hidden filter is refused whole
     screeners = load_screeners(ctx)
     latest = load_latest_runs(ctx, [(s.owner, s.id) for s in screeners])

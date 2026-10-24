@@ -12,7 +12,12 @@ from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 
-from algotrade.config.filters.definitions import FilterColumn, FilterDefinition, load_filter_set
+from algotrade.config.filters.definitions import (
+    FilterColumn,
+    FilterDefinition,
+    FilterSet,
+    load_filter_set,
+)
 from algotrade.config.site.settings import load_phrasebook, load_users
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
@@ -181,13 +186,21 @@ def _why(
     return Unavailable(kind, (field,), feature_cause(field, detail, kind.value, day))
 
 
-def load_served_filters(
-    ctx: Stores, surface: str, day: date | None = None, wanted: Iterable[str] = ()
-) -> ServedFilters:
-    """``surface``'s filters for ``ctx``'s user. ``NotFoundError`` for a surface with no file.
-    ``wanted``: the filter ids of the request; each ``feature:<field>`` one is offered too when
-    the surface takes features and the viewer's licences cover the field (else it is withheld, or
-    left for ``check`` to refuse), ``feature_filters.py``."""
+@dataclass(frozen=True)
+class ListFilters:
+    """What a list reads of a surface's filters: ``resolved`` (the pass's definitions) and
+    ``columns`` (the declared columns). No no-data check: only ``filterSet`` offers controls."""
+
+    resolved: ResolvedFilters
+    columns: tuple[FilterColumn, ...]
+
+
+def _resolve(
+    ctx: Stores, surface: str, wanted: Iterable[str]
+) -> tuple[FilterSet, FeatureSet, ResolvedFilters, tuple[FilterDefinition, ...]]:
+    """The surface's file, the site catalogue, the filters resolved for ``ctx``'s user and the
+    picked feature filters it may not use (``wanted``: see ``load_served_filters``).
+    ``NotFoundError`` for a surface with no file."""
     filter_set = load_filter_set(ctx.configs, surface)
     if not filter_set.filters and not filter_set.columns:
         raise NotFoundError(f"filters: no surface {surface!r}")
@@ -205,6 +218,26 @@ def load_served_filters(
             (*resolved.offered, *extra_on),
             resolved.withheld | {f.id for f in extra_off},
         )
+    return filter_set, site, resolved, tuple(extra_off)
+
+
+def load_list_filters(ctx: Stores, surface: str, wanted: Iterable[str] = ()) -> ListFilters:
+    """``resolved`` and ``columns`` of ``load_served_filters``, without its no-data check (a
+    full read of the surface's fields, whose result only ``filterSet`` uses): every list, table,
+    export and trade read takes its filters here."""
+    filter_set, _, resolved, _ = _resolve(ctx, surface, wanted)
+    return ListFilters(resolved, filter_set.columns)
+
+
+def load_served_filters(
+    ctx: Stores, surface: str, day: date | None = None, wanted: Iterable[str] = ()
+) -> ServedFilters:
+    """``surface``'s filters for ``ctx``'s user. ``NotFoundError`` for a surface with no file.
+    ``wanted``: the filter ids of the request; each ``feature:<field>`` one is offered too when
+    the surface takes features and the viewer's licences cover the field (else it is withheld, or
+    left for ``check`` to refuse), ``feature_filters.py``. Runs the no-data check: only
+    ``filterSet`` calls it (``tests/architecture``); lists use ``load_list_filters``."""
+    filter_set, site, resolved, extra_off = _resolve(ctx, surface, wanted)
     stale = _without_data(ctx, filter_set.filters, (f.id for f in resolved.offered))
     withheld = tuple(
         WithheldFilter(

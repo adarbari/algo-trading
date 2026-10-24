@@ -49,7 +49,7 @@ from algotrade.services.read.context import (
 from algotrade.services.read.evaluation.pick_edges import PickEdge, load_pick_edges
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import Cell, FilterInput, rule_for
-from algotrade.services.read.filtering.served import load_served_filters
+from algotrade.services.read.filtering.served import load_list_filters
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -741,7 +741,7 @@ def _filter_run(
     """``run``'s rows (rank order) that pass ``inputs``, the facets over the whole run and the
     tables the SET catalogue-field filters read with nothing for the session.
     ``FilterRefusedError`` for an input the viewer is not offered (refused before any read)."""
-    resolved = load_served_filters(ctx, SURFACE, ctx.session.date, [i.id for i in inputs]).resolved
+    resolved = load_list_filters(ctx, SURFACE, [i.id for i in inputs]).resolved
     resolved.check(i.id for i in inputs)
     rows = run_rows(ctx, run)
     changes = load_run_changes(ctx, run).by_instrument
@@ -928,7 +928,7 @@ def load_result_page(
     results = [found[(run.run_id, i)] for i in shown if (run.run_id, i) in found]
     toward = load_pick_edges(ctx, run, [(r.instrument_id, r.decision, r.rank) for r in results])
     walk = "days_picked" in history_wanted(
-        load_served_filters(ctx, SURFACE, ctx.session.date).resolved, _inputs(query, filters)
+        load_list_filters(ctx, SURFACE).resolved, _inputs(query, filters)
     )  # the walk back through the previous runs is read only for a request that filters on it
     streaks = days_picked(ctx, run, run_withheld) if walk else {}
     gates = _gate_counts(ctx, run)

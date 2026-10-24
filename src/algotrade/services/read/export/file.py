@@ -20,7 +20,7 @@ from algotrade.services.read.export.cells import cell
 from algotrade.services.read.export.surfaces import ROW_CAP, SURFACES, Exported, Params
 from algotrade.services.read.filtering.codec import decode_filters
 from algotrade.services.read.filtering.masks import filter_hash
-from algotrade.services.read.filtering.served import load_served_filters
+from algotrade.services.read.filtering.served import load_list_filters
 
 NOTICE = "personal-licence values are for the holder's own use, not for redistribution"
 
@@ -67,7 +67,7 @@ def export_file(
         raise NotFoundError(f"no such surface to export: {surface}")
     filters = decode_filters(f)
     # a More-filters ``feature:<field>`` is offered only when it is asked for, as in the page's read
-    resolved = load_served_filters(ctx, surface, ctx.session.date, [i.id for i in filters]).resolved
+    resolved = load_list_filters(ctx, surface, [i.id for i in filters]).resolved
     resolved.check(i.id for i in filters)
     found: Exported = load(ctx, filters, params or Params())
     cut = (

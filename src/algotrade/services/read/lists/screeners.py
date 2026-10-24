@@ -16,7 +16,7 @@ from algotrade.services.read.evaluation.track_record import load_listing_edge_id
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.filtering.rows import frame_of
-from algotrade.services.read.filtering.served import load_served_filters
+from algotrade.services.read.filtering.served import load_list_filters
 from algotrade.services.read.screens.runs import ScreenerRun, load_latest_runs
 from algotrade.services.read.screens.screeners import Screener, load_screeners
 
@@ -53,7 +53,7 @@ def load_screener_list(
 ) -> ScreenerList:
     """The user's screeners for ``ctx.session`` matching ``q`` and ``filters``.
     ``FilterRefusedError`` for a filter the viewer is not offered."""
-    served = load_served_filters(ctx, SURFACE, ctx.session.date)
+    served = load_list_filters(ctx, SURFACE)
     served.resolved.check(i.id for i in filters)
     needle = (q or "").strip().lower()
     found = [s for s in load_screeners(ctx) if not needle or _matches(s, needle)]
