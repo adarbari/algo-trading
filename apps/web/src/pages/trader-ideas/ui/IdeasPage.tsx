@@ -1,7 +1,6 @@
 /**
  * Trader > Ideas (home): the ticker-level ideas table across the user's screeners, full width,
- * under the regime strip, the paused picks, the preset views and the filter chips (search
- * params). A row opens its ticker in Explore (or a compare set) with the screener that surfaced it.
+ * under the regime strip, the paused picks and the shared filter bar (search params). A row opens its ticker in Explore (or a compare set) with the screener that surfaced it.
  * The signals of the followed edges sit above the table and load on demand (their own chunk).
  */
 import { Stack } from '@algotrade/ui';
@@ -9,11 +8,10 @@ import { Suspense } from 'react';
 
 import { lazyPage } from '@/shared/lib/lazy';
 import type { IdeaCompareSearch } from '@/features/idea-compare';
-import type { IdeasSearch, IdeasSearchPatch } from '@/entities/idea';
 import { IdeasHeading } from '@/widgets/ideas-heading';
 import { PausedIdeas } from '@/widgets/paused-ideas';
 import { RegimeStrip } from '@/widgets/regime-strip';
-import { TopIdeas } from '@/widgets/top-ideas';
+import { TopIdeas, type TopIdeasSearch, type TopIdeasSearchPatch } from '@/widgets/top-ideas';
 
 const EdgeSignals = lazyPage(() => import('@/widgets/edge-signals'), 'EdgeSignals');
 
@@ -21,9 +19,9 @@ const EdgeSignals = lazyPage(() => import('@/widgets/edge-signals'), 'EdgeSignal
 export const preloadEdgeSignals = EdgeSignals.preload;
 
 export interface IdeasPageProps {
-  /** The view in use and the filter chips (the URL's search params). */
-  search: IdeasSearch;
-  onSearchChange: (patch: IdeasSearchPatch) => void;
+  /** The column set and the filters in force (the URL's search params). */
+  search: TopIdeasSearch;
+  onSearchChange: (patch: TopIdeasSearchPatch) => void;
   /** Open the chosen tickers in Explore as a compare set. */
   onCompare: (search: IdeaCompareSearch) => void;
   /** Open one ticker in Explore, with the screener (config id) that surfaced it. */

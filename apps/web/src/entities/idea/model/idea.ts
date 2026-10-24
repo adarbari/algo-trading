@@ -10,6 +10,7 @@
  */
 import type { ServedUnknown } from '@/entities/availability';
 import type { ServedValue } from '@/entities/feature';
+import type { FilterFacets } from '@/entities/filter';
 import type { gqlTypes } from '@/shared/api';
 
 import { IDEA_FACTS } from './facts';
@@ -104,6 +105,10 @@ export interface ScreenerSummary {
   notRun: ServedUnknown | null;
   /** The run's order follows values the viewer's licences do not cover: it adds no idea. */
   withheld: boolean;
+  /** The run record's own coverage (`COMPLETE`, `PARTIAL`), null: no run or not recorded. */
+  coverage: string | null;
+  /** What the run went without, in the server's public words (never a table or step name). */
+  gaps: { kind: string; kindText: string; guideTerm: string }[];
   /** Its first picks that count towards the ideas, best first. */
   top: { symbol: string; score: number | null }[];
 }
@@ -120,6 +125,8 @@ export interface IdeasData {
   paused: PausedIdea[];
   /** The viewer's screeners (their own first, then the site presets by id). */
   screeners: ScreenerSummary[];
+  /** The server's counts for the filters in force (null: none sent or nothing stored). */
+  facets: FilterFacets | null;
 }
 
 const FLAG_LABELS: Record<string, string> = {
@@ -189,6 +196,12 @@ function toScreener(entry: ServedScreener): ScreenerSummary {
     picked: entry.picked,
     notRun: entry.notRun ?? null,
     withheld: entry.withheld,
+    coverage: entry.run?.coverage ?? null,
+    gaps: (entry.run?.unavailable ?? []).map((u) => ({
+      kind: u.kind,
+      kindText: u.kindText,
+      guideTerm: u.guideTerm,
+    })),
     top: entry.top.map((t) => ({
       symbol: t.instrument?.symbol ?? t.instrumentId,
       score: t.score ?? null,
@@ -204,6 +217,7 @@ export const NO_IDEAS: IdeasData = {
   pausedTotal: 0,
   paused: [],
   screeners: [],
+  facets: null,
 };
 
 function toPaused(entry: ServedPaused, names: ReadonlyMap<string, string>): PausedIdea {
@@ -230,5 +244,6 @@ export function toIdeasData(response: IdeasResponse): IdeasData {
     pausedTotal: found.pausedTotal,
     paused: found.paused.map((entry) => toPaused(entry, names)),
     screeners: found.screeners.map(toScreener),
+    facets: found.facets ?? null,
   };
 }

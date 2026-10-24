@@ -7,16 +7,30 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.read.context import NotFoundError, ReadContext
+from algotrade.services.read.context import NotFoundError, ReadContext, open_context
+from algotrade.services.read.filtering.definitions import FilterRefusedError
+from algotrade.services.read.filtering.masks import FilterInput
 from algotrade.services.read.instruments import table
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.instruments.table import UniverseFilter, load_table
 from algotrade.services.read.values import UnknownCode
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_rows
 from tests.helpers.stored_frames import T0, stamped
-from tests.unit.services.read.instruments.conftest import D0, D1, PRICE, context, store_with
+from tests.unit.services.read.instruments.conftest import (
+    D0,
+    D1,
+    FILTERS,
+    IBKR,
+    IBKR_IV30,
+    PRICE,
+    USERS,
+    context,
+    store_with,
+)
 
 CLOSE = "rollup.price_stats@v2.close"
 HV20 = "rollup.price_stats@v2.hv20"
@@ -128,10 +142,10 @@ def test_one_order_per_query_until_the_next_publish(monkeypatch: pytest.MonkeyPa
     ctx = context(reader)
     first = load_table(ctx, [CLOSE], sort=f"-{CLOSE}", size=1, page=1)
     second = load_table(ctx, [CLOSE], sort=f"-{CLOSE}", size=1, page=2)
-    assert len(calls) == 1  # the second page is sliced from the cached order
+    assert len(calls) == 2  # the filter pass and the sort read; the second page is sliced
     assert [i.symbol for i in (*first.instruments, *second.instruments)] == ["AAA", "ETFX"]
     load_table(ctx, [CLOSE], UniverseFilter(security_type="ETF"), sort=f"-{CLOSE}")
-    assert len(calls) == 2  # filters are part of the query
+    assert len(calls) > 2  # filters are part of the query
     rows = [{"instrument_id": i, "close": c, "hv20": 0.1, "high_52w": 1.0, "low_52w": 1.0}
             for i, c in (("EQ:AAA", 51.0), ("EQ:ETFX", 99.0))]  # fmt: skip
     later_ts = T0 + timedelta(minutes=1)
@@ -166,3 +180,123 @@ def test_a_sort_or_filter_on_a_withheld_field_orders_nothing_by_its_values() -> 
     assert trader.rows == ((None,),) * len(trader.rows)
     assert {u for row in trader.unknown for u in row} == {UnknownCode.LICENCE}
     assert holder.rows[0] == (0.42,)
+
+
+# ---------------------------------------------------------------------- filters (ADR 0082)
+IV_FILTER = {
+    "id": "iv", "label": "IV", "group": "tradeable", "kind": "range", "field": IBKR_IV30,
+    "bins": [0, 0.5, 1], "guide": "term:filter_spread",
+}  # fmt: skip
+
+
+def _with_iv(ctx_user: str, value: float) -> ReadContext:
+    """``ctx_user`` over a store whose AAA has ``iv30_ibkr`` = ``value``, with an IV filter."""
+
+    def write(w: StoreWriter) -> None:
+        write_rows(w, IBKR, D1, [{"instrument_id": "EQ:AAA", "iv30_ibkr": value}])
+
+    reader = store_with(_universe, write)
+    shipped = FILTERS[("site", "filters", "universe")]
+    docs = {
+        ("site", "filters", "universe"): {**shipped, "filter": [*shipped["filter"], IV_FILTER]},
+        ("site", "settings", "users"): USERS,
+    }
+    return open_context(reader, MemoryConfigStore(docs), UserContext(ctx_user))
+
+
+def _symbols(found: Any) -> list[str]:
+    return [i.symbol for i in found.instruments]
+
+
+def test_filters_narrow_the_whole_universe_before_it_is_paged(ctx: ReadContext) -> None:
+    only = [FilterInput("price", min=0)]
+    page = load_table(ctx, [CLOSE], page=1, size=1, inputs=only)
+    assert (_symbols(page), page.total) == (["AAA"], 1)  # ETFX has no close: UNKNOWN never passes
+    assert page.facets is not None and (page.facets.total, page.facets.matched) == (2, 1)
+    [price] = [f for f in page.facets.items if f.id == "price"]
+    assert (price.unknown, price.removes) == (1, 1)
+    assert load_table(ctx, [CLOSE], inputs=only, page=2, size=1).instruments == ()
+    plain = load_table(ctx, [CLOSE])
+    assert plain.facets is not None and plain.facets.matched == plain.total == 2
+
+
+def test_the_old_arguments_equal_the_filters_they_map_onto(ctx: ReadContext) -> None:
+    pairs = [
+        (UniverseFilter(security_type="etf"), [FilterInput("security_type", ["ETF"])]),
+        (UniverseFilter(sector="technology"), [FilterInput("sector", ["Technology"])]),
+        (UniverseFilter(optionable=False), [FilterInput("optionable", ["no"])]),
+        (UniverseFilter(optionable=True), [FilterInput("optionable", ["yes"])]),
+        (UniverseFilter(leveraged=True), [FilterInput("leveraged", ["yes"])]),
+        (
+            UniverseFilter(security_type="COMMON_STOCK", optionable=True),
+            [FilterInput("security_type", ["COMMON_STOCK"]), FilterInput("optionable", ["yes"])],
+        ),
+    ]
+    for old, new in pairs:
+        assert load_table(ctx, [CLOSE], old) == load_table(
+            ctx, [CLOSE], None, None, 1, 100, None, new
+        )
+    assert _symbols(load_table(ctx, [], UniverseFilter(optionable=False))) == ["ETFX"]  # no null
+    with pytest.raises(FilterRefusedError, match="twice"):
+        load_table(ctx, [], UniverseFilter(sector="Energy"), inputs=[FilterInput("sector")])
+
+
+def test_a_search_comes_after_the_filters_and_the_counts_are_of_the_universe(
+    ctx: ReadContext,
+) -> None:
+    page = load_table(ctx, [], UniverseFilter(q="x"), inputs=[FilterInput("price", min=0)])
+    assert page.total == 0 and page.facets is not None
+    assert (page.facets.total, page.facets.matched) == (2, 1)  # q is no filter
+    assert _symbols(
+        load_table(ctx, [], UniverseFilter(q="aa"), inputs=[FilterInput("price", min=0)])
+    ) == ["AAA"]
+
+
+def test_keys_carry_facets_only_when_a_filter_is_set(ctx: ReadContext) -> None:
+    assert load_table(ctx, [CLOSE], keys=["AAA", "ETFX"]).facets is None
+    off = [FilterInput("price", min=1, active=False), FilterInput("sector")]  # sets nothing
+    assert load_table(ctx, [CLOSE], keys=["AAA", "ETFX"], inputs=off).facets is None
+    found = load_table(ctx, [CLOSE], keys=["AAA", "ETFX"], inputs=[FilterInput("price", min=0)])
+    assert _symbols(found) == ["AAA"] and found.facets is not None and found.facets.total == 2
+
+
+def test_a_gap_is_disclosed_only_for_the_tables_of_a_set_filter() -> None:
+    early = context(store_with(_universe), D0.replace(day=1))  # the company snapshot is D0's
+    assert load_table(early, [SECTOR]).missing == ()  # the facets read it: no disclosure
+    found = load_table(early, [], inputs=[FilterInput("sector", ["Technology"])])
+    assert (found.total, found.missing) == (0, ("instruments/company",))
+
+
+def test_a_new_sort_or_search_reuses_the_filter_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    ctx = context(store_with(_universe))
+    calls: list[int] = []
+    real = table.field_view
+    monkeypatch.setattr(table, "field_view", lambda *a, **k: calls.append(1) or real(*a, **k))
+    load_table(ctx, [CLOSE], inputs=[FilterInput("price", min=0)])
+    after_first = len(calls)
+    load_table(
+        ctx, [CLOSE], UniverseFilter(q="a"), sort="-symbol", inputs=[FilterInput("price", min=0)]
+    )
+    assert len(calls) == after_first + 1  # only the sort / search read; the pass is cached
+
+
+def test_a_filter_the_viewer_is_not_offered_is_refused() -> None:
+    with pytest.raises(FilterRefusedError):
+        load_table(_with_iv("trader", 0.3), [], inputs=[FilterInput("iv", min=0.1)])
+    assert _symbols(
+        load_table(_with_iv("owner", 0.3), [], inputs=[FilterInput("iv", min=0.1)])
+    ) == ["AAA"]
+
+
+def test_changing_a_hidden_licence_fields_values_changes_no_count() -> None:
+    """The leak test: stores differing only in the stored ``iv30_ibkr``; the viewer without the
+    personal licence reads the same page and facets from both, with every offered filter set."""
+    given = [FilterInput("price", min=0), FilterInput("security_type", ["COMMON_STOCK"])]
+    shapes = [load_table(_with_iv("trader", v), [CLOSE], inputs=given) for v in (0.05, 0.95)]
+    assert shapes[0] == shapes[1] and shapes[0].facets is not None
+    assert all(f.id != "iv" for f in shapes[0].facets.items)
+    totals = [
+        load_table(_with_iv("owner", v), [], inputs=[FilterInput("iv", min=0.5)]).total
+        for v in (0.05, 0.95)
+    ]
+    assert totals == [0, 1]  # the holder of the licence reads the values

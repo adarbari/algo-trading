@@ -173,7 +173,7 @@ have no run, a partial run or a run missing a required input. A screener missing
 input is not counted.
 """
 next = "Nothing is needed from you: a newer day replaces the one shown by itself, and a failure is for the owner to fix."
-see_also = ["dataset_status", "unknown", "last_complete_session", "publishing_session", "not_run"]
+see_also = ["dataset_status", "unknown", "last_complete_session", "publishing_session", "not_run", "partial_run"]
 
 [[term]]
 id = "dataset_status"
