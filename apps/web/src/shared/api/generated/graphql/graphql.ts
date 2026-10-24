@@ -118,6 +118,12 @@ export type RiskDirection =
   | 'HIGHER_IS_RISK'
   | 'LOWER_IS_RISK';
 
+/** What a screener's run was for a session: COMPLETE (ran to the end), PARTIAL (ran with a gap, or its record is gone) or NOT_RUN */
+export type RunState =
+  | 'COMPLETE'
+  | 'NOT_RUN'
+  | 'PARTIAL';
+
 /** Where a run record stands: how far the run got */
 export type RunStatus =
   | 'COMPLETE'
@@ -745,7 +751,7 @@ export type ScreenerResultsQueryVariables = Exact<{
 }>;
 
 
-export type ScreenerResultsQuery = { session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string, group: string | null }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, latestRun: { runId: string, session: string, previousSession: string | null, status: string | null, coverage: string | null, regime: string | null, paused: number, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, kindTexts: Array<{ kind: UnavailableKind, text: string }>, results: Array<{ instrumentId: string, rank: number | null, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null, group: string | null }>, groups: Array<{ id: string, kind: string, members: Array<string>, parent: string | null, outcome: string | null, decidedBy: string | null }>, columns: Array<{ name: string, value: unknown }>, countsToward: Array<{ edgeId: string, edgeName: string, counts: boolean, code: string, topK: number | null, place: number | null }> }> } } | null } | null };
+export type ScreenerResultsQuery = { session: { date: string, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string, group: string | null }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, recentRuns: Array<{ session: string, state: RunState, served: boolean, runId: string | null, configVersion: number | null, picked: number | null, newPicks: number | null, dropped: number | null, leftOutShare: number | null, notRun: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }>, latestRun: { runId: string, session: string, previousSession: string | null, status: string | null, coverage: string | null, regime: string | null, paused: number, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, kinds: Array<Array<UnavailableKind | null>>, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, kindTexts: Array<{ kind: UnavailableKind, text: string }>, results: Array<{ instrumentId: string, rank: number | null, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null, group: string | null }>, groups: Array<{ id: string, kind: string, members: Array<string>, parent: string | null, outcome: string | null, decidedBy: string | null }>, columns: Array<{ name: string, value: unknown }>, countsToward: Array<{ edgeId: string, edgeName: string, counts: boolean, code: string, topK: number | null, place: number | null }> }> } } | null } | null };
 
 export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -4345,6 +4351,32 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
           status
           message
           runId
+        }
+      }
+    }
+    recentRuns {
+      session
+      state
+      served
+      runId
+      configVersion
+      picked
+      newPicks
+      dropped
+      leftOutShare
+      notRun {
+        code
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
         }
       }
     }

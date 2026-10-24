@@ -38,7 +38,7 @@ import {
   useTableView,
   ViewControls,
 } from '@/features/table-view';
-import { UnknownNote } from '@/entities/availability';
+import { UnknownNote, type ServedUnavailable } from '@/entities/availability';
 import { useFilterSet } from '@/entities/filter';
 import { byName, useFeatureCatalogue, type CriterionInfo, type TableRow } from '@/entities/feature';
 import { RunRegimeChip } from '@/entities/regime';
@@ -48,6 +48,7 @@ import {
   runMessage,
   useRunScreener,
   useScreenerResults,
+  type RecentRun,
 } from '@/entities/screen';
 
 import { usePageOf } from '../model/paging';
@@ -79,6 +80,8 @@ export interface ScreenerResultsProps {
   compared?: readonly string[];
   /** Tickers the unsaved criteria would drop from the picks (marked in the grid). */
   leaving?: ReadonlySet<string>;
+  /** The run line and strip above the table, given the screener's recent runs (page-composed). */
+  renderRunLine?: (runs: readonly RecentRun[], gaps: readonly ServedUnavailable[]) => ReactNode;
   /** What to show beside the table for the row under review (its detail, chart, ...). */
   renderDetail?: (focus: {
     row: TableRow;
@@ -123,6 +126,7 @@ export function ScreenerResults({
   leaving,
   compared = [],
   renderDetail,
+  renderRunLine,
 }: ScreenerResultsProps) {
   const definitions = useFilterSet(SURFACE);
   const known = definitions.data?.filterSet
@@ -307,11 +311,22 @@ export function ScreenerResults({
       }}
     />
   );
-  if (!renderDetail) return table;
+  const line =
+    renderRunLine && screener ? renderRunLine(screener.recentRuns, run?.unavailable ?? []) : null;
+  const withLine = (body: ReactNode) =>
+    line ? (
+      <Stack gap={3}>
+        {line}
+        {body}
+      </Stack>
+    ) : (
+      body
+    );
+  if (!renderDetail) return withLine(table);
   // The sheet opens only for a row the user chose, not the first-row fallback.
   const chosen = focusRow !== null && focusRow.instrumentId === focusId ? focusId : null;
   const index = chosen === null ? -1 : rows.findIndex((row) => row.instrumentId === chosen);
-  return (
+  return withLine(
     <MasterDetail
       columns="main-aside"
       master={table}
@@ -373,6 +388,6 @@ export function ScreenerResults({
       onDetailClose={() => {
         onFocusChange(null);
       }}
-    />
+    />,
   );
 }

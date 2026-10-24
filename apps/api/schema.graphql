@@ -3225,6 +3225,24 @@ type RangeBin {
 }
 
 """
+One session of a screener's recent runs (the run line and session strip of its results page): `state`, `served` (the page's own session: the one `latestRun` shows; the others are history, read as their run record left them), and for a run its `runId`, `configVersion`, `picked` and `paused` (whole run), `newPicks` / `dropped` against its previous run (null: none, or not stored; never 0), `leftOutShare` (0 to 1: the share of names it could not judge for want of a value; null: not counted) and `unavailable` (what the tables it went without leave out); a session with no run has `state` NOT_RUN and `notRun` says why
+"""
+type RecentRun {
+  session: Date!
+  state: RunState!
+  served: Boolean!
+  runId: String
+  configVersion: Int
+  picked: Int
+  paused: Int
+  newPicks: Int
+  dropped: Int
+  leftOutShare: Float
+  unavailable: [Unavailable!]!
+  notRun: Unknown
+}
+
+"""
 One NBER recession as the session knew it: `start` / `end` are the first days of its peak and trough months; `end` is null while the committee had not yet dated its end, and the announcement dates are null where none was published or it is not past
 """
 type Recession {
@@ -3402,6 +3420,15 @@ type RunItem {
   status: String!
 }
 
+"""
+What a screener's run was for a session: COMPLETE (ran to the end), PARTIAL (ran with a gap, or its record is gone) or NOT_RUN
+"""
+enum RunState {
+  COMPLETE
+  PARTIAL
+  NOT_RUN
+}
+
 """Where a run record stands: how far the run got"""
 enum RunStatus {
   QUEUED
@@ -3557,7 +3584,7 @@ type ScreenVersion {
 }
 
 """
-A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `criteria`, `groups` and `displayColumns` the current config's; `description` the one line saying what it finds (null: not written; not part of `hash`); `latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its picked count per session over a window ending at the session
+A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `criteria`, `groups` and `displayColumns` the current config's; `description` the one line saying what it finds (null: not written; not part of `hash`); `latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its picked count per session over a window ending at the session; `recentRuns` its last runs for the run line and strip
 """
 type Screener {
   id: String!
@@ -3586,6 +3613,11 @@ type Screener {
   Its picked count for each of the last `sessions` (default 30, at most 90) exchange sessions ending at the session, oldest first, one entry per session: a session it did not run in has `picked` null and `notRun` says why (never an older run); a session with several runs counts the latest; each entry is what `latestRun` says at that session
   """
   pickHistory(sessions: Int! = 30): [PickCount!]!
+
+  """
+  Its run for each of the last `limit` (default 10, at most 10) exchange sessions ending at the session, oldest first, one entry per session: the history behind the run line, each as its run record left it (never an older run carried into a later session); the entry of the session is what `latestRun` says
+  """
+  recentRuns(limit: Int! = 10): [RecentRun!]!
 }
 
 """

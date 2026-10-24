@@ -68,6 +68,32 @@ const ScreenerResults = graphql(`
           }
         }
       }
+      recentRuns {
+        session
+        state
+        served
+        runId
+        configVersion
+        picked
+        newPicks
+        dropped
+        leftOutShare
+        notRun {
+          code
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+      }
       latestRun {
         runId
         session
@@ -214,6 +240,9 @@ const ScreenerResults = graphql(`
 `);
 
 export type ScreenerResultsResponse = gqlTypes.ScreenerResultsQuery;
+
+/** One session of a screener's recent runs (the run line and the strip). */
+export type RecentRun = NonNullable<ScreenerResultsResponse['screener']>['recentRuns'][number];
 
 /**
  * One page of screener `id`'s latest run as `query` asks; the previous page stays on screen
