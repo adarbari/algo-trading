@@ -207,6 +207,37 @@ describe('useIdeas', () => {
     expect(client.getQueryData(['ideas-more', null])).toEqual(['c2']);
   });
 
+  it('keeps the last list while the first page of new filters is on its way', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    GQL.mockImplementation((_doc, variables) => {
+      const { filters } = variables as { filters: unknown };
+      if (filters === null) return Promise.resolve(page([1, 2], null));
+      return new Promise((resolve) => {
+        release = resolve;
+      });
+    });
+    const decision = [{ id: 'decision', values: ['WATCH'], active: true }];
+    const { result, rerender } = renderHook(({ f }) => useIdeas(f), {
+      wrapper,
+      initialProps: { f: [] as typeof decision },
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    rerender({ f: decision });
+    await waitFor(() => {
+      expect(GQL).toHaveBeenCalledTimes(2);
+    });
+    expect(result.current.isPending).toBe(false);
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.data?.ideas.map((i) => i.rank)).toEqual([1, 2]);
+    release(page([9], null));
+    await waitFor(() => {
+      expect(result.current.data?.ideas.map((i) => i.rank)).toEqual([9]);
+    });
+    expect(result.current.isPlaceholderData).toBe(false);
+  });
+
   it('starts over from a fresh first page when the server refuses the cursor', async () => {
     GQL.mockResolvedValueOnce(page([1, 2], 'old'))
       .mockRejectedValueOnce(

@@ -6,7 +6,6 @@
  * whole run, and each idea's facts by catalogue name (earnings, nearest expiry, IV: ADR 0038). The cache holds the response; `select` shapes it.
  */
 import {
-  keepPreviousData,
   queryOptions,
   useQueries,
   useQuery,
@@ -14,7 +13,7 @@ import {
   type QueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { toFilterInputs, type AppliedFilter, type FilterInput } from '@/entities/filter';
 import { gql, GraphQLRequestError, graphql, queryKeys } from '@/shared/api';
@@ -203,6 +202,11 @@ export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
 
   // A cursor the server refuses (BAD_REQUEST: the runs behind the loaded pages changed) means the
   // list is stale: start over from a fresh first page, never append to it.
+  // New filters are a new query, pending until its first page arrives: until then the last list
+  // (and its counts) stays, so the table and the bar do not blink mid-edit.
+  const settled = useRef(state.data);
+  if (state.data !== undefined) settled.current = state.data;
+  const placeholder = state.data === undefined && settled.current !== undefined;
   const { refused, keep, asked } = state;
   // Pages that no longer link up (see `linked`) leave the list for good: the cursors go with them.
   useEffect(() => {
@@ -221,10 +225,11 @@ export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
 
   const { next, laterFailed, refetchLater, refetchFirst } = state;
   return {
-    data: state.data,
+    data: state.data ?? settled.current,
+    isPlaceholderData: placeholder,
     error: state.error,
     isError: state.isError,
-    isPending: state.isPending,
+    isPending: state.isPending && !placeholder,
     isSuccess: state.isSuccess,
     isFetching: state.isFetching,
     refetch: () => {
@@ -313,7 +318,6 @@ function pageOptions(after: string | null, filters: readonly FilterInput[] | nul
     queryFn: ({ queryKey }) =>
       gql(IdeasPage, { ...variables, after, filters: variables.filters ?? null }, queryKey),
     // The first page of new filters shows the previous list (and its counts) until it arrives.
-    ...(after === null && { placeholderData: keepPreviousData }),
   });
 }
 

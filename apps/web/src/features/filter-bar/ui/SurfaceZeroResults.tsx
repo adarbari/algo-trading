@@ -20,6 +20,7 @@ export function SurfaceZeroResults({ surface, state, facets }: SurfaceZeroResult
   const set = useFilterSet(surface);
   const definitions = set.data?.filterSet?.filters ?? [];
   const noun = (set.data?.filterSet?.label ?? '').toLowerCase();
+  if (!set.data?.filterSet) return null;
   const inForce = state.filters.filter((f) => f.active).length;
   return (
     <ZeroResults
