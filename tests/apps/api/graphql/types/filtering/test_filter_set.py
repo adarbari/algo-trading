@@ -5,7 +5,7 @@ from tests.apps.api.graphql.conftest import Graph
 FILTER_SET = """query($surface: String!) {
   filterSet(surface: $surface) {
     surface label
-    filters { id label group kind guide windowUnit bins options { value label } }
+    filters { id label group kind guide windowUnit unit bins options { value label } }
     withheld { id unavailable { kind features guideTerm } }
   }
 }"""
@@ -26,6 +26,8 @@ def test_the_definitions_of_a_surface_are_served(graph: Graph) -> None:
     assert found["surface"] == "ideas" and {"decision", "dollar_volume", "earnings"} <= set(by_id)
     assert by_id["dollar_volume"]["kind"] == "RANGE" and by_id["dollar_volume"]["bins"]
     assert by_id["earnings"]["windowUnit"] == "SESSIONS"
+    assert by_id["dollar_volume_pct_universe"]["unit"] == "PERCENT"
+    assert by_id["dollar_volume"]["unit"] is None
     assert {o["value"] for o in by_id["decision"]["options"]} >= {"QUALIFIED", "WATCH"}
 
 

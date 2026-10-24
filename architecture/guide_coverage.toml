@@ -55,6 +55,10 @@ source = "graphql:FilterKind"
 exempt = "the control a filter is (pick, range, ...): it decides the widget, never shown as a word; the filter's own Guide entry explains what it filters"
 
 [[enum]]
+source = "graphql:ValueUnit"
+exempt = "how a range filter shows its 0..1 value (as 0..100 percent); the control prints a % sign, and the filter's Guide entry and the percentile term explain the rank"
+
+[[enum]]
 source = "graphql:WindowUnit"
 exempt = "the unit of a window filter's input, shown by the control as days / sessions; the filter's Guide entry explains what it counts"
 

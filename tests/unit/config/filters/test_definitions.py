@@ -234,6 +234,8 @@ def test_the_store_serves_the_file_by_surface() -> None:
         with_filter(kind="pick"),  # a pick needs options (and has bins)
         with_filter(kind="window", bins=None),  # a window needs its unit
         with_filter(window_unit="days"),  # a unit only on a window
+        with_filter(unit="percent", kind="toggle", bins=None),  # a value unit only on a range
+        with_filter(unit="bps"),  # unknown value unit
         with_filter(kind="toggle", bins=None, options="static"),  # options only on pick, select
         with_filter(group="elsewhere"),
         with_filter(kind="slider"),
@@ -285,3 +287,10 @@ def test_cohort_percentile_filters_are_ranges_over_the_zero_to_one_features(surf
                                      "dollar_volume_pct_universe"}  # fmt: skip
     for f in ranks:
         assert f.kind == "range" and f.bins[0] == 0 and f.bins[-1] == 1, f.id
+
+
+@pytest.mark.parametrize("surface", SURFACES)
+def test_every_cohort_percentile_range_is_shown_as_a_percent(surface: str) -> None:
+    for f in shipped(surface).filters:
+        assert (f.unit == "percent") == ("cohort_pct_" in f.field), f.id
+        assert f.unit is None or f.kind == "range", f.id
