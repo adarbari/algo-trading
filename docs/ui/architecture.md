@@ -78,6 +78,8 @@ request; a 401 ends the session):
 | TRADER (default, `/` opens Ideas) | Ideas `/ideas`, Screeners `/screeners` (list), `/screeners/new`, `/screeners/$id/edit` (Builder), Explore `/explore`, Regime `/regime` (the market as weather: `entities/regime`, widgets `regime-header`, `regime-indicators`, `reading-list`; the top-bar chip and the Ideas `regime-strip` read the same query), Calendar `/calendar` (events ahead across names: `entities/event`, `widgets/event-calendar-panel`, `features/calendar-source`), Backtests `/backtests` |
 | ADMIN | Ingestion `/admin/ingestion`, Screener runs & sharing `/admin/screener-runs`, Users & configs `/admin/users` |
 
+Filtering (ADR 0082, spec [filtering.md](filtering.md)) is one component family, not a table feature: `features/filter-bar` holds the `f` URL state (`useFilterState`, the codec) and `SurfaceFilterBar`, which a page gives only its surface name; `entities/filter` holds the surface's definitions (`useFilterSet`), the `FilterFacets` served with a filtered list and `toFilterInputs`. Merged today: Ideas renders `SurfaceFilterBar` on server-side filters. Explore's table, the screener results, the screener list and Edges have the server side (read-model.md) but keep their own web filters until their page migrations land; edge trades have neither yet.
+
 Explore is one page (ticker table with feature-catalogue columns, multi-select compare, detail
 tabs Overview / Compare / Chart / Options / Features / Events / Screener hits; one ticker opens
 on Overview, a compare set of two or more on Compare), not separate universe, instrument, chain
