@@ -134,7 +134,6 @@ function narrowed(results: Json, filters: FilterIn[]): Json {
   };
 }
 
-
 /** The definitions of the Screeners list's filters (config/site/filters/screeners.toml), trimmed. */
 const SCREENER_FILTER_SET = {
   surface: 'screeners',
