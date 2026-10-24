@@ -33,7 +33,10 @@ from algotrade.features.rollups.activity import (
     volume_profile,
 )
 from algotrade.features.rollups.bridges import etf_macro
+from algotrade.features.rollups.cohort import fundamental as cohort_fundamental
+from algotrade.features.rollups.cohort import options as cohort_options
 from algotrade.features.rollups.cohort import price as cohort_price
+from algotrade.features.rollups.cohort import valuation as cohort_valuation
 from algotrade.features.rollups.consensus import (
     analyst_estimates,
     analyst_ratings,
@@ -219,6 +222,9 @@ GROUPS: dict[str, FeatureGroup] = {
             share_classes.GROUP,
             relative_strength.GROUP,
             cohort_price.GROUP,
+            cohort_fundamental.GROUP,
+            cohort_options.GROUP,
+            cohort_valuation.GROUP,
             momentum_variants.GROUP,
             factor_betas.GROUP,
             etf_macro.GROUP,

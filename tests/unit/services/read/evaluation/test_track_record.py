@@ -7,7 +7,10 @@ from datetime import date
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import open_stores
-from algotrade.services.read.evaluation.track_record import load_track_records
+from algotrade.services.read.evaluation.track_record import (
+    load_listing_edge_ids,
+    load_track_records,
+)
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -69,3 +72,11 @@ def test_after_session_is_disclosed_on_the_track_record(backend: MemoryBackend) 
     assert before.after_session is True
     (without,) = load_track_records(stores(backend), "momo")
     assert without.after_session is False
+
+
+def test_the_edges_that_list_a_screener_need_no_run_rows(backend: MemoryBackend) -> None:
+    """The Screeners list counts them: an edge with no run at all still lists its screener."""
+    found = load_listing_edge_ids(stores(backend), ["momo", "other"])
+    assert found["other"] == () and len(found["momo"]) == len(
+        load_track_records(stores(backend), "momo")
+    )

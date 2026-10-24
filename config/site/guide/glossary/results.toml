@@ -378,6 +378,5 @@ A cohort percentile ranks one value against the same value of the other stocks i
 
 The rank is the average position among the stocks that have a value. It is scaled so the lowest is 0 and the highest is 1, and stocks with equal values share their position. 0.9 means the name is above nine tenths of its group, whatever the size of the numbers behind it.
 
-A percentile is null for an ETF, fund or trust, because only stocks count as the group. It is also null for a name with no sector or industry at that level, and for a group too small to rank (a site setting for each level). A sector or industry percentile says how the name stands against its peers. That can differ a lot from its rank against the whole universe.
+A percentile is null for an ETF, fund or trust, because only stocks count as the group. It is also null for a name with no sector or industry at that level, and for a group too small to rank (a site setting for each level). A name whose own value is missing is null too, and it is not counted in its group. On a partial trading day, when too few stocks have a price, every price percentile is null. A sector or industry percentile says how the name stands against its peers. That can differ a lot from its rank against the whole universe.
 """
-see_also = ["near_miss"]

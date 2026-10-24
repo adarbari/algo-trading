@@ -2802,6 +2802,19 @@ type Query {
   ): [Screener!]!
 
   """
+  The Screeners list: the screeners the user sees whose id, name or description contains `q` (any case) and that pass `filters` (the surface `screeners` of `filterSet`), by id, with the counts of the filter bar (ADR 0082)
+  """
+  screenerList(
+    filters: [FilterInput!] = null
+    q: String = null
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): ScreenerList
+
+  """
   The rule screen `id` as the user sees it (their own config, else the site preset), with its run for the session; null: no such screener, or nothing stored
   """
   screener(
@@ -3432,6 +3445,7 @@ type ScreenResultPage {
   reasons: [[NullReason]!]!
   kinds: [[UnavailableKind]!]!
   unavailable: [Unavailable!]!
+  facets: FilterFacets
 
   """The words of each kind `kinds` uses: how a cell's kind reads"""
   kindTexts: [KindText!]!
@@ -3494,6 +3508,15 @@ type ScreenerHit {
 }
 
 """
+The screeners the user sees that pass the search `q` (id, name or description) and the `filters` (the surface `screeners` of `filterSet`), by id: `total` counts them, `facets` the counts of the filter bar over the search's matches (`facets.total` before the filters). A screener with no run has no `runStatus` / `picked`: it never passes a filter on them
+"""
+type ScreenerList {
+  total: Int!
+  items: [Screener!]!
+  facets: FilterFacets!
+}
+
+"""
 A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown); `coverage`: the run record's own coverage (COMPLETE, PARTIAL; null: not recorded); `unavailable`: what the tables that had no rows when it ran leave out, not the session's as read now
 """
 type ScreenerRun {
@@ -3532,9 +3555,9 @@ type ScreenerRun {
   pickIds(size: Int! = 100): PickIds!
 
   """
-  Its rows as a review table: `decisions` (none: all; any case), `change` (`new` / `dropped`) and `q` (the symbol or name contains it) filtered, sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows
+  Its rows as a review table: `filters` (the surface `screener_results` of `filterSet`) and `q` (the symbol or name contains it) filtered, `decisions` and `change` (deprecated: the `decision` and `change` filters; `new` / `dropped`) likewise, over the whole run, with the counts in `facets` (ADR 0082), sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows
   """
-  results(decisions: [String!] = null, change: String = null, q: String = null, sort: String = null, columns: [FeatureName!] = null, page: Int! = 1, size: Int! = 100): ScreenResultPage!
+  results(decisions: [String!] = null, change: String = null, q: String = null, sort: String = null, columns: [FeatureName!] = null, page: Int! = 1, size: Int! = 100, filters: [FilterInput!] = null): ScreenResultPage!
 }
 
 """

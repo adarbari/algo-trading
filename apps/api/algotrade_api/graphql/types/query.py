@@ -43,6 +43,7 @@ from algotrade.services.read.guide.screeners import index as screener_index_page
 from algotrade.services.read.guide.screeners import screener as screener_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
+from algotrade.services.read.lists import screeners as list_screeners
 from algotrade.services.read.market import market
 from algotrade.services.read.ops import (
     backtests,
@@ -98,6 +99,7 @@ from algotrade_api.graphql.types.instruments.distribution import FeatureDistribu
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.instruments.table import FeatureTable
+from algotrade_api.graphql.types.lists.screener_list import ScreenerList
 from algotrade_api.graphql.types.market.market import Market
 from algotrade_api.graphql.types.market.regime import MarketRegime
 from algotrade_api.graphql.types.ops.accepted_formulas import AcceptedFormulaList
@@ -281,6 +283,27 @@ class Query:
         ctx = info.context.read(date)
         found = screeners.load_screeners(ctx) if ctx is not None else ()
         return [Screener.of(s, ctx) for s in found] if ctx is not None else []
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Screeners list: the screeners the user sees whose id, name or "
+        "description contains `q` (any case) and that pass `filters` (the surface `screeners` "
+        "of `filterSet`), by id, with the counts of the filter bar (ADR 0082)",
+        extensions=[MaxItems("filters", MAX_FILTERS), MaxItems("q", MAX_QUERY)],
+    )
+    async def screener_list(
+        self,
+        info: Ctx,
+        filters: list[FilterInput] | None = None,
+        q: str | None = None,
+        date: Day = None,
+    ) -> ScreenerList | None:
+        ctx = await info.context.aread(date)
+        found = (
+            await off_loop(list_screeners.load_screener_list, ctx, tuple(filters or ()), q)
+            if ctx is not None
+            else None
+        )
+        return ScreenerList.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The rule screen `id` as the user sees it (their own config, else the site "
