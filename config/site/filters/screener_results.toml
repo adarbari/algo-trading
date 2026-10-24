@@ -9,9 +9,9 @@
 #   setup:     score components / criterion outcomes (every screener has its own criteria, the
 #              row stores them per screener, not as one field a list-wide filter could name),
 #              the screen's display columns (the same: per screener)
-#   changed:   rank_moved_up (the previous run's rank is not stored on the row; `change` holds
-#              only new / dropped and the previous decision)
 #   tradeable: optionable (as in Ideas: no stored yes / no for a result row's chain)
+# rank_moved_up (read-time: the previous run's rank, ADR 0082) and near_misses / gates_failing
+# (the stored near_missed / failed gate lists) are built from the run's own rows.
 
 label = "Screener results"
 
@@ -34,6 +34,21 @@ source = "rank"
 id = "score"
 dtype = "float"
 source = "score"
+
+[[column]]
+id = "rank_change"
+dtype = "int"
+source = "rank_change"
+
+[[column]]
+id = "near_misses"
+dtype = "int"
+source = "near_misses"
+
+[[column]]
+id = "gates_failing"
+dtype = "int"
+source = "gates_failing"
 
 # ------------------------------------------------------------------------------------ setup
 
@@ -65,6 +80,24 @@ field = "column:score"
 bins = [0, 20, 40, 60, 80, 100]
 guide = "term:filter_score"
 
+[[filter]]
+id = "near_misses"
+label = "Near misses"
+group = "setup"
+kind = "range"
+field = "column:near_misses"
+bins = [0, 1, 2, 3, 5]
+guide = "term:filter_near_misses"
+
+[[filter]]
+id = "gates_failing"
+label = "Gates not passed"
+group = "setup"
+kind = "range"
+field = "column:gates_failing"
+bins = [0, 1, 2, 3, 5, 10]
+guide = "term:filter_gates_failing"
+
 # ------------------------------------------------------------------------------------ changed
 
 [[filter]]
@@ -83,6 +116,15 @@ label = "New"
 [[filter.option]]
 value = "dropped"
 label = "Dropped"
+
+[[filter]]
+id = "rank_moved_up"
+label = "Places moved up"
+group = "changed"
+kind = "range"
+field = "column:rank_change"
+bins = [1, 5, 20, 100]
+guide = "term:filter_rank_moved_up"
 
 [[filter]]
 id = "mom_pct_sector"

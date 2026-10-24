@@ -3491,6 +3491,21 @@ type ScreenResult {
   groups: [ScreenGroup!]!
 
   """
+  Places the row rose in the screener's order since the previous run (previous rank minus rank; negative: fell); null when unknown (no previous run, not in it, an order withheld, the config changed between the runs); filled on `ScreenerRun.results` only
+  """
+  rankChange: Int
+
+  """
+  How many gates the row narrowly missed; null when the run's outcomes are withheld; filled on `ScreenerRun.results` only
+  """
+  nearMisses: Int
+
+  """
+  How many gates the row failed or narrowly missed; null when the run's outcomes are withheld; filled on `ScreenerRun.results` only
+  """
+  gatesFailing: Int
+
+  """
   Each edge that lists the screener and whether it counts this row (empty: none does); filled on `ScreenerRun.results` only
   """
   countsToward: [PickEdge!]!
