@@ -43,3 +43,13 @@ See ADR 0082 decisions 1-4: `config/site/filters/<surface>.toml` -> `filterSet(s
 `RangeFilter` (with an `unknownHelp` slot for the Guide term), `WindowFilter`, `ZeroResults`, `FilterChips` (structured items; `onClear` only when the bar does not own Clear all). Pick uses `OptionList`, toggle
 `SegmentedControl`. Each has stories for every state, a `Narrow` story, an axe unit test and
 light and dark screenshots.
+
+## Enforcement
+`tests/architecture/test_layout_web.py::test_data_surfaces_use_the_filter_bar` ([ADR 0025 rule 12]) fails when a
+file under `apps/web/src` renders `DataTable`, `ExpandableTable`, `FeatureTable` or `MasterDetail`
+without `SurfaceFilterBar` / `FilterBar`, unless `architecture/web_filter_bar.toml` lists it:
+`[migrating]` (surfaces that will get the bar; shrink-only, the migrating PR deletes its line) or
+`[exempt]` (a reason: a fixed handful of rows, a detail panel). A fitness test with a TOML baseline
+is used, as for prose and derivations, because the baseline carries a reason per file, which
+an ESLint rule cannot. A listed file that gained the bar fails with its name, so a PR that
+migrates a surface must delete its line.
