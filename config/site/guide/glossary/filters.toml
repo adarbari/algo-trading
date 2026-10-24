@@ -283,16 +283,6 @@ next = "Choose yes to see only the edges you watch."
 see_also = ["follow_edge", "filter_toggle", "paper_trading"]
 
 [[term]]
-id = "filter_edge_hit_rate"
-term = "Out-of-sample hit rate filter"
-short = "Keeps the edges whose share of winning picks, measured out of sample, lies between a minimum and a maximum."
-body = """
-The hit rate is the share of the edge's picks that beat what it is judged against, on the period the edge was not tuned on. 0.60 means six picks in ten. Read it against the base rate, which is what any pick would have scored. An edge with no out-of-sample result is unknown and never passes.
-"""
-next = "Set a minimum of 0.55 to leave out the edges near a coin flip."
-see_also = ["win_rate", "base_rate", "out_of_sample", "filter_range", "filter_unknown_rows"]
-
-[[term]]
 id = "filter_edge_lift"
 term = "Out-of-sample lift filter"
 short = "Keeps the edges whose out-of-sample hit rate beats the base rate by a range of percentage points."

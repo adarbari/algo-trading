@@ -23,11 +23,9 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import open_stores
-from algotrade.services.read.edge_desk.states import LiveState
-from algotrade.services.read.evaluation.edges import Edge
 from algotrade.services.read.evaluation.runs import TradeRow
-from algotrade.services.read.evaluation.verdict.model import EdgeVerdict
 from algotrade.services.read.instruments.table import FeatureTable, UniverseFilter
+from algotrade.services.read.lists.edges import EdgeRow
 from algotrade.services.read.lists.screeners import ScreenerRow
 from algotrade.services.read.screens.ideas import Idea
 from algotrade.services.read.screens.results import ScreenResult
@@ -41,14 +39,9 @@ SURFACES = {
     "screener_results": ScreenResult,
     "universe": FeatureTable,
     "screeners": ScreenerRow,
-    "edges": Edge,
+    "edges": EdgeRow,
     "edge_trades": TradeRow,
 }  # surface -> the read object its columns come from
-# A row's facts that sit beside its read object (the list reads them with the row): the first
-# part of a column source names the object they come from.
-JOINS: dict[str, dict[str, Any]] = {
-    "edges": {"verdict": EdgeVerdict, "live": LiveState},
-}
 NUMERIC = {"int", "float", "float32", "float64", "int32", "int64"}
 KIND_DTYPES = {
     "pick": {"str"},
@@ -70,13 +63,10 @@ def _fields() -> dict[str, Any]:
     return dict(catalog_of(site.features).fields)
 
 
-def _walk(root: type, path: str, joins: dict[str, Any] | None = None) -> bool:
+def _walk(root: type, path: str) -> bool:
     """Whether ``a.b`` is a field of ``root``'s dataclass ``a`` (a tuple of them: its element)."""
     cls: Any = root
-    for i, part in enumerate(path.split(".")):
-        if i == 0 and joins and part in joins:
-            cls = joins[part]
-            continue
+    for part in path.split("."):
         if not dataclasses.is_dataclass(cls) or part not in {
             f.name for f in dataclasses.fields(cls)
         }:
@@ -118,7 +108,7 @@ def test_every_field_is_in_the_catalogue_or_a_column_of_the_surface(surface: str
 def test_every_column_comes_from_the_read_object(surface: str) -> None:
     for c in shipped(surface).columns:
         source = c.source.removeprefix("len(").removesuffix(")")
-        ok = _walk(SURFACES[surface], source, JOINS.get(surface))
+        ok = _walk(SURFACES[surface], source)
         assert ok, f"{surface} column {c.id}: no {c.source}"
 
 
