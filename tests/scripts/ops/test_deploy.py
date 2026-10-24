@@ -430,7 +430,8 @@ def test_every_deploy_hold_reads_the_release_trees_config(site: Site) -> None:
     assert out.returncode == 0, out.stdout + out.stderr
     seen = (site.calls.parent / "calls.log.env").read_text().splitlines()
     holds = [c for c in site.called() if c.startswith("ingest deploy-hold")]
-    assert len(seen) == len(holds) >= 1
+    assert len(seen) == len(holds) == 2  # the serving hold and the ingest sync's
+    assert any("--ingest-apply" in c for c in holds)
     assert set(seen) == {f"config_dir={site.tree}/config"}
 
 
