@@ -87,6 +87,7 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
       view: {
         columns: [],
         narrow_columns: [],
+        filters: '',
         sort: null,
         decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED'],
       },

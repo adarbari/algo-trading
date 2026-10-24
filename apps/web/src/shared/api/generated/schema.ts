@@ -1696,6 +1696,11 @@ export interface components {
              */
             decisions: string[];
             /**
+             * Filters
+             * @description the filter bar's `f` string ('' : no filters)
+             */
+            filters: string;
+            /**
              * Name
              * @description the view's name (null: the table's default view)
              */
@@ -1738,6 +1743,11 @@ export interface components {
              * @description decisions shown (empty: the page's default)
              */
             decisions: string[];
+            /**
+             * Filters
+             * @description the filter bar's `f` string (ADR 0082); absent or empty: no filters
+             */
+            filters?: string | null;
             /**
              * Narrow Columns
              * @description table column ids added back on a narrow (phone) table; absent: kept as saved

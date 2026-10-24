@@ -145,7 +145,7 @@
      "scope": "screener:vrp_scanner",
      "name": null
     },
-    "query": "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      sort\n      decisions\n      names\n    }\n  }\n"
+    "query": "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      filters\n      sort\n      decisions\n      names\n    }\n  }\n"
    },
    {
     "kind": "graphql",

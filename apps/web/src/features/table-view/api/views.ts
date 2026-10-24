@@ -20,6 +20,7 @@ const TableView = graphql(`
       saved
       columns
       narrowColumns
+      filters
       sort
       decisions
       names
@@ -62,6 +63,7 @@ export function useSaveView(scope: string) {
             narrow_columns: [...view.narrowColumns],
             sort: view.sort,
             decisions: [...view.decisions],
+            filters: view.filters,
           },
         }),
       ),
