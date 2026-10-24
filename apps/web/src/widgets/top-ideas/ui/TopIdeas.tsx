@@ -9,12 +9,14 @@ import { Button, DataTable, Panel, SegmentedControl, ShowMore, Stack, Text } fro
 import { useMemo, useState } from 'react';
 
 import {
+  encodeFilters,
   SurfaceFilterBar,
   SurfaceZeroResults,
   useFilterState,
   type FilterSearch,
   type LabelOf,
 } from '@/features/filter-bar';
+import { ExportButton } from '@/features/filter-export';
 import { GuideHelp, helped, termHelp } from '@/features/guide-help';
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
 import {
@@ -113,6 +115,14 @@ export function TopIdeas({
           ) : null
         }
         labelOf={labelOf}
+        actions={
+          <ExportButton
+            surface={SURFACE}
+            f={encodeFilters(filters.filters)}
+            session={ideas.data?.session}
+            help={termHelp('export')}
+          />
+        }
       />
       <Panel
         title="Top ideas · across all your screeners"

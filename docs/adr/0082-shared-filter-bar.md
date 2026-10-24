@@ -51,8 +51,19 @@ the caller computes itself, and the browser may not compute counts or percentile
    with `onToggle`, `onRemove`, `onClear`. Pick uses `OptionList` with counts, toggle
    `SegmentedControl`. A table, list or feed screen uses these and nothing else.
 6. **Cut from the first version:** percentile-of-cohort filters (each is a `cross_section`
-   feature, added with `add-feature`, no ADR), Export (open: may personal-licence values leave
-   as a file? until the owner decides, none), a slider, a count for switched-off chips.
+   feature, added with `add-feature`, no ADR), a slider, a count for switched-off chips.
+   **Export is in** (amended 2026-10-24, option (b), `docs/decisions/log.md`): the bar's `actions`
+   slot holds an Export button that fetches `GET /files/<surface>.csv?f=` (a file route, ADR 0037
+   amended like the ledger's, ADR 0064 decision 11). The file serves exactly what the viewer can
+   see: `services/read/export/` runs the surface's own gated loader unpaged through the filtering
+   pass with the viewer's `ReadContext` and the `f` the page shows, never browser rows; a personal-
+   licence cell is `LICENCE` to a non-holder and the full value to the holder (ADR 0069, as the
+   ledger CSV, ADR 0064 decision 10), UNKNOWN is its public kind, hidden fields are omitted, rows
+   are capped at 50,000 with a header comment when cut. The first line is a `#` notice (session,
+   viewer, licences held, "personal-licence values are for the holder's own use, not for
+   redistribution") and each export writes one audit log line (viewer, surface, filter hash, rows,
+   licences). A surface is one entry in the registration table `surfaces.SURFACES` (today Ideas,
+   screener results, the universe). Reversible by removing the route.
 
 ## Consequences
 One filter code path serves every surface, so the screener list, Edges and Explore get search,

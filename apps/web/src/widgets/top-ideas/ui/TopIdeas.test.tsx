@@ -628,7 +628,8 @@ describe('TopIdeas field headers', () => {
           name: /^What is .*\?$/,
         },
       );
-    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(7);
+    // seven columns' headers plus the Export button's help
+    expect(await screen.findAllByRole('button', { name: /^What is .*\?$/ })).toHaveLength(8);
     expect(help(/Expiry DTE/)).toBeVisible();
     expect(help(/IV30/)).toBeVisible();
     expect(help(/Score/)).toBeVisible();

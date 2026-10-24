@@ -21,3 +21,26 @@ def test_the_file_has_the_ticker_and_company_and_an_unnamed_pick_has_neither() -
     rows = [line.split(",") for line in lines[1:]]
     assert rows[0][at : at + 2] == ["OLD", "Old Inc"]  # the ticker at the decision session
     assert rows[2][at : at + 2] == ["NOT_STORED", "NOT_STORED"]  # the public kind, never the id
+
+
+def test_a_company_name_that_is_a_formula_is_neutralised_and_a_negative_value_stays_numeric() -> (
+    None
+):
+    from dataclasses import replace  # noqa: PLC0415
+
+    backend = MemoryBackend()
+    write_run(backend, "site1", FROZEN, 0.6, trades=LEDGER)
+    ctx = context(named(backend), "owner", reference=OCT)
+    row = load_edge_trades(ctx, edge_of(ctx), Period.ALL, limit=None).rows[0]
+    row = replace(
+        row,
+        company=replace(row.company, value='=HYPERLINK("x")'),
+        value=replace(row.value, value=-0.5),
+    )
+    lines = list(csv_lines((row,)))
+    header = lines[0].strip().split(",")
+    cells = lines[1].strip().split(",")
+    assert cells[header.index("company")].startswith("\"'=") or cells[
+        header.index("company")
+    ].startswith("'=")
+    assert cells[header.index("value")] == "-0.5"

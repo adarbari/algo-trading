@@ -551,8 +551,13 @@ purpose = "read objects about events for one session (ADR 0050): the stored even
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/export"
+purpose = "the filter bar's Export (ADR 0082 decision 6): a surface's rows as a CSV file from the surface's own gated loader under the page's filters (surfaces.py: one registration per surface), with the licence notice, the row cap and LICENCE cells for a non-holder (file.py)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/filtering"
-purpose = "the filtering pass of the read model (ADR 0082): a surface's filter definitions resolved for a viewer's licences (definitions.py), the truth of each active filter per row by core.model.predicates (masks.py: UNKNOWN never passes), and matched, per-filter removes, option counts, bins and unknown from one masked pass (facets.py); the frame of a list surface from its row objects by the declared column sources (rows.py); pure, deterministic"
+purpose = "the filtering pass of the read model (ADR 0082): a surface's filter definitions resolved for a viewer's licences (definitions.py), the truth of each active filter per row by core.model.predicates (masks.py: UNKNOWN never passes), and matched, per-filter removes, option counts, bins and unknown from one masked pass (facets.py); the `f` string decoded into inputs (codec.py); the frame of a list surface from its row objects by the declared column sources (rows.py); pure, deterministic"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

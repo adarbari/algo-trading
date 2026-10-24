@@ -115,8 +115,16 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "source_link" }, { call = "filing_url" }, { call = "load_event_links" }]
 
 [[responsibility]]
+id = "filter-export"
+description = "The filter bar's Export (ADR 0082 decision 6, services/read/export/): a surface's rows as a CSV file, read through the surface's own gated loader unpaged under the `f` string the page shows (decoded by filtering/codec.py) and the request's licences, so the file has what the viewer can see and nothing else (a personal-licence value is its public kind LICENCE to a non-holder, ADR 0069, as the ledger file, ADR 0064 decision 10; UNKNOWN is its kind, not stored is empty), a first-line notice naming the session, viewer and licences held, a 50,000-row cap that says so, and one registration per surface (surfaces.py); the route and its audit line are apps/api routes/export"
+owner = ["src/algotrade/services/read/export/*"]
+allowed = ["apps/api/algotrade_api/routes/export/surface.py"]  # the file route: one call
+section = "docs/adr/0082-shared-filter-bar.md#decision"
+detect = [{ call = "export_file" }]
+
+[[responsibility]]
 id = "filter-pass"
-description = "The one filtering pass of every table, list and feed (ADR 0082 decision 2-3, services/read/filtering/): a surface's definitions (config/site/filters, config/filters) resolved against the catalogue and the viewer's licences (a filter on a field the viewer's licences do not cover is not offered and is refused if sent, before any count: ADR 0069), the truth of each active filter on each row through core.model.predicates (the operator from the kind; UNKNOWN never passes; a min of 0 admits no null; a switched-off or empty input is in no mask), and from that one pass matched, removes(f) (rows passing every other active filter minus matched), option counts by count then value, fixed-edge bins and the unknown count; the definitions as a viewer is served them (filterSet: options, withheld filters as Unavailable) and the hash of the filters a paging cursor carries; pure and deterministic; Ideas adopts it (ADR 0082 PR 4), so do screener results (the old decisions / change arguments map onto the decision / change filters); so does the universe table (the older UniverseFilter attributes map onto its filters)"
+description = "The one filtering pass of every table, list and feed (ADR 0082 decision 2-3, services/read/filtering/): a surface's definitions (config/site/filters, config/filters) resolved against the catalogue and the viewer's licences (a filter on a field the viewer's licences do not cover is not offered and is refused if sent, before any count: ADR 0069), the truth of each active filter on each row through core.model.predicates (the operator from the kind; UNKNOWN never passes; a min of 0 admits no null; a switched-off or empty input is in no mask), and from that one pass matched, removes(f) (rows passing every other active filter minus matched), option counts by count then value, fixed-edge bins and the unknown count; the definitions as a viewer is served them (filterSet: options, withheld filters as Unavailable) and the hash of the filters a paging cursor carries, and the `f` URL string decoded into inputs (codec.py, read by the file route); pure and deterministic; Ideas adopts it (ADR 0082 PR 4), so do screener results (the old decisions / change arguments map onto the decision / change filters); so does the universe table (the older UniverseFilter attributes map onto its filters)"
 owner = ["src/algotrade/services/read/filtering/*"]
 allowed = [
     "src/algotrade/services/read/screens/ideas.py",  # the loader adopts the pass (ADR 0082)
@@ -125,6 +133,7 @@ allowed = [
     "apps/api/algotrade_api/graphql/types/query.py",  # filterSet: one loader call
     "src/algotrade/services/read/lists/*",  # the list loaders adopt the pass (ADR 0082)
     "src/algotrade/services/read/edge_ledger/trades.py",  # the ledger adopts the pass (ADR 0082)
+    "src/algotrade/services/read/export/*",  # a file is filtered by the same pass (ADR 0082)
 ]
 section = "docs/adr/0082-shared-filter-bar.md#decision"
 detect = [{ call = "compute_facets" }, { call = "evaluate_filters" }, { call = "resolve_definitions" }, { call = "load_served_filters" }, { call = "filter_hash" }, { call = "frame_of" }]
@@ -177,7 +186,10 @@ detect = [{ call = "site_screeners" }, { call = "rule_text" }, { call = "load_gu
 id = "ideas-list"
 description = "The Ideas list (ADR 0029): the viewer's screener pool built from the rule screens' runs for exactly the session (ADR 0036: a screener with no run for it is NOT_RUN, no lookback; a run withheld by a licence is WITHHELD and contributes nothing), ranked by the pure rule of services/ideas (ideas-ranking), each idea served with its best pick (values, regime, size multiplier, metrics, watch-outs, facts) and picked_by; per-screener picked counts and first picks; never recomputes a screen (read-model PR 5); ideas.priority is retired from PR B (the loader reads it until then)"
 owner = ["src/algotrade/services/read/screens/ideas.py"]
-allowed = ["apps/api/algotrade_api/graphql/*"]  # Query.ideas serves it (one loader call per resolver)
+allowed = [
+    "apps/api/algotrade_api/graphql/*",  # Query.ideas serves it (one loader call per resolver)
+    "src/algotrade/services/read/export/surfaces.py",  # the Ideas file is the same loader (ADR 0082)
+]
 section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
 detect = [{ call = "load_ideas" }]
 
