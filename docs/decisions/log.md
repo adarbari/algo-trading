@@ -717,3 +717,11 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: the gate cannot measure a lazy, click-only operation: `web_page_ops.py` does not follow `lazy(() => import(...))`, an uncertain operation is skipped by `fast_bench.op_set`, and views the crawl discovers are not timed.
 - Reasoning: B spends a request and a catalogue-sized read on every Ideas load against the request budget; C buys no measurement. Follow-up: teach the gate to time discovered click views, then shrink the list.
+
+## 2026-10-24 | Screener run line PR (#932) | Screeners list scripts budget raised by 100 B
+- Question: CI measured the Screeners list route's scripts at 217010 B against a budget of 217000 B (10 B over); the local build is unchanged at 217.0 kB. Trim or raise?
+- Options: trim another 10 B (an earlier trim changed nothing locally) / raise the `/screeners` scripts budget by 100 B / hold the PR.
+- Decision: `/screeners` `first_load_js_gzip_bytes` 217000 to 217100; no other budget changes.
+- decided by: owner
+- status: final
+- Reasoning: CI noise and main's drift, not the run line's behaviour; the owner chose to raise it in chat on 2026-10-24.
