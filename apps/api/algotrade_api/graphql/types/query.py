@@ -62,7 +62,7 @@ from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
 from algotrade.services.read.users.viewer import load_viewer
-from algotrade_api.graphql.context import RequestContext
+from algotrade_api.graphql.context import RequestContext, selects
 from algotrade_api.graphql.limits import (
     MAX_DAYS,
     MAX_FILTERS,
@@ -598,25 +598,43 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The trades of the verdict's basis of the edge `edgeId` (the screen and "
         "holding "
-        "period its verdict rests on: never chosen here), one `page` (from 1) for `period`, sorted "
-        "by the server (`descending`); `LIVE` reads the paper record as the session knew it. A "
-        "per-name value under a licence the viewer lacks is Unknown(LICENCE); a copy's "
-        "out-of-sample trades are withheld; null: no such edge"
+        "period its verdict rests on: never chosen here), one `page` (from 1) of the trades that "
+        "pass `filters` (the surface `edge_trades` of `filterSet`, applied to the whole ledger "
+        "before it is sorted and paged: `total` counts the matches, `facets` the counts, ADR "
+        "0082), sorted by the server (`descending`). `period` (deprecated: the filters "
+        "`record` and `in_sample`) adds the filters it stands for unless they are set: `ALL` "
+        "(the default) is the backtest's trades, `LIVE` the paper record as the session knew "
+        "it; null reads backtest and live together. A per-name value under a licence the viewer "
+        "lacks is Unknown(LICENCE) and never passes a filter on it; a copy's out-of-sample "
+        "trades are withheld; null: no such edge",
+        extensions=[MaxItems("filters", MAX_FILTERS)],
     )
     async def edge_trades(
         self,
         info: Ctx,
         edge_id: str,
-        period: edge_trade_reads.Period = edge_trade_reads.Period.ALL,
+        period: Annotated[
+            edge_trade_reads.Period | None,
+            strawberry.argument(deprecation_reason="use the filters record and in_sample"),
+        ] = edge_trade_reads.Period.ALL,
         page: int = 1,
         sort: edge_trade_reads.Sort = edge_trade_reads.Sort.DECISION,
         descending: bool = False,
+        filters: list[FilterInput] | None = None,
         date: Day = None,
     ) -> EdgeTradePage | None:
         ctx = await info.context.aread(date)
         found = (
             await off_loop(
-                edge_trade_reads.load_trades_of, ctx, edge_id, period, page, sort.value, descending
+                edge_trade_reads.load_trades_page,
+                ctx,
+                edge_id,
+                period,
+                page,
+                sort.value,
+                descending,
+                tuple(filters or ()),
+                selects(info, "facets"),
             )
             if ctx is not None
             else None
