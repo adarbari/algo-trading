@@ -106,6 +106,36 @@ function trackScripts(page: Page): { done: () => Promise<number>; requests: () =
   };
 }
 
+/**
+ * The nodes of the rendered page (`<body>`), once the count has not changed for `QUIET_MS`.
+ * `<head>` is not counted: the route-preload plugin adds `<link rel=modulepreload>` elements as
+ * chunks preload, three to four of them on some runs and not on others (Screeners read 238-245
+ * for the same page; the requests budget already covers the preloads). A fixed pause also
+ * counted whatever had rendered by then, so the wait is for a quiet DOM. Fails when it never settles.
+ */
+const QUIET_MS = 2000;
+const SETTLE_TIMEOUT_MS = 30_000;
+async function settledNodeCount(page: Page): Promise<number> {
+  return page.evaluate(
+    async ({ quiet, timeout }) => {
+      const count = (): number => document.body.querySelectorAll('*').length;
+      const start = performance.now();
+      let last = count();
+      let since = performance.now();
+      while (performance.now() - start < timeout) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const now = count();
+        if (now !== last) {
+          last = now;
+          since = performance.now();
+        } else if (performance.now() - since >= quiet) return now;
+      }
+      throw new Error(`the DOM node count never settled (last ${String(last)})`);
+    },
+    { quiet: QUIET_MS, timeout: SETTLE_TIMEOUT_MS },
+  );
+}
+
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
   await mockViewer(page);
@@ -123,8 +153,8 @@ for (const route of ROUTES) {
       (route.ready ?? ((p: Page) => p.getByRole('heading', { level: 1 }).first()))(page),
     ).toBeVisible();
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1500); // a lazy chunk (the chart engine) can still be on its way
     await settled(page);
+    const nodes = await settledNodeCount(page); // a lazy chunk or a help term can still be on its way
 
     const dom = await page.evaluate(() => {
       const perf = (
@@ -136,7 +166,6 @@ for (const route of ROUTES) {
         .filter(([start]) => start >= perf.fcp)
         .reduce((sum, [, duration]) => sum + Math.max(0, duration - 50), 0);
       return {
-        nodes: document.querySelectorAll('*').length,
         lcp: perf.lcp,
         tbt: blocking,
       };
@@ -144,7 +173,7 @@ for (const route of ROUTES) {
     const measured: Measured = {
       first_load_js_gzip_bytes: await tracker.done(),
       requests: tracker.requests(),
-      dom_nodes: dom.nodes,
+      dom_nodes: nodes,
       lcp_ms: dom.lcp === null ? null : Math.round(dom.lcp),
       tbt_ms: Math.round(dom.tbt),
     };
