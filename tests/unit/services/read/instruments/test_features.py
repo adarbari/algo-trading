@@ -1,14 +1,20 @@
 """Feature values by catalogue name for exactly the session: a value, or UNKNOWN with the
 reason (NO_PARTITION, NO_ROW, NULL), never an older partition's value."""
 
+import math
+from dataclasses import replace
 from datetime import date, timedelta
 
+import pandas as pd
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.availability.cause import UnavailableKind, feature_cause
 from algotrade.services.read.context import ReadContext, open_context
+from algotrade.services.read.instruments import features as features_module
 from algotrade.services.read.instruments.catalogue import (
     FeatureFormat,
     UnknownFeatureError,
@@ -18,6 +24,7 @@ from algotrade.services.read.instruments.features import (
     FeatureValue,
     _absence,
     cell_codes,
+    known_fields,
     load_feature_values,
 )
 from algotrade.services.read.values import NullReason, Unknown, UnknownCode
@@ -430,6 +437,7 @@ def test_fund_reference_applies_to_leveraged_and_inverse_funds_only() -> None:
 # ---- the data-licence gate (ADR 0028, services.licences) ----
 
 from tests.unit.services.read.instruments.conftest import (  # noqa: E402
+    IBKR,
     IBKR_IV30,
     VRP,
     context_as,
@@ -470,3 +478,78 @@ def test_a_withheld_field_is_withheld_whatever_is_stored_and_beside_open_ones() 
         assert found[0].value == 51.0 and found[2].value == "AAA"
         assert found[1].unknown is not None and found[1].unknown.code is UnknownCode.LICENCE
     assert load_feature_values(context_as(store_with(with_ibkr), "trader"), None, [IBKR_IV30]) == {}
+
+
+# ---- known_fields: the columnar "any known value" equals the per-cell answer (PR B) ----
+
+VOLUME = "rollups/instrument/volume@v1"
+DOLLAR_VOLUME = "rollup.volume@v1.dollar_volume"
+KNOWN_NAMES = [DOLLAR_VOLUME, CLOSE, HV20, NEXT, FROM_HIGH, SECTOR, SYMBOL, IBKR_IV30, VRP]
+POPULATION = ("EQ:AAA", "EQ:ETFX", "EQ:NOOPT", "EQ:OUTSIDE")  # the last: not in the reference
+CELLS = st.one_of(st.none(), st.just(math.nan), st.floats(1.0, 1e9))
+
+
+def old_answer(ctx: ReadContext, names: list[str]) -> dict[str, tuple[bool, bool]]:
+    """The check ``filtering/no_data.py`` made before ``known_fields``: the oracle."""
+    found = load_feature_values(ctx, None, names)
+    return {
+        n: (bool(found), any(v[k].value is not None for v in found.values()))
+        for k, n in enumerate(names)
+    }
+
+
+@settings(max_examples=40, deadline=None)
+@given(
+    volume=st.one_of(st.none(), st.lists(st.one_of(st.just("-"), CELLS), min_size=4, max_size=4)),
+    iv=st.one_of(st.none(), st.lists(CELLS, min_size=4, max_size=4)),
+    earlier=st.booleans(),  # a session before the snapshots: the company one is after it
+    user=st.sampled_from(["owner", "trader"]),
+)
+def test_known_fields_equals_the_per_cell_check(
+    volume: list[object] | None, iv: list[object] | None, earlier: bool, user: str
+) -> None:
+    def write(w: StoreWriter) -> None:
+        if volume is not None:  # "-": no row for that instrument
+            rows = [
+                {"instrument_id": i, "dollar_volume": v}
+                for i, v in zip(POPULATION, volume, strict=True)
+                if v != "-"
+            ]
+            if rows:
+                write_rows(w, VOLUME, D1, rows)
+        if iv is not None:
+            rows = [
+                {"instrument_id": i, "iv30_ibkr": v} for i, v in zip(POPULATION, iv, strict=True)
+            ]
+            write_rows(w, IBKR, D1, rows)
+
+    day = D0 - timedelta(days=1) if earlier else D1
+    ctx = context_as(store_with(write), user, day)
+    assert known_fields(ctx, KNOWN_NAMES) == old_answer(ctx, KNOWN_NAMES)
+
+
+def test_known_fields_with_no_reference_snapshot_is_unknown_over_an_empty_population(
+    ctx: ReadContext,
+) -> None:
+    ctx = replace(ctx, session=replace(ctx.session, reference_snapshot=None))
+    assert known_fields(ctx, [CLOSE, SECTOR]) == dict.fromkeys([CLOSE, SECTOR], (False, False))
+    assert old_answer(ctx, [CLOSE, SECTOR]) == known_fields(ctx, [CLOSE, SECTOR])
+
+
+@pytest.mark.parametrize("dtype", ["Float64", "object"])
+def test_a_pd_na_cell_is_unknown_in_both_checks(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch, dtype: str
+) -> None:
+    """``pd.NA`` is not a difference after all: ``_by_id`` reads the frame with
+    ``to_dict("records")``, which turns it into ``None`` before ``to_scalar`` sees it, so the old
+    check never counted it as the text ``<NA>``. Both answers are "no known value"."""
+    real = features_module.field_view
+
+    def with_na(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        view = real(*args, **kwargs)  # type: ignore[arg-type]
+        frame = view.frame.copy()
+        frame[HV20] = pd.Series([pd.NA] * len(frame), dtype=dtype, index=frame.index)
+        return replace(view, frame=frame)
+
+    monkeypatch.setattr(features_module, "field_view", with_na)
+    assert old_answer(ctx, [HV20]) == known_fields(ctx, [HV20]) == {HV20: (True, False)}
