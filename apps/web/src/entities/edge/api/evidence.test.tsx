@@ -38,6 +38,26 @@ describe('the edge ledger reads', () => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query EdgeTrades');
-    expect(GQL.mock.calls[0]?.[1]).toEqual(request);
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ ...request, filters: null });
+  });
+
+  it('sends the filters in force as the read takes them, applied before the page', async () => {
+    GQL.mockResolvedValue({ edgeTrades: { total: 0, rows: [] } });
+    const request = {
+      edgeId: 'drift',
+      period: 'ALL',
+      page: 1,
+      sort: 'DECISION',
+      descending: false,
+      filters: [{ id: 'result', values: ['won'], active: true }],
+    } as const;
+    const { result } = renderHook(() => useEdgeTrades(request), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(GQL.mock.calls[0]?.[1]).toMatchObject({
+      period: 'ALL',
+      filters: [{ id: 'result', values: ['won'], min: null, active: true }],
+    });
   });
 });
