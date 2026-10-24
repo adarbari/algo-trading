@@ -1,0 +1,209 @@
+# L3 site setting: the filters of the Edges list (ADR 0082, docs/ui/filtering.md). Typed by
+# src/algotrade/config/filters/definitions.py; fitness tests: tests/unit/config/filters/.
+# The row is an Edge (services/read/evaluation/edges.py) with its `verdict` (EdgeVerdict: the
+# figures are the basis's out-of-sample ones) and its `live` state (edge_desk/states.py
+# LiveState). Every filter's `guide` entry is in config/site/guide/glossary/filters.toml.
+# "Rejected" is a status; "decayed" is the live state `below` (under the backtest's usual range).
+#
+# Not here (listed in the PR as "needs new data"):
+#   thesis type   (the document's mechanism_kind is not on the read Edge)
+#   asset class   (no edge field; it follows from the universe selection, which is free-form)
+#   horizon       (an edge holds a tuple of horizons: no single value to range over)
+
+label = "Edges"
+
+[[column]]
+id = "status"
+dtype = "str"
+source = "status"
+
+[[column]]
+id = "mine"
+dtype = "bool"
+source = "mine"
+
+[[column]]
+id = "followed"
+dtype = "bool"
+source = "followed"
+
+[[column]]
+id = "verdict"
+dtype = "str"
+source = "verdict.verdict"
+
+[[column]]
+id = "hit_rate"
+dtype = "float"
+source = "verdict.win_rate"
+
+[[column]]
+id = "lift_pts"
+dtype = "float"
+source = "verdict.lift_pts"
+
+[[column]]
+id = "sample"
+dtype = "int"
+source = "verdict.oos_trades"
+
+[[column]]
+id = "live_state"
+dtype = "str"
+source = "live.state"
+
+# ------------------------------------------------------------------------------------ setup
+
+[[filter]]
+id = "verdict"
+label = "Verdict"
+group = "setup"
+kind = "pick"
+field = "column:verdict"
+options = "static"
+guide = "term:filter_edge_verdict"
+
+[[filter.option]]
+value = "works"
+label = "Works"
+
+[[filter.option]]
+value = "promising"
+label = "Promising"
+
+[[filter.option]]
+value = "not_working"
+label = "Not working"
+
+[[filter.option]]
+value = "not_enough_data"
+label = "Not enough data"
+
+[[filter.option]]
+value = "waiting_on_data"
+label = "Waiting on data"
+
+[[filter.option]]
+value = "diagnostic_only"
+label = "Diagnostic only"
+
+[[filter]]
+id = "status"
+label = "Status"
+group = "setup"
+kind = "pick"
+field = "column:status"
+options = "static"
+guide = "term:filter_edge_status"
+
+[[filter.option]]
+value = "researching"
+label = "Researching"
+
+[[filter.option]]
+value = "candidate"
+label = "Candidate"
+
+[[filter.option]]
+value = "evidenced"
+label = "Evidenced"
+
+[[filter.option]]
+value = "live"
+label = "Live"
+
+[[filter.option]]
+value = "retired"
+label = "Retired"
+
+[[filter.option]]
+value = "rejected"
+label = "Rejected"
+
+[[filter.option]]
+value = "blocked"
+label = "Blocked"
+
+[[filter]]
+id = "mine"
+label = "Mine"
+group = "setup"
+kind = "toggle"
+field = "column:mine"
+guide = "term:filter_edge_mine"
+
+[[filter]]
+id = "followed"
+label = "Following"
+group = "setup"
+kind = "toggle"
+field = "column:followed"
+guide = "term:filter_edge_followed"
+
+[[filter]]
+id = "hit_rate"
+label = "Out-of-sample hit rate"
+group = "setup"
+kind = "range"
+field = "column:hit_rate"
+bins = [0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1]
+guide = "term:filter_edge_hit_rate"
+
+[[filter]]
+id = "lift"
+label = "Out-of-sample lift"
+group = "setup"
+kind = "range"
+field = "column:lift_pts"
+bins = [-20, -10, -5, 0, 2, 5, 10, 20, 50]
+guide = "term:filter_edge_lift"
+
+[[filter]]
+id = "sample"
+label = "Out-of-sample trades"
+group = "setup"
+kind = "range"
+field = "column:sample"
+bins = [0, 30, 100, 300, 1000, 3000, 10000]
+guide = "term:filter_edge_sample"
+
+[[filter]]
+id = "live_state"
+label = "Live state"
+group = "setup"
+kind = "pick"
+field = "column:live_state"
+options = "static"
+guide = "term:filter_edge_live_state"
+
+[[filter.option]]
+value = "on_track"
+label = "On track"
+
+[[filter.option]]
+value = "below"
+label = "Below range"
+
+[[filter.option]]
+value = "above"
+label = "Above range"
+
+[[filter.option]]
+value = "too_early"
+label = "Too early"
+
+[[filter.option]]
+value = "no_backtest"
+label = "No backtest"
+
+[[filter.option]]
+value = "no_trades"
+label = "No trades"
+
+[[filter.option]]
+value = "not_settled"
+label = "Not settled"
+
+[[filter.option]]
+value = "not_recording"
+label = "Not recording"
