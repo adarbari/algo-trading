@@ -653,6 +653,7 @@ LICENSED: Final = {
     "score_licence": ("score",),
     "adv_licence": ("adv_usd_20d",),
 }
+TRADE_SURFACE = "edge_trades"  # config/site/filters/edge_trades.toml: the ledger's filters
 LEDGER_ORDER = ["variant", "horizon_sessions", "decision_session", "rank"]
 SORTABLE: Final = (
     "decision_session", "exit_session", "instrument_id", "rank", "status", "value", "score",

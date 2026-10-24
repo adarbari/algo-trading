@@ -38,7 +38,13 @@ from algotrade.services.read.edge_desk.states import is_recording
 from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edge
-from algotrade.services.read.evaluation.runs import SORTABLE, TradeCell, TradeRow, TradeText
+from algotrade.services.read.evaluation.runs import (
+    SORTABLE,
+    TRADE_SURFACE,
+    TradeCell,
+    TradeRow,
+    TradeText,
+)
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import NO, YES, FilterInput
 from algotrade.services.read.filtering.rows import frame_of
@@ -343,7 +349,6 @@ def load_trades_of(
     return None if edge is None else load_edge_trades(ctx, edge, period, page, sort, descending)
 
 
-SURFACE = "edge_trades"  # config/site/filters/edge_trades.toml
 SECTOR = "instrument.sector"
 BACKTEST, LIVE_RECORD = "backtest", "live"  # a ledger row's `source`
 
@@ -397,7 +402,7 @@ def load_filtered_trades(
     """Page ``page`` of the trades of ``edge``'s verdict basis for ``period`` that pass
     ``filters``, with the filter bar's counts. ``FilterRefusedError`` for a filter the viewer is
     not offered (before any read)."""
-    served = load_served_filters(ctx, SURFACE, ctx.session.date)
+    served = load_served_filters(ctx, TRADE_SURFACE, ctx.session.date)
     served.resolved.check(i.id for i in filters)
     page = max(page, 1)
     basis = official_basis(ctx, edge)
