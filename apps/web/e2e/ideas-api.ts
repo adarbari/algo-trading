@@ -109,13 +109,16 @@ export async function mockIdeasApi(page: Page, edgeDesk: unknown = NO_EDGE_DESK)
   await page.route('**/api/graphql', async (route: Route) => {
     const body = route.request().postDataJSON() as {
       query?: string;
-      variables?: { filters?: Input[] | null };
+      variables?: { filters?: Input[] | null; surface?: string };
     } | null;
     if (/query\s+EdgeDesk\b/.test(body?.query ?? '')) {
       await route.fulfill({ json: edgeDesk });
       return;
     }
-    if (/query\s+FilterSet\b/.test(body?.query ?? '')) {
+    if (
+      /query\s+FilterSet\b/.test(body?.query ?? '') &&
+      (body?.variables)?.surface === 'ideas'
+    ) {
       await route.fulfill({ json: FILTER_SET });
       return;
     }

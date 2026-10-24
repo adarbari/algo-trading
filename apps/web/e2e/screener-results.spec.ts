@@ -1,8 +1,8 @@
 /**
  * Trader > Screeners > one screener (Results) end to end, against the production build with
  * the API mocked from fixtures shaped like GraphQL `ScreenerResults` (builder-api.ts): the latest
- * run as a review table (criterion columns in their units, a tinted near miss, new / dropped
- * chips), decision filters and the user's view saved as they change it, the way to the Builder,
+ * run as a review table (criterion columns in their units, a tinted near miss), the shared
+ * filter bar (decision, since the previous run; zero-result recovery) and the user's view saved as they change it, the way to the Builder,
  * and the empty state of a screener with no run. Accessibility in both themes.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -67,18 +67,30 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
-test('decision chips filter the run and the view is saved as yours', async ({ page }) => {
+/** Toggle one value of the Decision filter in the toolbar's Setup popover, then close it. */
+async function toggleDecision(page: Page, name: RegExp): Promise<void> {
+  await page.getByRole('button', { name: /^Setup/ }).click();
+  await page.getByRole('list', { name: 'Decision' }).getByRole('button', { name }).click();
+  await page.keyboard.press('Escape');
+}
+
+test('the run opens on the picks, the filter bar narrows it, and the view is saved as yours', async ({
+  page,
+}) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
-  expect(mock.tables.at(-1)?.['decisions']).toEqual([
-    'QUALIFIED',
-    'WATCH',
-    'LIQUIDITY_RISK',
-    'EVENT_RISK',
-    'PAUSED',
+  await expect(page).toHaveURL(
+    /f=decision(%3A|:)QUALIFIED%2CWATCH%2CLIQUIDITY_RISK%2CEVENT_RISK%2CPAUSED/,
+  );
+  expect(mock.tables.at(-1)?.['filters']).toMatchObject([
+    { id: 'decision', values: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK', 'PAUSED'] },
   ]);
-  await page.getByRole('button', { name: /^Liquidity risk/ }).click();
+  await expect(page.getByRole('group', { name: 'Applied filters' })).toContainText(
+    'Decision Qualified, Watch, Liquidity risk, Event risk, Paused',
+  );
+  await toggleDecision(page, /^Liquidity risk/);
+  await expect(grid(page).getByRole('row', { name: /CHTR/ })).toHaveCount(0);
   await expect
     .poll(() => mock.views.at(-1))
     .toEqual({
@@ -87,23 +99,46 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
       view: {
         columns: [],
         narrow_columns: [],
-        filters: '',
+        filters: 'decision:QUALIFIED,WATCH,EVENT_RISK,PAUSED',
         sort: null,
-        decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED'],
+        decisions: [],
       },
     });
+  await page.getByRole('button', { name: /^What changed/ }).click();
+  await page
+    .getByRole('list', { name: 'Since the previous run' })
+    .getByRole('button', { name: /^New/ })
+    .click();
+  await page.keyboard.press('Escape');
+  await expect(grid(page).getByRole('row', { name: /SOXS/ })).toHaveCount(0);
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
   await expect
-    .poll(() => mock.tables.at(-1)?.['decisions'])
-    .toEqual(['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED']);
-  await page.getByRole('button', { name: /^New/ }).click();
-  await expect.poll(() => mock.tables.at(-1)?.['change']).toBe('new');
+    .poll(() => mock.views.at(-1)?.view['filters'])
+    .toBe('decision:QUALIFIED,WATCH,EVENT_RISK,PAUSED;change:new');
+});
+
+test('a link with filters opens the filtered run; an empty result says what to switch off', async ({
+  page,
+}) => {
+  await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner?f=decision:QUALIFIED;change:dropped');
+  await expect(page.getByText('No results match all 2 filters')).toBeVisible();
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Switch off Since the previous run gives 3/ }).click();
+  await expect(page).toHaveURL(/f=decision(%3A|:)QUALIFIED(%3B|;)(%21|!)change/);
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
+  await expect(grid(page).getByRole('row', { name: /XOM/ })).toHaveCount(0);
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'Clear all' }).click();
+  await expect(page).not.toHaveURL(/f=/);
+  await expect(grid(page).getByRole('row', { name: /XOM/ })).toBeVisible();
 });
 
 test('a view can be saved under a name, switched to and deleted', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
-  await page.getByRole('button', { name: /^Liquidity risk/ }).click(); // a change to the default view
+  await toggleDecision(page, /^Liquidity risk/); // a change to the default view
   await page.getByRole('button', { name: 'Save view as…' }).click();
   const dialog = page.getByRole('dialog', { name: 'Save view as' });
   await dialog.getByLabel('Name of the view').fill('VRP review');
@@ -113,12 +148,12 @@ test('a view can be saved under a name, switched to and deleted', async ({ page 
     .toMatchObject({
       id: 'vrp_scanner',
       name: 'VRP review',
-      view: { decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED'] },
+      view: { filters: 'decision:QUALIFIED,WATCH,EVENT_RISK,PAUSED' },
     });
   const views = page.getByRole('combobox', { name: 'View' });
   await expect(views).toHaveValue('VRP review');
   // What you change now is saved into that view, not the default one.
-  await page.getByRole('button', { name: /^Watch/ }).click();
+  await toggleDecision(page, /^Watch/);
   await expect.poll(() => mock.views.at(-1)).toMatchObject({ name: 'VRP review' });
   await views.selectOption({ label: 'Default view' });
   await expect(views).toHaveValue('');

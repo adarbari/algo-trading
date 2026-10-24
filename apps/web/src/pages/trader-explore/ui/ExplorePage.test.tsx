@@ -12,6 +12,7 @@ const widgets = vi.hoisted(() => ({
   overview: vi.fn(),
   hits: vi.fn(),
   why: vi.fn(),
+  universe: vi.fn(),
 }));
 
 vi.mock('@/features/ticker-search', async () => {
@@ -23,12 +24,26 @@ vi.mock('@/features/ticker-search', async () => {
     },
   };
 });
+vi.mock('./UniverseTable', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    UniverseTable: (props: Record<string, unknown>) => {
+      widgets.universe(props);
+      return <Text>universe table</Text>;
+    },
+  };
+});
 vi.mock('@/widgets/feature-table', async () => {
   const { Text } = await import('@algotrade/ui');
   return {
     FeatureTable: (props: Record<string, unknown>) => {
       widgets.side(props);
-      return <Text>{String(props['label'])}</Text>;
+      return (
+        <>
+          <Text>{String(props['label'])}</Text>
+          {props['header'] as React.ReactNode}
+        </>
+      );
     },
   };
 });
@@ -251,9 +266,38 @@ describe('ExplorePage', () => {
     ]);
   });
 
-  it('asks for a ticker when none is open', () => {
-    render(page({}));
-    expect(screen.getByText('No ticker open')).toBeInTheDocument();
+  it('shows the universe table when no ticker is open, with the URL filters and its actions', async () => {
+    const onSearchChange = vi.fn();
+    render(page({ f: 'sector:Technology', dims: 'feature.market_cap' }, onSearchChange));
+    expect(await screen.findByText('universe table')).toBeInTheDocument();
     expect(screen.queryByRole('tablist', { name: 'Open tickers' })).toBeNull();
+    const props = widgets.universe.mock.lastCall?.[0] as {
+      f: string;
+      columns: string[];
+      onFilterChange: (f: string | undefined) => void;
+      onColumnsChange: (dims: string | undefined) => void;
+      onOpen: (symbol: string) => void;
+      onCompare: (symbols: string[]) => void;
+    };
+    expect(props.f).toBe('sector:Technology');
+    expect(props.columns).toEqual(['feature.market_cap']);
+    props.onFilterChange(undefined);
+    expect(onSearchChange).toHaveBeenLastCalledWith({ f: undefined });
+    props.onColumnsChange('feature.close');
+    expect(onSearchChange).toHaveBeenLastCalledWith({ dims: 'feature.close' });
+    props.onOpen('KO');
+    expect(onSearchChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sel: 'KO', focus: 'KO' }),
+    );
+    props.onCompare(['AAPL', 'MSFT']);
+    expect(onSearchChange).toHaveBeenLastCalledWith({
+      sel: 'AAPL,MSFT',
+      focus: undefined,
+      tab: 'compare',
+    });
+    props.onCompare(['AAPL']);
+    expect(onSearchChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sel: 'AAPL', focus: 'AAPL' }),
+    );
   });
 });

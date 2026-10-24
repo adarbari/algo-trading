@@ -4,6 +4,7 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
+import { filterSearch, type FilterSearch } from '@/features/filter-bar';
 import { parseExploreSearch, type ExploreSearch } from '@/entities/explore';
 import type { SearchPatch } from '@/pages/trader-explore';
 
@@ -14,11 +15,19 @@ import { lazyPage } from '@/shared/lib/lazy';
 const ExplorePage = lazyPage(() => import('@/pages/trader-explore'), 'ExplorePage');
 
 /** The search params after a patch: `undefined` removes a key. */
-function patched(previous: ExploreSearch, patch: SearchPatch): ExploreSearch {
+function patched(
+  previous: ExploreSearch & FilterSearch,
+  patch: SearchPatch,
+): ExploreSearch & FilterSearch {
   const merged: Record<string, unknown> = { ...previous, ...patch };
-  return parseExploreSearch(
+  return validateSearch(
     Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)),
   );
+}
+
+/** Explore's own params and the filter bar's `f` (the universe table's filters). */
+function validateSearch(raw: Record<string, unknown>): ExploreSearch & FilterSearch {
+  return { ...parseExploreSearch(raw), ...filterSearch(raw) };
 }
 
 function ExploreRoute() {
@@ -38,7 +47,7 @@ function ExploreRoute() {
 export const exploreRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'explore',
-  validateSearch: parseExploreSearch,
+  validateSearch,
   // the tab the URL opens on loads its chunk and starts its reads here, not when it mounts
   loaderDeps: ({ search }) => search,
   ...pageRoute(ExplorePage, (page, client, search: ExploreSearch) =>

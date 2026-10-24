@@ -75,13 +75,55 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
-test('with nothing open the page asks for a ticker', async ({ page }) => {
+test('with nothing open the page is the universe table', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/explore');
-  await expect(page.getByText('No ticker open')).toBeVisible();
+  await expect(page.getByRole('grid', { name: 'Tickers' })).toBeVisible();
   await expect(open(page)).toHaveCount(0);
   await expectAccessible(page);
   expect(errors).toEqual([]);
+});
+
+test('the filter bar narrows the universe on the server, the URL keeps it, and ticked rows compare', async ({
+  page,
+}) => {
+  await page.goto('/explore');
+  const tickers = page.getByRole('grid', { name: 'Tickers' });
+  await expect(tickers.getByRole('row', { name: /Agilent/ })).toBeVisible();
+  await expect(tickers.getByRole('row', { name: /Alternative Access/ })).toBeVisible();
+  await expect(page.getByText('11,427 tickers')).toBeVisible();
+  await page.getByRole('button', { name: /^Setup/ }).click();
+  await page
+    .getByRole('list', { name: 'Security type' })
+    .getByRole('button', { name: /^Common stock/ })
+    .click();
+  await expect(page).toHaveURL(/f=security_type(%3A|:)COMMON_STOCK/);
+  await page.keyboard.press('Escape');
+  const chips = page.getByRole('group', { name: 'Applied filters' });
+  await expect(chips).toContainText('Security type Common stock');
+  await expect(page.getByText(/^[\d,]+ of 11,427$/).first()).toBeVisible();
+  await expect(tickers.getByRole('row', { name: /Alternative Access/ })).toHaveCount(0);
+  await tickers.getByRole('checkbox', { name: 'Select A', exact: true }).click();
+  await tickers.getByRole('checkbox', { name: 'Select AA', exact: true }).click();
+  await page.getByRole('button', { name: 'Compare selected (2)' }).click();
+  await expect(page).toHaveURL(/sel=A%2CAA/);
+  await expect(view(page).getByRole('tab', { name: 'Compare' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+});
+
+test('an empty universe result says what to switch off, and switching it off brings the rows back', async ({
+  page,
+}) => {
+  await page.goto('/explore?f=security_type:ETF;price:100000..');
+  await expect(page.getByText('No tickers match all 2 filters')).toBeVisible();
+  await page.getByRole('button', { name: /^Switch off Price gives/ }).click();
+  await expect(page).toHaveURL(/(%21|!)price/);
+  await expect(page.getByRole('grid', { name: 'Tickers' }).getByRole('row').nth(1)).toBeVisible();
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'Clear all' }).click();
+  await expect(page).not.toHaveURL(/f=/);
 });
 
 test('one ticker opens on its overview', async ({ page }) => {

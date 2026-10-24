@@ -119,10 +119,7 @@ export { scoreBreakdown, type ScoreLine } from './model/score';
 export {
   DEFAULT_DECISIONS,
   isShownCriterion,
-  orderedDecisions,
   resultsVariables,
-  shownDecisions,
-  type ScreenChange,
   type ScreenResultsQuery,
 } from './model/results';
 export { describeCriterion, describeRule } from './model/rule';

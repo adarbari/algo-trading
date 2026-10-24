@@ -140,6 +140,58 @@ test('Ideas: the screener chips wrap inside the screen and a tapped one opens th
   await expect(page).toHaveURL(/\/screeners\/vrp-scanner/);
 });
 
+test('Screener results: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({
+  page,
+}) => {
+  await page.goto('/screeners/vrp_scanner');
+  const rows = page.getByRole('grid', { name: 'Screener results' });
+  await expect(rows.getByRole('row', { name: /CHTR/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filters' }).tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  await sheet.getByRole('button', { name: 'Setup' }).tap();
+  await page
+    .getByRole('list', { name: 'Decision' })
+    .getByRole('button', { name: /^Liquidity risk/ })
+    .tap();
+  await page.keyboard.press('Escape');
+  await expect(sheet.getByRole('button', { name: 'Show 5 results' })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Show 5 results' }).tap();
+  await expect(rows.getByRole('row', { name: /CHTR/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()?.width ?? 0,
+  );
+  await page.goto('/screeners/vrp_scanner?f=decision:QUALIFIED;change:dropped');
+  await expect(page.getByText('No results match all 2 filters')).toBeVisible();
+  await page.getByRole('button', { name: /^Switch off Since the previous run gives 3/ }).tap();
+  await expect(rows.getByRole('row', { name: /AAPL/ })).toBeVisible();
+});
+
+test('Explore: the universe table has one Filters button and a sheet, and an empty result offers the way back', async ({
+  page,
+}) => {
+  await page.goto('/explore');
+  const tickers = page.getByRole('grid', { name: 'Tickers' });
+  await expect(tickers.getByRole('row', { name: /Agilent/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Filters' }).tap();
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  await sheet.getByRole('button', { name: 'Setup' }).tap();
+  await page
+    .getByRole('list', { name: 'Security type' })
+    .getByRole('button', { name: /^ETF/ })
+    .tap();
+  await page.keyboard.press('Escape');
+  await sheet.getByRole('button', { name: /^Show [\d,]+ results/ }).tap();
+  await expect(page).toHaveURL(/f=security_type(%3A|:)ETF/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()?.width ?? 0,
+  );
+  await page.goto('/explore?f=security_type:ETF;price:100000..');
+  await expect(page.getByText('No tickers match all 2 filters')).toBeVisible();
+  await page.getByRole('button', { name: /^Switch off Price gives/ }).tap();
+  await expect(tickers.getByRole('row', { name: /Alternative Access/ })).toBeVisible();
+});
+
 test('Ideas: a phone row keeps the ticker, who picked it, decision and score', async ({ page }) => {
   await page.goto('/ideas');
   const headers = page.getByRole('grid', { name: 'Top ideas' }).getByRole('columnheader');

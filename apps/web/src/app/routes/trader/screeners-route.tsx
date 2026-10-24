@@ -1,12 +1,13 @@
 /**
  * Trader > Screeners: the list (`/screeners`), a new screener (`/screeners/new`), a screener's
- * results (`/screeners/$id`, where the list opens) and its Builder (`/screeners/$id/edit`).
+ * results (`/screeners/$id`, where the list opens; the filter bar's `f` is its search param) and its Builder (`/screeners/$id/edit`).
  * The Builder and a new screener (`screener-builder-routes.tsx`, lazy) may carry
  * `returnTo=<edge id>` (opened from an edge's builder): they then return to it.
  * Tickers open in Explore.
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
+import { filterSearch } from '@/features/filter-bar';
 import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
 import { pageRoute } from '../page-loader';
@@ -38,10 +39,13 @@ function ScreenersIndex() {
 
 function ScreenerResultsRoute() {
   const { id } = resultsRoute.useParams();
-  const navigate = useNavigate();
+  const { f } = resultsRoute.useSearch();
+  const navigate = useNavigate({ from: resultsRoute.fullPath });
   return (
     <ScreenerResultsPage
       id={id}
+      f={f}
+      onFilterChange={(next) => void navigate({ search: next ? { f: next } : {}, replace: true })}
       onEdit={() => void navigate({ to: '/screeners/$id/edit', params: { id } })}
       onOpenTicker={(symbol) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })
@@ -72,6 +76,7 @@ const newRoute = createRoute({
 const resultsRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: '$id',
+  validateSearch: filterSearch,
   ...pageRoute(ScreenerResultsPage),
   component: ScreenerResultsRoute,
 });

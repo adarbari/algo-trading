@@ -15,8 +15,7 @@ export const SCREENER_RESULTS_OPERATION = 'ScreenerResults';
 const ScreenerResults = graphql(`
   query ScreenerResults(
     $id: String!
-    $decisions: [String!]
-    $change: String
+    $filters: [FilterInput!]
     $q: String
     $sort: String
     $columns: [FeatureName!]
@@ -101,8 +100,7 @@ const ScreenerResults = graphql(`
           count
         }
         results(
-          decisions: $decisions
-          change: $change
+          filters: $filters
           q: $q
           sort: $sort
           columns: $columns
@@ -142,6 +140,25 @@ const ScreenerResults = graphql(`
           unknown
           reasons
           kinds
+          facets {
+            total
+            matched
+            items {
+              id
+              active
+              removes
+              unknown
+              options {
+                value
+                count
+              }
+              bins {
+                lo
+                hi
+                count
+              }
+            }
+          }
           kindTexts {
             kind
             text
