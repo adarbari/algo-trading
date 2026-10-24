@@ -128,7 +128,7 @@ describe('FeatureTable', () => {
       emptyMessage: 'none',
     };
     const { rerender } = render(<FeatureTable {...props} filters={[]} q="" />);
-    expect(header).toHaveBeenLastCalledWith(facets);
+    expect(header).toHaveBeenLastCalledWith(facets, '2026-10-02');
     await user.click(screen.getByRole('button', { name: 'Next page' }));
     expect(asked().page).toBe(2);
     const filters = [{ id: 'security_type', values: ['ETF'], active: true }];

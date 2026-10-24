@@ -156,6 +156,11 @@ describe('UniverseTable', () => {
     expect(asked()['filters']).toEqual([{ id: 'security_type', values: ['ETF'], active: false }]);
   });
 
+  it('offers the export of the rows under the filters in force', async () => {
+    render(<Held initial="security_type:ETF" />);
+    expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument();
+  });
+
   it('opens a ticker, and the ticked ones as a compare set', async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();

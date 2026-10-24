@@ -267,3 +267,21 @@ test('the screener hits tab opens the screener the reader came from', async ({ p
   const hits = page.getByRole('region', { name: 'Screener hits' });
   await expect(hits.getByLabel('VRP scanner criteria for AAPL')).toBeVisible();
 });
+
+test('Export saves the universe under the filters in force: the request carries f, date and the table columns', async ({
+  page,
+}) => {
+  await page.route('**/api/files/universe.csv*', (route) =>
+    route.fulfill({ contentType: 'text/csv', body: 'symbol\nA\n' }),
+  );
+  await page.goto('/explore?f=security_type:ETF');
+  await expect(page.getByRole('grid', { name: 'Tickers' }).getByRole('row').nth(1)).toBeVisible();
+  const request = page.waitForRequest('**/api/files/universe.csv*');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export' }).click();
+  const query = new URL((await request).url()).searchParams;
+  expect(query.get('f')).toBe('security_type:ETF');
+  expect(query.get('date')).toBe('2026-10-02');
+  expect(query.getAll('columns')).toContain('rollup.price_stats@v2.close');
+  expect((await download).suggestedFilename()).toBe('universe-2026-10-02.csv');
+});
