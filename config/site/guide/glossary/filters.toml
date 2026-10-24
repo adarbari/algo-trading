@@ -124,6 +124,36 @@ next = "Tick New to see what the screener found since last time."
 see_also = ["screener_last_run", "filter_unknown_rows"]
 
 [[term]]
+id = "filter_rank_moved_up"
+term = "Places moved up filter"
+short = "Keeps the rows that rose in the screener's order since its previous run, by at least a number of places."
+body = """
+Places moved up is the row's rank in the screener's previous run minus its rank in this one, so 5 means it rose five places. A row that fell has a negative number. It compares the screener's last two stored runs, not two days of the market. A row has no number in four cases. The screener has no earlier run, or the previous run did not rank it. You may not see a run's order, or the settings changed between the runs. Such a row never passes this filter.
+"""
+next = "Set the minimum to 5 to see the names climbing the order fastest."
+see_also = ["filter_rank", "filter_change", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_near_misses"
+term = "Near misses filter"
+short = "Keeps the rows that narrowly missed a number of the screener's gates."
+body = """
+A gate is a rule the row must pass. A near miss is a gate the row missed by only a little, close enough that the screener lists the row as Watch rather than Reject. The number counts them for the row. Zero means none, which is not the same as unknown: a run whose values you may not see has no count, and its rows never pass this filter.
+"""
+next = "Set the minimum to 1 to see the rows that are one small step from qualifying."
+see_also = ["watch", "near_miss", "filter_gates_failing", "filter_range", "filter_unknown_rows"]
+
+[[term]]
+id = "filter_gates_failing"
+term = "Gates not passed filter"
+short = "Keeps the rows that missed a number of the screener's gates, narrowly or clearly."
+body = """
+A gate is a rule the row must pass. The number counts the gates the row missed, near misses included, so a row with 0 passed every gate it could be judged on. A gate with no data to judge is not counted here. A run whose values you may not see has no count, and its rows never pass this filter.
+"""
+next = "Set the maximum to 1 to see the rows that missed at most one gate."
+see_also = ["filter_near_misses", "filter_range", "filter_unknown_rows"]
+
+[[term]]
 id = "filter_security_type"
 term = "Security type filter"
 short = "Keeps the instruments of the types you tick: common stock, ETF, closed-end fund and so on."
@@ -375,9 +405,9 @@ id = "filter_group_changed"
 term = "What changed"
 short = "The filters that compare the session with the one before it."
 body = """
-A group button opens the filters it holds and shows how many are in use. On a screener's results, What changed holds the rows new or dropped since the screener's previous run. A list offers more here once it stores the comparison, such as how far a row moved up the ranking.
+A group button opens the filters it holds and shows how many are in use. On a screener's results, What changed holds the rows new or dropped since the screener's previous run. It also holds how many places a row rose in the screener's order.
 """
-see_also = ["filter_change", "filter_group_setup"]
+see_also = ["filter_change", "filter_rank_moved_up", "filter_group_setup"]
 
 [[term]]
 id = "filter_group_tradeable"
