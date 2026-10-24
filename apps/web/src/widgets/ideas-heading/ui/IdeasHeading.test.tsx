@@ -23,6 +23,7 @@ describe('IdeasHeading', () => {
       pausedTotal: 0,
       paused: [],
       screeners: [],
+      facets: null,
     };
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(data));
     const { container } = render(<IdeasHeading />);

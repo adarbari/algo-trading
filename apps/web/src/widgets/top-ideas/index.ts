@@ -1,2 +1,7 @@
-/** Widget: the ranked ideas table with its preset views and filter chips. */
-export { TopIdeas, type TopIdeasProps } from './ui/TopIdeas';
+/** Widget: the ranked ideas table under the shared filter bar. */
+export {
+  TopIdeas,
+  type TopIdeasProps,
+  type TopIdeasSearch,
+  type TopIdeasSearchPatch,
+} from './ui/TopIdeas';

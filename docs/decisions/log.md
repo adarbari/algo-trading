@@ -647,3 +647,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the badge is on every page by design; the overage is the badge itself, and the route budgets sit at measured size.
+
+## 2026-10-23 | Filter bar on Ideas PR (#924) | Entry and Ideas budgets raised by the filter bar's shared code
+- Question: adopting the shared filter bar on Ideas puts the `f` codec in the entry chunk (the route validates its search parameter synchronously) and the bar's components and read in the Ideas page; the two entry budgets and three route budgets sit below the measured size. Trim, or raise?
+- Options: cut the validation (an unvalidated `f` reaches the page) / raise the two entry budgets and the Ideas and Explore route budgets by the measured cost / drop the canonical form of `f`.
+- Decision: owner waiver of the shared rule for the two entry budgets only: entry 25310 to 25780 B and entry plus static imports 197010 to 197510 B (measured locally 25603 and 197336 B, +170 B margin for CI), through the `waivers` map; Ideas page chunk 46700 to 54900 B, Ideas first-load JS 235100 to 239000 B and requests 56 to 62, Explore chart first-load JS 305000 to 305500 B, each with a reason in `perf-budgets.json`. The owner pre-approved raises that come from the filter bar's shared code in the session that started this work (2026-10-23).
+- decided by: owner
+- status: final
+- Reasoning: one filter bar for every table, list and feed (ADR 0082) is the owner's design; the cost is the shared code itself, and later surfaces adopt it without raising anything again.
