@@ -494,6 +494,24 @@ name = "rollups/instrument/cohort_pct_price@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/cohort_pct_fundamental@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "percentile ranks of days to cover (a FINRA source: a rule screen may read it, a learned scorer may not, as events/short_interest)"
+
+[[table]]
+name = "rollups/instrument/cohort_pct_valuation@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/cohort_pct_options@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/pe_ratio@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the materialised expression feature pe_ratio (config/site/features/company/fundamentals.toml)"
+
+[[table]]
 name = "rollups/instrument/momentum_variants@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
