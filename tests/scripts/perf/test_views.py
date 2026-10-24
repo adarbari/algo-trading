@@ -825,11 +825,12 @@ def test_a_broken_exception_file_or_web_walk_cannot_crash_or_change_the_verdict(
 def test_every_measured_operation_has_a_resolvable_variable_set(
     gate_op_set: tuple[dict, dict],
 ) -> None:
-    """Fitness (hand run 9b, 2026-10-24: a new operation entered the measured set and failed the
-    nightly's integrity check): each timed operation either carries every required variable or
-    has a `VARIABLE_RESOLVERS` entry that fills it from the clone; an `empty_ok` name is a real
-    web operation. A legitimately empty answer needs `empty_ok` in benchmarks/perf_bar.toml
-    (owner approval, docs/decisions/log.md); missing variables need a resolver in fast_bench.py."""
+    """Fitness: each timed operation either carries every required variable or has a
+    `VARIABLE_RESOLVERS` entry that fills it from the clone; an `empty_ok` name is a real web
+    operation. This would NOT have caught hand run 9b's `EdgeProblems` (a variable-less operation
+    that answers empty by design): an empty answer shows only against the store. Such an answer
+    needs `empty_ok` in benchmarks/perf_bar.toml (owner approval, docs/decisions/log.md); missing
+    variables need a resolver in fast_bench.py."""
     fb = _load("fast_bench", "fast_bench.py")
     distinct, _ = gate_op_set
     gaps = []
