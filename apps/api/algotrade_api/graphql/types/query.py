@@ -43,6 +43,7 @@ from algotrade.services.read.guide.screeners import index as screener_index_page
 from algotrade.services.read.guide.screeners import screener as screener_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
+from algotrade.services.read.lists import edges as list_edges
 from algotrade.services.read.lists import screeners as list_screeners
 from algotrade.services.read.market import market
 from algotrade.services.read.ops import (
@@ -99,6 +100,7 @@ from algotrade_api.graphql.types.instruments.distribution import FeatureDistribu
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.instruments.table import FeatureTable
+from algotrade_api.graphql.types.lists.edge_list import EdgeList
 from algotrade_api.graphql.types.lists.screener_list import ScreenerList
 from algotrade_api.graphql.types.market.market import Market
 from algotrade_api.graphql.types.market.regime import MarketRegime
@@ -532,6 +534,29 @@ class Query:
         ctx = info.context.stores()
         found = edge_reads.load_edges(ctx, ids) if ctx is not None else ()
         return [Edge.of(e, ctx) for e in found] if ctx is not None else []
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Edges list: the edges the user sees whose id, name or thesis contains "
+        "`q` (any case) and that pass `filters` (the surface `edges` of `filterSet`: the old "
+        "views are the filters `mine`, `followed` and the status `rejected`), by id, with the "
+        "counts of the filter bar (ADR 0082). A session is read for the live state; null: "
+        "nothing stored",
+        extensions=[MaxItems("filters", MAX_FILTERS), MaxItems("q", MAX_QUERY)],
+    )
+    async def edge_list(
+        self,
+        info: Ctx,
+        filters: list[FilterInput] | None = None,
+        q: str | None = None,
+        date: Day = None,
+    ) -> EdgeList | None:
+        ctx = await info.context.aread(date)
+        found = (
+            await off_loop(list_edges.load_edge_list, ctx, tuple(filters or ()), q)
+            if ctx is not None
+            else None
+        )
+        return EdgeList.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The user's own edge files `edges` leaves out (or reads only in part), by id, "
