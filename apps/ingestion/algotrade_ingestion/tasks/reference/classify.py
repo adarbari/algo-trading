@@ -16,11 +16,6 @@ from algotrade.config.site.universe.etf_category import Phrases
 
 _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ETN", re.compile(r"\bETNs?\b|exchange[- ]traded notes?", re.I)),
-    # Nasdaq Trader suffixes a closed-end fund "- Closed End Fund", and a BDC too (``_BDC_SYMBOLS``
-    # are skipped: they file 10-K, stay common stock and feed ``bdc_price_to_nav``). Massive types
-    # both "CS"; a generic vendor type yields to this rule (ADR 0045). Royalty trusts and REITs
-    # carry no such suffix and are operating entities (SIC 6792 / 6798), so they stay common.
-    ("CEF", re.compile(r"-\s*closed end fund\s*$", re.I)),
     # not a name that ends "Common Stock" / "Ordinary Shares" ("Preferred Bank - Common Stock")
     (
         "PREFERRED",
@@ -31,6 +26,11 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("WARRANT", re.compile(r"\bwarrants?\b", re.I)),
     ("RIGHT", re.compile(r"\brights?\b(?! offering)", re.I)),
     ("NOTE", re.compile(r"\bnotes? due\b|\bdebentures?\b|\bsenior notes\b|% notes\b", re.I)),
+    # Nasdaq Trader suffixes a closed-end fund "- Closed End Fund", and a BDC too (``_BDC_SYMBOLS``
+    # are skipped: they file 10-K, stay common stock and feed ``bdc_price_to_nav``). Massive types
+    # both "CS"; a generic vendor type yields to this rule (ADR 0045). Royalty trusts and REITs
+    # carry no such suffix and are operating entities (SIC 6792 / 6798), so they stay common.
+    ("CEF", re.compile(r"-\s*closed end fund\s*$", re.I)),
     ("ADR", re.compile(r"american depositary|\bADSs?\b|\bADRs?\b", re.I)),
 )
 # Listed BDCs named "- Closed End Fund" (company entity_type "operating", 10-K filers; the

@@ -48,3 +48,6 @@ operating companies and had no share count (2 of 31 have one). `classify.securit
 other 14 become `CEF` (Calamos, Sprott FUND, Herzfeld, Oxford Lane, ArrowMark, Thornburg, Daxor).
 Royalty trusts (SIC 6792 / 6795) and REITs stay `COMMON_STOCK`. A `CEF` is a fund in `asset_class`
 (ADR 0013): they leave the stock populations; FIGI ids are unchanged; 0.27% of ACTIVE rows.
+Older reference snapshots are not rewritten: they keep these 14 as `COMMON_STOCK`, so edge trial logs and
+backtests over earlier sessions include them in stock populations. The rule sits after `PREFERRED` /
+`NOTE`; its pattern is deliberately a suffix match, narrower than `fund_nav.CLOSED_END_NAME` (contains).

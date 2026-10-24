@@ -83,6 +83,30 @@ def test_the_bdc_hand_list_is_the_same_in_the_screener_and_the_universe() -> Non
     assert EDGES["bdc_price_to_nav_reversion"].universe == "bdc_listed"
 
 
+def test_every_bdc_named_closed_end_fund_is_carved_out_of_the_cef_rule() -> None:
+    from algotrade_ingestion.tasks.reference.classify import _BDC_SYMBOLS  # noqa: PLC0415
+
+    text = (PRESETS / "selections" / "bdc_listed.toml").read_text()
+    listed = set(text.split("# NMFC", 1)[1].splitlines()[0].split())
+    # the listed BDCs Nasdaq Trader names "- Closed End Fund" (reference 2026-10-23)
+    suffixed = {
+        "ARCC",
+        "CGBD",
+        "FDUS",
+        "GBDC",
+        "GLAD",
+        "MFIC",
+        "OCSL",
+        "OFS",
+        "OXSQ",
+        "PSEC",
+        "SLRC",
+        "TCPC",
+        "WHF",
+    }
+    assert suffixed <= listed and suffixed <= _BDC_SYMBOLS
+
+
 def test_only_the_edge_with_a_verified_figure_carries_a_published_one() -> None:
     published = {i: EDGES[i].published for i in RANKS if EDGES[i].published}
     assert list(published) == ["cash_based_operating_profitability"]  # composite_value has none
