@@ -280,3 +280,77 @@ def test_finish_writes_the_readme_and_the_phases_and_top_cpu_into_status(tmp_pat
     )
     assert "timeline.csv" in (d / "README.txt").read_text()
     assert (d / "api.log").stat().st_size == fr.API_LOG_CAP
+
+
+def test_trash_watch_samples_until_the_pid_file_is_gone(tmp_path: Path) -> None:
+    pid_file = tmp_path / "trash-delete.pid"
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.1 0")
+    threading.Timer(1.5, pid_file.unlink).start()
+    t0 = time.time()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.3, 30.0)
+    assert time.time() - t0 < 10
+    rows = (tmp_path / "timeline.csv").read_text().splitlines()
+    assert len(rows) >= 2 and all(",trash-delete," in r for r in rows[1:])
+
+
+def test_trash_watch_gives_up_when_the_pid_file_never_appears_and_stops_at_its_cap(
+    tmp_path: Path,
+) -> None:
+    t0 = time.time()
+    fr.trash_watch(tmp_path, tmp_path / "none.pid", str(tmp_path), 0.2, 30.0, appear_s=0.5)
+    assert time.time() - t0 < 5
+    pid_file = tmp_path / "live.pid"
+    pid_file.write_text(f"{os.getpid()} x 0")  # never goes: the max-s cap ends it
+    t0 = time.time()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.2, 1.0)
+    assert 1.0 <= time.time() - t0 < 6
+
+
+def test_trash_watch_stops_for_a_stale_pid_file(tmp_path: Path) -> None:
+    pid_file = tmp_path / "stale.pid"
+    pid_file.write_text("999999 /x/data.trash.1 0")  # no such process
+    t0 = time.time()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.2, 30.0, appear_s=0.5)
+    assert time.time() - t0 < 5
+
+
+def test_trash_watch_with_a_zero_interval_does_not_spin(tmp_path: Path) -> None:
+    pid_file = tmp_path / "t.pid"
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.1 5")
+    threading.Timer(1.5, pid_file.unlink).start()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.0, 30.0)
+    assert len((tmp_path / "timeline.csv").read_text().splitlines()) <= 4  # a row a second at most
+
+
+def test_trash_watch_ignores_a_pid_file_of_another_trash_and_stops_when_it_changes(
+    tmp_path: Path,
+) -> None:
+    pid_file = tmp_path / "t.pid"
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.2 5")
+    fr.trash_watch(
+        tmp_path, pid_file, str(tmp_path), 0.2, 30.0, appear_s=0.5, trash="/x/data.trash.1"
+    )
+    assert len((tmp_path / "timeline.csv").read_text().splitlines()) == 1  # header only
+    pid_file.write_text(f"{os.getpid()} /x/data.trash.1 5")
+    t0 = time.time()
+    threading.Timer(1.2, pid_file.write_text, args=(f"{os.getpid()} /x/data.trash.9 7",)).start()
+    fr.trash_watch(tmp_path, pid_file, str(tmp_path), 0.3, 30.0, trash="/x/data.trash.1")
+    assert time.time() - t0 < 8  # the file named another delete: the stale watcher left
+
+
+def test_a_timed_out_probe_command_is_reaped_not_left_running(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CI failed with Popen.__del__ warnings: a killed child that was not waited for."""
+    made = []
+    real = fr.subprocess.Popen
+
+    class Recording(real):
+        def __init__(self, *a: object, **k: object) -> None:
+            super().__init__(*a, **k)
+            made.append(self)
+
+    monkeypatch.setattr(fr.subprocess, "Popen", Recording)
+    with pytest.raises(fr.subprocess.TimeoutExpired):
+        fr.run_cmd(["sleep", "5"], timeout=0.2)
+    assert made and made[0].returncode is not None  # killed and reaped
