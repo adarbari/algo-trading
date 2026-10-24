@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24 06:21 UTC",
+ "generated": "2026-10-24 06:22 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -155,6 +155,25 @@
     "LlmUsage"
    ],
    "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/admin/screener-runs": {
+   "route": "/admin/screener-runs",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "AdminScreenerRun",
+    "AdminScreenerRuns",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "AdminScreenerRun",
     "GuideHelpField"
    ],
    "interaction": [

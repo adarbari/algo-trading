@@ -674,6 +674,23 @@ export type ScreenerRunsQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type ScreenerRunsQuery = { session: { date: string } | null, screeners: Array<{ id: string, name: string, description: string | null, criteria: Array<{ id: string, field: string, mode: string, op: string, value: unknown }>, notRun: { kindText: string } | null, pickHistory: Array<{ session: string, picked: number | null }>, latestRun: { runId: string, session: string, picked: number, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }> } | null }> };
 
+export type AdminScreenerRunsQueryVariables = Exact<{
+  limit: number;
+  user?: string | null | undefined;
+  screener?: string | null | undefined;
+  status?: string | null | undefined;
+}>;
+
+
+export type AdminScreenerRunsQuery = { screenerRuns: Array<{ runId: string, configId: string, owner: string, session: string, status: string, startedAt: string, finishedAt: string | null, knowledgeTs: string, picked: number | null, paused: number | null, regime: string | null, coverage: string | null }> };
+
+export type AdminScreenerRunQueryVariables = Exact<{
+  runId: string;
+}>;
+
+
+export type AdminScreenerRunQuery = { screenerRun: { runId: string, configId: string, owner: string, session: string, status: string, startedAt: string, finishedAt: string | null, knowledgeTs: string, configVersion: number | null, configHash: string | null, picked: number | null, paused: number | null, regime: string | null, coverage: string | null, missingTables: Array<string>, missingOptionalTables: Array<string>, decisions: Array<{ decision: string, count: number }> | null, unavailable: Array<{ kind: UnavailableKind, features: Array<string>, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null }>, changes: { picked: number, paused: number, previousRunId: string | null, previousSession: string | null, previousVersion: number | null, newPicks: number | null, dropped: number | null } | null } | null };
+
 export type StatusStripQueryVariables = Exact<{
   admin: boolean;
 }>;
@@ -4270,6 +4287,74 @@ export const ScreenerRunsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenerRunsQuery, ScreenerRunsQueryVariables>;
+export const AdminScreenerRunsDocument = new TypedDocumentString(`
+    query AdminScreenerRuns($limit: Int!, $user: String, $screener: String, $status: String) {
+  screenerRuns(limit: $limit, user: $user, screener: $screener, status: $status) {
+    runId
+    configId
+    owner
+    session
+    status
+    startedAt
+    finishedAt
+    knowledgeTs
+    picked
+    paused
+    regime
+    coverage
+  }
+}
+    `) as unknown as TypedDocumentString<AdminScreenerRunsQuery, AdminScreenerRunsQueryVariables>;
+export const AdminScreenerRunDocument = new TypedDocumentString(`
+    query AdminScreenerRun($runId: String!) {
+  screenerRun(runId: $runId) {
+    runId
+    configId
+    owner
+    session
+    status
+    startedAt
+    finishedAt
+    knowledgeTs
+    configVersion
+    configHash
+    decisions {
+      decision
+      count
+    }
+    picked
+    paused
+    regime
+    coverage
+    missingTables
+    missingOptionalTables
+    unavailable {
+      kind
+      features
+      guideTerm
+      kindText
+      cause {
+        links {
+          level
+          subject
+          status
+          message
+          runId
+        }
+      }
+    }
+    changes {
+      picked
+      paused
+      previousRunId
+      previousSession
+      previousVersion
+      newPicks
+      dropped
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<AdminScreenerRunQuery, AdminScreenerRunQueryVariables>;
 export const StatusStripDocument = new TypedDocumentString(`
     query StatusStrip($admin: Boolean!) {
   session {

@@ -39,6 +39,8 @@ CALLS = {
     "accepted_formulas": "acceptedFormulas",
     "harness_runs": "harnessRuns(limit: 1)",
     "harness_run": 'harnessRun(runId: "x")',
+    "screener_runs": "screenerRuns(limit: 1)",
+    "screener_run": 'screenerRun(runId: "x")',
 }
 
 

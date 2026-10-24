@@ -369,6 +369,99 @@ Each night the edge's picks are stored for the session. This one has none. The n
 next = "Check the session date, then look again after the next nightly run."
 see_also = ["counts_toward"]
 
+# ------------------------------------------------------------------ the Admin Screener runs tab
+
+[[term]]
+id = "screener_run_status"
+term = "Screener run status"
+short = "Where a screener run stands in its record: queued, running, complete, partial, waiting or failed."
+body = """
+Every screener run leaves a record, and the record's status says how far the run got. Queued: the run is waiting to start. Running: it is reading the session's data now, so its picks and counts are not final. Complete: it finished and wrote its picks. Partial: it finished but some inputs were missing, so its picks cover fewer names than the screener's universe. Waiting: it is held until the data source publishes the session. Failed: it stopped with an error and wrote no picks.
+A run that never finished has no picked or paused count. The page shows that gap as not recorded, never as zero.
+"""
+next = "Open a partial or failed run to read which tables it lacked, then wait for the next nightly run or ask the owner to rerun it."
+see_also = ["screener_run_missing_tables", "screener_picks", "session"]
+
+[[term]]
+id = "screener_run_owner"
+term = "Screener run owner"
+short = "Whose run it is: site for the shared nightly run, or the name of the user whose own run it is."
+body = """
+The nightly job runs each screener once for the site and once for every declared user. A site run is the shared one every trader sees. A user's run applies that user's own settings and configs, so the same screener can pick different names for different owners.
+The Ideas page shows a trader only their own run. This tab shows all of them to admins.
+"""
+see_also = ["screener_run_config", "screener"]
+
+[[term]]
+id = "screener_run_picked"
+term = "Screener run picked"
+short = "How many names the run qualified, counted over the whole run before any page filter."
+body = """
+Picked counts every name whose decision was qualified, over the whole run. The detail lists each decision with its own count. A name the regime gate held back is counted under paused, not under picked.
+Worked example: a run with 12 picked and 3 paused found 15 names that met its rules; the regime held 3 of them back. An empty cell means the run never finished and recorded no count.
+"""
+next = "Compare the count with the run before it in the detail before you trust a sudden change."
+see_also = ["paused", "screener_run_decisions", "screener_run_status"]
+
+[[term]]
+id = "screener_run_decisions"
+term = "Screener run decisions"
+short = "Every decision the run gave, with how many names got it, over the whole run."
+body = """
+Each name in a run gets one decision: qualified, watch, reject, or paused when the regime gate held it back. The counts are over the whole run, not over the names a page shows. A decision with no names is not listed.
+"""
+see_also = ["qualified", "watch", "reject", "paused"]
+
+[[term]]
+id = "screener_run_coverage"
+term = "Screener run coverage"
+short = "How many names the run could screen out of those it was asked to screen."
+body = """
+Coverage is the run's own account of the universe it read: the names it screened against the names it should have. A name with missing data cannot pass a rule, so a low coverage means fewer picks, not fewer good setups.
+An empty cell means the run recorded no coverage, which is not full coverage.
+"""
+next = "Read the missing tables in the detail to see which data was lacking."
+see_also = ["screener_run_missing_tables", "screener_run_status"]
+
+[[term]]
+id = "screener_run_started"
+term = "Screener run started"
+short = "The clock time the run began, in UTC: when the app ran it, not the session it screened."
+body = """
+The session column is the trading day the run screened. Started is the clock time the run began, in UTC, and is usually the evening after the session. A rerun of an old session shows a late start for an early session.
+"""
+see_also = ["session", "knowledge_time"]
+
+[[term]]
+id = "screener_run_config"
+term = "Screener run config"
+short = "The version and hash of the screener's rules that this run used."
+body = """
+A screener's rules can change between nights. The version counts the saved changes. The hash is a short fingerprint of the rules as they were: two runs with the same hash used identical rules. A different version or hash from the previous run explains why its picks differ.
+"""
+see_also = ["screener_run_changes", "screener"]
+
+[[term]]
+id = "screener_run_missing_tables"
+term = "Screener run missing tables"
+short = "The stored tables a run lacked when it ran, split into required and optional."
+body = """
+A required table that is missing makes the run partial or failed: names that need it cannot pass a rule. An optional table, such as option volatility from the broker, only adds a warning, and rules that use it treat those names as unknown. The list names the tables as stored.
+An empty list means the run had every table. A table missing here is also the first link of the cause chain below it.
+"""
+next = "Check the ingestion tab for the step that writes the missing table."
+see_also = ["screener_run_status", "unknown"]
+
+[[term]]
+id = "screener_run_changes"
+term = "Screener run changes"
+short = "What the run changed against the screener's previous run: new picks, dropped picks and the run it was compared with."
+body = """
+New picks are names picked now and not in the previous run. Dropped are names picked then and not now. The previous run and its session are named so you can open it. A run with no earlier run, or one that wrote no comparison, shows not recorded, never zero.
+A large change right after a new config version is the config, not the market. Check the config version first.
+"""
+see_also = ["screener_run_config", "screener_run_picked"]
+
 [[term]]
 id = "cohort_percentile"
 term = "Cohort percentile"

@@ -3184,6 +3184,14 @@ type Query {
 
   """The edge evaluation run `runId`, with its rows; null: no such run"""
   harnessRun(runId: String!): HarnessRun
+
+  """
+  The `limit` most recent screener runs of any status, newest first: every screener of the site and every declared user, narrowed by `user` (whose), `screener` (config id) and `status` (the run record's)
+  """
+  screenerRuns(limit: Int! = 50, user: String = null, screener: String = null, status: String = null): [ScreenerRunEntry!]!
+
+  """The screener run `runId`; null: no such run"""
+  screenerRun(runId: String!): ScreenerRunEntry
 }
 
 """
@@ -3603,6 +3611,48 @@ type ScreenerRun {
   Its rows as a review table: `filters` (the surface `screener_results` of `filterSet`) and `q` (the symbol or name contains it) filtered, `decisions` and `change` (deprecated: the `decision` and `change` filters; `new` / `dropped`) likewise, over the whole run, with the counts in `facets` (ADR 0082), sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows
   """
   results(decisions: [String!] = null, change: String = null, q: String = null, sort: String = null, columns: [FeatureName!] = null, page: Int! = 1, size: Int! = 100, filters: [FilterInput!] = null): ScreenResultPage!
+}
+
+"""
+What a run froze when it wrote: the whole run's `picked` and `paused` counts, the run it was compared with (`previousRunId`, `previousSession`, `previousVersion`; null: there was none) and the tickers `newPicks` / `dropped` against it (null: no previous run, never 0)
+"""
+type ScreenerRunChanges {
+  picked: Int!
+  paused: Int!
+  previousRunId: String
+  previousSession: Date
+  previousVersion: Int
+  newPicks: Int
+  dropped: Int
+}
+
+"""
+One screener run of any status: `owner` whose run (`site`: the shared one), `session` it screened, the run record's `status`, `knowledgeTs` (its start while it has not finished), the `configVersion` and `configHash` that ran, every decision with its count over the whole run (`decisions`, `picked`, `paused`: null for a run that never finished, never 0), the `regime` label it stamped, its `coverage` and the tables it ran without (`missingTables`, `missingOptionalTables`; `unavailable`: what they leave out)
+"""
+type ScreenerRunEntry {
+  runId: String!
+  configId: String!
+  owner: String!
+  session: Date!
+  status: String!
+  startedAt: DateTime!
+  finishedAt: DateTime
+  knowledgeTs: DateTime!
+  configVersion: Int
+  configHash: String
+  decisions: [DecisionCount!]
+  picked: Int
+  paused: Int
+  regime: String
+  coverage: String
+  missingTables: [String!]!
+  missingOptionalTables: [String!]!
+  unavailable: [Unavailable!]!
+
+  """
+  What the run froze against the run before it; null: it has no `screen_runs` row (a run before the table, or one that never wrote). For the detail only: it reads one row per run, so asking it in a list is one read per entry
+  """
+  changes: ScreenerRunChanges
 }
 
 """
