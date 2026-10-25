@@ -49,10 +49,18 @@ light). No gradients, glows, shadows, emoji icons or number-in-card tiles.
 
 ### Themes and switches
 
-`UiProvider` sets attributes on `<html>`: `data-theme` = `dark` (default until the theme
-switch ships, ADR 0085) | `light` | `system` (follows `prefers-color-scheme`); `data-density` =
-`compact` (default) | `comfortable`; `data-updown` = `standard` | `cvd`.
+`UiProvider` sets attributes on `<html>`: `data-theme` = `light` | `dark` | `system`;
+`data-density` = `compact` (default) | `comfortable`; `data-updown` = `standard` | `cvd`.
 `prefers-reduced-motion: reduce` sets every duration to 0.
+
+**Theme choice (ADR 0085).** The user picks Light / Dark / System in the account menu
+(`widgets/theme-choice`); the default is System. The choice is stored per user (`[appearance]
+theme` in `preferences.toml`, `PUT /preferences/appearance`, read as `Query.appearance`) and
+copied to `localStorage` (`algotrade.theme`) so an inline script in `index.html` sets
+`data-theme` before the first paint. `UiProvider`'s `theme` is optional: absent, it leaves the
+attribute alone (it never writes a default on mount). `tokens.css` treats `system` and an absent
+attribute alike: anything but an explicit `dark` follows `prefers-color-scheme`. Stories and
+tests pass a theme explicitly; the e2e runner pins its colour scheme to dark.
 
 ### Colour (`--color-<role>`)
 

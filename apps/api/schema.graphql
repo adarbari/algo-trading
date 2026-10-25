@@ -48,6 +48,13 @@ type AheadEvent {
 }
 
 """
+The theme the user chose: `light`, `dark` or `system` (the device decides); `system` when nothing valid is stored
+"""
+type Appearance {
+  theme: String!
+}
+
+"""
 The verdict with the count of the outlook's test met (`needed` trades), on today's figures: its `level`, `reasons` it is not better (the failing tests, in words) and the server's `sentence`. An estimate, never an input to the verdict
 """
 type AtTarget {
@@ -2788,6 +2795,11 @@ type Query {
   Who this request is for: the signed-in registry user, their role and workspaces (ADR 0040; not session data)
   """
   viewer: Viewer!
+
+  """
+  The theme the user chose (`light`, `dark` or `system`; ADR 0085): `system` when nothing valid is stored. Per user, not session data; not part of `viewer`, which has no I/O
+  """
+  appearance: Appearance!
 
   """The session `date` resolves to; null: nothing stored"""
   session(

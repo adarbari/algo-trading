@@ -50,6 +50,11 @@ path = "/preferences/views/{scope}/view"
 test = "tests/contract/api/read_your_writes/test_preferences.py::test_view_put_shows_the_saved_view"
 
 [[route]]
+method = "PUT"
+path = "/preferences/appearance"
+test = "tests/contract/api/read_your_writes/test_preferences.py::test_appearance_put_shows_the_saved_theme"
+
+[[route]]
 method = "DELETE"
 path = "/preferences/views/{scope}/view"
 test = "tests/contract/api/read_your_writes/test_preferences.py::test_view_delete_forgets_a_named_view"

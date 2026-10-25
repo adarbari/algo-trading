@@ -1,8 +1,9 @@
 /**
  * Renders the typed tokens as CSS custom properties (the generated `tokens.css`).
  *
- * Themes (dark-first): `:root` is dark; `[data-theme='light']` is light; `[data-theme='system']`
- * follows `prefers-color-scheme`. Density: `[data-density='comfortable']` overrides the compact
+ * Themes (ADR 0085): `:root` is dark; `[data-theme='light']` is light; anything but an explicit
+ * `dark` (`system`, or no attribute yet) follows `prefers-color-scheme`, so one rule serves the
+ * explicit `system` choice and the page before the theme script has run. Density: `[data-density='comfortable']` overrides the compact
  * default; `@media (pointer: coarse)` raises control and row heights to the `touch` floor. Up / down: `[data-updown='cvd']` switches to the colour-blind-safe pair.
  * Run `npm run tokens` after editing a token source; CI fails if tokens.css is stale.
  */
@@ -76,7 +77,7 @@ function block(selector: string, vars: Vars, indent = ''): string {
 }
 
 const LIGHT = ":root[data-theme='light']";
-const SYSTEM = ":root[data-theme='system']";
+const SYSTEM = ":root:not([data-theme='dark'])";
 
 /** The full generated stylesheet. */
 export function renderTokensCss(): string {
