@@ -759,3 +759,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's word in chat, 2026-10-24, as relayed by the coordinating session; the first credible verdicts should not wait a year for a monthly setup to collect 40 forward decisions, and the post-publication years are the agreed honest fast track.
+
+## 2026-10-25 | ADR 0065 amendment (PR 967) | The eight owner decisions
+- Question: the eight owner decisions listed at the end of the ADR 0065 amendment 2026-10-25: label wording, which `close` setups, the Edges list headline, deflation on the post-publication basis, one setup per paper, the attestation, the window, the short-side cap.
+- Options: the recommended answer to each / another answer to any.
+- Decision: the recommended answers. (1) "after publication <years>", or "after the paper's sample" where they differ; (2) accept the 12 `close` setups, each with its named difference recorded; (3) two labelled columns, forward first; (4) Works deflated by the site-wide trial count; (5) `lazy_prices_10k_change` only, not `risk_factor_change`; (6) the per-setup attestation that parameters came from the paper's text, given at registration; (7) a closed window that stops at `frozen_from`; (8) short-side setups on a survivors-only universe capped at Not enough data.
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in the orchestrating session, 2026-10-25: "Accept the recommended answers on #966, #967 and #968. Tell each session to record them and release its PR (#966 first, then #968's renumber, then #967)."

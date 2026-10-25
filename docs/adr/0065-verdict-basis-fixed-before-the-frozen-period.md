@@ -3,8 +3,8 @@
 **Status:** accepted (2026-10-10; owner decision D9 of the Edge page redesign plan). Amends the
 verdict decision of [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (ED8: an edge's
 verdict is its best candidate's); keeps [0007](0007-point-in-time-data.md)'s rule that nothing
-chooses on what was not known when the choice is made. Amended 2026-10-25 (proposed, owner decision
-2026-10-24): a post-publication basis for setups taken from published research (last section).
+chooses on what was not known when the choice is made. Amended 2026-10-25 (accepted; owner decisions
+2026-10-24 and 2026-10-25): a post-publication basis for setups taken from published research (last section).
 
 ## Context
 An edge is implemented by several candidates: each of its screeners at each holding period of
@@ -137,8 +137,8 @@ amendment of this ADR says when a basis declared at filing may count. The verdic
 
 ## Amendment 2026-10-25: a post-publication basis for setups taken from published research (ADR 0053 amendment)
 
-Owner decision 2026-10-24 (`docs/decisions/log.md`). Everything marked **(owner)** is proposed and
-listed again under "Owner decisions" below. The per-setup inputs and the setups' sort into the
+Owner decision 2026-10-24 (`docs/decisions/log.md`). Each point marked **(owner)** was decided on
+2026-10-25 as recommended ("Owner decisions" below). The per-setup inputs and the setups' sort into the
 classes below are in `docs/edge-evidence/post-publication.md`. Architect review 2026-10-24: ten
 findings, all taken into the text below (the review's findings are in the PR).
 
@@ -286,11 +286,13 @@ window is the store's history before `frozen_from` and the exact `sample_end` do
 working, Promising) arrive without lowering the bar; none reads Works before the survivorship-free universe
 exists. The forward record is untouched and remains the only evidence for `status`.
 
-**Owner decisions** (recommendation first). (1) Label wording: "after publication <years>", or "after the
-paper's sample" where they differ. (2) Which `close` setups to accept, each with its named difference.
-(3) Edges list headline: two labelled columns, forward first (alternatives: forward only; post-publication
-only while forward is Not enough data). (4) Works on this basis deflated by the site-wide trial count: yes.
-(5) One setup per paper: `lazy_prices_10k_change` only, not `risk_factor_change` (decide now, before results
-are read). (6) The attestation (e) for each registered setup. (7) Closed window (stops at `frozen_from`) rather
-than running to the latest session. (8) A `short`-side setup on a survivors-only universe is capped at Not
-enough data, never Not working.
+**Owner decisions**, 2026-10-25 ("Accept the recommended answers on #966, #967 and #968", relayed by the
+orchestrating session; `docs/decisions/log.md`), each the recommended answer: (1) the label is "after
+publication <years>", or "after the paper's sample" where they differ. (2) The 12 `close` setups are accepted,
+each with its named difference (`match_notes`) recorded at registration. (3) The Edges list headline shows two
+labelled columns, forward first. (4) Works on this basis is deflated by the site-wide trial count. (5) One setup
+per paper: `lazy_prices_10k_change` only, not `risk_factor_change`. (6) The per-setup attestation that the
+parameters were set from the paper's text, not tuned on the store, is given at registration. (7) A closed
+window that stops at `frozen_from`. (8) A `short`-side setup on a survivors-only universe is capped at Not enough
+data, never Not working. The survivorship-free universe is the listing history of ADR 0084 (PR 968); the
+`universe_basis` stamp is added by the implementation PR.
