@@ -2,11 +2,11 @@
 
 Paper trades follow the edge's OWNER, never a follower: a site edge records once, as ``site``,
 and an own edge for its user; following is a bookmark and trades nothing. An edge records while
-its status is ``evidenced`` or ``live`` (``RECORDING``); a ``candidate`` or ``researching`` edge
-has no paper trades, and a ``retired`` or ``rejected`` one takes no new picks (its open trades
-still settle, ``results.run_night``). The record of an edge starts on the first night the job
-sees it recording (``since``, passed in by ``results``: never backfilled to the status's date),
-and from there:
+its status says so (``loading.records_paper``: a site edge from ``candidate`` to ``live``, a user's
+own edge from ``live``); a ``researching`` edge has no paper trades, and a ``retired``, ``rejected``
+or ``blocked`` one takes no new picks (its open trades still settle, ``results.run_night``). The
+record of an edge starts on the first night the job sees it recording (``since``, passed in by
+``results``: never backfilled to the status's date), and from there:
 the same decision sessions the backtest uses (``cross_section/sessions.decision_sessions``,
 spaced a horizon apart), and the picks are the harness's own (``cross_section/picks``: the
 screener's qualified names among the edge's eligible names, best first, the first ``top_k``),
@@ -22,7 +22,10 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.loading import RECORDING
+from algotrade.config.edges.loading import SITE, records_paper
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.strategy.resolve import ResolvedConfig
+from algotrade.config.strategy.schema import Selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import (
@@ -33,6 +36,7 @@ from algotrade.core.time.calendar import (
 )
 from algotrade.data import StoreReader
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.detail.licences import picks_licence
 from algotrade.services.evaluation.cross_section.events import (
     DEDUPE_SESSIONS,
     EventDayMissingError,
@@ -48,6 +52,7 @@ from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
 from algotrade.services.evaluation.cross_section.measuring import MEASURED_COVERAGE, names_for
 from algotrade.services.evaluation.cross_section.picks import eligible, long_picks, screen_variant
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
+from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 
 # Sessions an event schedule reads back to dedupe names. The dedupe is a chain (a name counted
@@ -70,7 +75,10 @@ class Signal:
 @dataclass(frozen=True)
 class EdgeSignals:
     """What one edge signalled at one session: ``signals`` (empty when none was due or
-    possible), ``skipped`` why a due signal could not be made (None: nothing was wrong)."""
+    possible), ``skipped`` why a due signal could not be made (None: nothing was wrong),
+    ``licence`` the strictest data licence of what the picks were read from (``trial_licences``:
+    the screen's and the universe's features, the implied vol field), recorded on every row so a
+    reader hides a name by the licence recorded at the signal (ADR 0064 decision 10)."""
 
     edge_id: str
     session: date
@@ -79,6 +87,7 @@ class EdgeSignals:
     horizon: int
     signals: tuple[Signal, ...] = ()
     skipped: str | None = None
+    licence: str | None = None
 
 
 def advance(day: date, sessions: int) -> date:
@@ -89,8 +98,9 @@ def advance(day: date, sessions: int) -> date:
 
 
 def paper_traded(edge: Edge) -> bool:
-    """The edge takes new paper picks for its owner's record: ``evidenced`` or ``live``."""
-    return edge.status in RECORDING
+    """The edge takes new paper picks for its owner's record (``loading.records_paper``): a site
+    edge from ``candidate``, a user's own from ``live``."""
+    return records_paper(edge.status, edge.owner == SITE)
 
 
 def legs_between(
@@ -129,7 +139,7 @@ def legs_between(
     return [leg for leg in legs if leg.decision >= start], events
 
 
-def _not_possible(edge: Edge) -> str | None:
+def not_possible(edge: Edge) -> str | None:
     """Why the paper record cannot trade ``edge`` (None: it can)."""
     if needs_implied_vol(edge) and iv_field_of(edge) in MIXED_SOURCE_IV:
         return "its implied vol field mixes sources: name one vendor's field"
@@ -137,9 +147,22 @@ def _not_possible(edge: Edge) -> str | None:
         return (
             f"a {edge.outcome.result_side} outcome is not paper traded: the record buys the picks"
         )
+    if edge.outcome.kind == PORTFOLIO_KIND:
+        return "a portfolio outcome holds a book, not the picks: it is not settled name by name"
     if edge.promoted is None and not edge.screeners:
         return "the edge has no screener to take picks from"
     return None
+
+
+def _licence(
+    configs: ConfigStore, user: UserContext, edge: Edge, config: ResolvedConfig, universe: Selection
+) -> str:
+    """The strictest licence of what ``edge``'s picks are read from (see ``EdgeSignals``)."""
+    features = catalogue(configs, user.user_id)
+    found = features.feature(iv_field_of(edge)) if needs_implied_vol(edge) else None
+    return picks_licence(
+        features, edge, universe, config, None if found is None else str(found.licence)
+    )
 
 
 def edge_signals(
@@ -154,7 +177,7 @@ def edge_signals(
     record counted from ``since``. ``user`` is the record owner's context (the ``site`` user's for
     a site edge): its presets and universes are the ones read, never a follower's."""
     horizon = edge.outcome.horizon_sessions[0]
-    if (why := _not_possible(edge)) is not None:
+    if (why := not_possible(edge)) is not None:
         return EdgeSignals(edge.id, session, None, None, horizon, (), why)
     try:
         legs, events = legs_between(reader, configs, user, edge, since, session, session)
@@ -169,12 +192,17 @@ def edge_signals(
     screener = edge.promoted or edge.screeners[0]
     config = resolve_config(configs, screener, user)
 
+    selection = edge_universe(configs, user, edge)
+    licence = _licence(configs, user, edge, config, selection)
+
     def made(signals: tuple[Signal, ...] = (), skipped: str | None = None) -> EdgeSignals:
-        return EdgeSignals(edge.id, session, screener, config.hash, horizon, signals, skipped)
+        return EdgeSignals(
+            edge.id, session, screener, config.hash, horizon, signals, skipped, licence
+        )
 
     try:
         run = screen_variant(reader, config, session)
-        universe = eligible(reader, edge_universe(configs, user, edge), session)
+        universe = eligible(reader, selection, session)
     except MissingDataError as missing:
         return made(skipped=f"no {missing.dataset} for {session.isoformat()}")
     if run.coverage not in MEASURED_COVERAGE:
