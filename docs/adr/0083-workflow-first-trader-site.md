@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-10-24; owner decisions, taken after the use-case research and the
 workflow design; an architect reviewed the build slices). Amends
-[0025](0025-frontend-architecture.md) (the TRADER sections) and
+[0025](0025-frontend-architecture.md) (the TRADER sections), [0069](0069-data-licence-gate.md) (for Ideas a withheld pick is dropped, not shown by name) and
 [0041](0041-natural-language-screener-drafts.md) (the model only translates: its `suggestions`
 go). Supersedes [0029](0029-rule-screener.md) decision 9 (Ideas is the viewer's screener pool)
 for the Ideas list, and the 2026-10-22 amendment of [0005](0005-ingestion-is-the-only-writer.md)
@@ -37,13 +37,16 @@ still owed before anyone is charged.
      (`/edges/new`, `/edges/$id/edit`): describe it (Describe it), rules, settings (outcome, schedule,
      universe), result (an on-request evaluation, ADR 0059), save (a user screener config, ADR
      0029, and a user edge document, ADR 0053: the existing writes, no new one). It is one route
-     group `/test`; the old builder URLs redirect to it. A trader's own screeners and setups are
+     group `/test`; the old builder URLs (`/screeners/new`, `/screeners/$id/edit`, `/edges/new`,
+     `/edges/$id/edit`) redirect to it. A screener's results page `/screeners/$id` (linked from
+     Ideas, Explore and Setups) stays where it is. A trader's own screeners and setups are
      listed under Test.
    - *Calendar* is unchanged. *Explore* is not a tab: it is reached by a global ticker search
      (⌘K, which searches tickers, setups and the Guide: the Guide's ⌘K search, ADR 0051, extended)
      and keeps its `/explore` route. *Regime* is not a tab either: its page stays at `/regime`,
      reached from the top-bar regime chip and ⌘K. The Screeners list `/screeners` leaves the bar
-     (a site screener lives in its setup, a user's own under Test; the route redirects to Test).
+     (a site screener lives in its setup, a user's own under Test; the list route redirects to
+     Test).
      Backtests is dropped (no page exists).
    - The account menu gains *Settings*: the nightly brief and display preferences only (the
      per-user `preferences.toml`, ADR 0032). **No account size, risk profile or position size is
@@ -53,25 +56,45 @@ still owed before anyone is charged.
    - *Source.* A site setup is listed when its stored verdict level is `works` or `promising`
      (`services/read/evaluation/verdict/stored.py`, the headline in `results/edge_verdict`),
      and its picks are the `picked` rows of `results/edge_picks` for the served session
-     (`services/read/evaluation/pick_edges.py`, place 1 first; ADR 0081). The screener's own
-     picks are not used. Ideas never judges live: a setup with no matching stored verdict (the
-     fingerprint differs, ADR 0053 amendment) is not listed and the page says how many were
-     left out for that reason (UNKNOWN with a reason, ADR 0036). `pick_edges.py` gains the
-     inverse read (setup to picks); no other module names the table.
+     (`services/read/evaluation/pick_edges.py`, place 1 first; ADR 0081), **of the verdict's
+     basis screener only** (ADR 0065: the verdict, the stop and the hold rest on that one
+     screener and horizon, so another screener's row of the setup is not an idea). The screener's
+     own picks are not used. `pick_edges.py` gains the inverse read (setup to picks); no other
+     module names the table.
+   - *Point in time.* For session S the verdict and the ledger are what was knowable at S: the
+     canonical run used has `range_to <= S` (a newer committed run is disclosed, not used; today
+     `runs.load_canonical_run` takes the latest committed run whatever S is, so it gains the
+     session bound), and ledger trades count only with `exit_session <= S`. An explicit past date
+     therefore reads the verdict then, not today's.
+   - *The basis is a stored fact.* `results/edge_verdict` gains `basis_screener` and
+     `basis_horizon` (today `basis` is only the words "screener, N trading days" and
+     `horizon_sessions` is a list), written by the `edge-eval` writer with a `JUDGE_VERSION` bump
+     (ADR 0053 amendment 2026-10-22); Ideas and the exit rule read these, never parse the words.
+   - *Missing is UNKNOWN, never empty.* Ideas never judges live. A setup with no usable stored
+     verdict is not listed; the page says how many were left out and why, by kind: no committed
+     run at S, fingerprint differs (`stored.py` returns a variant that carries the reason instead
+     of a bare `None`), row unreadable. A qualifying setup whose `edge_picks` row is `not_stored`,
+     `skipped` or `unjudged` (the step is optional, ADR 0081 decision 6) reads UNKNOWN with its
+     reason, not as "no picks"; only `not_decision_day` and a decision day that picked nothing
+     are empty.
    - *One ranking rule for every viewer.* Evidence strength, then rank within the setup:
      verdict level (`works` before `promising`), then the verdict's out-of-sample lift in points
-     (`lift_pts`), then its out-of-sample trades, then `edge_id`; then the pick's place, then
+     (`lift_pts`, a null sorts last), then its out-of-sample trades, then `edge_id`; then the pick's place, then
      `instrument_id`. A ticker picked by several setups is one idea at its best position and
      lists the others ("also in"). The rule is a pure function in `services/read/`, with a
      version recorded on the list.
-   - *Per viewer, only a filter.* The licence gate (ADR 0069) drops a pick whose screener ranks
-     on a field the viewer does not hold, before the cap, and its rank is never shown (ADR 0081
-     `withheld`); the visible list is renumbered. Then the list is **capped at 15**.
+   - *Per viewer, only a filter.* The licence gate (ADR 0069) drops a pick whose screener read
+     a field the viewer does not hold (the run's `field_licences`), before the cap; ADR 0069 shows
+     such a viewer the pick's name and decision, so this **amends 0069 for Ideas**: the pick is
+     not listed at all, and its rank is never shown (ADR 0081 `withheld`); the visible list is
+     renumbered. Then the list is **capped at 15**.
    - *Unproven.* Until any setup has a `works` or `promising` verdict, today's screener matches
      (the pool of ADR 0029, with the 2026-10-22 pool rule it keeps) are shown in a section
-     labelled **Unproven**, and the page says why. Once one setup qualifies the section is not
-     shown; a night on which the qualifying setups pick nothing is an empty list with its reason
-     (not a decision day, nothing qualified), never a fall-back to Unproven.
+     labelled **Unproven**, and the page says why; when setups were left out for want of a
+     readable verdict (above), that count and its reasons sit beside it, so a stale or missing
+     verdict never turns the home page into Unproven silently. Once one setup qualifies the
+     section is not shown; a night on which the qualifying setups pick nothing is an empty list
+     with its reason (not a decision day, nothing picked), never a fall-back to Unproven.
    - *No stored list, no per-viewer index.* The list is a read over stored rows (the same for
      everyone, filtered per viewer); the planned `ideas` step, the per-viewer SQLite index
      (`indexes/ideas.sqlite`, `storage/indexes/ideas.py`) and the API's rebuild of Ideas rows are
@@ -109,14 +132,18 @@ still owed before anyone is charged.
    - *Wording:* "publishes setups", "the setup's historical exit rule"; never "recommend",
      "your plan", "your stop". The slice that ships the list adds a fitness test over the
      Guide entries, site config and web labels for these words.
-   - *The language model only translates a trader's sentence into rules; it never suggests or
-     improves a rule.* Describe it's paths, checked in `services/drafting/`: the `suggestions`
+   - *In Describe it, the language model only translates a trader's sentence into rules; it
+     never suggests or improves a rule.* (The regime explanation, ADR 0041, and the headline
+     attribution, ADR 0050, are text about data with their own number checks, not rules: out of
+     scope.) Describe it's paths, checked in `services/drafting/`: the `suggestions`
      (protective checks the sentence did not ask for, ADR 0041 amendment 2026-10-11,
      `contract/suggestions.py`, `MAX_SUGGESTIONS`, `suggestions_dropped`, the Builder's
      "Suggested" group) **break the rule and are removed** in the Test slice (prompt, answer
      schema, `ScreenDraft`, REST response, web); the other paths stay because they only read the
      sentence: the readings of an unresolved vague word (the trader picks one; no threshold is
-     invented), `tie_break` only from "rank by", a re-draft of words the trader retyped. The
+     invented), `tie_break` only from "rank by", a re-draft of words the trader retyped, the formulas the
+     sentence's own words define (the trader accepts or skips each) and the `missing` requests
+     (a log of a span the catalogue cannot hold, ADR 0066, never a rule). The
      model's `notes` are limited to how the sentence was read (prompt rule and a golden case).
      The Test result states a verdict and never a changed rule.
    - *Every statistic* is labelled "backtested (hypothetical)" or "forward paper record since
@@ -136,8 +163,10 @@ still owed before anyone is charged.
   Guide entries and labels say "setup" where a trader reads them.
 - Until a setup earns `works` or `promising` the home page is the Unproven section, honestly
   labelled; 63 of 66 setups read `not_enough_data` today, so that is the first state.
-- Ideas needs no new writer, store or per-viewer table; it needs one pure ranking function, the
-  inverse read in `pick_edges.py` and a loader test on a fixture with a licence-held and a
+- Ideas needs no new writer, store or per-viewer table; the one stored change is two columns on
+  `results/edge_verdict` from its existing writer (`basis_screener`, `basis_horizon`, a
+  `JUDGE_VERSION` bump that refreshes every row at the next `edge-eval`). It needs one pure
+  ranking function, the session-bounded canonical run, the inverse read in `pick_edges.py` and a loader test on a fixture with a licence-held and a
   licence-withheld setup. The 2026-10-22 per-viewer index and its three amendments (0005, 0006,
   0077 (d)) are marked superseded; the weight / position rule survives only for Unproven.
 - A strong setup can fill the whole list of 15 (a setup's `top_k` can reach it); the card says
