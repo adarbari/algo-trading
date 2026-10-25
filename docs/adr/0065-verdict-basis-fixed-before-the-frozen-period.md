@@ -257,7 +257,8 @@ they get their own basis, name and ceiling, and never replace the forward one.
      copy has no post-publication basis however identical its rule, and its hidden out-of-sample withholding
      is untouched.
    - **Stored verdicts** (`verdict/stored.py`, `results/edge_verdict`): `judged_run_id` already tells the
-     two bases apart, so a nullable `basis_kind` is a column, not a key (read as `forward`); the fingerprint
+     two bases apart, so a nullable `basis_kind` is a column, not a key (read as `forward`; beside the `basis_screener` and
+     `basis_horizon` columns of ADR 0083, which a post-publication row fills from its declared basis); the fingerprint
      adds `basis_kind`, the registration, `basis_inputs_hash` and `universe_basis`; `canonical_kind` and the
      ingestion re-judge task take the basis; a reader that asks by edge alone gets the forward row.
 7. **Obligations of the implementation PR.** Which basis the Edges list headline shows, sorts and

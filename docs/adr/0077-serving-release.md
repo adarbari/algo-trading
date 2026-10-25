@@ -325,6 +325,8 @@ Owner decision 2026-10-22 ("The domain tables look good. Let us go with them", l
     ADR 0033).
 
 ## Amendment 2026-10-22 (d): Ideas gets a derived per-viewer index (owner exception)
+**Superseded by [0083](0083-workflow-first-trader-site.md) (2026-10-24): no Ideas index; decision 25 applies to Ideas again.**
+
 Owner decision 2026-10-22 (logged in `docs/decisions/log.md`, "Ideas ranking rule, store and
 licence (confirmed)").
 
