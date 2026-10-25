@@ -292,3 +292,16 @@ def test_etf_category_flags_nan_is_etf_is_not_an_etf() -> None:
     )
     got = etf_category_flags(frame, SETTINGS).iloc[0]
     assert got["etf_category_source"] == "not_etf"
+
+
+def test_closed_end_fund_suffix_types_cef_but_not_a_bdc_or_a_royalty_trust() -> None:
+    from algotrade_ingestion.tasks.reference.classify import security_type  # noqa: PLC0415
+
+    assert (
+        security_type("Calamos Strategic Total Return Fund - Closed End Fund", "CSQ", False)
+        == "CEF"
+    )
+    assert (
+        security_type("Ares Capital Corporation - Closed End Fund", "ARCC", False) == "COMMON_STOCK"
+    )
+    assert security_type("Permian Basin Royalty Trust Common Stock", "PBT", False) == "COMMON_STOCK"

@@ -10,7 +10,12 @@ from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input
-from algotrade.features.framework.feature import Feature
+from algotrade.features.framework.feature import (
+    Feature,
+    is_blank_check,
+    is_operating_type,
+    not_applicable,
+)
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.maintenance.coverage import cells, check_coverage
@@ -265,6 +270,46 @@ def test_funds_and_blank_checks_are_not_in_the_fundamentals_denominator() -> Non
     # E1 is an ETF and R2 a SPAC: neither counts; C2, R1, N1 are companies without a count
     assert cell(check, "rest")["missing"] == ["N1", "R1"]
     assert cell(check, "core")["applicable"] == 2
+
+
+def test_the_breakdown_counts_every_name_and_says_why_a_company_has_no_value() -> None:
+    """The grid counted rows stored and showed fundamentals green with 47% known: the ETF rows
+    are in ``rows`` but not in ``known``, and each operating company without a count has a cause."""
+    writer, reader = store()
+    company = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "cik": cik, "name": s, "sic": sic,
+         "sector": None, "fetched_on": D}
+        for s, cik, sic in (("R2", "1", "6770"), ("C2", "2", "3571"), ("R1", "3", "3571"))
+    ]  # fmt: skip
+    writer.write_table("instruments/company", D, "c", stamped(company, D, "c"))
+    put(writer, "rollups/instrument/fundamentals@v4", D,
+        {"C1": {"shares_outstanding": 1.0}, "R1": {"shares_outstanding": None},
+         "E1": {"shares_outstanding": None}})  # fmt: skip
+    rule = CoverageRule("fundamentals.shares_outstanding", 0.5, 0.5)
+    check = only(check_coverage(reader, D, rules(rule)), "fundamentals.shares_outstanding")
+    breakdown = check.data["breakdown"]
+    assert breakdown["by_type"] == [
+        {"security_type": "COMMON_STOCK", "names": 5, "rows": 2, "known": 1},
+        {"security_type": "ETF", "names": 1, "rows": 1, "known": 0},
+    ]
+    # C2 has a CIK and no row; R1 a row with no count; N1 no company CIK; R2 is a SPAC
+    assert breakdown["causes"] == {"BLANK_CHECK": 1, "NO_CIK": 1, "NO_FACTS": 1, "NO_ROW": 1}
+
+
+def test_a_table_with_no_partition_has_every_name_without_a_row() -> None:
+    _, reader = store()
+    rule = CoverageRule("fundamentals.shares_outstanding", 0.5, 0.5)
+    check = only(check_coverage(reader, D, rules(rule)), "fundamentals.shares_outstanding")
+    assert [(t["rows"], t["known"]) for t in check.data["breakdown"]["by_type"]] == [(0, 0), (0, 0)]
+    assert check.data["breakdown"]["causes"] == {"NO_CIK": 5}  # no company snapshot either
+
+
+def test_the_breakdown_operating_company_is_the_one_applies_to_decides() -> None:
+    """The breakdown and ``not_applicable`` share the helpers: they never disagree."""
+    for kind in ("COMMON_STOCK", "ADR", "ETF", "CLOSED_END_FUND", ""):
+        for sic in ("6770", "3571", ""):
+            ruled_out = bool(not_applicable(["operating_company"], None, kind, sic))
+            assert ruled_out == (not is_operating_type(kind) or is_blank_check(sic))
 
 
 def _explaining() -> FeatureSet:

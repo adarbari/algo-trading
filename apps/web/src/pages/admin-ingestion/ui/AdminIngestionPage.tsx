@@ -1,9 +1,10 @@
 /**
  * Admin › Ingestion: completeness and quality of the data, high level first with ways to drill
  * down. The summary strip; the completeness grid beside the selected cell's drill-down; the
- * option-chain coverage; the quality checks; verification vs IBKR beside the open review items (their rows open the ticker
- * in Explore); recent nightly runs. The
- * selected cell comes from the route (shareable); the page only lays the widgets out.
+ * fundamentals values known against rows stored; the option-chain coverage; the quality checks;
+ * verification vs IBKR beside the open review items (their rows open the ticker in Explore);
+ * recent nightly runs. The selected cell comes from the route (shareable); the page only lays
+ * the widgets out.
  */
 import { Grid, Heading, MasterDetail, Stack } from '@algotrade/ui';
 
@@ -12,6 +13,7 @@ import { ChainCoveragePanel } from '@/widgets/chain-coverage-panel';
 import { CompletenessPanel } from '@/widgets/completeness-panel';
 import { DrilldownPanel } from '@/widgets/drilldown-panel';
 import { IngestionSummary } from '@/widgets/ingestion-summary';
+import { KnownCoveragePanel } from '@/widgets/known-coverage-panel';
 import { QualityChecksPanel } from '@/widgets/quality-checks-panel';
 import { RecentRunsPanel } from '@/widgets/recent-runs-panel';
 import { ReviewItemsPanel } from '@/widgets/review-items-panel';
@@ -46,6 +48,7 @@ export function AdminIngestionPage({
         detailTitle={selected ? `${datasetLabel(selected.dataset)} · ${selected.session}` : ''}
         onDetailClose={onClearCell}
       />
+      <KnownCoveragePanel />
       <ChainCoveragePanel />
       <QualityChecksPanel />
       <Grid columns={2} gap={4} collapse="lg" align="start">

@@ -871,7 +871,7 @@
     "variables": {
      "sessions": 10
     },
-    "query": "\n  query IngestionCompleteness($sessions: Int!) {\n    completeness(sessions: $sessions) {\n      sessions\n      datasets\n      lastClosed\n      cells {\n        dataset\n        session\n        status\n        present\n        expected\n        basis\n        runIds\n      }\n    }\n    chainCoverage {\n      session\n      total\n      ok\n      share\n      statuses {\n        code\n        count\n      }\n      tiers {\n        tier\n        total\n        ok\n        stale\n      }\n      chronic\n      chronicNames\n      previousChronic\n      drift\n    }\n  }\n"
+    "query": "\n  query IngestionCompleteness($sessions: Int!) {\n    completeness(sessions: $sessions) {\n      sessions\n      datasets\n      lastClosed\n      cells {\n        dataset\n        session\n        status\n        present\n        expected\n        basis\n        runIds\n      }\n    }\n    chainCoverage {\n      session\n      total\n      ok\n      share\n      statuses {\n        code\n        count\n      }\n      tiers {\n        tier\n        total\n        ok\n        stale\n      }\n      chronic\n      chronicNames\n      previousChronic\n      drift\n    }\n    knownCoverage {\n      session\n      runId\n      byType {\n        securityType\n        names\n        rows\n        known\n        share\n      }\n      gaps {\n        gap\n        names\n      }\n      unknown {\n        code\n        kind\n        guideTerm\n        kindText\n        cause {\n          links {\n            level\n            subject\n            status\n            message\n            runId\n          }\n        }\n      }\n    }\n  }\n"
    },
    {
     "kind": "graphql",

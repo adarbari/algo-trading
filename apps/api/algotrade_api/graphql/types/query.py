@@ -16,6 +16,7 @@ from typing import Annotated
 import strawberry
 from strawberry.types import Info
 
+from algotrade.services.read.coverage import known_values
 from algotrade.services.read.edge_desk import desk as edge_desk
 from algotrade.services.read.edge_desk import live as edge_live
 from algotrade.services.read.edge_ledger import trades as edge_trade_reads
@@ -74,6 +75,7 @@ from algotrade_api.graphql.limits import (
 from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
+from algotrade_api.graphql.types.coverage.known_values import KnownCoverage
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeProblem, EdgeRun
 from algotrade_api.graphql.types.evaluation.evidence import (
     EdgeTradePage,
@@ -805,6 +807,17 @@ class Query:
         ctx = info.context.read(date)
         found = quality.load_quality(ctx) if ctx is not None else None
         return QualityReport.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The session's fundamentals share count known against the rows stored, by "
+        "security type, with the causes of an operating company's gap (NOT_RUN when no "
+        "nightly record of the session holds it); null: nothing stored",
+        extensions=[AdminOnly()],
+    )
+    def known_coverage(self, info: Ctx, date: Day = None) -> KnownCoverage | None:
+        ctx = info.context.read(date)
+        found = known_values.load_known_coverage(ctx) if ctx is not None else None
+        return KnownCoverage.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session's live verification vs IBKR (NO_PARTITION when it did not "

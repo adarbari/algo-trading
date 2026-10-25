@@ -39,6 +39,7 @@ __all__ = [
     "DatasetName",
     "DatasetState",
     "DatasetStatus",
+    "check_data",
     "check_name",
     "load_data_status",
     "share_status",
@@ -130,6 +131,24 @@ def check_name(feature: str) -> str:
     """The acceptance check of a coverage rule (``<group>.<column>``): the ingestion's
     ``coverage_<feature>`` (apps/ingestion tasks/maintenance/coverage.py)."""
     return f"coverage_{feature}"
+
+
+def check_data(ctx: ReadContext, feature: str, key: str) -> tuple[str, Mapping[str, Any]] | None:
+    """The run id and ``data`` of the coverage check of ``feature`` in the newest nightly record
+    of the session whose ``rollups`` step holds it with a ``key`` in its data (a retry carries
+    the step over without its checks; a record from before ``key`` existed lacks it); None when
+    no record does."""
+    for record in sorted(
+        ctx.reader.runs(NIGHTLY, ctx.session.date), key=lambda r: r.started_at, reverse=True
+    ):
+        steps = record.stats.get("steps")
+        step = steps.get(ROLLUPS_STEP) if isinstance(steps, Mapping) else None
+        checks = step.get("checks") if isinstance(step, Mapping) else None
+        for c in checks if isinstance(checks, list) else []:
+            data = c.get("data") if isinstance(c, Mapping) else None
+            if c.get("name") == check_name(feature) and isinstance(data, Mapping) and key in data:
+                return record.run_id, data
+    return None
 
 
 def _cells_of(steps: Any, name: str) -> tuple[DatasetState, int, int] | None:

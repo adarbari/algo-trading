@@ -30,6 +30,8 @@ prospectus's main document, ``parsed[IPO_FRAME]`` with the IPO facts read from i
 (``sec_prospectus/prospectus.py``). They live here so a task builds its requests without importing a
 vendor module. ``FilingTextRequest`` asks for the item sections of one 10-K / 10-Q (edge build D10):
 ``parsed[FILING_TEXT_FRAME]`` with ``FILING_TEXT_COLUMNS`` (``sec_text/filing_text.py``).
+The cover share classes of a periodic report are
+``parsed[COVER_SHARES_FRAME]`` with ``COVER_SHARES_COLUMNS`` (``sec_cover/cover_shares.py``).
 """
 
 from collections.abc import Collection
@@ -76,6 +78,11 @@ DEFAULT_10Q = ("I-2", "I-3", "II-1", "II-1A")
 FILING_TEXT_FRAME = "filing_text"  # key of ``Normalized.parsed`` holding one report's item rows
 FILING_TEXT_COLUMNS = (
     "item", "text", "char_count", "quality", "reason", "method", "parser_version",
+)  # fmt: skip
+COVER_SHARES_FRAME = "cover_shares"  # key of ``Normalized.parsed``: one filing's share classes
+COVER_SHARES_COLUMNS = (
+    "cik", "accession", "class_member", "shares", "as_of", "period_end", "trading_symbol",
+    "security_title",
 )  # fmt: skip
 # Form 4 (EB D6): insider transactions of an issuer, ``Form 4`` and its amendment. One frame shape
 # for the quarterly bulk sets and a filing's XML: a row per transaction line and reporting owner.
