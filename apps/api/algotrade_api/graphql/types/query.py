@@ -62,6 +62,7 @@ from algotrade.services.read.ops.admin_runs.screener_runs import RunStatus
 from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
+from algotrade.services.read.users.appearance import load_appearance
 from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext, selects
 from algotrade_api.graphql.limits import (
@@ -123,6 +124,7 @@ from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
 from algotrade_api.graphql.types.screens.view import TableView
 from algotrade_api.graphql.types.session import Session
+from algotrade_api.graphql.types.users.appearance import Appearance
 from algotrade_api.graphql.types.users.feature_requests import MyFeatureRequest
 from algotrade_api.graphql.types.users.viewer import Viewer
 
@@ -151,6 +153,17 @@ class Query:
     )
     def viewer(self, info: Ctx) -> Viewer:
         return Viewer.of(load_viewer(info.context.viewer))
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The theme the user chose (`light`, `dark` or `system`; ADR 0085): "
+        "`system` when nothing valid is stored. Per user, not session data; not part of `viewer`, "
+        "which has no I/O"
+    )
+    def appearance(self, info: Ctx) -> Appearance:
+        ctx = info.context.stores()
+        return (
+            Appearance.of(load_appearance(ctx)) if ctx is not None else Appearance(theme="system")
+        )
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session `date` resolves to; null: nothing stored"

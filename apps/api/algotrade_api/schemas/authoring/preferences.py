@@ -1,4 +1,5 @@
-"""``PUT`` / ``DELETE /preferences/views/{scope}/view``: a user's views of a table."""
+"""``PUT`` / ``DELETE /preferences/views/{scope}/view``: a user's views of a table;
+``PUT /preferences/appearance``: their Light / Dark / System choice."""
 
 from pydantic import BaseModel, Field
 
@@ -37,3 +38,11 @@ class TableView(Schema):
 
 class ViewNames(Schema):
     names: list[str] = Field(description="the user's named views of this table, sorted")
+
+
+class AppearanceBody(BaseModel):
+    theme: str = Field(description="light, dark or system (the device decides)")
+
+
+class Appearance(Schema):
+    theme: str = Field(description="the saved choice: light, dark or system")

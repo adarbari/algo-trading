@@ -43,11 +43,18 @@ describe.each(THEMES)('%s palette', (_name, palette) => {
 });
 
 describe('tokens.css', () => {
-  it('is dark-first with light and system overrides', () => {
+  it('is dark-first with an explicit light and a system fallback for an absent attribute', () => {
     const css = renderTokensCss();
     expect(css).toContain(`--color-bg: ${dark.surface.bg};`);
     expect(css).toContain(":root[data-theme='light']");
     expect(css).toContain('@media (prefers-color-scheme: light)');
+    // The fallback covers "system" and no attribute at all, never an explicit dark.
+    expect(css).toContain(":root:not([data-theme='dark'])");
+    const fallback = css.slice(css.indexOf('@media (prefers-color-scheme: light)'));
+    expect(fallback).toContain('color-scheme: light;');
+    expect(fallback.indexOf("[data-updown='cvd']")).toBeGreaterThan(
+      fallback.indexOf(`--color-bg: ${light.surface.bg};`),
+    );
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
   });
 });
