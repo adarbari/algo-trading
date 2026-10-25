@@ -72,14 +72,28 @@ listings, with S&P 500 intervals), so `pre_snapshot` no longer applies. Measured
    else ACQUIRED counts as 0; else BANKRUPTCY or STANDARDS take the owner's rule (decision 1); else 0, counted. The
    report gets a `DELISTINGS` section (counts by basis and reason) and shows the zero-convention figure beside
    the verdict. The edge-leg version is bumped, so the first run after it is a full one.
-6. **Left disclosed:** G5, G6, null types before 2017, ETF closures before 2016, renamed S&P 500 members until PR7,
+6. **The run stamp `universe_basis` (`survivors` | `free`)** (asked for by the ADR 0065 amendment, PR #967, so a post-publication verdict knows what it was measured on). The harness writes it in each run's stats
+   (`stats["universe_basis"]`, with `universe_basis_gaps`, the failed conditions) for the evaluated window
+   `[from, to]`; `free` only when **all** hold, otherwise `survivors`:
+   (a) the merged listing history (PR2) is the one `universe_asof` read, and the share of its qualifying
+   listings alive in the window with no id is at most `max_no_id_share`; (b) the share of names that delisted
+   in the window with bars to their last bar is at least `min_delisted_bars_share`; (c) `events/delisting` rows
+   exist for the window's delisted names and the share with `delisting_basis` UNKNOWN is at most
+   `max_unknown_delisting_share`; (d) the window's outcomes are `forward_returns@v3` (the delisting return
+   applied); (e) the share of names with a null `security_type` is at most `max_null_type_share`. Until
+   PR2 and PR6 exist the stamp is always `survivors`. The thresholds live in `config/site/verdict.toml`
+   `[universe_basis]`; **proposed values** (the owner can change them): 1%, 98%, 5%, 5%. Null types before
+   2017 (6,739 Massive rows) may keep early windows `survivors` until a proxy or another type source is
+   accepted: that is the intended answer, not a bug. The predicate is computed in `services/evaluation`
+   from counts the data layer returns (`data.listings`); the verdict rule reads only the stamp.
+7. **Left disclosed:** G5, G6, null types before 2017, ETF closures before 2016, renamed S&P 500 members until PR7,
    and that the NASDAQ rule uses each name's final exchange (G8).
 
 ## Plan (PRs; PR4 and PR5 are file-disjoint after PR2)
 PR1 this ADR, the adapter, the table, the task, the reader and tests, not run on the real store. PR2 merge, ids
 and types (architect review). PR3 the owner's runs (below). PR4 the `filings` task for delisted CIKs (the D1 / D10
-Form 25 follow-up). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3` and the harness
-disclosure (architect review). PR7 S&P 500 renames through Massive ticker events (probe first) and the 2024-26
+Form 25 follow-up). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3`, the harness
+disclosure and the `universe_basis` stamp (architect review). PR7 S&P 500 renames through Massive ticker events (probe first) and the 2024-26
 `EQ:<symbol>` bars migration (800 listings with no id have bars stored under `EQ:<symbol>` on 2025-06-02).
 
 **Backfill** (detached, README "Long runs"): Massive inactive list ~6 minutes; Tiingo meta ~35 batches; Tiingo bars
