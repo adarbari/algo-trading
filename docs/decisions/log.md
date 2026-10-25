@@ -751,3 +751,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's word in chat, 2026-10-24 ("Yes, i approve"), as relayed by the coordinator.
+
+## 2026-10-24 | Edge verdicts | A post-publication out-of-sample basis for research setups
+- Question: 63 of 66 setups read Not enough data because every out-of-sample period starts 2026-04-01 (5 or 6 independent decisions for a monthly setup against 40 needed); can a setup taken from published research be judged on the years after its paper's sample, without lowering `min_oos_trades = 40`?
+- Options: (1) forward-only, wait / (2) lower the 40 / (3) a second, separately labelled basis from the end of the paper's sample, for eligible research setups only.
+- Decision: (3). Split = end of the source paper's sample period, recorded in the site edge document; eligible only when our rule matches the paper's and the trial log shows no variant chosen after seeing results; our own setups stay forward-only; `min_oos_trades = 40` unchanged, no counting of overlapping windows or names; the two bases are never blended (UI: "backtested (hypothetical), after publication <years>" and "forward paper record since 2026-04-01"); verdicts on it need the survivorship-free universe, until then they carry the caveat and cannot be Works. Written as the ADR 0065 amendment 2026-10-25 (PR "ADR 0065 amendment: post-publication basis"); points left to the owner are listed in it and in the PR.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-10-24, as relayed by the coordinating session; the first credible verdicts should not wait a year for a monthly setup to collect 40 forward decisions, and the post-publication years are the agreed honest fast track.
