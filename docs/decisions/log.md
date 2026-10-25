@@ -751,3 +751,13 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's word in chat, 2026-10-24 ("Yes, i approve"), as relayed by the coordinator.
+
+## 2026-10-24 | Workflow-first trader site (ADR 0083) | TRADER bar, verdict-backed Ideas, historical exit rule, product rules
+- Question: how does the paid trader product's site fit the workflow (find, check, test) and what are its list and legal rules?
+- Options: as proposed in the use-case brief and workflow design (research artifacts of the 2026-10-24 sessions).
+- Decision: TRADER bar Ideas, Setups, Test, Calendar; Explore by ⌘K; Backtests dropped; Settings (no account size or risk profile); Ideas from the picks of setups with a stored verdict `works` / `promising`, one ranking rule, licence-filtered per viewer, cap 15, "Unproven" until one exists, no per-viewer index; the setup's historical exit rule (stop = the drawdown 80% of winning trades never exceeded, fallback 2 x ATR(14), hold = horizon); product rules (one nightly batch, no alerts or broker links, "publishes setups", the model only translates, every statistic labelled backtested (hypothetical) or forward paper record, methodology and risk statement, US-only launch).
+- decided by: owner
+- status: final
+- Note: the owner accepted the recommended answers on the ADR's gaps (2026-10-25, relayed by the orchestrating session: "Accept the recommended answers on #966, #967 and #968."): evidence strength = verdict level, then `lift_pts`, then out-of-sample trades; Regime and Explore off the bar but routed; the brief carries the shared list only; Unproven keeps today's size rule.
+- Note: recorded in ADR 0083, which supersedes the 2026-10-22 "Ideas ranking rule, store and licence" index decision. The legal rules are research, not counsel's opinion.
+- Reasoning: the research found two open jobs at $20-100 (an evidence-backed shortlist, an honest test); the bar follows them and the list rests only on stored verdicts.

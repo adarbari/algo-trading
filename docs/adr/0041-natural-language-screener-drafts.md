@@ -1,6 +1,6 @@
 # ADR 0041: Natural-language screener drafts through a swappable text model
 
-**Status:** accepted (2026-10-05; owner decision; implementation: roadmap NL1), amended
+**Status:** accepted (2026-10-05; owner decision; implementation: roadmap NL1), amended by [0083](0083-workflow-first-trader-site.md) (2026-10-24: the model only translates; the 2026-10-11 `suggestions` are removed), amended
 2026-10-06 (the prompt also carries two worked examples and a site phrasebook,
 `config/site/phrasebook.toml`: trader vocabulary mapped to catalogue fields with threshold
 hints, so a free model maps "momentum" or "near the low" the way the owner means; the owner
