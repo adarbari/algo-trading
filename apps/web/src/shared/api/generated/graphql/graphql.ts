@@ -92,6 +92,13 @@ export type IndicatorStatus =
   | 'ON'
   | 'UNKNOWN';
 
+/** Why an operating company has no value */
+export type KnownGap =
+  | 'BLANK_CHECK'
+  | 'NO_CIK'
+  | 'NO_FACTS'
+  | 'NO_ROW';
+
 /** What a session newer than the one served is doing */
 export type NewerState =
   | 'FAILED_RETRYING'
@@ -546,7 +553,7 @@ export type IngestionCompletenessQueryVariables = Exact<{
 }>;
 
 
-export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null, chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null };
+export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null, chainCoverage: { session: string, total: number, ok: number, share: number, chronic: number, chronicNames: Array<string>, previousChronic: number | null, drift: Array<string>, statuses: Array<{ code: string, count: number }>, tiers: Array<{ tier: string, total: number, ok: number, stale: number }> } | null, knownCoverage: { session: string, runId: string | null, byType: Array<{ securityType: string, names: number, rows: number, known: number, share: number | null }>, gaps: Array<{ gap: KnownGap, names: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null } | null };
 
 export type IngestionCellQueryVariables = Exact<{
   dataset: string;
@@ -3157,6 +3164,36 @@ export const IngestionCompletenessDocument = new TypedDocumentString(`
     chronicNames
     previousChronic
     drift
+  }
+  knownCoverage {
+    session
+    runId
+    byType {
+      securityType
+      names
+      rows
+      known
+      share
+    }
+    gaps {
+      gap
+      names
+    }
+    unknown {
+      code
+      kind
+      guideTerm
+      kindText
+      cause {
+        links {
+          level
+          subject
+          status
+          message
+          runId
+        }
+      }
+    }
   }
 }
     `) as unknown as TypedDocumentString<IngestionCompletenessQuery, IngestionCompletenessQueryVariables>;

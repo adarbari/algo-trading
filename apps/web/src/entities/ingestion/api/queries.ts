@@ -46,6 +46,36 @@ const IngestionCompleteness = graphql(`
       previousChronic
       drift
     }
+    knownCoverage {
+      session
+      runId
+      byType {
+        securityType
+        names
+        rows
+        known
+        share
+      }
+      gaps {
+        gap
+        names
+      }
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+    }
   }
 `);
 
@@ -109,6 +139,14 @@ function completenessQuery(sessions = SESSIONS) {
 /** Start the grid's read before the page mounts (a route loader); the hooks then join it. */
 export function prefetchCompleteness(client: QueryClient, sessions = SESSIONS): void {
   void client.query(completenessQuery(sessions)).catch(() => undefined);
+}
+
+/** The fundamentals share count known against rows stored (rides the grid's read); null: nothing stored. */
+export function useKnownCoverage() {
+  return useQuery({
+    ...completenessQuery(SESSIONS),
+    select: (data) => data.knownCoverage,
+  });
 }
 
 /** The grid; null: nothing stored. */

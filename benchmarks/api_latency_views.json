@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24 11:38 UTC",
+ "generated": "2026-10-24 22:50 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -220,13 +220,15 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
-    "GuideHelpField"
+    "GuideHelpField",
+    "TableView"
    ],
    "uncertain": [
     "EdgeResultDrawdown",
     "EdgeResultHorizons",
     "EdgeResultRegimes",
-    "GuideHelpField"
+    "GuideHelpField",
+    "TableView"
    ],
    "interaction": [
     "GuideEntries",
@@ -337,13 +339,15 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
-    "GuideHelpField"
+    "GuideHelpField",
+    "TableView"
    ],
    "uncertain": [
     "EdgeResultDrawdown",
     "EdgeResultHorizons",
     "EdgeResultRegimes",
-    "GuideHelpField"
+    "GuideHelpField",
+    "TableView"
    ],
    "interaction": [],
    "source": "static"
@@ -514,7 +518,8 @@
     "RegimeBands"
    ],
    "interaction": [
-    "GuideEntries"
+    "GuideEntries",
+    "TableView"
    ],
    "source": "static"
   },
@@ -1508,10 +1513,12 @@
     "EdgeDesk",
     "FilterSet",
     "GuideHelpField",
-    "IdeasPage"
+    "IdeasPage",
+    "TableView"
    ],
    "uncertain": [
-    "GuideHelpField"
+    "GuideHelpField",
+    "TableView"
    ],
    "interaction": [
     "GuideEntries"
@@ -1593,9 +1600,12 @@
     "ScreenerConfigs",
     "ScreenerListPage",
     "ScreenerRuns",
-    "ScreenerTrackRecords"
+    "ScreenerTrackRecords",
+    "TableView"
    ],
-   "uncertain": [],
+   "uncertain": [
+    "TableView"
+   ],
    "interaction": [
     "GuideEntries",
     "GuideHelpField"
@@ -1617,7 +1627,8 @@
    ],
    "uncertain": [
     "GuideHelpField",
-    "ScreenerResults"
+    "ScreenerResults",
+    "TableView"
    ],
    "interaction": [
     "GuideEntries",

@@ -45,6 +45,7 @@
 "src/widgets/harness-run-detail/ui/HarnessRunDetail.tsx" = "detail of one harness run: its checks, fixed rows"
 "src/widgets/harness-run-list/ui/HarnessRunList.tsx" = "admin harness run history, not yet on the bar (follow-up: a harness-runs surface)"
 "src/widgets/holdings-panel/ui/HoldingsPanel.tsx" = "one fund's top holdings, a fixed top-N list"
+"src/widgets/known-coverage-panel/ui/KnownCoveragePanel.tsx" = "admin detail panel: the security types of one dataset and the few causes of a gap, fixed rows"
 "src/widgets/options-panel/ui/OptionsPanel.tsx" = "one instrument's option chain tables (strike ladder), not a browsable list"
 "src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx" = "detail panel: the fixed list of quality checks of one run"
 "src/widgets/regime-episodes/ui/RegimeEpisodes.tsx" = "a handful of named regime episodes"
