@@ -19,12 +19,13 @@ Above range: it is over the end of the range. That is good news that deserves th
 because a lucky start fades.
 Too few settled trades: fewer signal sessions have closed than the site's minimum. The rate
 swings too widely to judge yet.
-No live record: the edge has no paper trades yet, since a site edge is recorded only once it is
-evidenced or live. The sentence also says when there is no backtest to compare with.
-Not recording: the edge does not take paper trades yet, so there is nothing to judge. A site
-edge is recorded once it is evidenced, and one of your own once you set it live; a candidate
-never is. The Live record section says so instead of staying empty, and the Live filter of the
-trades is off for it. It is not a bad result and not a missing one: paper trading has not started.
+No live record: the edge has no paper trades yet, since its record starts the first night after
+it was opened for recording. The sentence also says when there is no backtest to compare with.
+Not recording: the edge does not take paper trades, so there is nothing to judge. An open site
+setup (candidate, evidenced or live) is recorded; one of your own is recorded once you set it
+live; a draft, a retired or rejected setup is not. The Live record section says so instead of
+staying empty, and the Live filter of the trades is off for it. It is not a bad result and not a
+missing one: nothing is being recorded.
 Not yet settled: the session's nightly has not completed, so no settlement is read and nothing
 is judged until it has.
 The Ideas page shows a banner when an edge you follow, or a site edge, is below range. The

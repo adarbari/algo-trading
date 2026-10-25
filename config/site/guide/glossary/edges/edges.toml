@@ -303,9 +303,10 @@ term = "Paper trading"
 short = "What an edge of yours would have bought and sold, recorded every night as it happens."
 body = """
 Paper trades are recorded by an edge's owner, never by a follower. An edge records while it is
-evidenced or live. A site edge records once, for the site, and every follower of it reads that
-record. An edge of your own records for you alone, once you make it live. A candidate or
-researching edge records nothing. A retired or rejected one takes no new picks, though open
+open. A site edge is open from candidate to live, and a candidate's forward record is unproven,
+not absent. A site edge records once, for the site, and every follower of it reads that record.
+An edge of your own records for you alone, once you make it live. One of your own that is a draft
+or a candidate records nothing. A retired, rejected or blocked one takes no new picks, though open
 trades still settle. Following is only a bookmark and creates no paper trades.
 Each night the app takes the picks of the recording edge's screen, using only what was known
 that night and the owner's presets, never a follower's. It records them as paper trades: the
@@ -351,8 +352,8 @@ term = "Forward test"
 short = "A new version of an edge tried on live paper trades beside the edge it would replace."
 body = """
 A new version of an edge is a candidate first, tried on paper next to the version it would
-replace over the same nights' picks. A candidate records no paper trades itself (only an
-evidenced or live edge does, see Paper trading), so there is nothing to compare until it is live.
+replace over the same nights' picks. A candidate of your own records no paper trades itself (only
+a live one does, see Paper trading), so there is nothing to compare until it is live.
 It can go live and retire the old one once the site's number of sessions have passed and its win rate is not behind.
 Replacing earlier is allowed, but the edge then carries the label replaced without a forward test.
 The backtest of a version you have tuned looks better than it will do going forward.
@@ -367,10 +368,11 @@ short = "What the nightly run did for a followed edge on the session, so an empt
 body = """
 Signalled: the edge was due and its picks are listed as buys. No picks: it was due but its screen
 qualified no name. Not due: its schedule does not fire on this session (an edge held for 20
-sessions signals about once a month). Skipped: it was due but could not be signalled, and the reason says why (an input table was missing, the edge is not paper traded yet). It is never an empty record. Not run: the nightly has no finished run for the session. Missed counts due
+sessions signals about once a month). Skipped: it was due but could not be signalled, and the reason says why (an input table was missing, the edge's outcome is not one the record trades). It is never an empty record. Not run: the nightly has no finished run for the session. Missed counts due
 sessions between nights that nobody signalled, kept so a gap is never silent.
-Not recording: the nightly ran, but this edge is not evidenced or live, so it takes no new
-picks. A candidate, a retired edge and a site edge the site has not evidenced are not recording.
+Not recording: the nightly ran, but this edge is not open for recording, so it takes no new
+picks. A draft, a retired, rejected or blocked edge, and an edge of your own that is not live,
+are not recording.
 """
 see_also = ["paper_trading", "live_record"]
 

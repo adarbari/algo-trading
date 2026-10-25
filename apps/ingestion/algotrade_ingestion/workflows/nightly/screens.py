@@ -16,8 +16,8 @@ want of a table whose backfill is declared under way (``while_backfilling``, ADR
 amendment 2026-10-20).
 
 The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the owner's tonight picks of
-its evidenced or live edges (a follower's bookmark trades nothing) and settles the open paper
-trades whose outcome is stored
+its open edges (``loading.records_paper``; a follower's bookmark trades nothing) and settles the
+open paper trades whose outcome is stored
 (``services/evaluation/forward``). When an edge the owner records is below its usual range (the
 read model's live state, ADR 0064 decision 9) the step adds one WARN line naming it and keeps the
 names in its result: nothing is pushed or sent. It needs ``screens`` (settlement leaves a trade

@@ -6,12 +6,15 @@ import contextlib
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
+import pytest
 
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.user import SITE_USER, UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.data.paper import job_name, read_paper, read_stored
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
+from algotrade.services.evaluation.forward import results
 from algotrade.services.evaluation.forward.results import MISSED, paper_owners, run_night
 from algotrade.services.evaluation.forward.settle import outcome_hash
 from algotrade.services.evaluation.forward.signals import advance
@@ -363,8 +366,8 @@ def test_a_follower_of_a_site_edge_gets_no_trades_from_the_nightly() -> None:
     assert set(shared(d)["user_id"]) == {SITE_USER} and len(shared(d)) == 5
 
 
-def test_a_site_edge_records_while_evidenced_or_live_and_a_retired_one_only_settles() -> None:
-    for status, rows in (("candidate", 0), ("researching", 0), ("rejected", 0), ("evidenced", 5),
+def test_a_site_edge_records_from_candidate_to_live_and_a_retired_one_only_settles() -> None:
+    for status, rows in (("researching", 0), ("rejected", 0), ("candidate", 5), ("evidenced", 5),
                          ("live", 5)):  # fmt: skip
         d = site_desk(status=status, followers=())
         result, record = site_night(d, DAYS[0])
@@ -433,8 +436,8 @@ def test_a_followers_old_rows_settle_but_stay_out_of_the_shared_record() -> None
 def test_a_record_that_was_broken_starts_afresh_when_the_edge_records_again() -> None:
     d = site_desk(followers=())
     site_night(d, DAYS[0])  # evidenced: a record begins at DAYS[0] (due every second session)
-    candidate = site_desk(d.world, followers=(), status="candidate")
-    site_night(candidate, DAYS[1])  # a complete night that does not list the edge breaks the run
+    draft = site_desk(d.world, followers=(), status="researching")
+    site_night(draft, DAYS[1])  # a complete night that does not list the edge breaks the run
     _, again = site_night(d, DAYS[3])  # DAYS[0]'s cadence says not due; a fresh start is due
     assert again.stats["tonight"]["drift"]["state"] == "signalled"
 
@@ -493,3 +496,48 @@ def test_a_residual_edge_without_residual_rows_waits_and_never_stops_the_settlem
     skipped = book(d, until=late).query("signal_session == @DAYS[0]")
     assert set(skipped["status"]) == {"skipped"}
     assert set(skipped["reason"]) == {"no residual return stored for its window"}
+
+
+def test_a_site_candidate_records_and_settles_with_its_raw_return_and_licence() -> None:
+    """The product's forward record covers every open site setup: a candidate's picks are written
+    open (no return, the licence of what they were read from), and settle with the name's own
+    ``fwd_return`` beside the excess return."""
+    d = site_desk(followers=(), status="candidate")
+    result, _ = site_night(d, DAYS[0])
+    assert result.signalled == {"drift": 5}
+    opened = shared(d)
+    assert set(opened["status"]) == {"open"} and opened["return"].isna().all()
+    assert set(opened["licence"]) == {"open"}
+    site_night(d, SELL)
+    settled = shared(d)
+    assert set(settled["status"]) == {"won"}
+    assert settled["return"].notna().all() and settled["excess_return"].notna().all()
+    assert (settled["return"] > 0).all()  # the name's own price return over the window
+
+
+def test_an_own_candidate_is_not_recorded_only_a_live_edge_of_a_user_is() -> None:
+    result, _ = run_night(*_own(desk(status="candidate")), UserContext("u1"), DAYS[0], NOW)
+    assert result.rows == 0
+    live, _ = run_night(*_own(desk(status="live")), UserContext("u1"), DAYS[0], NOW)
+    assert live.rows == 5
+
+
+def _own(d: Desk):  # type: ignore[no-untyped-def]
+    return d.world.reader, d.world.results, d.configs
+
+
+def test_an_outcome_that_cannot_be_settled_leaves_its_trades_open_and_never_stops_the_night(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    d = site_desk(followers=(), status="candidate")
+    site_night(d, DAYS[0])
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise ConfigurationError("drift: pair_spread needs the siblings")
+
+    monkeypatch.setattr(results, "settle_group", refuse)
+    result, _ = site_night(d, SELL)
+    assert result.settled == {} and result.rows == 0  # a fixed definition settles them later
+    assert [s["edge"] for s in result.skipped] == ["drift"]
+    assert "pair_spread" in result.skipped[0]["reason"]
+    assert set(shared(d)["status"]) == {"open"}

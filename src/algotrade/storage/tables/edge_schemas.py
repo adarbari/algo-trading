@@ -141,21 +141,27 @@ WINNERS_STUDY = fixed(
 # ``reason`` (never a loss, never a zero); ``delisted`` marks a name measured to its last bar;
 # ``outcome_hash`` fingerprints the edge's [outcome] at the signal, so a trade is never judged by
 # a definition the user edited afterwards. ``buy_session`` is the entry session S,
-# ``sell_session`` the window's close, both from the trading calendar.
+# ``sell_session`` the window's close, both from the trading calendar. ``return`` is the name's
+# raw ``fwd_return`` over the window (``forward_returns@v2``, no benchmark, no cost), set when the
+# trade settles and null while open, skipped, for an option P&L outcome (the chain grain's
+# ``fwd_return`` is the option's) or in a row written before the column (the Past lists read it).
+# ``licence`` is the strictest data licence of what the picks were read from (``detail.licences``),
+# recorded at the signal: a reader hides a name from a viewer who does not hold it (ADR 0064
+# decision 10); null in a row written before the column reads as open.
 EDGE_PAPER = fixed(
     "results/edge_paper",
     "results",
     ("user_id", "edge_id", "signal_session", "instrument_id"),
     "instrument_id string!",
     *strings("user_id", "edge_id", "config_hash", "outcome_hash", "screener", "status"),
-    *strings("reason"),
+    *strings("reason", "licence"),
     "signal_session date!",
     "buy_session date",
     "sell_session date",
     "horizon_sessions int64",
     "rank int64",
     "delisted bool",
-    *floats("excess_return"),
+    *floats("excess_return", "return"),
     runs="merge",
     key=("user_id", "edge_id", "signal_session", "instrument_id"),
 )  # fmt: skip

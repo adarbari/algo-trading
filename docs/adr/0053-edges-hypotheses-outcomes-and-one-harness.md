@@ -500,8 +500,8 @@ for one thing is removed.
    the files, idempotently and atomically. Both go once every file is migrated (PR 5).
 6. **Paper trades follow the edge's owner (replaces the follow-based rule of the 2026-10-09
    amendment, item 7; owner decision 2026-10-10).** An edge records while its status is
-   `evidenced` or `live` (`config.edges.loading.RECORDING`); a user cannot set `evidenced`, so
-   their own edge records from `live`. The record's owner is `site` for a site edge, else the
+   `evidenced` or `live` (`RECORDING`; a site edge from `candidate`, ADR 0064 amendment
+   2026-10-24); a user cannot set `evidenced`, so their own edge records from `live`. The record's owner is `site` for a site edge, else the
    user whose edge it is: `results/edge_paper` and its key are unchanged, `user_id` now means the
    record owner (no migration), and the nightly runs one `edge-signals` job per record owner
    (`site` first), under that owner's context, so a follower's own presets and universes never

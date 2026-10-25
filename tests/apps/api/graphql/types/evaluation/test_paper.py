@@ -34,8 +34,9 @@ def test_a_user_who_follows_nothing_gets_an_empty_desk(graph: Graph) -> None:
     desk = body["data"]["edgeDesk"]
     assert desk["session"] == "2022-11-23" and desk["sellSession"] > desk["session"]
     assert desk["buys"] == desk["sells"] == desk["followed"] == []
-    # every site edge has a state: none is recorded yet, said, never absent
-    assert {s["state"] for s in desk["liveStates"]} == {"not_recording"}
+    # every site edge has a state, said, never absent: an open one records (nothing settled yet),
+    # a draft or a closed one records nothing
+    assert {s["state"] for s in desk["liveStates"]} == {"no_trades", "not_recording"}
     assert all(s["followed"] is False and s["closed"] == 0 for s in desk["liveStates"])
 
 

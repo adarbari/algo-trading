@@ -180,3 +180,48 @@ from the edge document's outcome, `verdict.counts_wins`).
 - The ledger of a run older than 45 days is gone unless it is canonical, the latest for its edge
   and user, or cited.
 - REST gains one GET (shrink-only list raised by this amendment only).
+
+## Amendment 2026-10-24: who is paper traded, every open site setup (ADR 0053 item 6)
+Owner request 2026-10-24 (ADR 0083: the cards show a setup's forward paper record beside its
+backtest; no setup is evidenced yet, 63 of 66 verdicts read not enough data, so under the first
+sentence of ADR 0053's 2026-10-10 item 6 the record was empty for all of them, and each unrecorded
+day is forward evidence that cannot be recovered). **Replaces that sentence** ("An edge records
+while its status is `evidenced` or `live`"); the rest of item 6 stands (record owner, one `site`
+record, `since` is the first night of the unbroken run, retired and rejected take no new picks and
+settle).
+
+1. **Recording is its own notion, not a verdict.** `config.edges.loading.records_paper(status,
+   site)`: a SITE edge records from `candidate` to `live` (`SITE_RECORDING`); a user's own edge
+   from `live` only (`RECORDING`: a user can set `candidate` freely, and a draft of theirs is no
+   one's evidence). `researching`, `retired`, `rejected` and `blocked` take no new picks. Status
+   semantics, verdicts and the ADR 0065 basis rules are unchanged: `evidenced` still means the
+   verdict cleared its bar, and a candidate's paper record is unproven (its live state is
+   `too_early` until `live_min_sessions` signal sessions have closed).
+2. **One predicate, three callers.** The nightly (`forward/signals.paper_traded`, so
+   `results.paper_owners` and `run_night`) and the read model (`edge_desk/states.is_recording`)
+   use it; `Edge.paper_traded` (the user's desk: followed, or their own live) is unchanged. The
+   nightly's below-range WARN line stays for `evidenced` / `live` edges: a candidate shows its
+   state and raises no warning.
+3. **A setup the record cannot trade says why and never stops the night.** `_not_possible` also
+   refuses a `portfolio_return` book (valued whole, never name by name), and `_missed` leaves it
+   out; a settlement that raises `ConfigurationError` leaves that edge's trades open, lists the
+   reason in the run's `skipped` and skips them only once `GRACE_SESSIONS` have passed
+   (`results._settlements`), instead of failing the owner's night for every setup. The nightly's
+   below-range line judges every row (`load_trades(redact=False)`: it names an edge, never a name).
+4. **Licence.** Each row records `licence`, the strictest licence of what its picks were read from
+   (`detail.licences.picks_licence`: the screen's and universe's features and the implied vol
+   field), at the signal. `edge_desk/paper.load_trades` reads no name whose recorded licence the
+   viewer does not hold and so counts it nowhere (decision 10); null (a row from before the
+   column) reads as open.
+5. **`return`.** A new nullable float column of `results/edge_paper` beside `excess_return`: the
+   name's own `fwd_return` over the window (`forward_returns@v2` through `read_outcomes`, read
+   before any residual attaches), set when the trade settles; null while open, skipped, for an
+   option P&L (the chain grain's `fwd_return` is the option's) and in rows from before the column
+   (a fixed table gives a missing column null on merge). Read as `PaperTrade.raw_return`.
+6. **Known differences, disclosed.** The record's decision sessions are spaced a horizon apart from
+   the first night the job saw the edge (`since`), while `results/edge_picks` (Ideas) follows the
+   document's schedule, so the days of the two differ. The "forward paper record since" date is the
+   record's own first night, never a status date. The nightly now re-runs the screen of every open
+   site setup; its cost on the serving path is estimated, not measured (see the PR).
+
+No backfill is possible or wanted: the record starts the first night the job lists the edge.
