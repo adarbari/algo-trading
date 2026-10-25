@@ -2,7 +2,8 @@
 
 **Status:** accepted (2026-10-24; owner decisions, taken after the use-case research and the
 workflow design; an architect reviewed the build slices). Amends
-[0025](0025-frontend-architecture.md) (the TRADER sections), [0069](0069-data-licence-gate.md) (for Ideas a withheld pick is dropped, not shown by name) and
+[0025](0025-frontend-architecture.md) (the TRADER sections), [0069](0069-data-licence-gate.md) (for Ideas a withheld pick is dropped, not shown by name), [0053](0053-edges-hypotheses-outcomes-and-one-harness.md)
+(amendment 2026-10-22: `results/edge_verdict` gains the basis columns) and
 [0041](0041-natural-language-screener-drafts.md) (the model only translates: its `suggestions`
 go). Supersedes [0029](0029-rule-screener.md) decision 9 (Ideas is the viewer's screener pool)
 for the Ideas list, and the 2026-10-22 amendment of [0005](0005-ingestion-is-the-only-writer.md)
@@ -63,8 +64,10 @@ still owed before anyone is charged.
      module names the table.
    - *Point in time.* For session S the verdict and the ledger are what was knowable at S: the
      canonical run used has `range_to <= S` (a newer committed run is disclosed, not used; today
-     `runs.load_canonical_run` takes the latest committed run whatever S is, so it gains the
-     session bound), and ledger trades count only with `exit_session <= S`. An explicit past date
+     `runs.load_canonical_run` takes the latest committed run whatever S is, so it gains an
+     optional session bound that every caller with a session in context passes, the Setups page
+     and the stored verdict included, so they name the same canonical run; the ledger purge has
+     no session and stays unbounded), and ledger trades count only with `exit_session <= S`. An explicit past date
      therefore reads the verdict then, not today's.
    - *The basis is a stored fact.* `results/edge_verdict` gains `basis_screener` and
      `basis_horizon` (today `basis` is only the words "screener, N trading days" and
@@ -119,8 +122,8 @@ still owed before anyone is charged.
    - *Fallback.* With fewer winning trades than a configured minimum (a `[exit_rule]` setting,
      value chosen in the implementing PR), the stop is 2 x `momentum.atr_14@v1` at the session,
      labelled "fallback: 2 x ATR(14), not from this setup's history".
-   - *Hold* is the edge document's `[outcome] horizon_sessions`, the horizon of the verdict's
-     basis.
+   - *Hold* is the verdict's stored `basis_horizon` (a session count; the document's
+     `[outcome] horizon_sessions` is a list of which it is one).
    - *Unknown, never filled.* A missing input (no ledger, no `atr_14` row for the session, no
      basis) is UNKNOWN with its reason (ADRs 0036, 0062). Long picks only (ADR 0081 decision 4).
      No position size, no stored account profile. If the percentile is too slow for a page it is
@@ -158,8 +161,9 @@ still owed before anyone is charged.
      ADR; this ADR fixes the rule.
 
 ## Consequences
-- The bar matches the workflow (Find, Check, Learn, Test); Backtests leaves the docs; old
-  `/screeners*` and `/edges/new` and `/edges/$id/edit` URLs redirect, so bookmarks and Guide links keep working.
+- The bar matches the workflow (Find, Check, Learn, Test); Backtests leaves the docs; the
+  redirected URLs (`/screeners`, `/screeners/new`, `/screeners/$id/edit`, `/edges/new`,
+  `/edges/$id/edit`; not the results page `/screeners/$id`) keep bookmarks and Guide links working.
   Guide entries and labels say "setup" where a trader reads them.
 - Until a setup earns `works` or `promising` the home page is the Unproven section, honestly
   labelled; 63 of 66 setups read `not_enough_data` today, so that is the first state.
