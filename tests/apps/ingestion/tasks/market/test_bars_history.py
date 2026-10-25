@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
-from algotrade.data.events import read_events
+from algotrade.data.events import read_events, stored_events
 from algotrade.data.prices import FLAGS_TABLE
 from algotrade.services.events.fill import IV_HISTORY, PRICE_STATS
 from algotrade.services.events.scope import LIQUIDITY
@@ -26,13 +26,15 @@ from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from tests.helpers.ingest_fakes import FIXED, http_for, task_ctx
 from tests.helpers.payloads import tiingo as payloads
-from tests.helpers.rollup_store import write_split
+from tests.helpers.rollup_store import write_dividends, write_split
 from tests.helpers.stored_frames import stamped, write_reference
 
 SINCE, UNTIL = date(2020, 1, 1), date(2020, 1, 7)
 DAYS = ["2020-01-02", "2020-01-03", "2020-01-06"]
 IDS = {"AAA": "EQ:AAA", "BBB": "EQ:BBB", "CCC": "EQ:CCC"}
 BARS = "bars/1d"
+DIVIDENDS = "events/dividend"
+UNTIL_2 = date(2020, 1, 14)
 
 
 class Vendor:
@@ -562,16 +564,19 @@ def test_tiingo_split_never_shadows_massive_row(writer: StoreWriter) -> None:
     assert list(out["ratio"]) == [2.0, 5.0] and list(out["source"]) == ["test", "tiingo"]
 
 
-def test_bars_and_tiingo_splits_are_published_together_or_not_at_all(
-    writer: StoreWriter, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("broken", ["events/split", DIVIDENDS])
+def test_bars_and_tiingo_actions_are_published_together_or_not_at_all(
+    writer: StoreWriter, monkeypatch: pytest.MonkeyPatch, broken: str
 ) -> None:
-    """Bars without their split would read as a -50% return: one failing write leaves neither."""
+    """Bars without their split would read as a -50% return: one failing write (the splits or
+    the dividends) leaves none of the three."""
     write_listings(writer, [("EQ:TIINGO:US0001", "OLD", "US0001", "2019-06-03", "2020-01-07")])
-    vendor = Vendor({"US0001": payloads.prices(rows(10), {"2020-01-03": 2.0})})
+    payload = payloads.prices(rows(10), {"2020-01-03": 2.0}, {"2020-01-06": 0.1})
+    vendor = Vendor({"US0001": payload})
     real = StoreWriter.write_table
 
     def failing(self: StoreWriter, table: str, *args: object, **kwargs: object) -> None:
-        if table == "events/split":
+        if table == broken:
             raise OSError("disk full")
         real(self, table, *args, **kwargs)  # type: ignore[arg-type]
 
@@ -581,9 +586,82 @@ def test_bars_and_tiingo_splits_are_published_together_or_not_at_all(
     monkeypatch.undo()
     reader = StoreReader(writer._backend)
     assert not any(reader.table(BARS, date.fromisoformat(d)) for d in DAYS)  # no bars either
-    assert not reader.dates("events/split")
-    run(writer, vendor, (), from_listings=True)  # the retry publishes both
+    assert not reader.dates("events/split") and not reader.dates(DIVIDENDS)
+    run(writer, vendor, (), from_listings=True)  # the retry publishes all three
     assert len(stored(writer, DAYS[0])) == 1 and len(_splits(writer)) == 1
+    assert len(_dividends(writer)) == 1
+
+
+def _dividends(writer: StoreWriter) -> pd.DataFrame:
+    return read_events(StoreReader(writer._backend), DIVIDENDS, date(2000, 1, 1), UNTIL_2).frame
+
+
+def test_tiingo_dividends_fill_only_the_history_before_another_source(
+    writer: StoreWriter,
+) -> None:
+    """Massive's history starts at its first stored ex-date (BBB's 2020-01-06): AAA's 2020-01-03
+    divCash becomes a row (as given, the ex-date, ``known_from`` the ex-date), AAA's 2020-01-13
+    does not (Massive's era: its rows carry what Tiingo lacks), nor BBB's 2020-01-03 (within
+    5 days of a stored row: one distribution dated apart would be counted twice)."""
+    write_dividends(writer, [("EQ:BBB", date(2020, 1, 6), 0.5, "recurring")], date(2020, 1, 7))
+    days = [*DAYS, "2020-01-13"]
+    vendor = Vendor(
+        {
+            "AAA": payloads.prices(rows(10, days), None, {"2020-01-03": 0.25, "2020-01-13": 0.3}),
+            "BBB": payloads.prices(rows(20, days), None, {"2020-01-03": 0.5}),
+        }
+    )
+    record = run(writer, vendor, until=UNTIL_2)
+    out = _dividends(writer)
+    tiingo = out[out["source"] == "tiingo"].to_dict("records")
+    assert record.stats["tiingo_dividend_rows"] == 1 and len(tiingo) == 1
+    row = tiingo[0]
+    assert (row["instrument_id"], row["symbol"], row["cash_amount"]) == ("EQ:AAA", "AAA", 0.25)
+    assert row["ts"] == pd.Timestamp("2020-01-03", tz="UTC")
+    assert pd.Timestamp(row["known_from"]).date() == date(2020, 1, 3)
+    assert list(out.sort_values("ts")["source"]) == ["tiingo", "test"]
+
+
+def test_a_tiingo_dividend_is_known_from_its_ex_date_never_earlier(writer: StoreWriter) -> None:
+    """No declaration date: the ex-date is the earliest honest knowledge day (ADR 0007). A read
+    by knowledge date (the next-ex-date rollup's) as of the day before does not see it, though
+    the run that stored it ran later; as of the ex-date it does."""
+    vendor = Vendor({"AAA": payloads.prices(rows(10), None, {"2020-01-06": 0.25})})
+    run(writer, vendor, ("AAA",))
+    reader = StoreReader(writer._backend)
+    assert stored_events(reader, DIVIDENDS, date(2020, 1, 3)).empty
+    seen = stored_events(reader, DIVIDENDS, date(2020, 1, 6))
+    assert list(seen["known_from"]) == [date(2020, 1, 6)]
+
+
+def test_tiingo_s_own_dividends_never_move_the_cutoff_or_repeat(writer: StoreWriter) -> None:
+    """With no other source stored every ex-date is written; a forced rerun finds its own rows
+    (not another source's start) and writes none again."""
+    paid = {"2020-01-02": 0.2, "2020-01-06": 0.3}
+    vendor = Vendor({"AAA": payloads.prices(rows(10), None, paid)})
+    assert run(writer, vendor, ("AAA",)).stats["tiingo_dividend_rows"] == 2
+    again = run(writer, vendor, ("AAA",), force=True)
+    assert again.stats["tiingo_dividend_rows"] == 0 and len(_dividends(writer)) == 2
+
+
+def test_actions_only_stores_the_actions_not_the_bars(writer: StoreWriter) -> None:
+    """``--actions-only``: the splits and dividends, no bars and no flags; its items are
+    ``acts:`` (skipped by the next actions-only run), never ``hist:`` (a bars run still fetches
+    the name)."""
+    payload = payloads.prices(rows(10), {"2020-01-03": 2.0}, {"2020-01-06": 0.1})
+    vendor = Vendor({"AAA": payload})
+    record = run(writer, vendor, ("AAA",), actions_only=True)
+    reader = StoreReader(writer._backend)
+    assert record.status is RunStatus.COMPLETE and not reader.dates(BARS)
+    assert not reader.dates(FLAGS_TABLE) and record.stats["actions_only"] is True
+    assert record.items["acts:EQ:AAA"] == "OK: 2020-01-01..2020-01-07"
+    assert "hist:EQ:AAA" not in record.items
+    assert len(_splits(writer)) == 1 and len(_dividends(writer)) == 1
+    run(writer, vendor, ("AAA",), actions_only=True)
+    assert vendor.asked == ["AAA"]  # done for the window
+    run(writer, vendor, ("AAA",))
+    assert vendor.asked == ["AAA", "AAA"] and len(stored(writer, DAYS[0])) == 1
+    assert len(_splits(writer)) == 1 and len(_dividends(writer)) == 1  # never twice
 
 
 def _flags(writer: StoreWriter) -> pd.DataFrame:

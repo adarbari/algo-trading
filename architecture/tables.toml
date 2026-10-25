@@ -117,6 +117,12 @@ note = "ADR 0061: the stored daily bars that cannot be right (reason, status FLA
 [[table]]
 name = "events/dividend"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
+also_written_by = [
+    # Tiingo's divCash for the history before Massive's (ex-dates before the first one another source stored, none
+    # within 5 days of a stored row), known_from = the ex-date (no declaration date), published with the same run's
+    # bars and splits (or alone with --actions-only): the 2002+ dividend history the covered-call backtests need.
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",
+]
 
 [[table]]
 name = "events/earnings"

@@ -25,11 +25,27 @@ def sample() -> bytes:
     return SAMPLE.read_bytes()
 
 
+# RECORDED: six rows of AAPL's ``/tiingo/daily/AAPL/prices`` as the 2026-10-09 ``bars-history``
+# run received them (``raw/source=tiingo``), exactly as sent: the 2014-05-08 dividend (3.29), the
+# 7:1 split of 2014-06-09 and the first dividend after it (0.47), each with the day before.
+# ``divCash`` is per share in the ex-date's share terms (unadjusted: 3.29 before the split, 0.47
+# after it), as Massive's ``cash_amount``.
+AAPL_2014_SLICE = (
+    REPO_ROOT / "tests" / "fixtures" / "sources" / "tiingo" / "daily_prices_aapl_2014_slice.json"
+)
+
+
+def aapl_2014_slice() -> bytes:
+    return AAPL_2014_SLICE.read_bytes()
+
+
 def prices(
     rows: Iterable[tuple[str, float, float, float, float, float]],
     splits: dict[str, float] | None = None,
+    dividends: dict[str, float] | None = None,
 ) -> bytes:
-    """rows: (ISO date, open, high, low, close, volume); ``splits``: date -> splitFactor."""
+    """rows: (ISO date, open, high, low, close, volume); ``splits``: date -> splitFactor;
+    ``dividends``: date -> divCash."""
     out = [
         {
             "date": f"{d}T00:00:00.000Z",
@@ -43,7 +59,7 @@ def prices(
             "adjLow": lo / 2,
             "adjClose": c / 2,
             "adjVolume": v * 2,
-            "divCash": 0.0,
+            "divCash": (dividends or {}).get(d, 0.0),
             "splitFactor": (splits or {}).get(d, 1.0),
         }
         for d, o, h, lo, c, v in rows

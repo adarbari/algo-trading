@@ -158,8 +158,12 @@ sent as an `Authorization: Token` header, never in URLs, raw files or logs. Lice
 written `BRK-B`; an unknown ticker answers 404). The payload's `open` / `high` / `low` /
 `close` / `volume` are **unadjusted**; they are stored as `bars/1d` rows with `source =
 "tiingo"` by the `bars-history` task (the `adj*` fields are ignored: corporate actions apply at
-read time, ADR 0016). `splitFactor` and `divCash` stay in the parsed payload for the task's
-split check against `events/split`.
+read time, ADR 0016). `splitFactor` and `divCash` stay in the parsed payload: the task checks
+the splits against `events/split` and writes the splits and dividends Massive's shallow history
+lacks (`events/split`, and `events/dividend` for ex-dates before Massive's first one, 2024-09;
+`divCash` is unadjusted, in the ex-date's share terms, untyped; `known_from` = the ex-date, as
+Tiingo gives no declaration date). `bars-history --actions-only --from-listings --since
+2002-01-01` stores that history back to 2002 without the bars.
 
 Free tier: 500 unique symbols a month, 50 requests an hour, 1,000 a day, so requests are spaced
 72 s apart (`[tiingo] min_interval_s`) and the ~140 scoped names take about 3 hours. The Power
