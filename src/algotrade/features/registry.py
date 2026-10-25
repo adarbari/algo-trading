@@ -242,12 +242,15 @@ _BY_FIELD: dict[str, Feature] = {f.field: f for f in FEATURES.values()}
 SUPERSEDED: dict[str, Superseded] = {
     "price_stats@v1": Superseded("price_stats@v2"),
     "dividends@v1": Superseded("dividends@v2"),
-    "fundamentals@v1": Superseded("fundamentals@v4"),
+    "fundamentals@v1": Superseded("fundamentals@v5"),
     # v3 adds shares_outstanding_year_ago; every v2 column is unchanged
-    "fundamentals@v2": Superseded("fundamentals@v4"),
+    "fundamentals@v2": Superseded("fundamentals@v5"),
     # v4 reads the facts by SEC acceptance session, not filing date (a one-session lookahead
     # fixed, ADR 0067 amendment); every v3 column is unchanged, the values are not
-    "fundamentals@v3": Superseded("fundamentals@v4"),
+    "fundamentals@v3": Superseded("fundamentals@v5"),
+    # v5 adds shares_source ifrs_weighted (foreign common-stock filers with only IFRS facts) and
+    # reads security_type; every v4 column is unchanged, the values are for those filers
+    "fundamentals@v4": Superseded("fundamentals@v5"),
     # v2 adds the year-ago EPS TTM and the latest quarter's revenue and EPS (with the quarter a
     # year earlier); every v1 column is unchanged
     "financials@v1": Superseded("financials@v3"),

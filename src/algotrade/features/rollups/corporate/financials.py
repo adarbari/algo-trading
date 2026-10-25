@@ -9,7 +9,7 @@ time, 13:00 on an early close). A 10-Q accepted at 16:30 on D is not in D's row 
 D+1's; a fact without an acceptance time counts from the session after its filing date (v2
 counted every fact ``filed <= session``: a date, so a filing accepted after the close counted
 at that close, a one-session lookahead in every feature of this group; ADR 0067 amendment,
-``fundamentals@v4`` has the same fix). The session's ``price_stats@v2`` (it sets which
+``fundamentals@v5`` has the same fix). The session's ``price_stats@v2`` (it sets which
 instruments get a row), ``events/split`` and ``instruments/reference`` (the security type).
 
 Each (concept, tag, period) takes its latest known value (a restatement replaces it from its

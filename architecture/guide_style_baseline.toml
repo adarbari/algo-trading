@@ -57,7 +57,7 @@
 "field:feature.kc_upper:reads" = 1
 "field:feature.liquidity_class:reads" = 1
 "field:feature.liquidity_high:reads" = 1
-"field:feature.market_cap:caveats" = 2
+"field:feature.market_cap:caveats" = 1
 "field:feature.near_52w:reads" = 1
 "field:feature.net_margin:caveats" = 1
 "field:feature.net_margin:reads" = 1
@@ -166,8 +166,8 @@
 "field:rollup.fund_reference@v1.reference_kind:caveats" = 2
 "field:rollup.fund_reference@v1.reference_kind:reads" = 1
 "field:rollup.fund_reference@v1.reference_status:reads" = 1
-"field:rollup.fundamentals@v4.shares_outstanding_year_ago:caveats" = 1
-"field:rollup.fundamentals@v4.shares_outstanding_year_ago:reads" = 1
+"field:rollup.fundamentals@v5.shares_outstanding_year_ago:caveats" = 1
+"field:rollup.fundamentals@v5.shares_outstanding_year_ago:reads" = 1
 "field:rollup.gaps@v1.gap_above:reads" = 1
 "field:rollup.gaps@v1.gap_below:caveats" = 1
 "field:rollup.gaps@v1.gap_below:reads" = 1

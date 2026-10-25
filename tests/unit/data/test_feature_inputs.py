@@ -552,7 +552,7 @@ def _fact(accepted: str | None, filed: date, **extra: object) -> dict[str, objec
 
 
 def test_shares_accepted_counts_a_filing_after_the_close_from_the_next_session() -> None:
-    """``instruments/shares_accepted`` (financials@v3, fundamentals@v4): a 10-Q accepted 16:30
+    """``instruments/shares_accepted`` (financials@v3, fundamentals@v5): a 10-Q accepted 16:30
     New York time on D is invisible at D's close and visible at D+1; the legacy
     ``instruments/shares`` read (by filing date) shows it at D, the lookahead this fixes."""
     writer, reader = store()

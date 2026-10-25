@@ -16,7 +16,7 @@ from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import END
 
 PRICE_STATS = "rollups/instrument/price_stats@v2"
-FUNDAMENTALS = "rollups/instrument/fundamentals@v4"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v5"
 FINANCIALS = "rollups/instrument/financials@v3"
 DIVIDENDS = "rollups/instrument/dividends@v2"
 

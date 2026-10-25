@@ -105,7 +105,7 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        the same facts counted from the session each became public (``shares.
                        known_from``: the first session whose close is after SEC's
                        acceptance of the filing, else the session after ``filed``), sorted by it
-                       (``financials@v3``, ``fundamentals@v4``; ADR 0067 amendment)
+                       (``financials@v3``, ``fundamentals@v5``; ADR 0067 amendment)
 - ``instruments/statements``
                        ``statements.reading.statement_facts``: every stored statement line (cost
                        of revenue, operating income, cash flow, balance sheet..., one row per

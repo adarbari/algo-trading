@@ -271,7 +271,7 @@ f) **SEC acceptance as knowledge_ts.** `financials.py` counts a fact `filed <= s
    Join each fact's `accn` to the submission's `acceptanceDateTime` (the submissions endpoint the
    filings task already uses), store `accepted_ts`; rollups count facts accepted before the
    session's close (16:00 NY, early closes from the calendar). New version of the raw facts table
-   and `financials@v3` / `fundamentals@v4`, backfill, retire the old. ADR 0067 amendment.
+   and `financials@v3` / `fundamentals@v5`, backfill, retire the old. ADR 0067 amendment.
    Effort M. Architect (point in time). Do early: quality / issuance ideas depend on it.
 
 ---
@@ -282,7 +282,7 @@ f) **SEC acceptance as knowledge_ts.** `financials.py` counts a fact `filed <= s
 | --- | --- | --- | --- |
 | H0 | Edge folder per edge (B1) + `family` key; `EVENT_CLASSES == EVENT_FIELDS` fitness test and the 3 missing fields (B2) | S | implementer; architect glance (new folder) |
 | H1 | Picks-series t, site-wide trials, published haircut display, `[published] leg` (7a, 7b) | S | architect (verdict) |
-| H2 | SEC acceptance knowledge_ts: facts table version, financials@v3, fundamentals@v4, backfill (7f) | M | architect (PIT) |
+| H2 | SEC acceptance knowledge_ts: facts table version, financials@v3, fundamentals@v5, backfill (7f) | M | architect (PIT) |
 | H3 | Outcome sides: short and long_short, borrow, ledger side (1) | M | architect |
 | H4 | Event-class framework + subtypes; 8-K item, NT, tender, index deletion, lockup, earnings-date shift (6) | M (+S each) | architect for framework and each known_from |
 | H5a | Calendar windows as schedules in the cross-section harness (2a) | S | implementer after ADR |
