@@ -650,7 +650,7 @@
       "feature.market_cap",
       "feature.pe_ratio",
       "rollup.financials@v3.revenue_ttm",
-      "rollup.fundamentals@v4.shares_outstanding",
+      "rollup.fundamentals@v5.shares_outstanding",
       "feature.revenue_growth_yoy",
       "rollup.financials@v3.net_income_ttm",
       "rollup.financials@v3.eps_diluted_ttm",

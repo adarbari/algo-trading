@@ -75,7 +75,8 @@ SOURCE = "sec_edgar"
 # with this code.
 ACCEPTANCE_VERSION_DATE = date(2026, 10, 19)
 # The day the ``ifrs_weighted`` concept and the ``units`` unit were added to the share counts: a
-# CIK fetched before it is backlog again, like the two dates above.
+# CIK fetched before it is backlog again, like the two dates above. Set at release to the first
+# nightly's session date: change it at merge if that is not this day.
 SHARE_CONCEPTS_VERSION_DATE = date(2026, 10, 25)
 FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 CONCEPTS = {  # our short name -> (taxonomy, XBRL concept)

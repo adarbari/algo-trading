@@ -417,7 +417,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 **`fundamentals@v5` rules.** Among facts public by the session's close (SEC acceptance, as `financials@v3`): the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
 still tags it (its latest `dei` filing is no older than its latest weighted average), else the
-latest filing's weighted average basic, else (v5) the latest filing's IFRS weighted average (`ifrs_weighted`), only for an instrument whose security type is known and not `ADR`: the fact counts ordinary shares and the shares-per-ADS ratio is not stored, so an ADR keeps no count from it. Splits after the count multiply it (after
+latest filing's weighted average basic, else (v5) the latest filing's IFRS weighted average (`ifrs_weighted`), only for an instrument whose security type is `COMMON_STOCK` (not an ADR, preferred, warrant or right): the fact counts ordinary shares and the shares-per-ADS ratio is not stored, so an ADR keeps no count from it. Splits after the count multiply it (after
 `period_end` for a cover count, after `filed` for a weighted average, which filers restate).
 The expression feature `market_cap = shares_outstanding x close` only when `OK`; `NO_SHARES` (ETFs, funds, no CIK:
 null, not an error), `STALE` (period end more than `stale_days`, 400, before the session;

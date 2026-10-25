@@ -428,7 +428,10 @@ def test_choose_takes_the_ifrs_average_last_and_only_for_allowed_instruments() -
     assert chosen["concept"].to_dict() == {"EQ:I": "ifrs_weighted", "EQ:W": "weighted_basic"}
     assert list(choose(facts)["instrument_id"]) == ["EQ:W"]  # no allowed instrument: no IFRS
     reference = pd.DataFrame(
-        {"instrument_id": ["EQ:A", "EQ:B", "EQ:C"], "security_type": ["ADR", "ETF", None]}
+        {
+            "instrument_id": ["EQ:A", "EQ:B", "EQ:C", "EQ:D", "EQ:E", "EQ:F"],
+            "security_type": ["ADR", "ETF", None, "PREFERRED", "WARRANT", "COMMON_STOCK"],
+        }
     )
-    assert ifrs_allowed(reference) == {"EQ:B"}
+    assert ifrs_allowed(reference) == {"EQ:F"}
     assert ifrs_allowed(None) == set() and ifrs_allowed(reference[["instrument_id"]]) == set()

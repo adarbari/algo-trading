@@ -19,7 +19,7 @@ Which count (per instrument, among facts public by the session's close):
   (most multi-class issuers);
 - else ``ifrs_weighted`` (``ifrs-full:WeightedAverageShares``, the same weighted average of the
   latest filing's current period): foreign filers with IFRS facts only (AZN, BP, TECK, MFC,
-  RCI). Only for an instrument whose ``security_type`` is known and is not ``ADR``: the fact
+  RCI). Only for an instrument whose ``security_type`` is ``COMMON_STOCK``: the fact
   counts ordinary shares, and an ADR's ratio of shares per ADS is not stored, so the count
   times the ADR's close would misstate the market cap. A foreign ordinary listing (COMMON_STOCK)
   needs no ratio. An ADR's own ``dei`` / ``weighted_basic`` counts are kept as before.
@@ -75,7 +75,7 @@ PRICE_STATS = "rollups/instrument/price_stats@v2"
 SPLITS = "events/split"
 DEI, WEIGHTED, IFRS = "dei", "weighted_basic", "ifrs_weighted"
 REFERENCE = "instruments/reference"
-ADR = "ADR"  # an ADS count is not the ordinary-share count the IFRS fact reports
+COMMON_STOCK = "COMMON_STOCK"  # the only type an ordinary-share IFRS count is valid for
 YEAR = 365  # days before shares_as_of the year-ago count's period ideally ended
 YEAR_AGO = (274, 456)  # days before shares_as_of that period may end: 9 to 15 months
 
@@ -155,12 +155,13 @@ def _latest(facts: pd.DataFrame, concept: str) -> pd.DataFrame:
 
 
 def ifrs_allowed(reference: pd.DataFrame | None) -> set[str]:
-    """Instruments the IFRS weighted average may count for: a known security type that is not
-    an ADR (no reference snapshot: none, an unknown type is not assumed ordinary)."""
+    """Instruments the IFRS weighted average may count for: ``COMMON_STOCK`` only. Not an ADR (its
+    ADS ratio is not stored), nor a preferred, warrant or right (the common count is not theirs),
+    nor an unknown type; no reference snapshot: none."""
     if reference is None or "security_type" not in reference.columns:
         return set()
     kind = reference["security_type"]
-    return set(reference.loc[kind.notna() & (kind != ADR), "instrument_id"].astype(str))
+    return set(reference.loc[kind == COMMON_STOCK, "instrument_id"].astype(str))
 
 
 def choose(facts: pd.DataFrame | None, ifrs_ids: set[str] | None = None) -> pd.DataFrame:
