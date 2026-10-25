@@ -274,7 +274,7 @@ domain data, SQLite for operational state, files for configuration"; ADR 0006, a
 
 - **Parquet**: analytical domain data (many rows, few columns, immutable, bulk-written by
   ingestion, versioned point-in-time) and derived business objects.
-- **SQLite** (planned, not built yet): operational state (the run ledger) and the one derived Ideas index. Any other derived
+- **SQLite** (planned, not built yet): operational state (the run ledger); the derived Ideas index was dropped (ADR 0083). Any other derived
   index needs its own ADR or owner decision; Parquet stays the truth for it.
 - **Files (TOML)**: human-edited configuration and documents.
 
