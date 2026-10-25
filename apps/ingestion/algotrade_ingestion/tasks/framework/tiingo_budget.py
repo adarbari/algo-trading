@@ -1,7 +1,8 @@
 """Tiingo's monthly symbol cap, counted once for every task that spends it.
 
 The free tier allows 500 distinct symbols a calendar month. Three tasks ask for symbols:
-``bars-history`` (items ``hist:<instrument id>``), ``winners-sample`` (items
+``bars-history`` (items ``hist:<instrument id>``, ``acts:<instrument id>`` with
+``--actions-only``: the same symbol, counted once as ``hist:``), ``winners-sample`` (items
 ``win:<ticker>:<start>``) and ``fund-nav`` (items ``nav:<fund instrument id>``: the fund's
 NAV symbol, a symbol of its own). ``month_symbols`` returns what they spent in the UTC month of
 the run's clock, whatever the item status (a ``FETCH_ERROR`` request may still have counted),
@@ -29,10 +30,12 @@ def _months(first: datetime, last: datetime) -> set[tuple[int, int]]:
 
 
 def _symbol(key: str) -> str | None:
-    """``hist:EQ:X`` / ``nav:EQ:X`` -> itself; ``win:T:2010-01-04`` -> ``win:T``; other items
-    -> None."""
+    """``hist:EQ:X`` / ``nav:EQ:X`` -> itself; ``acts:EQ:X`` -> ``hist:EQ:X`` (the same Tiingo
+    symbol); ``win:T:2010-01-04`` -> ``win:T``; other items -> None."""
     if key.startswith(("hist:", "nav:")):
         return key
+    if key.startswith("acts:"):
+        return "hist:" + key.removeprefix("acts:")
     if key.startswith("win:"):
         return "win:" + key.split(":")[1]
     return None

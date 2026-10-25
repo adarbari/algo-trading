@@ -318,7 +318,10 @@ Tiingo's Power tier. It needs a free Tiingo key (`ALGOTRADE_TIINGO_API_KEY` in `
 resumable (a name already fetched for the window is skipped; an interrupted run resumes when started
 again with the same `--until`; `--limit N` fetches N names a run) and never replaces a Massive row.
 Its run record reports unknown scope symbols, `overlap_rows` and `split_mismatches` (Tiingo's
-`splitFactor` against `events/split`):
+`splitFactor` against `events/split`), and `tiingo_split_rows` / `tiingo_dividend_rows` (the
+splits, and the dividends before Massive's history starts, that it adds; `--actions-only` stores
+only those, no bars: the 2002+ dividend history is
+`run bars-history --actions-only --from-listings --since 2002-01-01 --until <last session>`):
 
 ```bash
 mkdir -p var/logs
