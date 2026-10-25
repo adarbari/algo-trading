@@ -10,6 +10,7 @@ vi.mock('@/widgets/completeness-panel', () => ({
   CompletenessPanel: ({ selected }: { selected: { dataset: string } | null }) =>
     `[grid ${selected?.dataset ?? 'none'}]`,
 }));
+vi.mock('@/widgets/known-coverage-panel', () => ({ KnownCoveragePanel: stub('known') }));
 vi.mock('@/widgets/chain-coverage-panel', () => ({ ChainCoveragePanel: stub('chains') }));
 vi.mock('@/widgets/drilldown-panel', () => ({ DrilldownPanel: stub('drilldown') }));
 vi.mock('@/widgets/quality-checks-panel', () => ({ QualityChecksPanel: stub('quality') }));
@@ -35,6 +36,7 @@ describe('AdminIngestionPage', () => {
       'summary',
       'grid bars/1d',
       'drilldown',
+      'known',
       'chains',
       'quality',
       'verification',

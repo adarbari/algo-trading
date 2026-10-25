@@ -194,6 +194,14 @@ section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
 detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
+id = "known-value-coverage-read"
+description = "Values KNOWN against rows stored, for the Admin Ingestion page (owner decision 2026-10-24, services/read/coverage/known_values.py): KnownCoverage, the fundamentals share count by security type (names, rows, known) and the causes of an operating company's gap (BLANK_CHECK, NO_CIK, NO_FACTS, NO_ROW), read from the breakdown the nightly's coverage_fundamentals.shares_outstanding check stored in the run record (the newest record of exactly ctx.session.date that holds it), never a partition or an earlier session; a session without one is UNKNOWN NOT_RUN, never 0%. The causes name a source step, so the whole read is admin-only (ADR 0056). The breakdown is computed by the coverage-acceptance owner"
+owner = ["src/algotrade/services/read/coverage/known_values.py"]
+allowed = ["apps/api/algotrade_api/graphql/*"]  # Query.knownCoverage serves it: one loader call
+section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.md#later-prs-under-this-adr-not-in-this-change"
+detect = [{ call = "load_known_coverage" }]
+
+[[responsibility]]
 id = "pick-streaks"
 description = "How long a ticker has stayed on a screener's pick list and whether it is new to it (services/read/screens/streaks.py, ADR 0082 filter days_picked): a walk back through the chain of a run's previous runs (runs.load_previous_run: each run's own previous run, never the screener's latest, so a later run never changes an earlier session's value) over each run's picked rows, ending at the first run that did not pick the ticker and capped at 20; UNKNOWN (None, never 0 or a short streak) when the walk reaches a run withheld from the viewer or the end of the chain before the streak ends; a screener's results use it (Ideas is held until the streaks are precomputed at ingestion, decided 2026-10-24); new_today is the one-step form"
 owner = ["src/algotrade/services/read/screens/streaks.py"]

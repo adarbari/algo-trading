@@ -255,6 +255,18 @@ OPERATING_TYPES = frozenset({"COMMON_STOCK", "ADR"})  # security types that can 
 BLANK_CHECK_SIC = "6770"  # SEC SIC code of a blank-check company (SPAC): no operations
 
 
+def is_operating_type(security_type: str | None) -> bool:
+    """Whether a security type can be an operating company: a common stock or ADR, or no type
+    (a null fact never rules out). The one definition ``not_applicable`` and the coverage
+    breakdown share."""
+    return not security_type or security_type in OPERATING_TYPES
+
+
+def is_blank_check(sic: str | None) -> bool:
+    """Whether the SEC SIC code is a blank-check company's (``BLANK_CHECK_SIC``)."""
+    return (sic or "").strip() == BLANK_CHECK_SIC
+
+
 def not_applicable(
     applies: Iterable[str],
     optionable: bool | None,
@@ -272,9 +284,9 @@ def not_applicable(
     if "optionable" in wanted and optionable is False:
         return "optionable"
     if "operating_company" in wanted:
-        if security_type and security_type not in OPERATING_TYPES:
+        if not is_operating_type(security_type):
             return "operating_company"
-        if (sic or "").strip() == BLANK_CHECK_SIC:
+        if is_blank_check(sic):
             return "operating_company"
     if "leveraged_fund" in wanted and leveraged is False and inverse is False:
         return "leveraged_fund"

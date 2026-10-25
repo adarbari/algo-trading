@@ -188,6 +188,16 @@ def _holdings(writer: StoreWriter) -> None:
     _write(writer, "holdings/etf", rows, END)
 
 
+# The rollups step's coverage check data the Admin "known values" read serves (known_breakdown).
+KNOWN_BREAKDOWN = {
+    "by_type": [
+        {"security_type": "COMMON_STOCK", "names": 6, "rows": 6, "known": 5},
+        {"security_type": "ETF", "names": 4, "rows": 4, "known": 0},
+    ],
+    "causes": {"BLANK_CHECK": 1},
+}
+
+
 def _runs(writer: StoreWriter) -> None:
     nightly = start_run("nightly", END, NOW)
     nightly.items = {"bars": "COMPLETE", "chains": "PARTIAL"}
@@ -200,7 +210,16 @@ def _runs(writer: StoreWriter) -> None:
             "ibkr-iv": StepResult(
                 "ibkr-iv", StepStatus.SKIPPED, False, reason="skipped: IB Gateway unreachable"
             ).as_dict(),
-            "rollups": StepResult("rollups", StepStatus.SUCCEEDED).as_dict(),
+            "rollups": StepResult("rollups", StepStatus.SUCCEEDED).as_dict()
+            | {
+                "checks": [
+                    {
+                        "name": "coverage_fundamentals.shares_outstanding",
+                        "status": "PASS",
+                        "data": {"breakdown": KNOWN_BREAKDOWN},
+                    }
+                ]
+            },
         },
         "partial": ["steps not complete: chains"],
     }

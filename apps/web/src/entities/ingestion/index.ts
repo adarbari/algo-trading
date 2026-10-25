@@ -5,6 +5,7 @@ export {
   useChainCoverage,
   useCompleteness,
   useFocusCell,
+  useKnownCoverage,
 } from './api/queries';
 export { datasetLabel, isChains } from './model/dataset';
 export {
@@ -23,4 +24,7 @@ export type {
   ChainCoverage,
   Completeness,
   CompletenessCell,
+  KnownByType,
+  KnownCoverage,
+  KnownGapCount,
 } from './model/types';
