@@ -5,9 +5,11 @@ import asyncio
 import contextlib
 import cProfile
 import importlib.util
+import json
 import os
 import pstats
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -440,29 +442,53 @@ def _leaf() -> int:
     return sum(range(2000))
 
 
-def _mid() -> None:
+# cProfile keeps ONE context stack for the whole process (sys.monitoring is interpreter-wide in
+# 3.12), so a call any other thread makes while ``_leaf`` is in flight (an xdist worker's execnet
+# thread, coverage) can take the parent's place and lose or misattribute a call: CI saw an exact
+# count of 23091 for 23092. The snapshot test therefore profiles in a fresh one-thread process.
+_SNAPSHOT_PROBE = """
+import json, sys, time
+sys.path.insert(0, sys.argv[1])
+import page_profile as pp
+
+def _leaf():
+    return sum(range(2000))
+
+def _mid():
     end = time.perf_counter() + 0.4
     while time.perf_counter() < end:
         _leaf()
 
-
-def _outer() -> None:
+def _outer():
     _mid()
 
-
-def _entry(stats: dict, name: str) -> tuple:
-    return next(v for k, v in stats.items() if k[2] == name and "test_page_profile" in k[0])
+res = pp.run_profiled(_outer, limit_s=None, snapshot_s=0.05)
+rows = {k[2]: v for k, v in res.stats.items() if k[2] in ("_leaf", "_mid", "_outer")}
+print(json.dumps({
+    "snapshots": len(res.snapshots), "elapsed": res.elapsed,
+    "rows": {n: {"calls": v[1], "cum": v[3], "callers": {c[2]: r[1] for c, r in v[4].items()}}
+             for n, v in rows.items()},
+}))
+"""
 
 
 def test_a_mid_run_snapshot_leaves_callers_and_cumulative_time_intact() -> None:
-    res = pp.run_profiled(_outer, limit_s=None, snapshot_s=0.05)
-    assert len(res.snapshots) >= 3  # ticks happened while _mid was on the stack
-    leaf, mid, outer = (_entry(res.stats, n) for n in ("_leaf", "_mid", "_outer"))
-    assert any(k[2] == "_mid" for k in leaf[4])  # the leaf calls after a snapshot keep a caller
-    assert any(k[2] == "_outer" for k in mid[4])
-    assert outer[3] > 0.9 * res.elapsed and mid[3] > 0.9 * res.elapsed  # outer frames kept gaining
-    # and the leaf time reaches the outer frames' bucket path: the table is a connected graph
-    assert sum(r[1] for r in leaf[4].values()) == leaf[1]
+    out = subprocess.run(
+        [sys.executable, "-c", _SNAPSHOT_PROBE, str(PERF)],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    ).stdout
+    got = json.loads(out)
+    assert got["snapshots"] >= 3  # ticks happened while _mid was on the stack
+    leaf, mid, outer = (got["rows"][n] for n in ("_leaf", "_mid", "_outer"))
+    assert "_mid" in leaf["callers"]  # the leaf calls after a snapshot keep a caller
+    assert "_outer" in mid["callers"]
+    floor = 0.9 * got["elapsed"]
+    assert outer["cum"] > floor and mid["cum"] > floor  # outer frames kept gaining
+    # and every leaf call reaches a caller: the table is a connected graph
+    assert sum(leaf["callers"].values()) == leaf["calls"]
 
 
 def test_stats_now_matches_pstats_after_the_profile_stops() -> None:
