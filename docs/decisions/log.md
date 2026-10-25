@@ -752,6 +752,21 @@ follow-up PR).
 - status: final
 - Reasoning: the owner's word in chat, 2026-10-24 ("Yes, i approve"), as relayed by the coordinator.
 
+## 2026-10-24 | Edge verdicts | A post-publication out-of-sample basis for research setups
+- Question: 63 of 66 setups read Not enough data because every out-of-sample period starts 2026-04-01 (5 or 6 independent decisions for a monthly setup against 40 needed); can a setup taken from published research be judged on the years after its paper's sample, without lowering `min_oos_trades = 40`?
+- Options: (1) forward-only, wait / (2) lower the 40 / (3) a second, separately labelled basis from the end of the paper's sample, for eligible research setups only.
+- Decision: (3). Split = end of the source paper's sample period, recorded in the site edge document; eligible only when our rule matches the paper's and the trial log shows no variant chosen after seeing results; our own setups stay forward-only; `min_oos_trades = 40` unchanged, no counting of overlapping windows or names; the two bases are never blended (UI: "backtested (hypothetical), after publication <years>" and "forward paper record since 2026-04-01"); verdicts on it need the survivorship-free universe, until then they carry the caveat and cannot be Works. Written as the ADR 0065 amendment 2026-10-25 (PR "ADR 0065 amendment: post-publication basis"); points left to the owner are listed in it and in the PR.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-10-24, as relayed by the coordinating session; the first credible verdicts should not wait a year for a monthly setup to collect 40 forward decisions, and the post-publication years are the agreed honest fast track.
+
+## 2026-10-25 | ADR 0065 amendment (PR 967) | The eight owner decisions
+- Question: the eight owner decisions listed at the end of the ADR 0065 amendment 2026-10-25: label wording, which `close` setups, the Edges list headline, deflation on the post-publication basis, one setup per paper, the attestation, the window, the short-side cap.
+- Options: the recommended answer to each / another answer to any.
+- Decision: the recommended answers. (1) "after publication <years>", or "after the paper's sample" where they differ; (2) accept the 12 `close` setups, each with its named difference recorded; (3) two labelled columns, forward first; (4) Works deflated by the site-wide trial count; (5) `lazy_prices_10k_change` only, not `risk_factor_change`; (6) the per-setup attestation that parameters came from the paper's text, given at registration; (7) a closed window that stops at `frozen_from`; (8) short-side setups on a survivors-only universe capped at Not enough data.
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in the orchestrating session, 2026-10-25: "Accept the recommended answers on #966, #967 and #968. Tell each session to record them and release its PR (#966 first, then #968's renumber, then #967)."
 ## 2026-10-24 | Workflow-first trader site (ADR 0083) | TRADER bar, verdict-backed Ideas, historical exit rule, product rules
 - Question: how does the paid trader product's site fit the workflow (find, check, test) and what are its list and legal rules?
 - Options: as proposed in the use-case brief and workflow design (research artifacts of the 2026-10-24 sessions).
