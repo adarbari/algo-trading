@@ -708,3 +708,26 @@ def test_bars_history_publishes_flags_atomically(
 def test_a_run_without_bad_bars_writes_no_flags(writer: StoreWriter) -> None:
     run(writer, Vendor({"AAA": payloads.prices(rows(10)), "BBB": payloads.prices(rows(20))}))
     assert _flags(writer).empty and not StoreReader(writer._backend).dates(FLAGS_TABLE)
+
+
+def test_an_unfinished_run_of_the_other_mode_is_never_resumed(
+    writer: StoreWriter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A bars run that stopped with staged bars is the same task and session as an actions-only
+    run: resuming it in the other mode would mark its names done and drop their bars."""
+    vendor = Vendor({"AAA": payloads.prices(rows(10)), "BBB": payloads.prices(rows(20))})
+    real = StoreWriter.write_table
+
+    def failing(self: StoreWriter, table: str, *args: object, **kwargs: object) -> None:
+        if table == BARS:
+            raise OSError("disk full")
+        real(self, table, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(StoreWriter, "write_table", failing)
+    with pytest.raises(OSError, match="disk full"):
+        run(writer, vendor)
+    monkeypatch.undo()
+    with pytest.raises(ValueError, match="bars run left unfinished"):
+        run(writer, vendor, actions_only=True)
+    assert run(writer, vendor).status is RunStatus.COMPLETE  # its own mode resumes it
+    assert len(stored(writer, DAYS[0])) == 2

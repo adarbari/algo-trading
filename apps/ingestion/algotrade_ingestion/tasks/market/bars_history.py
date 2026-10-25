@@ -115,6 +115,7 @@ from algotrade_ingestion.tasks.framework.run import (
     NoResponseError,
     TaskContext,
     finished_runs,
+    resumable_run,
     status_label,
 )
 from algotrade_ingestion.tasks.framework.tiingo_budget import month_symbols
@@ -493,6 +494,20 @@ def _fill_picks(
     return list(islice(waiting, fill))
 
 
+def _refuse_other_mode(ctx: TaskContext, until: date, actions_only: bool) -> None:
+    """An unfinished run of the other mode for ``until`` would be resumed (same task, same
+    session): an actions-only run would mark a bars run's staged names done and drop their bars;
+    a bars run would publish nothing for an actions-only run's names. Refuse instead."""
+    record = resumable_run(ctx.writer, TASK, until)
+    other = HIST if actions_only else ACTS
+    if record is not None and any(k.startswith(other) for k in record.items):
+        mode = "a bars" if actions_only else "an --actions-only"
+        raise ValueError(
+            f"{record.run_id} is {mode} run left unfinished for --until {until}: finish it in "
+            "its own mode first (or pass another --until)"
+        )
+
+
 def ingest_bars_history(
     ctx: TaskContext,
     source: Source,
@@ -517,6 +532,7 @@ def ingest_bars_history(
         raise ValueError(f"--until {until} is before --since {since}")
     if from_listings and fill is not None:
         raise ValueError("--from-listings and --fill are two ways to pick names: use one")
+    _refuse_other_mode(ctx, until, actions_only)
     with IngestRun(ctx, TASK, until, resume=True) as run:
         runs = finished_runs(run.writer, TASK)
         prefix = ACTS if actions_only else HIST
