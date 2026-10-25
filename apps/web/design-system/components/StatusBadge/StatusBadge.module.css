@@ -9,7 +9,7 @@
   padding-block: 0;
   padding-inline: var(--space-1-5);
   border: var(--border-width-thin) solid var(--color-neutral-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   background: var(--color-neutral-bg);
   color: var(--color-neutral);
   font-family: var(--font-sans);
