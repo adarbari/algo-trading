@@ -88,6 +88,24 @@ LISTING_HISTORY = fixed(
     key=("source", "ticker", "start_date"),
 )
 
+# L1: every US ticker Massive lists as INACTIVE (delisted), one row per (ticker, last trading
+# day) from ``/v3/reference/tickers?active=false`` (ADR 0084): the names the active universe
+# lacks, with the vendor's CIK and FIGIs where it has them. A full copy per pull session
+# (snapshot). Identity only: ``end_date`` is the vendor's last trading day (null
+# for ~2% of the rows, where Massive gives none), ``vendor_type`` is null before 2017 and
+# ``security_type`` is ``MASSIVE_TYPES`` of it. No ``instrument_id`` yet: the merge into
+# ``instruments/listing_history`` is a later PR. knowledge_ts is the pull time.
+DELISTED_TICKERS = fixed(
+    "instruments/delisted_tickers",
+    "reference",
+    ("ticker", "ts"),
+    "ts timestamp_utc!",
+    *strings("ticker", "name", "exchange", "vendor_type", "security_type"),
+    *strings("cik", "figi", "share_class_figi"),
+    "end_date date",
+    key=("source", "ticker", "end_date"),
+)
+
 # L1: who was in an index when (ADR 0013's S&P 500 rule over history; edges ED6b-3): one row per
 # (index, ticker, membership interval) from the fja05680/sp500 history, a full copy per pull
 # session (snapshot). Keyed by ticker, not by id: the history predates our ids, and

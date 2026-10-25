@@ -301,6 +301,7 @@ max_macro_stale_share = 0.20     # macro (ADR 0048): FAIL if over 20% of the ena
                                  # than their cadence + release lag + 2 days (3 for a daily series), or any series lost stored vintages
 min_calendar_future_dates = 1    # macro release calendar (ADR 0050): FAIL if a FRED release lists fewer scheduled dates
                                  # after the session than this (FRED serves the next ones for every release it has)
+min_delisted_tickers = 10000     # delisted-tickers (ADR 0084): FAIL if Massive's inactive list holds fewer rows (23,557 on 2026-10-24)
 max_analyst_failed = 0.20        # analyst-snapshot (ADR 0068): WARN above 20% of the night's vendor calls failing (a refused name is no failure)
 max_analyst_backlog = 0.25       # analyst-snapshot (ADR 0068, 0072): WARN when over 25% of the in-scope names have no FMP row or coverage marker in the last 4 refresh windows (the never-asked backlog that NOT_FETCHED hides); the same limit grades Finnhub (finnhub_backlog, [finnhub] refresh_days), which also WARNs when the run skipped Finnhub
 max_filings_failed = 0.05  # 8-K filings (ADR 0050): FAIL if over 5% of the SEC requests (CIKs, index days) failed

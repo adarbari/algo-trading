@@ -149,6 +149,26 @@ days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KI
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
 
+### Massive delisted tickers (stored first; ADR 0084)
+
+`GET /v3/reference/tickers?market=stocks&active=false&limit=1000`, cursor-paged through
+`next_url` (key in the Authorization header only), is the free survivorship-free list of what
+the active universe lacks: 23,557 records in 24 pages on 2026-10-24. The `delisted-tickers`
+task (in no workflow) writes it as a full snapshot per session to `instruments/delisted_tickers`
+(`ticker`, `name`, `exchange` = the MIC, `vendor_type`, `security_type`, `cik`, `figi`,
+`share_class_figi`, `end_date`); `end_date` is Massive's `delisted_utc` day, the vendor's last
+trading day: identity (the id merge and the data-quality report), never a feature. Gaps, all
+measured on that pull: `type` is null before 2017 (28% of the rows; `security_type` is also null
+for the unmapped `INDEX`); FIGI covers 3-18% of the names delisted 2010-2018 and 37-78% from
+2019; CIK 79-97%; 505 rows (2%) carry no `delisted_utc`; no OTC names and no ETFs before 2016;
+a renamed company's old ticker is absent. Tickers go through `act_symbol` like the active list
+(`KIMpL` -> `KIM$L`, a lowercase `w` / `r` mark upper-cased); no two records collapsed on it.
+Request budget: the shared `massive` limiter (`[massive] min_interval_s` = 12.5 s, the free
+tier's 5 a minute), so about 24 requests = 5 minutes; a pull under `[quality]
+min_delisted_tickers` (10,000) rows FAILS. Stored first, merged into `instruments/listing_history`
+in the next PR (ADR 0084). The repo holds a 60-record slice,
+`tests/fixtures/sources/massive/inactive_tickers_slice.json`.
+
 ## Tiingo daily prices from 2018 (implemented, ADR 0050)
 
 Host `https://api.tiingo.com`; the key (`ALGOTRADE_TIINGO_API_KEY` in `.env`, a free account) is
