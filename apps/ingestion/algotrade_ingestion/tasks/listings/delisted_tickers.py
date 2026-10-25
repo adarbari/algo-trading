@@ -19,7 +19,7 @@ import pandas as pd
 
 from algotrade.data.listings.delisted import TABLE
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
+from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "delisted-tickers"
@@ -34,22 +34,19 @@ def _counts(values: pd.Series) -> dict[str, int]:
 
 def ingest_delisted_tickers(ctx: TaskContext, source: Source, session: date) -> RunRecord:
     with IngestRun(ctx, TASK, session) as run:
-        try:
-            normalized = run.fetch(source, FetchRequest(KEY, session_date=session))
-        except NoResponseError as error:
-            run.failed(str(error))
+        got = run.fetch_frame(
+            source,
+            FetchRequest(KEY, session_date=session),
+            TABLE,
+            "Massive's inactive list held no usable ticker",
+        )
+        if got is None:
             return run.record
-        rows = None if normalized is None else normalized.parsed.get(TABLE)
-        if rows is None or rows.empty:
-            run.failed("Massive's inactive list held no usable ticker")
-            return run.record
+        rows, notes = got
         floor = ctx.settings.min_delisted_tickers
         if len(rows) < floor:
             run.failed(f"{len(rows)} delisted tickers, expected at least {floor}")
             return run.record
-        rows = rows.copy()
-        rows.insert(0, "ts", pd.Timestamp(session, tz="UTC"))
-        rows = rows.astype(object).where(rows.notna(), None)
         run.write(TABLE, rows, source.name)
         years = pd.to_datetime(rows["end_date"]).dt.year
         run.stats.update(
@@ -62,6 +59,6 @@ def ingest_delisted_tickers(ctx: TaskContext, source: Source, session: date) -> 
                 str(y): int(n)
                 for y, n in years.dropna().astype(int).value_counts().sort_index().items()
             },
-            **(normalized.notes if normalized is not None else {}),
+            **notes,
         )
     return run.record
