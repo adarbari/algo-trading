@@ -1,6 +1,9 @@
+import { readdirSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import {
+  FONT,
   hasPages,
   preloadScript,
   preloadTable,
@@ -29,8 +32,8 @@ const bundle = {
   'assets/cache.js': chunk('assets/cache.js', {
     facadeModuleId: '/repo/apps/web/src/entities/page-cache/index.ts',
   }),
-  'assets/ibm-plex-sans-latin-400-normal-AbC.woff2': { type: 'asset' as const },
-  'assets/ibm-plex-sans-latin-300-normal-AbC.woff2': { type: 'asset' as const },
+  'assets/figtree-latin-400-normal-AbC.woff2': { type: 'asset' as const },
+  'assets/figtree-latin-300-normal-AbC.woff2': { type: 'asset' as const },
   'assets/early.js': chunk('assets/early.js', {
     facadeModuleId: '/repo/apps/web/src/app/router/early-reads.ts',
   }),
@@ -54,7 +57,7 @@ describe('preloadTable', () => {
       'assets/table.js',
       'assets/cache.js', // every page needs the saved page cache
       'assets/early.js', // and the start-up read of its data
-      'assets/ibm-plex-sans-latin-400-normal-AbC.woff2', // a first-paint font, after the scripts
+      'assets/figtree-latin-400-normal-AbC.woff2', // a first-paint font, after the scripts
     ]);
   });
 
@@ -116,5 +119,21 @@ describe('preloadScript', () => {
     document.head.innerHTML = '';
     runScript(preloadScript({ '/ideas': ['assets/a.js'] }, '/'))();
     expect(document.head.querySelectorAll('link')).toHaveLength(0);
+  });
+});
+
+describe('the first-paint font pattern', () => {
+  it('matches a file of each font family the design system ships', () => {
+    // A pattern naming a font that is no longer bundled would silently preload nothing.
+    const files = ['figtree', 'sora', 'dm-mono'].flatMap((pkg) =>
+      readdirSync(`node_modules/@fontsource/${pkg}/files`),
+    );
+    // Vite appends a content hash to the file name.
+    const matched = files
+      .map((file) => file.replace('.woff2', '-AbC123.woff2'))
+      .filter((file) => FONT.test(file));
+    for (const family of ['figtree', 'sora', 'dm-mono']) {
+      expect(matched.some((file) => file.startsWith(family))).toBe(true);
+    }
   });
 });

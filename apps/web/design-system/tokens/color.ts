@@ -1,5 +1,6 @@
 /**
- * Colour tokens: FINAL (owner-approved mockups, 2026-10-03; ADR 0011). Dark-first, one accent.
+ * Colour tokens: "Evening Desk" (owner-approved 2026-10-25; ADR 0085, amending ADR 0011). One accent,
+ * soft dark and a warm light. Lamp = `warning`, sea-glass = `positive` / `up`, loss = `negative` / `down`.
  *
  * Every value here is a ROLE, never a raw step: components use `--color-<role>` only. Light and
  * dark are defined together with the same keys (a typed `Palette`), so a role cannot exist in
@@ -25,9 +26,11 @@ export interface Palette {
   readonly surface: {
     /** The canvas behind everything. */
     readonly bg: string;
-    /** Panels, the top bar, popovers. */
+    /** The top bar. */
+    readonly bar: string;
+    /** Panels, popovers. */
     readonly surface: string;
-    /** Table row hover / zebra, inset wells. */
+    /** Raised: table row hover / zebra, inset wells. */
     readonly row: string;
     /** Panel and control borders. */
     readonly border: string;
@@ -68,79 +71,79 @@ export interface Palette {
 
 export const dark: Palette = {
   surface: {
-    bg: '#0d0f12',
-    surface: '#15181d',
-    row: '#1b1f25',
-    border: '#262a31',
-    borderSoft: '#1f2329',
-    control: '#333842',
-    track: '#23272e',
-    empty: '#1a1d22',
+    bg: '#121722',
+    bar: '#171e2c',
+    surface: '#1a2131',
+    row: '#202839',
+    border: '#263048',
+    borderSoft: '#1f2738',
+    control: '#364260',
+    track: '#232c41',
+    empty: '#2c3650',
   },
-  text: { primary: '#e8eaee', secondary: '#c3c7cf', muted: '#8b919c' },
+  text: { primary: '#eef1f6', secondary: '#c4cbd9', muted: '#a3acc0' },
   accent: {
-    accent: '#4f7cff',
-    // The Ideas / Main mockups put white on the accent (3.7:1, below AA); the Screener mockup's
-    // dark-on-accent passes (5.2:1), so dark text on the accent is the token.
-    onAccent: '#0d0f12',
-    soft: '#1a2440',
-    strong: '#a9bfff',
-    border: '#2f4380',
+    accent: '#aebdff',
+    onAccent: '#121722',
+    soft: '#252f4f',
+    strong: '#aebdff',
+    border: '#3a4a80',
   },
   status: {
-    positive: { bg: '#0f2a24', border: '#1e5c4e', fg: '#5fd3b5' },
-    warning: { bg: '#2e2312', border: '#6b4a17', fg: '#f0b55c' },
-    negative: { bg: '#2f1517', border: '#6e2a2e', fg: '#f08a8a' },
-    neutral: { bg: '#1b1f25', border: '#333842', fg: '#c3c7cf' },
-    info: { bg: '#1a2440', border: '#2f4380', fg: '#a9bfff' },
+    positive: { bg: '#173a33', border: '#2a6153', fg: '#6fd3b8' },
+    warning: { bg: '#3a2c14', border: '#7a5b24', fg: '#f5c26b' },
+    negative: { bg: '#3b2220', border: '#7a403a', fg: '#f4a38f' },
+    neutral: { bg: '#202839', border: '#364260', fg: '#c4cbd9' },
+    info: { bg: '#252f4f', border: '#3a4a80', fg: '#aebdff' },
   },
-  up: { standard: '#5fd3b5', cvd: '#56b4e9' },
-  down: { standard: '#f08a8a', cvd: '#e69f00' },
+  up: { standard: '#6fd3b8', cvd: '#56b4e9' },
+  down: { standard: '#f4a38f', cvd: '#e69f00' },
   series: {
-    s1: '#4f7cff',
-    s2: '#f0b55c',
-    s3: '#5fd3b5',
-    s4: '#a04ab3',
-    s5: '#bcb2fd',
-    s6: '#586e1c',
+    s1: '#aebdff',
+    s2: '#f5c26b',
+    s3: '#6fd3b8',
+    s4: '#c58bd9',
+    s5: '#e8e8f0',
+    s6: '#d6706a',
   },
 };
 
 export const light: Palette = {
   surface: {
-    bg: '#f7f7f5',
+    bg: '#f4f6fb',
+    bar: '#ffffff',
     surface: '#ffffff',
-    row: '#f1f1ee',
-    border: '#e3e3df',
-    borderSoft: '#ecece8',
-    control: '#d4d4cf',
-    track: '#f0f0ec',
-    empty: '#f0f0ec',
+    row: '#eef1f8',
+    border: '#dee3ee',
+    borderSoft: '#e8ecf4',
+    control: '#c9d0e0',
+    track: '#e6eaf3',
+    empty: '#dce1ec',
   },
-  text: { primary: '#16181d', secondary: '#3d424d', muted: '#5b606b' },
+  text: { primary: '#1a2033', secondary: '#3f4860', muted: '#5d667d' },
   accent: {
-    accent: '#2446a8',
+    accent: '#3e55c9',
     onAccent: '#ffffff',
-    soft: '#eef1fa',
-    strong: '#16306f',
-    border: '#b8c4ea',
+    soft: '#e6eafb',
+    strong: '#3346b0',
+    border: '#bcc6f0',
   },
   status: {
-    positive: { bg: '#eaf6f2', border: '#a9d6c9', fg: '#0b5d4f' },
-    warning: { bg: '#fdf3e3', border: '#e6b26b', fg: '#8a4b00' },
-    negative: { bg: '#fbecec', border: '#e5a3a3', fg: '#8f1d1d' },
-    neutral: { bg: '#f1f1ee', border: '#d4d4cf', fg: '#3d424d' },
-    info: { bg: '#eef1fa', border: '#b8c4ea', fg: '#16306f' },
+    positive: { bg: '#e2f5ef', border: '#a6d9cb', fg: '#137560' },
+    warning: { bg: '#fff4de', border: '#ebc884', fg: '#8a5a00' },
+    negative: { bg: '#fbeae6', border: '#e5afa3', fg: '#ad4631' },
+    neutral: { bg: '#eef1f8', border: '#c9d0e0', fg: '#3f4860' },
+    info: { bg: '#e6eafb', border: '#bcc6f0', fg: '#3346b0' },
   },
-  up: { standard: '#0b5d4f', cvd: '#0b62a8' },
-  down: { standard: '#8f1d1d', cvd: '#a14a00' },
+  up: { standard: '#137560', cvd: '#0b62a8' },
+  down: { standard: '#ad4631', cvd: '#a14a00' },
   series: {
-    s1: '#2446a8',
+    s1: '#3e55c9',
     s2: '#b45309',
-    s3: '#0b5d4f',
-    s4: '#540d2c',
-    s5: '#8c5bd1',
-    s6: '#4e986c',
+    s3: '#137560',
+    s4: '#c0408c',
+    s5: '#2e7fb8',
+    s6: '#191f7c',
   },
 };
 
@@ -149,6 +152,7 @@ export function colorRoles(palette: Palette, upDown: 'standard' | 'cvd'): [strin
   const { surface: s, text: t, accent: a } = palette;
   return [
     ['bg', s.bg],
+    ['bar', s.bar],
     ['surface', s.surface],
     ['row', s.row],
     ['border', s.border],
@@ -178,12 +182,17 @@ export function colorRoles(palette: Palette, upDown: 'standard' | 'cvd'): [strin
 
 /** Text colours and the backgrounds they must read on (AA 4.5:1), for the contrast check. */
 export function textPairs(palette: Palette): { fg: string; fgName: string; bgs: string[] }[] {
-  const backgrounds = [palette.surface.bg, palette.surface.surface, palette.surface.row];
+  const backgrounds = [
+    palette.surface.bg,
+    palette.surface.bar,
+    palette.surface.surface,
+    palette.surface.row,
+  ];
   return [
     { fgName: 'text', fg: palette.text.primary, bgs: backgrounds },
     { fgName: 'text-2', fg: palette.text.secondary, bgs: backgrounds },
     { fgName: 'muted', fg: palette.text.muted, bgs: backgrounds },
-    { fgName: 'accent', fg: palette.accent.accent, bgs: backgrounds.slice(0, 2) },
+    { fgName: 'accent', fg: palette.accent.accent, bgs: backgrounds.slice(0, 3) },
     { fgName: 'accent-strong', fg: palette.accent.strong, bgs: [palette.accent.soft] },
     { fgName: 'on-accent', fg: palette.accent.onAccent, bgs: [palette.accent.accent] },
     ...STATUSES.map((name) => ({

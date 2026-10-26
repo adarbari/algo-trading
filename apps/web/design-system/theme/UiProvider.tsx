@@ -2,15 +2,16 @@
  * The design-system root: loads fonts, tokens and base styles, and applies theme, density and
  * the up/down palette to the document. Wrap the app (and every story) in it exactly once.
  *
- * Fonts are self-hosted from @fontsource (IBM Plex Sans 400/500/600, IBM Plex Mono 400/500,
+ * Fonts are self-hosted from @fontsource (Sora 600, Figtree 400/500/600, DM Mono 400/500,
  * Latin subset only): bundled by Vite, so no third-party request, no layout shift waiting on a
  * CDN, identical glyphs in CI screenshots and offline.
  */
-import '@fontsource/ibm-plex-sans/latin-400.css';
-import '@fontsource/ibm-plex-sans/latin-500.css';
-import '@fontsource/ibm-plex-sans/latin-600.css';
-import '@fontsource/ibm-plex-mono/latin-400.css';
-import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/sora/latin-600.css';
+import '@fontsource/figtree/latin-400.css';
+import '@fontsource/figtree/latin-500.css';
+import '@fontsource/figtree/latin-600.css';
+import '@fontsource/dm-mono/latin-400.css';
+import '@fontsource/dm-mono/latin-500.css';
 import '../tokens/tokens.css';
 import './base.css';
 
