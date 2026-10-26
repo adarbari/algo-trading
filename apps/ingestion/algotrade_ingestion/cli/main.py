@@ -156,7 +156,8 @@ def writes(args: argparse.Namespace) -> bool:
         "serve-release",
     ):  # post-session, serve-release: own locks
         return False
-    if getattr(args, "task", None) == "compact-runs":  # probes the ingest lock itself
+    # Probe the ingest lock themselves (compact-runs) or hold the history store's own (ADR 0084):
+    if getattr(args, "task", None) in ("compact-runs", "option-history-import"):
         return False
     return not (args.command == "golden" and args.action in ("build", "verify"))
 
