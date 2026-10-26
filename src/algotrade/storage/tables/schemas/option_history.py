@@ -1,4 +1,4 @@
-"""Schemas of the bought option history (ADR 0084, HistoricalOptionData Level 2): the contract
+"""Schemas of the bought option history (ADR 0086, HistoricalOptionData Level 2): the contract
 quotes and the underlying's day and option statistics of one session, and the vendor's dividends
 and splits. A separate grain from ``chains/*`` and a separate store root
 (``ALGOTRADE_OPTION_HISTORY_URL``); licence personal; kept forever.

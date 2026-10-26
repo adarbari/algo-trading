@@ -1,4 +1,4 @@
-"""``HodFiles``: a folder of bought HistoricalOptionData zips as a source (ADR 0084).
+"""``HodFiles``: a folder of bought HistoricalOptionData zips as a source (ADR 0086).
 
 Not an HTTP vendor: the registry builds it from the directory the owner points a task at
 (``registry.FILE_SOURCES``, beside the golden fixture sources). ``sessions`` lists the folder by

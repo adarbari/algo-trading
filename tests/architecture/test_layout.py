@@ -213,7 +213,7 @@ def test_every_vendor_folder_contributes_a_registered_source(vendor: str) -> Non
         for name, spec in SOURCES.items()
         if str(getattr(spec.build, "__module__", "")).startswith(package + ".")
     ] + [n for n, s in SESSION_SOURCES.items() if s.kind.__module__.startswith(package + ".")]
-    built_here += [  # bought files in a folder (ADR 0084): no HTTP spec
+    built_here += [  # bought files in a folder (ADR 0086): no HTTP spec
         n for n, build in FILE_SOURCES.items() if str(build.__module__).startswith(package + ".")
     ]
     assert built_here, f"{vendor}: register at least one source in {LAYOUT['source_registry']}"

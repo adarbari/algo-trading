@@ -1,5 +1,5 @@
 """Synthetic HistoricalOptionData zips in a folder, and a main store with the listings they
-resolve through (ADR 0084). The vendor's own sample rows are never committed (public repo): the
+resolve through (ADR 0086). The vendor's own sample rows are never committed (public repo): the
 CSVs under ``tests/fixtures/sources/historicaloptiondata`` are invented, in the vendor's layout."""
 
 import zipfile

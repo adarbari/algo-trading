@@ -1,4 +1,4 @@
-"""A folder of HistoricalOptionData zips is scanned by member names alone (ADR 0084): daily and
+"""A folder of HistoricalOptionData zips is scanned by member names alone (ADR 0086): daily and
 monthly (``L2_``) zips, the stock history zip, a corrupt zip skipped, a member streamed."""
 
 import zipfile

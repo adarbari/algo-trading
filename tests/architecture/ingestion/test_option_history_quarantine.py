@@ -1,4 +1,4 @@
-"""The bought option history is quarantined (ADR 0084 decision 3): ``algotrade.data.option_history``
+"""The bought option history is quarantined (ADR 0086 decision 3): ``algotrade.data.option_history``
 is imported only by the ingestion app's import (``tasks/options_history``) and its verification
 checks (``tasks/verification``), and only ingestion asks the environment for its store URL. No
 evaluation, feature, screener, page read or API reaches a personal-licence history directly."""
@@ -16,7 +16,7 @@ ALLOWED = (
     "apps/ingestion/algotrade_ingestion/tasks/verification/",
 )
 SCANNED = ("src/algotrade", "apps/api", "apps/backtest", "apps/ingestion", "libs")
-CONTRACT = "Option history is quarantined: only ingestion reads it (ADR 0084)"
+CONTRACT = "Option history is quarantined: only ingestion reads it (ADR 0086)"
 GETTER = "option_history_url"
 GETTER_HOMES = ("src/algotrade/config/env.py", "apps/ingestion/")
 

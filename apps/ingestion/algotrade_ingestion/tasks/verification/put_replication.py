@@ -1,5 +1,5 @@
 """Replicate Cboe's PUT index from stored option quotes and compare it with the published level
-(ADR 0084 decision 6): the trust check on the data and the engine before any evidence from the
+(ADR 0086 decision 6): the trust check on the data and the engine before any evidence from the
 bought history is believed. Pure: quotes, rates and levels in, a series and a gap report out.
 
 The strategy (Cboe's published method): on each monthly expiry (the roll) sell the SPX put,

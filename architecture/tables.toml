@@ -89,27 +89,27 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 [[table]]
 name = "option_history/quotes"
 owner = "apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py"
-note = "ADR 0084: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0084 decision 1); every listed contract of every underlying at the 16:00 snapshot of one session (bid, ask, last, volume, open interest, the vendor's IV and delta as a cross-check only; adjusted series excluded); one partition per session, one run per session, files sorted by (symbol, expiry, strike) and clustered by symbol; kept forever"
+note = "ADR 0086: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0086 decision 1); every listed contract of every underlying at the 16:00 snapshot of one session (bid, ask, last, volume, open interest, the vendor's IV and delta as a cross-check only; adjusted series excluded); one partition per session, one run per session, files sorted by (symbol, expiry, strike) and clustered by symbol; kept forever"
 
 [[table]]
 name = "option_history/underlying"
 owner = "apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py"
-note = "ADR 0084: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0084 decision 1); the underlying's day (OHLCV, never the vendor's adjusted close) per symbol of one session, from the vendor's stockquotes file"
+note = "ADR 0086: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0086 decision 1); the underlying's day (OHLCV, never the vendor's adjusted close) per symbol of one session, from the vendor's stockquotes file"
 
 [[table]]
 name = "option_history/stats"
 owner = "apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py"
-note = "ADR 0084: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0084 decision 1); the vendor's 30-day IV by side and volume and open interest by side per symbol of one session (optionstats)"
+note = "ADR 0086: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0086 decision 1); the vendor's 30-day IV by side and volume and open interest by side per symbol of one session (optionstats)"
 
 [[table]]
 name = "option_history/dividends"
 owner = "apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py"
-note = "ADR 0084: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0084 decision 1); the vendor's dividends (stockhistory zip), partition = ex-date, runs merge; compared with events/dividend, never merged into it"
+note = "ADR 0086: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0086 decision 1); the vendor's dividends (stockhistory zip), partition = ex-date, runs merge; compared with events/dividend, never merged into it"
 
 [[table]]
 name = "option_history/splits"
 owner = "apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py"
-note = "ADR 0084: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0084 decision 1); the vendor's splits (new shares per old), partition = ex-date, runs merge; compared with events/split, never merged into it"
+note = "ADR 0086: bought HistoricalOptionData Level 2 end-of-day history in its own store root (ALGOTRADE_OPTION_HISTORY_URL, the external drive), read only through data/option_history; personal licence (HOD's terms: personal, non-commercial; nothing derived from it may be shown to a viewer without the licence, ADR 0086 decision 1); the vendor's splits (new shares per old), partition = ex-date, runs merge; compared with events/split, never merged into it"
 
 [[table]]
 name = "bars/1d"

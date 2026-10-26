@@ -54,7 +54,7 @@ def test_the_shipped_registry() -> None:
         "IDX:VIX9D": "VIX9D",  # Cboe's own files (EB D3): the code is the key
         "IDX:VIX6M": "VIX6M",
         "IDX:VVIX": "VVIX",
-        **{f"IDX:{k}": k for k in CBOE_STRATEGY_INDEXES},  # ADR 0084: the replication targets
+        **{f"IDX:{k}": k for k in CBOE_STRATEGY_INDEXES},  # ADR 0086: the replication targets
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
     third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}

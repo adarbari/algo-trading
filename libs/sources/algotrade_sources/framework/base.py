@@ -216,7 +216,7 @@ class HistorySession:
 
 @runtime_checkable
 class HistoryFileSource(Source, Protocol):
-    """A source over bought files in a folder (ADR 0084), not a vendor API: the sessions the
+    """A source over bought files in a folder (ADR 0086), not a vendor API: the sessions the
     folder holds, one session's frames, and the one-off stock history."""
 
     def sessions(self) -> list[HistorySession]: ...

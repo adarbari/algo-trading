@@ -1,4 +1,4 @@
-"""``option-history-import`` (ADR 0084): a folder of daily and monthly zips becomes one committed
+"""``option-history-import`` (ADR 0086): a folder of daily and monthly zips becomes one committed
 run per session in the history store; ids from the index map and the strict listing resolver; a
 session already held is skipped; the acceptance rules fail the batch, never silently."""
 

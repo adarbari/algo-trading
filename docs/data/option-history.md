@@ -1,9 +1,9 @@
-# Bought option history: HistoricalOptionData Level 2 (ADR 0084)
+# Bought option history: HistoricalOptionData Level 2 (ADR 0086)
 
 End-of-day option chains from 2002 to the purchase date, bought once ($1,495), kept in a store of
 their own on the external drive. **Personal licence**: nothing built from it may be shown to a
 viewer without that licence, and no outcome, feature or verdict is derived from it yet (the licence
-gate PR of ADR 0084 decision 1 comes first). The nightly product keeps serving the free Cboe chains
+gate PR of ADR 0086 decision 1 comes first). The nightly product keeps serving the free Cboe chains
 (`chains/*`); the two are never merged.
 
 ## What is stored (`option_history/*`, partition = session)
@@ -46,7 +46,7 @@ importable only by ingestion's import and checks.
    (`option-history-session`), in the history store, not on the admin pages.
 6. **Trust check before any evidence**: load the Treasury curve back to 2002 (`algotrade-ingest rates
    --from 2002-01-01`) and the Cboe benchmark levels (`algotrade-ingest run macro`), then
-   `algotrade-ingest run option-history-put-check`. Tolerance, fixed in ADR 0084 before the full run:
+   `algotrade-ingest run option-history-put-check`. Tolerance, fixed in ADR 0086 before the full run:
    RMS of the daily return difference at most 5 basis points, cumulative gap at most 100 basis
    points a year. A miss is reported, never tuned away.
 
@@ -68,11 +68,11 @@ expired in the window, so settlement is not exercised. Rate: the 3-month par yie
 | correlation of daily returns | 0.989 | 0.989 | |
 
 The level agrees (0.35 bp over 14 days), the days do not: 11 bp RMS against the 5 bp tolerance of ADR
-0084 (7.7 bp without 08-23). The two worst days are a pair, 08-23 (SPX -2.6% on the afternoon's tariff
+0086 (7.7 bp without 08-23). The two worst days are a pair, 08-23 (SPX -2.6% on the afternoon's tariff
 news: the simulated put lost 116 bp, the index more) and 08-26 (the rebound): the signature of a mark
 taken at another instant than the vendor's 16:00 quote, not of a wrong strike or carry (the carry of
 14 days is about 7 bp in all). **Likely causes, unproven until the full run:** Cboe marks and rolls on
 its own prices (a roll-time average, a settlement-time mark), not a 16:00 mid; the stand-ins named in
-ADR 0084 decision 6; Cboe accrues the 3-month auction rate, not the par yield. This pass proves the
+ADR 0086 decision 6; Cboe accrues the 3-month auction rate, not the par yield. This pass proves the
 reader and the engine run on the vendor's files and agree on the level; it is not the trust check
 (that needs the full history, many rolls, the SOQ settlement and `rates/treasury` back to 2002).

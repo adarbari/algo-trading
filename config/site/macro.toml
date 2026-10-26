@@ -525,7 +525,7 @@ url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VVIX_History.csv"
 date_column = "DATE"
 value_column = "VVIX"
 
-# --- Cboe strategy benchmarks (ADR 0084): total-return strategy index levels (PUT write, weekly
+# --- Cboe strategy benchmarks (ADR 0086): total-return strategy index levels (PUT write, weekly
 # WPUT, BXM buy-write, 30-delta BXMD, CNDR iron condor) the option-history replication is checked
 # against; static Cboe files like VIX9D. Defaults omitted: transform = "level", parser = "csv".
 

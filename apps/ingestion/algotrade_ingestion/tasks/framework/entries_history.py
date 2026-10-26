@@ -1,4 +1,4 @@
-"""Task entry and declaration for the bought option history (ADR 0084).
+"""Task entry and declaration for the bought option history (ADR 0086).
 
 Declared here, not in ``registry.py`` (which is at the file-length cap); the registry adds
 ``HISTORY_TASKS`` to ``TASKS``.
@@ -51,7 +51,7 @@ def run_option_history_put_check(ctx: TaskContext, p: Params) -> RunRecord:
 HISTORY_TASKS = (
     Task(
         "option-history-import",
-        "import bought HistoricalOptionData zips into the option-history store (ADR 0084)",
+        "import bought HistoricalOptionData zips into the option-history store (ADR 0086)",
         importer,
         TABLES,
         run_option_history_import,

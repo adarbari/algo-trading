@@ -1,4 +1,4 @@
-"""HistoricalOptionData session files parse (ADR 0084): both file variants (a daily zip's
+"""HistoricalOptionData session files parse (ADR 0086): both file variants (a daily zip's
 ``MM/DD/YYYY 16:00`` stamps and a monthly zip's date-only ones), the 16:00 New York instant, the
 OSI cross-check, nothing filtered, and the stock history files."""
 

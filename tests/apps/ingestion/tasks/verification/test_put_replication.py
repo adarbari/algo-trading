@@ -1,4 +1,4 @@
-"""The PUT-index replication (ADR 0084 decision 6): which put is sold, the portfolio's value by
+"""The PUT-index replication (ADR 0086 decision 6): which put is sold, the portfolio's value by
 hand, settlement at expiry, a missing price never carried, the gap statistics, the monthly rolls
 and the refusal to use a later rate for an earlier day."""
 
