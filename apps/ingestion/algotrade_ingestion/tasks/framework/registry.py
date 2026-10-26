@@ -185,16 +185,7 @@ TASKS: dict[str, Task] = {
             settings="sources.toml [tiingo]",
             params=(SESSION,),
         ),
-        Task(
-            "delisted-tickers",
-            "Massive's delisted tickers (instruments/delisted_tickers); in no workflow",
-            entries_reference.delisted_tickers,
-            ("instruments/delisted_tickers",),
-            entries_reference.run_delisted_tickers,
-            sources=("massive_tickers",),
-            settings="sources.toml [massive] [quality]",
-            params=(SESSION,),
-        ),
+        entries_reference.DELISTED_TICKERS,
         Task(
             "analyst-probe",
             "which analyst endpoints the FMP and Finnhub keys may call (analyst/vendor_access); "

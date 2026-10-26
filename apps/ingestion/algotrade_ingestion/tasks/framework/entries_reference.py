@@ -6,12 +6,10 @@ from pathlib import Path
 from algotrade.config.site.settings import load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework import source_guards
-from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
+from algotrade_ingestion.tasks.framework.params import SESSION, Params, Task, session_of, symbols
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import (
-    delisted_tickers as delisted_tickers,  # noqa: PLC0414 - re-exported to registry.py (file cap)
-)
-from algotrade_ingestion.tasks.listings import (
+    delisted_tickers,
     index_membership,
     listing_history,
     winners_sample,
@@ -89,6 +87,18 @@ def run_delisted_tickers(ctx: TaskContext, p: Params) -> RunRecord:
     return delisted_tickers.ingest_delisted_tickers(
         ctx, ctx.sources["massive_tickers"], session_of(p)
     )
+
+
+DELISTED_TICKERS = Task(
+    "delisted-tickers",
+    "Massive's delisted tickers (instruments/delisted_tickers); in no workflow",
+    delisted_tickers,
+    ("instruments/delisted_tickers",),
+    run_delisted_tickers,
+    sources=("massive_tickers",),
+    settings="sources.toml [massive] [quality]",
+    params=(SESSION,),
+)  # declared here, not in registry.py (file cap); registry.py lists it in TASKS
 
 
 def run_index_membership(ctx: TaskContext, p: Params) -> RunRecord:
