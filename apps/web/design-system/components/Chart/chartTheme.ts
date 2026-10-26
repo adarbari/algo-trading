@@ -55,7 +55,7 @@ export function readTheme(element: Element): EngineTheme {
   };
 }
 
-/** A number that changes when the active theme changes (re-read the tokens then). */
+/** A number that changes when the active theme or density changes (re-read the tokens then). */
 export function useThemeVersion(): number {
   const [version, setVersion] = useState(0);
   useEffect(() => {
@@ -65,7 +65,7 @@ export function useThemeVersion(): number {
     const observer = new MutationObserver(bump);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme', 'data-updown'],
+      attributeFilter: ['data-theme', 'data-updown', 'data-density'],
     });
     const scheme =
       typeof window.matchMedia === 'function'

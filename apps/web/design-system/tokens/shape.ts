@@ -1,7 +1,7 @@
-/** Shape tokens: FINAL (ADR 0011). Radius 3 / 4 / 6 px; crisp 1 px borders, never shadows. */
+/** Shape tokens (ADR 0085, amending 0011): radius 4 / 10 / 16 px and pill; crisp 1 px borders, never shadows. */
 
-/** sm: bars, tracks, swatches; md: controls, chips, nav items; lg: panels. */
-export const radius = { none: 0, sm: 3, md: 4, lg: 6 } as const;
+/** sm: bars, tracks, swatches; md: controls, nav items; lg: cards and panels; pill: verdict chips. */
+export const radius = { none: 0, sm: 4, md: 10, lg: 16, pill: 999 } as const;
 
 export const borderWidth = { thin: 1, thick: 2 } as const;
 

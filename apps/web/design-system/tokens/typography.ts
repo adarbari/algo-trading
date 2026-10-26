@@ -1,12 +1,13 @@
 /**
- * Typography tokens: FINAL (approved mockups 2026-10-03; ADR 0011). IBM Plex Sans for UI and
- * IBM Plex Mono for symbols, ids and code, self-hosted (@fontsource, loaded by UiProvider).
- * Tabular numbers everywhere. A small scale for dense working screens; body is 13 px.
+ * Typography tokens ("Evening Desk", ADR 0085): Sora for headings and display figures, Figtree
+ * for the UI, DM Mono for numbers, symbols, ids and code, self-hosted (@fontsource, loaded by
+ * UiProvider). Tabular numbers everywhere. A small scale for dense working screens; body is 13 px.
  */
 
 export const fontFamily = {
-  sans: "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
-  mono: "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+  display: "'Sora', 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  sans: "'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  mono: "'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
 } as const;
 
 /** Size and line height per step, in px (line height ~1.45 rounded to whole px). */

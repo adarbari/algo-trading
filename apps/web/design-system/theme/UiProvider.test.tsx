@@ -16,11 +16,15 @@ describe('UiProvider', () => {
     expect(root).toHaveAttribute('data-updown', 'cvd');
   });
 
-  it('is dark and compact by default', () => {
+  it('is compact by default and leaves the theme attribute alone when given none', () => {
+    document.documentElement.setAttribute('data-theme', 'light');
     render(<UiProvider>content</UiProvider>);
-    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
     expect(document.documentElement).toHaveAttribute('data-density', 'compact');
     expect(document.documentElement).toHaveAttribute('data-updown', 'standard');
+    document.documentElement.removeAttribute('data-theme');
+    render(<UiProvider>content</UiProvider>);
+    expect(document.documentElement).not.toHaveAttribute('data-theme');
   });
 
   it('can follow the system preference', () => {

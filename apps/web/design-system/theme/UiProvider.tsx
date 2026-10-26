@@ -2,15 +2,16 @@
  * The design-system root: loads fonts, tokens and base styles, and applies theme, density and
  * the up/down palette to the document. Wrap the app (and every story) in it exactly once.
  *
- * Fonts are self-hosted from @fontsource (IBM Plex Sans 400/500/600, IBM Plex Mono 400/500,
+ * Fonts are self-hosted from @fontsource (Sora 600, Figtree 400/500/600, DM Mono 400/500,
  * Latin subset only): bundled by Vite, so no third-party request, no layout shift waiting on a
  * CDN, identical glyphs in CI screenshots and offline.
  */
-import '@fontsource/ibm-plex-sans/latin-400.css';
-import '@fontsource/ibm-plex-sans/latin-500.css';
-import '@fontsource/ibm-plex-sans/latin-600.css';
-import '@fontsource/ibm-plex-mono/latin-400.css';
-import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/sora/latin-600.css';
+import '@fontsource/figtree/latin-400.css';
+import '@fontsource/figtree/latin-500.css';
+import '@fontsource/figtree/latin-600.css';
+import '@fontsource/dm-mono/latin-400.css';
+import '@fontsource/dm-mono/latin-500.css';
 import '../tokens/tokens.css';
 import './base.css';
 
@@ -18,12 +19,16 @@ import { useEffect, type ReactNode } from 'react';
 
 import type { DensityName } from '../tokens';
 
-/** `dark` is the default (dark-first); `system` follows `prefers-color-scheme`. */
+/** `system` follows `prefers-color-scheme`; the app chooses (ADR 0085), stories pass one. */
 export type Theme = 'dark' | 'light' | 'system';
 export type UpDownPalette = 'standard' | 'cvd';
 
 export interface UiProviderProps {
-  /** Colour theme; dark by default, `system` follows the OS. */
+  /**
+   * Colour theme. Absent: the attribute is left as it is (the page's inline script sets it from
+   * the stored choice before first paint, and with none the CSS follows the OS), so mounting never
+   * overwrites it.
+   */
   theme?: Theme;
   /** `compact` (default, data screens) or `comfortable`. */
   density?: DensityName;
@@ -33,14 +38,14 @@ export interface UiProviderProps {
 }
 
 export function UiProvider({
-  theme = 'dark',
+  theme,
   density = 'compact',
   upDown = 'standard',
   children,
 }: UiProviderProps) {
   useEffect(() => {
     const root = document.documentElement;
-    root.setAttribute('data-theme', theme);
+    if (theme !== undefined) root.setAttribute('data-theme', theme);
     root.setAttribute('data-density', density);
     root.setAttribute('data-updown', upDown);
   }, [theme, density, upDown]);

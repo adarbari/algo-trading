@@ -35,107 +35,118 @@ apps/web/
                           imports UI only from @algotrade/ui. See architecture.md.
 ```
 
-## Tokens (final)
+## Tokens ("Evening Desk")
 
-**Final: from the owner-approved mockups, 2026-10-03** (ADR 0011 note). Source of truth:
-`apps/web/design-system/tokens/*.ts` (typed; `npm run tokens` writes `tokens.css`). Browse them
-in Storybook under **Foundations/Tokens** (swatches in the active theme, both hex values,
-contrast ratios, type scale, space, radii, density). Components use only the CSS variables.
+**Owner-approved 2026-10-25 ([ADR 0085](../adr/0085-evening-desk-theme.md), amending 0011; the
+2026-10-03 tokens are replaced).** Source of truth: `apps/web/design-system/tokens/*.ts` (typed;
+`npm run tokens` writes `tokens.css`). Browse them in Storybook under **Foundations/Tokens**
+(swatches in the active theme, both hex values, contrast ratios, type scale, space, radii,
+density). Components use only the CSS variables.
 
-Style: dark-first, Webull-like crisp 1 px borders and modular panels; Robinhood-like plain
-English and progressive disclosure; IBKR-Desktop density without clutter. **One accent.** No
-gradients, glows, shadows, emoji icons or number-in-card tiles.
+Style: a soft dark and a warm light, crisp 1 px borders, generous radii (10-16) and pill verdict
+chips, plain English and progressive disclosure. **One accent** (periwinkle in dark, indigo in
+light). No gradients, glows, shadows, emoji icons or number-in-card tiles.
 
 ### Themes and switches
 
-`UiProvider` sets attributes on `<html>`: `data-theme` = `dark` (default) | `light` | `system`
-(follows `prefers-color-scheme`); `data-density` = `compact` (default) | `comfortable`;
-`data-updown` = `standard` | `cvd`. `prefers-reduced-motion: reduce` sets every duration to 0.
+`UiProvider` sets attributes on `<html>`: `data-theme` = `light` | `dark` | `system`;
+`data-density` = `compact` (default) | `comfortable`; `data-updown` = `standard` | `cvd`.
+`prefers-reduced-motion: reduce` sets every duration to 0.
+
+**Theme choice (ADR 0085).** The user picks Light / Dark / System in the account menu
+(`widgets/theme-choice`); the default is System. The choice is stored per user (`[appearance]
+theme` in `preferences.toml`, `PUT /preferences/appearance`, read as `Query.appearance`) and
+copied to `localStorage` (`algotrade.theme`) so an inline script in `index.html` sets
+`data-theme` before the first paint. `UiProvider`'s `theme` is optional: absent, it leaves the
+attribute alone (it never writes a default on mount). `tokens.css` treats `system` and an absent
+attribute alike: anything but an explicit `dark` follows `prefers-color-scheme`. Stories and
+tests pass a theme explicitly; the e2e runner pins its colour scheme to dark.
 
 ### Colour (`--color-<role>`)
 
 | Role | Dark | Light | Use |
 |---|---|---|---|
-| `bg` | `#0d0f12` | `#f7f7f5` | canvas |
-| `surface` | `#15181d` | `#ffffff` | panels, top bar, popovers |
-| `row` | `#1b1f25` | `#f1f1ee` | row hover, wells |
-| `border` | `#262a31` | `#e3e3df` | panel and control borders |
-| `border-soft` | `#1f2329` | `#ecece8` | dividers inside a panel |
-| `control` | `#333842` | `#d4d4cf` | control outlines (segmented, chips, inputs) |
-| `track` | `#23272e` | `#f0f0ec` | bar / meter track |
-| `empty` | `#1a1d22` | `#f0f0ec` | heatmap cell with no data |
-| `text` | `#e8eaee` | `#16181d` | primary text |
-| `text-2` | `#c3c7cf` | `#3d424d` | secondary text |
-| `muted` | `#8b919c` | `#5b606b` | captions, column headers, units |
-| `accent` | `#4f7cff` | `#2446a8` | THE accent: links, primary action, focus ring, selection |
-| `on-accent` | `#0d0f12` | `#ffffff` | text on a solid accent fill |
-| `accent-soft` | `#1a2440` | `#eef1fa` | selected nav item / row |
-| `accent-strong` | `#a9bfff` | `#16306f` | text on `accent-soft`, link hover |
-| `accent-border` | `#2f4380` | `#b8c4ea` | selected / focused panel border |
-| `positive` (`-bg`, `-border`) | `#5fd3b5` (`#0f2a24`, `#1e5c4e`) | `#0b5d4f` (`#eaf6f2`, `#a9d6c9`) | complete, pass |
-| `warning` (`-bg`, `-border`) | `#f0b55c` (`#2e2312`, `#6b4a17`) | `#8a4b00` (`#fdf3e3`, `#e6b26b`) | partial, stale |
-| `negative` (`-bg`, `-border`) | `#f08a8a` (`#2f1517`, `#6e2a2e`) | `#8f1d1d` (`#fbecec`, `#e5a3a3`) | failed, error |
-| `neutral` (`-bg`, `-border`) | `#c3c7cf` (`#1b1f25`, `#333842`) | `#3d424d` (`#f1f1ee`, `#d4d4cf`) | draft, unknown |
-| `info` (`-bg`, `-border`) | `#a9bfff` (`#1a2440`, `#2f4380`) | `#16306f` (`#eef1fa`, `#b8c4ea`) | notes (the accent hue: still one accent) |
-| `up` / `down` (standard) | `#5fd3b5` / `#f08a8a` | `#0b5d4f` / `#8f1d1d` | price moves |
+| `bg` | `#121722` | `#f4f6fb` | canvas |
+| `bar` | `#171e2c` | `#ffffff` | top bar |
+| `surface` | `#1a2131` | `#ffffff` | panels, popovers |
+| `row` | `#202839` | `#eef1f8` | raised: row hover, wells |
+| `border` | `#263048` | `#dee3ee` | panel and control borders |
+| `border-soft` | `#1f2738` | `#e8ecf4` | dividers inside a panel |
+| `control` | `#364260` | `#c9d0e0` | control outlines (segmented, chips, inputs) |
+| `track` | `#232c41` | `#e6eaf3` | bar / meter track |
+| `empty` | `#2c3650` | `#dce1ec` | heatmap cell with no data |
+| `text` | `#eef1f6` | `#1a2033` | primary text |
+| `text-2` | `#c4cbd9` | `#3f4860` | secondary text |
+| `muted` | `#a3acc0` | `#5d667d` | captions, column headers, units |
+| `accent` | `#aebdff` | `#3e55c9` | THE accent: links, primary action, focus ring, selection |
+| `on-accent` | `#121722` | `#ffffff` | text on a solid accent fill |
+| `accent-soft` | `#252f4f` | `#e6eafb` | selected nav item / row |
+| `accent-strong` | `#aebdff` | `#3346b0` | text on `accent-soft`, link hover |
+| `accent-border` | `#3a4a80` | `#bcc6f0` | selected / focused panel border |
+| `positive` = sea-glass, evidence (`-bg`, `-border`) | `#6fd3b8` (`#173a33`, `#2a6153`) | `#137560` (`#e2f5ef`, `#a6d9cb`) | complete, pass, evidence |
+| `warning` = lamp, highlight (`-bg`, `-border`) | `#f5c26b` (`#3a2c14`, `#7a5b24`) | `#8a5a00` (`#fff4de`, `#ebc884`) | partial, stale, highlight |
+| `negative` = loss (`-bg`, `-border`) | `#f4a38f` (`#3b2220`, `#7a403a`) | `#ad4631` (`#fbeae6`, `#e5afa3`) | failed, error, loss |
+| `neutral` (`-bg`, `-border`) | `#c4cbd9` (`#202839`, `#364260`) | `#3f4860` (`#eef1f8`, `#c9d0e0`) | draft, unknown |
+| `info` (`-bg`, `-border`) | `#aebdff` (`#252f4f`, `#3a4a80`) | `#3346b0` (`#e6eafb`, `#bcc6f0`) | notes (the accent hue: still one accent) |
+| `up` / `down` (standard) | `#6fd3b8` / `#f4a38f` | `#137560` / `#ad4631` | price moves |
 | `up` / `down` (`cvd`) | `#56b4e9` / `#e69f00` | `#0b62a8` / `#a14a00` | colour-blind-safe (Okabe-Ito blue / orange) |
 
-Deviation from the mockups: the Ideas / Ingestion boards put white on the dark accent (3.7:1,
-below AA); the Screener board's dark-on-accent (5.2:1) is the token. Everything else is the
-mockups' `.app` / `.app[data-theme=light]` palette unchanged (`neutral` and `info` are built
-from existing mockup colours).
+Deviations from the approved mockups, forced by contrast (ADR 0085): light loss text is
+`#ad4631` (the mockup's `#c2563f` is 4.1:1 on the ground), and a light dot or bar uses the role
+colour above, not the mockups' lighter fills (lamp `#d99a2b`, sea-glass `#1e9e80`, loss
+`#c2563f`: 2.2-3.1:1 as graphics). Border, track, control and tint values the mockups did not
+fix are derived from their neighbours.
 
-**Contrast (WCAG AA, 4.5:1)**, lowest ratio over bg / surface / row (status colours also over
-their own tint), checked by `tokens/tokens.test.ts` and by axe on every story in both themes:
+**Contrast (WCAG AA, 4.5:1)**, lowest ratio over bg / bar / surface / row (status colours also
+over their own tint), checked by `tokens/tokens.test.ts` and by axe on every story in both
+themes:
 
 | Text role | Dark | Light |
 |---|---|---|
-| text / text-2 / muted | 13.7 / 9.8 / 5.2 | 15.7 / 8.9 / 5.6 |
-| accent (on bg, surface) / accent-strong (on accent-soft) / on-accent | 4.8 / 8.5 / 5.2 | 7.8 / 11.0 / 8.3 |
-| positive / warning / negative / neutral / info | 8.3 / 8.4 / 6.9 / 9.8 / 8.5 | 6.9 / 6.0 / 7.8 / 8.9 / 11.0 |
-| up / down standard; cvd | 9.0 / 6.9; 7.2 / 7.4 | 6.9 / 7.9; 5.6 / 5.3 |
-
-`accent` text on `row` in dark is 4.46:1: on a hovered / zebra row use `accent-strong`.
+| text / text-2 / muted | 13.0 / 9.1 / 6.5 | 14.3 / 8.1 / 5.1 |
+| accent / accent-strong (on accent-soft) / on-accent | 8.8 / 7.2 / 9.8 | 5.8 / 6.6 / 6.3 |
+| positive / warning / negative / neutral / info | 6.9 / 8.3 / 7.3 / 9.1 / 7.2 | 5.0 / 5.2 / 4.9 / 8.1 / 6.6 |
+| up / down standard; cvd | 8.2 / 7.4; 6.4 / 6.5 | 5.0 / 5.0; 5.6 / 5.3 |
 
 ### Data-visualisation series (`--color-s1` ... `--color-s6`)
 
 Assign in this fixed order by entity (never cycled, never re-ranked when a filter changes the
 count); a seventh series folds into "Other" or small multiples. Status colours stay reserved
-for state and always come with a label. s1-s3 are the mockups' (Explore compare chart).
+for state and always come with a label. Retuned for Evening Desk (ADR 0085): s1-s3 are the
+accent, lamp and sea-glass.
 
 | Slot | Hue | Dark | Light |
 |---|---|---|---|
-| s1 | blue (the accent) | `#4f7cff` | `#2446a8` |
-| s2 | amber | `#f0b55c` | `#b45309` |
-| s3 | teal | `#5fd3b5` | `#0b5d4f` |
-| s4 | magenta / wine | `#a04ab3` | `#540d2c` |
-| s5 | lavender / violet | `#bcb2fd` | `#8c5bd1` |
-| s6 | moss / green | `#586e1c` | `#4e986c` |
+| s1 | periwinkle / indigo (the accent) | `#aebdff` | `#3e55c9` |
+| s2 | amber | `#f5c26b` | `#b45309` |
+| s3 | sea-glass | `#6fd3b8` | `#137560` |
+| s4 | orchid / magenta | `#c58bd9` | `#c0408c` |
+| s5 | silver / sky | `#e8e8f0` | `#2e7fb8` |
+| s6 | coral / navy | `#d6706a` | `#191f7c` |
 
-Validated with the data-viz palette validator (OKLab, Machado 2009 CVD simulation) over **all
-pairs**, not just adjacent ones, so scatter plots and small multiples are safe:
+Checked by `tokens.test.ts` (each at least 3:1 on bg and surface, all different) and over **all
+pairs** with an OKLab distance (x100) and the Machado 2009 colour-blind simulation (run once,
+2026-10-25; not in CI):
 
-| | Dark (surface `#15181d`) | Light (surface `#ffffff`) |
+| | Dark | Light |
 |---|---|---|
-| Worst pair, normal vision (ΔE×100, floor 15) | 18.3 (s2 / s3) | 17.7 (s1 / s3) |
-| Worst pair, protan / deutan (ΔE×100, target 8) | 10.3 (s3 / s5) | 9.7 (s2 / s3) |
-| Graphic contrast vs surface and bg (3:1) | all >= 3.1 | all >= 3.2 |
-| OKLCH lightness | 0.50-0.81 | 0.30-0.62 |
+| Worst pair, normal vision (target 15) | 12.4 | 11.8 |
+| Worst pair, protan / deutan (target 8) | 8.7 | 8.3 |
 
-Lightness is spread on purpose (the owner asked for series distinct in lightness as well as
-hue), so the series also separate in greyscale and print; the validator's narrow lightness
-band check is therefore not applied. Lines and bars still carry a legend and direct labels
-(colour is never the only key).
+The normal-vision target is not met: with the accent, lamp and sea-glass fixed by the approved
+look, six hues cannot all sit 15 apart while each keeps 3:1 on both grounds. The colour-blind
+target is met, and lines and bars still carry a legend and direct labels (colour is never the
+only key).
 
 ### Type
 
-**IBM Plex Sans** (UI; 400 / 500 / 600) and **IBM Plex Mono** (symbols, ids, code; 400 / 500),
-the fonts of the approved mockups, replacing the draft's Inter + JetBrains Mono. Plex is
-compact and highly legible at 12-13 px, has true tabular figures, and its Sans / Mono pair
-shares metrics. Self-hosted from `@fontsource/ibm-plex-sans` / `@fontsource/ibm-plex-mono`
-(Latin subset, imported by `UiProvider`) rather than the Google Fonts CDN: no third-party
-request or tracking, works offline and behind strict CSP, versions pinned in the lockfile, and
-the CI screenshots render the same glyphs every time. Tabular figures (`tnum`) everywhere.
+**Sora** (headings and display figures; 600), **Figtree** (UI; 400 / 500 / 600) and **DM Mono**
+(numbers, symbols, ids, code; 400 / 500): the Evening Desk fonts (ADR 0085), replacing IBM Plex.
+Self-hosted from `@fontsource/sora`, `@fontsource/figtree` and `@fontsource/dm-mono` (Latin
+subset, imported by `UiProvider`) rather than the Google Fonts CDN: no third-party request or
+tracking, works offline and behind strict CSP, versions pinned in the lockfile, and the CI
+screenshots render the same glyphs every time. Tabular figures (`tnum`) everywhere. The scale
+below stays at 13 px until the density pass (ADR 0085, decision 5) moves Trader to 15 px.
 
 | Token | xs | sm | md | base | lg | xl | 2xl | 3xl |
 |---|---|---|---|---|---|---|---|---|
@@ -152,7 +163,7 @@ Weights: regular 400, medium 500, semibold 600 (headings).
 | Size | `label` 140, `sidebar` 320, `page` 1600 px (max page width); `icon-sm` / `icon-md` / `icon-lg` 12 / 14 / 16; `popover` 280 (min list width); `search` 220 (top-bar search) |
 | Breakpoints (Grid `collapse`, container width) | sm 480, md 720, lg 960 px |
 | Touch (`@media (pointer: coarse)`, every density) | control 36, row 40, cell padding y 9 px (`density.touch`): controls, rows and every small variant keep at least the control height |
-| Radius | none 0, sm 3 (bars, tracks), md 4 (controls, chips), lg 6 (panels) |
+| Radius | none 0, sm 4 (bars, tracks), md 10 (controls, nav items), lg 16 (cards, panels), pill (verdict chips) |
 | Border | thin 1 px (all surfaces), thick 2 px; focus ring 2 px solid accent, offset 1 px |
 | Motion | fast 100 ms, base 150 ms, `cubic-bezier(0.2, 0, 0, 1)`; 0 ms under reduced motion |
 | z-index | base 0, raised 1, sticky 10, dropdown 100, overlay 200, modal 300, toast 400, tooltip 500 |

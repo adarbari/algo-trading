@@ -25,7 +25,7 @@ export const ROUTE_PAGES: Record<string, string[]> = {
 const EVERY_PAGE = ['src/entities/page-cache/index.ts', 'src/app/router/early-reads.ts'];
 
 /** The fonts the first paint uses (hashed file names found in the bundle): after the scripts. */
-const FONT = /ibm-plex-(sans-latin-(400|600)|mono-latin-400)-normal-.*\.woff2$/;
+export const FONT = /(figtree-latin-(400|600)|sora-latin-600|dm-mono-latin-400)-normal-.*\.woff2$/;
 
 /** What the plugin needs of a Rollup output chunk (asset entries are skipped). */
 export interface ChunkInfo {

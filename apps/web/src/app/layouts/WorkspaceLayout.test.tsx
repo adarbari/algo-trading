@@ -23,6 +23,8 @@ import { currentSession, gql, signOutSession, subscribeSession } from '@/shared/
 import { TRADER } from '../workspaces';
 import { WorkspaceLayout } from './WorkspaceLayout';
 
+vi.mock('@/widgets/theme-choice', () => ({ ThemeChoice: () => null }));
+
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
