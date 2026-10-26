@@ -13,7 +13,7 @@ from pathlib import Path
 
 DATA_URL = "ALGOTRADE_DATA_URL"
 DEFAULT_DATA_URL = "file://./var/data"
-# The bought option history's own store (ADR 0086), on the external drive: no default, so an
+# The bought option history's own store (ADR 0084), on the external drive: no default, so an
 # unset or unmounted root is "unavailable", never a folder under ./var. Ingestion only.
 OPTION_HISTORY_URL = "ALGOTRADE_OPTION_HISTORY_URL"
 CONFIG_DIR = "ALGOTRADE_CONFIG_DIR"
@@ -168,7 +168,7 @@ def data_url(explicit: str | None = None) -> str:
 
 def option_history_url(explicit: str | None = None) -> str | None:
     """The option-history store URL: ``explicit`` (a CLI flag), else
-    ``$ALGOTRADE_OPTION_HISTORY_URL``, else ``None`` (no default; ADR 0086)."""
+    ``$ALGOTRADE_OPTION_HISTORY_URL``, else ``None`` (no default; ADR 0084)."""
     value = explicit or credential(OPTION_HISTORY_URL)
     return value.strip() if value and value.strip() else None
 

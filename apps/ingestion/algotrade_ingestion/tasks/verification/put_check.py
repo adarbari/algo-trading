@@ -1,4 +1,4 @@
-"""The ``option-history-put-check`` task (ADR 0086 decision 6): replicate Cboe's PUT index from the
+"""The ``option-history-put-check`` task (ADR 0084 decision 6): replicate Cboe's PUT index from the
 stored option history and compare it with the published level (``macro/series`` ``IDX:PUT``).
 
 ``algotrade-ingest run option-history-put-check [--from D] [--to D] [--price mid|bid]``. The
@@ -29,7 +29,7 @@ from algotrade_ingestion.tasks.verification import put_replication
 TASK = "option-history-put-check"
 SERIES = "PUT"
 THREE_MONTHS = 91  # tenor_days of the curve's 3M point
-# Fixed before the full run (ADR 0086): the RMS of the daily return difference and the
+# Fixed before the full run (ADR 0084): the RMS of the daily return difference and the
 # cumulative gap, annualised.
 MAX_RMS_BP, MAX_ANNUAL_GAP_BP = 5.0, 100.0
 
@@ -115,7 +115,7 @@ def put_check(
         run.stats["annualised_gap_bp"] = annual_gap
         within = bool(report["rms_daily_diff_bp"] <= MAX_RMS_BP and annual_gap <= MAX_ANNUAL_GAP_BP)
         run.stats["within_tolerance"] = within
-        if not within:  # reported as a FAILED check, never tuned away (ADR 0086 decision 6)
+        if not within:  # reported as a FAILED check, never tuned away (ADR 0084 decision 6)
             run.failed(
                 f"outside tolerance: RMS {report['rms_daily_diff_bp']:.1f} bp "
                 f"(max {MAX_RMS_BP}), annualised gap {annual_gap:.1f} bp (max {MAX_ANNUAL_GAP_BP})"

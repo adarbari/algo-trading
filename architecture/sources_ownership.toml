@@ -70,10 +70,10 @@ detect = [{ string_prefix = "https://api.finra.org" }]
 
 [[responsibility]]
 id = "hod-session-files"
-description = "Parse HistoricalOptionData Level 2 files (ADR 0086): a folder of daily or monthly zips by member name, one session's options (both header variants, the 16:00 New York instant, the contract id from the explicit columns, adjusted series excluded and counted), stockquotes, optionstats, and the headerless dividends and splits; nothing filtered, nothing extracted to disk"
+description = "Parse HistoricalOptionData Level 2 files (ADR 0084): a folder of daily or monthly zips by member name, one session's options (both header variants, the 16:00 New York instant, the contract id from the explicit columns, adjusted series excluded and counted), stockquotes, optionstats, and the headerless dividends and splits; nothing filtered, nothing extracted to disk"
 owner = ["libs/sources/algotrade_sources/vendors/historicaloptiondata/*"]
 allowed = ["libs/sources/algotrade_sources/framework/registry.py"]  # builds the source from the folder
-section = "docs/adr/0086-bought-option-history.md#decision"
+section = "docs/adr/0084-bought-option-history.md#decision"
 detect = [{ call = "parse_options" }, { call = "parse_stock_quotes" }]
 
 [[responsibility]]

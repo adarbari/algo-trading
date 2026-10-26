@@ -1,4 +1,4 @@
-"""Open the option-history store (ADR 0086): its own root, marked by a sentinel file.
+"""Open the option-history store (ADR 0084): its own root, marked by a sentinel file.
 
 The local backend's lock creates missing directories, so a path whose drive is not mounted would
 quietly fill the boot disk. A history root therefore has to exist and hold ``SENTINEL`` before
@@ -72,5 +72,5 @@ def init_root(url: str | None) -> Path:
     (path / ".probe.lock").unlink(missing_ok=True)
     probe.replace(moved)
     moved.unlink()
-    (path / SENTINEL).write_text("ALGOTRADE option history (ADR 0086)\n")
+    (path / SENTINEL).write_text("ALGOTRADE option history (ADR 0084)\n")
     return path

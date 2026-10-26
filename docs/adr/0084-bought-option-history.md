@@ -1,4 +1,4 @@
-# ADR 0086: Bought end-of-day option history (HistoricalOptionData Level 2): a personal-licence store beside the Cboe chains
+# ADR 0084: Bought end-of-day option history (HistoricalOptionData Level 2): a personal-licence store beside the Cboe chains
 
 **Status:** proposed (2026-10-25; architect-reviewed once, findings applied). The owner chose the
 vendor after comparing HistoricalOptionData Level 2 ($1,495 once, 2002 to present) with ORATS ($599, 2007 on).

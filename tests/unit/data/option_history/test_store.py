@@ -1,4 +1,4 @@
-"""The option-history root (ADR 0086): no URL, no folder, no sentinel are each an error that names
+"""The option-history root (ADR 0084): no URL, no folder, no sentinel are each an error that names
 the fix, and a drive that is not mounted is never created on the boot disk."""
 
 from pathlib import Path

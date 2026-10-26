@@ -344,10 +344,10 @@ detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
 
 [[responsibility]]
 id = "option-history-import"
-description = "Import bought HistoricalOptionData zips into the option-history store (ADR 0086): list the folder's sessions, import each as its own committed run (a held checksum is skipped), resolve underlying ids (index map, then the strict listing resolver as of the session, null when unknown), store the vendor's dividends and splits once; the history store's own lock and recovery, never the main ingest lock; the batch FAILS by its acceptance rules"
+description = "Import bought HistoricalOptionData zips into the option-history store (ADR 0084): list the folder's sessions, import each as its own committed run (a held checksum is skipped), resolve underlying ids (index map, then the strict listing resolver as of the session, null when unknown), store the vendor's dividends and splits once; the history store's own lock and recovery, never the main ingest lock; the batch FAILS by its acceptance rules"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py"]
 allowed = ["apps/ingestion/algotrade_ingestion/tasks/framework/entries_history.py"]  # the registry entry
-section = "docs/adr/0086-bought-option-history.md#decision"
+section = "docs/adr/0084-bought-option-history.md#decision"
 detect = [{ call = "import_session" }, { call = "import_history" }]
 
 [[responsibility]]

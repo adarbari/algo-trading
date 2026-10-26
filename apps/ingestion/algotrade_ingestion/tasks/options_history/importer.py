@@ -1,4 +1,4 @@
-"""The ``option-history-import`` task (ADR 0086): a folder of bought HistoricalOptionData zips into
+"""The ``option-history-import`` task (ADR 0084): a folder of bought HistoricalOptionData zips into
 the option-history store (``ALGOTRADE_OPTION_HISTORY_URL``, its own root on the external drive).
 
 ``algotrade-ingest run option-history-import --source-dir <folder> [--from D] [--to D] [--limit N]

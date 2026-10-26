@@ -1,4 +1,4 @@
-"""``HodFiles`` (ADR 0086): a folder of synthetic vendor zips as a source: the sessions with their
+"""``HodFiles`` (ADR 0084): a folder of synthetic vendor zips as a source: the sessions with their
 checksums, one session's frames with the index ids, the ``Source`` contract's fetch / normalize and
 the stock history; a session whose options file is for another day is refused."""
 

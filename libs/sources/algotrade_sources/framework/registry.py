@@ -544,7 +544,7 @@ FIXTURES: dict[str, Callable[[Path | None], FixtureSource]] = {"synthetic": gold
 
 
 # Bought files in a folder the owner points a task at (``--source-dir``), not an HTTP vendor:
-# no transport, pacing or ``sources.toml`` section (ADR 0086).
+# no transport, pacing or ``sources.toml`` section (ADR 0084).
 FILE_SOURCES: dict[str, Callable[[Path | None], Source]] = {"hod_files": hod_files}
 
 

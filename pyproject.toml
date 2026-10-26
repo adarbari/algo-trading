@@ -197,7 +197,7 @@ allowed_importers = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Option history is quarantined: only ingestion reads it (ADR 0086)"
+name = "Option history is quarantined: only ingestion reads it (ADR 0084)"
 type = "protected"
 protected_modules = ["algotrade.data.option_history"]
 allowed_importers = [

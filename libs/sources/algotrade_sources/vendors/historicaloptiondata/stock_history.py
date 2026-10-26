@@ -1,4 +1,4 @@
-"""Parse the vendor's one-off ``stockhistory`` files (ADR 0086): ``dividends.csv`` (symbol,
+"""Parse the vendor's one-off ``stockhistory`` files (ADR 0084): ``dividends.csv`` (symbol,
 ex-date, amount) and ``stocksplits.csv`` (symbol, date, ratio, text), both headerless, dates
 ``M/D/YYYY``. Stored as the vendor's facts and compared with ``events/dividend`` and
 ``events/split``; never merged into them."""

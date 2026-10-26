@@ -1,4 +1,4 @@
-"""Reads of the option-history tables (ADR 0086), by session and underlying symbol.
+"""Reads of the option-history tables (ADR 0084), by session and underlying symbol.
 
 A session's rows are the partition's latest published run's, found from the import's run
 records. ``symbol`` (the vendor's underlying symbol) is what a read filters on, because

@@ -197,8 +197,8 @@ purpose = "reads of macro series and index levels (macro/series, ADR 0048): each
 
 [[dir]]
 path = "src/algotrade/data/option_history"
-purpose = "the bought option history's store and reads (ADR 0086): the sentinel-marked root on the external drive (ALGOTRADE_OPTION_HISTORY_URL), the session's quotes, underlying days and option statistics; personal licence, importable only by ingestion's import and checks; data/ is at its module cap, so this is a folder"
-contracts = ["Option history is quarantined: only ingestion reads it (ADR 0086)"]
+purpose = "the bought option history's store and reads (ADR 0084): the sentinel-marked root on the external drive (ALGOTRADE_OPTION_HISTORY_URL), the session's quotes, underlying days and option statistics; personal licence, importable only by ingestion's import and checks; data/ is at its module cap, so this is a folder"
+contracts = ["Option history is quarantined: only ingestion reads it (ADR 0084)"]
 
 [[dir]]
 path = "src/algotrade/data/outcomes"
