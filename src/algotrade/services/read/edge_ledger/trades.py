@@ -319,7 +319,7 @@ def _unnamed(
     words = f"{basis.key[0]}, {basis.key[1]} trading days"
     offset = 0 if limit is None else (page - 1) * limit
     if period is Period.LIVE and not is_recording(edge):
-        why = "paper trades are recorded once the edge is evidenced or followed"
+        why = "paper trades are recorded for an open site setup, or once you set your own edge live"
         link = CauseLink(CauseLevel.STEP, PAPER_STEP, UnknownCode.NOT_RECORDING.value, why)
         gap = Unknown(UnknownCode.NOT_RECORDING, Cause((link,)))
         return EdgeTradePage(period, page, gap, words)
@@ -429,7 +429,7 @@ def load_filtered_trades(
     if withheld and sample == [NO] and not given & {"record", "in_sample"}:
         return EdgeTradePage(shown, page, None, words, oos_hidden=True)  # the out-of-sample period
     if live and not backtest and not recording:
-        why = "paper trades are recorded once the edge is evidenced or followed"
+        why = "paper trades are recorded for an open site setup, or once you set your own edge live"
         return EdgeTradePage(shown, page, _unknown(why, UnknownCode.NOT_RECORDING), words)
     hidden = withheld
     rows: list[TradeRow] = []

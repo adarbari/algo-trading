@@ -197,6 +197,15 @@ allowed_importers = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Option history is quarantined: only ingestion reads it (ADR 0084)"
+type = "protected"
+protected_modules = ["algotrade.data.option_history"]
+allowed_importers = [
+    "algotrade_ingestion.tasks.options_history",
+    "algotrade_ingestion.tasks.verification",
+]
+
+[[tool.importlinter.contracts]]
 name = "Time-series evaluation reads outcomes only through its harness seam (ADR 0073)"
 type = "forbidden"
 source_modules = ["algotrade.services.evaluation.time_series"]

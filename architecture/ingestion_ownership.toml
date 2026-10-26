@@ -343,6 +343,14 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
 
 [[responsibility]]
+id = "option-history-import"
+description = "Import bought HistoricalOptionData zips into the option-history store (ADR 0084): list the folder's sessions, import each as its own committed run (a held checksum is skipped), resolve underlying ids (index map, then the strict listing resolver as of the session, null when unknown), store the vendor's dividends and splits once; the history store's own lock and recovery, never the main ingest lock; the batch FAILS by its acceptance rules"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/framework/entries_history.py"]  # the registry entry
+section = "docs/adr/0084-bought-option-history.md#decision"
+detect = [{ call = "import_session" }, { call = "import_history" }]
+
+[[responsibility]]
 id = "option-outcomes"
 description = "Compute and store chain P&L outcomes (ADR 0053 amendment, EB H13): for each window a session closes (S = T - h exchange sessions; structure, tenor rule and horizons from the open edge documents' option_pnl outcomes), for every underlying whose chain at S is OK, the contracts chosen from S's chain (the first expiry at least tenor_days out and not before T; the at-the-money strike or the put of a target delta by our own delta), their entry mid and ask, exit mid and bid (intrinsic at expiry), the P&L per unit premium and per underlying and the daily delta-hedged P&L (our own delta from each session's chain), UNMEASURED with a reason when a chain of the window is missing or STALE_DATA (ADR 0054; never filled from an earlier session), one run per window end into outcomes/option/structure_pnl@v1 with knowledge_ts the latest chain partition read, and its acceptance check; forward-only (chains from 2026-10-02); read back only through algotrade.data.outcomes, importable only from services/evaluation"
 owner = [

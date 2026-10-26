@@ -64,3 +64,15 @@ def trial_licences(
         score=score,
         adv=_of(features, (ADV_FIELD,)),
     )
+
+
+def picks_licence(
+    features: FeatureSet,
+    edge: Edge,
+    universe: Selection,
+    config: ResolvedConfig,
+    iv_licence: str | None,
+) -> str:
+    """The strictest licence of what a paper pick of ``edge`` through ``config`` is read from
+    (the trial's own: ``trial_licences``), recorded on each paper row at the signal."""
+    return trial_licences(features, edge, universe, [config], iv_licence).trial

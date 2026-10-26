@@ -188,12 +188,14 @@ def test_a_page_below_the_first_is_the_first(backend: MemoryBackend) -> None:
     assert page.page == 1 and [r.instrument_id for r in page.rows] == ["EQ:A", "EQ:B"]
 
 
-def test_a_candidate_has_no_live_period_and_says_so_never_an_empty_list(
+def test_a_draft_has_no_live_period_and_says_so_never_an_empty_list(
     backend: MemoryBackend,
 ) -> None:
     """The test that would have caught the Live filter showing "0 trades" for an edge that does
-    not record paper trades."""
-    ctx = context(backend, "me", cutoff=CUTOFF)  # drift is a candidate: nothing is recorded
+    not record paper trades (an open site setup, a candidate, does: from ADR 0053's 2026-10-24
+    amendment)."""
+    draft = {("site", "edges", "drift"): {**EDGE, "status": "researching"}}
+    ctx = context(backend, "me", draft, cutoff=CUTOFF)  # a draft: nothing is recorded
     page = load_edge_trades(ctx, edge_of(ctx), Period.LIVE)
     assert page.unknown is not None and page.unknown.code is UnknownCode.NOT_RECORDING
     assert page.rows == () and page.basis == "momo, 20 trading days"

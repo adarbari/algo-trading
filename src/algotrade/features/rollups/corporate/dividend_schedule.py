@@ -34,7 +34,10 @@ not known earlier: the snapshot rule, ADR 0007). On session S:
 A date after the session is only listed from 30 days before it, so NOT_ANNOUNCED is "none in
 the next ~30 days", not "none this quarter": ``days_to_ex_date`` above 30 never occurs. A session
 with no dividend row stored by it at all (before the first corporate-actions partition) has no
-row: UNKNOWN, never NOT_ANNOUNCED, which is only for a session whose listings were read.
+row: UNKNOWN, never NOT_ANNOUNCED, which is only for a session whose listings were read. A row
+backfilled later and known from its ex-date (``bars-history``'s Tiingo history: ``known_from``
+the ex-date, stored in a 2026 partition) is no listing read on that session: only a partition
+stored by the session (``session_date`` on or before it) makes NOT_ANNOUNCED knowable.
 """
 
 from datetime import date
@@ -150,8 +153,11 @@ def upcoming(
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     stats = inputs[PRICE_STATS]
     assert stats is not None  # required input
+    declared = inputs.get(DECLARED)
+    if declared is None or not (pd.to_datetime(declared["session_date"]).dt.date <= session).any():
+        return pd.DataFrame(columns=["instrument_id", *COLUMNS])  # no listing read: UNKNOWN
     today = stats[stats["session_date"] == session][["instrument_id"]]
-    nxt = upcoming(inputs.get(DECLARED), inputs.get(SPLITS), session)
+    nxt = upcoming(declared, inputs.get(SPLITS), session)
     out = today.merge(nxt, on="instrument_id", how="left")
     out["dividend_status"] = np.where(out["next_ex_date"].notna(), SCHEDULED, NOT_ANNOUNCED)
     return out[["instrument_id", *COLUMNS]].reset_index(drop=True)

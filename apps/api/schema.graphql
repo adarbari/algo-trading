@@ -685,7 +685,7 @@ type EdgeLive {
 }
 
 """
-One edge's live state for the session, the word a list, a header and the Ideas banner show. `state` is the live record's: on_track, below or above the backtest's usual range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or no_trades (no live record yet), not_settled (the session's nightly has not completed: nothing is judged) or not_recording (the edge records no paper trades: a candidate); `closed` settled trades, `wins`, `winRate`; `headline` the sentence; `term` the Guide entry that explains the state; `followed` the edge is on the user's desk (else a site edge the site records). Settled trades only, as the session's cutoff knew them
+One edge's live state for the session, the word a list, a header and the Ideas banner show. `state` is the live record's: on_track, below or above the backtest's usual range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or no_trades (no live record yet), not_settled (the session's nightly has not completed: nothing is judged) or not_recording (the edge records no paper trades: a draft, a closed site setup or an own candidate); `closed` settled trades, `wins`, `winRate`; `headline` the sentence; `term` the Guide entry that explains the state; `followed` the edge is on the user's desk (else a site edge the site records). Settled trades only, as the session's cutoff knew them
 """
 type EdgeLiveState {
   edgeId: String!
@@ -1429,7 +1429,7 @@ type FilterableFeature {
 }
 
 """
-An edge the user follows (or tries as a new version) and its record. `tonight` is what the nightly did for it on the session, so an empty buy list says why: signalled, no_picks (due, the screen qualified none), not_due, skipped (due but could not be signalled: `tonightReason`), not_recording (the nightly ran but the edge is not evidenced or live) or not_run (no nightly run for the session); `missed` the due sessions since the previous night that nobody signalled
+An edge the user follows (or tries as a new version) and its record. `tonight` is what the nightly did for it on the session, so an empty buy list says why: signalled, no_picks (due, the screen qualified none), not_due, skipped (due but could not be signalled: `tonightReason`), not_recording (the nightly ran but the edge is not open for recording) or not_run (no nightly run for the session); `missed` the due sessions since the previous night that nobody signalled
 """
 type FollowedEdge {
   edgeId: String!
