@@ -275,6 +275,11 @@ purpose = "volatility tasks: Cboe VIX futures by expiry (the VIX-family indices 
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/options_history"
+purpose = "the import of bought option history (ADR 0084): a folder of HistoricalOptionData zips into the option-history store, one committed run per session; tasks/market is at its module cap"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/profile"
 purpose = "profile tasks: descriptive text about what an instrument is (stock descriptions from Massive, ETF investment objectives from SEC prospectuses)"
 kind = "task-domain"

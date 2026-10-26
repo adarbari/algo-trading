@@ -89,6 +89,19 @@ def run_delisted_tickers(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
+LISTING_HISTORY = Task(
+    "listing-history",
+    "every US stock / ETF Tiingo ever listed, with its dates "
+    "(instruments/listing_history); in no workflow until the owner has read a real pull",
+    listing_history,
+    ("instruments/listing_history",),
+    run_listing_history,
+    sources=("tiingo_listings", "tiingo_meta"),
+    settings="sources.toml [tiingo]",
+    params=(SESSION,),
+)
+
+
 DELISTED_TICKERS = Task(
     "delisted-tickers",
     "Massive's delisted tickers (instruments/delisted_tickers); in no workflow",

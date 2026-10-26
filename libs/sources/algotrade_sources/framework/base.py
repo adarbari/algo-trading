@@ -201,3 +201,30 @@ class FixtureSource(Source, Protocol):
         ...
 
     def build(self) -> list[str]: ...
+
+
+@dataclass(frozen=True)
+class HistorySession:
+    """One session of a folder of bought history files: where it is and a checksum of its main
+    file (the zip member's CRC and size), so an import knows a session it already holds."""
+
+    session: date
+    location: str  # the zip's name
+    checksum: str
+    complete: bool  # every kind of file the vendor ships for a session is there
+
+
+@runtime_checkable
+class HistoryFileSource(Source, Protocol):
+    """A source over bought files in a folder (ADR 0084), not a vendor API: the sessions the
+    folder holds, one session's frames, and the one-off stock history."""
+
+    def sessions(self) -> list[HistorySession]: ...
+
+    def read(self, session: date) -> Normalized:
+        """One session's frames by table, with the day's quality counts in ``notes``."""
+        ...
+
+    def stock_history(self) -> Normalized | None:
+        """The vendor's dividends and splits (frames carry ``ex_date``), or ``None``."""
+        ...

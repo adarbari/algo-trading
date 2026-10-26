@@ -166,6 +166,10 @@ path = "tests/helpers/finra"
 purpose = "builders of the FINRA short-interest tests shared across suites: the Query API payloads (short interest, short-sale volume) in the API's field names"
 
 [[test_dir]]
+path = "tests/helpers/option_history"
+purpose = "builders of the option-history tests shared across suites: synthetic HistoricalOptionData zips in a folder (the vendor's file layouts, invented numbers) and a main store with the listings they resolve through"
+
+[[test_dir]]
 path = "tests/helpers/payloads"
 purpose = "synthetic payloads in a vendor's wire format, one module per vendor or feed"
 

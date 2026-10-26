@@ -64,6 +64,7 @@ from algotrade_sources.vendors.fred.observations import (
     too_many_vintages,
 )
 from algotrade_sources.vendors.fred.releases import FredReleaseDates
+from algotrade_sources.vendors.historicaloptiondata.files_source import hod_files
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
@@ -542,6 +543,11 @@ SESSION_SOURCES: dict[str, SessionSpec] = {
 FIXTURES: dict[str, Callable[[Path | None], FixtureSource]] = {"synthetic": golden_source}
 
 
+# Bought files in a folder the owner points a task at (``--source-dir``), not an HTTP vendor:
+# no transport, pacing or ``sources.toml`` section (ADR 0084).
+FILE_SOURCES: dict[str, Callable[[Path | None], Source]] = {"hod_files": hod_files}
+
+
 def fixture_source(name: str, directory: Path | None = None) -> FixtureSource:
     """The fixture source ``name`` over ``directory``. Unknown names raise ``KeyError``."""
     return FIXTURES[name](directory)
@@ -637,6 +643,9 @@ def build_sources(
     for name in wanted:
         if name in FIXTURES:
             built.sources[name] = fixture_source(name, fixture_dir)
+            continue
+        if name in FILE_SOURCES:
+            built.sources[name] = FILE_SOURCES[name](fixture_dir)
             continue
         if name in SESSION_SOURCES:
             session = SESSION_SOURCES[name]

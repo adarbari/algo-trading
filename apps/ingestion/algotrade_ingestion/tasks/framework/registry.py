@@ -35,6 +35,7 @@ from algotrade_ingestion.tasks.framework import (
     entries_reference,
     source_guards,
 )
+from algotrade_ingestion.tasks.framework.entries_history import HISTORY_TASKS
 from algotrade_ingestion.tasks.framework.params import (
     FROM,
     SESSION,
@@ -45,7 +46,7 @@ from algotrade_ingestion.tasks.framework.params import (
     session_of,
 )
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.listings import index_membership, listing_history, winners_sample
+from algotrade_ingestion.tasks.listings import index_membership, winners_sample
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
 from algotrade_ingestion.tasks.macro import series as macro_series
 from algotrade_ingestion.tasks.maintenance import (
@@ -174,17 +175,7 @@ TASKS: dict[str, Task] = {
                 Param("limit", ("--limit",), int, "fetch at most N companies this run"),
             ),
         ),
-        Task(
-            "listing-history",
-            "every US stock / ETF Tiingo ever listed, with its dates "
-            "(instruments/listing_history); in no workflow until the owner has read a real pull",
-            listing_history,
-            ("instruments/listing_history",),
-            entries_reference.run_listing_history,
-            sources=("tiingo_listings", "tiingo_meta"),
-            settings="sources.toml [tiingo]",
-            params=(SESSION,),
-        ),
+        entries_reference.LISTING_HISTORY,
         entries_reference.DELISTED_TICKERS,
         Task(
             "analyst-probe",
@@ -980,6 +971,7 @@ TASKS: dict[str, Task] = {
             sources=("synthetic",),
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),
         ),
+        *HISTORY_TASKS,
     )
 }
 
