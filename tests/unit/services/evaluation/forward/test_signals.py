@@ -2,15 +2,17 @@
 schedule fires from the record's ``since``, read at the signal session alone, and an edge or a
 screen that cannot be traded says why instead of returning an empty record."""
 
+from dataclasses import replace
 from datetime import date
 
-from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.loading import load_edges, records_paper
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.core.time.calendar import next_session
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
 from algotrade.services.evaluation.forward.signals import (
-    _not_possible,
     edge_signals,
     legs_between,
+    not_possible,
     paper_traded,
 )
 from tests.unit.services.evaluation.cross_section.conftest import DAYS, build_world, edge
@@ -60,8 +62,8 @@ def test_a_session_before_the_record_began_does_not_signal(following: Desk) -> N
     assert len(signals(following, DAYS[3], since=DAYS[3]).signals) == 5
 
 
-def test_only_an_evidenced_or_live_edge_is_paper_traded() -> None:
-    recording = {"live": True, "evidenced": True, "candidate": False, "retired": False}
+def test_only_an_open_site_edge_is_paper_traded() -> None:
+    recording = {"live": True, "evidenced": True, "candidate": True, "retired": False}
     for status, expected in {**recording, "researching": False, "rejected": False}.items():
         (edge,) = load_edges(site_desk(status=status, followers=()).configs, "site")
         assert paper_traded(edge) is expected
@@ -134,7 +136,23 @@ def test_a_short_or_long_short_edge_is_never_paper_traded_as_longs() -> None:
     spread says why instead of signalling the screen's best names."""
     base = {"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
             "start_offset_sessions": 1}  # fmt: skip
-    assert _not_possible(edge()) is None
+    assert not_possible(edge()) is None
     for side in ("short", "long_short"):
-        why = _not_possible(edge(outcome={**base, "side": side}, top_k=5))
+        why = not_possible(edge(outcome={**base, "side": side}, top_k=5))
         assert why is not None and side in why
+
+
+def test_a_portfolio_book_is_not_paper_traded_it_settles_whole_never_name_by_name() -> None:
+    book = replace(edge(), outcome=replace(edge().outcome, kind=PORTFOLIO_KIND))
+    why = not_possible(book)
+    assert why is not None and "portfolio" in why
+
+
+def test_the_gate_is_by_status_and_by_whose_edge_it_is() -> None:
+    for status in ("candidate", "evidenced", "live"):
+        assert records_paper(status, site=True)
+    for status in ("researching", "retired", "rejected", "blocked"):
+        assert not records_paper(status, site=True)
+    for status in ("researching", "candidate", "retired", "rejected", "blocked"):
+        assert not records_paper(status, site=False)  # a user's draft is no one's evidence
+    assert records_paper("live", site=False) and records_paper("evidenced", site=False)

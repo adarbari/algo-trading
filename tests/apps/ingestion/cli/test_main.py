@@ -1,5 +1,6 @@
 """End-to-end: the ingestion CLI against a local store, with fake vendor feeds (no network)."""
 
+import argparse
 import csv
 import json
 from datetime import date
@@ -684,3 +685,10 @@ def test_ingestion_caps_arrow_threads_from_the_site_config(
     monkeypatch.setattr(cli, "limit_threads", lambda cpu, io: seen.append((cpu, io)))
     cli.main(["arrivals"])
     assert seen == [(2, 4)]
+
+
+def test_the_option_history_import_takes_no_main_lock_but_the_put_check_does() -> None:
+    """The import holds the history store's own lock (ADR 0084), so the nightly's lock stays free
+    for the hours it runs; the PUT check writes a run record to the main store, under its lock."""
+    assert not cli.writes(argparse.Namespace(command="run", task="option-history-import"))
+    assert cli.writes(argparse.Namespace(command="run", task="option-history-put-check"))

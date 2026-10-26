@@ -77,3 +77,19 @@ def test_read_paper_keeps_only_the_rows_of_each_edges_record_owner() -> None:
     ]  # fmt: skip
     assert read_paper(store, {}, D1, D2).empty
     assert len(read_stored(store, "u1", D1, D2)) == 2  # the owner's own nightly settles both
+
+
+def test_a_row_written_before_the_return_and_licence_columns_reads_with_them_null() -> None:
+    """The partition of D1 was written by the first run without the columns; a later run that has
+    them merges into it, and both rows read back under ``PAPER_COLUMNS`` (null, never missing)."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    known = datetime(2026, 9, 1, 22, tzinfo=UTC)
+    old = _row("site", "EQ:A", D1)
+    new = _row("site", "EQ:B", D1, "won") | {"return": 0.04, "licence": "personal"}
+    for run, row in (("r1", old), ("r2", new)):
+        writer.write_table(EDGE_PAPER.name, D1, run, stamped([row], D1, run, known, "edge-signals"))
+    out = read_stored(StoreReader(backend), "site", D1, D1).set_index("instrument_id")
+    assert list(out.columns) == [c for c in PAPER_COLUMNS if c != "instrument_id"]
+    assert pd.isna(out.loc["EQ:A", "return"]) and pd.isna(out.loc["EQ:A", "licence"])
+    assert out.loc["EQ:B", "return"] == 0.04 and out.loc["EQ:B", "licence"] == "personal"

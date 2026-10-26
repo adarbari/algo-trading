@@ -45,6 +45,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | IV history / IV rank (enrichment) | **IBKR** (ADR 0028): IB's daily 30-day IV and HV per underlying, years of history; personal-use licence | our IV30 history (from the Cboe chains), the fallback | Implemented: `ibkr_iv@v1`, `iv_rank` with `iv_rank_source` |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
+| End-of-day option chains, history 2002 on (survivorship-free) | **HistoricalOptionData Level 2** (DeltaNeutral LLC; $1,495 once, daily or monthly zips of CSVs, the owner downloads them; `sources/vendors/historicaloptiondata`, `hod_files`, a folder source, no HTTP): raw 16:00 bid / ask / last / volume / open interest for about 4,300 underlyings incl. delisted names, plus stock quotes, option statistics, dividends and splits; personal licence | ORATS ($599, 2007 on) | Implemented (ADR 0084): `option-history-import` into its own store, `docs/data/option-history.md` |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
 | Analyst estimates, price targets, ratings (free tier) | **Yahoo** (unofficial, owner-only licence, ADR 0080: read per name when FMP has none: `analyst_*@v2`), **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v2`, `analyst_targets@v2`, `analyst_ratings@v2`, `analyst_revisions@v2` are built (docs/data/layers.md) |
@@ -158,8 +159,12 @@ sent as an `Authorization: Token` header, never in URLs, raw files or logs. Lice
 written `BRK-B`; an unknown ticker answers 404). The payload's `open` / `high` / `low` /
 `close` / `volume` are **unadjusted**; they are stored as `bars/1d` rows with `source =
 "tiingo"` by the `bars-history` task (the `adj*` fields are ignored: corporate actions apply at
-read time, ADR 0016). `splitFactor` and `divCash` stay in the parsed payload for the task's
-split check against `events/split`.
+read time, ADR 0016). `splitFactor` and `divCash` stay in the parsed payload: the task checks
+the splits against `events/split` and writes the splits and dividends Massive's shallow history
+lacks (`events/split`, and `events/dividend` for ex-dates before Massive's first one, 2024-09;
+`divCash` is unadjusted, in the ex-date's share terms, untyped; `known_from` = the ex-date, as
+Tiingo gives no declaration date). `bars-history --actions-only --from-listings --since
+2002-01-01` stores that history back to 2002 without the bars.
 
 Free tier: 500 unique symbols a month, 50 requests an hour, 1,000 a day, so requests are spaced
 72 s apart (`[tiingo] min_interval_s`) and the ~140 scoped names take about 3 hours. The Power
