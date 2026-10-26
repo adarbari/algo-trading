@@ -360,6 +360,12 @@ def test_the_macro_calendar_threshold_loads() -> None:
     assert SourcesSettings.from_document(document).min_calendar_future_dates == 3
 
 
+def test_the_delisted_tickers_floor_loads() -> None:
+    assert SourcesSettings.from_document(site("sources")).min_delisted_tickers == 10_000
+    document = {"quality": {"min_delisted_tickers": 5}}
+    assert SourcesSettings.from_document(document).min_delisted_tickers == 5
+
+
 def test_the_filings_threshold_loads() -> None:
     assert SourcesSettings.from_document(site("sources")).max_filings_failed == 0.05
     document = {"quality": {"max_filings_failed": 0.2}}

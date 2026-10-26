@@ -10,13 +10,15 @@ from tests.conftest import REPO_ROOT
 
 SCANNED = ("src/algotrade", "apps/api", "apps/backtest", "apps/ingestion", "libs")
 ALLOWED = (
-    "src/algotrade/data/listings/",  # universe_asof, delisted_by, read_listings, S&P 500
+    # universe_asof, delisted_by, read_listings, S&P 500; delisted.py (ADR 0086: Massive's
+    # delisted tickers, for the id merge and the quality report only)
+    "src/algotrade/data/listings/",
     "src/algotrade/data/resolver.py",  # is this listing alive on S
     "src/algotrade/storage/tables/schemas/reference.py",  # declares the columns
     "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",  # listing -> id
-    "apps/ingestion/algotrade_ingestion/tasks/listings/",  # the winners sample and its coverage
+    "apps/ingestion/algotrade_ingestion/tasks/listings/",  # winners sample, coverage, delisted
     "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # listings_over: clip
-    "libs/sources/",  # the vendor adapters that write the column
+    "libs/sources/",  # the vendor adapters that write the column (Tiingo, Massive inactive)
 )
 READ = re.compile(r"(?<![A-Za-z0-9_])end_date(?![A-Za-z0-9_])")
 

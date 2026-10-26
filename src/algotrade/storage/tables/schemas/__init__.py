@@ -80,6 +80,7 @@ from algotrade.storage.tables.schemas.outcomes import (
     outcomes_spec,
 )
 from algotrade.storage.tables.schemas.reference import (
+    DELISTED_TICKERS,
     ETF_HOLDINGS,
     ETF_SHARES,
     ID_MAP,
@@ -134,6 +135,7 @@ __all__ = [
     "CARRIED_FROM",
     "CHAIN_STATUS",
     "COVERAGE_STATUSES",
+    "DELISTED_TICKERS",
     "DISPLAY_COLUMN_MODE",
     "EARNINGS_8K_SOURCE",
     "EARNINGS_EVENTS",
