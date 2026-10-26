@@ -168,6 +168,18 @@ def test_one_row_per_price_stats_instrument_and_listings_without_a_date_are_not_
     assert out.drop(columns="dividend_status").isna().all().all()
 
 
+def test_a_backfilled_ex_date_known_on_the_session_is_no_listing_read_on_it() -> None:
+    """A Tiingo history row (``known_from`` its ex-date, stored in a later partition) is known on
+    its ex-date, but no corporate-actions listing was read by then: the session stays UNKNOWN (no
+    row), never NOT_ANNOUNCED for every name."""
+    writer, reader, days = _setup()
+    row = {"instrument_id": "EQ:A", "symbol": "A", "ts": pd.Timestamp(days[-3], tz="UTC"),
+           "cash_amount": 0.25, "known_from": days[-3]}  # fmt: skip
+    writer.write_table("events/dividend", END, "tiingo", stamped([row], END, "tiingo"))
+    frame = _frame(reader, days[-3])
+    assert frame is None or frame.empty
+
+
 def test_a_dividend_declared_after_the_session_is_not_known_in_a_rerun_partition() -> None:
     """A step retried later for the session stores what the vendor knows by then in the
     session's partition: a declaration dated after the session is not known on it."""

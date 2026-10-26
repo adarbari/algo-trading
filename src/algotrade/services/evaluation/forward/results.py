@@ -27,10 +27,19 @@ from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.paper import LOOKBACK_DAYS, job_name, read_stored
-from algotrade.services.evaluation.forward.settle import OPEN, outcome_hash, settle_group
+from algotrade.services.evaluation.forward.settle import (
+    GRACE_SESSIONS,
+    OPEN,
+    SKIPPED,
+    Settled,
+    outcome_hash,
+    settle_group,
+)
 from algotrade.services.evaluation.forward.signals import (
+    advance,
     edge_signals,
     legs_between,
+    not_possible,
     paper_traded,
 )
 from algotrade.storage.configs.store import ConfigStore
@@ -46,8 +55,8 @@ MISSED = "the nightly did not run edge-signals for this session"
 
 def paper_owners(reader: StoreReader, configs: ConfigStore, session: date) -> list[UserContext]:
     """The record owners the nightly works for, ``site`` first: those with an edge of their own
-    recording (evidenced or live), and those who still have open paper trades (they settle after
-    the edge stopped recording or is gone; a follower's old rows of a site edge count)."""
+    recording (``loading.records_paper``), and those who still have open paper trades (they settle
+    after the edge stopped recording or is gone; a follower's old rows of a site edge count)."""
     since = session - timedelta(days=LOOKBACK_DAYS)
     owners = []
     for owner in dict.fromkeys([SITE_USER, *configs.users()]):
@@ -81,25 +90,40 @@ def _settlements(
     book: pd.DataFrame,
     session: date,
     now: datetime,
-) -> tuple[list[dict[str, Any]], dict[str, int]]:
+) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, str]]]:
     open_rows = book[(book["status"] == OPEN) & (book["sell_session"] <= session)]
     rows: list[dict[str, Any]] = []
     counted: dict[str, int] = defaultdict(int)
+    failed: list[dict[str, str]] = []
     for group in _group(open_rows):
         edge = edges.get(str(group.iloc[0]["edge_id"]))
         if edge is None:  # deleted since: its trades stay open, nothing judges them
             continue
         by_name = group.set_index("instrument_id")
-        for done in settle_group(reader, edge, group, session, now):
+        try:
+            settled = settle_group(reader, edge, group, session, now)
+        except ConfigurationError as error:  # one edge's outcome never stops the night's record
+            why = f"the outcome could not be settled: {error}"
+            failed.append({"edge": edge.id, "reason": why})
+            late = session >= advance(group.iloc[0]["sell_session"], GRACE_SESSIONS)
+            # the trades stay open (a fixed definition settles them) and are skipped, with the
+            # reason, only once their window is long past
+            settled = (
+                [Settled(str(i), SKIPPED, why, None, False) for i in group["instrument_id"]]
+                if late
+                else []
+            )
+        for done in settled:
             row: dict[str, Any] = {str(k): v for k, v in by_name.loc[done.instrument_id].items()}
             row["instrument_id"] = done.instrument_id
             row.update(
                 status=done.status, reason=done.reason, delisted=done.delisted,
                 excess_return=float("nan") if done.excess_return is None else done.excess_return,
             )  # fmt: skip
+            row["return"] = float("nan") if done.raw_return is None else done.raw_return
             rows.append(row)
             counted[edge.id] += 1
-    return rows, dict(counted)
+    return rows, dict(counted), failed
 
 
 def _signals(
@@ -142,9 +166,11 @@ def _signals(
                     "user_id": user_id, "edge_id": edge.id, "signal_session": session,
                     "instrument_id": s.instrument_id, "config_hash": found.config_hash,
                     "outcome_hash": outcome_hash(edge), "screener": found.screener,
+                    "licence": found.licence,
                     "status": OPEN, "reason": "", "buy_session": s.buy_session,
                     "sell_session": s.sell_session, "horizon_sessions": found.horizon,
                     "rank": s.rank, "delisted": False, "excess_return": float("nan"),
+                    "return": float("nan"),
                 }
             )  # fmt: skip
         if found.signals:
@@ -194,8 +220,8 @@ def _missed(
     between = sessions_between(last.session_date, session)[1:-1]
     missed: list[dict[str, str]] = []
     for e in edges:
-        if not between or e.id not in last.stats.get("tonight", {}):
-            continue
+        if not between or e.id not in last.stats.get("tonight", {}) or not_possible(e):
+            continue  # an edge the record cannot trade has no due session to miss
         try:
             legs, _ = legs_between(reader, configs, user, e, since[e.id], between[0], between[-1])
         except (MissingDataError, ConfigurationError) as error:
@@ -230,7 +256,7 @@ def run_night(
     user_id = user.user_id
     edges = {e.id: e for e in load_edges(configs, user_id)}
     book = read_stored(reader, user_id, session - timedelta(days=LOOKBACK_DAYS), session, now)
-    settled, settled_n = _settlements(reader, edges, book, session, now)
+    settled, settled_n, unsettled = _settlements(reader, edges, book, session, now)
     recording = [e for e in edges.values() if e.owner == user_id and paper_traded(e)]
     nights = _nights(writer, user, session)
     since = _since(nights)
@@ -240,7 +266,9 @@ def run_night(
     rows = [*settled, *signals]
     record = start_run(job_name(user_id), session, now)
     missed = _missed(reader, configs, user, recording, nights, since, session)
-    night = PaperNight(session, signalled, settled_n, skipped, len(rows), tonight, missed)
+    night = PaperNight(
+        session, signalled, settled_n, [*skipped, *unsettled], len(rows), tonight, missed
+    )
     stats = {
         "signalled": night.signalled, "settled": night.settled, "skipped": night.skipped,
         "rows": night.rows, "tonight": night.tonight, "missed": night.missed,

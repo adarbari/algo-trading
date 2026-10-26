@@ -122,6 +122,12 @@ note = "ADR 0061: the stored daily bars that cannot be right (reason, status FLA
 [[table]]
 name = "events/dividend"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
+also_written_by = [
+    # Tiingo's divCash for the history before Massive's (ex-dates before the first one another source stored, none
+    # within 5 days of a stored row), known_from = the ex-date (no declaration date), published with the same run's
+    # bars and splits (or alone with --actions-only): the 2002+ dividend history the covered-call backtests need.
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",
+]
 
 [[table]]
 name = "events/earnings"
@@ -675,7 +681,7 @@ note = "what each site edge took at a session (ADR 0081): one row per (user, edg
 name = "results/edge_paper"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the forward paper record (ADR 0053 amendment 2026-10-10): one row per (record owner, edge, signal session, name) the nightly edge-signals job made for an evidenced or live edge, user_id being the RECORD owner (site for a site edge, else the user whose edge it is; a follower never writes one), settled by rewriting its own row (runs merge per key); framed and written by services/evaluation/forward/results.py, read through data/paper"
+note = "the forward paper record (ADR 0053 amendment 2026-10-10): one row per (record owner, edge, signal session, name) the nightly edge-signals job made for an edge open for recording (a site edge from candidate to live, a user's own from live: ADR 0064 amendment 2026-10-24, loading.records_paper), user_id being the RECORD owner (site for a site edge, else the user whose edge it is; a follower never writes one), settled by rewriting its own row (runs merge per key), with excess_return and the name's raw return (return, the stored fwd_return; null for an option P&L and before the column) and the licence recorded at the signal (a reader hides a name by it); framed and written by services/evaluation/forward/results.py, read through data/paper"
 
 [[table]]
 name = "results/winners_study"

@@ -68,6 +68,19 @@ def test_normalize_stores_the_unadjusted_columns_and_keeps_the_actions() -> None
     assert normalized.notes == {"invalid_rows": 0}
 
 
+def test_recorded_dividends_are_unadjusted_and_on_the_ex_date() -> None:
+    """AAPL as Tiingo sent it in 2026: 3.29 a share on 2014-05-08, the 7:1 split on 2014-06-09,
+    0.47 on 2014-08-07. The amounts are in each ex-date's share terms (never divided by the later
+    split), as Massive's ``cash_amount``: the ``events/dividend`` rows keep them as given."""
+    _, actions, invalid = parse_prices(payloads.aapl_2014_slice())
+    found = [(t.date(), f, d) for t, f, d in actions.itertuples(index=False)]
+    assert invalid == 0 and found == [
+        (date(2014, 5, 8), 1.0, 3.29),
+        (date(2014, 6, 9), 7.000007, 0.0),
+        (date(2014, 8, 7), 1.0, 0.47),
+    ]
+
+
 def test_without_an_instrument_id_the_rows_carry_only_the_symbol() -> None:
     source = TiingoDailyPrices(http_for(lambda url: b""))
     normalized = source.normalize(FetchRequest("aapl"), payloads.sample())
