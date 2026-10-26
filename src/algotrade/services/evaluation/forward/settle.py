@@ -12,12 +12,16 @@ the reason: a missing result is never a loss and never a zero. An outcome that r
 vol (``expires_otm``: the strike is set from it) reads it at the signal session D, as the harness
 does (``reads.session.implied_at``, ``harness.iv_field_of``); a name whose vol
 is missing or invalid there is skipped with that reason, never a loss. ``excess_return`` of a
-settled trade is set only when the outcome's value is a return (not an ``expires_otm`` cushion)."""
+settled trade is set only when the outcome's value is a return (not an ``expires_otm`` cushion);
+``raw_return`` is the name's own ``fwd_return`` over the window (``forward_returns@v2``: the
+close-to-close price return, no benchmark, no cost), set for a settled trade whose stored row has
+one (not for an option P&L, whose ``fwd_return`` is the option's); the Past lists read it."""
 
 import hashlib
 import json
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
+from typing import Any
 
 import pandas as pd
 
@@ -63,19 +67,25 @@ REASONS = {
 @dataclass(frozen=True)
 class Settled:
     """One trade's new state (``status`` won / lost / skipped); ``excess_return`` None unless
-    counted."""
+    counted; ``raw_return`` the stored ``fwd_return`` (None: skipped, or none stored)."""
 
     instrument_id: str
     status: str
     reason: str
     excess_return: float | None
     delisted: bool
+    raw_return: float | None = None
 
 
 def outcome_hash(edge: Edge) -> str:
     """A fingerprint of the edge's ``[outcome]``: what a hit means."""
     text = json.dumps(identity_dict(asdict(edge.outcome)), sort_keys=True, default=str)
     return hashlib.sha256(text.encode()).hexdigest()[:12]
+
+
+def _finite(value: Any) -> float | None:
+    number = pd.to_numeric(value, errors="coerce")
+    return float(number) if pd.notna(number) and abs(number) != float("inf") else None
 
 
 def _skipped(instrument: str, why: str) -> Settled:
@@ -117,6 +127,12 @@ def settle_group(
             [_skipped(i, "no outcome stored for its window") for i in names] if late else []
         )
     mine = stored[stored["instrument_id"].isin(names)]
+    raw = (  # the name's own price return, before any residual attaches; an option P&L has none
+        pd.Series(dtype=float)
+        if edge.outcome.kind == CHAIN_KIND
+        else pd.to_numeric(mine.set_index("instrument_id")["fwd_return"], errors="coerce")
+    )
+    raw = raw[~raw.index.duplicated()]
     if needs_residual(edge):  # a factor-neutral edge settles on the residual rows (EB H11)
         mine = attach_residuals(mine, read_residuals(reader, [buy], now), horizon)
         waiting = set(mine.loc[mine["residual_reason"] == NO_RESIDUAL_ROW, "instrument_id"])
@@ -150,6 +166,7 @@ def settle_group(
                 "",
                 float(str(row["value"])) if is_return(edge) else None,
                 bool(row["delisted"]),
+                _finite(raw.get(name)),
             )
         )
     return out

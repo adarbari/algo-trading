@@ -46,6 +46,7 @@ from algotrade.storage.tables.schemas.market import (
     VERIFICATION_IBKR,
     VX_FUTURES,
 )
+from algotrade.storage.tables.schemas.option_history import OPTION_HISTORY_TABLES
 from algotrade.storage.tables.schemas.outcomes import (
     OPTION_PNL_SPEC,
     OUTCOMES_PREFIX,
@@ -132,6 +133,7 @@ KNOWN: dict[str, TableSpec] = {
         FUND_NAV_EVENTS,
         INSIDER_EVENTS,
         OPTION_PNL_SPEC,
+        *OPTION_HISTORY_TABLES,
     )
 }
 

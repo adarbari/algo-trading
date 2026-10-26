@@ -149,12 +149,12 @@ describe('EdgeLive', () => {
       state: 'not_recording',
       closed: 0,
       winRate: null,
-      headline: 'No paper trades are recorded: they start when it is evidenced.',
+      headline: 'No paper trades are recorded: this setup is not open.',
       followed: false,
     };
     const { container } = render(<EdgeLive edgeId="drift" live={live} />);
     expect(screen.getByText('Not recording')).toBeVisible();
-    expect(screen.getByText(/they start when it is evidenced/)).toBeVisible();
+    expect(screen.getByText(/this setup is not open/)).toBeVisible();
     expect(screen.getByText('help live_state')).toBeVisible();
     await expectNoA11yViolations(container);
   });

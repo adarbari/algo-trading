@@ -9,7 +9,10 @@ an hour, 1,000 a day, 500 unique symbols a month, so every request waits on the 
 
 Bars are stored **unadjusted** (``open`` ... ``volume``, never the ``adj*`` fields): corporate
 actions apply at read time (ADR 0016). ``splitFactor`` and ``divCash`` are kept in
-``Normalized.parsed["actions"]`` for the task's split check, never stored from here.
+``Normalized.parsed["actions"]`` for the task's split check and its split and dividend rows
+(``bars-history``), never stored from here. ``divCash`` sits on the ex-date row, per share in
+that day's share terms (unadjusted), every distribution of the day summed; Tiingo gives no
+declaration, record or pay date.
 """
 
 import json

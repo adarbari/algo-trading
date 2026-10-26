@@ -14,9 +14,13 @@ says for the session; a number not known (an open trade's return) is None, never
 Knowledge too (ADR 0064 decision 9): a session that finished is read as its nightly left it. A row
 a later night wrote or rewrote (``knowledge_ts`` after the moment the session's workflow first
 completed, ADR 0062) is not read, so the latest row per trade at the cutoff is the record: a
-settlement recorded afterwards cannot change a past session's live state."""
+settlement recorded afterwards cannot change a past session's live state.
 
-from collections.abc import Mapping
+Licence (ADR 0064 decision 10): every row carries the strictest licence of the data its picks were
+read from, recorded at the signal; a viewer whose licences do not cover it reads none of its names
+(``_held``), so a hidden name is never counted into a record either."""
+
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
@@ -24,6 +28,7 @@ import pandas as pd
 
 from algotrade.config.user import SITE_USER
 from algotrade.data.paper import LOOKBACK_DAYS, read_paper
+from algotrade.services.licences import OPEN as OPEN_LICENCE
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.evaluation.edges import Edge
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -36,7 +41,9 @@ OPEN, WON, LOST, SKIPPED = "open", "won", "lost", "skipped"
 class PaperTrade:
     """One paper trade of an edge: ``rank`` 1 is the screener's best name; ``status`` open, won,
     lost or skipped (``reason`` says why: never a loss); ``excess_return`` only for a settled one
-    (the outcome's measure); ``delisted``: measured to the name's last bar."""
+    (the outcome's measure); ``raw_return`` only for a settled one with a stored price return
+    (the name's own ``fwd_return`` over the window); ``delisted``: measured to the name's last
+    bar."""
 
     edge_id: str
     edge_name: str
@@ -52,6 +59,7 @@ class PaperTrade:
     reason: str
     excess_return: float | None
     delisted: bool
+    raw_return: float | None = None
 
 
 def _text(value: object) -> str:
@@ -83,6 +91,7 @@ def _trade(row: dict[str, object], session: date, names: Mapping[str, str]) -> P
         reason=_text(row.get("reason")) if known else "",
         excess_return=_number(row.get("excess_return")) if status in (WON, LOST) else None,
         delisted=bool(to_scalar(row.get("delisted"))) if known else False,
+        raw_return=_number(row.get("return")) if status in (WON, LOST) else None,
     )
 
 
@@ -92,20 +101,32 @@ def record_owner(edge: Edge, user_id: str) -> str:
 
 
 def load_trades(
-    ctx: ReadContext, edges: Mapping[str, Edge], lookback: int | None = LOOKBACK_DAYS
+    ctx: ReadContext,
+    edges: Mapping[str, Edge],
+    lookback: int | None = LOOKBACK_DAYS,
+    redact: bool = True,
 ) -> tuple[PaperTrade, ...]:
     """Every paper trade of ``edges`` (by id; a trade of an edge the user does not see is left out,
     and so is a follower's old row of a site edge: only the record owner's rows count) signalled
     in the window up to ``ctx.session``, oldest signal first, as the rows stood at the session's
     cutoff (``Session.cutoff``; None: not bounded). ``lookback``: how many days of signal sessions
-    to read (None: every stored row, for a count that must be exact)."""
+    to read (None: every stored row, for a count that must be exact). ``redact`` False reads every
+    name whatever its licence: only for the owner's nightly run record (``below_range``)."""
     day = ctx.session.date
     owners = {i: record_owner(e, ctx.user.user_id) for i, e in edges.items()}
     since = date.min if lookback is None else day - timedelta(days=lookback)
     frame = read_paper(ctx.reader, owners, since, day, ctx.session.cutoff)
     names = {i: e.name for i, e in edges.items()}
     records = [{str(k): v for k, v in r.items()} for r in frame.to_dict("records")]
-    return tuple(_trade(r, day, names) for r in records)
+    return tuple(_trade(r, day, names) for r in records if not redact or _held(r, ctx.licences))
+
+
+def _held(row: Mapping[str, object], held: Collection[str]) -> bool:
+    """Whether the viewer may see the row's name: its picks were read from data of the licence
+    the nightly recorded at the signal (none recorded, ``open`` or held; ADR 0064 decision 10).
+    A name the viewer's licences do not cover is not read, so it is not counted either."""
+    licence = _text(row.get("licence"))
+    return licence in (OPEN_LICENCE, "") or licence in held
 
 
 def with_instruments(ctx: ReadContext, trades: tuple[PaperTrade, ...]) -> tuple[PaperTrade, ...]:

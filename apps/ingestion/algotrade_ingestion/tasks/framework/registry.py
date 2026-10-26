@@ -35,6 +35,7 @@ from algotrade_ingestion.tasks.framework import (
     entries_reference,
     source_guards,
 )
+from algotrade_ingestion.tasks.framework.entries_history import HISTORY_TASKS
 from algotrade_ingestion.tasks.framework.params import (
     FROM,
     SESSION,
@@ -335,10 +336,11 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "bars-history",
-            "unadjusted daily bars from Tiingo since 2018 for the scope list and its funds' "
-            "references (resumable backfill: 50 requests an hour on the free tier)",
+            "unadjusted daily bars (and the splits and dividends Massive's history lacks) from "
+            "Tiingo since 2018 for the scope list and its funds' references (resumable backfill: "
+            "50 requests an hour on the free tier)",
             bars_history,
-            ("bars/1d", "events/split", "events/bar_flag"),
+            ("bars/1d", "events/split", "events/dividend", "events/bar_flag"),
             entries_market.run_bars_history,
             sources=("tiingo_prices",),
             settings="sources.toml [tiingo]; events/scope.toml",
@@ -363,6 +365,13 @@ TASKS: dict[str, Task] = {
                     "the names are the listings of the universe over since..until (by "
                     "permaTicker; a reused ticker without one is never fetched), not the scope "
                     "list",
+                ),
+                Param(
+                    "actions_only",
+                    ("--actions-only",),
+                    None,
+                    "store only the splits and dividends (the history before Massive's), not "
+                    "the bars",
                 ),
                 Param(
                     "include_tiers",
@@ -971,6 +980,7 @@ TASKS: dict[str, Task] = {
             sources=("synthetic",),
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),
         ),
+        *HISTORY_TASKS,
     )
 }
 

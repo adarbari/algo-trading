@@ -166,7 +166,7 @@ class EdgePaper:
     "is what the nightly did for it on the session, so an empty buy list says why: signalled, "
     "no_picks (due, the screen qualified none), not_due, skipped (due but could not be "
     "signalled: `tonightReason`), not_recording (the nightly ran but the edge is not "
-    "evidenced or live) or not_run (no nightly run for the session); `missed` the due "
+    "open for recording) or not_run (no nightly run for the session); `missed` the due "
     "sessions since the previous night that nobody signalled"
 )
 class FollowedEdge:
@@ -198,7 +198,8 @@ class FollowedEdge:
     "banner show. `state` is the live record's: on_track, below or above the backtest's usual "
     "range (`low` to `high`), too_early (too few settled signal sessions), no_backtest or "
     "no_trades (no live record yet), not_settled (the session's nightly has not completed: "
-    "nothing is judged) or not_recording (the edge records no paper trades: a candidate); "
+    "nothing is judged) or not_recording (the edge records no paper trades: a draft, a closed "
+    "site setup or an own candidate); "
     "`closed` settled trades, `wins`, `winRate`; `headline` the "
     "sentence; `term` the Guide entry that explains the state; `followed` the edge is on the "
     "user's desk (else a site edge the site records). Settled trades only, as the session's "

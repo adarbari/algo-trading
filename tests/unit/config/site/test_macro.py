@@ -35,6 +35,9 @@ FILE = {
 }
 
 
+CBOE_STRATEGY_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR")
+
+
 def load(*series: dict[str, Any]) -> MacroSettings:
     return MacroSettings.from_document({"series": list(series)})
 
@@ -51,10 +54,16 @@ def test_the_shipped_registry() -> None:
         "IDX:VIX9D": "VIX9D",  # Cboe's own files (EB D3): the code is the key
         "IDX:VIX6M": "VIX6M",
         "IDX:VVIX": "VVIX",
+        **{f"IDX:{k}": k for k in CBOE_STRATEGY_INDEXES},  # ADR 0084: the replication targets
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
     third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}
-    third_party |= {"VIX9D", "VIX6M", "VVIX"}  # Cboe's files: personal use, no redistribution
+    third_party |= {
+        "VIX9D",
+        "VIX6M",
+        "VVIX",
+        *CBOE_STRATEGY_INDEXES,
+    }  # Cboe's files: personal use, no redistribution
     cape = {k for k in macro.keys if k.startswith("CAPE_")}  # Barclays' file: personal use
     assert len(cape) == 26 and personal == third_party | cape
     unrevised = {  # FRED's daily market series: never revised, so one plain request each
