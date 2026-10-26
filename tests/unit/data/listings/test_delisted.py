@@ -1,4 +1,4 @@
-"""``read_delisted_tickers``: the latest snapshot, whatever the session, and which (ADR 0084)."""
+"""``read_delisted_tickers``: the latest snapshot, whatever the session, and which (ADR 0086)."""
 
 from datetime import date
 

@@ -1,4 +1,4 @@
-"""``read_delisted_tickers``: Massive's inactive (delisted) tickers, the latest snapshot (ADR 0084).
+"""``read_delisted_tickers``: Massive's inactive (delisted) tickers, the latest snapshot (ADR 0086).
 
 ``instruments/delisted_tickers`` is a full copy per pull session, stamped with its pull time, so
 the read takes the **latest snapshot** whatever the session and says which (ADR 0036's rule for

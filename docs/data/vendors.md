@@ -149,7 +149,7 @@ days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KI
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
 
-### Massive delisted tickers (stored first; ADR 0084)
+### Massive delisted tickers (stored first; ADR 0086)
 
 `GET /v3/reference/tickers?market=stocks&active=false&limit=1000`, cursor-paged through
 `next_url` (key in the Authorization header only), is the free survivorship-free list of what
@@ -166,7 +166,7 @@ a renamed company's old ticker is absent. Tickers go through `act_symbol` like t
 Request budget: the shared `massive` limiter (`[massive] min_interval_s` = 12.5 s, the free
 tier's 5 a minute), so about 24 requests = 5 minutes; a pull under `[quality]
 min_delisted_tickers` (10,000) rows FAILS. Stored first, merged into `instruments/listing_history`
-in the next PR (ADR 0084). The repo holds a 60-record slice,
+in the next PR (ADR 0086). The repo holds a 60-record slice,
 `tests/fixtures/sources/massive/inactive_tickers_slice.json`.
 
 ## Tiingo daily prices from 2018 (implemented, ADR 0050)

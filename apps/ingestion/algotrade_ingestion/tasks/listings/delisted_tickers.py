@@ -1,5 +1,5 @@
 """``instruments/delisted_tickers``: the US names Massive lists as inactive, with the day each
-stopped trading (ADR 0084, survivorship-free listing history).
+stopped trading (ADR 0086, survivorship-free listing history).
 
 ``algotrade-ingest run delisted-tickers`` pulls Massive's inactive ticker list (about 24 pages
 of 1000 at the free tier's 12.5 s a request, so five minutes; ``MassiveTickers``, request key

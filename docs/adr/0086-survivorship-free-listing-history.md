@@ -1,4 +1,4 @@
-# ADR 0084: Survivorship-free listing history: Massive inactive tickers, delisting events and the delisting return
+# ADR 0086: Survivorship-free listing history: Massive inactive tickers, delisting events and the delisting return
 
 **Status:** proposed (2026-10-24; owner decisions 1 to 5 below open). Amends
 [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) ("Eligible names", the 2026-10-09

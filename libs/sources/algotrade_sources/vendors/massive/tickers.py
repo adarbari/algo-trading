@@ -1,7 +1,7 @@
 """Massive ticker list: every US stock/ETF with FIGI, CIK and type (``MassiveTickers``).
 
 Request key ``active`` (the default) lists the live names (identifiers for the universe build);
-request key ``inactive`` lists the delisted ones (ADR 0084, ``instruments/delisted_tickers``):
+request key ``inactive`` lists the delisted ones (ADR 0086, ``instruments/delisted_tickers``):
 ``active=false``, ``type`` is null before 2017, FIGI / CIK are partial, no OTC names, ETFs only
 from 2016 and a renamed company's old ticker is absent (measured 2026-10-24: 23,557 records, 24
 pages of 1000). Both page through ``next_url`` with the key in the Authorization header only,
