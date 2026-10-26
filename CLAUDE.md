@@ -103,8 +103,7 @@ entities -> shared -> @algotrade/ui`: it imports only downward, other slices onl
 (client generated from the API's OpenAPI document), data through Query hooks in entities /
 features; only `src/app` routes. Two workspaces, their sections in a horizontal top bar, the switch
 in the account menu: TRADER (Ideas, Setups, Test, Calendar; ADR 0083) and ADMIN (Ingestion,
-Screener runs, Users & configs); role gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (FINAL, approved
-mockups 2026-10-03) -> primitives -> components -> screens; screens lay out and set text only
+Screener runs, Users & configs); role gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (re-skinned "Evening Desk", ADR 0085, 2026-10-25) -> primitives -> components -> screens; screens lay out and set text only
 with the primitives (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden).
 Every folder is a `[[web_dir]]` in `architecture/web_layout.toml`. Lint messages name the rule and
 the skill with the fix.
