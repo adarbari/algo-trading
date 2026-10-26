@@ -148,6 +148,18 @@ section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-d
 detect = [{ import = "algotrade.storage.tables.readers" }]
 
 [[responsibility]]
+id = "option-history-reads"
+description = "Open and read the bought option history (ADR 0084): its own store root marked by a sentinel (an unmounted drive is HistoryUnavailableError, never a folder on the boot disk), and a session's quotes, underlying days and option statistics by symbol from the latest published import run; importable only by ingestion's import and checks"
+owner = ["src/algotrade/data/option_history/*"]
+allowed = [
+    "src/algotrade/storage/tables/schemas/option_history.py",  # declares the tables
+    "apps/ingestion/algotrade_ingestion/tasks/options_history/importer.py",  # the writer names its tables
+    "libs/sources/algotrade_sources/vendors/historicaloptiondata/files_source.py",  # the vendor frames' table names
+]
+section = "docs/adr/0084-bought-option-history.md#decision"
+detect = [{ string = "option_history/quotes" }, { string = "option_history/underlying" }]
+
+[[responsibility]]
 id = "parquet-io"
 description = "Physical file formats and paths (Parquet today, DuckDB later)"
 owner = ["src/algotrade/storage/backends/*"]

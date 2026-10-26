@@ -196,6 +196,11 @@ path = "src/algotrade/data/macro"
 purpose = "reads of macro series and index levels (macro/series, ADR 0048): each observation's latest vintage a session knew, and the pit = lag vintage rule"
 
 [[dir]]
+path = "src/algotrade/data/option_history"
+purpose = "the bought option history's store and reads (ADR 0084): the sentinel-marked root on the external drive (ALGOTRADE_OPTION_HISTORY_URL), the session's quotes, underlying days and option statistics; personal licence, importable only by ingestion's import and checks; data/ is at its module cap, so this is a folder"
+contracts = ["Option history is quarantined: only ingestion reads it (ADR 0084)"]
+
+[[dir]]
 path = "src/algotrade/data/outcomes"
 purpose = "reads of the outcomes grains (outcomes/instrument/ price windows, reading.py; outcomes/option/ chain P&L of option structures, chain.py; ADR 0053 and its EB H13 amendment): what happened after a start session, the tables read across sessions, only by the edge harness"
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]

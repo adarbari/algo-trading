@@ -35,6 +35,7 @@ from algotrade_ingestion.tasks.framework import (
     entries_reference,
     source_guards,
 )
+from algotrade_ingestion.tasks.framework.entries_history import HISTORY_TASKS
 from algotrade_ingestion.tasks.framework.params import (
     FROM,
     SESSION,
@@ -979,6 +980,7 @@ TASKS: dict[str, Task] = {
             sources=("synthetic",),
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),
         ),
+        *HISTORY_TASKS,
     )
 }
 
