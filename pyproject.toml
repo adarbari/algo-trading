@@ -13,7 +13,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "numpy>=2.5.3",
+    "numpy>=2.5.4",
     "pandas>=2.2",
     "pyarrow>=26.0.0",
 ]
