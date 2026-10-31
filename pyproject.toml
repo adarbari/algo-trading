@@ -36,7 +36,7 @@ dev = [
     "algotrade-ingestion",
     "algotrade-backtest",
     "algotrade-api",
-    "httpx2>=2.13",  # the FastAPI / Starlette TestClient transport (tests only)
+    "httpx2>=2.16.0",  # the FastAPI / Starlette TestClient transport (tests only)
     "pytest>=8.0",
     "pytest-cov>=7.1.0",
     "hypothesis>=6.170.5",
