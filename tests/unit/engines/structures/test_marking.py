@@ -146,3 +146,22 @@ def test_a_gap_between_entry_and_exit_costs_only_the_hedge() -> None:
     quiet = window(*SPREAD)
     mark_window([chain(0), chain(1, zero_bid={"P100", "P95"}), chain(2)], quiet)
     assert quiet.reason[0] is None
+
+
+def test_a_window_needs_option_legs_and_a_missing_entry_quote_is_a_reason() -> None:
+    with pytest.raises(ValueError, match="at least one option leg"):
+        Window(
+            pd.Series([A]), [], np.array([True]), np.array([None], object), np.array([None], object)
+        )
+    bad = LegColumn("S", 1.0, pd.Series(["x"]), np.array([1.0]), pd.Series([EXPIRY]))
+    with pytest.raises(ValueError, match="a call or a put"):
+        Window(
+            pd.Series([A]),
+            [bad],
+            np.array([True]),
+            np.array([None], object),
+            np.array([None], object),
+        )
+    w = window(*SPREAD)
+    mark_window([chain(0, zero_bid={"P95"}), chain(1), chain(2)], w)
+    assert w.reason[0] == "NO_ENTRY_QUOTE"
