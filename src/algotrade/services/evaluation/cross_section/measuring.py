@@ -762,9 +762,6 @@ def _read_closed(
         closed[horizon] = {}
         if not days:
             continue
-        if stored is not None:  # every row of the entry sessions, whatever horizon: stricter
-            seen = stored[stored["session_date"].map(_day).isin(set(days))]
-            out.outcome_licence = strictest((out.outcome_licence, outcome_licence(seen)))
         if stored is None or not any(days[0] <= d <= days[-1] for d in have):
             failed.setdefault(horizon, (missing_chain if chain else missing_outcomes)(days))
             continue  # nothing stored in its span
