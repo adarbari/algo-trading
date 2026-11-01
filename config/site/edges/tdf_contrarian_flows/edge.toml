@@ -25,7 +25,7 @@ size effect, not the target-date flow. (3) The trigger: the page's timing is a l
 market-trigger vocabulary has vix_spike only). The year-turn window the batch brief named is not the source's
 timing (the flow follows the month's market move, 5 to 20 sessions after each month end). Unblock: a stored target-date
 ownership or flow series, or a decided proxy; and the large_market_month trigger with its field in
-market_triggers@v1."""
+market_triggers@v2."""
 notes = """Idea page: docs/edge-ideas/frontier.md (tdf_contrarian_flows). The index-level form (a contrarian position
 in SPY after a month of plus or minus 5 percent) is a different, time-series claim and would be its own document on
 the trigger above."""

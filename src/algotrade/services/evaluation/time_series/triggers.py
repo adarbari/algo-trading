@@ -1,5 +1,5 @@
 """The periods of an ``on_market:<trigger>`` time-series edge (ADR 0075, ADR 0073): the trigger
-sessions D read from the market entity's stored ``market_triggers@v1`` row, one session at a
+sessions D read from the market entity's stored ``market_triggers@v2`` row, one session at a
 time (the row of D holds D as the trigger's date: first known at D, never before), each placed as a
 window of ``horizon`` sessions that starts after S = D + 1's close, and the stretches of the same
 length outside every window.

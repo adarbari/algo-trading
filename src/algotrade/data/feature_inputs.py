@@ -217,12 +217,13 @@ from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows, tenor_history
 from algotrade.data.reference import (
+    REFERENCE_HINT,
     UNIVERSE_TABLE,
     company_sectors,
     ids_for_symbols,
     instruments,
     load_universe,
-    snapshot,
+    read_snapshot,
     symbol_ids,
 )
 from algotrade.data.rollups import rollup_rows
@@ -652,22 +653,24 @@ STATEMENTS_ACCEPTED = f"{STATEMENTS}_accepted"
 STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
 REFERENCE_FACTS = (
     "instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse", "cik",
-    "share_class_figi",
+    "share_class_figi", "in_sp500",
 )  # fmt: skip
 
 
 def _reference_facts(reader: StoreReader, session: date) -> pd.DataFrame | None:
     try:
-        frame = instruments(reader, session)
+        frame, snap = read_snapshot(reader, REFERENCE_TABLE, session, REFERENCE_HINT)
     except MissingDataError:
         return None
     if "security_type" not in frame.columns:
         return None
-    snap = snapshot(reader, REFERENCE_TABLE, session)
-    pre = (
-        snap is not None and snap.pre_snapshot
-    )  # a later snapshot stands in: its types are not the session's
-    return frame[[c for c in REFERENCE_FACTS if c in frame.columns]].assign(pre_snapshot=pre)
+    if snap.pre_snapshot and "in_sp500" in frame.columns:
+        # a later snapshot's index list would be survivors
+        frame = frame.assign(in_sp500=pd.Series(pd.NA, index=frame.index, dtype="boolean"))
+    # a later snapshot stands in: its types are not the session's (the IFRS count refuses them)
+    return frame[[c for c in REFERENCE_FACTS if c in frame.columns]].assign(
+        pre_snapshot=snap.pre_snapshot
+    )
 
 
 def _leveraged_holdings(reader: StoreReader, session: date) -> pd.DataFrame | None:

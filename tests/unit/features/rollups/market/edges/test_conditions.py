@@ -1,4 +1,4 @@
-"""``market_conditions@v1``: each verdict by hand over synthetic series. The same-date rule (a
+"""``market_conditions@v2``: each verdict by hand over synthetic series. The same-date rule (a
 series with no observation on the VIX's date is null, never an older value), nulls before a
 series starts and for an incomplete window, a stale VIX is all null, the stand-aside verdict
 follows its three conditions with Kleene unknowns, the licences (personal values, open
@@ -41,11 +41,18 @@ def run(series: pd.DataFrame, session: date = END, **inputs: object) -> dict[str
 
 
 def trend_row(
-    rv: float | None = 0.12, sma: float | None = 0.03, day: date = DAYS[-1]
+    rv: float | None = 0.12, sma: float | None = 0.03, day: date = DAYS[-1], source: str = "bars"
 ) -> pd.DataFrame:
     """A ``market_trend@v2`` row dated ``day`` (default: the VIX's observation date)."""
     return pd.DataFrame(
-        [{"session_date": day, "spx_realised_vol_20d": rv, "spx_close_vs_sma200": sma}]
+        [
+            {
+                "session_date": day,
+                "spx_realised_vol_20d": rv,
+                "spx_close_vs_sma200": sma,
+                "spx_source": source,
+            }
+        ]
     )
 
 
@@ -229,10 +236,11 @@ def test_values_are_personal_and_every_verdict_is_open() -> None:
     personal = (
         "vix", "vix3m", "vix9d", "vix6m", "vvix", "vix_obs_date", "vix_pct_252",
         "vix_median_252", "vix_high_20", "vix_chg_5d", "backwardation_run", "vvix_pct_252",
+        "realised_corr_ratio_21",
     )  # fmt: skip
     for name in personal:
         assert by_name[name].licence == "personal", name
-    open_ = [n for n in by_name if n not in c.STORED_NUMBERS and n != "vix_obs_date"]
+    open_ = [n for n in by_name if n not in personal]
     assert {"short_premium_allowed", "rate_shock_on", "y10_chg_63d", "sessions_to_fomc"} <= set(
         open_
     )
@@ -244,7 +252,7 @@ def test_the_headline_regime_does_not_read_the_leaf() -> None:
     from algotrade.features.rollups.market import regime  # noqa: PLC0415
 
     tables = {i.table for i in regime.GROUP.inputs}
-    assert c.GROUP.table not in tables and c.GROUP.key == "market_conditions@v1"
+    assert c.GROUP.table not in tables and c.GROUP.key == "market_conditions@v2"
     assert regime.GROUP.key == "regime@v3"
 
 
@@ -256,3 +264,73 @@ def test_the_index_is_read_for_the_vix_date_never_the_sessions_own() -> None:
     assert got["index_vrp_cheap_on"] is False and got["index_vrp_rich_on"] is True
     only_today = trend_row(rv=0.40, day=END)
     assert run(macro(vix=20), **{TREND: only_today})["index_vrp_cheap_on"] is None
+
+
+def test_the_corr_ratio_uses_the_index_vol_over_the_members_vol() -> None:
+    from algotrade.features.rollups.market.edges import dispersion  # noqa: PLC0415
+
+    days = sessions_ending(END, dispersion.CLOSES)
+    closes = [100.0 * (1.0 + 0.01 * ((-1) ** i)) for i in range(dispersion.CLOSES)]
+    bars = pd.DataFrame(
+        [{"instrument_id": f"S{k}", "session_date": d, "open": p, "high": p, "low": p,
+          "close": p, "volume": 1.0} for k in range(60) for d, p in zip(days, closes, strict=True)]
+    )  # fmt: skip
+    universe = pd.DataFrame([{"instrument_id": f"S{k}", "asset_class": "STOCK"} for k in range(60)])
+    ref = pd.DataFrame({"instrument_id": universe["instrument_id"], "in_sp500": True})
+    members = dispersion.mean_member_vol(universe, ref, bars, END, 50)
+    inputs = {
+        c.BARS: bars,
+        c.UNIVERSE: universe,
+        c.REFERENCE: ref,
+        TREND: trend_row(rv=members / 2, day=END),
+    }
+    got = run(macro(), **inputs)
+    assert got["realised_corr_ratio_21"] == pytest.approx(0.5, rel=1e-3)
+    assert run(macro())["realised_corr_ratio_21"] is None  # no bars, no universe
+    level = {**inputs, TREND: trend_row(rv=members / 2, day=END, source="index")}
+    assert run(macro(), **level)["realised_corr_ratio_21"] is None  # window ends a session early
+
+
+def breadth_rows(now: float, then: float) -> pd.DataFrame:
+    """``market_breadth@v1`` rows dated the VIX's date and 5 sessions before it."""
+    days = [sessions_ending(DAYS[-1], 6)[0], DAYS[-1]]
+    return pd.DataFrame({"session_date": days, "pct_above_sma200": [then, now]})
+
+
+def test_the_label_is_read_from_rows_dated_the_vix_date() -> None:
+    from algotrade.features.rollups.market import breadth as mb  # noqa: PLC0415
+    from algotrade.features.rollups.market import regime as mr  # noqa: PLC0415
+
+    headline = pd.DataFrame({"session_date": [DAYS[-1]], "label": ["CALM"]})  # R11 is then off
+    calm = {
+        TREND: trend_row(rv=0.08, sma=0.03),
+        mb.GROUP.table: breadth_rows(0.6, 0.62),
+        mr.GROUP.table: headline,
+    }
+    got = run(macro(vix=15, vix3m=18), **calm)
+    assert got["conditions_label"] == "R1"
+    # breadth known only for the session itself, not the VIX's date: R3 and R1 cannot be decided
+    other = pd.DataFrame({"session_date": [END], "pct_above_sma200": [0.6]})
+    unknown = run(
+        macro(vix=15, vix3m=18),
+        **{TREND: trend_row(rv=0.08, sma=0.03), mb.GROUP.table: other, mr.GROUP.table: headline},
+    )
+    assert unknown["conditions_label"] is None  # R3 (before R1) cannot be decided: never filled
+
+
+def test_the_flags_and_the_label_columns_exist_with_their_licence() -> None:
+    by_name = {f.name: f for f in c.FEATURES}
+    assert by_name["conditions_label"].categories[-1] == "UNCLASSIFIED"
+    assert by_name["conditions_label"].licence == "open"
+    for name in ("earnings_season_on", "event_week_on"):
+        assert by_name[name].licence == "open"
+    bands = c.D.bands()
+    assert bands.stress_at == c.D.stress_at and bands.contango_below == c.D.contango_below
+    assert bands.backwardation_at == c.D.backwardation_at and bands.vrp_rich_at == c.D.vrp_rich_at
+    assert bands.vix_low_pct == c.D.vix_low_pct
+    assert run(macro())["event_week_on"] is None  # no FOMC known, and END is not an expiry week
+
+
+def test_the_label_bands_validate() -> None:
+    with pytest.raises(ValueError, match="correction"):
+        c.Params(correction_lo=-0.05, correction_hi=-0.15)

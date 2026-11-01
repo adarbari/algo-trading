@@ -10,7 +10,7 @@ scope = ["src/algotrade/features/"]
 
 [[responsibility]]
 id = "edge-market-triggers"
-description = "The market-level triggers an on_market:<trigger> edge times by (ADR 0075): the VIX spike (market_triggers@v1: the first session with the latest fresh VIX at least 30 and VIX / VIX3M above 1 after 21 quiet sessions, known from the session after its close, null when the reading is stale, never 'no spike') and its placement for the time-series harness (the trigger sessions read one at a time from the stored market row, windows that never overlap, the out-of-window base around them); the outcomes are read by time_series/harness.py alone"
+description = "The market-level triggers an on_market:<trigger> edge times by (ADR 0075): the VIX spike (market_triggers@v2: the first session with the latest fresh VIX at least 30 and VIX / VIX3M above 1 after 21 quiet sessions, known from the session after its close, null when the reading is stale, never 'no spike') and the post-spike contango (first session VIX is 25% or more below its 20-observation high with VIX / VIX3M below 1 and VIX above its 252-observation median, after 21 sessions with that state off) and its placement for the time-series harness (the trigger sessions read one at a time from the stored market row, windows that never overlap, the out-of-window base around them); the outcomes are read by time_series/harness.py alone"
 owner = [
     "src/algotrade/features/rollups/market/edges/triggers.py",
     "src/algotrade/services/evaluation/time_series/triggers.py",

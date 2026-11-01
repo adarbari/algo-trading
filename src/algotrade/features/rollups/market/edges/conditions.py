@@ -1,4 +1,4 @@
-"""``market_conditions@v1``: the market a setup enters, one ``MKT:US`` row per session (ADR 0088,
+"""``market_conditions@v2``: the market a setup enters, one ``MKT:US`` row per session (ADR 0088,
 design section 2.1): the VIX-family statistics, the dimension states D1-D11 as open ``_on``
 verdicts, the stand-aside verdict ``short_premium_allowed``, the 10-year yield change, the
 share of the universe about to report and the calendar distances. A **leaf** group: nothing in
@@ -29,12 +29,16 @@ reason names the condition ("the VIX curve is inverted"), never a value.
 
 A verdict is null (UNKNOWN) when an input it needs is null; the Kleene helpers of
 ``indicators`` (``compare``, ``either``, ``both``) combine them. The thresholds are ``Params``
-(``config/site/rollups.toml ["market_conditions@v1"]``); changing one is
-``market_conditions@v2``.
+(``config/site/rollups.toml ["market_conditions@v2"]``); changing one is
+``market_conditions@v3``.
+
+v2 added ``realised_corr_ratio_21`` (design D6, ``dispersion``) to v1's columns; v1 was never
+stored, so there is no v1 table to supersede.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date, timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -50,13 +54,24 @@ from algotrade.core.time.windows import windows
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.corporate import earnings_expected
-from algotrade.features.rollups.market import indicators, trend
+from algotrade.features.rollups.market import breadth, indicators, regime, trend
+from algotrade.features.rollups.market.edges.dispersion import CLOSES, mean_member_vol
+from algotrade.features.rollups.market.edges.labels import (
+    LABELS,
+    Bands,
+    LabelReadings,
+    classify,
+    flags,
+)
 from algotrade.features.rollups.market.indicators import Verdict, both, compare, either
 from algotrade.features.rollups.market.macro import MACRO
 from algotrade.features.rollups.market.observations import Series, as_series, fresh
 
 NAME = "market_conditions"
-VERSION = 1
+VERSION = 2
+BARS = "bars/1d"
+UNIVERSE = "universe"
+REFERENCE = "instruments/reference"
 TREASURY_10Y = "rates/treasury_10y"  # the 10-year par yield of each stored curve, by curve date
 RELEASES = "events/macro_release"
 MAX_AGE_SESSIONS = 3  # the newest VIX observation older than this is stale
@@ -73,28 +88,32 @@ FOMC_KEY = "FOMC"
 
 
 @dataclass(frozen=True)
-class Params:
-    """The verdict thresholds (research-options-regimes.md section 1, dimensions D1-D11)."""
+class Params(Bands):
+    """The verdict thresholds (research-options-regimes.md section 1, dimensions D1-D11): the
+    label bands of ``labels.Bands`` (contango, backwardation, rich vol, low VIX, stress, ...)
+    plus the thresholds only a verdict reads."""
 
-    contango_below: float = 0.95  # D2: VIX / VIX3M below this is contango
-    backwardation_at: float = 1.0  # D2: VIX / VIX3M at or above this is backwardation
     kink_at: float = 1.0  # D2: VIX9D / VIX at or above this is a front kink
-    vrp_rich_at: float = 4.0  # D3: VIX minus realised vol, points, at or above: rich
-    vrp_cheap_below: float = 0.0  # D3: ... below this: cheap
-    vix_low_pct: float = 20.0  # D1: VIX percentile of its last 252 observations below: low
-    vix_high_pct: float = 80.0  # D1: ... above: high
+    vrp_cheap_below: float = 0.0  # D3: VIX minus realised vol below this: cheap
+    vix_high_pct: float = 80.0  # D1: VIX percentile of its last 252 observations above: high
     recovery_off_high: float = 0.25  # D7: VIX at least this far below its 20-observation high
-    rate_shock_at: float = (
-        0.005  # D8: the 10-year yield up this much (decimal: 50 bp) in 63 sessions
-    )
+    rate_shock_at: float = 0.005  # D8: the 10-year yield up this much (50 bp) in 63 sessions
     vvix_high_above: float = 110.0  # D11: VVIX above this is high
-    stress_at: float = 35.0  # R-A: VIX at or above this is the STRESS band (as ``vix_band``)
+    corr_min_members: int = 50  # D6: complete stocks the mean member volatility needs
 
     def __post_init__(self) -> None:
         if not 0 <= self.vix_low_pct < self.vix_high_pct <= 100:
             raise ValueError("need 0 <= vix_low_pct < vix_high_pct <= 100")
         if not 0 < self.recovery_off_high < 1:
             raise ValueError("recovery_off_high must be in (0, 1)")
+        if self.corr_min_members < 1:
+            raise ValueError("corr_min_members must be >= 1")
+        if not self.correction_lo < self.correction_hi < 0:
+            raise ValueError("need correction_lo < correction_hi < 0")
+
+    def bands(self) -> Bands:
+        """The label thresholds of these parameters."""
+        return Bands(**{f.name: getattr(self, f.name) for f in fields(Bands)})
 
 
 D = Params()
@@ -112,6 +131,12 @@ _OWN_VIX, _OWN_VIX3M, _OWN9D, _OWN_VVIX, _OWN_PCT = (  # the verdicts read the s
 _OWN_HIGH, _OWN_MEDIAN, _OWN_CHG = (
     f"{NAME}.{c}@v{VERSION}" for c in ("vix_high_20", "vix_median_252", "vix_chg_5d")
 )
+_CROSS = trend.GROUP.feature("spx_sma50_vs_sma200").key
+_DRAWDOWN = trend.GROUP.feature("spx_drawdown_252d").key
+_BREADTH = breadth.GROUP.feature("pct_above_sma200").key
+_CORR = f"{NAME}.realised_corr_ratio_21@v{VERSION}"
+_CREDIT = indicators.GROUP.feature("hy_oas_on").key
+_REGIME = regime.GROUP.feature("label").key
 _YIELD = f"{TREASURY_10Y}.rate_par"
 _FOMC = f"{RELEASES}.release_date"
 _SEASON = earnings_expected.GROUP.feature("sessions_to_expected_report").key
@@ -354,6 +379,72 @@ FEATURES = (
         (_SEASON,),
         (0, 1),
     ),
+    _personal(
+        "realised_corr_ratio_21",
+        "float32",
+        "ratio",
+        "The S&P 500's realised volatility over the last 21 closes divided by the mean realised "
+        "volatility of its member stocks over the same closes: near 1 when the names move "
+        "together, low (0.3 or less) when they move apart (high dispersion)",
+        "the S&P 500 realised volatility is unknown (or came from the index level, whose 20 "
+        f"returns end a session before the stocks'), or fewer than {D.corr_min_members} "
+        "members have a bar on each of the last 21 sessions, or no universe or reference "
+        "snapshot is known before the session",
+        (
+            _RV,
+            f"{BARS}.close",
+            f"{UNIVERSE}.instrument_id",
+            f"{UNIVERSE}.asset_class",
+            f"{REFERENCE}.in_sp500",
+        ),
+        (0, 5),
+    ),
+    Feature(
+        "conditions_label",
+        "str",
+        "category",
+        "The market in one word, R1 to R12 by a fixed precedence (R6 bear, R7 spike in "
+        "backwardation, R12 options cheap, R8 recovery, R5 rate shock, R4 correction, R3 narrow "
+        "leadership, R2 low-vol grind, R1 calm uptrend, R11 macro high with the market calm) or "
+        "UNCLASSIFIED when no rule holds; R9 and R10 are the flags earnings_season_on and "
+        "event_week_on",
+        "a rule of higher precedence than the first that holds is unknown (a label never skips "
+        "an unknown rule), or every rule is unknown",
+        kind="label",
+        categories=LABELS,
+        inputs=(
+            _OWN_VIX,
+            _OWN_VIX3M,
+            _OWN_CHG,
+            _OWN_PCT,
+            _RV,
+            _SMA,
+            _CROSS,
+            _DRAWDOWN,
+            _BREADTH,
+            _CORR,
+            _CREDIT,
+            _REGIME,
+        ),
+    ),
+    _open(
+        "earnings_season_on",
+        "bool",
+        "flag",
+        "Earnings season: at least 15% of the names with an expected report date report within "
+        "the next 10 sessions (R9: a flag over any regime)",
+        "no name has an expected report date for the session",
+        (_SEASON,),
+    ),
+    _open(
+        "event_week_on",
+        "bool",
+        "flag",
+        "Event week: an FOMC decision within 5 sessions, or an option expiry week (R10: a flag "
+        "over any regime)",
+        "no FOMC decision is known ahead and it is not an expiry week",
+        (_FOMC,),
+    ),
     _open(
         "sessions_to_fomc",
         "int",
@@ -513,7 +604,7 @@ def fomc_dates(releases: pd.DataFrame | None, session: date) -> list[date]:
     return sorted(pd.to_datetime(live["release_date"]).dt.date.tolist())
 
 
-def calendar_columns(releases: pd.DataFrame | None, session: date) -> dict[str, object]:
+def calendar_columns(releases: pd.DataFrame | None, session: date) -> dict[str, Any]:
     """The calendar columns: FOMC distances from the dates known by ``session``, the opex week
     and the weekday from the exchange calendar."""
     known = fomc_dates(releases, session)
@@ -600,9 +691,103 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     row["vix_obs_date"] = obs_date
     row["y10_chg_63d"] = y10
     row.update(states)
-    row["earnings_season_share"] = season_share(inputs.get(earnings_expected.GROUP.table))
-    row.update(calendar_columns(inputs.get(RELEASES), session))
+    corr = corr_ratio(
+        _index_vol_on_bars(trend_rows, session),
+        mean_member_vol(
+            inputs.get(UNIVERSE),
+            inputs.get(REFERENCE),
+            inputs.get(BARS),
+            session,
+            params.corr_min_members,
+        ),
+    )
+    row["realised_corr_ratio_21"] = corr
+    share = season_share(inputs.get(earnings_expected.GROUP.table))
+    calendar = calendar_columns(inputs.get(RELEASES), session)
+    row["earnings_season_share"] = share
+    row.update(calendar)
+    bands = params.bands()
+    row["earnings_season_on"], row["event_week_on"] = flags(
+        share,
+        float(calendar["sessions_to_fomc"]),
+        bool(calendar["in_opex_week"]),
+        bands,
+    )
+    row["conditions_label"] = classify(
+        label_readings(inputs, obs_date, v, trend_rows, ind_rows, states, corr), bands
+    )
     return pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
+
+
+def _text_on(frame: pd.DataFrame | None, column: str, day: date | None) -> str | None:
+    """``column`` of the row dated ``day`` as text (None: no such row or a null)."""
+    if frame is None or frame.empty or day is None or column not in frame.columns:
+        return None
+    rows = frame[pd.to_datetime(frame["session_date"]).dt.date == day]
+    value = rows.iloc[-1][column] if len(rows) else None
+    return None if value is None or pd.isna(value) else str(value)
+
+
+def label_readings(
+    inputs: Inputs,
+    obs_date: date | None,
+    v: dict[str, float],
+    trend_rows: pd.DataFrame | None,
+    ind_rows: pd.DataFrame | None,
+    states: dict[str, Verdict],
+    corr: float,
+) -> LabelReadings:
+    """What the label rules read: the VIX-family numbers, the S&P 500 and breadth rows dated the
+    VIX's date (never the session's own), the credit card and the headline regime label."""
+    breadth_rows = inputs.get(breadth.GROUP.table)
+    regime_rows = inputs.get(regime.GROUP.table)
+    pct = _row_on(breadth_rows, "pct_above_sma200", obs_date)
+    then = (
+        _row_on(breadth_rows, "pct_above_sma200", sessions_ending(obs_date, 6)[0])
+        if obs_date is not None
+        else np.nan
+    )
+    rv = _row_on(trend_rows, "spx_realised_vol_20d", obs_date)
+    macro = _text_on(regime_rows, "label", obs_date)
+    credit = _row(ind_rows, "hy_oas_on")
+    return LabelReadings(
+        vix=v["vix"],
+        ratio=v["vix"] / v["vix3m"] if v["vix3m"] else np.nan,
+        run=v["backwardation_run"],
+        chg_5d=v["vix_chg_5d"],
+        pct_252=v["vix_pct_252"],
+        vrp=v["vix"] - rv * 100.0 if not np.isnan(rv) else np.nan,
+        drawdown=_row_on(trend_rows, "spx_drawdown_252d", obs_date),
+        sma_200=_row_on(trend_rows, "spx_close_vs_sma200", obs_date),
+        cross_50_200=_row_on(trend_rows, "spx_sma50_vs_sma200", obs_date),
+        breadth=pct,
+        breadth_falling=compare(pct - then, "<", 0.0),
+        corr_ratio=corr,
+        credit_on=None if np.isnan(credit) else bool(credit),
+        macro_high=None if macro is None else macro == "CAUTION",
+        cheap=states["index_vrp_cheap_on"],
+        recovery=states["post_spike_recovery_on"],
+        rate_shock=states["rate_shock_on"],
+    )
+
+
+def _index_vol_on_bars(trend_rows: pd.DataFrame | None, session: date) -> float:
+    """The S&P 500's 20-session realised volatility of ``session``'s trend row when it was
+    measured from SPY's bars (closes through ``session``, like the stocks'); NaN when it came
+    from the index level, whose pit lag ends the window a session earlier."""
+    if trend_rows is None or trend_rows.empty or "spx_source" not in trend_rows.columns:
+        return np.nan
+    day = pd.to_datetime(trend_rows["session_date"]).dt.date
+    rows = trend_rows[(day == session) & (trend_rows["spx_source"] == "bars")]
+    return _row(rows, "spx_realised_vol_20d")
+
+
+def corr_ratio(index_vol: float, member_vol: float) -> float:
+    """Index over mean member volatility (NaN when either is unknown or the members are flat)."""
+    return index_vol / member_vol if member_vol > 0 else np.nan
+
+
+_BREADTH_BACK = MAX_AGE_SESSIONS + 5  # the row of the VIX's date and the one 5 sessions before it
 
 
 def _lookback(p: Params) -> int:
@@ -622,6 +807,11 @@ GROUP = FeatureGroup(
         Input(TREASURY_10Y, lookback=YIELD_SESSIONS + 5, required=False),
         Input(RELEASES, lookback=0, required=False),
         Input(earnings_expected.GROUP.table, lookback=_lookback, required=False),
+        Input(BARS, lookback=CLOSES - 1, required=False),
+        Input(UNIVERSE, required=False),
+        Input(REFERENCE, required=False),
+        Input(breadth.GROUP.table, lookback=_BREADTH_BACK, required=False),
+        Input(regime.GROUP.table, lookback=MAX_AGE_SESSIONS, required=False),
     ),
     FEATURES,
     compute,

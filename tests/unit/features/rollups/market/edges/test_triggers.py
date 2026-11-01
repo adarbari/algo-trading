@@ -97,3 +97,73 @@ def test_no_series_at_all_is_null() -> None:
     pure = triggers.compute({triggers.MACRO: None}, END, None)
     assert list(pure["instrument_id"]) == ["MKT:US"]
     assert pure.drop(columns="instrument_id").isna().all(axis=None)
+
+
+# ---------------------------------------------------------------- post-spike contango (v2)
+LONG = sessions_ending(END, 400)[:-1]
+SPIKE, RECOVERED = (40.0, 30.0), (28.0, 32.0)  # VIX / VIX3M: backwardation, then contango 30% off
+
+
+def episode(first: int) -> dict[int, tuple[float, float]]:
+    """A spike (5 sessions in backwardation) at ``first`` and the recovery from ``first + 5``."""
+    return {**{first + k: SPIKE for k in range(5)}, first + 5: RECOVERED}
+
+
+def test_post_spike_contango_is_the_first_recovered_session_known_the_day_after() -> None:
+    got = row(series(episode(330) | {336: (15.0, 18.0)}, LONG))
+    assert got["post_spike_contango_date"] == next_session(LONG[335])
+    assert got["sessions_since_post_spike_contango"] == len(LONG) - 336
+
+
+def test_a_long_recovery_is_one_trigger_and_a_new_one_needs_21_sessions_off() -> None:
+    stay = {330 + k: SPIKE for k in range(5)} | {335 + k: RECOVERED for k in range(30)}
+    assert row(series(stay, LONG))["post_spike_contango_date"] == next_session(LONG[335])
+    second = {**episode(330), **{336 + k: (15.0, 18.0) for k in range(45)}, **episode(385)}
+    assert row(series(second, LONG))["post_spike_contango_date"] == next_session(LONG[390])
+    soon = {**episode(330), **{336 + k: (15.0, 18.0) for k in range(15)}, **episode(351)}
+    assert row(series(soon, LONG))["post_spike_contango_date"] == next_session(LONG[335])
+
+
+def test_still_inverted_or_not_far_enough_off_the_high_is_no_trigger() -> None:
+    inverted = {330 + k: SPIKE for k in range(5)} | {335: (28.0, 26.0)}
+    got = row(series(inverted, LONG))
+    assert got["post_spike_contango_date"] is None
+    assert got["sessions_since_post_spike_contango"] == triggers.NONE_SEEN
+    shallow = {330 + k: SPIKE for k in range(5)} | {335: (35.0, 38.0)}  # only 12% off the high
+    assert row(series(shallow, LONG))["post_spike_contango_date"] is None
+
+
+def test_the_median_window_must_be_complete_so_short_history_has_no_trigger() -> None:
+    short = LONG[-200:]
+    got = row(series(episode(150), short))
+    assert got["post_spike_contango_date"] is None
+    assert got["sessions_since_post_spike_contango"] == triggers.NONE_SEEN  # fresh, none seen
+
+
+def test_a_stale_reading_is_null_for_the_new_columns_too() -> None:
+    old = LONG[:-10]
+    got = row(series(episode(330), old))
+    assert got["post_spike_contango_date"] is None
+    assert pd.isna(got["sessions_since_post_spike_contango"])
+
+
+def test_no_lookahead_for_the_new_trigger() -> None:
+    d = next_session(LONG[335])
+    assert row(series(episode(330), LONG[:335]), d)["post_spike_contango_date"] is None
+    assert row(series(episode(330), LONG[:336]), d)["post_spike_contango_date"] == d
+
+
+def test_the_vix_spike_columns_do_not_change_with_the_longer_input() -> None:
+    both = row(series({130: HIGH}, LONG))  # inside the v1 window (with its 21 sessions of history)
+    assert both["vix_spike_date"] == next_session(LONG[130])
+    assert row(series({40: HIGH}, LONG))["vix_spike_date"] is None  # older than LOOKBACK
+
+
+def test_a_post_spike_contango_older_than_the_lookback_is_not_seen() -> None:
+    days = sessions_ending(END, 650)[:-1]  # enough history for a trigger 300+ sessions back
+    old = row(series(episode(300), days))  # known 344 sessions before END: outside LOOKBACK
+    assert old["post_spike_contango_date"] is None
+    assert old["sessions_since_post_spike_contango"] == triggers.NONE_SEEN
+    seen = row(series(episode(349), days))  # known 295 sessions before END
+    assert seen["post_spike_contango_date"] == next_session(days[354])
+    assert seen["sessions_since_post_spike_contango"] <= triggers.LOOKBACK

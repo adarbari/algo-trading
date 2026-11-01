@@ -1,5 +1,5 @@
 # L3 site setting: the Guide glossary of the market conditions (ADR 0051, ADR 0088): one [[term]]
-# for every column of market_conditions@v1 (config: features/rollups/market/edges/conditions.py),
+# for every column of market_conditions@v2 (config: features/rollups/market/edges/conditions.py),
 # shown by the help button where a setup's gate or slice names the column. A reason never gives a
 # VIX figure (the personal-use values); a verdict is our own aggregate. Typed by
 # src/algotrade/config/site/guide/glossary.py.
@@ -264,6 +264,56 @@ A value of 0.15 is about peak season. Names with no expected date are left out o
 the figure describes the names the calendar covers. It is unknown when no name has an expected date.
 """
 see_also = ["in_opex_week"]
+
+[[term]]
+id = "realised_corr_ratio_21"
+term = "Realised correlation ratio"
+short = "The S&P 500's realised volatility divided by the average realised volatility of its stocks, over the last 21 closes."
+body = """
+Near 1 means the stocks move together, as in a sell-off. Near 0.3 or less means they move apart, so
+the index is quiet while single names are wild. The figure is unknown when fewer than 50 members
+have all 21 closes. The stock list is the S&P 500 members in the session's snapshot, so it is
+unknown before the first snapshot. Check it beside the VIX before reading a calm index as a calm
+market.
+"""
+see_also = ["index_vrp_rich_on", "vix"]
+
+[[term]]
+id = "conditions_label"
+term = "Market label (R1 to R12)"
+short = "The market in one word: the first of R6, R7, R12, R8, R5, R4, R3, R11, R2, R1 that holds, or UNCLASSIFIED."
+body = """
+Each label is a market state with a published behaviour for option sellers. R6 is a bear market with
+high rising volatility. R7 is a fresh spike with the curve inverted. R12 is options cheap against
+realised volatility. R8 is the recovery after a spike. R5 is a rate-shock grind-down. R4 is a
+correction with the curve upward sloping. R3 is a narrow rally with the stocks moving apart. R11 is
+a high macro risk reading with the market calm and rising. R2 is a low-volatility grind. R1 is a
+calm uptrend with an upward-sloping curve. The rules are tried in that order and the first that
+holds names the session. The label is unknown when a higher-priority rule is unknown, and
+UNCLASSIFIED when every rule is off. Earnings season and event weeks are separate flags. Example:
+the VIX at 38 with the curve inverted for 12 closes in a falling market reads R6.
+"""
+see_also = ["earnings_season_on", "event_week_on", "short_premium_allowed", "post_spike_recovery_on"]
+
+[[term]]
+id = "earnings_season_on"
+term = "Earnings season"
+short = "On when at least 15% of the names with an expected report date report within the next 10 sessions."
+body = """
+It overlays any market label, because earnings season changes single names far more than the index.
+It is off below that share, and unknown when no name has an expected report date.
+"""
+see_also = ["earnings_season_share", "conditions_label"]
+
+[[term]]
+id = "event_week_on"
+term = "Event week"
+short = "On when an FOMC decision is within 5 sessions, or the session is in an option expiry week."
+body = """
+It overlays any market label. A decision date counts only once known on the session. It is unknown
+when no decision is known ahead and the session is not in an expiry week.
+"""
+see_also = ["sessions_to_fomc", "in_opex_week", "calendar_opex_week", "conditions_label"]
 
 [[term]]
 id = "sessions_to_fomc"
