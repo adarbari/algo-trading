@@ -38,11 +38,12 @@ from algotrade.data.chains import (
     option_quote_rows,
     underlying_quotes,
 )
+from algotrade.engines.structures.chain import DayChain
 from algotrade.features.rollups.positioning.chain_inputs import closing_spots, one_row_per_contract
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import OPTION_PNL
-from algotrade_ingestion.tasks.derived.option_paths import DayChain, structure_rows
+from algotrade_ingestion.tasks.derived.option_paths import structure_rows
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.quality import Check
 

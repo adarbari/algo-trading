@@ -2,7 +2,9 @@
 session's close to a later one earned, from quoted prices, and its daily delta hedge. Pure numpy.
 
 A position is a call weight and a put weight (a straddle is 1 and 1, a put 0 and 1), held long;
-a short position is its negative and is applied by the harness. Quotes, never a model price:
+a short position is its negative and is applied by the harness. A multi-leg position (ADR 0088:
+a spread, a covered call's option leg) is a quantity per leg: ``position_sum`` combines per-leg
+values and ``leg_greeks`` gives each leg's own Black-Scholes Greeks. Quotes, never a model price:
 
 - ``long_pnl``: per share, mid in and mid out, and executable (bought at the ask, sold at the bid;
   at expiry the intrinsic value is both);
@@ -14,6 +16,8 @@ a short position is its negative and is applied by the harness. Quotes, never a 
   position's net delta at session ``k``'s close, the hedge held to the next close). No financing,
   no hedge cost, no vendor Greek.
 """
+
+from typing import NamedTuple
 
 import numpy as np
 
@@ -69,6 +73,44 @@ def leg_delta(
         itm_flat = ~otm & (np.abs(s - k) > 0) & (m <= intrinsic(s, k, call) * (1 + 1e-6) + 1e-9)
     limit = np.where(otm & inside, 0.0, np.where(itm_flat, np.where(call, 1.0, -1.0), np.nan))
     return np.asarray(np.where(ok, delta, limit), dtype=np.float64)
+
+
+class LegGreeks(NamedTuple):
+    """Our own sensitivities of each leg at the vol its mid implies (units: ``black_scholes``)."""
+
+    delta: Array
+    gamma: Array
+    vega: Array
+    theta: Array
+
+
+def leg_greeks(
+    mid: ArrayLike, spot: ArrayLike, strike: ArrayLike, t_years: ArrayLike, is_call: ArrayLike
+) -> LegGreeks:
+    """Delta, gamma, vega and theta of each leg from its mid (r = q = 0), at the implied vol
+    ``implied_vol`` solves. ``delta`` is ``leg_delta`` (so it keeps its far-from-the-money
+    limits); gamma, vega and theta are NaN where no vol solves: a Greek we cannot compute is
+    never a zero."""
+    m, s, k, t = (np.asarray(a, dtype=np.float64) for a in (mid, spot, strike, t_years))
+    call = np.asarray(is_call, dtype=bool)
+    solved = implied_vol(m, s, k, t, 0.0, 0.0, call)
+    ok = solved.status == IVStatus.OK
+    g = greeks(s, k, t, 0.0, 0.0, np.where(ok, solved.iv, 1.0), call)
+    nan = np.full(np.shape(ok), np.nan)
+    return LegGreeks(
+        delta=leg_delta(m, s, k, t, call),
+        gamma=np.asarray(np.where(ok, g.gamma, nan), dtype=np.float64),
+        vega=np.asarray(np.where(ok, g.vega, nan), dtype=np.float64),
+        theta=np.asarray(np.where(ok, g.theta, nan), dtype=np.float64),
+    )
+
+
+def position_sum(qty: ArrayLike, per_leg: Array) -> Array:
+    """The position's value (or net delta, or any per-leg figure): ``sum(qty_i * per_leg[i])``
+    over the leg axis 0 of ``per_leg`` (``(legs, n)``). NaN where any leg's figure is NaN, so a
+    leg we cannot value never reads as zero."""
+    weights = np.asarray(qty, dtype=np.float64).reshape(-1, *([1] * (per_leg.ndim - 1)))
+    return np.asarray((weights * per_leg).sum(axis=0), dtype=np.float64)
 
 
 def hedged_pnl(entry_value: ArrayLike, exit_value: ArrayLike, spots: Array, deltas: Array) -> Array:

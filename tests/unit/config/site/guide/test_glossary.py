@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.edges.positions.fields import POSITION_FIELDS
 from algotrade.config.site.guide.glossary import (
     EDGES_FOLDER,
     FOLDER,
@@ -17,6 +18,7 @@ from algotrade.config.site.guide.glossary import (
 )
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.fields import position_field
 from algotrade.data import StoreReader
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import open_stores
@@ -60,7 +62,7 @@ def test_short_is_one_sentence() -> None:
 
 def test_every_catalogue_name_in_the_prose_is_in_the_catalogue() -> None:
     site = open_stores(StoreReader(MemoryBackend()), SHIPPED, UserContext(SITE_USER))
-    fields = catalog_of(site.features).fields
+    fields = {*catalog_of(site.features).fields, *(position_field(f.name) for f in POSITION_FIELDS)}
     for term in load_guide_glossary(SHIPPED).terms:
         named = {n for text in (term.short, term.body) for n in name_tokens(text)}
         unknown = sorted(n for n in named if not n[0].isdigit() and n not in fields)

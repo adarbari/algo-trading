@@ -33,13 +33,21 @@ price), NO_CHAIN (no quotes of the side's right), NO_EXPIRY (none ``dte_min..dte
 out), NO_STRIKE (none with our |delta| in ``search_lo..search_hi``), OUTSIDE_BAND (a best
 contract, but none in the band), OK (the best contract is in the band).
 
+``select_legs`` generalises the search from "the put or call of a target delta" to "the option
+legs of a position template" (ADR 0088, design 2.4): the expiry by tenor and cycle, each leg's
+strike by the template's rule (``delta``, ``atm`` or ``otm_pct``), one tie rule (open interest,
+then the lower strike, then the contract id). ``wing_row`` and the two groups are unchanged;
+the option-outcome writers and the example position call ``select_legs``.
+
 Also here, so both groups declare the same columns the same way: ``wing_features`` (the
 documented columns with their ranges and null meanings, worded from the side and the
 parameters' bands) and ``Side`` (what differs between a put and a call).
 """
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import Protocol
 
 import numpy as np
 import pandas as pd
@@ -54,7 +62,9 @@ from algotrade.features.rollups.options.iv30 import (  # the same input tables, 
     UNDERLYINGS,
     positive_spots,
 )
+from algotrade.features.rollups.positioning.chain_inputs import two_sided_mid
 from algotrade.quant.black_scholes import greeks
+from algotrade.quant.edges.chain_pnl import leg_delta
 from algotrade.quant.implied_vol import IVStatus, implied_vol
 from algotrade.quant.rates import DAYS_PER_YEAR, YieldCurve
 
@@ -337,3 +347,175 @@ def compute(
             row |= wing_row(priced[iid], p, side)
         rows.append({"instrument_id": iid, **row})
     return pd.DataFrame(rows).reindex(columns=columns)
+
+
+class LegRule(Protocol):
+    """The fields of a template leg the selector reads (``config.edges.positions.templates.Leg``
+    satisfies it; the features layer does not import the config layer)."""
+
+    @property
+    def kind(self) -> str: ...
+    @property
+    def qty(self) -> int: ...
+    @property
+    def right(self) -> str | None: ...
+    @property
+    def strike(self) -> str | None: ...
+    @property
+    def delta(self) -> float | None: ...
+    @property
+    def otm_pct(self) -> float | None: ...
+    @property
+    def tenor_days(self) -> int | None: ...
+
+
+OPTION = "option"  # a leg's ``kind`` that needs a contract (the other kind, shares, needs none)
+
+
+type DeltaFn = Callable[[np.ndarray, float, np.ndarray, float, bool], np.ndarray]
+
+
+@dataclass(frozen=True)
+class ChosenLeg:
+    """An option leg of a template resolved to one contract of the session's chain."""
+
+    leg: LegRule
+    instrument_id: str
+    strike: float
+    expiry: date
+    mid: float
+    delta: float  # our own, signed as the contract's right (NaN for an ``atm`` / ``otm_pct`` leg)
+
+
+@dataclass(frozen=True)
+class LegSelection:
+    """The chosen option legs in the template's order, or ``reason`` (``NO_EXPIRY``: no allowed
+    expiry far enough out; ``NO_ENTRY_QUOTE``: a leg has no two-sided contract by its rule, or
+    two legs would be the same contract). A reason is a counted refusal, never a missing P&L."""
+
+    legs: tuple[ChosenLeg, ...] = ()
+    reason: str | None = None
+
+
+def _expiry_for(
+    listed: Sequence[date], session: date, tenor: int, cycle: str, not_before: date | None
+) -> date | None:
+    """The first expiry the cycle allows at least ``tenor`` days after ``session`` (and not
+    before ``not_before``): ``monthly`` the standard monthlies, ``weekly`` every Friday expiry
+    (the monthlies included), ``any`` every listed one."""
+    monthly = standard_monthly_expiries(listed)
+    fridays = {e for e in listed if e.isoweekday() == 5}  # monthlies are Fridays too
+    allowed = {"monthly": monthly, "weekly": fridays, "any": set(listed)}[cycle]
+    floor = max(session.toordinal() + tenor, not_before.toordinal() if not_before else 0)
+    later = sorted(e for e in allowed if e.toordinal() >= floor)
+    return later[0] if later else None
+
+
+def _pick(candidates: pd.DataFrame, distance: pd.Series) -> pd.Series:
+    """The row nearest ``distance`` 0; ties: higher open interest, lower strike, contract id."""
+    order = candidates.assign(_d=distance, _oi=-candidates["open_interest"].fillna(0)).sort_values(
+        ["_d", "_oi", "strike", "instrument_id"]
+    )
+    return order.iloc[0]
+
+
+def select_legs(
+    chain: pd.DataFrame,
+    legs: Sequence[LegRule],
+    spot: float,
+    session: date,
+    tenor_days: int,
+    expiry_cycle: str = "monthly",
+    *,
+    not_before: date | None,
+    delta_fn: DeltaFn = leg_delta,
+) -> LegSelection:
+    """The option legs of a template chosen from one underlying's chain at ``session`` (``chain``:
+    ``instrument_id``, ``expiry``, ``right`` C / P, ``strike``, ``bid``, ``ask`` and optionally
+    ``open_interest``), from that session's quotes alone. Only two-sided quotes (bid > 0 and ask
+    above it) are candidates. ``atm`` legs share one strike: the listed strike nearest ``spot``
+    where each of their rights is quoted. ``delta`` picks the contract whose own delta
+    (``chain_pnl.leg_delta``, r = q = 0) is nearest the target; ``otm_pct`` the strike nearest
+    ``spot`` moved that share out of the money. A leg's own ``tenor_days`` replaces the
+    argument. ``not_before`` (required: the window's end, or None for no floor) keeps an expiry from
+    falling before the position's exit. ``delta_fn`` is the delta convention (default ``leg_delta``,
+    r = q = 0, the option engine's own); a caller that wants the wings' curve-and-dividend delta
+    passes one (the two can differ by 0.01-0.02 of delta at 45 days)."""
+    options = [leg for leg in legs if leg.kind == OPTION]
+    quotes = chain.assign(expiry=pd.to_datetime(chain["expiry"]).dt.date)
+    quotes = quotes.assign(mid=two_sided_mid(quotes["bid"], quotes["ask"]))
+    quotes = quotes[quotes["mid"].notna() & (quotes["bid"] > 0)]
+    if "open_interest" not in quotes:
+        quotes = quotes.assign(open_interest=0)
+    listed = sorted(set(pd.to_datetime(chain["expiry"]).dt.date)) if len(chain) else []
+    chosen: dict[int, ChosenLeg] = {}
+    expiries: dict[int, date] = {}
+    for i, leg in enumerate(options):
+        found = _expiry_for(listed, session, leg.tenor_days or tenor_days, expiry_cycle, not_before)
+        if found is None:
+            return LegSelection(reason="NO_EXPIRY")
+        expiries[i] = found
+    atm = [i for i, leg in enumerate(options) if leg.strike == "atm"]
+    wanted = [(str(options[i].right), expiries[i]) for i in atm]
+    atm_strike = _atm_strike(quotes, wanted, spot)
+    if atm and atm_strike is None:
+        return LegSelection(reason="NO_ENTRY_QUOTE")
+    for i, leg in enumerate(options):
+        pool = _quoted(quotes, str(leg.right), expiries[i]).drop_duplicates("instrument_id")
+        if pool.empty:
+            return LegSelection(reason="NO_ENTRY_QUOTE")
+        strike = pool["strike"].astype(float)
+        delta = float("nan")
+        if leg.strike == "atm":
+            pool = pool[strike == atm_strike]
+            distance = pd.Series(0.0, index=pool.index)
+        elif leg.strike == "otm_pct":
+            sign = 1 if leg.right == "C" else -1
+            distance = (strike - spot * (1 + sign * (leg.otm_pct or 0.0))).abs()
+        else:
+            t = max((expiries[i] - session).days, 0) / DAYS_PER_YEAR
+            d = delta_fn(
+                pool["mid"].to_numpy(float), spot, strike.to_numpy(float), t, leg.right == "C"
+            )
+            pool = pool.assign(_delta=d)
+            distance = (pd.Series(np.abs(d), index=pool.index) - (leg.delta or 0.0)).abs()
+            pool, distance = pool[distance.notna()], distance.dropna()
+        if pool.empty:
+            return LegSelection(reason="NO_ENTRY_QUOTE")
+        best = _pick(pool, distance)
+        if leg.strike == "delta":
+            delta = float(best["_delta"])
+        chosen[i] = ChosenLeg(
+            leg,
+            str(best["instrument_id"]),
+            float(best["strike"]),
+            expiries[i],
+            float(best["mid"]),
+            delta,
+        )
+    ids = [c.instrument_id for c in chosen.values()]
+    if len(set(ids)) != len(ids):
+        return LegSelection(reason="NO_ENTRY_QUOTE")
+    return LegSelection(tuple(chosen[i] for i in range(len(options))))
+
+
+def _quoted(quotes: pd.DataFrame, right: str, expiry: date) -> pd.DataFrame:
+    return quotes[(quotes["right"] == right) & (quotes["expiry"] == expiry)]
+
+
+def _atm_strike(quotes: pd.DataFrame, wanted: list[tuple[str, date]], spot: float) -> float | None:
+    """The listed strike nearest ``spot`` quoted two-sided for every (right, expiry) in
+    ``wanted``; ties: higher open interest summed over them, then the lower strike."""
+    if not wanted:
+        return None
+    pools = [_quoted(quotes, right, expiry) for right, expiry in wanted]
+    common = set.intersection(*(set(p["strike"].astype(float)) for p in pools))
+    if not common:
+        return None
+
+    def open_interest(strike: float) -> float:
+        return sum(
+            float(p.loc[p["strike"] == strike, "open_interest"].fillna(0).max()) for p in pools
+        )
+
+    return min(common, key=lambda k: (abs(k - spot), -open_interest(k), k))

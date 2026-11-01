@@ -101,6 +101,10 @@ path = "config/site/guide/glossary/edges"
 purpose = "the Guide's glossary of the edges (ADR 0051, ADR 0064), one <theme>.toml per theme: the edge page, its evidence and curve, the live record, the outlook and haircut, the ledger and variants, cost and capacity, where the result worked (loaded after the glossary folder; kind guide_glossary_edges)"
 
 [[config_dir]]
+path = "config/site/guide/glossary/setups"
+purpose = "the Guide's glossary of a setup's parts (ADR 0051, ADR 0088), one <theme>.toml per theme: the rule grammar and the facts of an open position (loaded after the edges subfolder; kind guide_glossary_setups)"
+
+[[config_dir]]
 path = "config/site/guide/mechanisms"
 purpose = "the Guide's edge mechanism pages (ADR 0051, ADR 0064), one <id>.toml per MECHANISM_KINDS value of config/edges/document.py (nine files, the 12-file cap): title, question, an examples line, the short hero, how it works, why it survives, what the research found, real versus decoy, what not to read into it, see-also glossary terms, optional stat tiles and the verified sources (loaded by config/site/guide/mechanisms.py; kind guide_mechanisms; fitness tests: exactly one file per mechanism kind)"
 

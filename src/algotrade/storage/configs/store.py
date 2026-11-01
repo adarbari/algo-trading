@@ -19,6 +19,7 @@ KINDS = (
     "guide_screeners",
     "guide_glossary",
     "guide_glossary_edges",
+    "guide_glossary_setups",
     "guide_mechanisms",
     "guide_ideas",
     "events",
@@ -54,6 +55,7 @@ class ConfigStore(Protocol):
         ``guide_screeners`` its screener prose (``site/guide/screeners/<family>/<id>.toml``);
         ``guide_glossary`` its glossary terms (``site/guide/glossary/<theme>.toml``),
         ``guide_glossary_edges`` the edge ones (``site/guide/glossary/edges/<theme>.toml``),
+        ``guide_glossary_setups`` a setup's parts (``site/guide/glossary/setups/<theme>.toml``),
         ``guide_mechanisms`` its edge-mechanism pages (``site/guide/mechanisms/<id>.toml``),
         ``guide_ideas`` the researched-not-built ideas (``site/guide/ideas/<family>.toml``);
         ``edges`` the edge documents (``site/edges/<id>/edge.toml``, or a user's draft under
