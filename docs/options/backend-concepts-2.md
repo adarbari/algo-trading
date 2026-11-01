@@ -454,7 +454,7 @@ ADR 0047), and it holds no licence. E2r makes it scope-aware:
 |---|---|---|---|---|---|
 | `screener` | screener criteria and rank | instrument (its own `pause_in` stays the ADR 0049 label) | D | entry at S = D + offset | any; the trial records the strictest |
 | `universe` | a universe `Selection` | instrument | D | entry at S | any; the trial records it |
-| `gate` | the setup gate (2.2) | market (incl. calendar columns); P2: portfolio | D | entry at S | **open only** (H1) |
+| `gate` | the setup gate (2.2) | market (incl. calendar columns); P2: portfolio | D | entry at S | any; its licence enters the trial's (ADR 0088 decision 7; was "open only", H1) |
 | `entry` | `[outcome.entry] when` | instrument, market; P2: portfolio | each close t of the wait | S = t + offset (>= 1) | any; the trial records it |
 | `case` | case values (2.4) | instrument, market; P2: portfolio | D (the served session for picks) | the resolved point at S | any; the trial records it |
 | `exit` | `[outcome.exit] when` and the compiled settings | instrument, market, position | each close t of the trade | t + 1, or t for position-only rules (2.4a) | any; the trial and the outcome row record it |
@@ -485,7 +485,7 @@ semantics. At `gate`, `entry`, `case` and `exit`:
   builds the catalogue for an edge document, so `config/strategy` keeps its import direction.
 - Events are named only through their features, whose `known_from` rule the feature already applies;
   no use site reads an event row.
-- The licence of a rule is the strictest of its fields. Outside the gate it may be personal; the E1
+- The licence of a rule is the strictest of its fields. It may be personal at any site, the gate included (ADR 0088 decision 20); the E1
   licence gate then treats the trial as personal (owner decision 9). Rules may read `no_ml` tables: a
   person wrote the rule (`no-ml-tables`).
 - A rule's canonical form (sorted keys, the parsed `Group`) enters the variant's identity through

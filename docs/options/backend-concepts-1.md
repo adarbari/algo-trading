@@ -81,7 +81,7 @@ a rule. The first-draft `{field, require}` form is dropped: `require = true` is 
 **Where (owner `run-overlays`, amends ADR 0049).**
 - `config/strategy/regime.py` parses `gate` with `parse_group` and checks it with
   `FieldCatalog.check(..., site = "gate")`: market fields only (`market.*`, which holds the calendar
-  facts), open licence only (H1; one check, also the fitness test). The edge document's `gate` key is
+  facts), any licence, which enters the trial's (ADR 0088 decision 7 replaces H1's "open licence only"). The edge document's `gate` key is
   parsed by this module (`document.py` gains the key name only): a gate is not specific to options (X5
   gates on `regime@v3.label`).
 - `engines/screening/gate.py`: the open / closed / unknown decision becomes a pure function of a

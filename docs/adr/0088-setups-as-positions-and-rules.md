@@ -56,7 +56,7 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
    `outcomes/option/structure_pnl@v2` (supersedes the empty v1), keyed by the resolved legs' `position_key`
    (never the template id), with a price source (one per entry session, by a fixed cutover at
    `FIRST_CBOE_CHAIN_SESSION`, 2026-10-02: history strictly before, Cboe from it) and a `licence` per row.
-   Share trades stay in `forward_returns@v2`. Both satisfy one trade contract (entry and exit session, exit
+   A row's `knowledge_ts` is the latest `knowledge_ts` of every partition it read (chain or history, and the catalogue fields an exit rule names), never the window close; "closed by S" reads `window_end`. A trade entered before 2026-10-02 whose window runs past the bought history's last session is UNMEASURED with a reason (history ended) and counted, never priced by the intrinsic fallback or a Cboe exit. Share trades stay in `forward_returns@v2`. Both satisfy one trade contract (entry and exit session, exit
    kind, capital basis, return on capital by cost level, worst adverse move, price source, licence) in
    `services/evaluation/evidence/`; one evidence path reads only that contract. Price sources are `bars`,
    `cboe`, `option_history` and `model`; `expires_otm` / `hit_target` have no capital basis. One publisher
@@ -74,7 +74,7 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
    `gate_closed`, read as `paused`. A setup that wants both judged declares the gated and ungated pair as
    a variant; the harness reports open, closed and unknown slices (closed = the inverse decoy).
    `market_conditions@v1`, one leaf market group beside the unchanged `regime@v3`, stores the inputs and
-   `_on` states as catalogue features a gate may name; nothing in it is shared by default. A gate's fields
+   `_on` states as catalogue features a gate may name; nothing in it is shared by default. Its stored state columns (`_on`, `short_premium_allowed`) are declared **open** as our own aggregate, through the per-field licence of ADR 0069 decision 4, while raw VIX-family values stay personal (the reviewer's recommendation; owner to confirm, see "Needs the owner"). A gate's fields
    count toward the setup's licence under decision 20 (this replaces the review finding H1's rule that a
    gate may only read open stored verdict columns).
 8. **Base `delta_equivalent`** for named option sleeves on the time-series harness (decision 14), with
@@ -99,7 +99,7 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
     splice importable only by the cross-section harness. Decision 3 of 0084 is extended to exactly these
     two. A trial's licence is the strictest licence of the rows and partitions it actually read (no date
     rule): an option trial over 2015 is personal, a share trial over 2015 stays open. Every row of
-    `results/edge_trades` carries its own `licence`.
+    `results/edge_trades` carries its own `licence`. The setup's open verdict reads a trial over `price_source = cboe` rows only; a slice that reads history rows is a separate trial, owner-only (decision 12), so the Cboe forward record stays open.
 
 ### Owner decisions (2026-11-01, in chat; final)
 12. **History-derived evidence is owner-only for now**, until HOD's terms on derived statistics are read;
@@ -121,7 +121,7 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
       research source it came from; a fitness test checks `holdout_from` is after that source's data
       cut-off. Thresholds from the October 2026 AI study (data through 2026-10-23) start no earlier than
       2026-11-02.
-    - *The minimum* is measured across the joined history and Cboe stretch.
+    - *The holdout* is the sessions after both the research source's data cut-off and the commit that fixes the rule (a threshold tuned later restarts it), counted over trades whose window has closed. *The minimum* of 3 months is measured across the joined history and Cboe stretch. This decision has no basis unless #967 is accepted.
     - *The joint is disclosed:* the history's prices are HistoricalOptionData's 16:00 New York snapshot,
       the Cboe stretch's the Cboe close (the fixed cutover of decision 5, 2026-10-02); an evidence page
       over the joined holdout says so, and the price source is a column of every trade.
@@ -134,7 +134,7 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
 18. **The `tails` profile is opt-in per setup by a new version (a)**; stored share verdicts stay.
 19. **A setup publishes its own evaluated exit rule (d)**: the 80th-percentile stop of ADR 0083 decision 3
     only for a setup that declares no stop; no ATR fallback for option setups.
-20. **A rule's licence is its strictest field (a)**; the trial is personal if any rule read a personal
+20. **A rule's licence is its strictest field (a)**, at the gate, entry, case and exit sites; the screener and universe stay under 0064 decision 10 and 0069 decision 3, so no existing setup disappears (reviewer's recommendation, owner to confirm); the trial is personal if any rule read a personal
     field; such a setup is hidden from, and adds no Ideas picks for, a viewer without that licence. The
     gate is a rule, so its fields count too (reading recorded for owner confirmation: it is the proposer's,
     not stated by the owner).
@@ -160,6 +160,11 @@ cost for options, PSR 0.95 / 0.90, CVaR ratio <= 1.25, >= 5 tail windows); retir
 now (it is empty); retire c18; single-name earnings setups from 2018 with PRIOR_YEAR dates; keep FRED's
 one-day VIX lag; history chain features on the external drive. FOMC dates carry the schedule's
 announcement date as `known_from` per year (decision 3 of 0050 exception).
+
+### Needs the owner (not answered on 2026-11-01; written as the reviewer's recommendation)
+- **A.** The stored `market_conditions@v1` states are open (decision 7); the alternative is personal, which makes every VIX-gated setup, A1 included, owner-only.
+- **B.** Decision 20 applies to gate, entry, case and exit rules only; the alternative applies it to the screener and universe too, amends 0064 decision 10 and hides existing setups such as `vrp_short_premium` and `c18` from viewers without the licence.
+- **C.** The reading that a gate's fields count toward the setup's licence (decision 20).
 
 ## Amendments (each ADR gets a pointer to this one)
 - **0053:** outcome kinds, the trade contract, measures and the verdict profile; rules over features as a
