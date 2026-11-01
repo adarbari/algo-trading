@@ -404,7 +404,7 @@ def _expiry_for(
     before ``not_before``): ``monthly`` the standard monthlies, ``weekly`` every Friday expiry
     (the monthlies included), ``any`` every listed one."""
     monthly = standard_monthly_expiries(listed)
-    fridays = {e for e in listed if e.weekday() == 4}  # monthlies are Fridays too
+    fridays = {e for e in listed if e.isoweekday() == 5}  # monthlies are Fridays too
     allowed = {"monthly": monthly, "weekly": fridays, "any": set(listed)}[cycle]
     floor = max(session.toordinal() + tenor, not_before.toordinal() if not_before else 0)
     later = sorted(e for e in allowed if e.toordinal() >= floor)
