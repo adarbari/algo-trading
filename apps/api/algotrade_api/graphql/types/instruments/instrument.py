@@ -14,7 +14,9 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS, DEFAULT_MONTHS
 from algotrade.services.read.instruments import identity
 from algotrade.services.read.instruments.prices import Adjustment
+from algotrade.services.read.options.grid import load_option_grid
 from algotrade_api.graphql.limits import MAX_DAYS, MAX_MONTHS, MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.events.event import Event
 from algotrade_api.graphql.types.events.instrument_events import InstrumentEvents
@@ -22,6 +24,7 @@ from algotrade_api.graphql.types.instruments.chain import OptionChain
 from algotrade_api.graphql.types.instruments.feature import FeatureValue
 from algotrade_api.graphql.types.instruments.holdings import Holdings
 from algotrade_api.graphql.types.instruments.series import FeatureSeries, PriceSeries
+from algotrade_api.graphql.types.options.grid import OptionGridResult, result_of
 
 if TYPE_CHECKING:  # the screens' types name Instrument: resolved lazily (no import cycle)
     from algotrade_api.graphql.types.screens.hit import ScreenerHit
@@ -108,6 +111,14 @@ class Instrument:
     async def chain(self, info: Info) -> OptionChain | None:
         found = await self.ctx.loaders.chains.load((self.instrument_id,))
         return OptionChain.of(found, self.ctx) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The option grid for the session (ADR 0083 amendment 2026-11-01): puts and "
+        "calls at our delta bands and expiry buckets, derived figures only (never a vendor "
+        "bid, ask, last or size); or why there is none"
+    )
+    async def option_grid(self, info: Info) -> OptionGridResult:
+        return result_of(await off_loop(load_option_grid, self.ctx, self.instrument_id))
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="An ETF's `top` largest holdings as of the issuer's date the session "

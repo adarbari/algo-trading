@@ -103,6 +103,7 @@ from algotrade.features.rollups.positioning import (
     skew,
     skew_history,
 )
+from algotrade.features.rollups.premium import short_premium
 from algotrade.features.rollups.price import (
     anchored_vwap,
     bands,
@@ -183,6 +184,7 @@ GROUPS: dict[str, FeatureGroup] = {
             qmj.GROUP,
             put_wing.GROUP,
             call_wing.GROUP,
+            short_premium.GROUP,
             price_moves.GROUP,
             max_return.GROUP,
             session_returns.GROUP,
