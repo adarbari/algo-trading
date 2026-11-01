@@ -1552,6 +1552,18 @@
    "interaction": [],
    "source": "static"
   },
+  "/onboarding": {
+   "route": "/onboarding",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "TraderPreferences"
+   ],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static"
+  },
   "/regime": {
    "route": "/regime",
    "search": {},
@@ -1725,6 +1737,18 @@
    "clicks": [],
    "params": {},
    "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static"
+  },
+  "/settings": {
+   "route": "/settings",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "TraderPreferences"
+   ],
    "uncertain": [],
    "interaction": [],
    "source": "static"

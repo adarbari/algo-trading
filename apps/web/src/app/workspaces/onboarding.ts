@@ -6,8 +6,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { redirect } from '@tanstack/react-router';
 
-import { ensureTraderPreferences } from '@/entities/trader-preferences';
-
 export const ONBOARDING_PATH = '/onboarding';
 
 /** `beforeLoad` step of the trader layout, run after the workspace guard. */
@@ -21,6 +19,7 @@ export async function onboardingGuard({
   if (location.pathname === ONBOARDING_PATH) return;
   let answered = true;
   try {
+    const { ensureTraderPreferences } = await import('@/entities/trader-preferences');
     answered = (await ensureTraderPreferences(context.queryClient)).defaultTab !== null;
   } catch {
     return;

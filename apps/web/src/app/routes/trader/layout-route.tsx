@@ -10,7 +10,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 import { lazyPage } from '@/shared/lib/lazy';
 
 import { WorkspaceLayout } from '../../layouts';
-import { onboardingGuard, TRADER, workspaceGuard } from '../../workspaces';
+import { TRADER, workspaceGuard } from '../../workspaces';
 import { pageRoute } from '../page-loader';
 import { rootRoute } from '../root';
 
@@ -21,6 +21,8 @@ export const traderRoute = createRoute({
   id: 'trader',
   beforeLoad: async (args) => {
     await guard(args);
+    // Loaded on demand: the entry chunk carries only the call (perf-budgets.json).
+    const { onboardingGuard } = await import('../../workspaces/onboarding');
     await onboardingGuard(args);
   },
   component: () => <WorkspaceLayout workspace={TRADER} />,
