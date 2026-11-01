@@ -172,7 +172,8 @@ def test_each_registry_file_loads_from_its_recorded_response(
         ("SKEW", files_cboe.SKEW, 126.09, 149.76),  # the close only, from 1990
         ("COR1M", files_cboe.COR1M, 23.5, 13.51),  # COR3M has the same five columns
         ("COR3M", files_cboe.COR1M, 23.5, 13.51),
-        ("DSPX", files_cboe.DSPX, 17.81, 37.43),  # the close only, from 2014
+        ("DSPX", files_cboe.DSPX, 17.81, 37.43),
+        ("BFLY", files_cboe.BFLY, 100.0, 435.68),  # CMBO, CLL and PPUT: the same two columns
     ],
 )
 def test_the_cboe_index_files_read_as_index_series_known_a_day_late(
@@ -192,6 +193,7 @@ def test_the_cboe_index_files_read_as_index_series_known_a_day_late(
         date(2011, 1, 4),
         date(2006, 3, 6),
         date(1990, 1, 2),
+        date(1986, 6, 20),
         date(2006, 1, 3),
         date(2014, 6, 19),
     )

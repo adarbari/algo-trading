@@ -169,3 +169,57 @@ terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, n
 url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/DSPX_History.csv"
 date_column = "DATE"
 value_column = "DSPX"
+
+# --- the rest of Cboe's SPX strategy benchmarks (EB D4 follow-up), beside PUT/WPUT/BXM/BXMD/CNDR above.
+
+[[series]]
+key = "BFLY"                  # Cboe iron butterfly index, short ATM straddle with long wings (1986-06-20)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/BFLY_History.csv"
+date_column = "DATE"
+value_column = "BFLY"
+
+[[series]]
+key = "CMBO"                  # Cboe S&P 500 covered combo index, short put and short call around a long stock position (1986-06-30)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/CMBO_History.csv"
+date_column = "DATE"
+value_column = "CMBO"
+
+[[series]]
+key = "CLL"                  # Cboe S&P 500 95-110 collar index (2008-08-26)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/CLL_History.csv"
+date_column = "DATE"
+value_column = "CLL"
+
+[[series]]
+key = "PPUT"                  # Cboe S&P 500 5% put protection index (1986-06-30)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/PPUT_History.csv"
+date_column = "DATE"
+value_column = "PPUT"
