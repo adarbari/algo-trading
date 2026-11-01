@@ -14,11 +14,9 @@ broken pull and nothing is written.
 
 from datetime import date
 
-import pandas as pd
-
 from algotrade.data.listings.membership import TABLE, members_on
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
+from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "index-membership"
@@ -33,29 +31,26 @@ def ingest_index_membership(
     expected_members: tuple[int, int] = EXPECTED_MEMBERS,
 ) -> RunRecord:
     with IngestRun(ctx, TASK, session) as run:
-        try:
-            normalized = run.fetch(source, FetchRequest(KEY, session_date=session))
-        except NoResponseError as error:
-            run.failed(str(error))
+        got = run.fetch_frame(
+            source,
+            FetchRequest(KEY, session_date=session),
+            TABLE,
+            "the membership file held no usable interval",
+        )
+        if got is None:
             return run.record
-        rows = None if normalized is None else normalized.parsed.get(TABLE)
-        if rows is None or rows.empty:
-            run.failed("the membership file held no usable interval")
-            return run.record
+        rows, notes = got
         current = len(members_on(rows, session))
         low, high = expected_members
         if not low <= current <= high:
             run.failed(f"{current} tickers are members on {session}, expected {low}..{high}")
             return run.record
-        rows = rows.copy()
-        rows.insert(0, "ts", pd.Timestamp(session, tz="UTC"))
-        rows = rows.astype(object).where(rows.notna(), None)
         run.write(TABLE, rows, source.name)
         run.stats.update(
             intervals=len(rows),
             tickers=int(rows["ticker"].nunique()),
             members_on_session=current,
             first_start=str(min(rows["start_date"])),
-            **(normalized.notes if normalized is not None else {}),
+            **notes,
         )
     return run.record

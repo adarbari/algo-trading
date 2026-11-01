@@ -1,5 +1,5 @@
 """``earnings_gap_volume@v1``: the last report's window volume over the 20 sessions before it,
-the same report as ``earnings_reaction@v1`` counts, null (never zero) when a bar is missing."""
+the same report as ``earnings_reaction@v2`` counts, null (never zero) when a bar is missing."""
 
 from datetime import date
 

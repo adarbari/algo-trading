@@ -11,12 +11,14 @@ import pytest
 from algotrade.config.edges.chain import tenor_sessions
 from algotrade.config.edges.document import CLOSED, MODEL_KIND, Edge
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.schedules.events import event_class, event_subtype
 from algotrade.config.strategy.schema import Selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.predicates import Group
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.engines.selection.evaluate import evaluate_selection
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.events import event_field
 from algotrade.services.evaluation.cross_section.measuring import MIN_SCORE_COVERAGE
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.strategies.screeners import Decision
@@ -313,3 +315,33 @@ def test_the_lockup_edge_enters_before_the_expiry_and_shorts_the_most_liquid_fir
     )
     window = {c["op"]: c["value"] for c in doc["criteria"].values() if "lockup" in c["field"]}
     assert window == {"gte": 0, "lte": 11}
+
+
+# The ten site edges on an ``on_event:earnings*`` class and the (count field, date field, sign,
+# announced ahead) each reads (F10): the opt-in ``earnings_reaction_session`` class is added
+# beside them and changes none of these windows (a golden pin, not a recomputation).
+EARNINGS_EDGES = {
+    "on_event:earnings_reaction": (
+        "rollup.earnings_reaction@v2.sessions_since_reaction",
+        "rollup.earnings_reaction@v2.reaction_end_date", 1, False,
+    ),
+    "on_event:earnings_expected": (
+        "rollup.earnings_expected@v1.sessions_to_expected_report",
+        "rollup.earnings_expected@v1.expected_report_date", -1, True,
+    ),
+    "on_event:earnings_date_shift:earlier": (
+        "rollup.earnings_date_shift@v1.sessions_since_earnings_shift",
+        "rollup.earnings_date_shift@v1.earnings_shift_known_date", 1, False,
+    ),
+}  # fmt: skip
+
+
+def test_the_ten_earnings_edges_keep_their_event_fields_beside_the_reaction_session_class() -> None:
+    edges = [e for e in load_edges(STORE) if e.schedule.startswith("on_event:earnings")]
+    assert len(edges) == 10
+    assert {e.schedule for e in edges} <= set(EARNINGS_EDGES)  # none opted into the new class
+    for edge in edges:
+        spec = event_field(event_class(edge.schedule) or "", event_subtype(edge.schedule))
+        assert (spec.count, spec.date, spec.sign, spec.announced_ahead) == EARNINGS_EDGES[
+            edge.schedule
+        ]

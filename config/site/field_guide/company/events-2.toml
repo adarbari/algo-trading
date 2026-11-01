@@ -246,7 +246,7 @@ theme = "events"
 reads = "The last 20 sessions' return with the daily returns of every earnings reaction window left out. A window runs from the close before a report to the close after it. The value is the month's move that earnings did not make. It equals rollup.price_stats@v2.ret_20d when no report fell in the window. A large negative value is a name that fell on no earnings news, a reversal candidate."
 caveats = [
   "Null when a close is missing in the 21, the history is shorter, or no earnings report is known for the name at all. The calendar cannot say it did not report. A name the calendar missed is null, not neutral.",
-  "It removes the report's own two returns, not the days around it. Drift after the window (rollup.earnings_reaction@v1.sessions_since_reaction) is still in.",
+  "It removes the report's own two returns, not the days around it. Drift after the window (rollup.earnings_reaction@v2.sessions_since_reaction) is still in.",
   "Other news is still in the return: a deal, a downgrade, guidance outside the report. rollup.filing_activity@v1.filing_count_5d shows the last week's 8-Ks only.",
   "Only reports known on the session are removed, so a past session is read as it was.",
 ]
@@ -411,9 +411,9 @@ note = "null (no date) names drop out"
 [[field]]
 name = "rollup.earnings_gap_volume@v1.reaction_volume_ratio"
 theme = "events"
-reads = "How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio."
+reads = "How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v2.earnings_volume_ratio."
 caveats = [
-  "A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v1.reaction_excess_return for what the price did.",
+  "A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v2.reaction_excess_return for what the price did.",
   "Null when a bar of the window or of the 20 sessions before it is missing, or the history is short. A hard 'gte' drops those names.",
 ]
 sources = ["Bernard and Thomas (1989), Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research"]
@@ -491,3 +491,227 @@ op = "lte"
 value = 5
 mode = "hard"
 note = "illustrative screen: five sessions is one trading week, the window in which the move is still news; no published cut-off"
+
+[[field]]
+name = "rollup.earnings_reaction@v2.abs_move_mean_8"
+theme = "events"
+reads = "How far the stock usually moves on a report, as a decimal (0.06 is 6%). It is the mean of its last eight reports, each the absolute move from the close before the report to the close after it. It is the raw move, not the excess over SPY, because it is what an option straddle on the report prices. Read it next to the implied move of the report ahead (feature.earnings_move_ratio does the division)."
+caveats = [
+  "Eight reports is two years. A company that changed (a merger, a new business) is averaged with its old self, and one extreme report moves a mean of eight a lot. Compare rollup.earnings_reaction@v2.abs_move_median_8, and check rollup.earnings_reaction@v2.abs_moves_counted.",
+  "The window is two sessions, so it holds the move whether the company reported before the open or after the close. It can include other news of those days (a deal, an offering). It is a bigger number than the one-day gap of a report made before the open.",
+  "A report counts only once the session after it has closed, so the report ahead is never in it. A report whose window lacks a bar is left out, and one older than the history (about eight quarters) is not counted.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v2); the realised half of implied against realised earnings moves"]
+[[field.use]]
+for = "names that usually move at least 5% on a report"
+op = "gte"
+value = 0.05
+mode = "hard"
+note = "illustrative: pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4 so a name with one report in history is not read as typical"
+
+[[field]]
+name = "rollup.earnings_reaction@v2.abs_move_median_8"
+theme = "events"
+reads = "The typical move on a report, as a decimal (0.04 is 4%). It is the median of the last eight reports, each the absolute move from the close before the report to the close after it. Half of those reports moved the stock less than this and half more, so one outlier does not shift it the way it shifts rollup.earnings_reaction@v2.abs_move_mean_8."
+caveats = [
+  "A median far below the mean says a few big reports drive the average. A median near the mean says the name moves about the same every time. The straddle can look expensive against the median and fair against the mean.",
+  "Same window and the same exclusions as the mean: two sessions around the report, the report ahead never in it, a report without both bars left out. With few reports counted it is a rough number: check rollup.earnings_reaction@v2.abs_moves_counted.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v2)"]
+[[field.use]]
+for = "names whose typical report move is small"
+op = "lte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "illustrative: a name that rarely moves much on a report; no published cut-off"
+
+[[field]]
+name = "rollup.earnings_reaction@v2.abs_moves_counted"
+theme = "events"
+reads = "How many of the name's last eight reports stand behind its past-move numbers: reports whose two-session window has closed with both bars. 8 is a full history, 0 means no past report could be measured (a new listing, an ETF, a name whose reports are not in the calendar). It is a count, so 0 is a fact, not a gap."
+caveats = [
+  "The history behind it is about eight quarters of sessions, so a name listed or first covered recently has fewer; a name with a gap in its bars has fewer. Fewer than 4 makes the mean a poor guide: feature.earnings_move_ratio is null below 4.",
+  "It counts reports, not quarters: a report the calendar listed twice for one quarter (a moved date) counts once.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v2)"]
+[[field.use]]
+for = "enough past reports to read the average"
+op = "gte"
+value = 4
+mode = "hard"
+
+[[field]]
+name = "feature.earnings_move_ratio"
+theme = "events"
+reads = "Whether the options price the next report above or below what the name usually does. It is the straddle's implied move (rollup.implied_move@v1.implied_move, a share of the price) divided by the mean move on the last eight reports (rollup.earnings_reaction@v2.abs_move_mean_8). 1.0 is a straddle at the usual move; 1.5 is 50% above it; 0.7 is 30% below."
+caveats = [
+  "Only an expiry that covers the report is read. When rollup.implied_move@v1.move_basis is TERM (no report within 60 days, or none an expiry covers) the ratio is null, because a 30-day straddle is not a report price.",
+  "The straddle also pays for the days between today and the report and for the expiry after it, so a farther expiry reads richer; read rollup.implied_move@v1.move_dte. Past moves are two sessions around the report, the straddle spans to the expiry.",
+  "A mean of past moves is a poor forecast for a name that changed, and one outlier report inflates it (so the ratio reads cheap); compare rollup.earnings_reaction@v2.abs_move_median_8. Null below 4 past reports.",
+]
+sources = ["Site convention; the implied against realised earnings move comparison used by options traders"]
+[[field.use]]
+for = "options pricing the report above the name's history"
+op = "gte"
+value = 1.3
+mode = "soft"
+tolerance = 0.1
+note = "feature.earnings_move_rich uses 1.3; a threshold chosen for the setup, not a published one"
+
+[[field]]
+name = "feature.earnings_move_rich"
+theme = "events"
+reads = "True when the options price the next report at 1.3 times or more the name's mean move on its last eight reports (feature.earnings_move_ratio). The straddle is expensive against what the name has done. It is the setting for selling the report; it says the price is high, not that the sale pays."
+caveats = [
+  "A true flag compares two averages. It is not an edge: the realised move of this report can be anything. A rich straddle on a name about to change (a deal, a new product) is rich for a reason. Read the setup's backtested verdict before the flag.",
+  "Null, not false, when the ratio is null (no report-covering expiry, fewer than 4 past reports): a hard criterion drops those names.",
+]
+sources = ["Site convention (config/site/features/options/earnings.toml)"]
+[[field.use]]
+for = "a straddle priced rich against the name's past reports"
+op = "eq"
+value = true
+mode = "hard"
+
+[[field]]
+name = "feature.earnings_move_cheap"
+theme = "events"
+reads = "True when the options price the next report at 0.8 times or less the name's mean move on its last eight reports (feature.earnings_move_ratio). The straddle is cheap against what the name has done. It is the setting for buying the report, and a reason to leave the name out of a sale; it says the price is low, not that the buy pays."
+caveats = [
+  "One outlier report in the last eight inflates the mean and makes the ratio read cheap; compare rollup.earnings_reaction@v2.abs_move_median_8.",
+  "Null, not false, when the ratio is null (no report-covering expiry, fewer than 4 past reports): a hard criterion drops those names. A false flag is not a rich one: the ratio between 0.8 and 1.3 is neither.",
+]
+sources = ["Site convention (config/site/features/options/earnings.toml)"]
+[[field.use]]
+for = "a straddle priced cheap against the name's past reports"
+op = "eq"
+value = true
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction@v2.abs_move_mean_4"
+theme = "events"
+reads = "The mean absolute move of the name's newest four reports, as a decimal (0.06 is 6%). Set it against rollup.earnings_reaction@v2.abs_move_mean_8: a recent mean above the two-year one says the reports have been getting bigger."
+caveats = [
+  "Four reports is one year and the mean of four moves a lot with one outlier. Read rollup.earnings_reaction@v2.abs_moves_counted: below four it covers fewer reports.",
+  "Same window as the others: two sessions around the report, raw move, the report ahead never in it.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v2)"]
+[[field.use]]
+for = "names whose recent reports moved at least 5%"
+op = "gte"
+value = 0.05
+mode = "soft"
+tolerance = 0.01
+note = "illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4"
+
+[[field]]
+name = "rollup.earnings_reaction@v2.abs_move_max_8"
+theme = "events"
+reads = "The biggest absolute move among the name's last eight reports, as a decimal (0.25 is 25%). It is the worst surprise in two years, the size a seller of the report has already lost once."
+caveats = [
+  "One report, so it says nothing about how often. Compare rollup.earnings_reaction@v2.abs_move_median_8.",
+  "It can hold other news of the two sessions (a deal, an offering). Check the date before reading it as an earnings surprise.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v2)"]
+[[field.use]]
+for = "names with no report move above 15% in two years"
+op = "lte"
+value = 0.15
+mode = "hard"
+note = "illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4"
+
+[[field]]
+name = "rollup.earnings_reaction@v2.signed_move_mean_8"
+theme = "events"
+reads = "The mean signed move of the name's last eight reports, as a decimal. Positive: it has tended to rise on reports. Negative: it has tended to fall. A fall counts as negative, so rises and falls offset."
+caveats = [
+  "Eight reports are a small sample and one large move sets the sign. Read it with rollup.earnings_reaction@v2.up_moves_8.",
+  "It describes the past, not the next report. A name that rose on most reports can still fall on the next.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v2)"]
+[[field.use]]
+for = "names that tended to rise on reports"
+op = "gt"
+value = 0
+mode = "soft"
+tolerance = 0.005
+note = "illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4"
+
+[[field]]
+name = "rollup.earnings_reaction@v2.up_moves_8"
+theme = "events"
+reads = "How many of the name's last eight reports moved the price up, from the close before the report to the close after it. Out of rollup.earnings_reaction@v2.abs_moves_counted, it shows whether the rises were the habit or the exception."
+caveats = [
+  "A count out of at most eight is a small sample: 6 of 8 is not strong evidence of a pattern.",
+  "Flat reports count as not up, so abs_moves_counted minus this is the falls and the flat ones.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v2)"]
+[[field.use]]
+for = "names that rose on at least six of eight reports"
+op = "gte"
+value = 6
+mode = "soft"
+tolerance = 0.5
+note = "illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.reaction_session_status"
+theme = "events"
+reads = "Whether the newest report's reaction day is known and has come. OK: the day is known and today is on or after it. PENDING: the day is still ahead, as with a report made after the close today. UNKNOWN_TIME: the calendar gave no before-open or after-close time."
+caveats = [
+  "UNKNOWN_TIME names are left out of the reaction-day schedule, never guessed, so a screen that needs the reaction day drops them. Check rollup.earnings_reaction_session@v1.reaction_report_time.",
+  "It describes the newest report only: a name stays OK for months until its next report.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "only names whose reaction day is known"
+op = "eq"
+value = "OK"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.reaction_report_time"
+theme = "events"
+reads = "When in the day the newest report was made: pre_market (before the open), after_hours (after the close) or unknown. It is the time on the earnings calendar row known by the session, not the time of a filing seen later."
+caveats = [
+  "A calendar time is a vendor's, and it can be missing for small names. A report with no time reads unknown and has no reaction day.",
+  "An 8-K filing time (intraday) is known only after the event and is never used here.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "reports made before the open"
+op = "eq"
+value = "pre_market"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.reaction_session_date"
+theme = "events"
+reads = "The session the newest report moves the price on: the report's own session if made before the open, the next session if made after the close. It differs from rollup.earnings_reaction@v2.reaction_end_date, which is always the session after the report."
+caveats = [
+  "Null while the reaction day is ahead (PENDING) or the report time is unknown.",
+  "It names the reaction day, not the best day to trade: the move may be over by the open of the next session.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "a reaction day that has already come"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.sessions_since_reaction_session"
+theme = "events"
+reads = "Exchange sessions from the newest report's reaction day up to the session. 0 means the session is the reaction day, 1 the day after. It is the count the reaction-day schedule reads to enter at the right session."
+caveats = [
+  "Null while the reaction day is ahead or the report time is unknown, so a hard criterion drops those names.",
+  "A name keeps counting up until its next report, so a large value is a stale report, not a fresh one.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "a report whose reaction day was in the last five sessions"
+op = "lte"
+value = 5
+mode = "hard"
+note = "illustrative: one trading week; no published cut-off"
