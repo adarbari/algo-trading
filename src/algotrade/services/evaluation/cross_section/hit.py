@@ -73,13 +73,13 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from algotrade.config.edges.chain import (
+from algotrade.config.edges.document import EXCESS_MEASURES, Edge
+from algotrade.config.edges.positions.chain import (
     CHAIN_KIND,
     HEDGED_STRUCTURES,
     SHORT_STRUCTURES,
     grain_structure,
 )
-from algotrade.config.edges.document import EXCESS_MEASURES, Edge
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant.black_scholes import (
     atm_straddle_price,

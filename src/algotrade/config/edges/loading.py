@@ -35,6 +35,8 @@ from typing import Any, Protocol
 from algotrade.config.edges.document import Edge, expand_baselines, parse_edge
 from algotrade.config.edges.follow import AUDIT, is_legacy, legacy_own, parse_audit, parse_follow
 from algotrade.config.edges.follow import KEY as FOLLOW
+from algotrade.config.edges.positions.spec import check_edge as check_positions
+from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import site_document
 from algotrade.config.strategy.catalog import FieldCatalog
@@ -128,6 +130,7 @@ def _load(
     selections = {n for scope in scopes for n in configs.names(scope, SELECTIONS)}
     verdict = VerdictSettings.from_document(site_document(configs.load, "verdict"))
     standard = verdict.decoys_standard
+    templates = load_templates(configs)
     parsed: dict[str, Edge] = {}
     for name, (doc, where, _root) in sorted(layered.items()):
         try:
@@ -136,6 +139,7 @@ def _load(
                 edge, baselines=expand_baselines(edge.baselines, standard, edge.screeners)
             )
             _check_presets(edge, where, screeners, selections)
+            check_positions(edge, where, templates)
             if catalog is not None and not isinstance(edge.universe, str):
                 catalog.check(edge.universe.where, f"{where} universe")
         except ConfigurationError as exc:

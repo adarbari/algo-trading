@@ -23,6 +23,7 @@ KINDS = (
     "guide_ideas",
     "events",
     "studies",
+    "positions",
     "series",
     "ranking",
     "filters",

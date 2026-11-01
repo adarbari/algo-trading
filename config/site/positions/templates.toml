@@ -1,0 +1,55 @@
+# Position templates (ADR 0088, design 2.4): a position is a list of legs, shares (a signed
+# quantity) or an option chosen at entry from one session's chain by a strike rule (`delta`,
+# `atm` or `otm_pct`; there is no target-yield rule). `collateral` is the capital a return is
+# measured on: notional (spot x quantity), cash_secured (strike x 100), max_loss (width x 100
+# less the credit) or regt. An edge outcome names a template by `position` and may override its
+# parameters. Typed by src/algotrade/config/edges/positions/templates.py.
+
+[[template]]
+id = "long_shares"
+legs = [{ kind = "shares", qty = 100 }]
+collateral = "notional"
+
+[[template]]
+id = "short_shares"
+legs = [{ kind = "shares", qty = -100 }]
+collateral = "notional"
+
+[[template]]
+id = "short_put"
+legs = [{ kind = "option", right = "P", qty = -1, strike = "delta", delta = 0.30 }]
+collateral = "cash_secured"
+
+[[template]]
+id = "put_spread"
+legs = [
+  { kind = "option", right = "P", qty = -1, strike = "delta", delta = 0.30 },
+  { kind = "option", right = "P", qty = 1, strike = "delta", delta = 0.10 },
+]
+collateral = "max_loss"
+
+[[template]]
+id = "covered_call"
+legs = [
+  { kind = "shares", qty = 100 },
+  { kind = "option", right = "C", qty = -1, strike = "delta", delta = 0.30 },
+]
+collateral = "notional"
+
+[[template]]
+id = "short_straddle"
+legs = [
+  { kind = "option", right = "P", qty = -1, strike = "atm" },
+  { kind = "option", right = "C", qty = -1, strike = "atm" },
+]
+collateral = "regt"
+
+[[template]]
+id = "iron_fly"
+legs = [
+  { kind = "option", right = "P", qty = -1, strike = "atm" },
+  { kind = "option", right = "C", qty = -1, strike = "atm" },
+  { kind = "option", right = "P", qty = 1, strike = "otm_pct", otm_pct = 0.05 },
+  { kind = "option", right = "C", qty = 1, strike = "otm_pct", otm_pct = 0.05 },
+]
+collateral = "max_loss"

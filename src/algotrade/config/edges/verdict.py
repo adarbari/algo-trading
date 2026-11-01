@@ -37,6 +37,7 @@ KEYS = (
     "decoys",
     "capacity_adv_floor_usd",
     "capacity_position_usd",
+    "exit_rule",  # typed apart (positions/exit_rule.py); never a judge input
 )
 EDGE_COSTS_KEYS = ("levels_bps", "borrow_bps_annual")
 LEGS = ("long", "short", "long_short")  # ``[published] leg`` (ADR 0065; outcome sides)

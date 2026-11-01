@@ -41,6 +41,11 @@ MAX_TENOR_DAYS = 400
 def grain_structure(structure: str, strike_delta: float | None) -> str:
     """The structure the grain stores (held long) for a document ``structure``: ``atm_straddle``,
     or ``put_delta_NN`` for the short put of delta ``NN / 100``."""
+    if structure not in CHAIN_STRUCTURES:
+        raise ConfigurationError(
+            f"option_pnl structure {structure!r}: an outcome that names a position template is "
+            f"not measured until the option engine reads it (ADR 0088, E3a / E4)"
+        )
     if structure == "put_short":
         assert strike_delta is not None
         return f"put_delta_{round(strike_delta * 100):02d}"
@@ -67,6 +72,22 @@ def check_chain(
     elif delta is not None:
         raise ConfigurationError(f"{o.where} strike_delta: only a put_short has a strike")
     return structure, delta, None, None
+
+
+def check_positioned(
+    o: Table, delta: float | None, pct: float | None, iv_field: str | None
+) -> tuple[None, float | None, None, None]:
+    """``(None, strike_delta, None, None)`` of an ``option_pnl`` outcome that names a ``position``
+    template (ADR 0088): the legs, not a ``structure``, say what is held; ``strike_delta`` (0.05 to
+    0.5) overrides the template's delta legs."""
+    if "structure" in o.names():
+        raise ConfigurationError(f"{o.where} position: not with structure")
+    if pct is not None or iv_field is not None:
+        key = "otm_pct" if pct is not None else "iv_field"
+        raise ConfigurationError(f"{o.where} {key}: an option_pnl reads quoted prices, it has none")
+    if delta is not None and not 0.05 <= round(delta, 2) <= 0.5:
+        raise ConfigurationError(f"{o.where} strike_delta: 0.05 to 0.5, got {delta}")
+    return None, None if delta is None else round(delta, 2), None, None
 
 
 def chain_tenor(o: Table, kind: str) -> int | None:
@@ -146,7 +167,11 @@ def option_fields(o: Table, kind: str) -> tuple[str | None, float | None, float 
     structures = structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
     structure = o.choice("structure", "", structures) if "structure" in o.names() else None
     if kind == CHAIN_KIND:
-        return check_chain(o, structure, delta, pct, iv_field)
+        return (
+            check_positioned(o, delta, pct, iv_field)
+            if "position" in o.names()
+            else check_chain(o, structure, delta, pct, iv_field)
+        )
     if kind not in ("expires_otm", "option_model_pnl", CHAIN_KIND):
         for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
             if value is not None:

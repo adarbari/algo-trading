@@ -86,7 +86,7 @@ def test_every_key_of_the_verdict_file_is_read_and_every_read_key_is_in_the_file
     """Fitness: a threshold added to ``KEYS`` is written in ``verdict.toml`` (with its comment),
     and a key in the file is one the loader reads (an unknown one already fails to load)."""
     doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
-    assert set(doc) == set(KEYS)
+    assert set(doc) == set(KEYS) - {"exit_rule"}  # typed apart (positions/exit_rule.py)
     assert set(doc["published_haircut"]) == set(LEGS)
     assert set(doc["edge_costs"]) == {"levels_bps", "borrow_bps_annual"}
 
