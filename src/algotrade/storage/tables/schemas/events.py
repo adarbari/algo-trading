@@ -223,6 +223,7 @@ MACRO_SERIES = fixed(
     "vintage_kind string!",
     runs="merge",
     key=("instrument_id", "obs_date", "vintage_date"),
+    cluster_by=("instrument_id",),  # one row group per series: a read of a few skips the rest
 )
 
 # L1: what each analyst-data vendor's key may call (ADR 0068), one row per (vendor, endpoint):

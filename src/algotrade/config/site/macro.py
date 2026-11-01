@@ -20,7 +20,7 @@ never ``"*"``: the registry must name every stored series without reading the fi
 import re
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
@@ -102,6 +102,9 @@ class MacroSeries:
     section: int = 1  # a file of several tables: which one (``french_zip``), from 1
     revised: bool = False
     refetch_days: int = 0  # a published file: read again after this many days (0: by cadence)
+    research: bool = (
+        False  # expanded from a ``macro/<name>.toml`` [[file]] (ADR 0089), not an entry
+    )
 
     @property
     def is_revised(self) -> bool:
@@ -214,7 +217,8 @@ def _expand(name: str, doc: Mapping[str, Any]) -> tuple[MacroSeries, ...]:
         for column in columns:
             entry = {k: v for k, v in merged.items() if k not in BLOCK_KEYS}
             entry |= {"key": series_key(prefix, column), "value_column": column}
-            series.append(_series(entry, i, f"{where} [[file]] {prefix}"))
+            built = _series(entry, i, f"{where} [[file]] {prefix}")
+            series.append(replace(built, research=True))
     return tuple(series)
 
 

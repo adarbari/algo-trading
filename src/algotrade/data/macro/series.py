@@ -48,6 +48,21 @@ def stored_vintages(
     return frame.sort_values(order, kind="stable").reset_index(drop=True)
 
 
+def stored_keys(reader: StoreReader, ids: Sequence[str]) -> pd.DataFrame:
+    """The (``instrument_id``, ``obs_date``, ``vintage_date``) of every stored vintage of ``ids``
+    (never every series), without values: only the key columns and ``knowledge_ts`` are read, so
+    a long research series costs a fraction of ``stored_vintages``. ``date`` objects, one row per
+    key; empty when none or ``ids`` is empty."""
+    cols = ["instrument_id", "obs_date", "vintage_date"]
+    wanted = [*cols, "knowledge_ts"]
+    frame = reader.table_range(TABLE, *ALL_TIME, None, list(ids), wanted) if ids else None
+    if frame is None or frame.empty:
+        return pd.DataFrame(columns=cols)
+    for column in ("obs_date", "vintage_date"):
+        frame[column] = pd.to_datetime(frame[column]).dt.date
+    return frame[cols].drop_duplicates().reset_index(drop=True)
+
+
 def first_alfred_vintages(vintages: pd.DataFrame) -> dict[str, date]:
     """Per ``instrument_id`` of ``vintages`` (``stored_vintages``' shape), its earliest ALFRED
     vintage date: before it the stored history is the figures as first vintaged, not as they
