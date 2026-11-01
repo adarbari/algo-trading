@@ -16,6 +16,16 @@ next = "Open the edge's result and compare its picks with the names that reporte
 see_also = ["base_rate", "out_of_sample", "event_class_earnings_expected"]
 
 [[term]]
+id = "event_class_earnings_reaction_session"
+term = "On the earnings reaction day"
+short = "The edge starts on the session a company's report moves the price, by its time of day."
+body = """
+The trigger is a reported result, anchored on the session the market reacts to it. A report made before the open has its reaction that same day. A report made after the close has it the next session. The time of day is the one the earnings calendar gave by the decision session. A report with no known time is left out and counted, never guessed. The edge enters from the anchor on, as its start offset says. Only reports known by the decision session count, and one name counts once in about two months. Compare the picks with other names that reported in the same weeks, not with the whole market.
+"""
+next = "Open the edge's report and check how many names were left out for an unknown report time."
+see_also = ["base_rate", "out_of_sample", "event_class_earnings_reaction"]
+
+[[term]]
 id = "event_class_earnings_expected"
 term = "Before an expected earnings report"
 short = "The edge starts before a report that is scheduled or expected from last year's date."
