@@ -66,6 +66,7 @@ EXEMPT = {
     "services/read/events/reference.py": GATED_LOADERS,
     "services/read/market/features.py": GATED_LOADERS,
     "services/read/market/history.py": GATED_LOADERS,
+    "services/read/evaluation/positions/exit_rule.py": GATED_LOADERS,  # momentum.atr_14 (open)
     "services/read/regime/fields.py": GATED_LOADERS,
     "services/read/regime/history.py": GATED_LOADERS,
     "services/read/regime/sources.py": "provenance dates and kinds of a card's series (never a "

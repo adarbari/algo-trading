@@ -520,6 +520,11 @@ type Edge {
   The user's own edge against the edge it extends and its baselines, in-sample only while `oosHidden`; null for a site edge
   """
   compare: EdgeCompare
+
+  """
+  The setup's historical exit rule at the served session, for a pick (`instrumentId`, for the ATR fallback): the stop and the hold, long picks only; null: no session is served
+  """
+  exitRule(instrumentId: String = null): ExitRule
 }
 
 """One quality-bar answer: `key` names the question, `text` the answer"""
@@ -1143,6 +1148,18 @@ type EvidenceProgress {
   reached: Boolean!
   checks: [VerdictCriterion!]!
   outlook: EdgeOutlook
+}
+
+"""
+A setup's historical exit rule at the served session: the `stop` and the `holdSessions` (the verdict's basis horizon), each null only with `unknown` saying why (never filled from an older value; none of it is read from a run that ends after the served session). `winners`: the basis's winning long trades read; `inSampleOnly`: the run hides its out-of-sample trades, so only in-sample winners were read
+"""
+type ExitRule {
+  edgeId: String!
+  stop: Stop
+  holdSessions: Int
+  unknown: Unknown
+  winners: Int!
+  inSampleOnly: Boolean!
 }
 
 """
@@ -3887,6 +3904,25 @@ type SliceFigure {
   liftPts: Float
   trades: Int
   thin: Boolean!
+}
+
+"""
+A stop. `fraction`: how far below the entry reference close (HISTORY: the drawdown that `1 - beyond` of the setup's winning trades never exceeded, on `winners` trades; DECLARED: the setup's own rule); FALLBACK: `multiple` x `atr` (ATR(14), usd per share), not from this setup's history
+"""
+type Stop {
+  kind: StopKind!
+  fraction: Float
+  atr: Float
+  multiple: Float
+  winners: Int
+  beyond: Float
+}
+
+"""Where a published stop comes from"""
+enum StopKind {
+  HISTORY
+  FALLBACK
+  DECLARED
 }
 
 """
