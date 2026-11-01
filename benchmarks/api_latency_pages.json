@@ -473,7 +473,7 @@
      "filters": null,
      "q": null
     },
-    "query": "\n  query EdgesPage($filters: [FilterInput!], $q: String) {\n    edgeList(filters: $filters, q: $q) {\n      total\n      facets {\n        total\n        matched\n        items {\n          id\n          active\n          removes\n          unknown\n          options {\n            value\n            count\n          }\n          bins {\n            lo\n            hi\n            count\n          }\n        }\n      }\n      items {\n        id\n        name\n        status\n        state\n        mine\n        screeners\n        summary {\n          verdict\n          result\n          trades\n        }\n      }\n    }\n  }\n"
+    "query": "\n  query EdgesPage($filters: [FilterInput!], $q: String) {\n    edgeList(filters: $filters, q: $q) {\n      total\n      facets {\n        total\n        matched\n        items {\n          id\n          active\n          removes\n          unknown\n          options {\n            value\n            count\n          }\n          bins {\n            lo\n            hi\n            count\n          }\n        }\n      }\n      items {\n        id\n        name\n        thesis\n        status\n        state\n        mine\n        screeners\n        summary {\n          verdict\n          result\n          trades\n        }\n      }\n    }\n  }\n"
    },
    {
     "kind": "graphql",
@@ -494,7 +494,7 @@
      "filters": null,
      "q": null
     },
-    "query": "\n  query EdgesPage($filters: [FilterInput!], $q: String) {\n    edgeList(filters: $filters, q: $q) {\n      total\n      facets {\n        total\n        matched\n        items {\n          id\n          active\n          removes\n          unknown\n          options {\n            value\n            count\n          }\n          bins {\n            lo\n            hi\n            count\n          }\n        }\n      }\n      items {\n        id\n        name\n        status\n        state\n        mine\n        screeners\n        summary {\n          verdict\n          result\n          trades\n        }\n      }\n    }\n  }\n"
+    "query": "\n  query EdgesPage($filters: [FilterInput!], $q: String) {\n    edgeList(filters: $filters, q: $q) {\n      total\n      facets {\n        total\n        matched\n        items {\n          id\n          active\n          removes\n          unknown\n          options {\n            value\n            count\n          }\n          bins {\n            lo\n            hi\n            count\n          }\n        }\n      }\n      items {\n        id\n        name\n        thesis\n        status\n        state\n        mine\n        screeners\n        summary {\n          verdict\n          result\n          trades\n        }\n      }\n    }\n  }\n"
    },
    {
     "kind": "graphql",
