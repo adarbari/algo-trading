@@ -243,11 +243,11 @@ export function HeatGrid({
                     ) : (
                       <>
                         <span className={styles.figure}>
-                          {cell.text}
+                          {cell.text}{' '}
                           {cell.flag !== undefined && (
                             <span className={styles.flag}>{cell.flag}</span>
                           )}
-                        </span>
+                        </span>{' '}
                         {cell.sub !== undefined && <span className={styles.sub}>{cell.sub}</span>}
                       </>
                     )}
