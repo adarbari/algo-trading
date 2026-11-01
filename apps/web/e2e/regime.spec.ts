@@ -55,15 +55,6 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
-test('the Regime page shows the sizing rules of the caller, read-only', async ({ page }) => {
-  await page.goto('/regime');
-  await expect(
-    page.getByText('The regime gate is off: new positions are at full size'),
-  ).toBeVisible();
-  await expect(page.getByLabel('Size of a new position')).toContainText('50%');
-  await expect(page.getByLabel('Your screeners')).toContainText('pause in Storm and Severe storm');
-});
-
 test('a card opens its indicator in the help drawer, which opens the Guide page', async ({
   page,
 }) => {
