@@ -133,6 +133,12 @@ def config_ids(store: ConfigStore, scope: str) -> list[str]:
     return sorted({n for kind in CONFIG_KINDS for n in store.names(scope, kind)})
 
 
+def strategy_ids(store: ConfigStore, scope: str) -> list[str]:
+    """Every strategy config id in ``scope``, sorted: the ``strategies`` folder only, so no
+    screener preset is read or resolved (the kind is the folder, ``config_document``)."""
+    return sorted(set(store.names(scope, CONFIG_KINDS[0])))
+
+
 def config_generation(configs: ConfigStore) -> Callable[[str, bool], int | None]:
     """A user's config generation for the response cache key (ADR 0077 decision 15): ``None``
     while a write of theirs is in flight (odd) or the counter cannot be read, so nothing is
