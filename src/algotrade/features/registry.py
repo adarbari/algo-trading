@@ -77,8 +77,8 @@ from algotrade.features.rollups.market import (
     macro_asof,
     regime,
     trend,
-    triggers,
 )
+from algotrade.features.rollups.market.edges import triggers
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,

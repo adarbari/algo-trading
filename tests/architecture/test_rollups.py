@@ -55,7 +55,9 @@ def test_declaration_is_valid_and_typed(key: str) -> None:
         assert SITE.expressions[rollup.name].materialise and rollup.params is None
         return
     module = Path(str(__import__(rollup.compute.__module__, fromlist=["x"]).__file__))
-    assert module.parent.parent == REPO_ROOT / "src" / "algotrade" / "features" / "rollups"
+    rollups = REPO_ROOT / "src" / "algotrade" / "features" / "rollups"
+    # <kind>/<module>.py, or one level deeper where a kind is split (market/edges/)
+    assert rollups in (module.parent.parent, module.parent.parent.parent)
 
 
 @pytest.mark.parametrize("key", sorted(GROUPS))
