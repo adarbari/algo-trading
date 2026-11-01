@@ -4,6 +4,8 @@
 > per-setup gate, section 9) replaces the review finding H1's "gate open-only" rule, and the ADR number
 > is 0088 (the text below says 0087 where it was written before #968 took that number). The research
 > files named below are not in the repo.
+>
+> Residual returns (`residual_returns@v1`) before 2013: owner answer 2026-11-01 "Add French factors (a)": daily Fama-French factors are added in a separate PR that amends ADR 0053; this plan does not decide them.
 
 # Options setups: backend design (2026-10-25, revised after the architect review;
 generalised to share and option setups alike, 2026-10-31)
