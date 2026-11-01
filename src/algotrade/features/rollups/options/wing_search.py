@@ -44,7 +44,7 @@ documented columns with their ranges and null meanings, worded from the side and
 parameters' bands) and ``Side`` (what differs between a put and a call).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Protocol
@@ -372,6 +372,9 @@ class LegRule(Protocol):
 OPTION = "option"  # a leg's ``kind`` that needs a contract (the other kind, shares, needs none)
 
 
+type DeltaFn = Callable[[np.ndarray, float, np.ndarray, float, bool], np.ndarray]
+
+
 @dataclass(frozen=True)
 class ChosenLeg:
     """An option leg of a template resolved to one contract of the session's chain."""
@@ -398,9 +401,11 @@ def _expiry_for(
     listed: Sequence[date], session: date, tenor: int, cycle: str, not_before: date | None
 ) -> date | None:
     """The first expiry the cycle allows at least ``tenor`` days after ``session`` (and not
-    before ``not_before``): ``monthly`` the standard monthlies, ``weekly`` the others, ``any``."""
+    before ``not_before``): ``monthly`` the standard monthlies, ``weekly`` every Friday expiry
+    (the monthlies included), ``any`` every listed one."""
     monthly = standard_monthly_expiries(listed)
-    allowed = {"monthly": monthly, "weekly": set(listed) - monthly, "any": set(listed)}[cycle]
+    fridays = {e for e in listed if e.weekday() == 4}  # monthlies are Fridays too
+    allowed = {"monthly": monthly, "weekly": fridays, "any": set(listed)}[cycle]
     floor = max(session.toordinal() + tenor, not_before.toordinal() if not_before else 0)
     later = sorted(e for e in allowed if e.toordinal() >= floor)
     return later[0] if later else None
@@ -421,7 +426,9 @@ def select_legs(
     session: date,
     tenor_days: int,
     expiry_cycle: str = "monthly",
-    not_before: date | None = None,
+    *,
+    not_before: date | None,
+    delta_fn: DeltaFn = leg_delta,
 ) -> LegSelection:
     """The option legs of a template chosen from one underlying's chain at ``session`` (``chain``:
     ``instrument_id``, ``expiry``, ``right`` C / P, ``strike``, ``bid``, ``ask`` and optionally
@@ -430,7 +437,10 @@ def select_legs(
     where each of their rights is quoted. ``delta`` picks the contract whose own delta
     (``chain_pnl.leg_delta``, r = q = 0) is nearest the target; ``otm_pct`` the strike nearest
     ``spot`` moved that share out of the money. A leg's own ``tenor_days`` replaces the
-    argument."""
+    argument. ``not_before`` (required: the window's end, or None for no floor) keeps an expiry from
+    falling before the position's exit. ``delta_fn`` is the delta convention (default ``leg_delta``,
+    r = q = 0, the option engine's own); a caller that wants the wings' curve-and-dividend delta
+    passes one (the two can differ by 0.01-0.02 of delta at 45 days)."""
     options = [leg for leg in legs if leg.kind == OPTION]
     quotes = chain.assign(expiry=pd.to_datetime(chain["expiry"]).dt.date)
     quotes = quotes.assign(mid=two_sided_mid(quotes["bid"], quotes["ask"]))
@@ -464,7 +474,7 @@ def select_legs(
             distance = (strike - spot * (1 + sign * (leg.otm_pct or 0.0))).abs()
         else:
             t = max((expiries[i] - session).days, 0) / DAYS_PER_YEAR
-            d = leg_delta(
+            d = delta_fn(
                 pool["mid"].to_numpy(float), spot, strike.to_numpy(float), t, leg.right == "C"
             )
             pool = pool.assign(_delta=d)

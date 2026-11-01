@@ -51,6 +51,10 @@ class Window:
     reason: np.ndarray
     hedge: np.ndarray
 
+    def __post_init__(self) -> None:
+        if not self.legs or any(leg.right not in ("C", "P") for leg in self.legs):
+            raise ValueError("a window holds at least one option leg, each a call or a put")
+
     def fail(self, who: np.ndarray, why: str) -> None:
         """Record ``why`` for the names in ``who`` that have no reason yet."""
         for i in np.flatnonzero(self.ok & who & pd.isna(self.reason)):
@@ -182,5 +186,6 @@ def mark_window(days: Sequence[DayChain], w: Window, labels: Labels | None = Non
     )
     spots, deltas = _hedge_path(days, w, labels)
     exit_mid, exit_exec, at_expiry = _exit_values(days[-1], w, spots[-1])
+    w.fail(~np.isfinite(entry_mid), "NO_ENTRY_QUOTE")
     w.fail(~np.isfinite(exit_mid), "NO_EXIT_QUOTE")
     return Marks(spots, entry_mid, entry_exec, exit_mid, exit_exec, at_expiry, deltas)

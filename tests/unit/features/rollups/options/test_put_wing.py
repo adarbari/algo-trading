@@ -326,7 +326,7 @@ def test_properties_on_random_chains(
 
 SESSION = date(2026, 10, 5)
 MONTHLY = date(2026, 11, 20)  # the third Friday
-WEEKLY = date(2026, 11, 6)
+WEEKLY = date(2026, 11, 6)  # a Friday that is not the third
 TEMPLATES = load_templates(FileConfigStore(REPO_ROOT / "config"))
 SPOT, VOL = 100.0, 0.30
 
@@ -350,86 +350,89 @@ def legs(template: str) -> list[Leg]:
     return list(TEMPLATES[template].legs)
 
 
-def pick(template: str, tenor: int = 30, cycle: str = "monthly", **kw: object) -> object:
-    return ws.select_legs(chain(), legs(template), SPOT, SESSION, tenor, cycle, **kw)  # type: ignore[arg-type]
+def sel(
+    quotes: pd.DataFrame, rules: list[Leg], tenor: int = 30, cycle: str = "monthly",
+    not_before: date | None = None, **kw: object,
+) -> ws.LegSelection:  # fmt: skip
+    return ws.select_legs(quotes, rules, SPOT, SESSION, tenor, cycle, not_before=not_before, **kw)  # type: ignore[arg-type]
 
 
 def test_a_short_put_by_delta_is_the_contract_whose_own_delta_is_nearest_the_target() -> None:
-    chosen = pick("short_put")
-    [c] = chosen.legs  # type: ignore[attr-defined]
-    assert chosen.reason is None  # type: ignore[attr-defined]
+    chosen = sel(chain(), legs("short_put"))
+    [c] = chosen.legs
+    assert chosen.reason is None
     assert (c.expiry, c.leg.qty) == (MONTHLY, -1) and c.instrument_id.startswith("P")
     assert 0.2 < abs(c.delta) < 0.4  # a 30-delta put (template default 0.30)
 
 
 def test_a_credit_spread_picks_two_puts_in_the_templates_order() -> None:
-    chosen = pick("put_spread")
-    short, long = chosen.legs  # type: ignore[attr-defined]
+    short, long = sel(chain(), legs("put_spread")).legs
     assert (short.leg.qty, long.leg.qty) == (-1, 1) and long.strike < short.strike
     assert abs(short.delta) > abs(long.delta)
 
 
 def test_atm_legs_share_the_strike_nearest_the_spot() -> None:
-    put, call = pick("short_straddle").legs  # type: ignore[attr-defined]
+    put, call = sel(chain(), legs("short_straddle")).legs
     assert {call.strike, put.strike} == {100.0} and (put.leg.right, call.leg.right) == ("P", "C")
 
 
 def test_otm_pct_picks_the_strike_nearest_that_distance_out_of_the_money() -> None:
-    chosen = pick("iron_fly")
-    shorts, wings = chosen.legs[:2], chosen.legs[2:]  # type: ignore[attr-defined]
+    chosen = sel(chain(), legs("iron_fly"))
+    shorts, (put_wing, call_wing) = chosen.legs[:2], chosen.legs[2:]
     assert {c.strike for c in shorts} == {100.0}
-    put_wing, call_wing = wings
     assert (put_wing.strike, call_wing.strike) == (95.0, 105.0)  # 5% out of the money
 
 
 def test_the_tie_rule_is_open_interest_then_the_lower_strike_then_the_contract_id() -> None:
     leg = Leg("option", -1, "P", "otm_pct", otm_pct=0.025, delta=None)  # 97.5: 95 and 100 tie
-    base = ws.select_legs(chain(), [leg], SPOT, SESSION, 30)
-    assert base.legs[0].strike == 95.0  # equal open interest: the lower strike
+    assert sel(chain(), [leg]).legs[0].strike == 95.0  # equal open interest: the lower strike
     heavy = chain({"P100-1120": 500})
-    assert ws.select_legs(heavy, [leg], SPOT, SESSION, 30).legs[0].strike == 100.0  # more OI wins
+    assert sel(heavy, [leg]).legs[0].strike == 100.0  # more open interest wins
     twin = pd.concat([chain(), chain().assign(instrument_id=lambda d: "Z" + d["instrument_id"])])
-    assert ws.select_legs(twin, [leg], SPOT, SESSION, 30).legs[0].instrument_id == "P95-1120"
+    assert sel(twin, [leg]).legs[0].instrument_id == "P95-1120"
 
 
 def test_the_expiry_follows_the_tenor_and_the_cycle() -> None:
-    weekly = ws.select_legs(chain(), legs("short_put"), SPOT, SESSION, 30, "weekly")
-    assert weekly.legs[0].expiry == WEEKLY  # the first non-monthly 30+ days out
-    assert pick("short_put", tenor=10, cycle="any").legs[0].expiry == WEEKLY  # type: ignore[attr-defined]
-    held = ws.select_legs(chain(), legs("short_put"), SPOT, SESSION, 5, "any", not_before=MONTHLY)
+    assert sel(chain(), legs("short_put"), 30, "weekly").legs[0].expiry == WEEKLY
+    assert sel(chain(), legs("short_put"), 33, "weekly").legs[0].expiry == MONTHLY  # a Friday too
+    assert sel(chain(), legs("short_put"), 10, "any").legs[0].expiry == WEEKLY
+    held = sel(chain(), legs("short_put"), 5, "any", not_before=MONTHLY)
     assert held.legs[0].expiry == MONTHLY  # never before the window's end
     own = [Leg("option", -1, "P", "delta", delta=0.3, tenor_days=40)]
-    assert ws.select_legs(chain(), own, SPOT, SESSION, 5, "monthly").legs[0].expiry == MONTHLY
+    assert sel(chain(), own, 5, "monthly").legs[0].expiry == MONTHLY
+
+
+def test_the_weekly_cycle_takes_the_monthly_when_it_is_the_nearest_friday() -> None:
+    only_monthly = chain()[lambda d: d["expiry"] == MONTHLY]
+    assert sel(only_monthly, legs("short_put"), 30, "weekly").legs[0].expiry == MONTHLY
+
+
+def test_a_delta_convention_can_be_passed_and_the_default_is_the_engines() -> None:
+    zero = sel(chain(), legs("short_put"), delta_fn=lambda m, s, k, t, c: np.zeros_like(m))
+    assert zero.reason is None and zero.legs[0].delta == 0.0  # picks by the function it is given
 
 
 @pytest.mark.parametrize(
-    ("changes", "reason"),
-    [
-        ({"tenor": 400}, "NO_EXPIRY"),
-        ({"template": "put_spread", "cycle": "weekly", "tenor": 400}, "NO_EXPIRY"),
-    ],
+    ("template", "cycle"), [("short_put", "monthly"), ("put_spread", "weekly")]
 )
-def test_no_allowed_expiry_is_a_counted_refusal(changes: dict[str, object], reason: str) -> None:
-    got = ws.select_legs(chain(), legs(str(changes.get("template", "short_put"))), SPOT, SESSION,
-                      int(changes["tenor"]), str(changes.get("cycle", "monthly")))  # type: ignore[call-overload]  # fmt: skip
-    assert (got.legs, got.reason) == ((), reason)
+def test_no_allowed_expiry_is_a_counted_refusal(template: str, cycle: str) -> None:
+    got = sel(chain(), legs(template), 400, cycle)
+    assert (got.legs, got.reason) == ((), "NO_EXPIRY")
 
 
 def test_a_leg_with_no_two_sided_quote_or_that_repeats_a_contract_is_refused() -> None:
     thin = chain().assign(bid=0.0)
-    assert ws.select_legs(thin, legs("short_put"), SPOT, SESSION, 30).reason == "NO_ENTRY_QUOTE"
+    assert sel(thin, legs("short_put")).reason == "NO_ENTRY_QUOTE"
     twice = [Leg("option", -1, "P", "delta", delta=0.3), Leg("option", 1, "P", "delta", delta=0.3)]
-    assert ws.select_legs(chain(), twice, SPOT, SESSION, 30).reason == "NO_ENTRY_QUOTE"
-    assert ws.select_legs(chain().iloc[0:0], legs("short_put"), SPOT, SESSION, 30).reason == (
-        "NO_EXPIRY"
-    )
+    assert sel(chain(), twice).reason == "NO_ENTRY_QUOTE"
+    assert sel(chain().iloc[0:0], legs("short_put")).reason == "NO_EXPIRY"
 
 
 def test_a_share_leg_needs_no_selection_and_is_not_returned() -> None:
-    got = ws.select_legs(chain(), legs("covered_call"), SPOT, SESSION, 30)
+    got = sel(chain(), legs("covered_call"))
     assert len(got.legs) == 1 and got.legs[0].leg.right == "C"
 
 
 def test_the_choice_is_deterministic() -> None:
-    a, b = pick("put_spread"), pick("put_spread")
-    assert a == b and np.isfinite([c.mid for c in a.legs]).all()  # type: ignore[attr-defined]
+    a, b = sel(chain(), legs("put_spread")), sel(chain(), legs("put_spread"))
+    assert a == b and np.isfinite([c.mid for c in a.legs]).all()
