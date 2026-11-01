@@ -281,17 +281,17 @@ see_also = ["index_vrp_rich_on", "vix"]
 [[term]]
 id = "conditions_label"
 term = "Market label (R1 to R12)"
-short = "The market in one word: the first of R6, R7, R12, R8, R5, R4, R3, R2, R1, R11 that holds, or UNCLASSIFIED."
+short = "The market in one word: the first of R6, R7, R12, R8, R5, R4, R3, R11, R2, R1 that holds, or UNCLASSIFIED."
 body = """
 Each label is a market state with a published behaviour for option sellers. R6 is a bear market with
 high rising volatility. R7 is a fresh spike with the curve inverted. R12 is options cheap against
 realised volatility. R8 is the recovery after a spike. R5 is a rate-shock grind-down. R4 is a
 correction with the curve upward sloping. R3 is a narrow rally with the stocks moving apart. R2 is a
-low-volatility grind. R1 is a calm uptrend with an upward-sloping curve. R11 is a high macro risk
-reading with the market calm. The rules are tried in that order and the first that holds names the
-session. The label is unknown when a higher-priority rule is unknown, and UNCLASSIFIED when every
-rule is off. Earnings season and event weeks are separate flags. Example: the VIX at 32 with the
-curve inverted for 12 closes in a falling market reads R6.
+low-volatility grind. R11 is a high macro risk reading with the market calm and rising. R2 is a low-
+volatility grind. R1 is a calm uptrend with an upward-sloping curve. The rules are tried in that
+order and the first that holds names the session. The label is unknown when a higher-priority rule
+is unknown, and UNCLASSIFIED when every rule is off. Earnings season and event weeks are separate
+flags. Example: the VIX at 38 with the curve inverted for 12 closes in a falling market reads R6.
 """
 see_also = ["earnings_season_on", "event_week_on", "short_premium_allowed", "post_spike_recovery_on"]
 
