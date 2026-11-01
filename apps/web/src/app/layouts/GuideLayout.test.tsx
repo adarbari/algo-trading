@@ -22,6 +22,8 @@ import { currentSession, gql, subscribeSession } from '@/shared/api';
 import { ADMIN, rememberWorkspace, TRADER } from '../workspaces';
 import { GuideLayout } from './GuideLayout';
 
+vi.mock('@/widgets/theme-choice', () => ({ ThemeChoice: () => null }));
+
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {

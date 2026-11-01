@@ -59,7 +59,12 @@ export function Chip({
       <span className={styles.label} data-struck={struck || undefined}>
         {label}
       </span>
-      {meta !== undefined && <span className={styles.meta}>{meta}</span>}
+      {meta !== undefined && (
+        <>
+          {' '}
+          <span className={styles.meta}>{meta}</span>
+        </>
+      )}
     </>
   );
   return (
@@ -76,7 +81,6 @@ export function Chip({
           className={styles.main}
           data-interactive=""
           ref={buttonRef}
-          aria-label={meta === undefined ? undefined : `${label}, ${meta}`}
           aria-pressed={toggle ? isSelected : undefined}
           disabled={disabled}
           onClick={(event) => {

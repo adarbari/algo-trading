@@ -20,6 +20,34 @@
         "title": "Alternative",
         "type": "object"
       },
+      "Appearance": {
+        "properties": {
+          "theme": {
+            "description": "the saved choice: light, dark or system",
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "title": "Appearance",
+        "type": "object"
+      },
+      "AppearanceBody": {
+        "properties": {
+          "theme": {
+            "description": "light, dark or system (the device decides)",
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "title": "AppearanceBody",
+        "type": "object"
+      },
       "Build": {
         "properties": {
           "api": {
@@ -4024,6 +4052,67 @@
         "summary": "Job Status",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/preferences/appearance": {
+      "put": {
+        "operationId": "save_appearance_preferences_appearance_put",
+        "parameters": [
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppearanceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appearance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Appearance",
+        "tags": [
+          "ideas"
         ]
       }
     },

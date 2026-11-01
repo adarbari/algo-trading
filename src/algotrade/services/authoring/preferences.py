@@ -12,7 +12,11 @@ only scrubbed of a deleted screener.
 
 Read-model PR 8 moved the views from ``screeners.<id>`` to ``views."screener:<id>"``: every
 preferences write moves the old tables first (``_moved``), so a saved view is never lost and
-the old layout disappears with the user's next write."""
+the old layout disappears with the user's next write.
+
+``[appearance] theme`` (ADR 0085 decision 6: ``light`` / ``dark`` / ``system``, the user's
+Light / Dark / System choice) is saved by ``save_appearance``; every other write keeps the table
+as it is."""
 
 import re
 from collections.abc import Mapping, Sequence
@@ -30,6 +34,7 @@ from algotrade.services.read.screens.views import (
     scope_parts,
     surface_exists,
 )
+from algotrade.services.read.users.appearance import APPEARANCE, THEMES
 from algotrade.storage.configs.writer import ConfigWriter
 
 PREFERENCES = "preferences"
@@ -204,3 +209,15 @@ def delete_view(writer: ConfigWriter, user: str, scope: str, name: str) -> list[
     current[VIEWS] = views
     writer.save_preferences(who, current)
     return sorted(named_views)
+
+
+def save_appearance(writer: ConfigWriter, user: str, theme: str) -> str:
+    """Replace ``user``'s ``[appearance] theme`` (views and other preferences are kept);
+    ``theme`` is one of ``light`` / ``dark`` / ``system``. Returns it."""
+    if theme not in THEMES:
+        raise ConfigurationError(f"appearance.theme: one of {', '.join(THEMES)}")
+    who = author(user).user_id
+    current = _load(writer, who)
+    current[APPEARANCE] = {**dict(current.get(APPEARANCE) or {}), "theme": theme}
+    writer.save_preferences(who, current)
+    return theme
