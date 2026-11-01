@@ -28,7 +28,12 @@ CATALOG = FieldCatalog.build(
         },
         "position": {"position.dte": "int"},
     },
-    licences={"market.skew@v1.close": "personal", "market.vix@v1.close": "open"},
+    licences={
+        "market.skew@v1.close": "personal",
+        "market.vix@v1.close": "open",
+        "market.regime@v1.label": "open",
+        "market.regime@v1.state": "open",
+    },
     domains={"market.regime@v1.label": ("CALM", "STRESS")},
 )
 
@@ -126,7 +131,10 @@ def test_a_level_declared_only_in_a_test_is_readable_by_a_gate_rule() -> None:
         ("gate",), "Feature.licence",
     )  # fmt: skip
     catalog = FieldCatalog.build(
-        {}, levels={"sector": {"sector.flow@v1.net": "float"}}, declared=(*LEVELS, sector)
+        {},
+        levels={"sector": {"sector.flow@v1.net": "float"}},
+        licences={"sector.flow@v1.net": "open"},
+        declared=(*LEVELS, sector),
     )
     catalog.check(rule("sector.flow@v1.net", "gt", 0), "rule", "gate")
     with pytest.raises(ConfigurationError, match=r"sector-level field.*'exit'"):
@@ -140,3 +148,22 @@ def test_levels_name_computed_providers_by_string_and_import_no_engine() -> None
     tree = ast.parse(Path(levels_module.__file__ or "").read_text())
     imported = {n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
     assert not [m for m in imported if m.startswith(("algotrade.engines", "algotrade.services"))]
+
+
+def test_a_gate_field_with_no_declared_licence_is_refused() -> None:
+    bare = FieldCatalog.build({}, levels={"market": {"market.x@v1.y": "float"}})
+    with pytest.raises(ConfigurationError, match="no declared licence"):
+        bare.check(rule("market.x@v1.y", "gt", 1), "rule", "gate")
+    bare.check(rule("market.x@v1.y", "gt", 1), "rule", "entry")
+
+
+def test_a_rule_value_outside_the_declared_domain_is_refused_at_strict_sites() -> None:
+    for op, value in (("ne", "hihg"), ("eq", "hihg"), ("in", ["CALM", "hihg"])):
+        with pytest.raises(ConfigurationError, match="not a value of"):
+            CATALOG.check(rule("market.regime@v1.label", op, value), "rule", "gate")
+    CATALOG.check(rule("market.regime@v1.label", "in", ["CALM", "STRESS"]), "rule", "gate")
+
+
+def test_a_levels_fields_start_with_one_of_its_heads() -> None:
+    with pytest.raises(ConfigurationError, match="do not start with a head"):
+        FieldCatalog.build({}, levels={"market": {"position.dte": "int"}})
