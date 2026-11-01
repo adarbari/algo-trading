@@ -1,0 +1,109 @@
+# Kenneth French's daily data library (ADR 0089): the factor and industry files as published
+# macro series. One [[file]] per zip (a file used by two blocks, the industry zips, is still one
+# request per run: the adapter reads a URL once); each listed column expands into a series
+# keyed <prefix>_<COLUMN> (src/algotrade/config/site/macro.py), values in PERCENT as published.
+#
+# The library has no vintages and is re-estimated: each pull stores a changed value as a new
+# `lagged` vintage dated the run's session (never before the fetch), and a day first seen takes
+# the observation date + release_lag_days. French posts a month's files about a month after it
+# ends (CRSP), so 70 days is about twice that and errs late; the files are pulled at most every 28
+# days (refetch_days) because their terms are unconfirmed. cadence = "monthly": a daily series'
+# 3-day staleness margin would flag every French series for weeks before each monthly update
+# (stale after 31 + 70 + 2 = 103 days). The missing marks -99.99 and -999 are no value.
+
+[defaults]
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 70
+refetch_days = 28
+pit = "lag"
+revised = true
+licence = "personal"
+terms = "Kenneth R. French data library (https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html): no terms of use stated; files carry only 'Copyright <year> Eugene F. Fama and Kenneth R. French' and are built from CRSP; used as personal research data, one pull a month, never redistributed, cite Fama and French (pending owner confirmation: open vs personal)"
+parser = "french_zip"
+date_column = "date"
+
+# the Fama-French 3 factors and the risk-free rate (1926-)
+[[file]]
+prefix = "FF3"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily_CSV.zip"
+columns = [
+    "Mkt-RF", "SMB", "HML", "RF",
+]
+
+# the Fama-French 5 factors (2x3) and the risk-free rate (1963-)
+[[file]]
+prefix = "FF5"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip"
+columns = [
+    "Mkt-RF", "SMB", "HML", "RMW", "CMA", "RF",
+]
+
+# the momentum factor (1926-11-)
+[[file]]
+prefix = "FF"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_daily_CSV.zip"
+columns = [
+    "Mom",
+]
+
+# the short-term reversal factor (1926-01-)
+[[file]]
+prefix = "FF"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_ST_Reversal_Factor_daily_CSV.zip"
+columns = [
+    "ST_Rev",
+]
+
+# the long-term reversal factor (1930-03-)
+[[file]]
+prefix = "FF"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_LT_Reversal_Factor_daily_CSV.zip"
+columns = [
+    "LT_Rev",
+]
+
+# 12 industry portfolios, value weighted (1926-)
+[[file]]
+prefix = "IND12"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/12_Industry_Portfolios_daily_CSV.zip"
+columns = [
+    "NoDur", "Durbl", "Manuf", "Enrgy", "Chems", "BusEq", "Telcm", "Utils", "Shops", "Hlth",
+    "Money", "Other",
+]
+
+# 12 industry portfolios, equal weighted (1926-)
+[[file]]
+prefix = "IND12EW"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/12_Industry_Portfolios_daily_CSV.zip"
+section = 2
+columns = [
+    "NoDur", "Durbl", "Manuf", "Enrgy", "Chems", "BusEq", "Telcm", "Utils", "Shops", "Hlth",
+    "Money", "Other",
+]
+
+# 49 industry portfolios, value weighted (1926-)
+[[file]]
+prefix = "IND49"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/49_Industry_Portfolios_daily_CSV.zip"
+columns = [
+    "Agric", "Food", "Soda", "Beer", "Smoke", "Toys", "Fun", "Books", "Hshld", "Clths", "Hlth",
+    "MedEq", "Drugs", "Chems", "Rubbr", "Txtls", "BldMt", "Cnstr", "Steel", "FabPr", "Mach",
+    "ElcEq", "Autos", "Aero", "Ships", "Guns", "Gold", "Mines", "Coal", "Oil", "Util", "Telcm",
+    "PerSv", "BusSv", "Hardw", "Softw", "Chips", "LabEq", "Paper", "Boxes", "Trans", "Whlsl",
+    "Rtail", "Meals", "Banks", "Insur", "RlEst", "Fin", "Other",
+]
+
+# 49 industry portfolios, equal weighted (1926-)
+[[file]]
+prefix = "IND49EW"
+url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/49_Industry_Portfolios_daily_CSV.zip"
+section = 2
+columns = [
+    "Agric", "Food", "Soda", "Beer", "Smoke", "Toys", "Fun", "Books", "Hshld", "Clths", "Hlth",
+    "MedEq", "Drugs", "Chems", "Rubbr", "Txtls", "BldMt", "Cnstr", "Steel", "FabPr", "Mach",
+    "ElcEq", "Autos", "Aero", "Ships", "Guns", "Gold", "Mines", "Coal", "Oil", "Util", "Telcm",
+    "PerSv", "BusSv", "Hardw", "Softw", "Chips", "LabEq", "Paper", "Boxes", "Trans", "Whlsl",
+    "Rtail", "Meals", "Banks", "Insur", "RlEst", "Fin", "Other",
+]

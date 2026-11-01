@@ -9,7 +9,8 @@ import pytest
 from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.settings import load_macro
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
+from tests.conftest import REPO_ROOT
 from tests.unit.config.site.test_settings import site
 
 FRED = {
@@ -128,3 +129,95 @@ def test_the_document_shape_is_checked() -> None:
         MacroSettings.from_document({"indices": []})
     with pytest.raises(ConfigurationError, match=r"\[\[series\]\]"):
         MacroSettings.from_document({"series": {"key": "X"}})
+
+
+# --- config/site/macro/<name>.toml: a published file expanded into one series per column (ADR 0089)
+
+BLOCK = {
+    "defaults": {
+        "source": "published", "kind": "macro", "cadence": "monthly", "pit": "lag",
+        "release_lag_days": 70, "revised": True, "licence": "personal", "terms": "t",
+        "parser": "french_zip", "date_column": "date",
+    },
+    "file": [
+        {"prefix": "FF3", "url": "https://x.test/ff3.zip", "columns": ["Mkt-RF", "SMB"]},
+        {"prefix": "IND12EW", "url": "https://x.test/i.zip", "section": 2, "columns": ["NoDur"]},
+        {"prefix": "FF", "url": "https://x.test/m.zip", "columns": ["Mom   ", "LT_Rev"]},
+    ],
+}  # fmt: skip
+
+
+def expand(files: dict[str, Any], *series: dict[str, Any]) -> MacroSettings:
+    return MacroSettings.from_document({"series": list(series)}, files)
+
+
+def test_a_file_block_expands_into_one_ordinary_series_per_column() -> None:
+    macro = expand({"french": BLOCK}, FRED)
+    assert [s.key for s in macro.series] == [
+        "UNRATE", "FF3_MKT_RF", "FF3_SMB", "IND12EW_NODUR", "FF_MOM", "FF_LT_REV",
+    ]  # fmt: skip
+    smb, ew, mom = macro.by_key("FF3_SMB"), macro.by_key("IND12EW_NODUR"), macro.by_key("FF_MOM")
+    assert (smb.value_column, smb.date_column, smb.parser, smb.section) == (
+        "SMB", "date", "french_zip", 1,
+    )  # fmt: skip
+    assert (ew.section, ew.url) == (2, "https://x.test/i.zip")
+    assert (mom.value_column, mom.instrument_id) == ("Mom   ", "MACRO:FF_MOM")
+    assert all(
+        s.licence == "personal" and s.revised and s.release_lag_days == 70 for s in macro.series[1:]
+    )
+    assert macro.by_key("FF3_MKT_RF").stale_after_days == 31 + 70 + 2  # monthly, not a daily margin
+
+
+def test_a_block_overrides_the_defaults_and_a_key_clash_fails_across_both_places() -> None:
+    block = {**BLOCK, "file": [{**BLOCK["file"][0], "release_lag_days": 10}]}
+    assert expand({"f": block}).by_key("FF3_SMB").release_lag_days == 10
+    with pytest.raises(ConfigurationError, match=r"more than once: \['FF3_SMB'\]"):
+        expand({"f": BLOCK}, {**FILE, "key": "FF3_SMB"})
+    with pytest.raises(ConfigurationError, match=r"more than once"):
+        expand({"a": BLOCK, "b": BLOCK})
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"columns": "*"}, r"list the file's columns"),
+        ({"columns": []}, r"list the file's columns"),
+        ({"prefix": ""}, "prefix: required"),
+        ({"prefix": "ff3"}, "key: expected"),
+        ({"section": 0}, "section"),
+        ({"url": "http://x.test/a.zip"}, "https URL"),
+        ({"colour": "red"}, "unknown keys"),
+    ],
+)
+def test_an_invalid_file_block_fails_with_its_path(change: dict[str, Any], message: str) -> None:
+    block = {**BLOCK, "file": [{**BLOCK["file"][0], **change}]}
+    with pytest.raises(ConfigurationError, match=message) as raised:
+        expand({"french": block})
+    assert "french.toml" in str(raised.value)
+
+
+def test_the_shape_of_a_files_document_is_checked() -> None:
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        expand({"f": {"series": []}})
+    with pytest.raises(ConfigurationError, match="defaults: expected a table"):
+        expand({"f": {"defaults": 1}})
+    with pytest.raises(ConfigurationError, match=r"\[\[file\]\]"):
+        expand({"f": {"file": {"prefix": "X"}}})
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        expand({"f": {**BLOCK, "defaults": {**BLOCK["defaults"], "colour": "red"}}})
+    assert expand({"f": {}}).series == ()
+
+
+def test_a_fred_series_takes_no_section() -> None:
+    with pytest.raises(ConfigurationError, match=r"takes no \['section'\]"):
+        load({**FRED, "section": 2})
+
+
+def test_the_shipped_french_file_loads_through_the_store() -> None:
+    store = FileConfigStore(REPO_ROOT / "config", local=False)
+    assert store.names("site", "macro") == ["french"] and store.names("u", "macro") == []
+    assert store.load("u", "macro", "french") is None  # site-only
+    macro = load_macro(store)
+    french = [s for s in macro.series if s.parser == "french_zip"]
+    assert len(french) == 135 and len(macro.series) == len(macro.keys)
+    assert macro.by_key("UNRATE").parser == ""  # macro.toml's own series are still there

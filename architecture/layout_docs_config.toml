@@ -81,6 +81,10 @@ path = "config/site/events"
 purpose = "event-sensitivity track settings: the scope list of names the event study runs for and the registry of macro releases it calendars and the links.toml of each release's agency page (ADR 0050)"
 
 [[config_dir]]
+path = "config/site/macro"
+purpose = "published files expanded into macro series (ADR 0089), one <source>.toml per source: [defaults] for the series fields and a [[file]] per file (prefix, url, parser, section, the columns it takes), each column a series keyed <prefix>_<COLUMN> (src/algotrade/config/site/macro.py); french.toml is Kenneth French's daily factor and industry files. macro.toml, at its 1000-line cap, keeps the one-series-per-entry declarations"
+
+[[config_dir]]
 path = "config/site/guide"
 purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups, the screener families in order each with its purpose and intro, the Screeners page's lead), start.toml (the numbered Start here pages, [[page]]); the glossary in glossary/, the edge mechanism pages in mechanisms/, the researched-not-built ideas in ideas/ and the screener prose in screeners/"
 

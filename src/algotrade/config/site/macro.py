@@ -7,13 +7,21 @@ API, or a ``published`` file at ``url``), what it is (``kind``: an economic ``ma
 an ``index`` level), how its point in time is known (``pit``: ALFRED vintages, or
 ``obs_date + release_lag_days`` for unrevised series) and the terms it is used under. The
 series' instrument id (``MACRO:<KEY>`` / ``IDX:<KEY>``) comes from ``kind`` and ``key``.
+
+A published file with many columns of one table (Kenneth French's factor and industry files) is
+declared once, not per column: ``config/site/macro/<name>.toml`` holds ``[defaults]`` for the
+series fields and a ``[[file]]`` per file (``prefix``, ``url``, ``parser``, ``section``, the
+``columns`` it takes). Each column expands into an ordinary ``MacroSeries`` keyed
+``<prefix>_<COLUMN>`` (upper case, anything outside ``A-Z0-9`` an underscore) with the column as
+its ``value_column``, so the task, the source and the table see plain series. Columns are listed,
+never ``"*"``: the registry must name every stored series without reading the file.
 """
 
 import re
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 from algotrade.config.site.fields import Table, reject_secrets
@@ -38,6 +46,8 @@ HELD_LICENCES = (
     "yahoo",
 )  # a vendor's or a user's: ``yahoo`` is the owner's alone (ADR 0080)
 FILE_KEYS = ("url", "date_column", "value_column", "parser")
+FOLDER = "macro"  # config/site/macro/<name>.toml: files expanded into series (kind ``macro``)
+BLOCK_KEYS = ("prefix", "columns")  # a [[file]]'s own keys; the rest are series fields
 KEYS = (
     "key",
     "code",
@@ -51,9 +61,18 @@ KEYS = (
     "terms",
     "revised",
     "refetch_days",
+    "section",
     *FILE_KEYS,
 )
 _KEY = re.compile(r"^[A-Z0-9][A-Z0-9_]*$")
+
+
+class Documents(Protocol):
+    """What the loader needs from a config store (``ConfigStore``)."""
+
+    def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None: ...
+
+    def names(self, scope: str, kind: str) -> list[str]: ...
 
 
 @dataclass(frozen=True)
@@ -80,6 +99,7 @@ class MacroSeries:
     date_column: str = ""
     value_column: str = ""
     parser: str = ""
+    section: int = 1  # a file of several tables: which one (``french_zip``), from 1
     revised: bool = False
     refetch_days: int = 0  # a published file: read again after this many days (0: by cadence)
 
@@ -130,7 +150,17 @@ class MacroSettings:
         return found
 
     @classmethod
-    def from_document(cls, doc: Mapping[str, Any] | None) -> "MacroSettings":
+    def from_configs(cls, doc: Mapping[str, Any] | None, configs: Documents) -> "MacroSettings":
+        """``macro.toml``'s document and every ``config/site/macro/<name>.toml`` of the store."""
+        files = {n: configs.load("site", FOLDER, n) or {} for n in configs.names("site", FOLDER)}
+        return cls.from_document(doc, files)
+
+    @classmethod
+    def from_document(
+        cls, doc: Mapping[str, Any] | None, files: Mapping[str, Mapping[str, Any]] | None = None
+    ) -> "MacroSettings":
+        """``macro.toml``'s ``[[series]]`` then, in file-name order, the series every ``[[file]]``
+        of ``files`` (``config/site/macro/<name>.toml`` by name) expands into."""
         reject_secrets(doc or {}, WHERE)
         root = Table(doc, WHERE)
         root.only(("macro", "series"))
@@ -139,6 +169,8 @@ class MacroSettings:
         if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
             raise ConfigurationError(f"{WHERE} series: expected a list of tables ([[series]])")
         series = tuple(_series(entry, i) for i, entry in enumerate(raw))
+        for name in sorted(files or {}):
+            series += _expand(name, (files or {})[name])
         repeated = sorted(k for k, n in Counter(s.key for s in series).items() if n > 1)
         if repeated:
             raise ConfigurationError(f"{WHERE}: keys declared more than once: {repeated}")
@@ -151,11 +183,51 @@ def _required(t: Table, key: str, choices: tuple[str, ...] | None = None) -> str
     return t.choice(key, "", choices) if choices else t.text(key, "")
 
 
-def _series(doc: Mapping[str, Any], index: int) -> MacroSeries:
-    key = _required(Table(doc, f"{WHERE} [[series]][{index}]"), "key")
+def _expand(name: str, doc: Mapping[str, Any]) -> tuple[MacroSeries, ...]:
+    """The series of ``macro/<name>.toml``: each ``[[file]]`` over ``[defaults]``, one a column."""
+    where = f"{FOLDER}/{name}.toml"
+    reject_secrets(doc, where)
+    root = Table(doc, where)
+    root.only(("defaults", "file"))
+    defaults = root.raw("defaults") or {}
+    if not isinstance(defaults, Mapping):
+        raise ConfigurationError(f"{where} defaults: expected a table")
+    Table(defaults, f"{where} [defaults]").only(
+        (*(k for k in KEYS if k not in ("key", "value_column")), *BLOCK_KEYS)
+    )
+    raw = root.raw("file") or []
+    if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
+        raise ConfigurationError(f"{where} file: expected a list of tables ([[file]])")
+    series: list[MacroSeries] = []
+    for i, block in enumerate(raw):
+        label = f"{where} [[file]][{i}]"
+        merged = {**defaults, **block}
+        prefix, columns = merged.get("prefix"), merged.get("columns")
+        if not isinstance(prefix, str) or not prefix:
+            raise ConfigurationError(f"{label} prefix: required text")
+        if (
+            not isinstance(columns, list)
+            or not columns
+            or not all(isinstance(c, str) and c.strip() for c in columns)
+        ):
+            raise ConfigurationError(f'{label} columns: list the file\'s columns (not "*")')
+        for column in columns:
+            entry = {k: v for k, v in merged.items() if k not in BLOCK_KEYS}
+            entry |= {"key": series_key(prefix, column), "value_column": column}
+            series.append(_series(entry, i, f"{where} [[file]] {prefix}"))
+    return tuple(series)
+
+
+def series_key(prefix: str, column: str) -> str:
+    """``<prefix>_<COLUMN>``: upper case, a run of other characters one underscore."""
+    return f"{prefix}_{re.sub('[^A-Z0-9]+', '_', column.upper()).strip('_')}"
+
+
+def _series(doc: Mapping[str, Any], index: int, origin: str = f"{WHERE} [[series]]") -> MacroSeries:
+    key = _required(Table(doc, f"{origin}[{index}]"), "key")
     if not _KEY.match(key):
-        raise ConfigurationError(f"{WHERE} [[series]][{index}] key: expected {_KEY.pattern}")
-    where = f"{WHERE} [[series]] {key}"
+        raise ConfigurationError(f"{origin}[{index}] key: expected {_KEY.pattern}")
+    where = f"{origin} {key}"
     t = Table(doc, where)
     t.only(KEYS)
     source = _required(t, "source", SOURCES)
@@ -174,6 +246,7 @@ def _series(doc: Mapping[str, Any], index: int) -> MacroSeries:
         date_column=t.text("date_column", ""),
         value_column=t.text("value_column", ""),
         parser=t.text("parser", "csv" if source == "published" else ""),
+        section=t.integer("section", 1, 1),
         revised=t.boolean("revised", False),
         refetch_days=t.integer("refetch_days", 0, 0),
     )
@@ -185,7 +258,7 @@ def _check_source(s: MacroSeries, where: str) -> None:
     """A ``fred`` series has no file keys; a ``published`` one has a URL and its columns;
     ALFRED vintages exist only for FRED series."""
     if s.source == "fred":
-        given = [k for k in FILE_KEYS if getattr(s, k)]
+        given = [k for k in (*FILE_KEYS, "section") if getattr(s, k) not in ("", 1)]
         if given:
             raise ConfigurationError(f"{where}: a fred series takes no {given}")
         return

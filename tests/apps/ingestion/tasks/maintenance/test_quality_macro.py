@@ -19,6 +19,7 @@ from algotrade.config.site.events.releases import FOLDER, NAME, MacroReleases
 from algotrade.config.site.macro import MacroSettings
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
+from algotrade.data.macro.vintages import lagged_vintages
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus, start_run
@@ -95,6 +96,38 @@ def test_stale_series_fail_above_the_share(ages: list[int], status: str) -> None
     assert fresh[0] == status
     if status != "PASS":
         assert "S2" in fresh[1] and "max 20%" in fresh[1]
+
+
+def test_a_french_file_a_month_behind_is_not_stale() -> None:
+    """ADR 0089: French's daily files end about a month before the session and each day is known
+    from observation + 70 days (``lagged``), so the newest value a session knows is 70 days old,
+    and the pull every 28 days lets that drift to about 90: inside the monthly 103-day window.
+    A ``daily`` series (stale after 74 days) would flag the 95-day case."""
+    block = {
+        "defaults": {
+            "source": "published", "kind": "macro", "cadence": "monthly", "pit": "lag",
+            "release_lag_days": 70, "revised": True, "licence": "personal", "terms": "t",
+            "parser": "french_zip", "date_column": "date",
+        },
+        "file": [{"prefix": "FF3", "url": "https://x.test/f.zip", "columns": ["SMB", "HML"]}],
+    }  # fmt: skip
+    macro = MacroSettings.from_document({}, {"french": block})
+    assert {s.stale_after_days for s in macro.series} == {103}
+    keys = [s.key for s in macro.series]
+    for file_ends, status in ((D - timedelta(days=32), "PASS"), (D - timedelta(days=95), "PASS"),
+                              (D - timedelta(days=120), "FAIL")):  # fmt: skip
+        obs = pd.DataFrame({"obs_date": pd.date_range(end=file_ends, periods=300)})
+        rows = []
+        for key in keys:
+            lagged = lagged_vintages(obs, 70).assign(
+                instrument_id=f"MACRO:{key}", series=key, value=1.0
+            )
+            rows += lagged.to_dict("records")
+        backend = MemoryBackend()
+        StoreWriter(backend).write_table("macro/series", D, "m", stamped(rows, D, "m"))
+        fresh = by_name(macro_checks(StoreReader(backend), D, SourcesSettings(), macro))
+        assert fresh["macro_fresh"][0] == status, (file_ends, fresh["macro_fresh"])
+        assert fresh["macro_vintages"][0] == "PASS"
 
 
 def test_a_series_with_no_value_in_the_window_is_stale_and_nothing_stored_fails() -> None:

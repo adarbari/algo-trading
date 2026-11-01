@@ -15,6 +15,14 @@ plain format needs no code, only a registry entry:
   then one column per country). The date is read day first (a plain ``csv`` read would take
   ``05/10/1982`` as May) and written ISO; ``0`` (before a country's start) and ``#VALUE!``
   are no value, as a blank cell;
+- ``french_zip``: a file of Kenneth French's data library (a zip holding one CSV, CRLF lines, a
+  free-text preamble, then one or more sections: a header line that starts with a comma, rows of
+  ``YYYYMMDD`` and percent returns, a blank line; a copyright footer after the last one). A
+  section is found by its header line (the preamble has blank lines too), counted from 1 as the
+  registry's ``section`` (the industry files hold the value-weighted section, then the
+  equal-weighted one). The empty first header cell is named ``date``, column names lose their
+  padding (``Mom   ``), the date is written ISO, and ``-99.99`` / ``-999`` (the library's missing
+  marks) are no value. Values stay in percent, as published;
 - ``shiller_xls``: Shiller's ``ie_data.xls`` (a legacy Excel workbook with a multi-row header).
   Reading ``.xls`` needs ``xlrd``, which is not a dependency (``openpyxl``, the one workbook
   reader we ship, reads only ``.xlsx``), so it raises ``NotImplementedError`` until that
@@ -24,11 +32,13 @@ An empty body is an empty table (a file with nothing in it yet), not an error.
 """
 
 import io
+import zipfile
 from collections.abc import Callable
+from functools import lru_cache
 
 import pandas as pd
 
-type Parser = Callable[[bytes], pd.DataFrame]
+type Parser = Callable[..., pd.DataFrame]
 
 
 def parse_csv(payload: bytes) -> pd.DataFrame:
@@ -77,6 +87,49 @@ def parse_cape_csv(payload: bytes) -> pd.DataFrame:
     return frame
 
 
+FRENCH_NO_VALUE = ("-99.99", "-999")  # the library's missing marks, as published
+FRENCH_SECTIONS_CACHED = 2  # a file's series are consecutive, so one section is parsed once
+
+
+def _french_text(payload: bytes) -> list[str]:
+    """The lines of the one CSV inside the zip."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            names = [n for n in archive.namelist() if n.lower().endswith(".csv")]
+            if len(names) != 1:
+                raise ValueError(f"expected one CSV in the zip, found {archive.namelist()}")
+            raw = archive.read(names[0])
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"not a zip file: {exc}") from exc
+    return raw.decode("utf-8-sig", errors="replace").splitlines()
+
+
+@lru_cache(maxsize=FRENCH_SECTIONS_CACHED)
+def _french_section(payload: bytes, section: int) -> pd.DataFrame:
+    lines = _french_text(payload)
+    headers = [i for i, line in enumerate(lines) if line.startswith(",")]
+    if section < 1 or section > len(headers):
+        raise ValueError(f"no section {section} in the file ({len(headers)} found)")
+    start = headers[section - 1]
+    end = next((i for i in range(start + 1, len(lines)) if not lines[i].strip()), len(lines))
+    frame = parse_csv("\n".join(lines[start:end]).encode())
+    frame = frame.rename(columns={frame.columns[0]: "date"})
+    dates = pd.to_datetime(frame["date"].str.strip(), format="%Y%m%d", errors="coerce")
+    frame["date"] = dates.dt.strftime("%Y-%m-%d").where(dates.notna(), None)
+    for column in frame.columns.drop("date"):
+        cells = frame[column].str.strip()
+        frame[column] = cells.where(~cells.isin(FRENCH_NO_VALUE), None)
+    return frame
+
+
+def parse_french_zip(payload: bytes, section: int = 1) -> pd.DataFrame:
+    """One section of a French data-library zip (the module docstring says how it is found)."""
+    return _french_section(payload, section)
+
+
+SECTIONED = frozenset({"french_zip"})  # parsers that take the registry's ``section``
+
+
 def parse_shiller_xls(payload: bytes) -> pd.DataFrame:
     """Shiller's ``ie_data.xls``: not readable until ``xlrd`` is a dependency."""
     raise NotImplementedError(
@@ -89,5 +142,6 @@ PARSERS: dict[str, Parser] = {
     "csv": parse_csv,
     "epu_daily": parse_epu_daily,
     "cape_csv": parse_cape_csv,
+    "french_zip": parse_french_zip,
     "shiller_xls": parse_shiller_xls,
 }
