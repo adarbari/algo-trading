@@ -54,11 +54,21 @@ def test_the_leg_key_is_stable_and_follows_each_version(monkeypatch: pytest.Monk
         monkeypatch.undo()
 
 
+def test_leg_v5_is_a_new_key_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR 0088, E6a: a v4 leg (no trade-contract fields on its picks) is never reused: the key
+    of fixed inputs is not the v4 one, and ``LEG_VERSION`` is 5."""
+    assert key.LEG_VERSION == 5
+    monkeypatch.setattr(key, "LEG_VERSION", 4)
+    v4 = leg_key(**BASE)  # type: ignore[arg-type]
+    monkeypatch.undo()
+    assert leg_key(**BASE) != v4  # type: ignore[arg-type]
+
+
 def test_leg_v4_is_a_new_key_scheme() -> None:
     """ADR 0064 decision 4: a v1 leg (no picks, no hits per cost level) is never reused; ADR 0053
     amendment 2026-10-18: nor a v2 one (no sector-stratified draws), nor a v3 one (no buy/hold
     band)."""
-    assert key.LEG_VERSION == 4
+    assert key.LEG_VERSION >= 4
 
 
 def test_a_hold_rank_moves_the_key_only_when_set() -> None:
