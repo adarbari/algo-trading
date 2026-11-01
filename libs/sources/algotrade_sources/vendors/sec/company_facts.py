@@ -14,7 +14,7 @@ counts:
   Alphabet). Each filing reports several periods (quarter, year to date, prior-year
   comparatives); we keep its current period: the latest ``end``, then the shortest span.
 - ``ifrs-full:WeightedAverageShares`` (``ifrs_weighted``): the same weighted average for
-  foreign filers that report under IFRS and have no us-gaap facts (AZN, BP, TECK), reduced
+  foreign filers that report under IFRS and have no us-gaap facts (TECK, MFC, RCI), reduced
   the same way. The fact says nothing about ADS ratios: the reader decides whom it may count for
   (``fundamentals@v5``: not ADRs, whose count is ordinary shares).
 

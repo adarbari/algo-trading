@@ -18,7 +18,7 @@ Which count (per instrument, among facts public by the session's close):
   filing's current period): the fallback for filers that stopped tagging the cover page
   (most multi-class issuers);
 - else ``ifrs_weighted`` (``ifrs-full:WeightedAverageShares``, the same weighted average of the
-  latest filing's current period): foreign filers with IFRS facts only (AZN, BP, TECK, MFC,
+  latest filing's current period): foreign filers with IFRS facts only (TECK, MFC,
   RCI). Only for an instrument whose ``security_type`` is ``COMMON_STOCK``: the fact
   counts ordinary shares, and an ADR's ratio of shares per ADS is not stored, so the count
   times the ADR's close would misstate the market cap. A foreign ordinary listing (COMMON_STOCK)
@@ -157,8 +157,12 @@ def _latest(facts: pd.DataFrame, concept: str) -> pd.DataFrame:
 def ifrs_allowed(reference: pd.DataFrame | None) -> set[str]:
     """Instruments the IFRS weighted average may count for: ``COMMON_STOCK`` only. Not an ADR (its
     ADS ratio is not stored), nor a preferred, warrant or right (the common count is not theirs),
-    nor an unknown type; no reference snapshot: none."""
+    nor an unknown type; no reference snapshot, or one taken after the session
+    (``pre_snapshot``: its types are not the session's, e.g. an ADS-priced history before an
+    ordinary-share switch): none."""
     if reference is None or "security_type" not in reference.columns:
+        return set()
+    if "pre_snapshot" in reference.columns and bool(reference["pre_snapshot"].any()):
         return set()
     kind = reference["security_type"]
     return set(reference.loc[kind == COMMON_STOCK, "instrument_id"].astype(str))

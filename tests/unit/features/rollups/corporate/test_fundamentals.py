@@ -356,7 +356,9 @@ def test_turnover_is_in_one_share_terms_across_forward_and_reverse_splits() -> N
     assert turnover["EQ:NONE"] == pytest.approx(1e5 / 1e6)
 
 
-def _ifrs_store(reference: list[tuple[str, str | None]] | None):  # type: ignore[no-untyped-def]
+def _ifrs_store(  # type: ignore[no-untyped-def]
+    reference: list[tuple[str, str | None]] | None, snapshot_on: date = END
+):
     """IFRS-only filers (AZN-like) with a close, one per security type given."""
     writer, reader = store()
     ids = ["EQ:ORD", "EQ:ADR", "EQ:UNK", "EQ:DEI", "EQ:TRUST"]
@@ -382,7 +384,9 @@ def _ifrs_store(reference: list[tuple[str, str | None]] | None):  # type: ignore
              "security_type": t, "status": "ACTIVE"}
             for i, t in reference
         ]  # fmt: skip
-        writer.write_table("instruments/reference", END, "ref", stamped(rows, END, "ref"))
+        writer.write_table(
+            "instruments/reference", snapshot_on, "ref", stamped(rows, snapshot_on, "ref")
+        )
     return reader
 
 
@@ -415,6 +419,16 @@ def test_without_a_reference_snapshot_no_ifrs_count_is_used() -> None:
     assert rows.loc["EQ:DEI", "shares_source"] == "dei"  # the others are unchanged
 
 
+def test_a_reference_snapshot_after_the_session_gives_no_ifrs_count() -> None:
+    """The test that would have caught an ADS-priced history read with a later snapshot's
+    ordinary-share type (AZN before its switch): the IFRS count needs the session's own types."""
+    later = END + timedelta(days=30)
+    reader = _ifrs_store([("EQ:ORD", "COMMON_STOCK")], snapshot_on=later)
+    rows = _rows(reader, [END])[END]
+    assert rows.loc["EQ:ORD", "market_cap_status"] == "NO_SHARES"
+    assert rows.loc["EQ:DEI", "shares_source"] == "dei"  # the others are unchanged
+
+
 def test_choose_takes_the_ifrs_average_last_and_only_for_allowed_instruments() -> None:
     facts = pd.DataFrame(
         [
@@ -434,4 +448,5 @@ def test_choose_takes_the_ifrs_average_last_and_only_for_allowed_instruments() -
         }
     )
     assert ifrs_allowed(reference) == {"EQ:F"}
+    assert ifrs_allowed(reference.assign(pre_snapshot=True)) == set()
     assert ifrs_allowed(None) == set() and ifrs_allowed(reference[["instrument_id"]]) == set()
