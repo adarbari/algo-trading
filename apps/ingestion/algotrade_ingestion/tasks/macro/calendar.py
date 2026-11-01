@@ -21,6 +21,13 @@ release (FOMC) lists its dates in the registry: neither fetches. A row's
   which retires rows an earlier source wrongly stored (FRED's daily FOMC rows) without deleting
   anything; a session before it still reads them (point in time).
 
+- A ``dates`` release is stored from its first date on (no 400-day look-back; the look-ahead
+  stays), and a year it declares in ``[[release.year]]`` takes that year's ``known_from``
+  (ADR 0088: the schedule's publication, not the day we first read it). A date in the past
+  with an earlier declared ``known_from`` is two versions, one a run (the table keeps one row
+  per key in a run): ``scheduled`` known from the declaration, and on the next run ``released``
+  known from the date, so a session in between sees it upcoming.
+
 Only the rows the table lacks and the changed versions are written: a rerun on an unchanged
 calendar writes nothing. A date FRED moves is a new ``ts``; the old row gets its ``moved``
 version.
@@ -88,23 +95,37 @@ def rule_dates(spec: MacroRelease, start: date, end: date) -> list[date]:
 
 def release_rows(spec: MacroRelease, days: Sequence[date], session: date) -> pd.DataFrame:
     """``COLUMNS`` rows of ``spec`` for ``days``, before the stored-row comparison: ``status``
-    by the session, ``known_from`` the earlier of the session and the release date."""
-    rows = [
-        {
-            "instrument_id": spec.instrument_id,
-            "ts": release_moment(day, spec.clock),
-            "release_key": spec.key,
-            "release_name": spec.name,
-            "release_date": day,
-            "time_et": spec.time_et,
-            "status": RELEASED if day <= session else SCHEDULED,
-            "known_from": min(session, day),
-        }
-        for day in sorted(set(days))
-    ]
+    by the session, ``known_from`` the earlier of the session and the release date; a date of a
+    year the release declares is known from that declaration (``scheduled``), and, once past,
+    a second ``released`` version known from the date."""
+    declared = spec.known_from_by_year
+    rows = []
+    for day in sorted(set(days)):
+        known = declared.get(day.year)
+        if known is not None and known < day:
+            rows.append(_row(spec, day, SCHEDULED, known))
+            if day <= session:
+                rows.append(_row(spec, day, RELEASED, day))
+        else:
+            status = RELEASED if day <= session else SCHEDULED
+            rows.append(_row(spec, day, status, min(session, day)))
     out = pd.DataFrame(rows, columns=COLUMNS)
     out["ts"] = pd.to_datetime(out["ts"], utc=True)
     return out
+
+
+def _row(spec: MacroRelease, day: date, status: str, known_from: date) -> dict[str, object]:
+    """One ``COLUMNS`` row of ``spec`` on ``day``."""
+    return {
+        "instrument_id": spec.instrument_id,
+        "ts": release_moment(day, spec.clock),
+        "release_key": spec.key,
+        "release_name": spec.name,
+        "release_date": day,
+        "time_et": spec.time_et,
+        "status": status,
+        "known_from": known_from,
+    }
 
 
 def rows_to_write(target: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
@@ -112,7 +133,8 @@ def rows_to_write(target: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
     per key): the ones it lacks, those that turn ``released`` (a version of its own, with the
     ``known_from`` of ``target``: a session before the release date still reads ``scheduled``),
     a ``moved`` date FRED lists again, and a changed name (keeping the stored ``known_from``).
-    A ``released`` row is final."""
+    A ``released`` row is final. A date ``target`` holds in two versions (a declared year) is
+    written as its first one, ``scheduled``, when the table lacks it."""
     if target.empty:
         return target
     kept = held.reindex(columns=[*KEY, *HELD])
@@ -124,7 +146,7 @@ def rows_to_write(target: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
     renamed = (merged["status_held"] == merged["status"]) & (
         merged["release_name_held"] != merged["release_name"]
     )
-    out = merged[new | turned | back | renamed].copy()
+    out = merged[new | turned | back | renamed].drop_duplicates(KEY, keep="first").copy()
     keep_known = renamed[out.index]
     out.loc[keep_known, "known_from"] = out.loc[keep_known, "known_from_held"]
     return out[COLUMNS].reset_index(drop=True)
@@ -181,7 +203,7 @@ def _one_release(
     listed: list[date] = []
     if spec.source == "dates":
         listed = list(spec.dates)
-        days, stamp = [d for d in spec.dates if window[0] <= d <= window[1]], DATES_SOURCE
+        days, stamp = [d for d in spec.dates if d <= window[1]], DATES_SOURCE
         retire, span = (SCHEDULED, RELEASED), (date.min, date.max)
     elif spec.source == "fred":
         assert source is not None
