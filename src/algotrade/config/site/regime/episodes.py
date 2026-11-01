@@ -3,7 +3,9 @@ docs/market-regime-plan.md section 2): the twelve S&P 500 drawdowns of 19% or mo
 each with its closing-basis ``peak`` and ``trough`` sessions, the S&P 500 and Nasdaq
 drawdowns, the NBER recession months when there was one, what caused it, and ``known_from``
 (the trough: the earliest session a feature about the episode may be non-null, since no
-feature may know an episode's depth before it ended).
+feature may know an episode's depth before it ended). Three short vol shocks (``aug_2015``,
+``volmageddon_2018``, ``yen_carry_2024``; falls of 8-12%) follow them for the stress replays of
+options setups; each cites its ``source``.
 
 The loader checks shape, ordering (peak before trough, ``known_from`` not before the trough),
 unique keys and non-empty text. ``name`` is the plain name a page shows and ``recovered`` the
@@ -46,6 +48,7 @@ KEYS = (
     "cause",
     "known_from",
     "notes",
+    "source",
 )
 RECESSION_KEYS = ("start", "end", "announced_start", "announced_end")
 TIMELINE_KEYS = ("lookback_sessions", "clear_horizon_sessions", "gate_labels", "min_coverage")
@@ -63,7 +66,8 @@ class Episode:
     """One drawdown. ``spx_drawdown`` / ``nasdaq_drawdown``: peak-to-trough fractions (zero or
     negative); ``recession``: an NBER recession overlaps it (``nber_start`` / ``nber_end``: its
     first and last months, as the first day of the month); ``kind``: ``recession`` or
-    ``shock``."""
+    ``shock``; ``source``: where the dates and drawdowns are read from (empty: the plan's
+    reviewed values)."""
 
     key: str
     peak: date
@@ -79,6 +83,7 @@ class Episode:
     nber_start: date | None = None
     nber_end: date | None = None
     recovered: date | None = None
+    source: str = ""
 
 
 @dataclass(frozen=True)
@@ -208,6 +213,7 @@ def _episode(t: Table) -> Episode:
         nber_start=nber.get("nber_start"),
         nber_end=nber.get("nber_end"),
         recovered=_optional_date(t, "recovered"),
+        source=" ".join(t.text("source", "").split()),
     )
     if e.peak >= e.trough:
         raise ConfigurationError(f"{t.where}: peak {e.peak} is not before trough {e.trough}")
