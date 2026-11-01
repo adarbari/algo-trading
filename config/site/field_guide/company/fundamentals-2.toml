@@ -15,9 +15,9 @@ op = "not_null"
 mode = "hard"
 
 [[field]]
-name = "rollup.fundamentals@v4.shares_outstanding_year_ago"
+name = "rollup.fundamentals@v5.shares_outstanding_year_ago"
 theme = "fundamentals"
-reads = "The company's share count a year earlier: the count of the same kind (cover page or weighted average) whose period ended 9 to 15 months before rollup.fundamentals@v4.shares_as_of, the one closest to a year, split-adjusted to the session. The base of feature.shares_change_yoy."
+reads = "The company's share count a year earlier: the count of the same kind (cover page or weighted average) whose period ended 9 to 15 months before rollup.fundamentals@v5.shares_as_of, the one closest to a year, split-adjusted to the session. The base of feature.shares_change_yoy."
 caveats = [
   "Null for a recent filer, and for a company that began tagging the cover page less than a year ago (no cover count a year back): the weighted average is not substituted, as the two differ by definition.",
   "A weighted average lags: it is the average over its period, not the count at its end.",

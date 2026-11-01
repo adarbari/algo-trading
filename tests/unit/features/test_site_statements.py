@@ -18,7 +18,7 @@ from tests.helpers.rollup_store import END
 
 TABLES = {
     "rollups/instrument/price_stats@v2": ("close",),
-    "rollups/instrument/fundamentals@v4": ("shares_outstanding", "market_cap_status"),
+    "rollups/instrument/fundamentals@v5": ("shares_outstanding", "market_cap_status"),
     "rollups/instrument/financials@v3": (
         "revenue_ttm", "net_income_ttm", "eps_diluted_ttm", "financials_status", "eps_stale",
         "is_adr", "ttm_as_of",

@@ -16,7 +16,7 @@ import pandas as pd
 from algotrade.data import StoreReader
 from algotrade.data.rollups import rollup_as_of
 
-FUNDAMENTALS = "rollups/instrument/fundamentals@v4"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v5"
 PRICE_STATS = "rollups/instrument/price_stats@v2"
 
 

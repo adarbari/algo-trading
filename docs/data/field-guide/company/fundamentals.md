@@ -126,7 +126,7 @@ Sources: Stambaugh, Yu and Yuan (2015), Journal of Finance 70(5)
 **When the reading lies**
 
 - Buybacks that only offset stock pay leave the count flat and read false, though cash was spent; a count that fell through a reverse split is not a buyback. Check feature.net_issuance_pct_12m and cash flow.
-- Share counts come from filing cover pages, so a count can lag a quarter. Null when the year-ago count is missing or the current one is stale (rollup.fundamentals@v4.market_cap_status STALE); a hard 'eq true' drops those names.
+- Share counts come from filing cover pages, so a count can lag a quarter. Null when the year-ago count is missing or the current one is stale (rollup.fundamentals@v5.market_cap_status STALE); a hard 'eq true' drops those names.
 - A company can retire stock while borrowing to do it; check feature.debt_to_equity.
 
 Sources: Ikenberry, Lakonishok and Vermaelen (1995), Market underreaction to open market share repurchases, JFE 39; Pontiff and Woodgate (2008), Share issuance and cross-sectional returns, JF 63
@@ -145,8 +145,8 @@ Sources: Ikenberry, Lakonishok and Vermaelen (1995), Market underreaction to ope
 
 **When the reading lies**
 
-- The count is the company total and the price is this share class's, so a company with two listed classes shows the same cap on both only when they trade at the same price. Check rollup.fundamentals@v4.market_cap_status.
-- Null for funds (no share count filed), for a stale count (rollup.fundamentals@v4.market_cap_status STALE) and for a company with no SEC filing (foreign private issuers); a hard size gate drops ETFs and many ADRs.
+- The count is the company total and the price is this share class's, so a company with two listed classes shows the same cap on both only when they trade at the same price. Check rollup.fundamentals@v5.market_cap_status.
+- Null for funds (no share count filed), for a stale count (rollup.fundamentals@v5.market_cap_status STALE) and for a company with no SEC share count. A foreign company that files under IFRS has one only for its ordinary listing (rollup.fundamentals@v5.shares_source ifrs_weighted); its ADR has none, since the ordinary-share count needs the shares-per-ADR ratio. A hard size gate drops ETFs and many ADRs.
 - Cap is size, not quality or liquidity: a $20B name can trade $5M a day (a controlled company) and a $500M name $50M (a meme). Pair with rollup.price_stats@v2.adv_usd_20d.
 
 Sources: Market-cap bucket conventions: https://en.wikipedia.org/wiki/Market_capitalization and Morningstar's definitions
@@ -301,7 +301,7 @@ Sources: Site convention (features/rollups/corporate/dividends.py)
 **When the reading lies**
 
 - Sales are not profit: a grocer and a software company trade at very different P/S for good reason. Pair it with feature.net_margin, or compare within instrument.sector; a low P/S on a 1% margin is not cheap.
-- Market cap is the company total count times this class's close (rollup.fundamentals@v4.market_cap_status says whether the count is current), while revenue is the company's: misstated when share classes trade at very different prices, and for an ADR whose ratio is not stored.
+- Market cap is the company total count times this class's close (rollup.fundamentals@v5.market_cap_status says whether the count is current), while revenue is the company's: misstated when share classes trade at very different prices, and for an ADR whose ratio is not stored.
 - Banks, insurers and other financials report revenue in ways that do not compare with industrials; the ratio means little there.
 - Null for funds, for a stale or missing count, for a missing or stale revenue TTM (rollup.financials@v3.financials_status STALE) and for no revenue: a hard 'lt 2' silently drops all of them. The revenue TTM can be four months old.
 
@@ -424,7 +424,7 @@ Sources: O'Neil, How to Make Money in Stocks: CAN SLIM 'C', current quarterly ea
 - The counts are the company total from the filings: a cover-page count against a cover-page count, or a weighted average against a weighted average, never one against the other, so a company that began tagging the cover page recently is null. Weighted averages lag a buyback or an offering by about half a period.
 - A stock split is adjusted away, but a spin-off, a merger or a reverse merger changes the count without being dilution; check feature.market_cap and the filings when the change is above 0.5.
 - A shrinking count can hide an offering: companies buy back what compensation issues, so a flat count is not a company that does nothing. Pair with rollup.financials@v3.eps_diluted_ttm growth.
-- Null for funds, companies without two counts a year apart (recent IPOs and filers), and a stale count (rollup.fundamentals@v4.market_cap_status STALE).
+- Null for funds, companies without two counts a year apart (recent IPOs and filers), and a stale count (rollup.fundamentals@v5.market_cap_status STALE).
 
 Sources: Pontiff and Woodgate (2008), Share Issuance and Cross-Sectional Returns, Journal of Finance: issuers underperform, repurchasers outperform; Faber (2013), Shareholder Yield: the net of dividends and buybacks as the measure of cash returned
 
@@ -528,9 +528,9 @@ Sources: SEC EDGAR company facts (docs/data/vendors.md)
 
 Sources: SEC EDGAR company facts (docs/data/vendors.md)
 
-### `rollup.fundamentals@v4.shares_outstanding_year_ago`
+### `rollup.fundamentals@v5.shares_outstanding_year_ago`
 
-**How to read it.** The company's share count a year earlier: the count of the same kind (cover page or weighted average) whose period ended 9 to 15 months before rollup.fundamentals@v4.shares_as_of, the one closest to a year, split-adjusted to the session. The base of feature.shares_change_yoy.
+**How to read it.** The company's share count a year earlier: the count of the same kind (cover page or weighted average) whose period ended 9 to 15 months before rollup.fundamentals@v5.shares_as_of, the one closest to a year, split-adjusted to the session. The base of feature.shares_change_yoy.
 
 **The criterion per intent**
 

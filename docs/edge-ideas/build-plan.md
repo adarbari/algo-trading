@@ -35,7 +35,7 @@ PRs land in this order. Every PR except H0 and H5a gets an `architect` review.
 | --- | --- | --- |
 | H0 | One folder per edge: `config/site/edges/<id>/edge.toml`, because the 12-file folder cap cannot hold 100+ edges. A `family` key. Fitness test `EVENT_CLASSES == EVENT_FIELDS`: 3 of the 5 declared classes validate but fail at run time (a bug found in this review), so add their fields | S |
 | H1 | A t-statistic on the picks series, the trial count site-wide (the t > 3 bar in the literature), the published-size haircut shown beside `[published]`, and `[published] leg` | S |
-| H2 | SEC acceptance time as the `knowledge_ts` of fundamentals. Today a 10-Q accepted after 16:00 counts one session early (a real lookahead). New raw facts version, `financials@v3`, `fundamentals@v4`, backfill | M |
+| H2 | SEC acceptance time as the `knowledge_ts` of fundamentals. Today a 10-Q accepted after 16:00 counts one session early (a real lookahead). New raw facts version, `financials@v3`, `fundamentals@v5`, backfill | M |
 | H3 | Outcome sides: `short` (bottom K, for avoid lists) and `long_short` (spread, no base rate), an assumed borrow cost, a side column in the ledger | M |
 | H4 | An event-class framework with subtypes. Classes on stored tables: earnings-date shift, 8-K item, NT late filing, S&P deletion apart from addition, tender offer, lockup expiry | M |
 | H5a | Calendar windows as schedules: turn of month, OPEX week, quarter end, pre-holiday | S |

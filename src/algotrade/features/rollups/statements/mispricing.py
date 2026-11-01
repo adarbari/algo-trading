@@ -2,7 +2,7 @@
 cross-sectional composite rank, from the stored SEC statement groups.
 
 Inputs: ``balance_sheet@v2``, ``income_statement@v2``, ``cash_flow@v2``, ``financials@v3`` and
-``fundamentals@v4`` rows of the session (each already point in time by when its filing was public,
+``fundamentals@v5`` rows of the session (each already point in time by when its filing was public,
 ADR 0067: a figure enters a session at its filing's acceptance, never at its period end), the SEC
 INSTANT facts of ``instruments/statements_accepted`` (only for the total assets a year before the
 balance sheet date) and the session's ``price_stats@v2`` (it sets which instruments get a row). A
@@ -53,7 +53,7 @@ BALANCE = "rollups/instrument/balance_sheet@v2"
 INCOME = "rollups/instrument/income_statement@v2"
 CASH_FLOW = "rollups/instrument/cash_flow@v2"
 FINANCIALS = "rollups/instrument/financials@v3"
-FUNDAMENTALS = "rollups/instrument/fundamentals@v4"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v5"
 ASSETS_TAG = LINES["assets"][0]
 YEAR_DAYS = 365
 # Overpriced when HIGH: the first five; the last two are underpriced when high (inverted).
@@ -234,8 +234,8 @@ FEATURES = (
         valid_range=(0, 1), kind="cross_section",
         inputs=(
             *_BS_INPUTS,
-            "fundamentals.shares_outstanding@v4",
-            "fundamentals.shares_outstanding_year_ago@v4",
+            "fundamentals.shares_outstanding@v5",
+            "fundamentals.shares_outstanding_year_ago@v5",
         ),
     ),
     Feature(

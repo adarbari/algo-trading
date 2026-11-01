@@ -105,7 +105,7 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        the same facts counted from the session each became public (``shares.
                        known_from``: the first session whose close is after SEC's
                        acceptance of the filing, else the session after ``filed``), sorted by it
-                       (``financials@v3``, ``fundamentals@v4``; ADR 0067 amendment)
+                       (``financials@v3``, ``fundamentals@v5``; ADR 0067 amendment)
 - ``instruments/statements``
                        ``statements.reading.statement_facts``: every stored statement line (cost
                        of revenue, operating income, cash flow, balance sheet..., one row per
@@ -667,7 +667,10 @@ def _reference_facts(reader: StoreReader, session: date) -> pd.DataFrame | None:
     if snap.pre_snapshot and "in_sp500" in frame.columns:
         # a later snapshot's index list would be survivors
         frame = frame.assign(in_sp500=pd.Series(pd.NA, index=frame.index, dtype="boolean"))
-    return frame[[c for c in REFERENCE_FACTS if c in frame.columns]]
+    # a later snapshot stands in: its types are not the session's (the IFRS count refuses them)
+    return frame[[c for c in REFERENCE_FACTS if c in frame.columns]].assign(
+        pre_snapshot=snap.pre_snapshot
+    )
 
 
 def _leveraged_holdings(reader: StoreReader, session: date) -> pd.DataFrame | None:

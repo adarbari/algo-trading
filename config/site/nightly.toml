@@ -92,7 +92,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/financials@v3",
     "rollups/instrument/flow_history@v1",
     "rollups/instrument/fund_reference@v1",
-    "rollups/instrument/fundamentals@v4",
+    "rollups/instrument/fundamentals@v5",
     "rollups/instrument/gaps@v1",   # 43 MB
     "rollups/instrument/growth_history@v2",
     "rollups/instrument/ibkr_iv@v1",

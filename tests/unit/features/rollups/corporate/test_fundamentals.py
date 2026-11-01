@@ -1,4 +1,4 @@
-"""``fundamentals@v4``: point in time by filing date, cover count vs weighted fallback,
+"""``fundamentals@v5``: point in time by filing date, cover count vs weighted fallback,
 amendments, splits after the count, statuses (OK / NO_SHARES / STALE / NO_PRICE), the count a
 year earlier (``shares_outstanding_year_ago``: the 9 to 15 month window, the same concept, point
 in time by filing date, split-adjusted), ``shares_change_yoy``, that every v2 column is
@@ -19,6 +19,7 @@ from algotrade.features.rollups.corporate.fundamentals import (
     SHARES,
     FundamentalsParams,
     choose,
+    ifrs_allowed,
     year_ago,
 )
 from algotrade.features.rollups.price import price_stats, volume
@@ -294,12 +295,12 @@ def test_shares_change_yoy_end_to_end_on_stored_counts() -> None:
 def test_params_validate_and_catalogue_fields() -> None:
     with pytest.raises(ValueError, match="stale_days"):
         replace(FundamentalsParams(), stale_days=0)
-    columns = catalogue_columns()["fundamentals@v4"]
+    columns = catalogue_columns()["fundamentals@v5"]
     assert columns["shares_outstanding"] == "float32" and columns["market_cap_status"] == "str"
     assert columns["shares_outstanding_year_ago"] == "float32"
     assert "market_cap" not in columns  # an expression feature since v2
-    assert field_source("rollup.fundamentals@v4.market_cap_status") == (
-        "rollups/instrument/fundamentals@v4",
+    assert field_source("rollup.fundamentals@v5.market_cap_status") == (
+        "rollups/instrument/fundamentals@v5",
         "market_cap_status",
     )
 
@@ -353,3 +354,99 @@ def test_turnover_is_in_one_share_terms_across_forward_and_reverse_splits() -> N
     assert turnover["EQ:REV"] == pytest.approx(1e5 / 1e5)  # a tenth of the shares
     assert turnover["EQ:LATE"] == pytest.approx(1e5 / 1e6)  # the later split changes nothing
     assert turnover["EQ:NONE"] == pytest.approx(1e5 / 1e6)
+
+
+def _ifrs_store(  # type: ignore[no-untyped-def]
+    reference: list[tuple[str, str | None]] | None, snapshot_on: date = END
+):
+    """IFRS-only filers (AZN-like) with a close, one per security type given."""
+    writer, reader = store()
+    ids = ["EQ:ORD", "EQ:ADR", "EQ:UNK", "EQ:DEI", "EQ:TRUST"]
+    write_bars(writer, {iid: series(60, n) for n, iid in enumerate(ids)})
+    old, new = END - timedelta(days=500), END - timedelta(days=130)
+    write_facts(
+        writer,
+        [
+            *(fact(i, "ifrs_weighted", 1500.0, old, old + timedelta(days=10), "20-F")
+              for i in ids[:3]),
+            *(fact(i, "ifrs_weighted", 1600.0, new, new + timedelta(days=10), "20-F")
+              for i in ids[:3]),
+            # a cover count outranks the IFRS average; a trust's units are read as shares
+            fact("EQ:DEI", "dei", 5.0, END - timedelta(days=20), END - timedelta(days=15)),
+            fact("EQ:DEI", "ifrs_weighted", 9.0, new, new + timedelta(days=10), "20-F"),
+            {**fact("EQ:TRUST", "dei", 46.0, END - timedelta(days=20), END - timedelta(days=15)),
+             "unit": "units"},
+        ],
+    )  # fmt: skip
+    if reference is not None:
+        rows = [
+            {"instrument_id": i, "symbol": i[3:], "asset_class": "equity", "multiplier": 1.0,
+             "security_type": t, "status": "ACTIVE"}
+            for i, t in reference
+        ]  # fmt: skip
+        writer.write_table(
+            "instruments/reference", snapshot_on, "ref", stamped(rows, snapshot_on, "ref")
+        )
+    return reader
+
+
+def test_an_ifrs_filer_has_shares_unless_it_is_an_adr_or_of_unknown_type() -> None:
+    """The test that would have caught an IFRS-only filer reading NO_SHARES: the IFRS weighted
+    average is its count (and year-ago), but never an ADR's (its ADS ratio is not stored), nor
+    one whose security type is not known."""
+    reader = _ifrs_store(
+        [("EQ:ORD", "COMMON_STOCK"), ("EQ:ADR", "ADR"), ("EQ:DEI", "COMMON_STOCK"),
+         ("EQ:TRUST", "COMMON_STOCK")]
+    )  # fmt: skip
+    rows = _rows(reader, [END])[END]
+    ordinary = rows.loc["EQ:ORD"]
+    assert (ordinary["shares_source"], ordinary["shares_outstanding"]) == ("ifrs_weighted", 1600.0)
+    assert ordinary["shares_outstanding_year_ago"] == 1500.0
+    assert ordinary["market_cap_status"] == "OK"
+    for iid in ("EQ:ADR", "EQ:UNK"):
+        assert rows.loc[iid, "market_cap_status"] == "NO_SHARES"
+        assert pd.isna(rows.loc[iid, "shares_outstanding"])
+    assert (rows.loc["EQ:DEI", "shares_source"], rows.loc["EQ:DEI", "shares_outstanding"]) == (
+        "dei",
+        5.0,
+    )
+    assert rows.loc["EQ:TRUST", "shares_outstanding"] == 46.0
+
+
+def test_without_a_reference_snapshot_no_ifrs_count_is_used() -> None:
+    rows = _rows(_ifrs_store(None), [END])[END]
+    assert rows.loc["EQ:ORD", "market_cap_status"] == "NO_SHARES"
+    assert rows.loc["EQ:DEI", "shares_source"] == "dei"  # the others are unchanged
+
+
+def test_a_reference_snapshot_after_the_session_gives_no_ifrs_count() -> None:
+    """The test that would have caught an ADS-priced history read with a later snapshot's
+    ordinary-share type (AZN before its switch): the IFRS count needs the session's own types."""
+    later = END + timedelta(days=30)
+    reader = _ifrs_store([("EQ:ORD", "COMMON_STOCK")], snapshot_on=later)
+    rows = _rows(reader, [END])[END]
+    assert rows.loc["EQ:ORD", "market_cap_status"] == "NO_SHARES"
+    assert rows.loc["EQ:DEI", "shares_source"] == "dei"  # the others are unchanged
+
+
+def test_choose_takes_the_ifrs_average_last_and_only_for_allowed_instruments() -> None:
+    facts = pd.DataFrame(
+        [
+            fact("EQ:I", "ifrs_weighted", 8.0, END, END),
+            fact("EQ:J", "ifrs_weighted", 7.0, END, END),
+            fact("EQ:W", "weighted_basic", 6.0, END - timedelta(days=9), END),
+            fact("EQ:W", "ifrs_weighted", 5.0, END, END),
+        ]
+    )
+    chosen = choose(facts, {"EQ:I", "EQ:W"}).set_index("instrument_id")
+    assert chosen["concept"].to_dict() == {"EQ:I": "ifrs_weighted", "EQ:W": "weighted_basic"}
+    assert list(choose(facts)["instrument_id"]) == ["EQ:W"]  # no allowed instrument: no IFRS
+    reference = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:B", "EQ:C", "EQ:D", "EQ:E", "EQ:F"],
+            "security_type": ["ADR", "ETF", None, "PREFERRED", "WARRANT", "COMMON_STOCK"],
+        }
+    )
+    assert ifrs_allowed(reference) == {"EQ:F"}
+    assert ifrs_allowed(reference.assign(pre_snapshot=True)) == set()
+    assert ifrs_allowed(None) == set() and ifrs_allowed(reference[["instrument_id"]]) == set()

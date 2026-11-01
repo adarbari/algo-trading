@@ -10,6 +10,16 @@
 scope = ["src/algotrade/core/", "src/algotrade/config/"]
 
 [[responsibility]]
+id = "case-values"
+description = "Parameters of an outcome chosen by rule (ADR 0088, design 2.4): a literal or `{ cases = [{ when, value }], default }` parsed fail closed (config/edges/positions/cases.py: the case table split from the outcome leaving its default as the literal, `[outcome.entry]`, the canonical form of a rule group so a reordered group has one identity) and resolved at one session by `resolve_case` (engines/selection/cases.py, pure: the first TRUE case, the default only when every case is FALSE, an UNKNOWN case first is CASE_UNKNOWN); callers resolve through it, never re-evaluate a case table"
+owner = ["src/algotrade/config/edges/positions/cases.py", "src/algotrade/engines/selection/cases.py"]
+allowed = [
+    "src/algotrade/config/edges/document.py",  # splits the case tables off an outcome before typing it
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "resolve_case" }, { call = "split_cases" }]
+
+[[responsibility]]
 id = "edge-documents"
 description = "Load and validate edge documents (ADR 0053 decision 1): config/site/edges/<id>/edge.toml with a user's config/users/<id>/edges/ over it (ADR 0015; a user document is a copy that `extends` an edge under its own id, a new edge, or only the `[follow]` bookmark (`since`, labels) of a site edge: never a shadow of a site edge, ADR 0053 amendments 2026-10-09 and 2026-10-10; an edge has one status of `STATUSES`, a user's own edge sets it (`USER_STATUSES`) with the server-written `[audit]`, and `follow.py` types the bookmark and the audit and reads the old `[follow]` states tolerantly (`LEGACY`); the Edge carries `site_frozen_from`, the split a copy's run is exploratory against, and `owner`, `site` or the user, from where its document lives, never a key; `load_all_edges` is every owner's edges for the evaluation CLI; `LEGACY_SITE_OWNERS` the older owner whose run records the site's reads), typed into frozen Edge dataclasses fail closed (outcome, schedule and event class, universe, status, the nine quality-bar answers), screeners, baselines and a named universe checked against the presets that exist, the winners study's parameters (WinnersStudySettings, config/site/studies/winners.toml, ED6), and docs/edges.md rendered from them; consumers call load_edges, never read the kind themselves"
 owner = ["src/algotrade/config/edges/*", "src/algotrade/config/edges/schedules/*", "src/algotrade/config/edges/positions/*"]
@@ -48,11 +58,28 @@ section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-
 detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }, { string_prefix = "MKT:" }, { string_prefix = "IDX:" }, { string_prefix = "MACRO:" }]
 
 [[responsibility]]
+id = "position-fields"
+description = "The position-level fields of an open trade (ADR 0088, design 2.4a): `POSITION_FIELDS` (config/edges/positions/fields.py: name, type, unit, which legs each applies to, its Guide term), the `position.` field head (core/model/fields.py), and `fields_for(template)`, the fields that apply to a template's legs; the catalogue offers them only at the exit site, and the engine that computes them per close (E3b) takes its list from here"
+owner = ["src/algotrade/config/edges/positions/fields.py"]
+allowed = [
+    "src/algotrade/config/edges/positions/spec.py",  # checks an exit rule against the template's fields
+]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "fields_for" }]
+
+[[responsibility]]
 id = "position-templates"
 description = "Position templates (ADR 0088, design 2.4): config/site/positions/templates.toml typed fail closed into frozen Templates (legs: shares of a signed quantity, or an option chosen by a delta / atm / otm_pct strike rule, never a target yield; the collateral rule), checked against an edge's `position` and `position:<id>` baselines where the edge loads, and `position_of(outcome)`, the one function that names the templates an outcome holds (the `position` key, else the template of a return outcome's side); the read model, the trade contract and the engine call it, never re-derive a side to a position"
 owner = ["src/algotrade/config/edges/positions/templates.py"]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "position_of" }, { call = "parse_templates" }]
+
+[[responsibility]]
+id = "rule-use-sites"
+description = "Which fields a rule may name at each use site (ADR 0088, design 2.13, 2.15): `LEVELS` (config/strategy/levels.py) declares each feature level once (field heads, stored or computed provider named by a string, join, the sites that may read it), `FieldCatalog` (catalog.py) is built per site from `LEVELS[*].scopes` (instrument-only at `screener` / `universe`; market, position and portfolio fields where a level's scopes say), carries each field's licence (an expression takes the strictest of its inputs) and each string field's declared domain, and makes the gate / entry / case / exit sites fail closed (no `is_null` / `not_null`, `ne` / `not_in` on a string only over a declared domain with an out-of-domain value read as missing, the gate reads only open data); callers never test a field head or a level by name"
+owner = ["src/algotrade/config/strategy/catalog.py", "src/algotrade/config/strategy/levels.py"]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "levels_at" }]
 
 [[responsibility]]
 id = "screen-spec"
@@ -117,6 +144,7 @@ description = "Evaluate Rule / Group predicates over named fields with three-val
 owner = ["src/algotrade/core/model/predicates.py"]
 allowed = [
     "src/algotrade/engines/selection/evaluate.py",  # the selection's per-rule funnel audit evaluates each top-level child
+    "src/algotrade/engines/selection/cases.py",  # a case-valued parameter's rules at one session (ADR 0088)
     "src/algotrade/strategies/screeners/rules/*",  # rule screens evaluate criteria, tiers and flags with it
     "src/algotrade/services/read/filtering/masks.py",  # a filter input is a rule on each row (ADR 0082)
 ]

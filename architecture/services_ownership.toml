@@ -269,6 +269,14 @@ section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"
 detect = [{ call = "OnDemandScreens" }]
 
 [[responsibility]]
+id = "option-structures"
+description = "Marking a position of option legs through its window (ADR 0088, design 2.4): engines/structures takes each session's chain from the caller and gives per name the underlying's closes, the position's mid and executable value at entry and exit (a long leg bought at the ask and sold at the bid, a short leg the reverse), the intrinsic value of a leg that expires on the exit, the exit fallback for a zero-bid quote, the net delta at each close for the daily hedge, and the reasons a name is unmeasured (a missing or stale chain, no exit quote, no delta); never fills a session from an earlier one; pure: features, config and quant only, the callers load the chains"
+owner = ["src/algotrade/engines/structures/*"]
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/derived/option_paths.py"]  # shapes a v1 structure's stored row from the marks
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-18-optionpnl-the-chain-pl-grain-eb-h13"
+detect = [{ call = "mark_window" }]
+
+[[responsibility]]
 id = "part-redraft-limit"
 description = "The per-user daily cap on part re-drafts of a Describe-it draft (ADR 0041, amended 2026-10-12; `[limits] part_redrafts_per_day` of llm.toml, 30 by default): a user's calls of use case screener-draft-part on the exchange day, counted from the usage log (never a counter a restart resets) plus the calls this process made that the background recorder has not written yet, admitted under a lock, failing closed when the count cannot be read; at the limit a DailyLimitError (429, code part_redraft_limit)"
 owner = ["src/algotrade/services/drafting/redraft/cap.py"]

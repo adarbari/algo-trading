@@ -217,7 +217,7 @@
           }
         },
         {
-          "name": "rollup.fundamentals@v4.shares_outstanding",
+          "name": "rollup.fundamentals@v5.shares_outstanding",
           "value": 14594180096.0,
           "unknown": null,
           "info": {

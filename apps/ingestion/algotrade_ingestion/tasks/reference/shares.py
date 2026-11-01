@@ -66,7 +66,7 @@ from algotrade_sources.framework.series import FILINGS_FRAME, FilingsRequest
 TASK = "shares"
 COMPANY = "instruments/company"
 CHECKPOINT_EVERY = 100
-FUNDAMENTALS = "rollups/instrument/fundamentals@v4"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v5"
 PRICE_STATS = "rollups/instrument/price_stats@v2"
 CARRY = "carry"  # staging key for facts copied to instruments new to a CIK
 XBRL_SINCE = date(2009, 1, 1)  # company facts start with the 2009 XBRL phase-in: no older filing

@@ -17,7 +17,7 @@ listed expiry to hold (``NO_EXPIRY``) or no two-sided strike to enter (``NO_ENTR
 """
 
 import re
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -25,13 +25,16 @@ import numpy as np
 import pandas as pd
 
 from algotrade.data.chains import OK_LABEL, STALE
+from algotrade.engines.structures.chain import DayChain, Labels
+from algotrade.engines.structures.marking import DAYS_PER_YEAR, LegColumn, Window, mark_window
 from algotrade.features.rollups.positioning.chain_inputs import two_sided_mid
-from algotrade.quant.edges.chain_pnl import hedged_pnl, intrinsic, leg_delta, long_pnl
+from algotrade.quant.edges.chain_pnl import hedged_pnl, leg_delta, long_pnl
 
 OK = OK_LABEL
-DAYS_PER_YEAR = 365  # ADR 0021: time to expiry in calendar days
 ATM_STRADDLE = "atm_straddle"
 _PUT_DELTA = re.compile(r"put_delta_(\d{2})")
+# The marking, expiry value, exit fallback and hedge are ``engines/structures`` (ADR 0088, E3a);
+# this module chooses a v1 structure's contracts and shapes the stored row.
 ROW_COLUMNS = (
     "instrument_id", "structure", "tenor_days", "horizon_sessions", "window_end", "call_id",
     "put_id", "expiry", "strike", "entry_spot", "entry_mid", "entry_ask", "exit_spot", "exit_mid",
@@ -39,19 +42,6 @@ ROW_COLUMNS = (
     "hedged_pnl_per_premium", "hedged_pnl_per_underlying", "outcome_status", "outcome_reason",
     "hedge_reason",
 )  # fmt: skip
-
-
-@dataclass(frozen=True)
-class DayChain:
-    """What one session's stored chain says: the quotes (``instrument_id``, ``underlying_id``,
-    ``expiry``, ``right`` C / P, ``strike``, ``bid``, ``ask``), each underlying's quote, its
-    chain status label (``OK``, ``STALE_DATA``, ...) and when the partitions became known."""
-
-    day: date
-    options: pd.DataFrame | None
-    spots: Mapping[str, float]
-    labels: Mapping[str, str]
-    known: datetime | None
 
 
 @dataclass(frozen=True)
@@ -72,32 +62,6 @@ def structure_of(key: str) -> Structure:
     if found is None or not 0 < int(found.group(1)) < 100:
         raise ValueError(f"unknown chain structure {key!r}")
     return Structure(key, 0.0, 1.0, int(found.group(1)) / 100.0)
-
-
-def _years(expiry: pd.Series, day: date) -> np.ndarray:
-    return np.asarray((pd.to_datetime(expiry).dt.date.map(lambda e: (e - day).days)), float) / (
-        DAYS_PER_YEAR
-    )
-
-
-def _usable(chain: DayChain, ids: pd.Series) -> np.ndarray:
-    return np.array(
-        [chain.labels.get(i) == OK and np.isfinite(chain.spots.get(i, np.nan)) for i in ids]
-    )
-
-
-def _why_not(chain: DayChain, ids: pd.Series) -> list[str]:
-    """Per name the reason its chain on ``chain.day`` is not usable (``""`` when it is)."""
-    out = []
-    for i in ids:
-        label = chain.labels.get(i)
-        if label == OK and np.isfinite(chain.spots.get(i, np.nan)):
-            out.append("")
-        elif label == STALE:
-            out.append(f"STALE_CHAIN:{chain.day}")
-        else:
-            out.append(f"NO_CHAIN:{chain.day}")
-    return out
 
 
 def _entry_contracts(entry: DayChain, s: Structure, tenor: int, end: date) -> pd.DataFrame:
@@ -169,100 +133,7 @@ def _pick_strike(
     }
 
 
-def _leg(chain: DayChain, ids: pd.Series, lenient: bool = False) -> pd.DataFrame:
-    """The bid, ask and two-sided mid of contracts ``ids`` on one session (NaN where not quoted).
-    ``lenient`` (the exit and the hedge sessions): a quote with a zero bid and an ask is read as
-    bid 0 and mid ask / 2, as a far out-of-the-money leg is quoted after a large move; the entry
-    needs a bid above zero."""
-    blank = pd.DataFrame(np.nan, index=range(len(ids)), columns=["bid", "ask", "mid"])
-    if chain.options is None or chain.options.empty:
-        return blank
-    indexed = chain.options.drop_duplicates("instrument_id").set_index("instrument_id")
-    found = indexed.reindex(ids.to_numpy())[["bid", "ask"]].astype(float)
-    found.index = blank.index
-    found["mid"] = two_sided_mid(found["bid"], found["ask"])
-    if lenient:
-        bid, ask = found["bid"].to_numpy(), found["ask"].to_numpy()
-        with np.errstate(invalid="ignore"):
-            zero_bid = (bid == 0) & (ask > 0)
-        found["mid"] = np.where(zero_bid, ask / 2, found["mid"])
-    return found
-
-
 type Loader = Callable[[date, Collection[str] | None], DayChain]
-
-
-@dataclass
-class _Held:
-    """The positions of one window: per entry underlying its contracts, weights, expiry and
-    strike; ``ok`` the names with contracts and ``reason`` why a name is UNMEASURED so far."""
-
-    names: pd.Series
-    ids: dict[str, pd.Series]
-    weight: dict[str, float]
-    expiry: pd.Series
-    strike: np.ndarray
-    ok: np.ndarray
-    reason: np.ndarray
-    hedge: np.ndarray  # why the hedged P&L alone is missing (a hedge session)
-
-    def fail_hedge(self, who: np.ndarray, why: str) -> None:
-        """Record ``why`` for the names in ``who`` whose hedge has no reason yet."""
-        for i in np.flatnonzero(self.ok & who & pd.isna(self.hedge)):
-            self.hedge[i] = why
-
-    def fail(self, who: np.ndarray, why: str) -> None:
-        """Record ``why`` for the names in ``who`` that have no reason yet."""
-        for i in np.flatnonzero(self.ok & who & pd.isna(self.reason)):
-            self.reason[i] = why
-
-    def legs(self) -> list[str]:
-        return [r for r in self.ids if self.weight[r]]
-
-
-def _hedge_path(days: Sequence[DayChain], held: _Held) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    """The underlying's close on each session and, on each but the last, the position's net
-    delta (NaN where a leg's delta cannot be computed). The exit session's missing or stale chain
-    is a reason of the name; one between the entry and the exit, or a delta that cannot be
-    computed, is only a reason its hedge is missing (``hedge``)."""
-    spots = [np.array([days[0].spots.get(i, np.nan) for i in held.names], float)]
-    deltas: list[np.ndarray] = []
-    for k, day in enumerate(days):
-        usable = _usable(day, held.names)
-        last = k == len(days) - 1
-        for i in map(int, np.flatnonzero(held.ok & ~usable)):
-            why = _why_not(day, held.names.iloc[i : i + 1])[0]
-            if last:
-                held.fail(np.arange(len(held.ok)) == i, why)
-            else:
-                held.fail_hedge(np.arange(len(held.ok)) == i, why)
-        if k:
-            spots.append(np.array([day.spots.get(i, np.nan) for i in held.names], float))
-        if last:
-            break
-        years = _years(held.expiry.where(held.expiry.notna(), day.day), day.day)
-        net, priced = np.zeros(len(held.names)), np.ones(len(held.names), bool)
-        for r in held.legs():
-            leg = _leg(day, held.ids[r], lenient=True)
-            d = leg_delta(leg["mid"], spots[-1], held.strike, years, r == "C")
-            net += held.weight[r] * np.nan_to_num(d)
-            priced &= np.isfinite(d)
-        held.fail_hedge(usable & ~priced, f"NO_DELTA:{day.day}")
-        deltas.append(np.where(priced & usable, net, np.nan))
-    return spots, deltas
-
-
-def _exit_values(
-    exit_: DayChain, held: _Held, exit_spot: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """``(exit_mid, exit_bid, at_expiry)``: the quoted mid and bid of the position at the exit
-    session, the intrinsic value for a contract that expires on it."""
-    at_expiry = np.array([isinstance(e, date) and e == exit_.day for e in held.expiry])
-    quotes = {r: _leg(exit_, held.ids[r], lenient=True) for r in held.legs()}
-    mid = sum(held.weight[r] * quotes[r]["mid"].to_numpy() for r in quotes)
-    bid = sum(held.weight[r] * quotes[r]["bid"].to_numpy() for r in quotes)
-    value = sum(held.weight[r] * intrinsic(exit_spot, held.strike, r == "C") for r in quotes)
-    return np.where(at_expiry, value, mid), np.where(at_expiry, value, bid), at_expiry
 
 
 def structure_rows(
@@ -291,24 +162,21 @@ def structure_rows(
     ok = pd.isna(picks["reason"]).to_numpy()  # the names with contracts at the entry
     if not ok.any():
         return _finish(out, reason, np.full(n, None, object)), known
-    held = _Held(
-        picks["instrument_id"],
-        {r: picks[c].fillna("") for r, c in (("C", "call_id"), ("P", "put_id"))},
-        {"C": s.call, "P": s.put},
-        pd.Series(picks["expiry"]).reset_index(drop=True),
-        picks["strike"].astype(float).to_numpy(),
-        ok,
-        reason,
-        np.full(n, None, dtype=object),
-    )
+    expiry = pd.Series(picks["expiry"]).reset_index(drop=True)
+    strike = picks["strike"].astype(float).to_numpy()
+    legs = [
+        LegColumn(right, weight, picks[col].fillna(""), strike, expiry)
+        for right, weight, col in (("C", s.call, "call_id"), ("P", s.put, "put_id"))
+        if weight
+    ]
+    window = Window(picks["instrument_id"], legs, ok, reason, np.full(n, None, dtype=object))
     out["call_id"], out["put_id"] = picks["call_id"].to_numpy(), picks["put_id"].to_numpy()
-    out["expiry"], out["strike"] = held.expiry.to_numpy(), held.strike
-    entry_legs = {r: _leg(entry, held.ids[r]) for r in held.legs()}
-    entry_mid = sum(held.weight[r] * entry_legs[r]["mid"].to_numpy() for r in entry_legs)
-    entry_ask = sum(held.weight[r] * entry_legs[r]["ask"].to_numpy() for r in entry_legs)
-    spots, deltas = _hedge_path(days, held)
-    exit_mid, exit_bid, at_expiry = _exit_values(days[-1], held, spots[-1])
-    held.fail(~np.isfinite(exit_mid), "NO_EXIT_QUOTE")
+    out["expiry"], out["strike"] = expiry.to_numpy(), strike
+    marks = mark_window(days, window, Labels(OK, STALE))
+    entry_mid, entry_ask = marks.entry_mid, marks.entry_exec
+    spots, deltas = marks.spots, marks.deltas
+    exit_mid, exit_bid, at_expiry = marks.exit_mid, marks.exit_exec, marks.at_expiry
+    held = window
     spot0 = spots[0]
     mid, executable, per_underlying = long_pnl(entry_mid, entry_ask, exit_mid, exit_bid, spot0)
     with np.errstate(invalid="ignore", divide="ignore"):
