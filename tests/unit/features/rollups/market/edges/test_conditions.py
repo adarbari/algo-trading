@@ -299,14 +299,21 @@ def breadth_rows(now: float, then: float) -> pd.DataFrame:
 
 def test_the_label_is_read_from_rows_dated_the_vix_date() -> None:
     from algotrade.features.rollups.market import breadth as mb  # noqa: PLC0415
+    from algotrade.features.rollups.market import regime as mr  # noqa: PLC0415
 
-    calm = {TREND: trend_row(rv=0.08, sma=0.03), mb.GROUP.table: breadth_rows(0.6, 0.62)}
+    headline = pd.DataFrame({"session_date": [DAYS[-1]], "label": ["CALM"]})  # R11 is then off
+    calm = {
+        TREND: trend_row(rv=0.08, sma=0.03),
+        mb.GROUP.table: breadth_rows(0.6, 0.62),
+        mr.GROUP.table: headline,
+    }
     got = run(macro(vix=15, vix3m=18), **calm)
     assert got["conditions_label"] == "R1"
     # breadth known only for the session itself, not the VIX's date: R3 and R1 cannot be decided
     other = pd.DataFrame({"session_date": [END], "pct_above_sma200": [0.6]})
     unknown = run(
-        macro(vix=15, vix3m=18), **{TREND: trend_row(rv=0.08, sma=0.03), mb.GROUP.table: other}
+        macro(vix=15, vix3m=18),
+        **{TREND: trend_row(rv=0.08, sma=0.03), mb.GROUP.table: other, mr.GROUP.table: headline},
     )
     assert unknown["conditions_label"] is None  # R3 (before R1) cannot be decided: never filled
 
@@ -317,7 +324,10 @@ def test_the_flags_and_the_label_columns_exist_with_their_licence() -> None:
     assert by_name["conditions_label"].licence == "open"
     for name in ("earnings_season_on", "event_week_on"):
         assert by_name[name].licence == "open"
-    assert c.D.bands().stress_at == c.D.stress_at
+    bands = c.D.bands()
+    assert bands.stress_at == c.D.stress_at and bands.contango_below == c.D.contango_below
+    assert bands.backwardation_at == c.D.backwardation_at and bands.vrp_rich_at == c.D.vrp_rich_at
+    assert bands.vix_low_pct == c.D.vix_low_pct
     assert run(macro())["event_week_on"] is None  # no FOMC known, and END is not an expiry week
 
 

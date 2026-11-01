@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from algotrade.features.rollups.market.indicators import Verdict, both, compare, either
 
-PRECEDENCE = ("R6", "R7", "R12", "R8", "R5", "R4", "R3", "R2", "R1", "R11")
+PRECEDENCE = ("R6", "R7", "R12", "R8", "R5", "R4", "R3", "R11", "R2", "R1")
 LABELS = (*sorted(PRECEDENCE, key=lambda r: int(r[1:])), "UNCLASSIFIED")
 
 
@@ -39,6 +39,10 @@ class Bands:
     backwardation_days: int = 10  # R6 needs this many closes inverted; R7 only that few
     spike_chg: float = 0.40  # R7: VIX up this much over 5 observations
     thin_vrp: float = 2.0  # R2: VIX minus realised volatility below this is thin
+    contango_below: float = 0.95  # D2: VIX / VIX3M below this is contango (as the verdict)
+    backwardation_at: float = 1.0  # D2: VIX / VIX3M at or above this is backwardation
+    vrp_rich_at: float = 4.0  # D3: VIX minus realised volatility at or above this is rich
+    vix_low_pct: float = 20.0  # D1: a VIX percentile below this is low
     season_share: float = 0.15  # R9: this share of names about to report
     fomc_days: int = 5  # R10: a decision within this many sessions
 
@@ -77,23 +81,24 @@ def rules(x: LabelReadings, b: Bands) -> dict[str, Verdict]:
     above_or_near = compare(x.sma_200, ">=", b.near_trend)
     caution = _band(x.vix, b.calm_below, b.stress_at)
     calm = compare(x.vix, "<", b.calm_below)
-    rich = compare(x.vrp, ">=", 4.0)
+    rich = compare(x.vrp, ">=", b.vrp_rich_at)
     return {
         "R6": both(below, compare(x.cross_50_200, "<", 0.0), compare(x.vix, ">=", b.stress_at),
                    compare(x.run, ">=", b.backwardation_days),
                    compare(x.breadth, "<", b.breadth_bear), x.credit_on),
-        "R7": both(compare(x.ratio, ">=", 1.0), compare(x.run, "<", b.backwardation_days),
+        "R7": both(compare(x.ratio, ">=", b.backwardation_at),
+                   compare(x.run, "<", b.backwardation_days),
                    compare(x.chg_5d, ">=", b.spike_chg), above_or_near),
         "R12": both(x.cheap, None if x.recovery is None else not x.recovery),
         "R8": x.recovery,
         "R5": both(below, x.rate_shock, caution, rich),
-        "R4": both(caution, compare(x.ratio, "<", 1.0),
+        "R4": both(caution, compare(x.ratio, "<", b.backwardation_at),
                    _band(x.drawdown, b.correction_lo, b.correction_hi), above_or_near),
         "R3": both(compare(x.sma_200, ">=", 0.0), compare(x.breadth, "<", b.breadth_narrow),
                    x.breadth_falling, compare(x.corr_ratio, "<", b.corr_low)),
-        "R2": both(compare(x.pct_252, "<", 20.0), compare(x.vrp, "<", b.thin_vrp),
+        "R2": both(compare(x.pct_252, "<", b.vix_low_pct), compare(x.vrp, "<", b.thin_vrp),
                    compare(x.sma_200, ">=", 0.0)),
-        "R1": both(calm, compare(x.ratio, "<", 0.95), compare(x.sma_200, ">=", 0.0),
+        "R1": both(calm, compare(x.ratio, "<", b.contango_below), compare(x.sma_200, ">=", 0.0),
                    compare(x.breadth, ">=", b.breadth_narrow), compare(x.vrp, ">=", 0.0)),
         "R11": both(x.macro_high, calm, compare(x.sma_200, ">=", 0.0)),
     }  # fmt: skip

@@ -83,6 +83,8 @@ def test_r1_a_calm_uptrend_and_r11_macro_high_with_the_market_calm() -> None:
     assert label(vix=15.0, ratio=0.9, pct_252=50.0, vrp=5.0) == "R1"
     assert label(vix=15.0, ratio=0.97, macro_high=True) == "R11"
     assert label(vix=15.0, ratio=0.97, macro_high=False) == "UNCLASSIFIED"
+    # the research's own R11 case also meets every R1 condition: the more cautious rule wins
+    assert label(vix=15.0, ratio=0.9, pct_252=50.0, vrp=5.0, macro_high=True) == "R11"
 
 
 def test_precedence_the_first_rule_that_holds_names_the_session() -> None:
@@ -93,6 +95,7 @@ def test_precedence_the_first_rule_that_holds_names_the_session() -> None:
         "vrp": 1.0,
     }  # R2 holds; R1 needs vrp >= 0 too
     assert label(**both) == "R2"  # R2 before R1
+    assert label(**both, macro_high=True) == "R11"  # R11 before R2 and R1
     assert label(cheap=True, recovery=False, ratio=0.9, vix=15.0, pct_252=10.0, vrp=1.0) == "R12"
 
 
@@ -117,6 +120,16 @@ def test_unknown_inputs_with_nothing_off_make_the_label_unknown() -> None:
         NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, None, NAN, None, None, None, None, None
     )
     assert lb.classify(unknown, B) is None
+
+
+def test_the_bands_follow_the_verdict_thresholds() -> None:
+    wide = replace(B, contango_below=0.99, vix_low_pct=60.0, vrp_rich_at=1.0, backwardation_at=1.1)
+    ok = replace(OFF, vix=15.0, ratio=0.97, pct_252=50.0, vrp=2.0, sma_200=0.02)
+    assert lb.classify(ok, B) != "R1" and lb.classify(ok, wide) == "R1"  # contango_below, vrp_rich
+    low = replace(OFF, vix=13.0, ratio=0.9, pct_252=40.0, vrp=1.0)
+    assert lb.classify(low, B) != "R2" and lb.classify(low, wide) == "R2"  # vix_low_pct
+    spike = replace(OFF, ratio=1.05, run=3.0, chg_5d=0.5, sma_200=0.0)
+    assert lb.classify(spike, B) == "R7" and lb.classify(spike, wide) != "R7"  # backwardation_at
 
 
 def test_the_flags_are_r9_and_r10() -> None:

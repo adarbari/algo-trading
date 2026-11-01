@@ -137,7 +137,9 @@ class Params:
             breadth_narrow=self.breadth_narrow, breadth_bear=self.breadth_bear,
             corr_low=self.corr_low, backwardation_days=self.backwardation_days,
             spike_chg=self.spike_chg, thin_vrp=self.thin_vrp, season_share=self.season_share,
-            fomc_days=self.fomc_days,
+            fomc_days=self.fomc_days, contango_below=self.contango_below,
+            backwardation_at=self.backwardation_at, vrp_rich_at=self.vrp_rich_at,
+            vix_low_pct=self.vix_low_pct,
         )  # fmt: skip
 
 
