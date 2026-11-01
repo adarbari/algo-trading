@@ -677,3 +677,10 @@ def test_a_cursor_is_refused_when_the_values_a_filter_reads_were_rewritten() -> 
     )
     with pytest.raises(ConfigurationError, match="changed since"):
         load_ideas(view(rewritten), 2, cursor, given)
+
+
+def test_tab_narrows_the_pool_to_the_screeners_of_that_tab(ctx: ReadContext) -> None:
+    """A screener no setup lists is in Stocks only (ADR 0083 amendment (a))."""
+    assert _ids(load_ideas(ctx, 10, tab="stocks")) == _ids(load_ideas(ctx, 10))
+    premium = load_ideas(ctx, 10, tab="premium")
+    assert premium.screeners == () and premium.items == ()

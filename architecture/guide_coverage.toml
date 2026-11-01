@@ -41,6 +41,26 @@ tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]
 # ------------------------------------------------------------------ enums and status fields
 
 [[enum]]
+source = "graphql:IdeaTab"
+values = { STOCKS = "term:idea_tab", PREMIUM = "term:idea_tab" }
+names = { STOCKS = "Stocks", PREMIUM = "Premium" }
+
+[[enum]]
+source = "graphql:SetupIdeas.state"
+values_from = "python:algotrade.services.read.ideas.picks:STATES"
+values = { listed = "term:ideas_listed", unproven = "term:ideas_unproven" }
+
+[[enum]]
+source = "graphql:SetupGroup.state"
+values_from = "python:algotrade.services.read.ideas.of_setup:STATES"
+values = { picked = "term:idea_setup_picked", nothing_picked = "term:idea_setup_nothing_picked", not_a_decision_day = "term:edge_pick_not_a_decision_day", unknown = "term:idea_setup_unknown" }
+
+[[enum]]
+source = "graphql:LeftOut.kind"
+values_from = "python:algotrade.services.read.ideas.picks:LEFT_OUT_ALL"
+values = { newer_run = "term:idea_left_out_newer_run", no_verdict = "term:idea_left_out_no_verdict", no_basis = "term:idea_left_out_no_basis", licence = "term:idea_left_out_licence" }
+
+[[enum]]
 source = "graphql:RegimeLabel"
 values = { CALM = "term:regime", CAUTION = "term:regime", STRESS = "term:regime", CRISIS = "term:regime", UNKNOWN = "term:regime" }
 

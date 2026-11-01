@@ -292,7 +292,7 @@ def test_types_mirror_read_model() -> None:
     objects = graphql_objects()
     assert objects, "no GraphQL object types found"
     for cls in objects:
-        if cls.__name__ in ("Query", "UserQuery"):  # the root and its base: each field a resolver
+        if cls.__name__ in ("Query", "IdeasQuery", "UserQuery"):  # the root and its parts
             assert all(f.base_resolver for f in cls.__strawberry_definition__.fields)
             continue
         of = cls.__dict__.get("of")

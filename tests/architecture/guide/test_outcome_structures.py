@@ -6,15 +6,10 @@ The kinds themselves are covered through ``EdgeSettings.kind`` in ``guide_covera
 import pytest
 
 from algotrade.config.edges.document import MODEL_BASIS
-from algotrade.config.edges.positions.chain import (
-    CHAIN_BASIS,
-    CHAIN_STRUCTURES,
-    MODEL_STRUCTURES,
-    STRUCTURES,
-)
+from algotrade.config.edges.positions.chain import CHAIN_BASIS, MODEL_STRUCTURES, STRUCTURES
 from algotrade.config.site.guide.glossary import GlossaryTerm, load_guide_glossary
 from algotrade.storage.configs.files import FileConfigStore
-from algotrade.storage.tables.schemas import OPTION_PNL_REASONS, OPTION_PNL_STATUSES
+from algotrade.storage.tables.schemas import STRUCTURE_PNL_REASONS, STRUCTURE_PNL_STATUSES
 from tests.conftest import REPO_ROOT
 
 STRUCTURE_TERMS = {
@@ -49,25 +44,19 @@ def test_the_expires_otm_structures_are_not_model_structures() -> None:
     assert not set(STRUCTURES) & set(MODEL_STRUCTURES)
 
 
-CHAIN_TERMS = {
-    "atm_straddle_long": "straddle_long",
-    "atm_straddle_short": "straddle_short",
-    "delta_hedged_atm": "delta_hedged_straddle",
-    "delta_hedged_atm_short": "delta_hedged_straddle_short",
-    "put_short": "put_short",
-}
 STATUS_TERMS = {"COMPLETE": "chain_outcome_complete", "UNMEASURED": "chain_outcome_unmeasured"}
 
 
-def test_every_chain_structure_status_reason_and_the_basis_has_a_term() -> None:
-    assert set(CHAIN_TERMS) == set(CHAIN_STRUCTURES), FIX
-    assert set(STATUS_TERMS) == set(OPTION_PNL_STATUSES), FIX
+def test_every_chain_status_reason_and_the_basis_has_a_term() -> None:
+    """The option_pnl outcome names a position template (ADR 0088), so no structure enum is left to
+    cover; the trade table's statuses, reasons and the ``chain`` basis still are."""
+    assert set(STATUS_TERMS) == set(STRUCTURE_PNL_STATUSES), FIX
     found = _terms()
-    for value, term in {**CHAIN_TERMS, **STATUS_TERMS, CHAIN_BASIS: "chain_basis"}.items():
+    for value, term in {**STATUS_TERMS, CHAIN_BASIS: "chain_basis"}.items():
         assert term in found, f"{value}: no Guide term {term!r}; {FIX}"
-    for term in ("chain_outcome_complete", "chain_outcome_unmeasured", "chain_basis", "put_short"):
+    for term in ("chain_outcome_complete", "chain_outcome_unmeasured", "chain_basis"):
         assert found[term].next, f"{term}: a state-like term needs a next"
     body = found["chain_outcome_unmeasured"].body
-    missing = [code for code in OPTION_PNL_REASONS if code not in body]
+    missing = [code for code in STRUCTURE_PNL_REASONS if code not in body]
     assert not missing, f"the chain_outcome_unmeasured entry does not explain {missing}"
     assert "outcome_option_pnl" in found["chain_basis"].see_also

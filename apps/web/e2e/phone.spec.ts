@@ -210,6 +210,7 @@ test('Admin ingestion: a tapped completeness cell opens its drill-down in a shee
   page,
 }) => {
   await page.goto('/admin/ingestion');
+  await page.getByRole('tab', { name: 'Data coverage' }).tap();
   const grid = page.getByRole('grid', { name: 'Completeness by dataset and session' });
   await grid
     .getByRole('gridcell', { name: /^Option chains, / })

@@ -14,7 +14,6 @@ from functools import partial
 from typing import Annotated
 
 import strawberry
-from strawberry.types import Info
 
 from algotrade.services.read.coverage import known_values
 from algotrade.services.read.edge_desk import desk as edge_desk
@@ -60,14 +59,12 @@ from algotrade.services.read.ops import (
 from algotrade.services.read.ops.admin_runs import harness_runs, screener_runs
 from algotrade.services.read.ops.admin_runs.screener_runs import RunStatus
 from algotrade.services.read.regime import regime
-from algotrade.services.read.screens import documents, ideas, screeners, views
-from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
+from algotrade.services.read.screens import documents, screeners, views
 from algotrade.services.read.users.viewer import load_viewer
-from algotrade_api.graphql.context import RequestContext, selects
+from algotrade_api.graphql.context import selects
 from algotrade_api.graphql.limits import (
     MAX_DAYS,
     MAX_FILTERS,
-    MAX_IDEAS_PAGE,
     MAX_NAMES,
     MAX_PAGE,
     MaxItems,
@@ -99,6 +96,7 @@ from algotrade_api.graphql.types.guide.screeners.screener import GuideScreenerDe
 from algotrade_api.graphql.types.guide.search import GuideSearch
 from algotrade_api.graphql.types.guide.situation import GuideSituationDetail
 from algotrade_api.graphql.types.guide.written import GuideStartPage, GuideTerm
+from algotrade_api.graphql.types.ideas_query import IdeasQuery
 from algotrade_api.graphql.types.instruments.distribution import FeatureDistribution
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -118,22 +116,14 @@ from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
 from algotrade_api.graphql.types.ops.review import ReviewList
 from algotrade_api.graphql.types.ops.run import NightlyRun, RunDetail, RunItem
 from algotrade_api.graphql.types.ops.usage import LlmUsage
+from algotrade_api.graphql.types.query_args import Ctx, Day
 from algotrade_api.graphql.types.screens.document import ScreenDetail, ScreenListing, ScreenVersion
-from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
 from algotrade_api.graphql.types.screens.view import TableView
 from algotrade_api.graphql.types.session import Session
 from algotrade_api.graphql.types.users.feature_requests import MyFeatureRequest
 from algotrade_api.graphql.types.users.queries import UserQuery
 
-Day = Annotated[
-    dt.date | None,
-    strawberry.argument(
-        description="the session to read (default: the latest with bars); every value "
-        "below is for exactly this date"
-    ),
-]
-Ctx = Info[RequestContext, None]
 MAX_RUNS = 100  # nightlyRuns(limit)
 MAX_SESSIONS = 60  # completeness(sessions)
 MAX_CALLS = 200  # llmUsage(recent)
@@ -143,7 +133,7 @@ MAX_REFS = 100  # guideEntries(refs)
 
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
-class Query(UserQuery):
+class Query(IdeasQuery, UserQuery):
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session `date` resolves to; null: nothing stored"
     )
@@ -227,32 +217,6 @@ class Query(UserQuery):
         load = event_calendar.load_event_calendar  # off the event loop: one read per source
         found = await off_loop(load, ctx, instrument_ids, days, scope) if ctx is not None else None
         return EventCalendar.of(found) if found is not None else None
-
-    @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The tickers the user's screeners picked in the session, ranked by the "
-        "Ideas rule (a screener's first picks, weighted by position and by whose screener it "
-        "is; each idea is served from its best pick) (`first` of them from the `after` "
-        "cursor, `nextCursor` the next page's); a screener with no run for the session is "
-        "listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list "
-        "before it is paged: `total` then counts the ideas that pass, `facets` the counts "
-        "(ADR 0082); a cursor is only good for the filters it was issued under. Null: nothing "
-        "stored",
-        extensions=[MaxItems("first", MAX_IDEAS_PAGE), MaxItems("filters", MAX_FILTERS)],
-    )
-    async def ideas(
-        self,
-        info: Ctx,
-        first: int = IDEAS_FIRST_PAGE,
-        after: str | None = None,
-        filters: list[FilterInput] | None = None,
-        date: Day = None,
-    ) -> Ideas | None:
-        ctx = await info.context.aread(date)
-        given = tuple(filters or ())
-        # Off the event loop (a whole-run read); the items' `features` loads still batch.
-        load = ideas.load_ideas
-        found = await off_loop(load, ctx, first, after, given) if ctx is not None else None
-        return Ideas.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The US market for the session: the market-entity features by catalogue "
