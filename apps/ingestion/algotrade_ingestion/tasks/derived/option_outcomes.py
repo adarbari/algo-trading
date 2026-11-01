@@ -1,33 +1,48 @@
-"""The ``option-outcomes`` task (ADR 0053 amendment, EB H13): write the chain P&L of every window
-a session closes to ``outcomes/option/structure_pnl@v1``, the second outcomes grain, which only
-the edge harness reads (``data.outcomes``).
+"""The ``option-outcomes`` task (ADR 0053 amendment, EB H13; ADR 0088, design 2.5): write the
+option trades of every window a session closes to ``outcomes/option/structure_pnl@v2``, the second
+outcomes grain, which only the edge harness reads (``data.outcomes``).
 
-For a window-end session T and each (structure, tenor rule, horizon h) the site's open edge
-documents with an ``option_pnl`` outcome name (``config.edges``), S is the h-th exchange session
-before T and the rows are the underlyings whose chain at S is ``OK``: what the structure bought at
-S's close and sold at T's earned (``option_paths``, quotes and our own delta from each session's
-stored chain, never filled from an earlier session), written to partition S. ``knowledge_ts`` is
-the latest ``knowledge_ts`` among the chain partitions the window read, not the write time. A
-window whose S is before the first stored chain is not computed (chains are stored from
-2026-10-02: the grain is forward-only, no backfill); one whose T has not closed is refused. Each
-night also recomputes the ``RECHECK`` window ends before it (a re-run never retracts a row; its
-rows win per key), so a night's missed run is caught up.
+For a window-end session T and each position of the site's open edge documents with an
+``option_pnl`` outcome (``positions_wanted``: the outcome, each variant and each case point of a
+case-valued parameter, for each hold h of its ``horizon_sessions``), S is the h-th exchange session
+before T and the rows are the underlyings whose chain at S is ``OK``: the contracts chosen from S's
+chain alone, the trade held to the first exit its rules give or to T (the option-structure engine,
+``engines/structures/trades``; quotes and our own delta from each session's stored chain, never
+filled from an earlier session), written to partition S under a ``position_key`` built from the
+resolved legs (``config/edges/positions/key.py``). An exit rule over catalogue fields reads each
+close's fields from that close's partition only (``option_fields``); a rule over a field the
+window cannot read at all is REFUSED (recorded, the position's other windows and the other
+positions still write, the check FAILs), as is ``skip_report_in_life`` until the earnings read
+lands (E4b). A row's ``knowledge_ts`` is the latest chain and field partition read up to its own
+exit; its ``licence`` the strictest of the price source and the rule's fields. A window whose S is
+before the first stored chain is not computed (chains are stored from 2026-10-02); one whose T has
+not closed is refused. Each night also recomputes the ``RECHECK`` window ends before it (a re-run
+never retracts a row; its rows win per key), so a night's missed run is caught up.
+
+``frame_and_publish`` is the one function that writes the table (G24): the owner-run history
+writer (E5) computes frames and calls it.
 
 The acceptance check (``check_option_outcomes``) holds the run to its own count: every underlying
-with an ``OK`` chain at S has a row, and the run's rows are stored; UNMEASURED rows are counted by
-reason in the detail, never failures (a stale chain is a fact of the feed, ADR 0054).
+with an ``OK`` chain at S has a row of each key, and the run's rows are stored; UNMEASURED rows are
+counted by reason in the detail, never failures (a stale chain is a fact of the feed, ADR 0054); a
+refused position FAILs.
 """
 
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass
 from datetime import date
 
 import pandas as pd
 
-from algotrade.config.edges.document import CLOSED
-from algotrade.config.edges.loading import Documents, load_edges
-from algotrade.config.edges.positions.chain import CHAIN_KIND, grain_structure
+from algotrade.config.edges.document import CLOSED, Edge, Outcome
+from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.key import case_points, position_key
+from algotrade.config.edges.positions.spec import ExitRule, exit_rules
+from algotrade.config.edges.positions.templates import Templates, load_templates
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
+from algotrade.core.model.fields import is_position_field
 from algotrade.core.time.calendar import close_time, sessions_between, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
@@ -39,37 +54,71 @@ from algotrade.data.chains import (
     underlying_quotes,
 )
 from algotrade.engines.structures.chain import DayChain
+from algotrade.engines.structures.trades import select_window, walk_trades
+from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.framework.feature import strictest
 from algotrade.features.rollups.positioning.chain_inputs import closing_spots, one_row_per_contract
+from algotrade.features.site import site_features
+from algotrade.services.licences import licence_of
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
-from algotrade.storage.tables.schemas import OPTION_PNL
-from algotrade_ingestion.tasks.derived.option_paths import structure_rows
+from algotrade.storage.tables.schemas import STRUCTURE_PNL, spec_for
+from algotrade.storage.tables.spec import COMMON
+from algotrade_ingestion.tasks.derived.option_fields import FieldLoader, refuse_unstored
+from algotrade_ingestion.tasks.derived.option_paths import position_rows
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.quality import Check
 
 TASK = "option-outcomes"
 SOURCE = "option_outcomes"
-TABLE = OPTION_PNL
+TABLE = STRUCTURE_PNL
 TABLES = (TABLE,)
+PRICE_SOURCE = "cboe"  # this writer's chains; the licence of Cboe's open quotes is open
 RECHECK = 2  # the window ends before a night's that it recomputes (a missed night is caught up)
 SHOWN = 5  # reasons listed per window in the run stats
-QUOTE_COLUMNS = ("instrument_id", "underlying_id", "expiry", "right", "strike", "bid", "ask", "ts")
+QUOTE_COLUMNS = (
+    "instrument_id", "underlying_id", "expiry", "right", "strike", "bid", "ask", "open_interest",
+    "ts",
+)  # fmt: skip
 SITE = FileConfigStore(config_dir())
 
 
-def windows_wanted(configs: Documents | None = None) -> list[tuple[str, int, int]]:
-    """The ``(grain structure, tenor_days, horizon_sessions)`` of every open edge document's (and
-    ``[[variants]]``') ``option_pnl`` outcome, sorted: a new edge needs no code change."""
-    edges = [e for e in load_edges(configs or SITE) if e.status not in CLOSED]
-    outcomes = [o for e in edges for o in (e.outcome, *(v.outcome for v in e.variants))]
-    return sorted(
-        {
-            (grain_structure(o.structure or "", o.strike_delta), int(o.tenor_days or 0), h)
-            for o in outcomes
-            if o.kind == CHAIN_KIND
-            for h in o.horizon_sessions
-        }
-    )
+@dataclass(frozen=True)
+class Wanted:
+    """One position to write for a window ending at a night: the outcome (a document's, a
+    variant's or a case point's) held at most ``hold`` sessions, its stored ``key``, its ordered
+    exit ``rules`` and the catalogue ``fields`` they name."""
+
+    outcome: Outcome
+    hold: int
+    key: str
+    rules: tuple[ExitRule, ...]
+    fields: tuple[str, ...]
+
+
+def positions_wanted(edges: Collection[Edge], templates: Templates) -> list[Wanted]:
+    """Every position of the open edge documents' (and ``[[variants]]``') ``option_pnl`` outcomes
+    and their case points, for each hold of its ``horizon_sessions``, by key (a new edge needs no
+    code change; two setups that resolve to one key share its rows)."""
+    outcomes = [
+        o
+        for e in edges
+        if e.status not in CLOSED
+        for o in (e.outcome, *(v.outcome for v in e.variants))
+    ]
+    found: dict[str, Wanted] = {}
+    for outcome in outcomes:
+        if outcome.kind != CHAIN_KIND or outcome.position is None:
+            continue
+        for point in case_points(outcome, templates):
+            rules = exit_rules(point.position.exit if point.position else None)
+            names = {
+                r.field for x in rules for r in x.rule.rules() if not is_position_field(r.field)
+            }
+            for hold in point.horizon_sessions:
+                key = position_key(point, hold)
+                found[key] = Wanted(point, hold, key, rules, tuple(sorted(names)))
+    return sorted(found.values(), key=lambda w: (w.hold, w.key))
 
 
 class ChainLoader:
@@ -140,66 +189,137 @@ def compute_option_outcomes(
         raise ValueError(f"no exchange session in {start}..{end or session}")
     if close_time(ends[-1]) > ctx.clock():
         raise ValueError(f"the window ending {ends[-1]} has not closed yet")
-    wanted = windows_wanted(ctx.configs)
+    configs = ctx.configs or SITE
+    wanted = positions_wanted(load_edges(configs), load_templates(configs))
     stored = ctx.reader.dates(CHAIN_STATUS)
     first = stored[0] if stored else ends[-1]
     loader = ChainLoader(ctx.reader, ctx.settings)
+    fields = FieldLoader(ctx.reader)
+    features = site_features(configs) if any(w.fields for w in wanted) else None
     record: RunRecord | None = None
     for t in ends:
-        record = _one(ctx, t, wanted, first, loader)
+        record = _one(ctx, t, wanted, first, loader, fields, features)
     assert record is not None
     return record
+
+
+def _licence(features: FeatureSet | None, fields: tuple[str, ...]) -> str:
+    """The strictest licence of Cboe's open quotes and the exit rule's catalogue fields."""
+    held = [] if features is None else [licence_of(features, f) for f in fields]
+    return strictest(["open", *held])
+
+
+def trade_rows(
+    w: Wanted,
+    sessions: list[date],
+    loader: ChainLoader,
+    fields: FieldLoader,
+    licence: str,
+) -> tuple[pd.DataFrame, int]:
+    """The ``structure_pnl@v2`` rows of position ``w`` for the window ``sessions`` (S..T in
+    order) -> (rows, the number of names with an ``OK`` chain at S). The chain of S is read whole,
+    the later sessions' only for the contracts the entry chose; each close's rule fields come from
+    that close's own partition."""
+    spec = w.outcome.position
+    assert spec is not None
+    entry = loader(sessions[0], None)
+    selected = select_window(
+        entry, spec.legs, int(w.outcome.tenor_days or 0), spec.expiry_cycle, sessions[-1]
+    )
+    held = {c.instrument_id for sel in selected.values() for c in sel.legs}
+    days = [entry, *(loader(d, held) for d in sessions[1:])]
+    names = sorted(n for n, sel in selected.items() if sel.reason is None)
+    catalogue, stamps = [], [entry.known]
+    for day in days[1:]:
+        values, field_known = fields(day.day, w.fields, names)
+        catalogue.append(values)
+        stamps.append(max((x for x in (day.known, field_known) if x is not None), default=None))
+    trades = walk_trades(days, spec.legs, spec.collateral, selected, w.rules, catalogue, spec.book)
+    rows = position_rows(
+        trades, stamps, key=w.key, hold=w.hold, window_end=sessions[-1], price_source=PRICE_SOURCE,
+        licence=licence, ts=close_time(sessions[0]),
+    )  # fmt: skip
+    return rows, len(selected)
 
 
 def _one(
     ctx: TaskContext,
     end: date,
-    wanted: list[tuple[str, int, int]],
+    wanted: list[Wanted],
     first: date,
     loader: ChainLoader,
+    fields: FieldLoader,
+    features: FeatureSet | None,
 ) -> RunRecord:
     current: date | None = None
     parts: dict[date, list[pd.DataFrame]] = {}  # one partition per start session, written once
     with IngestRun(ctx, TASK, end) as run:
-        for structure, tenor, h in sorted(wanted, key=lambda w: w[2]):
-            key = f"{structure}:t{tenor}:h{h}"
-            sessions = sessions_ending(end, h + 1)
+        for w in wanted:
+            sessions = sessions_ending(end, w.hold + 1)
             if sessions[0] < first:
-                run.record_item(key, "BEFORE_HISTORY")
+                run.record_item(w.key, "BEFORE_HISTORY")
+                continue
+            refusal = _refusal(ctx.reader, w, sessions)
+            if refusal:
+                run.record_item(w.key, f"REFUSED: {refusal}")
+                run.stats[w.key] = {"refused": refusal}
                 continue
             if sessions[0] != current:
-                loader.reset()  # the previous horizon's entry chain is not this one's
+                loader.reset()  # the previous hold's entry chain is not this one's
                 current = sessions[0]
-            rows, known = structure_rows(sessions, loader, structure, tenor, h)
+            rows, ok = trade_rows(w, sessions, loader, fields, _licence(features, w.fields))
             if len(rows):
-                stamp = known if known is not None else ctx.clock()
-                parts.setdefault(sessions[0], []).append(
-                    rows.assign(ts=close_time(sessions[0]), knowledge_ts=pd.Timestamp(stamp))
-                )
+                parts.setdefault(sessions[0], []).append(rows)
             reasons = rows.loc[rows["outcome_status"] == "UNMEASURED", "outcome_reason"]
-            run.record_item(key, f"OK: {len(rows)} rows")
-            run.stats[key] = {
+            run.record_item(w.key, f"OK: {len(rows)} rows")
+            run.stats[w.key] = {
                 "start": sessions[0].isoformat(),
                 "rows": len(rows),
+                "ok_chains": ok,
                 "unmeasured": len(reasons),
-                "hedge_missing": int(rows["hedge_reason"].notna().sum()),
+                "unknown_closes": int(rows["exit_unknown_closes"].sum()),
                 "reasons": {
                     str(r).split(":")[0]: int(n) for r, n in reasons.value_counts().items()
                 },
             }
-        for start, frames in parts.items():
-            # same-horizon windows share S: a second write would replace the first partition
-            both = pd.concat(frames, ignore_index=True)
-            stamps = both.pop("knowledge_ts")
-            run.write(TABLE, both, SOURCE, session=start, known=stamps)
+        frame_and_publish(run, parts)
         loader.reset()
     return run.record
 
 
+def _refusal(reader: StoreReader, w: Wanted, sessions: list[date]) -> str:
+    """Why position ``w`` is not written for the window ``sessions`` ('' when it is)."""
+    spec = w.outcome.position
+    if spec is not None and spec.skip_report_in_life:
+        return "skip_report_in_life needs the expected-report read (a later slice)"
+    problems = refuse_unstored(reader, w.fields, sessions[1:])
+    return "; ".join(problems[:SHOWN])
+
+
+DECLARED = tuple(c.name for c in spec_for(TABLE).columns if c.name not in COMMON)  # + the stamps
+
+
+def frame_and_publish(run: IngestRun, parts: Mapping[date, list[pd.DataFrame]]) -> None:
+    """Write the trade frames of each start session as one partition of ``structure_pnl@v2``: the
+    one publisher of the table (G24; the history writer calls it too). Each frame must carry
+    exactly the table's declared columns (``knowledge_ts`` per row beside them); the frames of one
+    session are joined (a second write would replace the partition's first), ``knowledge_ts`` is
+    taken from the rows, never the write time."""
+    for start, frames in sorted(parts.items()):
+        both = pd.concat(frames, ignore_index=True)
+        wanted = {*DECLARED, "knowledge_ts"}
+        missing, extra = sorted(wanted - set(both.columns)), sorted(set(both.columns) - wanted)
+        if missing or extra:
+            raise ValueError(f"{TABLE} frame for {start}: missing {missing}, undeclared {extra}")
+        stamps = both.pop("knowledge_ts")
+        run.write(TABLE, both, SOURCE, session=start, known=stamps)
+
+
 def check_option_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
     """The acceptance of the ``option-outcomes`` step for window end ``session``: for each
-    window the run computed, every underlying with an ``OK`` chain at S (counted again here from
-    the stored status) has a row, and the run's rows are stored."""
+    position window the run computed, every underlying with an ``OK`` chain at S (counted again
+    here from the stored status) has a row of that ``position_key``, and the run's rows are
+    stored; a position the run refused fails."""
     runs = [r for r in reader.runs(TASK, session) if r.status == RunStatus.COMPLETE]
     if not runs:
         return [Check("option_outcomes", "FAIL", f"no complete option-outcomes run for {session}")]
@@ -207,7 +327,12 @@ def check_option_outcomes(reader: StoreReader, session: date, s: SourcesSettings
     unmeasured = 0
     windows = 0
     for key, value in sorted(runs[-1].stats.items()):
-        if not isinstance(value, dict) or "start" not in value:
+        if not isinstance(value, dict):
+            continue
+        if "refused" in value:
+            problems.append(f"{key[:60]}: refused ({value['refused']})")
+            continue
+        if "start" not in value:
             continue
         windows += 1
         start = date.fromisoformat(value["start"])
@@ -216,21 +341,18 @@ def check_option_outcomes(reader: StoreReader, session: date, s: SourcesSettings
         if status is not None and not status.empty:
             labels = chain_labels(status, start, s.max_chain_stale_sessions)
             ok = int((labels == OK_LABEL).sum())
-        structure, tenor, horizon = key.split(":")
         part = reader.table(TABLE, start)
         mine = 0
         if part is not None:
             mine = int(
                 (
                     (pd.to_datetime(part["window_end"]).dt.date == session)
-                    & (part["structure"] == structure)
-                    & (part["tenor_days"] == int(tenor.removeprefix("t")))
-                    & (part["horizon_sessions"] == int(horizon.removeprefix("h")))
+                    & (part["position_key"] == key)
                 ).sum()
             )
         if ok != value["rows"] or mine != value["rows"]:
             problems.append(
-                f"{key}: {ok} OK chains at {start}, {value['rows']} rows, {mine} stored"
+                f"{key[:60]}: {ok} OK chains at {start}, {value['rows']} rows, {mine} stored"
             )
         unmeasured += int(value["unmeasured"])
     if problems:
@@ -238,7 +360,7 @@ def check_option_outcomes(reader: StoreReader, session: date, s: SourcesSettings
     return [
         Check(
             "option_outcomes", "PASS",
-            f"{windows} windows closed by {session}, every OK chain has a row; "
+            f"{windows} position windows closed by {session}, every OK chain has a row; "
             f"{unmeasured} UNMEASURED (a chain missing or stale)",
         )
     ]  # fmt: skip

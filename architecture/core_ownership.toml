@@ -68,6 +68,18 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "fields_for" }]
 
 [[responsibility]]
+id = "position-key"
+description = "The stored identity of an option trade (ADR 0088, design 2.5, G24): resolve_legs gives an outcome's legs from its template (strike_delta replaces the delta of the short delta legs only), position_key the canonical sorted JSON of the resolved legs, collateral rule, selection parameters, entry offset, ordered exit rules and hold cap (never the template id, so a template edit changes the key a trade is stored under), parse_position_key its inverse, case_points the concrete outcomes a case-valued setup can resolve to, with_legs fills them on a loaded edge; callers key a trade through it, never build the string"
+owner = ["src/algotrade/config/edges/positions/key.py"]
+allowed = [
+    "src/algotrade/config/edges/loading.py",  # fills the resolved legs once an edge is checked against the templates
+    "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py",  # the writer stores the key
+    "src/algotrade/services/evaluation/cross_section/hit.py",  # the reader selects the edge's own key
+]
+section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
+detect = [{ call = "position_key" }, { call = "parse_position_key" }, { call = "resolve_legs" }]
+
+[[responsibility]]
 id = "position-templates"
 description = "Position templates (ADR 0088, design 2.4): config/site/positions/templates.toml typed fail closed into frozen Templates (legs: shares of a signed quantity, or an option chosen by a delta / atm / otm_pct strike rule, never a target yield; the collateral rule), checked against an edge's `position` and `position:<id>` baselines where the edge loads, and `position_of(outcome)`, the one function that names the templates an outcome holds (the `position` key, else the template of a return outcome's side); the read model, the trade contract and the engine call it, never re-derive a side to a position"
 owner = ["src/algotrade/config/edges/positions/templates.py"]

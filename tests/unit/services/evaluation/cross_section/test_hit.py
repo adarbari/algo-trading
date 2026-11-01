@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from algotrade.config.edges.positions.key import position_key
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.quant.black_scholes import (
@@ -380,52 +381,43 @@ def pair_edge(**outcome: object):  # type: ignore[no-untyped-def]
     return edge(outcome={**base, **outcome}, top_k=5)
 
 
-# ---- option_pnl: the P&L of quoted prices from the chain grain (basis "chain") ------------
+# ---- option_pnl: the P&L of quoted prices from the option trade grain (basis "chain") ------
 
 CHAIN = {
     "kind": "option_pnl", "horizon_sessions": [5], "benchmark": "none", "tenor_days": 30,
-    "structure": "atm_straddle_long", "start_offset_sessions": 1,
+    "position": "short_put", "strike_delta": 0.25, "start_offset_sessions": 1,
 }  # fmt: skip
-
-
-def chain_rows(n: int = 3, **columns: object) -> pd.DataFrame:
-    """Rows of the chain grain: entry 5.0 mid / 5.2 ask on a 100 stock, exit 7.0 mid / 6.8 bid
-    (half-spreads 0.2 at entry and 0.2 at exit), mid P&L 2.0 (0.02 of the stock), hedged 1.0."""
-    base: dict[str, object] = {
-        "instrument_id": [f"EQ:{i}" for i in range(n)], "structure": ["atm_straddle"] * n,
-        "tenor_days": [30] * n, "entry_spot": [100.0] * n, "entry_mid": [5.0] * n,
-        "entry_ask": [5.2] * n, "exit_mid": [7.0] * n, "exit_bid": [6.8] * n,
-        "pnl_per_underlying": [0.02] * n, "hedged_pnl_per_underlying": [0.01] * n,
-        "outcome_status": ["COMPLETE"] * n, "outcome_reason": [None] * n,
-        "hedge_reason": [None] * n,
-    }  # fmt: skip
-    return pd.DataFrame({**base, **columns})
 
 
 def chain_edge(**changes: object):  # type: ignore[no-untyped-def]
     return edge(outcome={**CHAIN, **changes}, schedule="every_session")
 
 
-def test_a_long_straddle_earns_the_quoted_executable_pnl_over_the_entry_spot() -> None:
+def chain_rows(n: int = 3, hold: int = 5, e=None, **columns: object) -> pd.DataFrame:  # type: ignore[no-untyped-def]
+    """Rows of the trade grain of ``e`` (default: ``chain_edge()``): a 100 stock, mid P&L 2.0
+    with half-spreads 0.2 at entry and 0.2 at exit (0.016 of the stock net)."""
+    key = position_key((e or chain_edge()).outcome, hold)
+    base: dict[str, object] = {
+        "instrument_id": [f"EQ:{i}" for i in range(n)], "position_key": [key] * n,
+        "entry_spot": [100.0] * n, "entry_half_spread": [0.2] * n, "exit_half_spread": [0.2] * n,
+        "pnl_mid": [2.0] * n, "exit_unknown_closes": [0] * n,
+        "outcome_status": ["COMPLETE"] * n, "outcome_reason": [None] * n,
+    }  # fmt: skip
+    return pd.DataFrame({**base, **columns})
+
+
+def test_a_position_earns_its_mid_pnl_less_the_half_spreads_over_the_entry_spot() -> None:
     e = chain_edge()
     assert not needs_implied_vol(e)  # priced from quotes: no implied-vol field
     out = apply_outcome(e, chain_rows())
-    assert np.allclose(out["value"], (6.8 - 5.2) / 100)  # bought at the ask, sold at the bid
+    assert np.allclose(out["value"], (2.0 - 0.2 - 0.2) / 100)
     assert list(out["hit"]) == [True] * 3 and set(out["excluded"]) == {""}
 
 
-def test_a_short_structure_sells_at_the_bid_and_buys_back_at_the_ask() -> None:
-    out = apply_outcome(chain_edge(structure="atm_straddle_short"), chain_rows())
-    entry_bid, exit_ask = 2 * 5.0 - 5.2, 2 * 7.0 - 6.8  # the quote is symmetric around the mid
-    assert np.allclose(out["value"], (entry_bid - exit_ask) / 100)
-    assert list(out["hit"]) == [False] * 3  # the straddle gained, the seller lost
-
-
-def test_a_hedged_structure_reads_the_hedged_pnl_less_the_same_half_spreads() -> None:
-    long = apply_outcome(chain_edge(structure="delta_hedged_atm"), chain_rows())
-    short = apply_outcome(chain_edge(structure="delta_hedged_atm_short"), chain_rows())
-    assert np.allclose(long["value"], 0.01 - (0.2 + 0.2) / 100)
-    assert np.allclose(short["value"], -0.01 - (0.2 + 0.2) / 100)  # a seller pays the spread too
+def test_a_loss_after_the_spread_is_a_miss_the_sign_is_in_the_pnl() -> None:
+    out = apply_outcome(chain_edge(), chain_rows(pnl_mid=[0.3, -2.0, 0.5]))
+    assert np.allclose(out["value"], [-0.001, -0.024, 0.001])
+    assert list(out["hit"]) == [False, False, True]
 
 
 def test_cost_bps_is_charged_once_in_bps_of_the_entry_spot() -> None:
@@ -434,42 +426,41 @@ def test_cost_bps_is_charged_once_in_bps_of_the_entry_spot() -> None:
     assert np.allclose(base - costed, 0.0025)
 
 
-def test_only_the_edges_structure_and_tenor_are_scored_one_row_per_instrument() -> None:
+def test_only_the_edges_position_key_for_the_horizon_is_scored_one_row_per_instrument() -> None:
+    other = chain_edge(strike_delta=0.1)  # another delta is another key
+    longer = chain_edge(horizon_sessions=[5, 10])
     frame = pd.concat(
-        [
-            chain_rows(2),
-            chain_rows(2, structure=["put_delta_25"] * 2),
-            chain_rows(2, tenor_days=[60] * 2),
-        ],
+        [chain_rows(2), chain_rows(2, e=other), chain_rows(2, hold=10, e=longer)],
         ignore_index=True,
     )
     out = apply_outcome(chain_edge(), frame)
     assert list(out["instrument_id"]) == ["EQ:0", "EQ:1"]
-    put = apply_outcome(
-        chain_edge(structure="put_short", strike_delta=0.25), frame.assign(pnl_per_underlying=0.0)
-    )
-    assert list(put["instrument_id"]) == ["EQ:0", "EQ:1"]  # the long put of delta 0.25, sold
+    assert len(apply_outcome(longer, frame)) == 4  # an edge with two holds keeps both keys' rows
+
+
+def test_two_exit_rules_are_two_keys_and_only_the_edges_own_is_scored() -> None:
+    taken = chain_edge(exit={"take_profit": 0.5})
+    frame = pd.concat([chain_rows(2), chain_rows(2, e=taken, pnl_mid=[9.0, 9.0])])
+    assert np.allclose(apply_outcome(chain_edge(), frame)["value"], 0.016)
+    assert np.allclose(apply_outcome(taken, frame)["value"], (9.0 - 0.4) / 100)
 
 
 def test_an_unmeasured_or_priceless_row_is_excluded_never_a_miss_or_a_zero() -> None:
     frame = chain_rows(
         3, outcome_status=["COMPLETE", "UNMEASURED", "COMPLETE"],
         outcome_reason=[None, "STALE_CHAIN:2026-10-06", None],
-        pnl_per_underlying=[0.02, None, NAN],
+        pnl_mid=[0.02, None, NAN],
     )  # fmt: skip
     out = apply_outcome(chain_edge(), frame)
     assert list(out["excluded"]) == ["", "unmeasured", "missing_value"]
     assert np.isnan(out["value"].iloc[1:]).all() and not out["hit"].iloc[1:].any()
 
 
-def test_a_hedged_row_with_a_hedge_reason_is_unmeasured_but_an_unhedged_one_still_counts() -> None:
-    frame = chain_rows(
-        2, hedged_pnl_per_underlying=[0.01, None], hedge_reason=[None, "STALE_CHAIN:2026-10-06"]
-    )
-    hedged = apply_outcome(chain_edge(structure="delta_hedged_atm"), frame)
-    assert list(hedged["excluded"]) == ["", "unmeasured"] and not hedged["hit"].iloc[1]
-    plain = apply_outcome(chain_edge(), frame)  # the unhedged P&L does not need the hedge
-    assert list(plain["excluded"]) == ["", ""] and plain["hit"].all()
+def test_a_trade_whose_exit_rule_was_unknown_on_a_close_is_unmeasured() -> None:
+    """Until ``verdict.toml`` names an ``exit_unknown_share`` (a named follow-up of E4), any close
+    on which an exit rule could not be read makes the trade UNMEASURED: the strictest stand-in."""
+    out = apply_outcome(chain_edge(), chain_rows(2, exit_unknown_closes=[0, 3]))
+    assert list(out["excluded"]) == ["", "unmeasured"] and not out["hit"].iloc[1]
 
 
 def _residual(**outcome: object) -> object:
