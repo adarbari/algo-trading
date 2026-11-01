@@ -6,6 +6,7 @@ Parsed here, checked against the site's templates where the edge loads (``check_
 engine that reads it is a later slice. ``when`` of ``[outcome.exit]`` and ``[outcome.entry]`` are
 parsed with the rules (E2r)."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +18,7 @@ from algotrade.config.edges.positions.templates import (
     check_known,
 )
 from algotrade.config.site.fields import Table
+from algotrade.config.strategy.schema import Group, parse_group
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 
@@ -79,19 +81,29 @@ def spec_of(o: Table, kind: str, offset: int) -> PositionSpec | None:
     )
 
 
+def gate_of(t: Table) -> Group | None:
+    """The setup's gate as a parsed rule group (structure only; the catalogue check and the
+    decision are E7's, which is when ``check_edge`` stops refusing it)."""
+    raw = t.raw("gate")
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ConfigurationError(f"{t.where} gate: expected a rule table, got {raw!r}")
+    return parse_group(raw, f"{t.where} gate")
+
+
 def _exit(o: Table) -> ExitSettings | None:
     if "exit" not in o.names():
         return None
     t = o.table("exit", EXIT_KEYS)
     stop, dte = t.number("stop_loss", None, 0), t.integer("exit_dte", -1, -1)
     profit = t.number("take_profit", None, 0)
-    if profit is not None and not 0 < profit <= 1:
-        raise ConfigurationError(f"{t.where} take_profit: expected a share of the credit in (0, 1]")
-    if stop is not None and stop <= 0:
-        raise ConfigurationError(f"{t.where} stop_loss: expected a multiple of the credit > 0")
+    if profit is not None and profit > 1:
+        raise ConfigurationError(f"{t.where} take_profit: expected a share of the credit, 0 to 1")
     if dte > MAX_EXIT_DTE:
         raise ConfigurationError(f"{t.where} exit_dte: at most {MAX_EXIT_DTE} days")
-    settings = ExitSettings(profit, stop, dte if dte >= 0 else None)
+    # 0 is "not set" (a grid axis spells off as 0)
+    settings = ExitSettings(profit or None, stop or None, dte if dte > 0 else None)
     if settings == ExitSettings():
         raise ConfigurationError(f"{t.where}: names none of {list(EXIT_KEYS)}")
     return settings
@@ -112,12 +124,16 @@ def check_outcome(outcome: "Outcome", where: str, templates: Templates) -> None:
             f"{where} position: {spec.template!r} does not fit a {kind} outcome "
             f"(option_pnl takes a template with an option leg, a return outcome shares only)"
         )
+    if outcome.strike_delta is not None and not any(leg.strike == "delta" for leg in template.legs):
+        raise ConfigurationError(
+            f"{where} strike_delta: {spec.template!r} has no leg chosen by delta"
+        )
     if template.share_only:
         if spec.exit is not None or spec.book or spec.skip_report_in_life:
             raise ConfigurationError(
                 f"{where} position: exit, book and skip_report_in_life are for an option position"
             )
-        if spec.template not in SIDE_TEMPLATES.get(outcome.side, ()):
+        if SIDE_TEMPLATES.get(outcome.side) != (spec.template,):
             raise ConfigurationError(
                 f"{where} position: {spec.template!r} is not the position of side {outcome.side!r}"
             )
@@ -130,6 +146,11 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
     for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
         check_outcome(outcome, where, templates)
     check_known(where, "baselines", edge.position_baselines, templates)
+    if edge.gate is not None:
+        raise ConfigurationError(
+            f"{where} gate: not applied by any run yet (E7), so a gated edge would be "
+            f"measured ungated"
+        )
     if not edge.variant_grid:
         return
     if edge.outcome.kind != OPTION_KIND or edge.outcome.position is None:

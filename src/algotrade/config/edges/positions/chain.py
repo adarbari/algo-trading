@@ -41,6 +41,11 @@ MAX_TENOR_DAYS = 400
 def grain_structure(structure: str, strike_delta: float | None) -> str:
     """The structure the grain stores (held long) for a document ``structure``: ``atm_straddle``,
     or ``put_delta_NN`` for the short put of delta ``NN / 100``."""
+    if structure not in CHAIN_STRUCTURES:
+        raise ConfigurationError(
+            f"option_pnl structure {structure!r}: an outcome that names a position template is "
+            f"not measured until the option engine reads it (ADR 0088, E3a / E4)"
+        )
     if structure == "put_short":
         assert strike_delta is not None
         return f"put_delta_{round(strike_delta * 100):02d}"

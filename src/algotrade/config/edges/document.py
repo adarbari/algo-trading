@@ -141,7 +141,7 @@ from algotrade.config.edges.portfolio import (
 )
 from algotrade.config.edges.positions import chain, grid
 from algotrade.config.edges.positions.spec import KEYS as POSITION_KEYS
-from algotrade.config.edges.positions.spec import PositionSpec, spec_of
+from algotrade.config.edges.positions.spec import PositionSpec, gate_of, spec_of
 from algotrade.config.edges.positions.templates import POSITION_PREFIX, baseline_template
 from algotrade.config.edges.schedules.events import (
     EVENT_CLASSES,
@@ -160,7 +160,7 @@ from algotrade.config.edges.schedules.markets import (
 )
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
-from algotrade.config.strategy.schema import Selection, parse_selection
+from algotrade.config.strategy.schema import Group, Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.core.time.windows import (
@@ -388,7 +388,7 @@ class Edge:
     oos_class: str | None = None
     # ADR 0088: the setup's gate (a rule over market features, parsed with the rules), its
     # variant grids, the verdict profile (None: the kind's) and the ``position:<id>`` baselines.
-    gate: Mapping[str, Any] | None = None
+    gate: Group | None = None
     variant_grid: tuple[grid.Grid, ...] = ()
     verdict_profile: str | None = None
     position_baselines: tuple[str, ...] = ()
@@ -495,7 +495,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         screeners=screeners,
         baselines=baselines,
         position_baselines=position_baselines,
-        gate=_gate(t),
+        gate=gate_of(t),
         variant_grid=grid.parse_grids(t),
         verdict_profile=t.choice("verdict_profile", "", PROFILES)
         if "verdict_profile" in doc
@@ -961,13 +961,6 @@ def _baselines(t: Table) -> tuple[tuple[str, ...], tuple[str, ...]]:
     owned = tuple(baseline_template(s) for s in raw if s.startswith(POSITION_PREFIX))
     rest = Table({"baselines": [s for s in raw if not s.startswith(POSITION_PREFIX)]}, t.where)
     return _ids(rest, "baselines", (STANDARD,)), owned
-
-
-def _gate(t: Table) -> Mapping[str, Any] | None:
-    raw = t.raw("gate")
-    if raw is not None and not isinstance(raw, Mapping):
-        raise ConfigurationError(f"{t.where} gate: expected a rule table, got {raw!r}")
-    return raw
 
 
 def _ids(t: Table, key: str, tokens: tuple[str, ...] = ()) -> tuple[str, ...]:

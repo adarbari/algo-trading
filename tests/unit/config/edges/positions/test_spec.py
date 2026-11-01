@@ -10,6 +10,8 @@ import pytest
 
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.positions.chain import grain_structure
 from algotrade.config.edges.positions.spec import ExitSettings, PositionSpec, check_edge
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
@@ -18,6 +20,7 @@ from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import WHERE, document
 
 TEMPLATES = load_templates(FileConfigStore(REPO_ROOT / "config"))
+GATE = {"all": [{"field": "market.vix_close", "op": "lt", "value": 30}]}
 PUT = {
     "kind": "option_pnl", "horizon_sessions": [21], "benchmark": "none",
     "start_offset_sessions": 1, "tenor_days": 30, "position": "short_put", "strike_delta": 0.2,
@@ -45,7 +48,6 @@ def test_a_position_round_trips() -> None:
         ({"start_offset_sessions": 0}, "start_offset_sessions: the screen runs after"),
         ({"exit": {}}, "names none of"),
         ({"exit": {"take_profit": 1.5}}, "take_profit"),
-        ({"exit": {"stop_loss": 0}}, "stop_loss"),
         ({"exit": {"when": {}}}, "unknown keys"),
         ({"expiry_cycle": "daily"}, "expiry_cycle"),
         ({"position": "Bad Id"}, "invalid position id"),
@@ -104,8 +106,8 @@ def test_a_position_baseline_is_a_paired_base_not_a_screener() -> None:
 def test_the_new_edge_keys_parse_and_a_document_without_them_hashes_as_before() -> None:
     plain = parse_edge(document(), "drift", WHERE)
     assert (plain.gate, plain.variant_grid, plain.verdict_profile) == (None, (), None)
-    new = parse_edge(document(gate={"all": []}, verdict_profile="tails"), "drift", WHERE)
-    assert new.gate == {"all": []} and new.verdict_profile == "tails"
+    new = parse_edge(document(gate=GATE, verdict_profile="tails"), "drift", WHERE)
+    assert new.gate is not None and new.verdict_profile == "tails"
     with pytest.raises(ConfigurationError, match="verdict_profile"):
         parse_edge(document(verdict_profile="best"), "drift", WHERE)
     keys = ("position", "gate", "verdict_profile", "variant_grid", "position_baselines")
@@ -122,3 +124,43 @@ def test_a_grid_belongs_to_an_option_position() -> None:
     clash = {**put(), "variant_grid": grid, "variants": [{"id": "g_d16"}]}
     with pytest.raises(ConfigurationError, match="clash with a variant"):
         check_edge(parse_edge(clash, "drift", WHERE), WHERE, TEMPLATES)
+
+
+def test_a_gate_is_parsed_but_refused_until_a_run_applies_it() -> None:
+    edge = parse_edge(document(gate=GATE), "drift", WHERE)
+    with pytest.raises(ConfigurationError, match="gate: not applied by any run yet"):
+        check_edge(edge, WHERE, TEMPLATES)
+    with pytest.raises(ConfigurationError, match="gate"):
+        parse_edge(document(gate={"all": []}), "drift", WHERE)
+
+
+def test_a_positioned_option_outcome_is_not_measured_as_another_structure() -> None:
+    o = parse_edge(put(), "drift", WHERE).outcome
+    with pytest.raises(ConfigurationError, match="not measured until the option engine"):
+        grain_structure(o.structure or "", o.strike_delta)
+
+
+def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> None:
+    both = {**PUT, "kind": "excess_return", "benchmark": "SPY", "position": "long_shares",
+            "side": "long_short"}  # fmt: skip
+    for key in (
+        "tenor_days",
+        "strike_delta",
+        "expiry_cycle",
+        "skip_report_in_life",
+        "book",
+        "exit",
+    ):
+        both.pop(key)
+    with pytest.raises(ConfigurationError, match="not the position of side"):
+        check_edge(parse_edge(document(outcome=both, top_k=5), "drift", WHERE), WHERE, TEMPLATES)
+    fly = parse_edge(put(position="iron_fly", exit=None), "drift", WHERE)
+    with pytest.raises(ConfigurationError, match="has no leg chosen by delta"):
+        check_edge(fly, WHERE, TEMPLATES)
+
+
+def test_every_site_edge_hashes_without_the_new_keys() -> None:
+    new = ("position", "gate", "verdict_profile", "variant_grid", "position_baselines")
+    for edge in load_edges(FileConfigStore(REPO_ROOT / "config")):
+        assert not set(new) & set(identity_dict(asdict(edge))), edge.id
+        assert "position" not in identity_dict(asdict(edge.outcome)), edge.id

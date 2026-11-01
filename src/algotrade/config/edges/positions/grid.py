@@ -18,6 +18,9 @@ AXES: dict[str, tuple[str, int]] = {
 }  # fmt: skip
 INTEGER_AXES = ("tenor_days", "exit_dte")
 MAX_POINTS = 64
+# the bounds of each axis's outcome key (spec.py, chain.py)
+BOUNDS = {"strike_delta": (0.05, 0.5), "tenor_days": (1, 400), "take_profit": (0, 1),
+          "stop_loss": (0, 1e6), "exit_dte": (0, 400)}  # fmt: skip
 KEYS = ("prefix", *AXES)
 
 
@@ -35,14 +38,16 @@ class GridPoint:
 
 def _axis(t: Table, name: str) -> tuple[float, ...]:
     raw = t.raw(name)
+    low, high = BOUNDS[name]
     numeric = isinstance(raw, list) and all(
-        isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0 for v in raw
+        isinstance(v, (int, float)) and not isinstance(v, bool) and low <= v <= high for v in raw
     )
     whole = name not in INTEGER_AXES or all(type(v) is int for v in raw or ())
     if not numeric or not raw or not whole or list(raw) != sorted(set(raw)):
         raise ConfigurationError(
             f"{t.where} {name}: expected one or more ascending, distinct "
-            f"{'integers' if name in INTEGER_AXES else 'numbers'} >= 0, got {raw!r}"
+            f"{'integers' if name in INTEGER_AXES else 'numbers'} within {(low, high)}, "
+            f"got {raw!r}"
         )
     return tuple(raw)
 
