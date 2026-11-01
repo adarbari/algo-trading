@@ -151,3 +151,13 @@ def test_the_family_files_of_series_join_the_one_registry() -> None:
     )
     with pytest.raises(ConfigurationError, match=r"more than once: \['SPX'\]"):
         load_macro(twice)
+
+
+def test_a_family_file_holds_only_series() -> None:
+    for doc in ({"serie": [FILE]}, {"series": [FILE], "macro": {"run_budget_s": 5}}):
+        store = MemoryConfigStore({("site", "series", "cboe"): doc})
+        with pytest.raises(ConfigurationError):
+            load_macro(store)
+    odd = MemoryConfigStore({("site", "series", "cboe"): {"series": {"key": "X"}}})
+    with pytest.raises(ConfigurationError, match="list of tables"):
+        load_macro(odd)

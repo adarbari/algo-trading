@@ -136,7 +136,11 @@ class MacroSettings:
         """``main`` (``macro.toml``) with the ``[[series]]`` of each family file after its own."""
         series = list((main or {}).get("series") or [])
         for family in families:
-            series += list((family or {}).get("series") or [])
+            Table(family, "series/*.toml").only(("series",))
+            extra = (family or {}).get("series") or []
+            if not isinstance(extra, list):
+                raise ConfigurationError("series/*.toml series: expected a list of tables")
+            series += extra
         return cls.from_document({**(main or {}), "series": series} if series else main)
 
     @classmethod
