@@ -273,7 +273,9 @@ post-session workflow, below).
   expired. A critical latest-only step that failed and whose session is no
   longer the latest FAILS as expired until the owner waives it: `algotrade-ingest nightly --date D --waive
   chains --reason "..."` (the waiver, its user, time and reason are stored in the run record and
-  kept on later attempts).
+  kept on later attempts). Behind a FAILED or WAITING older session the latest closed session
+  still runs its snapshot steps (`latest_only = SNAPSHOT`) in a snapshot-only pass, its
+  other steps held `NOT_RUN`; they are reused once the older session clears (ADR 0086).
 - **Quiet when up to date** (`cli/main.py`): the scheduled form (no `--date`, no `--force`)
   first reads the `nightly` run records, before taking the lock; when every session up to the
   last closed one is done it prints `nothing to do: <session> already ingested`
