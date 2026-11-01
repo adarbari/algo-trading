@@ -343,3 +343,71 @@ Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
 - Flat reports count as not up, so abs_moves_counted minus this is the falls and the flat ones.
 
 Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
+
+### `rollup.earnings_reaction_session@v1.reaction_session_status`
+
+**How to read it.** Whether the newest report's reaction day is known and has come. OK: the day is known and today is on or after it. PENDING: the day is still ahead, as with a report made after the close today. UNKNOWN_TIME: the calendar gave no before-open or after-close time.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| only names whose reaction day is known | `eq "OK"` | hard | - | - |
+
+**When the reading lies**
+
+- UNKNOWN_TIME names are left out of the reaction-day schedule, never guessed, so a screen that needs the reaction day drops them. Check rollup.earnings_reaction_session@v1.reaction_report_time.
+- It describes the newest report only: a name stays OK for months until its next report.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
+
+### `rollup.earnings_reaction_session@v1.reaction_report_time`
+
+**How to read it.** When in the day the newest report was made: pre_market (before the open), after_hours (after the close) or unknown. It is the time on the earnings calendar row known by the session, not the time of a filing seen later.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| reports made before the open | `eq "pre_market"` | hard | - | - |
+
+**When the reading lies**
+
+- A calendar time is a vendor's, and it can be missing for small names. A report with no time reads unknown and has no reaction day.
+- An 8-K filing time (intraday) is known only after the event and is never used here.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
+
+### `rollup.earnings_reaction_session@v1.reaction_session_date`
+
+**How to read it.** The session the newest report moves the price on: the report's own session if made before the open, the next session if made after the close. It differs from rollup.earnings_reaction@v2.reaction_end_date, which is always the session after the report.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a reaction day that has already come | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null while the reaction day is ahead (PENDING) or the report time is unknown.
+- It names the reaction day, not the best day to trade: the move may be over by the open of the next session.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
+
+### `rollup.earnings_reaction_session@v1.sessions_since_reaction_session`
+
+**How to read it.** Exchange sessions from the newest report's reaction day up to the session. 0 means the session is the reaction day, 1 the day after. It is the count the reaction-day schedule reads to enter at the right session.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a report whose reaction day was in the last five sessions | `lte 5` | hard | - | illustrative: one trading week; no published cut-off |
+
+**When the reading lies**
+
+- Null while the reaction day is ahead or the report time is unknown, so a hard criterion drops those names.
+- A name keeps counting up until its next report, so a large value is a stale report, not a fresh one.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
