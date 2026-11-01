@@ -62,6 +62,17 @@ def _pctile(what: str) -> str:
     )
 
 
+def hv_feature(n: int) -> Feature:
+    """The declaration of ``hv<n>``: close-to-close realised volatility over ``n`` log returns
+    (shared with ``vol_long``, which declares the longer windows)."""
+    return Feature(
+        f"hv{n}", "float32", "decimal",
+        f"Close-to-close realised volatility: sample stdev of the last {n} log returns x "
+        f"sqrt({PERIODS_PER_YEAR})",
+        _gap(n + 1), valid_range=(0, 5), inputs=(CLOSE,),
+    )  # fmt: skip
+
+
 FEATURES = (
     *(
         Feature(
@@ -75,15 +86,7 @@ FEATURES = (
         )
         for n in ATR_WINDOWS
     ),
-    *(
-        Feature(
-            f"hv{n}", "float32", "decimal",
-            f"Close-to-close realised volatility: sample stdev of the last {n} log returns x "
-            f"sqrt({PERIODS_PER_YEAR})",
-            _gap(n + 1), valid_range=(0, 5), inputs=(CLOSE,),
-        )
-        for n in HV_WINDOWS
-    ),
+    *(hv_feature(n) for n in HV_WINDOWS),
     Feature(
         f"hv{PCTILE_BASE}_pctile_{PCTILE_WINDOW}d", "float32", "decimal",
         f"Share of the {PCTILE_WINDOW} sessions before the session whose {PCTILE_BASE}-session "

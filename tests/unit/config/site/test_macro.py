@@ -38,7 +38,7 @@ FILE = {
 }
 
 
-CBOE_STRATEGY_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR")
+CBOE_STRATEGY_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR", "BFLY", "CMBO", "CLL", "PPUT")
 CBOE_SETUP_INPUTS = ("SKEW", "COR1M", "COR3M", "DSPX")  # EB D4: skew, correlation, dispersion
 
 

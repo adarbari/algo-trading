@@ -121,7 +121,7 @@ id = "options_signals"
 title = "Option-implied signals"
 purpose = "What option prices say about the share, ranked across the market."
 intro = "Option traders often know something before the share moves. These screens rank names by the shape of their option prices (calls against puts, the smirk, a rise in implied volatility) and by how heavily the options trade against the stock."
-presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "iv_change_ibkr", "option_stock_volume", "retail_option_attention", "lottery_max"]
+presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "iv_change_ibkr", "option_stock_volume", "retail_option_attention", "lottery_max", "earnings_move_rich", "earnings_move_cheap"]
 
 [[family]]
 id = "cross_section"

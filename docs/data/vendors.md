@@ -105,6 +105,8 @@ Verified 2026-10-17.
   **EB D4 (2026-11-01):** SKEW (close only, from 1990-01-02), COR1M and COR3M (OHLC, from 2006-01-03),
   DSPX (close only, from 2014-06-19), measured the same day; same personal-use licence as the rest
   of the Cboe files (no different terms found). Stored although no setup reads them yet (owner tenet).
+  **Strategy benchmarks, the rest (2026-11-01):** BFLY (from 1986-06-20), CMBO (1986-06-30), CLL (2008-08-26),
+  PPUT (1986-06-30), close only, same files and terms, beside PUT / WPUT / BXM / BXMD / CNDR (ADR 0084).
 - **VX futures** `https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv`,
   one file per contract holding its whole life: `Trade Date,Futures,Open,High,Low,Close,Settle,Change,
   Total Volume,EFP,Open Interest`. History starts with the 2013 contracts (403 for earlier ones). The
@@ -152,6 +154,26 @@ where it stopped; nightly fetches the session's bars and a corporate-action wind
 days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KIMpL`) are mapped to the universe's ACT style (`KIM$L`).
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
+
+### Massive delisted tickers (stored first; ADR 0087)
+
+`GET /v3/reference/tickers?market=stocks&active=false&limit=1000`, cursor-paged through
+`next_url` (key in the Authorization header only), is the free survivorship-free list of what
+the active universe lacks: 23,557 records in 24 pages on 2026-10-24. The `delisted-tickers`
+task (in no workflow) writes it as a full snapshot per session to `instruments/delisted_tickers`
+(`ticker`, `name`, `exchange` = the MIC, `vendor_type`, `security_type`, `cik`, `figi`,
+`share_class_figi`, `end_date`); `end_date` is Massive's `delisted_utc` day, the vendor's last
+trading day: identity (the id merge and the data-quality report), never a feature. Gaps, all
+measured on that pull: `type` is null before 2017 (28% of the rows; `security_type` is also null
+for the unmapped `INDEX`); FIGI covers 3-18% of the names delisted 2010-2018 and 37-78% from
+2019; CIK 79-97%; 505 rows (2%) carry no `delisted_utc`; no OTC names and no ETFs before 2016;
+a renamed company's old ticker is absent. Tickers go through `act_symbol` like the active list
+(`KIMpL` -> `KIM$L`, a lowercase `w` / `r` mark upper-cased); no two records collapsed on it.
+Request budget: the shared `massive` limiter (`[massive] min_interval_s` = 12.5 s, the free
+tier's 5 a minute), so about 24 requests = 5 minutes; a pull under `[quality]
+min_delisted_tickers` (10,000) rows FAILS. Stored first, merged into `instruments/listing_history`
+in the next PR (ADR 0087). The repo holds a 60-record slice,
+`tests/fixtures/sources/massive/inactive_tickers_slice.json`.
 
 ## Tiingo daily prices from 2018 (implemented, ADR 0050)
 
@@ -571,7 +593,7 @@ Paced by `[published] min_interval_s` (1 s); one request per file, refetched by 
 | OFR Financial Stress Index (financialresearch.gov) | `csv`: `Date,OFR FSI,Credit,Equity valuation,...`, daily | market stress | OFR public data: `open` |
 | Stooq daily history (`stooq.com/q/d/l/?s=<symbol>&i=d`) | `csv`: `Date,Open,High,Low,Close,Volume`, `value_column = "Close"` | not used: it now answers a JavaScript browser-verification page (HTML), so `SPX` comes from FRED `SP500` | free for personal use, no redistribution: **`personal`** |
 | Barclays Shiller CAPE, `cape.csv` (`indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv`) | `cape_csv`: `Date` (`dd/mm/yyyy` month-ends) + 26 country columns, 1981-12-, `0` and `#VALUE!` = no value | country CAPE, `MACRO:CAPE_<COUNTRY>` (EB D7) | terms not retrievable (decision log 2026-10-17): **`personal`**, one pull per 28 days, never redistributed |
-| Kenneth French data library, 7 daily US zips (`mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/`: 3 and 5 factors, momentum, short- and long-term reversal, 12 and 49 industries) | `french_zip`: a zip of one CSV (CRLF, a preamble, then sections that start at a header line with an empty first cell, `YYYYMMDD` dates, percent returns), `section` 1 (value weighted) or 2 (equal weighted, the industry files), `-99.99` / `-999` = no value | factors and industry returns, `MACRO:FF3_*`, `FF5_*`, `FF_MOM`, `FF_ST_REV`, `FF_LT_REV`, `IND12_*`, `IND12EW_*`, `IND49_*`, `IND49EW_*` (ADR 0089) | no terms of use stated; files carry only "Copyright <year> Eugene F. Fama and Kenneth R. French", built from CRSP: **`personal`** pending the owner, one pull per 28 days, never redistributed, cite Fama and French |
+| Kenneth French data library, 7 daily US zips (`mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/`: 3 and 5 factors, momentum, short- and long-term reversal, 12 and 49 industries) | `french_zip`: a zip of one CSV (CRLF, a preamble, then sections that start at a header line with an empty first cell, `YYYYMMDD` dates, percent returns), `section` 1 (value weighted) or 2 (equal weighted, the industry files), `-99.99` / `-999` = no value; declared as `[[file]]` blocks in `config/site/series/french.toml`, point in time as the CAPE file with a 70-day lag, `cadence = "monthly"`, one request per zip; fixtures `french_*.zip` are trimmed real files (vintage `202609 CRSP`) | factors and industry returns, `MACRO:FF3_*`, `FF5_*`, `FF_MOM`, `FF_ST_REV`, `FF_LT_REV`, `IND12_*`, `IND12EW_*`, `IND49_*`, `IND49EW_*` (ADR 0089) | no terms of use stated; files carry only "Copyright <year> Eugene F. Fama and Kenneth R. French", built from CRSP: **`personal`** pending the owner, one pull per 28 days, never redistributed, cite Fama and French |
 | Shiller `ie_data.xls` (Yale) | `shiller_xls`: a legacy `.xls` workbook | CAPE, long-run earnings | academic data, credit the author: `open` |
 
 **Country CAPE point in time:** the file has no vintages and is re-estimated. A month first
@@ -581,16 +603,6 @@ vintage dated that run's session, never before the fetch. The 26 series share on
 run (the adapter reads a URL once) and `refetch_days = 28` keeps it to one pull a month.
 `tests/fixtures/sources/published/cape.csv` is hand-built in the file's format, not vendor
 data.
-
-**Kenneth French files (ADR 0089):** declared in `config/site/series/french.toml` (a `[[file]]`
-per zip, the columns listed; each column is a series `<prefix>_<COLUMN>`, values in percent as
-published), because `macro.toml` is at its length cap and one block beats 135 entries. Point in
-time as the CAPE file: a day first seen is known from observation + 70 days; a changed value on
-a later pull is a new vintage dated that run's session. `cadence = "monthly"` (the library
-updates once a month, so a series is stale after 103 days, not 74). One request per zip per run
-(the industry zips serve two blocks). `tests/fixtures/sources/published/french_*.zip` are real
-files trimmed to the preamble, the first and last 10 rows of each section and the footer
-(vintage `202609 CRSP`, downloaded 2026-11-01).
 
 The fixtures in `tests/helpers/payloads/` are written from these documented formats, not
 recorded: CI never calls the network. **Follow-up:** `shiller_xls` raises

@@ -655,3 +655,63 @@ value = 6
 mode = "soft"
 tolerance = 0.5
 note = "illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.reaction_session_status"
+theme = "events"
+reads = "Whether the newest report's reaction day is known and has come. OK: the day is known and today is on or after it. PENDING: the day is still ahead, as with a report made after the close today. UNKNOWN_TIME: the calendar gave no before-open or after-close time."
+caveats = [
+  "UNKNOWN_TIME names are left out of the reaction-day schedule, never guessed, so a screen that needs the reaction day drops them. Check rollup.earnings_reaction_session@v1.reaction_report_time.",
+  "It describes the newest report only: a name stays OK for months until its next report.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "only names whose reaction day is known"
+op = "eq"
+value = "OK"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.reaction_report_time"
+theme = "events"
+reads = "When in the day the newest report was made: pre_market (before the open), after_hours (after the close) or unknown. It is the time on the earnings calendar row known by the session, not the time of a filing seen later."
+caveats = [
+  "A calendar time is a vendor's, and it can be missing for small names. A report with no time reads unknown and has no reaction day.",
+  "An 8-K filing time (intraday) is known only after the event and is never used here.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "reports made before the open"
+op = "eq"
+value = "pre_market"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.reaction_session_date"
+theme = "events"
+reads = "The session the newest report moves the price on: the report's own session if made before the open, the next session if made after the close. It differs from rollup.earnings_reaction@v2.reaction_end_date, which is always the session after the report."
+caveats = [
+  "Null while the reaction day is ahead (PENDING) or the report time is unknown.",
+  "It names the reaction day, not the best day to trade: the move may be over by the open of the next session.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "a reaction day that has already come"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction_session@v1.sessions_since_reaction_session"
+theme = "events"
+reads = "Exchange sessions from the newest report's reaction day up to the session. 0 means the session is the reaction day, 1 the day after. It is the count the reaction-day schedule reads to enter at the right session."
+caveats = [
+  "Null while the reaction day is ahead or the report time is unknown, so a hard criterion drops those names.",
+  "A name keeps counting up until its next report, so a large value is a stale report, not a fresh one.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction_session@v1)"]
+[[field.use]]
+for = "a report whose reaction day was in the last five sessions"
+op = "lte"
+value = 5
+mode = "hard"
+note = "illustrative: one trading week; no published cut-off"
