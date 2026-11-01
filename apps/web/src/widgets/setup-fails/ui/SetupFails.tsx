@@ -25,7 +25,11 @@ export function SetupFails({ edgeId }: SetupFailsProps) {
       </Stack>
       <EdgeRegimes edgeId={edgeId} />
       <Disclosure label="By holding period" open={open} onOpenChange={setOpen}>
-        {open && <EdgeHorizons edgeId={edgeId} />}
+        {open && (
+          <Stack gap={0}>
+            <EdgeHorizons edgeId={edgeId} />
+          </Stack>
+        )}
       </Disclosure>
     </Stack>
   );

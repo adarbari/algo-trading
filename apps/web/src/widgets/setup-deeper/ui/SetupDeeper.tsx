@@ -46,7 +46,11 @@ export function SetupDeeper({ edge, children }: SetupDeeperProps) {
             </Grid>
           </Stack>
           <EdgeDetailsBody edge={edge} />
-          {edge.mine && <EdgeCompare edgeId={edge.id} />}
+          {edge.mine && (
+            <Stack gap={3}>
+              <EdgeCompare edgeId={edge.id} />
+            </Stack>
+          )}
           {children}
         </Stack>
       )}
