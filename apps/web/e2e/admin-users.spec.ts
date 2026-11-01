@@ -2,10 +2,10 @@
  * Admin › Users end to end against a mocked API: the declared people with their role and licences
  * (never an email), accessible in dark and light; a failed read shows its error.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
-import { mockNoGuideEntries } from './admin-api';
+import { FAIL, mockAdminApi, mockNoGuideEntries } from './admin-api';
 import { mockViewer } from './auth-api';
 import { mockRegimeApi } from './regime-api';
 
@@ -15,21 +15,6 @@ const PEOPLE = [
   { id: 'site', name: 'Scheduled site screens', role: 'admin', licences: [], scheduled: true },
 ];
 
-async function mockRegistry(page: Page, answer: 'ok' | 'fail'): Promise<void> {
-  await page.route('**/api/graphql', async (route) => {
-    const body = route.request().postDataJSON() as { query?: string } | null;
-    if (!/query\s+UserRegistry\b/.test(body?.query ?? '')) {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill(
-      answer === 'ok'
-        ? { json: { data: { userRegistry: { people: PEOPLE } } } }
-        : { json: { errors: [{ message: 'boom' }], data: null } },
-    );
-  });
-}
-
 for (const theme of ['dark', 'light'] as const) {
   test(`lists the declared people (${theme})`, async ({ page }) => {
     const errors: string[] = [];
@@ -37,7 +22,7 @@ for (const theme of ['dark', 'light'] as const) {
     await mockRegimeApi(page);
     await mockViewer(page);
     await mockNoGuideEntries(page);
-    await mockRegistry(page, 'ok');
+    await mockAdminApi(page, { userRegistry: { people: PEOPLE } });
     await page.goto('/admin/users');
     await page.evaluate((t) => {
       document.documentElement.setAttribute('data-theme', t);
@@ -56,7 +41,7 @@ test('a failed read shows its error', async ({ page }) => {
   await mockRegimeApi(page);
   await mockViewer(page);
   await mockNoGuideEntries(page);
-  await mockRegistry(page, 'fail');
+  await mockAdminApi(page, { userRegistry: FAIL });
   await page.goto('/admin/users');
   await expect(page.getByText('The people failed to load.')).toBeVisible();
 });
