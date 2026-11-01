@@ -7,12 +7,12 @@
 # src/algotrade/config/site/guide/screeners.py; fitness tests in
 # tests/unit/config/site/guide/test_screeners.py.
 id = "earnings_gap_volume"
-version = 1  # the preset version this prose was written for
+version = 2  # the preset version this prose was written for
 summary = "Finds liquid stocks that jumped at least 10% more than the market on their latest earnings report on at least three times their usual volume, biggest jump first: the episodic pivot of growth-stock screeners, with the volume confirmation.[^2] It is a candidate edge under test, not a proven trade."
 hit = "The name is a common stock closing above $5 that trades at least $5M a day, whose close after the report beat SPY's by 10% or more measured from the close before it, with the report's three sessions trading at least three times the volume of the 20 sessions before. The biggest reaction ranks first."
 not_checked = "It does not know why the stock moved (earnings, guidance, a bid or an offering look the same), whether the name had gone nowhere for months, or the opening gap: only closes are stored, so you buy a session later. It is the screen of the earnings gap edge, which the harness is still testing."
 before_acting = [
-  "A reaction of +10% or more can already be the whole move: rollup.earnings_reaction@v1.reaction_excess_return runs to the close after the report, and you can only buy a session later.[^1]",
+  "A reaction of +10% or more can already be the whole move: rollup.earnings_reaction@v2.reaction_excess_return runs to the close after the report, and you can only buy a session later.[^1]",
   "Heavy volume can come from an offering or an index change in the window: read rollup.earnings_gap_volume@v1.reaction_volume_ratio beside the price and the news.",
   "The same names without the volume rule are the earnings_gap_only screen: the edge asks whether the volume adds anything to a plain gap.",
 ]

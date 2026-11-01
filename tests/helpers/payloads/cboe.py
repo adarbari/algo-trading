@@ -167,3 +167,6 @@ def index_file(rows: tuple[tuple[str, float], ...], close_only: str = "") -> byt
 
 VIX9D = index_file((("01/04/2011", 16.06), ("01/05/2011", 15.57), ("10/16/2026", 20.12)))
 VVIX = index_file((("03/06/2006", 71.73), ("10/15/2026", 100.5)), close_only="VVIX")
+SKEW = index_file((("01/02/1990", 126.09), ("10/30/2026", 149.76)), close_only="SKEW")
+COR1M = index_file((("01/03/2006", 23.5), ("10/30/2026", 13.51)))
+DSPX = index_file((("06/19/2014", 17.81), ("10/30/2026", 37.43)), close_only="DSPX")

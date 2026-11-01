@@ -165,7 +165,7 @@ def _stored(field: str) -> bool:
 def test_the_schedule_is_one_the_harness_runs(edge: Edge) -> None:
     """The entry session S is always after the decision session D (the offset validators); a
     plain schedule gives decision sessions; an event schedule needs a declared field whose
-    group is in the catalogue, else the edge waits with no screeners (earnings_reaction@v1 and
+    group is in the catalogue, else the edge waits with no screeners (earnings_reaction@v2 and
     earnings_expected@v1 arrive with ED4b and ED4e)."""
     event = edge.event_class
     trigger = market_trigger(edge.schedule)

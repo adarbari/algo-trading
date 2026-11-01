@@ -77,6 +77,10 @@ path = "config/site/ranking"
 purpose = "ranking parameters, one <name>.toml per ranked list: ideas.toml, the Ideas ranking rule (site_top 5, user_top 20, user_weight 3; owner decision 2026-10-22), typed by src/algotrade/config/ranking/ideas.py, read by services/ideas/rule.py"
 
 [[config_dir]]
+path = "config/site/series"
+purpose = "macro series by source family, one <family>.toml of [[series]] tables per family: cboe.toml (Cboe's static index files); read together with macro.toml by load_macro (ADR 0048), split out because macro.toml is at the 1000-line cap"
+
+[[config_dir]]
 path = "config/site/studies"
 purpose = "research-study settings, one <name>.toml per study: winners.toml, the ED6 winners study's outcome window, grid, winner and control definitions, discovery thresholds and gate (typed by src/algotrade/config/edges/winners.py; ADR 0053 amendment 2026-10-09)"
 

@@ -7,14 +7,14 @@
 # src/algotrade/config/site/guide/screeners.py; fitness tests in
 # tests/unit/config/site/guide/test_screeners.py.
 id = "pead_small_cap"
-version = 1  # the preset version this prose was written for
+version = 2  # the preset version this prose was written for
 summary = "Finds small Nasdaq stocks that jumped on their latest earnings report by at least 5% more than the market, biggest jump first: post-earnings drift, the finding that small stocks keep moving the same way for weeks after a report.[^1] It is a candidate edge under test, not a proven trade."
 hit = "The name is a Nasdaq-listed common stock under $2B of market value, closing above $3, that traded at least $2M a day before its report, and whose close after the report beat SPY's by 5% or more measured from the close before it. The biggest reaction ranks first."
 not_checked = "It does not know whether the report beat estimates (only how the price reacted), why it moved (a takeover bid or an offering looks the same), or how old the reaction is. It is the screen of the small-cap earnings drift edge, which the harness is still testing."
 before_acting = [
-  "Small names trade with wide spreads: compare rollup.earnings_reaction@v1.pre_event_adv_usd_20d with the size you would trade, and expect costs of tens of basis points a round trip.[^2]",
+  "Small names trade with wide spreads: compare rollup.earnings_reaction@v2.pre_event_adv_usd_20d with the size you would trade, and expect costs of tens of basis points a round trip.[^2]",
   "The drift has faded in larger stocks and is strongest only in the smallest; read the harness's results by size bucket before trusting a pick.[^3]",
-  "A reaction of +5% or more can already be the whole move: rollup.earnings_reaction@v1.reaction_excess_return is measured to the close after the report, and you can only buy a session later.",
+  "A reaction of +5% or more can already be the whole move: rollup.earnings_reaction@v2.reaction_excess_return is measured to the close after the report, and you can only buy a session later.",
 ]
 related = [
   { id = "size_small", reason = "the size baseline the edge is compared with" },

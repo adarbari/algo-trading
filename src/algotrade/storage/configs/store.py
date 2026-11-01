@@ -24,6 +24,7 @@ KINDS = (
     "events",
     "studies",
     "positions",
+    "series",
     "ranking",
     "filters",
     "edges",
@@ -43,6 +44,8 @@ class ConfigStore(Protocol):
         reference files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only); ``events``
         the site's event-sensitivity files (``site/events/{scope,releases}.toml``, ADR 0050,
         site-only);
+        ``series`` the site's macro series by source family (``site/series/<family>.toml``,
+        ADR 0048, site-only; read with ``macro.toml`` by ``load_macro``);
         ``studies`` the site's research-study settings (``site/studies/<name>.toml``, ADR 0053,
         site-only); ``ranking`` the site's ranking parameters (``site/ranking/ideas.toml``, the
         Ideas rule, site-only); ``filters`` the site's table, list and feed filter definitions
