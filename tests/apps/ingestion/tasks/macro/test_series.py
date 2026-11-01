@@ -314,3 +314,30 @@ def test_the_budget_is_a_typed_macro_setting() -> None:
     assert tight.run_budget_s == 60
     with pytest.raises(Exception, match="run_budget_s"):
         MacroSettings.from_document({"macro": {"run_budget_s": 0}})
+
+
+def test_a_night_reads_the_stored_vintages_of_the_series_due_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0087: a published file pulled once a month is NOT_DUE on the other nights, and its
+    (very long) stored history is not read just to be skipped."""
+    ctx = context(Feeds())
+    ingest_macro(ctx, REGISTRY, D1)
+    asked: list[list[str]] = []
+    original = StoreReader.table_range
+
+    def spy(self: StoreReader, table: str, *args: Any, **kw: Any) -> Any:
+        if table == TABLE:
+            instruments = kw.get("instruments", args[3] if len(args) > 3 else None)
+            asked.append(list(instruments or []))
+        return original(self, table, *args, **kw)
+
+    monkeypatch.setattr(StoreReader, "table_range", spy)
+    same_day = ingest_macro(ctx, REGISTRY, D1)
+    assert same_day.items["SPX"] == "NOT_DUE" and asked == [["MACRO:GDP_REAL", "MACRO:T10Y3M"]]
+    asked.clear()
+    ingest_macro(ctx, REGISTRY, D2)  # the file is due again: its ids are read
+    assert asked and "IDX:SPX" in asked[0]
+    asked.clear()
+    quiet = MacroSettings.from_document({"series": [SPX]})
+    assert ingest_macro(ctx, quiet, D2).items == {"SPX": "NOT_DUE"} and asked == []

@@ -38,8 +38,8 @@ from functools import partial
 import pandas as pd
 
 from algotrade.config.site.macro import MacroSeries, MacroSettings
+from algotrade.data.macro.series import COLUMNS, stored_vintages
 from algotrade.data.macro.series import TABLE as SERIES_TABLE
-from algotrade.data.macro.series import stored_vintages
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     IngestRun,
@@ -148,7 +148,12 @@ def ingest_macro(
     over_budget: list[str] = []
     started = ctx.clock()
     with IngestRun(ctx, TASK, session) as run:
-        held = stored_vintages(run.reader, [s.instrument_id for s in chosen])
+        due = [  # what this run may fetch: only these series' stored vintages are read
+            s.instrument_id
+            for s in chosen
+            if ctx.sources.get(s.source) is not None and (forced or not _not_due(s, session, last))
+        ]
+        held = stored_vintages(run.reader, due) if due else pd.DataFrame(columns=COLUMNS)
         by_id = {str(i): rows.reset_index(drop=True) for i, rows in held.groupby("instrument_id")}
         for spec in chosen:
             stored = by_id.get(spec.instrument_id, held.iloc[0:0])
