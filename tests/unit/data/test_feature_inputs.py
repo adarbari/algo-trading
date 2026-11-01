@@ -325,13 +325,14 @@ def test_reference_input_carries_the_fund_facts_when_stored() -> None:
     rows = [
         {"instrument_id": "EQ:F", "symbol": "F", "name": "Direxion Daily TSLA Bull 2X Shares",
          "asset_class": "equity", "multiplier": 1.0, "security_type": "ETF", "status": "ACTIVE",
-         "is_leveraged": True, "is_inverse": False, "optionable": True},
+         "is_leveraged": True, "is_inverse": False, "optionable": True, "in_sp500": False},
     ]  # fmt: skip
     writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
     seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
     stored = [c for c in inputs.REFERENCE_FACTS if c not in ("cik", "share_class_figi")]
     assert seen is not None and list(seen.columns) == stored  # the ids are not stored here
     assert seen.iloc[0]["name"].endswith("Bull 2X Shares") and bool(seen.iloc[0]["is_leveraged"])
+    assert seen.iloc[0]["in_sp500"] is not None and not bool(seen.iloc[0]["in_sp500"])
 
 
 def test_holdings_input_is_the_leveraged_funds_latest_holdings_the_session_sees() -> None:

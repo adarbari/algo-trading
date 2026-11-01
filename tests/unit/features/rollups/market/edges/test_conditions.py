@@ -1,4 +1,4 @@
-"""``market_conditions@v1``: each verdict by hand over synthetic series. The same-date rule (a
+"""``market_conditions@v2``: each verdict by hand over synthetic series. The same-date rule (a
 series with no observation on the VIX's date is null, never an older value), nulls before a
 series starts and for an incomplete window, a stale VIX is all null, the stand-aside verdict
 follows its three conditions with Kleene unknowns, the licences (personal values, open
@@ -229,10 +229,11 @@ def test_values_are_personal_and_every_verdict_is_open() -> None:
     personal = (
         "vix", "vix3m", "vix9d", "vix6m", "vvix", "vix_obs_date", "vix_pct_252",
         "vix_median_252", "vix_high_20", "vix_chg_5d", "backwardation_run", "vvix_pct_252",
+        "realised_corr_ratio_21",
     )  # fmt: skip
     for name in personal:
         assert by_name[name].licence == "personal", name
-    open_ = [n for n in by_name if n not in c.STORED_NUMBERS and n != "vix_obs_date"]
+    open_ = [n for n in by_name if n not in personal]
     assert {"short_premium_allowed", "rate_shock_on", "y10_chg_63d", "sessions_to_fomc"} <= set(
         open_
     )
@@ -244,7 +245,7 @@ def test_the_headline_regime_does_not_read_the_leaf() -> None:
     from algotrade.features.rollups.market import regime  # noqa: PLC0415
 
     tables = {i.table for i in regime.GROUP.inputs}
-    assert c.GROUP.table not in tables and c.GROUP.key == "market_conditions@v1"
+    assert c.GROUP.table not in tables and c.GROUP.key == "market_conditions@v2"
     assert regime.GROUP.key == "regime@v3"
 
 
@@ -256,3 +257,26 @@ def test_the_index_is_read_for_the_vix_date_never_the_sessions_own() -> None:
     assert got["index_vrp_cheap_on"] is False and got["index_vrp_rich_on"] is True
     only_today = trend_row(rv=0.40, day=END)
     assert run(macro(vix=20), **{TREND: only_today})["index_vrp_cheap_on"] is None
+
+
+def test_the_corr_ratio_uses_the_index_vol_over_the_members_vol() -> None:
+    from algotrade.features.rollups.market.edges import dispersion  # noqa: PLC0415
+
+    days = sessions_ending(END, dispersion.CLOSES)
+    closes = [100.0 * (1.0 + 0.01 * ((-1) ** i)) for i in range(dispersion.CLOSES)]
+    bars = pd.DataFrame(
+        [{"instrument_id": f"S{k}", "session_date": d, "open": p, "high": p, "low": p,
+          "close": p, "volume": 1.0} for k in range(60) for d, p in zip(days, closes, strict=True)]
+    )  # fmt: skip
+    universe = pd.DataFrame([{"instrument_id": f"S{k}", "asset_class": "STOCK"} for k in range(60)])
+    ref = pd.DataFrame({"instrument_id": universe["instrument_id"], "in_sp500": True})
+    members = dispersion.mean_member_vol(universe, ref, bars, END, 50)
+    inputs = {
+        c.BARS: bars,
+        c.UNIVERSE: universe,
+        c.REFERENCE: ref,
+        TREND: trend_row(rv=members / 2, day=END),
+    }
+    got = run(macro(), **inputs)
+    assert got["realised_corr_ratio_21"] == pytest.approx(0.5, rel=1e-3)
+    assert run(macro())["realised_corr_ratio_21"] is None  # no bars, no universe
