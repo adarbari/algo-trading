@@ -37,3 +37,56 @@ Sources: Volatility breakout systems (Kaufman, Trading Systems and Methods: rang
 - Null after a gap in the last 61 sessions, a shorter history, or hv60 of 0.
 
 Sources: Sinclair (2013), Volatility Trading: volatility cones and term comparison
+
+### `rollup.vol_long@v1.hv126`
+
+**How to read it.** Close-to-close realised volatility over the last 126 sessions (half a year), annualised: 0.30 means the half-year's daily moves, scaled to a year, were 30%. It sits between hv60 and the year: a name whose hv126 is far above its hv252 has turned wilder this half. A large cap runs 0.15 to 0.30, a growth name 0.40 to 0.60, a biotech or a leveraged fund above 0.70.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a volatile half-year | `gte 0.4` | soft | 0.05 | compare with rollup.vol_long@v1.hv252 to see whether the name is calming or heating up |
+
+**When the reading lies**
+
+- Two earnings days sit inside half a year and each lifts it; check rollup.earnings@v1.last_earnings_date.
+- Null after a gap in the last 127 sessions or a shorter history; never a shorter window.
+
+Sources: Realised volatility estimators: ADR 0021; Sinclair (2013), Volatility Trading
+
+### `rollup.vol_long@v1.hv252`
+
+**How to read it.** Close-to-close realised volatility over the last 252 sessions (a year), annualised: the name's through-the-cycle level, the usual base for judging an option's implied volatility. An implied vol well under hv252 is cheap against the year (a long-straddle setup's raw material); well over it is rich (a short-premium setup's). A large cap runs 0.15 to 0.30, a growth name 0.40 to 0.60.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| implied vol cheap against the year | `lte 0.3` | soft | 0.05 | this is the realised side only: the comparison is feature.iv_hv_spread-style, implied minus hv252 |
+
+**When the reading lies**
+
+- A year with one crash day carries it for the whole year: check rollup.vol_long@v1.downside_dev_252 and the biggest day with rollup.price_moves@v1.one_day_move.
+- A name that changed business, was acquired or split a year ago is not the name it was: check rollup.earnings@v1.last_earnings_date and the company's filings for the change.
+- Null after a gap in the last 253 sessions or a shorter history; never a shorter window.
+
+Sources: Realised volatility estimators: ADR 0021; Goyal and Saretto (2009), Cross-section of option returns and volatility, JFE: implied against historical volatility
+
+### `rollup.vol_long@v1.downside_dev_252`
+
+**How to read it.** The root mean square of the year's negative daily returns (a gain counts as zero), annualised: the volatility of the losses alone. 0.15 means the typical bad day, scaled to a year, is a 15% pace. A name that mostly jumps up reads low here while hv252 reads high. A name that mostly bleeds reads about the same on both.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| losses are small and steady (downside volatility low) | `lte 0.15` | soft | 0.03 | read beside rollup.vol_long@v1.hv252: a low downside with a high hv252 is an up-jumper |
+
+**When the reading lies**
+
+- A year with one crash day is dominated by that day; compare with rollup.vol_long@v1.hv252 before reading a high value as steady weakness.
+- It treats every gain as zero, so it cannot tell a flat name from a rising one: pair it with rollup.trend_stats@v2.ret_252d for the direction.
+- Null after a gap in the last 253 sessions or a shorter history; never a shorter window.
+
+Sources: Sortino and Price (1994), Performance measurement in a downside risk framework, Journal of Investing
