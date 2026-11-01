@@ -1,0 +1,76 @@
+# L3 site setting: the Guide glossary, the option grid (ADR 0051, ADR 0083 amendment of 2026-11-01). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "option_grid"
+term = "Option grid"
+short = "The puts and calls of one stock at several strikes and expiry dates, each cell the figures of one sold option."
+body = """
+Each row is an expiry about 7, 14, 30, 45, 60 or 90 days away, the nearest listed one. Each column is a delta from 0.10 to 0.30, the strike whose delta of ours is nearest it. A cell shows the premium we compute as the middle of the stored bid and ask, never the bid or ask itself, and the figures that follow from it. A cell that says why it is empty (no listed expiry, too thin a quote, no strike near that delta) is not a zero. The prices are the last stored quotes of the session, end of day and delayed, so judge a trade on a live quote.
+"""
+next = "Pick the expiry first, then read down the delta you are comfortable with."
+see_also = ["delta_band", "return_on_collateral", "yield_a_year", "breakeven_price", "chance_below_strike", "spread_of_mid", "report_inside_expiry"]
+
+[[term]]
+id = "delta_band"
+term = "Delta band"
+short = "The delta a cell aims for: the strike whose own delta is nearest, within 0.025 of it."
+body = """
+Delta is our own, worked out from the option's mid premium with the Treasury rate and the dividend yield, not copied from the feed. A put's delta is negative and a call's positive, and the grid reads each by its size. A band with no strike within 0.025 of it stays empty rather than showing a strike far from it. A lower delta sits farther from the price, pays less and is less likely to be reached.
+"""
+see_also = ["option_grid", "chance_below_strike"]
+
+[[term]]
+id = "return_on_collateral"
+term = "Return on collateral"
+short = "The premium over what backs the position: a put's premium over its strike, a call's over the share price."
+body = """
+A cash-secured put sets aside the strike price to buy the shares if they are assigned, so its premium is measured against that cash. A covered call is backed by the shares, so its premium is measured against the share price. It is a return for the whole period to the expiry, not a year.
+"""
+see_also = ["yield_a_year"]
+
+[[term]]
+id = "yield_a_year"
+term = "Yield a year"
+short = "The return on collateral scaled to a year: that return times 365, over the days to the expiry."
+body = """
+It is simple, not compounded, and it assumes the same trade could be repeated at the same price for a year. That is rarely true, so use it to compare cells, not as a forecast. Short expiries and wide spreads inflate it. A high yield is usually a high implied volatility paying for a real risk.
+"""
+see_also = ["return_on_collateral", "spread_of_mid"]
+
+[[term]]
+id = "breakeven_price"
+term = "Breakeven"
+short = "The price the stock can fall to at the expiry before the sold option loses money."
+body = """
+For a put it is the strike minus the premium. For a covered call it is the share price now minus the premium. It ignores commissions and early assignment, and it describes the expiry, not a stop.
+"""
+see_also = ["return_on_collateral"]
+
+[[term]]
+id = "chance_below_strike"
+term = "Chance below the strike"
+short = "The model's chance that the stock ends below the strike at the expiry."
+body = """
+It comes from the option's implied volatility with no drift and no interest, the same convention the setups use. It is a model number, not a forecast, and it is only as good as the volatility the market priced in. The volatility we solve uses the Treasury rate and the dividend yield, so the two differ by about one percentage point at 30 days.
+"""
+see_also = ["delta_band", "option_grid"]
+
+[[term]]
+id = "spread_of_mid"
+term = "Spread of mid"
+short = "The gap between the stored bid and ask as a share of the middle price."
+body = """
+A wide spread means the premium shown is less reachable: filling at the middle is unlikely and the real price is nearer the worse side. It is measured on the stored end-of-day quote, so a live quote can differ.
+"""
+see_also = ["option_grid", "yield_a_year"]
+
+[[term]]
+id = "report_inside_expiry"
+term = "Report inside"
+short = "Whether the company's next earnings report falls after today and on or before the expiry."
+body = """
+An earnings report inside the life of the option can move the stock past the strike, so the premium may be paying for it. When the report date is not known the column says so rather than showing no report. An ETF has no earnings report, so the question does not apply to it.
+"""
+see_also = ["option_grid"]

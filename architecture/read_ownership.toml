@@ -202,6 +202,13 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "load_known_coverage" }]
 
 [[responsibility]]
+id = "option-grid-read"
+description = "The option grid of an underlying for the session (services/read/options/grid.py, ADR 0083 amendment 2026-11-01, plan V6): puts and calls at our delta bands (0.10 to 0.30) and expiry buckets (about 7, 14, 30, 45, 60, 90 days), each cell derived figures only (our mid, delta and IV, return on collateral, yield a year, breakeven, the chance below the strike, spread as a share of the mid, open interest), never a vendor bid, ask, last or size; read from exactly the session's chain, spot and Treasury curve (no chain or rate partition is NO_PARTITION, never r = 0); a gap an Unknown (NO_ROW, NOT_APPLICABLE, ILLIQUID), a report inside the expiry from the next report date by catalogue name (UNKNOWN, never False, when not known) and the IV rank from iv_history@v2 (UNKNOWN until its history is long enough). Picking and the figures are option-band-pick"
+owner = ["src/algotrade/services/read/options/grid.py"]
+section = "docs/api/read-model.md#graphql-conventions"
+detect = [{ call = "load_option_grid" }]
+
+[[responsibility]]
 id = "pick-streaks"
 description = "How long a ticker has stayed on a screener's pick list and whether it is new to it (services/read/screens/streaks.py, ADR 0082 filter days_picked): a walk back through the chain of a run's previous runs (runs.load_previous_run: each run's own previous run, never the screener's latest, so a later run never changes an earlier session's value) over each run's picked rows, ending at the first run that did not pick the ticker and capped at 20; UNKNOWN (None, never 0 or a short streak) when the walk reaches a run withheld from the viewer or the end of the chain before the streak ends; a screener's results use it (Ideas is held until the streaks are precomputed at ingestion, decided 2026-10-24); new_today is the one-step form"
 owner = ["src/algotrade/services/read/screens/streaks.py"]
