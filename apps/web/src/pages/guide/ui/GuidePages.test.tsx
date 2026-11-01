@@ -120,6 +120,7 @@ vi.mock('@/widgets/guide-situations', () => ({
 
 vi.mock('@/widgets/guide-start', () => ({
   GuideStartIndex: () => <Text>start index</Text>,
+  StartOutline: () => <Text>start outline</Text>,
   GuideStart: (props: Record<string, unknown>) => {
     widgets.start(props);
     return <Text>start page</Text>;
