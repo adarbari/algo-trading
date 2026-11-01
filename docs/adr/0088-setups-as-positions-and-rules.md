@@ -110,12 +110,24 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
 14. **Base `delta_equivalent` (a)** for named option sleeves, variants and gates allowed for that base
     only. Lifts ADR 0073 decision 1's calendar-schedule, `excess_return` and no-variants limits for that
     base only.
-15. **Paper-derived structures use PR #967's post-publication basis (a), with a minimum.** A gate or
-    threshold chosen in this research is judged only on data the research did not see, and **no verdict
-    is given until that holdout holds at least 3 months**: from the Cboe start on 2026-10-02 the earliest
-    is 2027-01-04; the verdict's own minimum-trade rules apply on top. Its history slice is labelled
-    in-sample. **Open:** whether the bought history can supply unseen months earlier (months the research
-    did not read); not decided here.
+15. **Paper-derived structures use PR #967's post-publication basis (a), with a minimum and an early
+    start.** A gate or threshold chosen in this research is judged only on data the research did not
+    see, and **no verdict is given until that holdout holds at least 3 months**; the verdict's own
+    minimum-trade rules apply on top. The holdout may start before the Cboe start (owner: "Yes, start
+    earlier"), on the bought history:
+    - *Where it starts:* the first session after the latest data the research read for that gate or
+      threshold, not 2026-10-02. The history slice before it is labelled in-sample.
+    - *Declared per item:* each research-chosen gate or threshold declares a `holdout_from` and the
+      research source it came from; a fitness test checks `holdout_from` is after that source's data
+      cut-off. Thresholds from the October 2026 AI study (data through 2026-10-23) start no earlier than
+      2026-11-02.
+    - *The minimum* is measured across the joined history and Cboe stretch.
+    - *The joint is disclosed:* the history's prices are HistoricalOptionData's 16:00 New York snapshot,
+      the Cboe stretch's the Cboe close (the fixed cutover of decision 5, 2026-10-02); an evidence page
+      over the joined holdout says so, and the price source is a column of every trade.
+    - *Cut-off dates* come from the research files. Only the AI study states one; the three option-setup
+      catalogue files (dated 2026-10-25) do not, so a `holdout_from` for a gate or threshold taken from
+      them cannot be set until the cut-off is read from them (open item in the PR, not guessed).
 16. **Ideas stays as ADR 0083 says (a); the setup state is a chip.** No 0083 amendment for Ideas by state.
 17. **A1 (the first option setup) is published gated** by the research gate R-A; the ungated version is a
     variant.
@@ -182,6 +194,7 @@ announcement date as `known_from` per year (decision 3 of 0050 exception).
   (`add-responsibility`); this ADR adds no code.
 - A gate is per setup, so there is no shared verdict to keep open; the cost is that a setup reading a
   VIX-family field is personal and hidden from viewers without the licence (decisions 12, 20).
-- No option verdict is published before the 3-month unseen holdout (2027-01-04 at the earliest); the
-  first option setups show as "Unproven" meanwhile.
+- No option verdict is published before a gate's or threshold's 3-month unseen holdout; with the
+  history the holdout can start before the Cboe stretch, so the earliest date is per item (its
+  `holdout_from`), not fixed. The first option setups show as "Unproven" meanwhile.
 - Slices D2, E1 and later start from this ADR; E1 needs the 0084 part accepted.

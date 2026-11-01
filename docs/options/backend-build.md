@@ -472,8 +472,13 @@ exit rule (E2 -> E12a) is off it.
 4. **(a), with a minimum.** #967's post-publication basis for paper-derived structures; any gate or
    threshold chosen in this research is judged only on data the research did not see, and **no verdict
    is given until that holdout holds at least 3 months** (from the Cboe start 2026-10-02, the earliest
-   is 2027-01-04; the verdict's own minimum-trade rules still apply on top). Open question to the
-   owner: start the holdout earlier with the bought history for months the research did not read.
+   is 2027-01-04; the verdict's own minimum-trade rules still apply on top). Owner, 2026-11-01: **yes, start
+   earlier**: the holdout may begin before 2026-10-02 on the bought history, at the first session after
+   the latest data the research read for that gate or threshold. Each gate or threshold declares its
+   `holdout_from` (with the research source it came from), checked by a fitness test against the
+   research cut-off; thresholds from the October 2026 AI study start 2026-11-02 at the earliest. The
+   3-month minimum still holds across the joined history + Cboe holdout, and the joint is disclosed
+   (16:00 HOD snapshot vs the Cboe close).
 5. **(a)** Defer: Ideas stays as ADR 0083 says; the setup state is a chip.
 6. **Gated** (recommended): A1 published gated by R-A, the ungated version a variant.
 7. **(a)** The `tails` profile opt-in per setup by a new version; stored share verdicts stay.
