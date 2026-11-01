@@ -615,6 +615,7 @@ def evaluate_edge(
                         scope.universe,
                         [m.config for m in variant.members] or [variant.config],
                         licences[scope.key],
+                        stats.outcome_licence,
                     ),
                     legs=_details(kept, block_stats, found, closed) if scope.key == MAIN else (),
                     report_containment=diagnostic,

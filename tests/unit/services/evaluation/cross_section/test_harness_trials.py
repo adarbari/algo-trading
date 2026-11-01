@@ -18,6 +18,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import next_session
 from algotrade.quant.edges.statistics import sharpe
+from algotrade.services.evaluation.cross_section import measuring
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.detail.windows import SeriesFacts
 from algotrade.services.evaluation.cross_section.harness import (
@@ -437,3 +438,32 @@ def test_an_option_pnl_edge_with_no_chain_outcome_stored_is_missing_data() -> No
             w.reader, w.results, w.configs, UserContext("site"), edge(outcome=CHAIN_OUTCOME),
             DAYS[0], DAYS[-1], AS_OF,
         )  # fmt: skip
+
+
+def test_outcome_rows_recording_a_personal_licence_make_the_trial_personal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0084 decision 1: the trial's licence includes the strictest licence of the outcome
+    rows it joined (the screen and universe are open here), recorded as ``evidence_licence``.
+    No stored outcome table has a ``licence`` column yet (``structure_pnl@v2``, E4, is the first),
+    so the read is wrapped to add the column the history-priced rows will carry."""
+    real = measuring.read_stored
+
+    def tagged(*args: Any, **kwargs: Any) -> Any:
+        frame = real(*args, **kwargs)
+        return None if frame is None else frame.assign(licence="personal")
+
+    w = build_world()
+    plain = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), edge(), DAYS[0], DAYS[-1], AS_OF
+    )
+    assert {r.licence for r in plain.results} == {"open"}
+    monkeypatch.setattr(measuring, "read_stored", tagged)
+    personal = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), edge(), DAYS[0], DAYS[-1], AS_OF
+    )
+    assert {(r.licence, r.licences.outcome) for r in personal.results if r.licences} == {
+        ("personal", "personal")
+    }
+    frame = edge_eval_frame(personal, "r", AS_OF)
+    assert set(frame["evidence_licence"].dropna()) == {"personal"}

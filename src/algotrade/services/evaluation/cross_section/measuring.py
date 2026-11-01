@@ -39,7 +39,9 @@ from algotrade.data.outcomes import (
     select_outcomes,
 )
 from algotrade.engines.screening.runner import RunCoverage
+from algotrade.features.framework.feature import strictest
 from algotrade.quant.edges.statistics import moments
+from algotrade.services.evaluation.cross_section.detail.licences import outcome_licence
 from algotrade.services.evaluation.cross_section.events import EventSchedule
 from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
@@ -614,6 +616,7 @@ class _Measured:
     rows: list[Mapping[str, Any]] = field(default_factory=list)  # the legs, as stored rows
     outcome_reads: dict[tuple[str, int, date], OutcomeRead] = field(default_factory=dict)
     seqs: Mapping[date, int] = field(default_factory=dict)  # entry session -> outcome partition seq
+    outcome_licence: str = "open"  # the strictest licence of the outcome rows read (E1)
 
 
 @dataclass(frozen=True)
@@ -748,6 +751,9 @@ def _read_closed(
         closed[horizon] = {}
         if not days:
             continue
+        if stored is not None:  # every row of the entry sessions, whatever horizon: stricter
+            seen = stored[stored["session_date"].map(_day).isin(set(days))]
+            out.outcome_licence = strictest((out.outcome_licence, outcome_licence(seen)))
         if stored is None or not any(days[0] <= d <= days[-1] for d in have):
             failed.setdefault(horizon, (missing_chain if chain else missing_outcomes)(days))
             continue  # nothing stored in its span

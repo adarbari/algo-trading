@@ -29,11 +29,12 @@ detect = [{ call = "add_version" }, { call = "save_features" }]
 
 [[responsibility]]
 id = "data-licence-gate"
-description = "Which catalogue fields a user may see values of (ADR 0069, ADR 0028, ADR 0064 decision 10): the licences a user holds from the users registry (open for everyone, others only when config/site/users.toml lists them; a role grants none, ADR 0040), the licence of a field (a stored feature's own, an expression's strictest of what it reads) and the fields a user lacks the licence of; every path that serves per-name values removes those fields before it reads them (ReadContext.licences in the read model; `held` of fields_view / run_screener for a screener run and the Builder's preview), so they are UNKNOWN with the public kind LICENCE and a screen never passes a hard criterion on one (ADR 0015)"
+description = "Which catalogue fields a user may see values of (ADR 0069, ADR 0028, ADR 0064 decision 10): the licences a user holds from the users registry (open for everyone, others only when config/site/users.toml lists them; a role grants none, ADR 0040), the licence of a field (a stored feature's own, an expression's strictest of what it reads) and the fields a user lacks the licence of, and a setup whose canonical run joined outcome rows under a licence the user lacks (EdgeRun.evidence_licence from the trial's outcome licence: not listed, no verdict, no pick; ADR 0084 decision 1); every path that serves per-name values removes those fields before it reads them (ReadContext.licences in the read model; `held` of fields_view / run_screener for a screener run and the Builder's preview), so they are UNKNOWN with the public kind LICENCE and a screen never passes a hard criterion on one (ADR 0015)"
 owner = ["src/algotrade/services/licences.py"]
 allowed = [
     "src/algotrade/services/selection.py",  # fields_view: the screen's one read of values
     "src/algotrade/services/read/context.py",  # ReadContext.licences: the request user's held set
+    "src/algotrade/services/read/evaluation/verdict/evidence_licence.py",  # a setup whose outcome rows the viewer lacks the licence of is not served (ADR 0084 decision 1)
     "src/algotrade/services/read/instruments/table.py",  # a table's filters and sort
     "src/algotrade/services/read/filtering/definitions.py",  # which filters a viewer is offered (ADR 0082)
     "src/algotrade/services/read/filtering/served.py",  # the viewer's held set and a withheld filter's licence
