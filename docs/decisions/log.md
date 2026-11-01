@@ -848,3 +848,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the owner's instruction of 2026-11-01 ("new screens are available and work end to end, incrementally"); the architect review (file-disjointness, ownership, licence, cache key) and the simplicity review (cut two components, merge slices).
+
+## 2026-11-01 | Evening Desk V2 | Setups library and setup page: what ships now, what waits
+- Question: (1) the verdict words (the mockup's "Too few cases to tell", "No better than chance", "Baseline" against the read model's `not_enough_data`, `not_working`, `diagnostic_only`); (2) "Start here" without a curated list; (3) "Ideas tonight" before V3's inverse read; (4) the forward-record label without a `since` date; (5) the "Before you act" items.
+- Options: (1) relabel now / keep the served words and map only the tone; (2) a curated list in config / the first three of the best verdict group; (3) the followed-setups desk only / leave the section out until V3; (4) derive the date in the browser / label it "Forward paper record" until the read serves `since`; (5) setup-specific / three checks that hold for any setup.
+- Decision: (1) keep the served words (they are Guide terms and filter labels) and map each code onto the design system's verdict tones; the relabel is a follow-up with the Guide terms and filter definitions. (2) The first three of the best verdict group, shown while the list is not narrowed. (3) Left out; a follow-up PR adds it from V3's setup-to-picks read (the desk covers followed setups only and "none tonight" would mislead for the rest). (4) "Forward paper record" without a date on the live-record strip; `PaperRecord.since` is a read change for a later PR (the browser derives nothing from rows). (5) Three generic checks (report date, the stop is history, hypothetical and at risk); the Guide entry holds the explanation.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: each keeps the fixed rules (labelled statistics, publisher wording, nothing derived in the browser) without a read change in this slice.

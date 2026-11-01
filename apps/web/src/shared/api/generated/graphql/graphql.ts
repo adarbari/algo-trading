@@ -327,7 +327,7 @@ export type EdgesPageQueryVariables = Exact<{
 }>;
 
 
-export type EdgesPageQuery = { edgeList: { total: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> }, items: Array<{ id: string, name: string, status: string, state: string, mine: boolean, screeners: Array<string>, summary: { verdict: string, result: string, trades: number | null } }> } | null };
+export type EdgesPageQuery = { edgeList: { total: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> }, items: Array<{ id: string, name: string, thesis: string, status: string, state: string, mine: boolean, screeners: Array<string>, summary: { verdict: string, result: string, trades: number | null } }> } | null };
 
 export type EdgeProblemsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1386,6 +1386,7 @@ export const EdgesPageDocument = new TypedDocumentString(`
     items {
       id
       name
+      thesis
       status
       state
       mine

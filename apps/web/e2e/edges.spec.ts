@@ -33,8 +33,8 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
   await page.goto('/ideas');
   await page.getByRole('navigation', { name: 'Trader sections' }).getByText('Edges').click();
   await expect(page).toHaveURL(/\/edges$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Edges' })).toBeVisible();
-  const list = page.getByRole('grid', { name: 'Edges' });
+  await expect(page.getByRole('heading', { level: 1, name: 'Setups' })).toBeVisible();
+  const list = page.getByRole('grid', { name: 'Setups' });
   await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toContainText('Promising');
   await expect(list.getByRole('row', { name: /S&P 500 index changes/ })).toContainText(
     'Waiting on data',
@@ -48,10 +48,10 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
   await expect(page.getByText(/^Evaluated 2 Oct, 8 sessions ago\./)).toBeVisible();
   await expect(page.getByRole('link', { name: /run-frozen/ })).toHaveCount(0);
   await page
-    .getByRole('navigation', { name: 'Sections of this edge' })
-    .getByRole('link', { name: 'Details' })
+    .getByRole('navigation', { name: 'Sections of this setup' })
+    .getByRole('link', { name: 'Dig deeper' })
     .click();
-  await page.getByRole('button', { name: /^Details/ }).click();
+  await page.getByRole('button', { name: /^Dig deeper/ }).click();
   await page.getByRole('heading', { level: 3, name: 'Variants tried' }).scrollIntoViewIfNeeded();
   await expect(page.getByText('EXPLORATORY')).toBeVisible();
   await expect(page.getByText('99.0%')).toHaveCount(0);
@@ -77,56 +77,57 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   ).toBeVisible();
   await expect(page.getByRole('meter', { name: 'Out-of-sample trades' })).toBeVisible();
   await expect(page.getByText('Projected: 15 Mar 2027')).toBeVisible();
-  const nav = page.getByRole('navigation', { name: 'Sections of this edge' });
+  const nav = page.getByRole('navigation', { name: 'Sections of this setup' });
   for (const name of [
-    'Evidence',
-    'How sure',
-    'Where it worked',
-    'Trades',
-    'Definition',
-    'Details',
+    'The rules',
+    'How it has done',
+    'When it fails',
+    'Before you act',
+    'Dig deeper',
   ]) {
     await expect(nav.getByRole('link', { name })).toBeVisible();
   }
-  await expect(nav.getByRole('link', { name: 'Live record' })).toBeVisible(); // says why when nothing is recorded
-  // Evidence: the curve (read as it comes near) and the figures of both sides of the split.
-  await expect(page.getByRole('heading', { level: 2, name: 'Evidence' })).toBeVisible();
+  // The rules, then how it has done: the strip labelled backtested, the curve, the forward record.
+  await expect(page.getByRole('heading', { level: 2, name: 'The rules' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'How it has done' })).toBeVisible();
+  await expect(page.getByText(/^Backtested \(hypothetical\)/).first()).toBeVisible();
   await expect(page.getByRole('img', { name: /^Evidence curve of the picks/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Figures of both sides of the split' }).click();
   const figures = page.getByRole('grid', { name: 'In-sample, out-of-sample and all figures' });
   await expect(figures.getByRole('columnheader', { name: 'Out-of-sample · n=6' })).toBeVisible();
   await expect(figures.getByRole('row', { name: /Win rate/ })).toContainText('57.0%');
-  // How sure: deciles, robustness with the multiple-testing line, decay with the paper not given.
-  await nav.getByRole('link', { name: 'How sure' }).click();
+  // The years and the drawdown are read only when their disclosure opens.
+  await page.getByRole('button', { name: 'Year by year' }).click();
+  await expect(page.getByRole('grid', { name: 'Year by year' })).toBeVisible();
+  expect(sections.has('EdgeResultDrawdown')).toBe(false);
+  await page.getByRole('button', { name: 'Drawdown and costs' }).click();
+  await expect(page.getByRole('grid', { name: 'Deepest drawdowns' })).toBeVisible();
+  await expect(
+    page.getByRole('img', { name: 'Evidence curve below its previous high' }),
+  ).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Lift at each round-trip cost' })).toContainText(
+    'Break-even',
+  );
+  // When it fails: by regime, and by holding period (the basis marked) behind a disclosure.
+  await nav.getByRole('link', { name: 'When it fails' }).click();
+  await expect(page.getByRole('grid', { name: 'By regime' })).toContainText('Stress');
+  await page.getByRole('button', { name: 'By holding period' }).click();
+  await expect(page.getByRole('grid', { name: 'By holding period' })).toContainText(
+    'Verdict basis',
+  );
+  await expect(page.getByRole('list', { name: 'Before you act' })).toBeVisible();
+  // Dig deeper: how sure, then the trades and the variants.
+  await nav.getByRole('link', { name: 'Dig deeper' }).click();
+  await page.getByRole('button', { name: /^Dig deeper/ }).click();
   await expect(page.getByRole('list', { name: 'Mean outcome by decile' })).toBeVisible();
   await expect(
     page.getByText('Sharpe 1.10 over 70 trades with 3 variants becomes 0.40.'),
   ).toBeVisible();
   await expect(page.getByRole('list', { name: 'Decay by stage' })).toContainText('Not given');
-  // Where it worked: the years, then the drawdown, read only when its view opens.
-  await nav.getByRole('link', { name: 'Where it worked' }).click();
-  await expect(page.getByRole('grid', { name: 'Year by year' })).toBeVisible();
-  expect(sections.has('EdgeResultDrawdown')).toBe(false);
-  await page.getByRole('tab', { name: 'Drawdown' }).click();
-  await expect(page.getByRole('grid', { name: 'Deepest drawdowns' })).toBeVisible();
-  await expect(
-    page.getByRole('img', { name: 'Evidence curve below its previous high' }),
-  ).toBeVisible();
-  // The other cuts: by regime and by holding period (the basis marked), the cost strip under them.
-  await page.getByRole('tab', { name: 'Regime' }).click();
-  await expect(page.getByRole('grid', { name: 'By regime' })).toContainText('Stress');
-  await page.getByRole('tab', { name: 'Holding period' }).click();
-  await expect(page.getByRole('grid', { name: 'By holding period' })).toContainText(
-    'Verdict basis',
-  );
-  await expect(page.getByRole('region', { name: 'Lift at each round-trip cost' })).toContainText(
-    'Break-even',
-  );
-  // Trades: the ledger of the verdict's basis, a period switch and the file.
-  await nav.getByRole('link', { name: 'Trades' }).click();
   const ledger = page.getByRole('grid', { name: 'Trade ledger' });
   await expect(ledger).toContainText('AAA');
   await expect(ledger.getByRole('row')).toHaveCount(3); // the header and two trades
-  await page.getByRole('button', { name: 'Setup' }).click();
+  await page.getByRole('button', { name: 'Setup', exact: true }).click();
   await page.getByRole('list', { name: 'Result' }).getByRole('button', { name: /^Lost/ }).click();
   await page.keyboard.press('Escape');
   await expect(ledger.getByRole('row')).toHaveCount(2); // narrowed on the server
@@ -144,9 +145,6 @@ test("the chosen edge's page reads in order: the verdict and what would change i
   await expect(ledger).toContainText('BBB');
   await page.getByRole('button', { name: 'Clear all' }).click();
   await expect(page.getByRole('button', { name: 'CSV' })).toBeVisible();
-  // Details: the variant grid with its basis marked.
-  await nav.getByRole('link', { name: 'Details' }).click();
-  await page.getByRole('button', { name: /^Details/ }).click();
   await page.getByRole('heading', { level: 3, name: 'Variants tried' }).scrollIntoViewIfNeeded();
   await expect(
     page.getByRole('grid', { name: 'Variant grid: lift in points by holding period' }),
@@ -160,9 +158,9 @@ test('the list narrows by filter and search, and an edge offers Clone and Follow
 }) => {
   const errors = collectErrors(page);
   await page.goto('/edges');
-  const list = page.getByRole('grid', { name: 'Edges' });
-  await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toContainText('site edge');
-  await page.getByRole('button', { name: 'Setup' }).click();
+  const list = page.getByRole('grid', { name: 'Setups' });
+  await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toContainText('Candidate');
+  await page.getByRole('group', { name: 'Filters' }).getByRole('button', { name: 'Setup' }).click();
   await page.getByRole('radiogroup', { name: 'Mine' }).getByRole('radio', { name: 'Yes' }).click();
   await expect(page).toHaveURL(/f=mine/);
   await page.keyboard.press('Escape');
@@ -170,7 +168,7 @@ test('the list narrows by filter and search, and an edge offers Clone and Follow
   await expect(page.getByText('No edges match this filter')).toBeVisible();
   await list.getByRole('button', { name: 'Clear all' }).click();
   await expect(page).not.toHaveURL(/f=/);
-  await page.getByRole('searchbox', { name: 'Search edges' }).fill('winners');
+  await page.getByRole('searchbox', { name: 'Find a setup' }).fill('winners');
   await expect(page).toHaveURL(/q=winners/);
   await expect(list.getByRole('row', { name: /S&P 500 index changes/ })).toHaveCount(0);
   await list.getByRole('row', { name: /Momentum 12-1/ }).click();
@@ -265,7 +263,7 @@ test('a user clones an edge, edits a screen in the Screen Builder, returns, save
 test('New edge opens the empty builder and Cancel goes back to the list', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/edges');
-  await page.getByRole('button', { name: 'New edge' }).click();
+  await page.getByRole('button', { name: 'Test your own idea' }).click();
   await expect(page).toHaveURL(/\/edges\/new$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Untitled edge' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save and run backtest' })).toBeDisabled();
@@ -279,7 +277,7 @@ test('New edge opens the empty builder and Cancel goes back to the list', async 
 
 test('an old ?view= link opens the list narrowed by the filter it stood for', async ({ page }) => {
   await page.goto('/edges?view=rejected');
-  const list = page.getByRole('grid', { name: 'Edges' });
+  const list = page.getByRole('grid', { name: 'Setups' });
   await expect(list.getByRole('row', { name: /S&P 500 index changes/ })).toBeVisible();
   await expect(list.getByRole('row', { name: /Momentum 12-1/ })).toHaveCount(0);
   await expect(

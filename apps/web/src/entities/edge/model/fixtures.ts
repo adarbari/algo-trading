@@ -513,6 +513,7 @@ export function edgeFixture(id: string): Edge {
 export const EDGE_ROW_FIXTURES: EdgeRow[] = EDGES_FIXTURE.edges.map((e) => ({
   id: e.id,
   name: e.name,
+  thesis: e.thesis,
   status: e.status,
   state: e.state,
   mine: e.mine,

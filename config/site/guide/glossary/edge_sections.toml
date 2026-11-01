@@ -41,3 +41,43 @@ An average hides when an edge worked. Year by year gives one row for each calend
 """
 next = "Look for a result that is spread over the years, and a drawdown that is no deeper out-of-sample than in-sample."
 see_also = ["year_by_year", "by_regime", "by_holding_period", "cost_sensitivity", "drawdown", "partial_year", "in_sample", "out_of_sample", "evidence_curve"]
+
+[[term]]
+id = "setups_start_here"
+term = "Start here"
+short = "Three setups to read first: the best-evidenced ones in the library, each with its idea and verdict."
+body = """
+The tiles are the first three setups of the best verdict group in the library, so the first tile is the one with the strongest evidence today. Each shows the idea in one sentence and its verdict. Open one to read its rules, how it has done and when it fails. The tiles disappear while you search or filter, because a narrowed list should not be preceded by setups you did not ask for. Everything in the library is a published setup, not personal advice, and every figure on it is a backtest (hypothetical) unless it says forward paper record.
+"""
+next = "Open the first tile and read the page top to bottom before you look at the others."
+see_also = ["verdict", "edge_definition", "setup_how_done", "setup_when_fails"]
+
+[[term]]
+id = "setup_how_done"
+term = "How it has done"
+short = "The setup's result out of sample, labelled backtested (hypothetical), with its curve, its years, its drawdown and its forward paper record."
+body = """
+The strip gives the out-of-sample result in numbers. They are the win rate, the base rate it is compared with and the lift between them. Then come the trades behind it and the share of random-pick backtests it beats. The line under the strip says which basis the numbers come from. Backtested (hypothetical) means the picks the rules would have made on past data. Forward paper record means the picks the rules made after they were published. A backtest is not a promise: it uses today's stock list, which flatters it. The curve shows how the result came about. Under it, open the year by year, the drawdown and costs, and the figures of both sides of the split. At the foot of the section is the forward paper record, or the reason there is none yet.
+"""
+next = "Read the trades before the percentage: a result on few trades can be luck."
+see_also = ["edge_evidence_section", "out_of_sample", "base_rate", "win_rate", "live_record", "edge_where_worked", "year_by_year"]
+
+[[term]]
+id = "setup_when_fails"
+term = "When it fails"
+short = "How the setup did in each market regime, and at other holding periods: where its edge shrinks or disappears."
+body = """
+An average hides the markets in which a setup does not work. Each regime row shows the win rate, the base rate and the trades in calm, caution, stress and crisis markets, for the period you choose. A regime where the win rate is no better than the base rate is a market in which the setup has shown no edge. The disclosure under it shows the same screen held for other numbers of trading days, with the verdict's own period marked. A row on few trades is thin: read it as a direction, not a number.
+"""
+next = "Compare the regime the market is in now, shown in the top bar, with its row."
+see_also = ["by_regime", "by_holding_period", "regime", "slice_state", "win_rate", "base_rate"]
+
+[[term]]
+id = "setup_before_you_act"
+term = "Before you act"
+short = "Checks that apply to any setup before relying on one of its ideas."
+body = """
+A setup publishes an idea and its history, not an instruction. Check the next report date of the name: a report inside the holding period changes what the history measured. The stop on the page is the setup's historical exit rule: the drawdown that most winners never passed. It is not fitted to an account, a position size or a risk limit. Those are yours to set. Every figure is backtested (hypothetical) or a forward paper record, and capital is at risk.
+"""
+next = "Write down your own stop and size before the first order, not after."
+see_also = ["edge_definition", "setup_how_done", "setup_when_fails"]
