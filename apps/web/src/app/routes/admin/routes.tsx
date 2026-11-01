@@ -4,12 +4,12 @@ import { createRoute } from '@tanstack/react-router';
 import { WorkspaceLayout } from '../../layouts';
 import { ADMIN, workspaceGuard } from '../../workspaces';
 import { rootRoute } from '../root';
-import { placeholderRoute } from '../section-route';
 import { featureRequestsRoute } from './feature-requests';
 import { harnessRunsRoute } from './harness-runs';
 import { ingestionRoute } from './ingestion';
 import { llmUsageRoute } from './llm-usage';
 import { screenerRunsRoute } from './screener-runs';
+import { usersRoute } from './users';
 
 export const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -24,5 +24,5 @@ export const adminRoutes = adminRoute.addChildren([
   harnessRunsRoute(adminRoute),
   featureRequestsRoute(adminRoute),
   screenerRunsRoute(adminRoute),
-  placeholderRoute(adminRoute, ADMIN, '/admin/users', 'users'),
+  usersRoute(adminRoute),
 ]);

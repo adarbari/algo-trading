@@ -640,7 +640,7 @@ body = """
 Some values come from a source licensed for one person's own use, such as the broker feed. The notice names the session the file reads, your user and the licences you hold, and says those values are for the holder's own use and not for redistribution. A person who does not hold the licence sees LICENCE in those cells and never the value. Each export is logged with your user, the list, the filters, the number of rows and the licences held.
 """
 next = "Keep a file that holds personal-licence values to yourself."
-see_also = ["export", "unavailable_licence"]
+see_also = ["export", "unavailable_licence", "user_licences"]
 
 [[term]]
 id = "filter_withheld_no_data"

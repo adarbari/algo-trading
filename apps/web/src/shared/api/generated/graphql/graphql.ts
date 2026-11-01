@@ -809,6 +809,11 @@ export type DataStatusQueryVariables = Exact<{
 
 export type DataStatusQuery = { session: { date: string, newer: { date: string } | null, dataStatus: { state: DataState, knowledgeTs: string | null, affectedScreeners: number, totalScreeners: number, datasets: Array<{ name: DatasetName, status: DatasetState, share: number | null, unavailable: Array<{ kindText: string, cause?: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string }> } | null }> }> } } | null };
 
+export type UserRegistryQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type UserRegistryQuery = { userRegistry: { people: Array<{ id: string, name: string, role: string, licences: Array<string>, scheduled: boolean }> } | null };
+
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -4768,6 +4773,19 @@ export const DataStatusDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DataStatusQuery, DataStatusQueryVariables>;
+export const UserRegistryDocument = new TypedDocumentString(`
+    query UserRegistry {
+  userRegistry {
+    people {
+      id
+      name
+      role
+      licences
+      scheduled
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<UserRegistryQuery, UserRegistryQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {

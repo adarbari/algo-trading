@@ -1,0 +1,30 @@
+# L3 site setting: the Guide glossary, the people the site declares (ADR 0040). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "user_person"
+term = "Person"
+short = "One user the site declares in reviewed config, shown by id and name, never by email."
+body = """
+People are declared in the site's reviewed users file; signing in through the identity provider proves who someone is, and the file says what they may do. The page shows the id and the display name only. The email and the provider's subject stay on the server. One entry, the scheduled screens user, is not a person: the nightly job runs the site's own screens as it.
+"""
+see_also = ["user_role", "user_licences"]
+
+[[term]]
+id = "user_role"
+term = "Role"
+short = "Admin or trader: what a person may open, set by the site's config and never by the sign-in provider."
+body = """
+A trader opens the trader site: Ideas, Setups, Test and Calendar. An admin opens those and the admin site: the nightly run, evaluations, AI and requests, and this list. The server enforces the role on every admin read; the browser only hides what the role cannot open.
+"""
+see_also = ["user_person", "user_licences"]
+
+[[term]]
+id = "user_licences"
+term = "Licences held"
+short = "The licences a person holds beyond the open data everyone sees."
+body = """
+Some data comes from a personal-use source and may only be shown to the person whose licence it is. A person with such a licence sees values built from that source; everyone else sees them as not available for licence reasons. An empty cell means the person holds only the open data.
+"""
+see_also = ["user_person", "user_role"]

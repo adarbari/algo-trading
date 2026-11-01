@@ -38,6 +38,7 @@ const STRUCTURE = [
   'src/widgets/known-coverage-panel/model/columns.tsx', // admin: the fundamentals share count by security type and the causes of its gaps
   'src/widgets/guide-screener/model/columns.tsx', // a screener's criteria, one row each
   'src/widgets/feature-request-list/model/columns.tsx', // admin: requested features, one record each
+  'src/widgets/user-list/model/columns.tsx', // admin: the declared people, one record each
   'src/widgets/harness-run-detail/model/columns.tsx', // admin: one evaluation run's stored rows
   'src/widgets/harness-run-list/model/columns.tsx', // admin: edge evaluation runs, one record each
   'src/widgets/holdings-panel/model/columns.tsx', // an ETF's holdings (issuer-dated weights)
