@@ -113,7 +113,7 @@ const yieldCell = (text: string, level: 1 | 2 | 3, sub: string, flag?: string): 
   text,
   level,
   sub,
-  flag,
+  ...(flag === undefined ? {} : { flag }),
 });
 
 const yieldProps = {

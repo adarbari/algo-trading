@@ -128,7 +128,9 @@ describe('HeatGrid', () => {
         ]}
       />,
     );
-    const cell = screen.getByRole('gridcell', { name: /12\.2%, strike 78, report/ });
+    const cell = screen.getByRole('gridcell', {
+      name: /^12\.2% report strike 78, Middle, Fri 20 Nov/,
+    });
     expect(cell).toHaveAttribute('data-level', '2');
     expect(screen.getByRole('columnheader', { name: /28 days/ })).toBeInTheDocument();
     await expectNoA11yViolations(container);

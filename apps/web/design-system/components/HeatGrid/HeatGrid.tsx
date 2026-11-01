@@ -82,6 +82,18 @@ const DEFAULT_LABELS: Record<HeatStatus, string> = {
 const STATUSES: HeatStatus[] = ['complete', 'partial', 'failed', 'not-collected'];
 const MISSING: HeatGridCell = { status: 'not-collected' };
 
+/**
+ * A cell's accessible name. A graded cell shows its figure, flag and second line, so its name
+ * starts with that visible text (WCAG label in name), then says where it is.
+ */
+function cellName(row: string, column: string, status: string, cell: HeatGridCell): string {
+  if (cell.level === undefined) {
+    return `${row}, ${column}: ${status}${cell.text ? ` ${cell.text}` : ''}`;
+  }
+  const shown = [cell.text, cell.flag, cell.sub].filter(Boolean).join(' ');
+  return `${shown}, ${row}, ${column}: ${status}`;
+}
+
 export function HeatGrid({
   rows,
   columns,
@@ -213,7 +225,7 @@ export function HeatGrid({
                     data-level={cell.level}
                     data-loading={loading || undefined}
                     aria-selected={isSelected}
-                    aria-label={`${row.label}, ${column.label}: ${words[cell.status]}${cell.text ? ` ${cell.text}` : ''}${cell.sub ? `, ${cell.sub}` : ''}${cell.flag ? `, ${cell.flag}` : ''}`}
+                    aria-label={cellName(row.label, column.label, words[cell.status], cell)}
                     tabIndex={isActive ? 0 : -1}
                     onClick={() => {
                       setFocus({ r, c });
