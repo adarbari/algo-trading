@@ -102,6 +102,7 @@ from algotrade_ingestion.workflows.nightly.sessions import (
 )
 from algotrade_ingestion.workflows.nightly.steps import (
     BAD,
+    HELD_PREFIX,
     Outcome,
     Status,
     Step,
@@ -577,17 +578,24 @@ def run_session(
     waive: Mapping[str, str] | None = None,
     settings: NightlySettings | None = None,
     signal_step: ScreenStep | None = None,
+    held_behind: date | None = None,
 ) -> dict[str, Any]:
     """Every ``NIGHTLY`` step for one session; saves the session's ``nightly`` run record.
     ``resume``: reuse the steps an earlier attempt of the session did; ``waive``: step ->
-    reason, accepted by hand; ``settings``: the deadlines a step may wait until."""
+    reason, accepted by hand; ``settings``: the deadlines a step may wait until;
+    ``held_behind``: an older session that has not succeeded (ADR 0086): only the snapshot
+    steps run (each writes just this session's own partition), the rest are held back."""
     settings = settings or NightlySettings()
     before = earlier_attempts(ctx.reader, session) if resume else Attempts()
     done: dict[str, StepResult] = {}
     reran: set[str] = set()  # steps this attempt ran to success: their dependents re-run
     with IngestRun(ctx, NIGHTLY_RUN, session) as run:
         for step in NIGHTLY:
-            held = _not_run(step, ctx, session, latest, done, before, waive or {}, reran)
+            held: StepResult | None
+            if held_behind is not None and step.latest_only != SNAPSHOT:
+                held = _held(step, StepStatus.NOT_RUN, f"{HELD_PREFIX}{held_behind} not done")
+            else:
+                held = _not_run(step, ctx, session, latest, done, before, waive or {}, reran)
             if held is None:
                 # decided before the run: this attempt's own task run must not count
                 stale = step.name in before.done and _superseded(
@@ -625,6 +633,10 @@ def run_session(
             done[step.name] = held
             run.record_item(step.name, step_item(held))
         status = overall(done.values())
+        if held_behind is not None and status is Status.FAILED:
+            # only held back (the older session is the one failing), not failing itself
+            own = [r for r in done.values() if not (r.reason or "").startswith(HELD_PREFIX)]
+            status = Status.WAITING if overall(own) is Status.SUCCEEDED else Status.FAILED
         failed = [
             f"{n}: {r.error or r.reason or r.status.value}"
             for n, r in done.items()
@@ -632,6 +644,8 @@ def run_session(
         ]
         if status is Status.FAILED:
             run.failed(f"critical steps not done: {'; '.join(failed)}")
+        elif status is Status.WAITING and held_behind is not None:
+            run.waiting(f"held behind session {held_behind}: its snapshot steps are done")
         elif status is Status.WAITING:  # not done either: the next run resumes it (ADR 0043)
             run.waiting(f"waiting for publication: {'; '.join(failed)}")
         for step in NIGHTLY:
@@ -665,12 +679,14 @@ def run_nightly(
     signal_step: ScreenStep | None = None,
 ) -> dict[str, Any]:
     """The planned sessions, oldest first, stopping at the first that FAILS (the later ones
-    are ``held``); then ``FINALLY``. -> the run summary (status, per-session steps with
+    are ``held``, but the latest still takes its snapshot steps, ADR 0086); then ``FINALLY``.
+    -> the run summary (status, per-session steps with
     status and duration, start / finish, catch-up, warnings)."""
     settings = settings or NightlySettings()
     started = ctx.clock()
     runs: list[dict[str, Any]] = []
     held: list[date] = []
+    snapshots: list[dict[str, Any]] = []
     for session in plan.sessions:
         if runs and runs[-1]["status"] != Status.SUCCEEDED:  # failed or waiting
             held.append(session)
@@ -689,6 +705,30 @@ def run_nightly(
             )
         )
     ran = [date.fromisoformat(r["session"]) for r in runs]
+    # The latest closed session was not run (held behind a failed one, or past the catch-up
+    # cap): the source serves only its current snapshot, so take it now (ADR 0086).
+    unrun = [*held, *plan.waiting]
+    last_run = runs[-1] if runs else None
+    failed_or_first = (
+        date.fromisoformat(last_run["session"])
+        if last_run and last_run["status"] != Status.SUCCEEDED
+        else (unrun[0] if unrun else None)
+    )
+    if runs and plan.until is not None and plan.until not in ran and unrun:
+        snapshots.append(
+            run_session(
+                ctx,
+                plan.until,
+                True,
+                screens,
+                workers,
+                resume,
+                waive,
+                settings,
+                signal_step,
+                held_behind=failed_or_first,
+            )
+        )
     reference = ran[-1] if ran else plan.last_done
     final: dict[str, StepResult] = {}
     if reference is not None:
@@ -714,7 +754,7 @@ def run_nightly(
         )
     optional = [
         f"{r['session']} {name}: {s.get('error') or s.get('reason') or s['status']}"
-        for r in runs
+        for r in [*runs, *snapshots]
         for name, s in r["steps"].items()
         if not s["critical"] and s["status"] == StepStatus.FAILED
     ]
@@ -728,6 +768,7 @@ def run_nightly(
             "waiting": [d.isoformat() for d in plan.waiting],
         },
         "runs": runs,
+        "snapshot_runs": snapshots,
         "steps": {name: r.as_dict() for name, r in final.items()},
         "started_at": started.isoformat(),
         "finished_at": finished.isoformat(),

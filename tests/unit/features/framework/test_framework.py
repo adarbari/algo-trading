@@ -14,6 +14,7 @@ from algotrade.core.time.calendar import sessions_between
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.runner import (
+    _check_point_in_time,
     by_key,
     compute_one,
     compute_sessions,
@@ -322,3 +323,15 @@ def test_params_and_selection() -> None:
     assert len(by_key(GROUPS, [])) == len(GROUPS)
     with pytest.raises(KeyError, match="unknown rollups"):
         by_key(GROUPS, ["nope@v1"])
+
+
+def test_point_in_time_guard_skips_a_row_without_known_from() -> None:
+    """The latest-dated row of events/dividend can be a legacy one with no ``known_from``
+    (the Tiingo backfill added the column): the guard reads it as known, not a TypeError."""
+    group = next(iter(GROUPS.values()))
+    session = date(2026, 10, 26)
+    rows = pd.DataFrame({"known_from": [date(2026, 10, 1), None]})
+    _check_point_in_time(group, "events/dividend", rows, session)
+    later = pd.DataFrame({"known_from": [date(2026, 10, 27)]})
+    with pytest.raises(AssertionError, match="reached"):
+        _check_point_in_time(group, "events/dividend", later, session)
