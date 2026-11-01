@@ -312,12 +312,22 @@ def parsed_edges(ctx: Stores, user: str) -> tuple[document.Edge, ...]:
     )
 
 
-def load_edges(ctx: Stores, ids: Sequence[str] | None = None) -> tuple[Edge, ...]:
-    """Every edge ``ctx.user`` sees, by id; none without documents. ``ids``: only those."""
+def load_edges(
+    ctx: Stores, ids: Sequence[str] | None = None, gated: bool = True
+) -> tuple[Edge, ...]:
+    """Every edge ``ctx.user`` sees, by id; none without documents. ``ids``: only those. A setup
+    whose evidence the viewer lacks the licence of is not among them (ADR 0084 decision 1:
+    ``evidence_licence.evidence_visible``); ``gated=False`` for a count that is not evidence
+    (the site trial count)."""
+    # a function-level import: evidence_licence reads runs, which imports this module
+    from algotrade.services.read.evaluation.verdict.evidence_licence import (  # noqa: PLC0415
+        evidence_visible,
+    )
+
     site = set(ctx.configs.names(loading.SITE, loading.KIND))
     user = ctx.user.user_id
     found = parsed_edges(ctx, user)
-    return tuple(
+    built = (
         _edge(
             e,
             mine=e.id not in site,
@@ -326,6 +336,7 @@ def load_edges(ctx: Stores, ids: Sequence[str] | None = None) -> tuple[Edge, ...
         for e in found
         if ids is None or e.id in ids
     )
+    return tuple(e for e in built if not gated or evidence_visible(ctx, e))
 
 
 def load_edge(ctx: Stores, edge_id: str) -> Edge | None:

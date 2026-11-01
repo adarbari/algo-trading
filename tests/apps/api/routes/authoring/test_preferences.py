@@ -179,3 +179,45 @@ def test_a_surface_with_a_filter_bar_keeps_views_and_an_unknown_one_is_refused(
         True, "decision:QUALIFIED", ["Qualified"]
     )  # fmt: skip
     assert writer_client.put("/preferences/views/surface:nope/view", json=body).status_code == 400
+
+
+APPEARANCE = "/preferences/appearance"
+READ_THEME = "query Appearance { appearance { theme } }"
+
+
+def read_theme(client: TestClient) -> str:
+    return client.post("/graphql", json={"query": READ_THEME}).json()["data"]["appearance"]["theme"]  # type: ignore[no-any-return]
+
+
+def test_the_theme_is_saved_per_user_read_back_and_keeps_the_views(
+    writer_client: TestClient, root: Path
+) -> None:
+    prefs = root / "users" / "local" / "preferences.toml"
+    assert read_theme(writer_client) == "system"  # nothing stored: the OS decides
+    writer_client.put(VIEW, json=BODY)
+    saved = writer_client.put(APPEARANCE, json={"theme": "dark"})
+    assert (saved.status_code, saved.json()) == (200, {"theme": "dark"})
+    assert read_theme(writer_client) == "dark"
+    text = prefs.read_text()
+    assert "[appearance]" in text and 'theme = "dark"' in text and CLOSE in text
+    assert read(writer_client)["columns"] == [CLOSE]  # the view is still there
+    writer_client.put(VIEW, json=BODY)  # a views write keeps the theme
+    assert read_theme(writer_client) == "dark"
+    bob = {"X-Act-For": "bob"}
+    assert writer_client.put(APPEARANCE, json={"theme": "light"}, headers=bob).status_code == 200
+    assert (root / "users" / "bob" / "preferences.toml").exists()
+    assert read_theme(writer_client) == "dark"  # bob's own file
+
+
+def test_a_malformed_stored_theme_reads_as_system(writer_client: TestClient, root: Path) -> None:
+    prefs = root / "users" / "local" / "preferences.toml"
+    prefs.parent.mkdir(parents=True)
+    prefs.write_text('[appearance]\ntheme = "sepia"\n')
+    assert read_theme(writer_client) == "system"
+
+
+def test_a_theme_is_checked_before_it_is_saved(writer_client: TestClient, root: Path) -> None:
+    for body in ({"theme": "sepia"}, {"theme": "Dark"}, {"theme": ""}):
+        assert writer_client.put(APPEARANCE, json=body).status_code == 400, body
+    assert writer_client.put(APPEARANCE, json={}).status_code == 422
+    assert not (root / "users" / "local" / "preferences.toml").exists()

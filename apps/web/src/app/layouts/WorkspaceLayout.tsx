@@ -4,7 +4,8 @@
  * Composition only: AppShell, TopBar, AccountMenu, WorkspaceSwitch and NavTabs come from the
  * design system; this file supplies the router's current path, its Link and navigation (the
  * design system knows no routes). The account menu (the viewer's name) holds the workspace
- * switch, listing only the workspaces the viewer may enter (hidden when there is one), and,
+ * switch, listing only the workspaces the viewer may enter (hidden when there is one), the
+ * Light / Dark / System choice (ADR 0085), and,
  * when they signed in through Supabase, a sign-out action; the regime chip (ADR 0047) sits
  * before the name, on both workspaces, and opens the Regime page. The status strip (open system
  * issues, ADR 0052's one tree) sits under the bar on every page once the viewer is known. The Guide's search dialog
@@ -30,6 +31,7 @@ import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
 import { GuideSearchProvider } from '@/features/guide-search';
 import { SystemStatusStrip } from '@/widgets/status-strip';
+import { ThemeChoice } from '@/widgets/theme-choice';
 
 import {
   canEnter,
@@ -111,6 +113,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
                           />
                         </Stack>
                       ) : null}
+                      <ThemeChoice />
                     </AccountMenu>
                   </Stack>
                 )

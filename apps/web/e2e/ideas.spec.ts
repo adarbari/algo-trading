@@ -185,7 +185,7 @@ test('a link with filters opens the filtered table', async ({ page }) => {
   await expect(
     page
       .getByRole('group', { name: 'Applied filters' })
-      .getByRole('button', { name: /^Decision Event risk, removes 5/ }),
+      .getByRole('button', { name: /^Decision Event risk removes 5/ }),
   ).toBeVisible();
 });
 

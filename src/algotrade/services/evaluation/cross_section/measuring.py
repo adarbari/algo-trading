@@ -29,6 +29,7 @@ from algotrade.data.outcomes import (
     RESIDUAL_FIELDS,
     attach_residuals,
     chain_seqs,
+    licence_frames,
     missing_chain,
     missing_outcomes,
     outcome_seqs,
@@ -39,7 +40,9 @@ from algotrade.data.outcomes import (
     select_outcomes,
 )
 from algotrade.engines.screening.runner import RunCoverage
+from algotrade.features.framework.feature import strictest
 from algotrade.quant.edges.statistics import moments
+from algotrade.services.evaluation.cross_section.detail.licences import outcome_licence
 from algotrade.services.evaluation.cross_section.events import EventSchedule
 from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
@@ -614,6 +617,7 @@ class _Measured:
     rows: list[Mapping[str, Any]] = field(default_factory=list)  # the legs, as stored rows
     outcome_reads: dict[tuple[str, int, date], OutcomeRead] = field(default_factory=dict)
     seqs: Mapping[date, int] = field(default_factory=dict)  # entry session -> outcome partition seq
+    outcome_licence: str = "open"  # the strictest licence of the outcome rows read (E1)
 
 
 @dataclass(frozen=True)
@@ -673,6 +677,7 @@ def _measure(
     computes a leg and one that reads it hold the same numbers. Only the sessions of ``reuse``
     are computed; its stored legs are taken as they are (``legs/reuse.py``)."""
     out = _Measured({}, {}, {}, {}, {})
+    out.outcome_licence = _entries_licence(reader, plans, as_of)  # reused legs included
     todo = reuse.days
     legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
     days = sorted({leg.decision for leg in legs})
@@ -709,6 +714,15 @@ def _measure(
         if lost and len(lost) == len(out.legs[_, variant_id]):
             raise lost_error(lost)
     return out
+
+
+def _entries_licence(reader: StoreReader, plans: Sequence[_Plan], as_of: datetime) -> str:
+    """The strictest licence recorded on the outcome rows of every entry session the plans
+    cover, a stored leg reused by this run included (its outcome rows are not read again, so the
+    chunk reads alone would miss them)."""
+    entries = {leg.entry for p in plans for b in p.blocks for leg in b}
+    found = licence_frames(reader, _chain(plans), entries, as_of)
+    return strictest(outcome_licence(f) for f in found)
 
 
 def _chain(plans: Sequence[_Plan]) -> bool:

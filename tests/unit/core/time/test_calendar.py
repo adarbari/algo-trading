@@ -320,3 +320,12 @@ def test_weekdays_between_lists_every_such_weekday_inclusive() -> None:
     assert wednesdays == [date(2013, 1, 2), date(2013, 1, 9), date(2013, 1, 16), date(2013, 1, 23)]
     assert weekdays_between(date(2013, 1, 2), date(2013, 1, 8), 2) == [date(2013, 1, 2)]
     assert weekdays_between(date(2013, 1, 3), date(2013, 1, 8), 2) == []
+
+
+def test_weekday_and_the_last_session_of_the_week() -> None:
+    from algotrade.core.time.calendar import is_last_session_of_week, session_weekday  # noqa: PLC0415
+
+    assert session_weekday(date(2026, 10, 5)) == 0 and session_weekday(date(2026, 10, 2)) == 4
+    assert is_last_session_of_week(date(2026, 10, 2))  # a Friday
+    assert not is_last_session_of_week(date(2026, 10, 1))
+    assert is_last_session_of_week(date(2026, 4, 2))  # Thursday before Good Friday
