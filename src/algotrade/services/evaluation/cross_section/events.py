@@ -5,7 +5,7 @@ yet known at D is absent by construction.
 
 Each event class names a count field and a date field (``EVENT_FIELDS``). With the entry
 session S = anchor + offset and D = S - 1, a name has the event at D when its count field reads
-``sign * (offset - 1)``: ``earnings_reaction@v1.sessions_since_reaction == offset - 1`` and
+``sign * (offset - 1)``: ``earnings_reaction@v2.sessions_since_reaction == offset - 1`` and
 ``earnings_expected@v1.sessions_to_expected_report == 1 - offset``. A name with no value in the
 count field is UNKNOWN (counted with its reason, never read as "no event"); a reaction whose
 date is after D is not known at D and is excluded the same way. An event is counted once per
@@ -87,8 +87,8 @@ class EventField:
 
 EVENT_FIELDS: Mapping[str, EventField] = {
     "earnings_reaction": EventField(
-        "rollup.earnings_reaction@v1.sessions_since_reaction",
-        "rollup.earnings_reaction@v1.reaction_end_date",
+        "rollup.earnings_reaction@v2.sessions_since_reaction",
+        "rollup.earnings_reaction@v2.reaction_end_date",
         sign=1,
         announced_ahead=False,
     ),

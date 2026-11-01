@@ -10,8 +10,6 @@ site/field_guide/<group>/<file>.toml       L3 field guide, one folder per theme 
                                            ``field_guide``, ADR 0041; the file name is unique)
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
-site/macro/<name>.toml                     L3 published files expanded into macro series, one
-                                           file per source (kind ``macro``, ADR 0087)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
 site/guide/start.toml                      L3 Guide Start here pages (kind ``guide``)
 site/guide/glossary/<theme>.toml           L3 Guide glossary, one file per theme (kind
@@ -65,8 +63,8 @@ SITE_FOLDERS = {
     "field_guide": "field_guide",
     "regime": "regime",
     "events": "events",
-    "macro": "macro",
     "studies": "studies",
+    "series": "series",
     "ranking": "ranking",
     "filters": "filters",
     "guide": "guide",
@@ -83,8 +81,8 @@ NESTED = (
     "field_guide",
 )  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
-    "defaults", "settings", "field_guide", "regime", "events", "macro", "studies", "ranking",
-    "filters", "guide",
+    "defaults", "settings", "field_guide", "regime", "events", "studies", "series",
+    "ranking", "filters", "guide",
     "guide_screeners", "guide_glossary", "guide_glossary_edges", "guide_mechanisms", "guide_ideas",
 )  # fmt: skip
 DRAFT = "draft.toml"

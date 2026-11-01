@@ -2,6 +2,7 @@
 levels, third-party and Stooq series personal), ids come from kind and key, and every rule
 names the entry."""
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,7 +12,8 @@ from algotrade.config.site.settings import load_macro
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from tests.conftest import REPO_ROOT
-from tests.unit.config.site.test_settings import site
+
+REPO = Path(__file__).resolve().parents[4]
 
 FRED = {
     "key": "UNRATE",
@@ -37,6 +39,7 @@ FILE = {
 
 
 CBOE_STRATEGY_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR")
+CBOE_SETUP_INPUTS = ("SKEW", "COR1M", "COR3M", "DSPX")  # EB D4: skew, correlation, dispersion
 
 
 def load(*series: dict[str, Any]) -> MacroSettings:
@@ -44,7 +47,7 @@ def load(*series: dict[str, Any]) -> MacroSettings:
 
 
 def test_the_shipped_registry() -> None:
-    macro = MacroSettings.from_document(site("macro"))
+    macro = load_macro(FileConfigStore(REPO / "config", local=False))  # macro.toml + series/
     assert {"T10Y3M", "BAMLH0A0HYM2", "UNRATE", "NFCI", "RRPONTSYD"} <= macro.keys
     indices = {s.instrument_id: s.vendor_code for s in macro.series if s.kind == "index"}
     assert indices == {
@@ -56,6 +59,7 @@ def test_the_shipped_registry() -> None:
         "IDX:VIX6M": "VIX6M",
         "IDX:VVIX": "VVIX",
         **{f"IDX:{k}": k for k in CBOE_STRATEGY_INDEXES},  # ADR 0084: the replication targets
+        **{f"IDX:{k}": k for k in CBOE_SETUP_INPUTS},
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
     third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}
@@ -64,9 +68,12 @@ def test_the_shipped_registry() -> None:
         "VIX6M",
         "VVIX",
         *CBOE_STRATEGY_INDEXES,
+        *CBOE_SETUP_INPUTS,
     }  # Cboe's files: personal use, no redistribution
     cape = {k for k in macro.keys if k.startswith("CAPE_")}  # Barclays' file: personal use
-    assert len(cape) == 26 and personal == third_party | cape
+    french = {s.key for s in macro.series if s.research}  # French's library: personal, ADR 0087
+    assert len(cape) == 26 and len(french) == 135
+    assert personal == third_party | cape | french
     unrevised = {  # FRED's daily market series: never revised, so one plain request each
         "T10Y3M", "T10Y2Y", "BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "DFII10", "RRPONTSYD",
         "SPX", "COMP", "VIX", "VIX3M",
@@ -81,7 +88,7 @@ def test_the_shipped_registry() -> None:
     assert min(revised_late.values()) >= 125  # a final value before ALFRED's first vintage
     assert all(s.terms for s in macro.series)
     files = {"EBP", "EBP_RECESSION_PROB", "OFR_FSI", "EPU_DAILY"}  # re-estimated in place
-    assert {s.key for s in macro.series if s.revised} == files | cape
+    assert {s.key for s in macro.series if s.revised} == files | cape | french
     assert all(macro.by_key(k).pit == "lag" and macro.by_key(k).is_revised for k in files)
     assert macro.by_key("UNRATE").is_revised and not macro.by_key("T10Y3M").is_revised
     assert macro.by_key("EBP").release_lag_days == 45  # the Fed posts irregularly
@@ -131,7 +138,7 @@ def test_the_document_shape_is_checked() -> None:
         MacroSettings.from_document({"series": {"key": "X"}})
 
 
-# --- config/site/macro/<name>.toml: a published file expanded into one series per column (ADR 0087)
+# --- config/site/series/<family>.toml: a file expanded into a series per column (ADR 0087)
 
 BLOCK = {
     "defaults": {
@@ -148,7 +155,7 @@ BLOCK = {
 
 
 def expand(files: dict[str, Any], *series: dict[str, Any]) -> MacroSettings:
-    return MacroSettings.from_document({"series": list(series)}, files)
+    return MacroSettings.from_documents({"series": list(series)}, list(files.values()))
 
 
 def test_a_file_block_expands_into_one_ordinary_series_per_column() -> None:
@@ -193,12 +200,12 @@ def test_an_invalid_file_block_fails_with_its_path(change: dict[str, Any], messa
     block = {**BLOCK, "file": [{**BLOCK["file"][0], **change}]}
     with pytest.raises(ConfigurationError, match=message) as raised:
         expand({"french": block})
-    assert "french.toml" in str(raised.value)
+    assert "series/*.toml" in str(raised.value)
 
 
 def test_the_shape_of_a_files_document_is_checked() -> None:
     with pytest.raises(ConfigurationError, match="unknown keys"):
-        expand({"f": {"series": []}})
+        expand({"f": {"colour": []}})
     with pytest.raises(ConfigurationError, match="defaults: expected a table"):
         expand({"f": {"defaults": 1}})
     with pytest.raises(ConfigurationError, match=r"\[\[file\]\]"):
@@ -215,9 +222,37 @@ def test_a_fred_series_takes_no_section() -> None:
 
 def test_the_shipped_french_file_loads_through_the_store() -> None:
     store = FileConfigStore(REPO_ROOT / "config", local=False)
-    assert store.names("site", "macro") == ["french"] and store.names("u", "macro") == []
-    assert store.load("u", "macro", "french") is None  # site-only
+    assert store.names("site", "series") == ["cboe", "french"]
+    assert store.load("u", "series", "french") is None  # site-only
     macro = load_macro(store)
     french = [s for s in macro.series if s.parser == "french_zip"]
     assert len(french) == 135 and len(macro.series) == len(macro.keys)
     assert macro.by_key("UNRATE").parser == ""  # macro.toml's own series are still there
+
+
+def test_the_family_files_of_series_join_the_one_registry() -> None:
+    store = MemoryConfigStore(
+        {
+            ("site", "settings", "macro"): {"series": [FRED]},
+            ("site", "series", "cboe"): {"series": [FILE]},
+        }
+    )
+    assert [s.key for s in load_macro(store).series] == ["UNRATE", "SPX"]
+    twice = MemoryConfigStore(
+        {
+            ("site", "settings", "macro"): {"series": [FILE]},
+            ("site", "series", "cboe"): {"series": [FILE]},
+        }
+    )
+    with pytest.raises(ConfigurationError, match=r"more than once: \['SPX'\]"):
+        load_macro(twice)
+
+
+def test_a_family_file_holds_only_series() -> None:
+    for doc in ({"serie": [FILE]}, {"series": [FILE], "macro": {"run_budget_s": 5}}):
+        store = MemoryConfigStore({("site", "series", "cboe"): doc})
+        with pytest.raises(ConfigurationError):
+            load_macro(store)
+    odd = MemoryConfigStore({("site", "series", "cboe"): {"series": {"key": "X"}}})
+    with pytest.raises(ConfigurationError, match="list of tables"):
+        load_macro(odd)

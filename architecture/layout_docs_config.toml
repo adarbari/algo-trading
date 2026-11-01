@@ -73,16 +73,16 @@ path = "config/site/ranking"
 purpose = "ranking parameters, one <name>.toml per ranked list: ideas.toml, the Ideas ranking rule (site_top 5, user_top 20, user_weight 3; owner decision 2026-10-22), typed by src/algotrade/config/ranking/ideas.py, read by services/ideas/rule.py"
 
 [[config_dir]]
+path = "config/site/series"
+purpose = "macro series by source family, one <family>.toml per family, [[series]] tables and/or [defaults] with a [[file]] per published file whose columns each become a series keyed <prefix>_<COLUMN> (ADR 0087, src/algotrade/config/site/macro.py): cboe.toml (Cboe's static index files), french.toml (Kenneth French's daily factor and industry files); read together with macro.toml by load_macro (ADR 0048), split out because macro.toml is at the 1000-line cap"
+
+[[config_dir]]
 path = "config/site/studies"
 purpose = "research-study settings, one <name>.toml per study: winners.toml, the ED6 winners study's outcome window, grid, winner and control definitions, discovery thresholds and gate (typed by src/algotrade/config/edges/winners.py; ADR 0053 amendment 2026-10-09)"
 
 [[config_dir]]
 path = "config/site/events"
 purpose = "event-sensitivity track settings: the scope list of names the event study runs for and the registry of macro releases it calendars and the links.toml of each release's agency page (ADR 0050)"
-
-[[config_dir]]
-path = "config/site/macro"
-purpose = "published files expanded into macro series (ADR 0087), one <source>.toml per source: [defaults] for the series fields and a [[file]] per file (prefix, url, parser, section, the columns it takes), each column a series keyed <prefix>_<COLUMN> (src/algotrade/config/site/macro.py); french.toml is Kenneth French's daily factor and industry files. macro.toml, at its 1000-line cap, keeps the one-series-per-entry declarations"
 
 [[config_dir]]
 path = "config/site/guide"

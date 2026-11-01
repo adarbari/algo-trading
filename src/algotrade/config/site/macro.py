@@ -9,7 +9,7 @@ an ``index`` level), how its point in time is known (``pit``: ALFRED vintages, o
 series' instrument id (``MACRO:<KEY>`` / ``IDX:<KEY>``) comes from ``kind`` and ``key``.
 
 A published file with many columns of one table (Kenneth French's factor and industry files) is
-declared once, not per column: ``config/site/macro/<name>.toml`` holds ``[defaults]`` for the
+declared once, not per column: a family file of ``config/site/series/`` holds ``[defaults]`` for the
 series fields and a ``[[file]]`` per file (``prefix``, ``url``, ``parser``, ``section``, the
 ``columns`` it takes). Each column expands into an ordinary ``MacroSeries`` keyed
 ``<prefix>_<COLUMN>`` (upper case, anything outside ``A-Z0-9`` an underscore) with the column as
@@ -19,9 +19,9 @@ never ``"*"``: the registry must name every stored series without reading the fi
 
 import re
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Protocol
+from typing import Any
 from urllib.parse import urlsplit
 
 from algotrade.config.site.fields import Table, reject_secrets
@@ -46,7 +46,7 @@ HELD_LICENCES = (
     "yahoo",
 )  # a vendor's or a user's: ``yahoo`` is the owner's alone (ADR 0080)
 FILE_KEYS = ("url", "date_column", "value_column", "parser")
-FOLDER = "macro"  # config/site/macro/<name>.toml: files expanded into series (kind ``macro``)
+FAMILY = "series/*.toml"  # config/site/series/<family>.toml: [[series]] and [[file]] blocks
 BLOCK_KEYS = ("prefix", "columns")  # a [[file]]'s own keys; the rest are series fields
 KEYS = (
     "key",
@@ -65,14 +65,6 @@ KEYS = (
     *FILE_KEYS,
 )
 _KEY = re.compile(r"^[A-Z0-9][A-Z0-9_]*$")
-
-
-class Documents(Protocol):
-    """What the loader needs from a config store (``ConfigStore``)."""
-
-    def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None: ...
-
-    def names(self, scope: str, kind: str) -> list[str]: ...
 
 
 @dataclass(frozen=True)
@@ -103,7 +95,7 @@ class MacroSeries:
     revised: bool = False
     refetch_days: int = 0  # a published file: read again after this many days (0: by cadence)
     research: bool = (
-        False  # expanded from a ``macro/<name>.toml`` [[file]] (ADR 0087), not an entry
+        False  # expanded from a ``series/<family>.toml`` [[file]] (ADR 0087), not an entry
     )
 
     @property
@@ -153,17 +145,27 @@ class MacroSettings:
         return found
 
     @classmethod
-    def from_configs(cls, doc: Mapping[str, Any] | None, configs: Documents) -> "MacroSettings":
-        """``macro.toml``'s document and every ``config/site/macro/<name>.toml`` of the store."""
-        files = {n: configs.load("site", FOLDER, n) or {} for n in configs.names("site", FOLDER)}
-        return cls.from_document(doc, files)
+    def from_documents(
+        cls, main: Mapping[str, Any] | None, families: Sequence[Mapping[str, Any] | None]
+    ) -> "MacroSettings":
+        """``main`` (``macro.toml``) with each family file (``site/series/<family>.toml``) after
+        it: its own ``[[series]]``, then the series its ``[[file]]`` blocks expand into."""
+        base = cls.from_document(main)
+        series = list(base.series)
+        for family in families:
+            doc = family or {}
+            reject_secrets(doc, FAMILY)
+            Table(doc, FAMILY).only(("series", "defaults", "file"))
+            extra = doc.get("series") or []
+            if not isinstance(extra, list) or not all(isinstance(e, Mapping) for e in extra):
+                raise ConfigurationError(f"{FAMILY} series: expected a list of tables")
+            series += [_series(e, i, f"{FAMILY} [[series]]") for i, e in enumerate(extra)]
+            series += _expand(doc)
+        _unique(series)
+        return cls(tuple(series), base.run_budget_s)
 
     @classmethod
-    def from_document(
-        cls, doc: Mapping[str, Any] | None, files: Mapping[str, Mapping[str, Any]] | None = None
-    ) -> "MacroSettings":
-        """``macro.toml``'s ``[[series]]`` then, in file-name order, the series every ``[[file]]``
-        of ``files`` (``config/site/macro/<name>.toml`` by name) expands into."""
+    def from_document(cls, doc: Mapping[str, Any] | None) -> "MacroSettings":
         reject_secrets(doc or {}, WHERE)
         root = Table(doc, WHERE)
         root.only(("macro", "series"))
@@ -172,12 +174,14 @@ class MacroSettings:
         if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
             raise ConfigurationError(f"{WHERE} series: expected a list of tables ([[series]])")
         series = tuple(_series(entry, i) for i, entry in enumerate(raw))
-        for name in sorted(files or {}):
-            series += _expand(name, (files or {})[name])
-        repeated = sorted(k for k, n in Counter(s.key for s in series).items() if n > 1)
-        if repeated:
-            raise ConfigurationError(f"{WHERE}: keys declared more than once: {repeated}")
+        _unique(series)
         return cls(series, budget)
+
+
+def _unique(series: Sequence[MacroSeries]) -> None:
+    repeated = sorted(k for k, n in Counter(s.key for s in series).items() if n > 1)
+    if repeated:
+        raise ConfigurationError(f"{WHERE}: keys declared more than once: {repeated}")
 
 
 def _required(t: Table, key: str, choices: tuple[str, ...] | None = None) -> str:
@@ -186,12 +190,10 @@ def _required(t: Table, key: str, choices: tuple[str, ...] | None = None) -> str
     return t.choice(key, "", choices) if choices else t.text(key, "")
 
 
-def _expand(name: str, doc: Mapping[str, Any]) -> tuple[MacroSeries, ...]:
-    """The series of ``macro/<name>.toml``: each ``[[file]]`` over ``[defaults]``, one a column."""
-    where = f"{FOLDER}/{name}.toml"
-    reject_secrets(doc, where)
+def _expand(doc: Mapping[str, Any]) -> tuple[MacroSeries, ...]:
+    """The series of a family file's ``[[file]]`` blocks, each over ``[defaults]``, one a column."""
+    where = FAMILY
     root = Table(doc, where)
-    root.only(("defaults", "file"))
     defaults = root.raw("defaults") or {}
     if not isinstance(defaults, Mapping):
         raise ConfigurationError(f"{where} defaults: expected a table")

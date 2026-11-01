@@ -373,7 +373,7 @@ def test_the_equal_weighted_section_is_what_ind12ew_stores_not_the_value_weighte
     """Finding 1 of the ADR 0087 review: the task's request carried no ``section``, so IND12EW_*
     stored the value-weighted returns."""
     ctx = french_context((RECORDED / "french_ind12_daily.zip").read_bytes())
-    record = ingest_macro(ctx, MacroSettings.from_document({}, {"french": FRENCH}), D1)
+    record = ingest_macro(ctx, MacroSettings.from_documents({}, [FRENCH]), D1)
     assert record.items == {"IND12_NODUR": "OK: 20 rows", "IND12EW_NODUR": "OK: 20 rows"}
     value, equal = rows(table(ctx), "IND12_NODUR"), rows(table(ctx), "IND12EW_NODUR")
     assert value[0][3] == pytest.approx(0.02) and equal[0][3] == pytest.approx(0.37)
@@ -385,7 +385,7 @@ def test_a_french_day_added_by_a_later_pull_is_stored_beside_the_backfill() -> N
     series already has vintages, so it is added at ``max(obs + 70, session)`` (here obs + 70,
     still ahead; the clipping case is ``test_plan``'s)."""
     original = (RECORDED / "french_ind12_daily.zip").read_bytes()
-    one = MacroSettings.from_document({}, {"french": {**FRENCH, "file": FRENCH["file"][:1]}})
+    one = MacroSettings.from_documents({}, [{**FRENCH, "file": FRENCH["file"][:1]}])
     ctx = french_context(original)
     ingest_macro(ctx, one, D1)  # the backfill keeps obs + 70
     assert rows(table(ctx), "IND12_NODUR")[-1][:2] == (date(2026, 9, 30), date(2026, 12, 9))

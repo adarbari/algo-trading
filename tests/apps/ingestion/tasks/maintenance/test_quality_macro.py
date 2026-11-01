@@ -134,7 +134,7 @@ def test_a_french_file_a_month_behind_is_not_stale() -> None:
     from observation + 70 days (``lagged``), so the newest value a session knows is 70 days old,
     and the pull every 28 days lets that drift to about 90: inside the monthly 103-day window.
     A ``daily`` series (stale after 74 days) would flag the 95-day case."""
-    macro = MacroSettings.from_document({}, {"french": BLOCK})
+    macro = MacroSettings.from_documents({}, [BLOCK])
     assert {s.stale_after_days for s in macro.series} == {103}
     keys = [s.key for s in macro.series]
     for file_ends, status in (
@@ -148,7 +148,7 @@ def test_a_french_file_a_month_behind_is_not_stale() -> None:
 
 
 def test_research_series_are_graded_only_on_a_night_they_were_fetched() -> None:
-    macro = MacroSettings.from_document({}, {"french": BLOCK})
+    macro = MacroSettings.from_documents({}, [BLOCK])
     reader = french_store(macro, D - timedelta(days=200))  # long stale
     status, detail = by_name(macro_checks(reader, D, SourcesSettings(), macro))[
         "macro_research_fresh"
@@ -167,7 +167,7 @@ def test_research_series_are_graded_only_on_a_night_they_were_fetched() -> None:
 
 
 def test_research_series_lose_no_vintages_on_the_nights_they_are_graded() -> None:
-    macro = MacroSettings.from_document({}, {"french": BLOCK})
+    macro = MacroSettings.from_documents({}, [BLOCK])
     reader = french_store(macro, D - timedelta(days=32))  # 300 vintages each
     record_run(reader, {"FF3_SMB": 301}, RunStatus.COMPLETE)  # a run once held one more
     quiet = by_name(macro_checks(reader, D, SourcesSettings(), macro))
@@ -184,7 +184,7 @@ def test_research_series_stay_out_of_the_stale_share_and_are_read_without_values
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     keys = [f"S{i}" for i in range(5)]
-    research = MacroSettings.from_document({}, {"french": BLOCK})
+    research = MacroSettings.from_documents({}, [BLOCK])
     both = MacroSettings(registry(*keys).series + research.series)
     reader = store({k: D - timedelta(days=1) for k in keys})
     asked: list[tuple[Any, Any]] = []

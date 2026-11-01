@@ -95,13 +95,16 @@ Free static files on Cboe's CDN, no key; personal non-commercial use only (https
 never redistributed, so no vendor data is committed (the fixtures are made up in the real format).
 Verified 2026-10-17.
 
-- **Indices** `https://cdn.cboe.com/api/global/us_indices/daily_prices/<VIX9D|VIX6M|VVIX>_History.csv`
+- **Indices** `https://cdn.cboe.com/api/global/us_indices/daily_prices/<VIX9D|VIX6M|VVIX|SKEW|COR1M|COR3M|DSPX>_History.csv`
   (a 307 to `cdn-api.cboe.com`, followed): `DATE,OPEN,HIGH,LOW,CLOSE` (VVIX: `DATE,VVIX`, the close
   only), `MM/DD/YYYY`, VIX9D from 2011, VIX6M from 2008, VVIX from 2006. They are
-  `[[series]]` of `config/site/macro.toml` (`published` source, `csv` parser, `IDX:<KEY>` in
+  `[[series]]` of `config/site/series/cboe.toml` (read with `macro.toml`; `published` source, `csv` parser, `IDX:<KEY>` in
   `macro/series`): no code. **VIX and VIX3M stay FRED's** (`VIXCLS`, `VXVCLS`, the same closes). The
   index files' `Last-Modified` was Friday 21:31 UTC (17:31 New York) for Friday's close, so
   `release_lag_days = 1` errs late (vintage = observation + 1 day, ADR 0048).
+  **EB D4 (2026-11-01):** SKEW (close only, from 1990-01-02), COR1M and COR3M (OHLC, from 2006-01-03),
+  DSPX (close only, from 2014-06-19), measured the same day; same personal-use licence as the rest
+  of the Cboe files (no different terms found). Stored although no setup reads them yet (owner tenet).
 - **VX futures** `https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv`,
   one file per contract holding its whole life: `Trade Date,Futures,Open,High,Low,Close,Settle,Change,
   Total Volume,EFP,Open Interest`. History starts with the 2013 contracts (403 for earlier ones). The
@@ -579,7 +582,7 @@ run (the adapter reads a URL once) and `refetch_days = 28` keeps it to one pull 
 `tests/fixtures/sources/published/cape.csv` is hand-built in the file's format, not vendor
 data.
 
-**Kenneth French files (ADR 0087):** declared in `config/site/macro/french.toml` (a `[[file]]`
+**Kenneth French files (ADR 0087):** declared in `config/site/series/french.toml` (a `[[file]]`
 per zip, the columns listed; each column is a series `<prefix>_<COLUMN>`, values in percent as
 published), because `macro.toml` is at its length cap and one block beats 135 entries. Point in
 time as the CAPE file: a day first seen is known from observation + 70 days; a changed value on

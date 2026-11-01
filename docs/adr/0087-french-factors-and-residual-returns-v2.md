@@ -33,11 +33,12 @@ whole history, so past values can change. The files state no terms of use. They 
      exists. Skipped: the other industry cuts (5/10/17/30/38/48, which overlap 12 and 49), the
      portfolio sorts (size x B/M, beta, variance), the monthly and annual files, and the
      international factors. Each is config only when wanted.
-2. **Config.** `config/site/macro.toml` is at the file-length cap and `config/site/` is at the
-   folder cap. The library's files are declared in `config/site/macro/french.toml`: one
-   `[[file]]` block per file (`prefix`, `url`, `parser`, `columns`, `section`) over shared
-   `[defaults]`. The loader expands each block into ordinary `MacroSeries`, with keys unique
-   across both files. Moving `macro.toml` into the folder is a follow-up.
+2. **Config.** `config/site/macro.toml` is at the file-length cap. The library's files are
+   declared in `config/site/series/french.toml`, a family file of the existing `series` kind
+   (beside `cboe.toml`, read with `macro.toml` by `load_macro`): one `[[file]]` block per file
+   (`prefix`, `url`, `parser`, `columns`, `section`) over shared `[defaults]`. The loader expands
+   each block into ordinary `MacroSeries`, with keys unique across all files. Moving
+   `macro.toml` into the folder is a follow-up.
 3. **Point in time.** `pit = "lag"`, `revised = true`, `release_lag_days = 70`,
    `refetch_days = 28`. The 70 days are about five weeks to post, plus the worst case of an
    observation on the 1st, which errs late.
