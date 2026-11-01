@@ -761,3 +761,11 @@ follow-up PR).
 - Note: the owner accepted the recommended answers on the ADR's gaps (2026-10-25, relayed by the orchestrating session: "Accept the recommended answers on #966, #967 and #968."): evidence strength = verdict level, then `lift_pts`, then out-of-sample trades; Regime and Explore off the bar but routed; the brief carries the shared list only; Unproven keeps today's size rule.
 - Note: recorded in ADR 0083, which supersedes the 2026-10-22 "Ideas ranking rule, store and licence" index decision. The legal rules are research, not counsel's opinion.
 - Reasoning: the research found two open jobs at $20-100 (an evidence-backed shortlist, an honest test); the bar follows them and the list rests only on stored verdicts.
+
+## 2026-11-01 | Survivorship-free listing history (ADR 0087) | Delisting return convention; pull the data now
+- Question: (1) which return to book for a bankruptcy or listing-standards delisting with no OTC print; (2) renew Tiingo Power, or pull the data now?
+- Options: (1) (a) CRSP-style replacement -30% NYSE / AMEX, -55% NASDAQ, zero figure shown beside / (b) unmeasured / (c) zero. (2) renew one month / do not renew and wait / rush PR2 and backfill before 2026-11-09 / renew longer.
+- Decision: (1) (a): a delisted name a setup would have bought is penalised, never flat. (2) pull the data now: the Massive delisted list was started on 2026-11-01; the Tiingo bars for the new ids follow PR2's ids; the renewal is raised again only if PR2 and that pull cannot both finish before 2026-11-09.
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in chat, 2026-11-01: "Ideally anything delisted if the setup suggests buying them it is a problem we should pick any options which penalizes picking a delisted stock is traded" and "let us pull the data. we still have enough time to do it. Let us start the backfill immediately." Decisions 3 to 5 of the ADR stay open.

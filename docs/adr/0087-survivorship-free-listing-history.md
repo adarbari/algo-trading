@@ -1,6 +1,6 @@
 # ADR 0087: Survivorship-free listing history: Massive inactive tickers, delisting events and the delisting return
 
-**Status:** proposed (2026-10-24; owner decisions 1 to 5 below open). Amends
+**Status:** proposed (2026-10-24; owner decisions 1 and 2 taken 2026-11-01, 3 to 5 below open). Amends
 [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) ("Eligible names", the 2026-10-09
 amendment on historical eligibility, the DELISTED outcome), [0013](0013-universe.md) (the universe is
 survivors and the delisted alike), [0018](0018-figi-instrument-ids.md) (the id order for historic listings)
@@ -102,10 +102,17 @@ plan (ends 2026-11-09; the free tier would take about 20 months); SEC submission
 60 minutes, free; then the pending `outcomes` backfill from 2010 once (bars grow about 12%).
 
 ## Owner decisions
-1. **Delisting return of a bankruptcy or listing-standards delisting with no OTC print:** (a) the CRSP-style
-   replacement, -30% NYSE / AMEX and -55% NASDAQ (Shumway 1997; Shumway and Warther 1999), the zero figure shown
-   beside the verdict (recommended); (b) UNMEASURED; (c) zero.
-2. **Tiingo Power:** renew one month only if PR2 has not merged by 2026-11-02 (the bars for the new ids need it).
+Taken by the owner in the session's chat on 2026-11-01 (their words quoted):
+1. **Delisting return of a bankruptcy or listing-standards delisting with no OTC print: decided, option (a)**,
+   the CRSP-style replacement, -30% NYSE / AMEX and -55% NASDAQ (Shumway 1997; Shumway and Warther 1999), the
+   zero figure shown beside the verdict. Owner: "Ideally anything delisted if the setup suggests buying them it is
+   a problem we should pick any options which penalizes picking a delisted stock is traded."
+2. **Tiingo Power: decided, pull the data now.** Owner: "let us pull the data. we still have enough time to do it.
+   Let us start the backfill immediately." The Massive list was started the same day. The Tiingo bars for the new
+   ids need PR2's ids first, so they start when PR2 has merged; the Power plan ends 2026-11-09, and if PR2 and that
+   pull cannot both finish before then, the renewal is raised again with the owner (it is not assumed either way).
+
+Still open (recommended answers; not yet taken):
 3. **Hold the 2010 `outcomes` backfill and `evaluate-edges` until PR3 is done** (recommended): otherwise the first
    verdicts are survivor-tilted and are re-run.
 4. **ETF closures before 2016 stay out of the universe, disclosed** (matters only for ETF edges).
