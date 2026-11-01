@@ -52,6 +52,8 @@ def test_the_task_writes_a_stamped_snapshot_with_its_stats() -> None:
     assert "instrument_id" not in stored.columns  # no id until the listing-history merge
     twtr = stored[stored["ticker"] == "TWTR"].iloc[0]
     assert (twtr["end_date"], twtr["security_type"]) == (date(2022, 10, 31), "COMMON_STOCK")
+    assert (twtr["market"], twtr["locale"], twtr["currency_name"]) == ("stocks", "us", "usd")
+    assert twtr["last_updated_utc"] == "2024-12-03T22:29:45.588279Z"  # as received, never parsed
     stats = record.stats
     assert stats["rows"] == 60 and stats["dropped_duplicate"] == 0
     assert (stats["with_cik"], stats["with_figi"], stats["without_end_date"]) == (54, 25, 3)

@@ -41,7 +41,8 @@ def ticking() -> datetime:
 
 
 def listings() -> pd.DataFrame:
-    return parse_listings(payloads.supported_tickers_zip())[0]
+    every = parse_listings(payloads.supported_tickers_zip())[0]
+    return every[every["scope_reason"].isna()].reset_index(drop=True)  # the rows in scope
 
 
 def store(writer: StoreWriter, frame: pd.DataFrame) -> None:

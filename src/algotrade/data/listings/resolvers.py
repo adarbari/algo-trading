@@ -12,15 +12,14 @@ times); ``MissingDataError`` when no listing history is stored."""
 from collections.abc import Callable
 from datetime import date
 
-from algotrade.data.listings.universe import TABLE
-from algotrade.data.reference import REFERENCE_HINT, read_snapshot
+from algotrade.data.listings.universe import listing_frame
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.tables.readers import StoreReader
 
 
 def listing_resolver(reader: StoreReader) -> Callable[[date], SymbolResolver]:
     """A function from a day to the resolver of the listings alive on it."""
-    listings, _ = read_snapshot(reader, TABLE, None, REFERENCE_HINT)
+    listings, _ = listing_frame(reader)
     kept: dict[date, SymbolResolver] = {}
 
     def on(day: date) -> SymbolResolver:

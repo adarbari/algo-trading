@@ -1,5 +1,7 @@
 # ADR 0075: Market-level triggers, lockup and reverse-split classes, two calendar windows
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): the `post_spike_contango` and `fomc` triggers.
+
 **Status:** accepted (2026-10-18; orchestrator design call, architect-reviewed, pending owner
 confirmation, see `docs/decisions/log.md`). Amends [0053](0053-edges-hypotheses-outcomes-and-one-harness.md)
 (amendment 2026-10-08: ED4, item 7 "Event schedules", the schedule vocabulary) and [0073](0073-calendar-schedules-and-the-time-series-base.md)

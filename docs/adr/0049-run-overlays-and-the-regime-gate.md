@@ -1,5 +1,7 @@
 # ADR 0049: Run overlays and the regime gate
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): the gate as a rule over market and calendar fields applied at setup level outside screening; `pause_in` read as the same decision.
+
 **Status:** accepted (2026-10-06; architect design for the market regime track,
 [market-regime-plan.md](../market-regime-plan.md)). Extends [0008](0008-backtests-read-only-from-stores.md)
 (a missing market value is an error), [0015](0015-configs-selections-users.md) (the `[regime]`

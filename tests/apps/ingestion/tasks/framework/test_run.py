@@ -222,6 +222,40 @@ def test_stamp_adds_point_in_time_columns() -> None:
     assert list(out.columns) == ["x", "session_date", "knowledge_ts", "source", "run_id"]
 
 
+def test_source_is_stamped_per_row_when_given_a_series() -> None:
+    """A merged table (Tiingo's rows beside Massive's, ADR 0087) stamps each row's own source,
+    whatever the frame's index."""
+    frame = pd.DataFrame({"x": [1, 2, 3]}, index=[7, 4, 9])
+    sources = pd.Series(["tiingo", "massive", "tiingo"], index=[0, 1, 2])  # another index
+    out = stamp(frame, DAY, NOW, sources, "r1")
+    assert list(out["source"]) == ["tiingo", "massive", "tiingo"]
+    assert list(out.index) == [7, 4, 9]
+    assert set(stamp(frame, DAY, NOW, "one", "r1")["source"]) == {"one"}  # a name still works
+
+
+def test_write_stamps_each_row_with_its_own_source() -> None:
+    writer, reader, _ = store()
+    rows = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB"],
+            "exchange": ["NYSE", "NASDAQ"],
+            "asset_type": "Stock",
+            "ts": pd.Timestamp(DAY, tz="UTC"),
+            "start_date": [date(2000, 1, 3), None],
+            "end_date": [None, date(2020, 1, 3)],
+        }
+    )
+    with IngestRun(task_ctx(writer, reader, clock=lambda: NOW), "t", DAY) as run:
+        run.write(
+            "instruments/listing_history", rows, pd.Series(["tiingo", "massive"], index=rows.index)
+        )
+    stored = reader.table("instruments/listing_history", DAY)
+    assert stored is not None
+    assert dict(zip(stored["ticker"], stored["source"], strict=True)) == {
+        "AAA": "tiingo", "BBB": "massive",
+    }  # fmt: skip
+
+
 # ---------------------------------------------------------------------- atomic publication
 
 A, B = "rollups/instrument/a@v1", "rollups/instrument/b@v1"

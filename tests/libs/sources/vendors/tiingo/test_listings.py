@@ -17,6 +17,10 @@ from tests.helpers.ingest_fakes import http_for
 from tests.helpers.payloads import tiingo as payloads
 
 
+def in_scope(listings: pd.DataFrame) -> pd.DataFrame:
+    return listings[listings["scope_reason"].isna()].reset_index(drop=True)
+
+
 def test_the_one_file_is_fetched_as_received() -> None:
     urls: list[str] = []
     zipped = payloads.supported_tickers_zip()
@@ -25,9 +29,28 @@ def test_the_one_file_is_fetched_as_received() -> None:
     assert urls == [URL]
 
 
-def test_rows_are_filtered_mapped_and_a_recycled_ticker_keeps_every_listing() -> None:
-    listings, dropped = parse_listings(payloads.supported_tickers_zip())
-    assert list(listings.columns) == COLUMNS
+def test_every_file_row_is_returned_and_the_ones_out_of_scope_say_why() -> None:
+    every, counts = parse_listings(payloads.supported_tickers_zip())
+    assert list(every.columns) == COLUMNS
+    assert len(every) == 244  # the file's rows: none discarded
+    assert every["scope_reason"].isna().sum() == 217
+    assert counts == {
+        "not_usd": 8, "other_exchange": 11, "other_asset_type": 0, "no_start_date": 0,
+        "no_ticker": 0, "odd_ticker": 6, "exact_duplicate": 0, "duplicate_start": 2,
+    }  # fmt: skip
+    by_reason = every.groupby("scope_reason").size().to_dict()
+    assert by_reason == {"not_usd": 8, "other_exchange": 11, "odd_ticker": 6, "duplicate_start": 2}
+    # An out-of-scope row keeps what the file said where we have no name for it.
+    other = every[every["scope_reason"] == "other_exchange"]
+    assert not other["exchange"].isin({"NYSE", "NASDAQ", "AMEX", "ARCA", "BATS"}).any()
+    assert other["exchange"].notna().all() and other["start_date"].notna().all()
+    odd = every[every["scope_reason"] == "odd_ticker"]
+    assert odd["ticker"].str.contains("[/ (]", regex=True).any()
+
+
+def test_rows_are_mapped_and_a_recycled_ticker_keeps_every_listing() -> None:
+    every, _ = parse_listings(payloads.supported_tickers_zip())
+    listings = in_scope(every)
     assert len(listings) == 217
     by_listing = listings.set_index(["ticker", "start_date"])
     aac = listings[listings["ticker"] == "AAC"]
@@ -45,20 +68,31 @@ def test_rows_are_filtered_mapped_and_a_recycled_ticker_keeps_every_listing() ->
     assert (listings["exchange"] == "ARCA").sum() == 7  # NYSE ARCA rows
     assert set(listings["perma_ticker"]) == {""} and set(listings["price_currency"]) == {"USD"}
     assert not listings["ticker"].str.contains("[/ (]", regex=True).any()
-    assert dropped == {
-        "not_usd": 8, "other_exchange": 11, "other_asset_type": 0, "no_start_date": 0,
-        "no_ticker": 0, "odd_ticker": 6,
-    }  # fmt: skip
 
 
-def test_a_ticker_listed_twice_on_one_day_keeps_the_row_still_open() -> None:
+def test_a_ticker_listed_twice_on_one_day_keeps_the_row_still_open_in_scope() -> None:
     raw = (
         b"ticker,exchange,assetType,priceCurrency,startDate,endDate\n"
         b"ACHX,BATS,Stock,USD,2026-06-30,2026-06-30\n"
         b"ACHX,BATS,ETF,USD,2026-06-30,2026-10-08\n"
     )
-    listings, _ = parse_listings(raw)
-    assert list(listings["asset_type"]) == ["ETF"] and listings["end_date"].isna().all()
+    listings, counts = parse_listings(raw)
+    assert list(in_scope(listings)["asset_type"]) == ["ETF"]
+    assert in_scope(listings)["end_date"].isna().all()
+    loser = listings[listings["scope_reason"] == "duplicate_start"]
+    assert list(loser["asset_type"]) == ["Stock"] and counts["duplicate_start"] == 1
+
+
+def test_a_row_repeating_another_on_every_key_column_is_dropped_and_counted() -> None:
+    raw = (
+        b"ticker,exchange,assetType,priceCurrency,startDate,endDate\n"
+        b"AAA,NYSE,Stock,USD,2000-01-03,2012-01-03\n"
+        b"AAA,NYSE,Stock,USD,2000-01-03,2012-01-03\n"
+        b"AAA,NYSE,Stock,USD,2000-01-03,2013-01-03\n"
+    )
+    listings, counts = parse_listings(raw)
+    assert counts["exact_duplicate"] == 1 and len(listings) == 2
+    assert list(listings["scope_reason"].fillna("in")) == ["duplicate_start", "in"]
 
 
 def test_a_bare_csv_parses_too_and_normalize_exposes_the_frame_as_parsed() -> None:
@@ -67,8 +101,11 @@ def test_a_bare_csv_parses_too_and_normalize_exposes_the_frame_as_parsed() -> No
         FetchRequest("x", session_date=date(2026, 10, 8)), payloads.supported_tickers_csv()
     )
     assert normalized is not None and normalized.tables == {}
-    assert len(normalized.parsed[TABLE]) == 217 and normalized.notes["dropped_not_usd"] == 8
-    assert normalized.notes["dropped_odd_ticker"] == 6
+    assert len(normalized.parsed[TABLE]) == 244
+    assert normalized.notes["out_of_scope_not_usd"] == 8
+    assert normalized.notes["out_of_scope_odd_ticker"] == 6
+    assert normalized.notes["out_of_scope_duplicate_start"] == 2
+    assert normalized.notes["dropped_exact_duplicate"] == 0
 
 
 def test_a_file_without_the_documented_header_is_an_error() -> None:
@@ -79,7 +116,7 @@ def test_a_file_without_the_documented_header_is_an_error() -> None:
 def test_a_live_name_stays_in_the_universe_and_a_delisted_one_leaves_it() -> None:
     from algotrade.data.listings.universe import listed_asof  # noqa: PLC0415
 
-    listings, _ = parse_listings(payloads.supported_tickers_zip())
+    listings = in_scope(parse_listings(payloads.supported_tickers_zip())[0])
     by_ticker = {t: listings[listings["ticker"] == t] for t in ("AAPL", "TWTR")}
     ids = pd.concat([x.assign(instrument_id=f"EQ:TIINGO:{t}") for t, x in by_ticker.items()])
     after = listed_asof(ids, date(2026, 12, 1), {"AAPL"})  # past the pull's last day
@@ -88,7 +125,7 @@ def test_a_live_name_stays_in_the_universe_and_a_delisted_one_leaves_it() -> Non
     assert list(during.instruments["ticker"]) == ["AAPL", "TWTR"]
 
 
-def test_the_open_end_is_the_latest_day_of_the_kept_rows_not_of_a_foreign_listing() -> None:
+def test_the_open_end_is_the_latest_day_of_the_rows_in_scope_not_of_a_foreign_listing() -> None:
     raw = (
         b"ticker,exchange,assetType,priceCurrency,startDate,endDate\n"
         b"AAA,NYSE,Stock,USD,2000-01-03,2026-10-08\n"

@@ -1,5 +1,7 @@
 # ADR 0065: The verdict's basis is fixed before the frozen period is read
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): decision 15 applies the post-publication basis to option structures with a 3-month minimum holdout.
+
 **Status:** accepted (2026-10-10; owner decision D9 of the Edge page redesign plan). Amends the
 verdict decision of [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (ED8: an edge's
 verdict is its best candidate's); keeps [0007](0007-point-in-time-data.md)'s rule that nothing
