@@ -289,3 +289,38 @@ def test_the_corr_ratio_uses_the_index_vol_over_the_members_vol() -> None:
     assert run(macro())["realised_corr_ratio_21"] is None  # no bars, no universe
     level = {**inputs, TREND: trend_row(rv=members / 2, day=END, source="index")}
     assert run(macro(), **level)["realised_corr_ratio_21"] is None  # window ends a session early
+
+
+def breadth_rows(now: float, then: float) -> pd.DataFrame:
+    """``market_breadth@v1`` rows dated the VIX's date and 5 sessions before it."""
+    days = [sessions_ending(DAYS[-1], 6)[0], DAYS[-1]]
+    return pd.DataFrame({"session_date": days, "pct_above_sma200": [then, now]})
+
+
+def test_the_label_is_read_from_rows_dated_the_vix_date() -> None:
+    from algotrade.features.rollups.market import breadth as mb  # noqa: PLC0415
+
+    calm = {TREND: trend_row(rv=0.08, sma=0.03), mb.GROUP.table: breadth_rows(0.6, 0.62)}
+    got = run(macro(vix=15, vix3m=18), **calm)
+    assert got["conditions_label"] == "R1"
+    # breadth known only for the session itself, not the VIX's date: R3 and R1 cannot be decided
+    other = pd.DataFrame({"session_date": [END], "pct_above_sma200": [0.6]})
+    unknown = run(
+        macro(vix=15, vix3m=18), **{TREND: trend_row(rv=0.08, sma=0.03), mb.GROUP.table: other}
+    )
+    assert unknown["conditions_label"] is None  # R3 (before R1) cannot be decided: never filled
+
+
+def test_the_flags_and_the_label_columns_exist_with_their_licence() -> None:
+    by_name = {f.name: f for f in c.FEATURES}
+    assert by_name["conditions_label"].categories[-1] == "UNCLASSIFIED"
+    assert by_name["conditions_label"].licence == "open"
+    for name in ("earnings_season_on", "event_week_on"):
+        assert by_name[name].licence == "open"
+    assert c.D.bands().stress_at == c.D.stress_at
+    assert run(macro())["event_week_on"] is None  # no FOMC known, and END is not an expiry week
+
+
+def test_the_label_bands_validate() -> None:
+    with pytest.raises(ValueError, match="correction"):
+        c.Params(correction_lo=-0.05, correction_hi=-0.15)
