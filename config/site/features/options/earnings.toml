@@ -36,3 +36,31 @@ unit = "flag"
 description = "Whether the next known ex-dividend date falls on or before the covered-call wing's target expiry (call_wing.target_expiry): the early-assignment risk of the short call, and the dividend the shares collect if it is not assigned"
 null_meaning = "no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no call target expiry (call_wing NO_SPOT, NO_CHAIN or NO_EXPIRY)"
 version = 1
+
+[earnings_move_ratio]
+expr = 'if(implied_move.move_basis == "EARNINGS" and earnings_reaction.abs_moves_counted >= min_moves and earnings_reaction.abs_move_mean_8 > 0, implied_move.implied_move / earnings_reaction.abs_move_mean_8, null)'
+params = { min_moves = 4 }
+dtype = "float"
+unit = "ratio"
+valid_range = [0, inf]
+description = "The move the options price for the next earnings report (implied_move.implied_move, the at-the-money straddle as a share of the spot) over the name's mean absolute move on its last eight reports (earnings_reaction.abs_move_mean_8): 1 is a straddle priced at the name's usual earnings move, above 1 the options price a bigger move than it has delivered, below 1 a smaller one"
+null_meaning = "the move expiry does not cover the next report (implied_move.move_basis is not EARNINGS, or implied_move is null), fewer than 4 past reports have a closed window with both bars (earnings_reaction.abs_moves_counted, params.min_moves), or the mean past move is 0"
+version = 1
+
+[earnings_move_rich]
+expr = "earnings_move_ratio >= rich_ratio"
+params = { rich_ratio = 1.3 }
+dtype = "bool"
+unit = "flag"
+description = "Whether the options price the next earnings report at 1.3 times or more the name's mean absolute move on its last eight reports (earnings_move_ratio >= 1.3, params.rich_ratio): the straddle is expensive against what the name has done, the setting a seller of the report looks for"
+null_meaning = "earnings_move_ratio is null (the move expiry does not cover the next report, or fewer than 4 past reports had a closed window)"
+version = 1
+
+[earnings_move_cheap]
+expr = "earnings_move_ratio <= cheap_ratio"
+params = { cheap_ratio = 0.8 }
+dtype = "bool"
+unit = "flag"
+description = "Whether the options price the next earnings report at 0.8 times or less the name's mean absolute move on its last eight reports (earnings_move_ratio <= 0.8, params.cheap_ratio): the straddle is cheap against what the name has done, the setting a buyer of the report looks for, or a name to leave out of a sale"
+null_meaning = "earnings_move_ratio is null (the move expiry does not cover the next report, or fewer than 4 past reports had a closed window)"
+version = 1

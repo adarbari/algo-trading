@@ -36,7 +36,7 @@ ACTIVE = {
 
 PRICE = "rollup.option_liquidity@v1.underlying_price"
 REACTION = (
-    "rollups/instrument/earnings_reaction@v1"  # the event field of on_event:earnings_reaction
+    "rollups/instrument/earnings_reaction@v2"  # the event field of on_event:earnings_reaction
 )
 
 
