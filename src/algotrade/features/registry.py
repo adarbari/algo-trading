@@ -29,6 +29,7 @@ from algotrade.features.rollups.activity import (
     max_return,
     session_returns,
     signed_volume,
+    vol_long,
     vol_stats,
     volume_profile,
 )
@@ -193,6 +194,7 @@ GROUPS: dict[str, FeatureGroup] = {
             trend_stats.GROUP,
             candle.GROUP,
             vol_stats.GROUP,
+            vol_long.GROUP,
             volume_profile.GROUP,
             swing_levels.GROUP,
             pivot_strength.GROUP,

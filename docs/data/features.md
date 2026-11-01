@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-762 stored features in 93 groups, in dependency order; 164 expression features.
+765 stored features in 94 groups, in dependency order; 164 expression features.
 
 ## `option_liquidity@v1`
 
@@ -506,6 +506,16 @@ Wilder ATR over 5 / 20, realised vol over 10 / 60, the hv20 and volume percentil
 | `adv_shares_60d` | window | float32 | shares | open | >= 0 | Mean share volume over the last 60 sessions, the session included | a session among the last 60 has no bar (a gap), or the history is shorter | `bars/1d.volume` |
 | `volume_pctile_252d` | window | float32 | decimal | open | 0 .. 1 | Share of the 252 sessions before the session whose share volume was strictly below the session's: 0.98 means only 2% of the year's sessions traded more | the session's volume is unknown, or fewer than 240 of the 252 sessions before it have one | `bars/1d.volume` |
 | `pocket_pivot` | window | bool | flag | open |  | The pocket pivot: the close is above the previous close and the session's volume is above the volume of every down-close session among the 10 sessions before it (Morales and Kacher); false on a down day, or when the last 10 sessions had no down close to beat | a session among the last 12 has no bar (a gap), or the history is shorter | `bars/1d.close`, `bars/1d.volume` |
+
+## `vol_long@v1`
+
+Close-to-close realised volatility over 126 and 252 sessions and the 252-session downside deviation, beside vol_stats@v1's 10 and 60. Stored as `rollups/instrument/vol_long@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `hv126` | window | float32 | decimal | open | 0 .. 5 | Close-to-close realised volatility: sample stdev of the last 126 log returns x sqrt(252) | a session among the last 127 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `hv252` | window | float32 | decimal | open | 0 .. 5 | Close-to-close realised volatility: sample stdev of the last 252 log returns x sqrt(252) | a session among the last 253 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `downside_dev_252` | window | float32 | decimal | open | 0 .. 5 | Downside deviation: the root mean square of the last 252 negative log returns (non-negative returns count as 0) x sqrt(252) | a session among the last 253 has no bar (a gap), or the history is shorter | `bars/1d.close` |
 
 ## `swing_levels@v1`
 
