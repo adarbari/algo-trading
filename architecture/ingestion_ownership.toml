@@ -72,6 +72,16 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
+id = "delisted-tickers-ingestion"
+description = "Store Massive's inactive (delisted) tickers in instruments/delisted_tickers (ADR 0087): one full snapshot per session from MassiveTickers' inactive list (cursor-paged, 12.5 s a request on the free tier), a pull under [quality] min_delisted_tickers rows FAILED before any write, the vendor's last trading day as end_date (identity, never a feature), in no workflow until the listing-history merge"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_reference.py",  # the registry entry's runner calls the task
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "ingest_delisted_tickers" }]
+
+[[responsibility]]
 id = "edge-picks"
 description = "Store what every site edge took at a session in results/edge_picks (ADR 0081): per site edge and screener it lists, the picks the harness's one rule gave (services/evaluation/edge_picks/night.py over picks.long_picks, the edge's universe, schedule and top_k) or why none (not_decision_day, unjudged, skipped), one publish per run, resumable by the stored keys, an optional nightly step after the screens with its acceptance check; decides nothing itself (the rule is the harness's)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/edges/picks.py"]

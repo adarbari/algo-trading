@@ -6,9 +6,14 @@ from pathlib import Path
 from algotrade.config.site.settings import load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework import source_guards
-from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
+from algotrade_ingestion.tasks.framework.params import SESSION, Params, Task, session_of, symbols
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.listings import index_membership, listing_history, winners_sample
+from algotrade_ingestion.tasks.listings import (
+    delisted_tickers,
+    index_membership,
+    listing_history,
+    winners_sample,
+)
 from algotrade_ingestion.tasks.market import (
     etf_holdings,
 )
@@ -76,6 +81,37 @@ def run_listing_history(ctx: TaskContext, p: Params) -> RunRecord:
     return listing_history.ingest_listing_history(
         ctx, ctx.sources["tiingo_listings"], session_of(p), ctx.sources.get("tiingo_meta")
     )
+
+
+def run_delisted_tickers(ctx: TaskContext, p: Params) -> RunRecord:
+    return delisted_tickers.ingest_delisted_tickers(
+        ctx, ctx.sources["massive_tickers"], session_of(p)
+    )
+
+
+LISTING_HISTORY = Task(
+    "listing-history",
+    "every US stock / ETF Tiingo ever listed, with its dates "
+    "(instruments/listing_history); in no workflow until the owner has read a real pull",
+    listing_history,
+    ("instruments/listing_history",),
+    run_listing_history,
+    sources=("tiingo_listings", "tiingo_meta"),
+    settings="sources.toml [tiingo]",
+    params=(SESSION,),
+)
+
+
+DELISTED_TICKERS = Task(
+    "delisted-tickers",
+    "Massive's delisted tickers (instruments/delisted_tickers); in no workflow",
+    delisted_tickers,
+    ("instruments/delisted_tickers",),
+    run_delisted_tickers,
+    sources=("massive_tickers",),
+    settings="sources.toml [massive] [quality]",
+    params=(SESSION,),
+)  # declared here, not in registry.py (file cap); registry.py lists it in TASKS
 
 
 def run_index_membership(ctx: TaskContext, p: Params) -> RunRecord:

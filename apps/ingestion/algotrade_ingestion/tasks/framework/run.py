@@ -317,6 +317,25 @@ class IngestRun:
         self.writer.raw.put(source.name, source.dataset, self.session, self.run_id, key, payload)
         return source.normalize(request, payload)
 
+    def fetch_frame(
+        self, source: Source, request: FetchRequest, table: str, empty: str
+    ) -> tuple[pd.DataFrame, Mapping[str, Any]] | None:
+        """``fetch`` for a snapshot task: the frame of ``table`` the source parsed, with the
+        source's notes, stamped with the session as ``ts``. ``None`` after ``failed(...)``: no
+        response, or no usable row (``empty`` is the reason)."""
+        try:
+            normalized = self.fetch(source, request)
+        except NoResponseError as error:
+            self.failed(str(error))
+            return None
+        rows = None if normalized is None else normalized.parsed.get(table)
+        if normalized is None or rows is None or rows.empty:
+            self.failed(empty)
+            return None
+        rows = rows.copy()
+        rows.insert(0, "ts", pd.Timestamp(self.session, tz="UTC"))
+        return rows.astype(object).where(rows.notna(), None), normalized.notes
+
     # ------------------------------------------------------------------ ids
 
     def resolver(self, as_of: date | None = None) -> SymbolResolver:

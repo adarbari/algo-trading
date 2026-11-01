@@ -42,6 +42,11 @@ name = "instruments/listing_history"
 owner = "apps/ingestion/algotrade_ingestion/tasks/listings/listing_history.py"
 
 [[table]]
+name = "instruments/delisted_tickers"
+owner = "apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"
+note = "ADR 0087: Massive's inactive (delisted) tickers, a full snapshot per pull session, key (source, ticker, end_date); Massive's free key; end_date is the vendor's last trading day (identity, never a feature; null for ~2% of rows); vendor_type and security_type are null before 2017; no OTC names, no ETFs before 2016, a renamed company's old ticker is absent; FIGI and CIK are partial; no instrument_id until the listing-history merge"
+
+[[table]]
 name = "analyst/vendor_access"
 owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/probe.py"
 note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Finnhub), one row per (vendor, endpoint), from the by-hand analyst-probe"
