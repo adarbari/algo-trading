@@ -56,3 +56,8 @@ standard = [               # the decoy battery every edge is compared with on th
   "amihud_illiquid",       # list is a new run (baselines are in the run hash), never a new trial.
   "beta_low",
 ]
+
+[exit_rule]                # ADR 0083 decision 3: the published historical exit rule of a share setup, read
+min_winners = 30           # from the evidence (never a judge input, never in settings_hash): the fewest winning
+stop_percentile = 0.80     # trades the stop rests on (below it: the ATR fallback; 30 leaves six past the
+atr_multiple = 2.0         # stop), the share of winners whose adverse move the stop clears, the fallback's ATR multiple

@@ -110,6 +110,17 @@ NOT_JUDGED = {
 }  # fmt: skip
 
 
+def test_the_exit_rule_section_is_no_judge_input_and_never_in_the_settings_hash() -> None:
+    """``[exit_rule]`` (ADR 0083 d3) reads the evidence out: changing it must not re-judge."""
+    base = {("site", "settings", "verdict"): {"works_trades": 100}}
+    more = {("site", "settings", "verdict"): {"works_trades": 100, "exit_rule": {"min_winners": 9}}}
+    hashes = {
+        fp.settings_hash(load_verdict(stores(MemoryBackend(), docs=docs).configs))
+        for docs in (base, more)
+    }
+    assert len(hashes) == 1
+
+
 def test_the_judge_call_carries_every_judge_input() -> None:
     """Adding an argument to ``judge`` without the call (so the fingerprint) fails here."""
     params = set(inspect.signature(judge).parameters)
