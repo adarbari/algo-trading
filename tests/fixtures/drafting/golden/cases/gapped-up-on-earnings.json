@@ -21,8 +21,8 @@
         "span": "on earnings",
         "bucket": "A",
         "fields": [
-          "rollup.earnings_reaction@v1.sessions_since_reaction",
-          "rollup.earnings_reaction@v1.reaction_excess_return"
+          "rollup.earnings_reaction@v2.sessions_since_reaction",
+          "rollup.earnings_reaction@v2.reaction_excess_return"
         ],
         "op": [
           "lte",

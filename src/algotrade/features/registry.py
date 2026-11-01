@@ -77,8 +77,8 @@ from algotrade.features.rollups.market import (
     macro_asof,
     regime,
     trend,
-    triggers,
 )
+from algotrade.features.rollups.market.edges import triggers
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,
@@ -250,6 +250,9 @@ SUPERSEDED: dict[str, Superseded] = {
     "fundamentals@v3": Superseded("fundamentals@v4"),
     # v2 adds the year-ago EPS TTM and the latest quarter's revenue and EPS (with the quarter a
     # year earlier); every v1 column is unchanged
+    # v2 adds the past earnings moves (abs_move_mean_8, abs_move_median_8, abs_moves_counted);
+    # every v1 column is unchanged, and the history is longer so a stale name's last report counts
+    "earnings_reaction@v1": Superseded("earnings_reaction@v2"),
     "financials@v1": Superseded("financials@v3"),
     # v3 reads the facts by SEC acceptance session (same fix); every v2 column is unchanged
     "financials@v2": Superseded("financials@v3"),

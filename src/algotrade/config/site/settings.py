@@ -955,8 +955,9 @@ def load_field_guide(configs: SiteDocuments) -> FieldGuideSettings:
 
 
 def load_macro(configs: SiteDocuments) -> MacroSettings:
-    """``macro.toml`` (ADR 0048); missing: no series."""
-    return MacroSettings.from_document(site_document(configs.load, "macro"))
+    """``macro.toml`` and the ``site/series/*.toml`` family files, one registry (ADR 0048)."""
+    families = [configs.load("site", "series", n) for n in configs.names("site", "series")]
+    return MacroSettings.from_documents(site_document(configs.load, "macro"), families)
 
 
 def load_rollups(
