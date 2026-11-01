@@ -312,12 +312,12 @@ rules (2.13, G11) on top of them.
 | entry offset | `start_offset_sessions` | S = D + offset, entered at S's close; every edge sets it (the parser default 0 is refused), 1 = the next close | the same rule: >= 1, the legs selected and filled from S's chain (as v1 `option_pnl` does); the gate is read at D | exists for both; below 1 refused for every non-event schedule (`config/edges/document.py:738-741`: the screen runs after D's close) |
 | horizon | `horizon_sessions` | the exit: the close of the h-th session after S | the hold cap | exists |
 | expiry | implied by an option leg | n/a | held to expiry when it falls before the cap; assignment rules (2.4) | new (E3a) |
-| take profit | `[outcome.exit] take_profit` | P2: needs a path-aware share grain | close when the mark captures this share of the credit | new (E3b) |
-| stop loss | `[outcome.exit] stop_loss` | P2: as take profit | close when the loss reaches this multiple of the credit | new (E3b) |
+| take profit | `[outcome.exit] take_profit` | P1 via E3c (a share path walker) | close when the mark captures this share of the credit | new (E3b) |
+| stop loss | `[outcome.exit] stop_loss` | P1 via E3c: as take profit | close when the loss reaches this multiple of the credit | new (E3b) |
 | DTE | `[outcome.exit] exit_dte` | n/a | close at this many days to expiry | new (E3b) |
 | path filter | `max_drawdown` | a hit also needs the window's dip within it (unchanged) | refused: an exit, not a filter | exists |
 | entry condition | `[outcome.entry] when` (use site `entry`), `within_sessions` (default 1) | the same rule for both kinds: at each close t from D to D + `within_sessions` - 1, the first t whose instrument and market fields make it TRUE; S = t + `start_offset_sessions`; never TRUE in the wait: not entered (`NOT_TRIGGERED`, counted, not a missing P&L) | as shares; the legs then selected at S. The writers (E4 Cboe, E5 history) write every S in [D + offset, D + `within_sessions` - 1 + offset] for the screened names of an edge with `[outcome.entry]`; until they do, an entry condition on `option_pnl` is refused (G9-M3) | new (E13; shares: a harness mapping over `forward_returns@v2`'s rows; options after the writers cover the wait) |
-| exit condition | `[outcome.exit] when` (use site `exit`) | P2: needs the path-aware share grain | instrument, market and position-level fields at each close; `exit_kind = CONDITION` | new (E3b) |
+| exit condition | `[outcome.exit] when` (use site `exit`) | P1 via E3c (a share path walker) | instrument, market and position-level fields at each close; `exit_kind = CONDITION` | new (E3b) |
 
 **No entry at D's close (G-H1).** The screen, the gate (`market_conditions@v1` at D) and the
 picks are known only after D's close, so entering at that close is lookahead; the existing refusal
