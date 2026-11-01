@@ -263,7 +263,7 @@ def test_funds_and_blank_checks_are_not_in_the_fundamentals_denominator() -> Non
     company = [{"instrument_id": "EQ:R2", "symbol": "R2", "cik": "1", "name": "R2 Acquisition",
                 "sic": "6770", "sector": None, "fetched_on": D}]  # fmt: skip
     writer.write_table("instruments/company", D, "c", stamped(company, D, "c"))
-    put(writer, "rollups/instrument/fundamentals@v4", D,
+    put(writer, "rollups/instrument/fundamentals@v5", D,
         {"C1": {"shares_outstanding": 1.0}, "R1": {"shares_outstanding": None}})  # fmt: skip
     rule = CoverageRule("fundamentals.shares_outstanding", 0.5, 0.5)
     check = only(check_coverage(reader, D, rules(rule)), "fundamentals.shares_outstanding")
@@ -282,7 +282,7 @@ def test_the_breakdown_counts_every_name_and_says_why_a_company_has_no_value() -
         for s, cik, sic in (("R2", "1", "6770"), ("C2", "2", "3571"), ("R1", "3", "3571"))
     ]  # fmt: skip
     writer.write_table("instruments/company", D, "c", stamped(company, D, "c"))
-    put(writer, "rollups/instrument/fundamentals@v4", D,
+    put(writer, "rollups/instrument/fundamentals@v5", D,
         {"C1": {"shares_outstanding": 1.0}, "R1": {"shares_outstanding": None},
          "E1": {"shares_outstanding": None}})  # fmt: skip
     rule = CoverageRule("fundamentals.shares_outstanding", 0.5, 0.5)

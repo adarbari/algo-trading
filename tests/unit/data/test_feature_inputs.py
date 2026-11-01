@@ -313,7 +313,12 @@ def test_reference_input_is_the_security_types_the_session_sees() -> None:
     ]  # fmt: skip
     writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
     seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
-    assert seen is not None and list(seen.columns) == ["instrument_id", "security_type", "symbol"]
+    assert seen is not None and list(seen.columns) == [
+        "instrument_id",
+        "security_type",
+        "symbol",
+        "pre_snapshot",
+    ]
     assert dict(zip(seen["instrument_id"], seen["security_type"], strict=True)) == {
         "EQ:A": "ADR",
         "EQ:B": "COMMON_STOCK",
@@ -330,7 +335,8 @@ def test_reference_input_carries_the_fund_facts_when_stored() -> None:
     writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
     seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
     stored = [c for c in inputs.REFERENCE_FACTS if c not in ("cik", "share_class_figi")]
-    assert seen is not None and list(seen.columns) == stored  # the ids are not stored here
+    # the ids are not stored here
+    assert seen is not None and list(seen.columns) == [*stored, "pre_snapshot"]
     assert seen.iloc[0]["name"].endswith("Bull 2X Shares") and bool(seen.iloc[0]["is_leveraged"])
 
 
@@ -552,7 +558,7 @@ def _fact(accepted: str | None, filed: date, **extra: object) -> dict[str, objec
 
 
 def test_shares_accepted_counts_a_filing_after_the_close_from_the_next_session() -> None:
-    """``instruments/shares_accepted`` (financials@v3, fundamentals@v4): a 10-Q accepted 16:30
+    """``instruments/shares_accepted`` (financials@v3, fundamentals@v5): a 10-Q accepted 16:30
     New York time on D is invisible at D's close and visible at D+1; the legacy
     ``instruments/shares`` read (by filing date) shows it at D, the lookahead this fixes."""
     writer, reader = store()

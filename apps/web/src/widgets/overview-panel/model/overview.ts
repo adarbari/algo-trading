@@ -79,7 +79,7 @@ const GROUPS: readonly { id: string; title: string; facts: readonly FactSpec[] }
       {
         id: 'shares',
         label: 'Shares outstanding',
-        name: feature('rollup.fundamentals@v4.shares_outstanding'),
+        name: feature('rollup.fundamentals@v5.shares_outstanding'),
       },
       {
         id: 'growth',

@@ -105,7 +105,7 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        the same facts counted from the session each became public (``shares.
                        known_from``: the first session whose close is after SEC's
                        acceptance of the filing, else the session after ``filed``), sorted by it
-                       (``financials@v3``, ``fundamentals@v4``; ADR 0067 amendment)
+                       (``financials@v3``, ``fundamentals@v5``; ADR 0067 amendment)
 - ``instruments/statements``
                        ``statements.reading.statement_facts``: every stored statement line (cost
                        of revenue, operating income, cash flow, balance sheet..., one row per
@@ -188,7 +188,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.core.model.fields import COMPANY_TABLE, group_of_table
+from algotrade.core.model.fields import COMPANY_TABLE, REFERENCE_TABLE, group_of_table
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.data.analyst.reading import KINDS as ANALYST_KINDS
 from algotrade.data.analyst.reading import TABLE as ANALYST
@@ -222,6 +222,7 @@ from algotrade.data.reference import (
     ids_for_symbols,
     instruments,
     load_universe,
+    snapshot,
     symbol_ids,
 )
 from algotrade.data.rollups import rollup_rows
@@ -662,7 +663,11 @@ def _reference_facts(reader: StoreReader, session: date) -> pd.DataFrame | None:
         return None
     if "security_type" not in frame.columns:
         return None
-    return frame[[c for c in REFERENCE_FACTS if c in frame.columns]]
+    snap = snapshot(reader, REFERENCE_TABLE, session)
+    pre = (
+        snap is not None and snap.pre_snapshot
+    )  # a later snapshot stands in: its types are not the session's
+    return frame[[c for c in REFERENCE_FACTS if c in frame.columns]].assign(pre_snapshot=pre)
 
 
 def _leveraged_holdings(reader: StoreReader, session: date) -> pd.DataFrame | None:

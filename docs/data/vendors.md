@@ -736,6 +736,7 @@ cost an extra request.
 |---|---|---|
 | `dei:EntityCommonStockSharesOutstanding` (cover page, as of a date just before filing) | `dei` | each value; several values for one date are classes (companyfacts drops the class labels) and are summed, `class_values` counts them |
 | `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` | `weighted_basic` | the filing's current period: latest period end, then the shortest span (comparatives and year-to-date dropped) |
+| `ifrs-full:WeightedAverageShares` | `ifrs_weighted` | as `weighted_basic`; read by `fundamentals@v5` for non-ADR instruments only. A count tagged in `units` instead of `shares` (royalty trusts) is read from it; `unit` keeps the one read |
 | `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); all three tags are kept (`tag`), `financials@v3` prefers them in this order and never subtracts across tags |
 | `us-gaap:NetIncomeLoss` (USD) | `net_income` | the same periods; losses are kept |
 | `us-gaap:EarningsPerShareDiluted` (USD per share) | `eps_diluted` | the same periods; negative values are kept |
@@ -800,7 +801,7 @@ one fetch of each company's document; a CIK is fetched when either table is due.
 class-specific counts, so every instrument of a CIK (GOOGL and GOOG) gets the company total.
 Most multi-class issuers no longer tag the cover count, so they fall back to the weighted
 average; Berkshire's last facts are from 2015 (class A equivalents), so BRK.A / BRK.B are
-`STALE` in `fundamentals@v4`, not wrong.
+`STALE` in `fundamentals@v5`, not wrong.
 
 Checked live 2026-10-05 (financials, sessions up to 2026-10-02, scratch copy of the store): AAPL
 TTM revenue $466.8B (four quarters to 2026-06-27, filed 2026-07-31), net income $128.9B, diluted
@@ -815,7 +816,7 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 
 **Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
 download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
-`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v4`.
+`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v5`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The
 `instruments/statements` backlog (CIKs with share counts and no statements marker yet) is fetched
 `[sec_edgar] statements_backfill_per_night` (400) a night (5,260 CIKs), so it finishes in about 14 nights
@@ -831,12 +832,12 @@ accepted until 17:30 New York time that day, after the 16:00 close. The `shares`
 CIK's submissions (`sec_filings`, `https://data.sec.gov/submissions/CIK##########.json` and its older pages,
 every form back to 2009: one to a few extra requests per CIK through the shared `sec` limiter) and stores each
 fact's `acceptanceDateTime` as `accepted_ts` (UTC) in `instruments/shares` and `instruments/statements`.
-`financials@v3`, `fundamentals@v4`, `growth_history@v2`, `income_statement@v2`, `cash_flow@v2` and `balance_sheet@v2` count a fact from the first session whose close is after it.
+`financials@v3`, `fundamentals@v5`, `growth_history@v2`, `income_statement@v2`, `cash_flow@v2` and `balance_sheet@v2` count a fact from the first session whose close is after it.
 Backfill (owner, from the main checkout, once): `ACCEPTANCE_VERSION_DATE` (`company_facts.py`) counts every
 CIK fetched before it as backlog, refetched under the nightly cap (`backfill_per_night`, 400), no command; to do
 it at once run `algotrade-ingest run shares --force` (refetches every CIK, outside the cap; only the facts
 without a time that now have one are written, under their old keys), then
-`algotrade-ingest rollups --from <first session> --to <last session> --only financials@v3,fundamentals@v4,growth_history@v2,income_statement@v2,cash_flow@v2,balance_sheet@v2`
+`algotrade-ingest rollups --from <first session> --to <last session> --only financials@v3,fundamentals@v5,growth_history@v2,income_statement@v2,cash_flow@v2,balance_sheet@v2`
 and, once those are complete, `algotrade-ingest retire-features --group financials@v2 --dry-run` (then without
 `--dry-run`), the same for `fundamentals@v3`, `growth_history@v1`, `income_statement@v1`, `cash_flow@v1`, `balance_sheet@v1`. Facts never refetched keep a null time and count from the
 session after `filed` (never the old rule).

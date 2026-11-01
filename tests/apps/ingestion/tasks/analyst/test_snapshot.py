@@ -435,7 +435,7 @@ def seed_caps(writer: StoreWriter, caps: dict[str, float]) -> None:
         "sh",
     )
     writer.write_table("rollups/instrument/price_stats@v2", REFERENCE_DAY, "px", px)
-    writer.write_table("rollups/instrument/fundamentals@v4", REFERENCE_DAY, "sh", sh)
+    writer.write_table("rollups/instrument/fundamentals@v5", REFERENCE_DAY, "sh", sh)
 
 
 def test_a_night_of_refusals_asks_more_names_than_budget_over_three() -> None:

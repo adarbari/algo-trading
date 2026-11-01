@@ -26,7 +26,7 @@ from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.ingest_fakes import task_ctx
 
 FROM, TO = date(2020, 1, 1), date(2021, 8, 10)
-ONLY = ("price_stats@v2", "trend_stats@v2", "fundamentals@v4")
+ONLY = ("price_stats@v2", "trend_stats@v2", "fundamentals@v5")
 
 
 @pytest.fixture(scope="module")

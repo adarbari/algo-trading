@@ -67,7 +67,7 @@ source = "ours"          # "ours" (iv30@v1.iv30) or "cboe" (iv30@v1.iv30_cboe)
 window = 252             # sessions for a FULL rank (today included)
 min_provisional = 60     # sessions with an IBKR IV before the rank is shown (PROVISIONAL)
 
-["fundamentals@v4"]
+["fundamentals@v5"]
 stale_days = 400         # shares whose period ended longer ago than this are STALE (no market cap);
                          # 10-Q filers report every ~3 months, 20-F filers once a year
 

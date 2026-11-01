@@ -176,7 +176,7 @@ datasets-build:  ## regenerate golden CSVs from the catalogue (then review + com
 # (tests/integration/test_golden_edge.py::test_the_makefile_range_is_the_catalogue_range checks it).
 GOLDEN_FROM = 2020-01-01
 GOLDEN_TO = 2021-08-10
-GOLDEN_ROLLUPS = price_stats@v2,trend_stats@v2,fundamentals@v4
+GOLDEN_ROLLUPS = price_stats@v2,trend_stats@v2,fundamentals@v5
 GOLDEN_EDGE = momentum_12_1
 GOLDEN_BASELINES = --extra-baseline size_small  # scored on the golden store only, not in the edge document
 
