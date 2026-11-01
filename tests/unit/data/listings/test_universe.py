@@ -6,7 +6,13 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.listings.universe import COLUMNS, delisted_by, listed_asof, universe_asof
+from algotrade.data.listings.universe import (
+    COLUMNS,
+    delisted_by,
+    listed_asof,
+    listing_frame,
+    universe_asof,
+)
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -202,3 +208,214 @@ def test_listings_over_excludes_a_recycled_ticker_whose_membership_ended_before_
     writer.write_table("instruments/index_membership", day, "m", members)
     out, _ = listings_over(StoreReader(writer._backend), date(2010, 1, 4), date(2020, 12, 31))
     assert out.empty  # the old company's membership is not the new listing's
+
+
+# ---------------------------------------------------- the merged table (ADR 0087): every read
+
+
+def _merged_store() -> StoreReader:
+    """A merged snapshot: a Tiingo row, a Massive-only row, a Tiingo row out of scope that
+    carries an id and is alive (an OTC listing), and a Massive row with no start date."""
+    now, day = pd.Timestamp("2026-10-05", tz="UTC"), date(2026, 10, 5)
+    rows = [  # id, ticker, exchange, source, start, end, scope_reason, security_type
+        ("EQ:A", "AAA", "NASDAQ", "tiingo", date(2000, 1, 3), None, None, None),
+        ("EQ:M", "MMM", "NASDAQ", "massive", date(2000, 1, 3), date(2013, 1, 2), None, "WARRANT"),
+        ("EQ:O", "OTC", "NASDAQ", "tiingo", date(2000, 1, 3), None, "other_exchange", None),
+        ("EQ:U", "UND", "NASDAQ", "massive", None, date(2014, 1, 2), None, "COMMON_STOCK"),
+        (None, "NOEND", "NASDAQ", "massive", None, None, None, None),
+    ]
+    frame = pd.DataFrame(
+        rows,
+        columns=["instrument_id", "ticker", "exchange", "source", "start_date", "end_date",
+                 "scope_reason", "security_type"],
+    ).assign(asset_type="Stock", price_currency="USD", perma_ticker="", ts=now,
+             session_date=day, knowledge_ts=now, run_id="r")  # fmt: skip
+    frame["start_date"] = (
+        frame["start_date"].astype(object).where(frame["start_date"].notna(), None)
+    )
+    frame["end_date"] = frame["end_date"].astype(object).where(frame["end_date"].notna(), None)
+    members = pd.DataFrame(
+        {"index_name": ["SP500"], "ticker": ["AAA"], "start_date": [date(2000, 1, 3)],
+         "end_date": [None], "ts": [now], "session_date": [day], "knowledge_ts": [now],
+         "source": ["x"], "run_id": ["m"]}
+    )  # fmt: skip
+    writer = StoreWriter(MemoryBackend())
+    writer.write_table("instruments/listing_history", day, "r", frame)
+    writer.write_table("instruments/index_membership", day, "m", members)
+    return StoreReader(writer._backend)
+
+
+def test_rows_out_of_scope_are_stored_but_never_read() -> None:
+    from algotrade.data.listings.resolvers import listing_resolver  # noqa: PLC0415
+    from algotrade.data.listings.tickers import listing_tickers  # noqa: PLC0415
+    from algotrade.data.listings.universe import (  # noqa: PLC0415
+        listing_frame,
+        listings_over,
+        read_listings,
+    )
+
+    reader = _merged_store()
+    raw = reader.table("instruments/listing_history", date(2026, 10, 5))
+    assert raw is not None and "OTC" in set(raw["ticker"])  # stored
+    frame, snap = listing_frame(reader)
+    assert snap.snapshot_date == date(2026, 10, 5) and "OTC" not in set(frame["ticker"])
+    assert "OTC" not in set(universe_asof(reader, date(2012, 6, 1)).instruments["ticker"])
+    over, _ = listings_over(reader, date(2010, 1, 4), date(2012, 6, 1))
+    assert "OTC" not in set(over["ticker"])
+    assert "EQ:O" not in delisted_by(reader, date(2030, 1, 1))
+    assert "OTC" not in set(read_listings(reader)[0]["ticker"])
+    assert listing_resolver(reader)(date(2012, 6, 1)).knows("OTC") is False
+    assert "EQ:O" not in listing_tickers(reader).by_id
+
+
+def test_an_old_snapshot_reads_null_types_and_the_added_columns_without_a_key_error() -> None:
+    backend, day = MemoryBackend(), date(2026, 10, 5)
+    old = _listings().assign(source="tiingo", run_id="r", perma_ticker="", price_currency="USD")
+    old["ts"] = pd.Timestamp(day, tz="UTC")
+    old = old.assign(session_date=day, knowledge_ts=pd.Timestamp(day, tz="UTC"))
+    old["start_date"] = pd.to_datetime(old["start_date"]).dt.date
+    old["end_date"] = pd.to_datetime(old["end_date"]).dt.date.where(old["end_date"].notna(), None)
+    StoreWriter(backend).write_table("instruments/listing_history", day, "r", old)
+    members = pd.DataFrame(
+        {"index_name": ["SP500"], "ticker": ["AAA"], "start_date": [date(1999, 1, 4)],
+         "end_date": [None], "ts": [pd.Timestamp(day, tz="UTC")], "session_date": [day],
+         "knowledge_ts": [pd.Timestamp(day, tz="UTC")], "source": ["x"], "run_id": ["m"]}
+    )  # fmt: skip
+    StoreWriter(backend).write_table("instruments/index_membership", day, "m", members)
+    got = universe_asof(StoreReader(backend), S)  # no scope_reason, no security_type stored
+    assert list(got.instruments["ticker"]) == ["AAA", "CCC", "DDD", "RCY"]
+    assert got.instruments["security_type"].isna().all()
+    assert got.null_type == 3 and got.undated == 0  # the three Stocks; DDD is an ETF
+    frame, _ = listing_frame(StoreReader(backend))
+    assert {"scope_reason", "id_source", "vendor_end_date", "is_adr"} <= set(frame.columns)
+    assert frame["scope_reason"].isna().all() and len(frame) == len(old)
+
+
+def test_a_listing_with_no_start_is_counted_undated_and_never_returned() -> None:
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    reader = _merged_store()
+    got = universe_asof(reader, date(2012, 6, 1))
+    # UND (end 2014) and NOEND (open) may be alive on S: counted, never returned; MMM is dated.
+    assert got.undated == 2
+    assert list(got.instruments["ticker"]) == ["AAA", "MMM"]
+    assert list(got.instruments["security_type"].fillna("none")) == ["none", "WARRANT"]
+    assert got.null_type == 1  # AAA is a Stock with no type
+    assert universe_asof(reader, date(2013, 6, 3)).undated == 2  # UND until 2014-01-02, NOEND open
+    assert universe_asof(reader, date(2015, 1, 5)).undated == 1  # UND has ended: only NOEND
+    over, _ = listings_over(reader, date(2010, 1, 4), date(2020, 12, 31))
+    assert "UND" not in set(over["ticker"])  # the guard: a null start is never in a window
+
+
+def test_the_winners_sample_reads_only_tiingo_rows() -> None:
+    from algotrade.data.listings.universe import read_listings  # noqa: PLC0415
+
+    frame, _ = read_listings(_merged_store())
+    assert set(frame["source"]) == {"tiingo"} and list(frame["ticker"]) == ["AAA"]
+
+
+def _shared_id_store(
+    rows: list[tuple[str, str, date, date | None]], perma: bool = False
+) -> StoreReader:
+    """Listings (id, ticker, start, end), all NASDAQ stocks of one snapshot; ``perma``: each
+    row's permaTicker is its id's (one company)."""
+    now, day = pd.Timestamp("2026-10-05", tz="UTC"), date(2026, 10, 5)
+    frame = pd.DataFrame(rows, columns=["instrument_id", "ticker", "start_date", "end_date"])
+    frame = frame.assign(exchange="NASDAQ", asset_type="Stock", price_currency="USD",
+                         perma_ticker=frame["instrument_id"].str[3:] if perma else "",
+                         source="tiingo", ts=now, session_date=day,
+                         knowledge_ts=now, run_id="r")  # fmt: skip
+    frame["end_date"] = frame["end_date"].astype(object).where(frame["end_date"].notna(), None)
+    members = pd.DataFrame(
+        {"index_name": ["SP500"], "ticker": ["NONE"], "start_date": [date(2000, 1, 3)],
+         "end_date": [None], "ts": [now], "session_date": [day], "knowledge_ts": [now],
+         "source": ["x"], "run_id": ["m"]}
+    )  # fmt: skip
+    writer = StoreWriter(MemoryBackend())
+    writer.write_table("instruments/listing_history", day, "r", frame)
+    writer.write_table("instruments/index_membership", day, "m", members)
+    return StoreReader(writer._backend)
+
+
+def test_two_listings_of_one_id_alive_together_are_one_name_and_counted() -> None:
+    reader = _shared_id_store(
+        [
+            ("EQ:X", "XYZ", date(2000, 1, 3), date(2025, 3, 1)),
+            ("EQ:X", "XYZQ", date(2001, 1, 3), date(2025, 6, 2)),  # the same id, alive together
+            ("EQ:Y", "YYY", date(2000, 1, 3), None),
+        ]
+    )
+    got = universe_asof(reader, date(2024, 6, 3))  # the later start stays, as in the resolver
+    assert list(got.instruments["ticker"]) == ["XYZQ", "YYY"] and got.duplicate_id == 1
+    later = universe_asof(reader, date(2025, 4, 1))  # only the second is still listed
+    assert list(later.instruments["ticker"]) == ["XYZQ", "YYY"] and later.duplicate_id == 0
+
+
+def test_a_shared_id_is_delisted_only_once_every_one_of_its_listings_has_ended() -> None:
+    reader = _shared_id_store(
+        [
+            ("EQ:FB", "FB", date(2012, 5, 18), date(2022, 6, 8)),  # a ticker change: one instrument
+            ("EQ:FB", "META", date(2022, 6, 9), None),
+            ("EQ:Z", "ZZZ", date(2000, 1, 3), date(2010, 1, 4)),
+            ("EQ:W", "WA", date(2000, 1, 3), date(2005, 1, 4)),
+            ("EQ:W", "WB", date(2006, 1, 3), date(2012, 1, 4)),
+        ]
+    )
+    assert delisted_by(reader, date(2030, 1, 1)) == {
+        "EQ:Z": date(2010, 1, 4),
+        "EQ:W": date(2012, 1, 4),
+    }  # FB: META is still listed
+    assert delisted_by(reader, date(2011, 1, 1)) == {"EQ:Z": date(2010, 1, 4)}  # WB still listed
+
+
+def test_a_gap_relisting_after_the_session_does_not_hide_an_earlier_delisting() -> None:
+    reader = _shared_id_store(
+        [
+            ("EQ:G", "GAP", date(2000, 1, 3), date(2012, 1, 4)),
+            ("EQ:G", "GAP", date(2015, 1, 5), None),  # re-listed in 2015: unknown in 2013
+        ]
+    )
+    assert delisted_by(reader, date(2013, 1, 2)) == {"EQ:G": date(2012, 1, 4)}
+    assert delisted_by(reader, date(2016, 1, 4)) == {}  # open again once it has started
+
+
+def test_a_shared_id_keeps_the_span_of_all_its_listings_for_the_bars_backfill() -> None:
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    reader = _shared_id_store(
+        [
+            ("EQ:FB", "FB", date(2012, 5, 18), date(2022, 6, 8)),
+            ("EQ:FB", "META", date(2022, 6, 9), None),  # one company, two tickers in turn
+            ("EQ:Q", "QQQ", date(2000, 1, 3), date(2010, 1, 4)),
+            ("EQ:Q", "QQQ", date(2013, 1, 3), date(2020, 1, 3)),  # a gap re-listing
+            ("EQ:X", "XA", date(2001, 1, 3), None),
+        ],
+        perma=True,
+    )
+    over, _ = listings_over(reader, date(2010, 6, 1), date(2024, 1, 2))
+    by = over.set_index("instrument_id")
+    assert by.loc["EQ:FB", ["ticker", "start_date", "end_date"]].tolist() == [
+        "META",
+        date(2012, 5, 18),
+        None,
+    ]  # the earliest start, open because META is, the latest ticker
+    assert by.loc["EQ:Q", "start_date"] == date(2013, 1, 3)  # 2000-2010 is before the window
+    assert by.loc["EQ:Q", "end_date"] == date(2020, 1, 3) and by.loc["EQ:Q", "reused"]
+    assert len(over) == 3
+    wide, _ = listings_over(reader, date(1999, 1, 4), date(2024, 1, 2))
+    q = wide.set_index("instrument_id").loc["EQ:Q"]
+    assert (q["start_date"], q["end_date"]) == (date(2000, 1, 3), date(2020, 1, 3))
+
+
+def test_the_universe_keeps_the_latest_start_of_an_id_alive_twice_as_the_resolver_does() -> None:
+    from algotrade.data.listings.resolvers import listing_resolver  # noqa: PLC0415
+
+    reader = _shared_id_store(
+        [
+            ("EQ:X", "AAA", date(2000, 1, 3), None),
+            ("EQ:X", "ZZZ", date(2010, 1, 4), None),  # the later start, the later ticker
+        ]
+    )
+    got = universe_asof(reader, date(2012, 6, 1))
+    assert list(got.instruments["ticker"]) == ["ZZZ"] and got.duplicate_id == 1
+    assert listing_resolver(reader)(date(2012, 6, 1)).id_for("ZZZ") == "EQ:X"

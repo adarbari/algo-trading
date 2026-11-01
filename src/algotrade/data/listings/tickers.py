@@ -14,8 +14,7 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.data.listings.universe import TABLE
-from algotrade.data.reference import REFERENCE_HINT, read_snapshot
+from algotrade.data.listings.universe import listing_frame
 from algotrade.storage.tables.readers import StoreReader
 
 
@@ -36,7 +35,7 @@ class ListingTickers:
 
 def listing_tickers(reader: StoreReader) -> ListingTickers:
     """The tickers of every listing with a trusted id in the latest listing snapshot."""
-    frame, snap = read_snapshot(reader, TABLE, None, REFERENCE_HINT)
+    frame, snap = listing_frame(reader)
     ids = frame["instrument_id"].notna() & (frame["instrument_id"].astype(str) != "")
     kept = frame[ids]
     starts = pd.to_datetime(kept["start_date"]).dt.date

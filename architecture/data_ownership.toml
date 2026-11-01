@@ -89,7 +89,7 @@ detect = [{ call = "stored_filing_text" }, { call = "latest_filing_versions" }, 
 
 [[responsibility]]
 id = "historical-identity"
-description = "The names and identity fields of a session before the first reference snapshot (ADR 0053 amendment 2026-10-09, ED6): universe_asof's listings alive on the session (the delisted too) in place of the earliest snapshot's names, a name alive in today's snapshot keeping today's row (optionable, security_type: a disclosed lookahead tilt), a delisted one counted as a common stock with its optionable decided by the universe's own close and adv_usd_20d floors (a universe without them is a ConfigurationError, never a number of our own); the edge harness and the training frame only (historical=True), the run's caveat (rule, sessions, names by path) persisted in its run record and shown in its report"
+description = "The names and identity fields of a session before the first reference snapshot (ADR 0053 amendment 2026-10-09, ED6): universe_asof's listings alive on the session (the delisted too) in place of the earliest snapshot's names, a name alive in today's snapshot keeping today's row (optionable, security_type: a disclosed lookahead tilt), a delisted one keeping the security_type the listing history stored (Massive's, point in time: a warrant stays a warrant, ADR 0087) and only a null type counted as a common stock (an ETF row stays an ETF), those names in type_proxy_ids and counted by type_paths, with its optionable decided by the universe's own close and adv_usd_20d floors (a universe without them is a ConfigurationError, never a number of our own); the edge harness and the training frame only (historical=True), the run's caveat (rule, sessions, names by path) persisted in its run record and shown in its report"
 owner = ["src/algotrade/data/listings/identity.py", "src/algotrade/services/evaluation/cross_section/historical.py"]
 allowed = ["src/algotrade/services/evaluation/cross_section/picks.py", "src/algotrade/services/features.py"]  # the callers: the harness reads, field_view substitutes
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-09-historical-eligibility-before-the-first-snapshot"
@@ -112,7 +112,7 @@ detect = [{ call = "build_history" }, { call = "HistoryCopy" }]
 
 [[responsibility]]
 id = "listing-ticker-asof"
-description = "The ticker a listing carried on a session, for a name no reference snapshot ever held (a delisted pick of an edge's trade ledger, EQ:TIINGO:<perma>): the latest instruments/listing_history row of the id that started on or before the session (a name listed later has none, never a later ticker; the vendor's end_date is not read), read once per publish by the ledger's cache; edge_ledger/trades.py only"
+description = "The ticker a listing carried on a session, for a name no reference snapshot ever held (a delisted pick of an edge's trade ledger, EQ:TIINGO:<perma>): the latest instruments/listing_history row in scope of the id (through data.listings.universe.listing_frame, never the raw table: an out-of-scope row is never read) that started on or before the session (a name listed later has none, never a later ticker; the vendor's end_date is not read), read once per publish by the ledger's cache; edge_ledger/trades.py only"
 owner = ["src/algotrade/data/listings/tickers.py"]
 allowed = ["src/algotrade/services/read/edge_ledger/trades.py"]  # the ledger names its delisted picks
 section = "docs/adr/0018-figi-instrument-ids.md#decision"

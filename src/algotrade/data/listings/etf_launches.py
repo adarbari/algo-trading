@@ -21,7 +21,7 @@ import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
-from algotrade.data.listings.universe import TABLE as LISTINGS
+from algotrade.data.listings.universe import listing_frame
 from algotrade.data.reference import REFERENCE_HINT, read_snapshot
 from algotrade.storage.tables.readers import StoreReader
 
@@ -44,7 +44,7 @@ def etf_launches(reader: StoreReader) -> pd.DataFrame:
         )
     funds = reference[reference["etf_category"].isin(SPECIALISED)]
     funds = funds[["instrument_id", "etf_category", "etf_theme"]]
-    listings, _ = read_snapshot(reader, LISTINGS, None, REFERENCE_HINT)
+    listings, _ = listing_frame(reader)
     listings = listings[["instrument_id", "start_date"]].dropna()
     starts = listings.assign(event_date=pd.to_datetime(listings["start_date"]).dt.date)
     first = starts.groupby("instrument_id")["event_date"].min().rename("event_date")

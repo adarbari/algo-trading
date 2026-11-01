@@ -4,15 +4,19 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.core.model.instruments import equity_id
 from algotrade.data import StoreReader
 from algotrade.data.reference import resolver
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.reference.instrument_ids import (
     assign_ids,
+    assign_listing_ids,
+    assign_listing_ids_counted,
     cumulative_map,
     figi_review_rows,
     match_perma,
+    match_perma_reasons,
     rename_ids,
 )
 from algotrade_ingestion.tasks.reference.universe_build import (
@@ -274,3 +278,116 @@ def test_single_delisted_listing_never_takes_active_row() -> None:
     assert list(perma) == [""] and stats["perma_ambiguous"] == 1
     perma, _ = match_perma(_listings(("LIVE", None)), _meta(("LIVE", "US8", False)))
     assert list(perma) == [""]  # an open listing never takes an inactive row either
+
+
+def test_match_perma_says_why_a_listing_has_none() -> None:
+    listings = _listings(("AAC", date(2021, 4, 19)), ("AAC", date(2023, 11, 6)), ("ZZZ", None))
+    meta = _meta(("AAC", "US1", False), ("AAC", "US2", False))
+    perma, why, stats = match_perma_reasons(listings, meta)
+    assert list(perma) == ["", "", ""]
+    assert list(why) == ["perma_ambiguous", "perma_ambiguous", "perma_no_meta"]
+    assert stats["perma_ambiguous"] == 2 and stats["perma_no_meta"] == 1
+
+
+# ------------------------------------------------------- listing ids (ADR 0087, the id order)
+
+
+def _listing_rows(*rows: dict[str, object]) -> pd.DataFrame:
+    base: dict[str, object] = {
+        "source": "tiingo", "exchange": "NASDAQ", "asset_type": "Stock",
+        "start_date": date(2005, 1, 3), "end_date": date(2015, 1, 2), "perma_ticker": "",
+        "figi": None, "scope_reason": None,
+    }  # fmt: skip
+    return pd.DataFrame([{**base, **row} for row in rows])
+
+
+def _history(*rows: tuple[str, str, date, date | None]) -> pd.DataFrame:
+    return pd.DataFrame(rows, columns=["instrument_id", "symbol", "valid_from", "valid_to"])
+
+
+def test_the_figi_step_runs_only_after_symbol_history_and_the_perma_ticker_fail() -> None:
+    listings = _listing_rows(
+        {"ticker": "HIST", "figi": "BBG000HIST"},  # symbol_history first: its figi is not used
+        {"ticker": "PERM", "perma_ticker": "US1", "figi": "BBG000PERM"},  # the perma next
+        {"ticker": "FIGI", "figi": "BBG000FIGI"},  # neither: the figi
+        {"ticker": "TWIN1", "figi": "BBG000TWIN"},  # one figi on two listings: none of them
+        {"ticker": "TWIN2", "figi": "BBG000TWIN"},
+        {"ticker": "HELD", "figi": "BBG000HELD"},  # its id is symbol_history's for another symbol
+        {"ticker": "MAPPED", "figi": "BBG000MAP"},  # its id is an id_map new_id
+    )
+    history = _history(
+        ("EQ:BBG000HIST", "HIST", date(2000, 1, 3), None),
+        ("EQ:BBG000HELD", "RENAMED", date(2000, 1, 3), None),
+    )
+    out, stats = assign_listing_ids_counted(listings, history, None, {"EQ:BBG000MAP"})
+    by = out.set_index("ticker")
+    pairs = ["instrument_id", "id_source"]
+    assert by.loc["HIST", pairs].tolist() == ["EQ:BBG000HIST", "symbol_history"]
+    assert by.loc["PERM", pairs].tolist() == ["EQ:TIINGO:US1", "perma"]
+    assert by.loc["FIGI", pairs].tolist() == ["EQ:BBG000FIGI", "figi"]
+    assert by.loc[["TWIN1", "TWIN2"], "instrument_id"].isna().all()
+    assert set(by.loc[["TWIN1", "TWIN2"], "no_id_reason"]) == {"figi_shared"}
+    assert by.loc["HELD", "no_id_reason"] == "figi_held" and pd.isna(
+        by.loc["HELD", "instrument_id"]
+    )
+    assert by.loc["MAPPED", "no_id_reason"] == "figi_held"
+    assert stats["ids_by_figi"] == 1 and stats["no_id_figi_shared"] == 2
+
+
+def test_listings_of_one_perma_ticker_share_its_id_in_turn_never_at_once() -> None:
+    listings = _listing_rows(
+        {"ticker": "FIRST", "perma_ticker": "US7"},  # 2005 to 2015
+        {"ticker": "SECOND", "perma_ticker": "US7", "start_date": date(2016, 1, 4),
+         "end_date": None},  # the ticker change: the same instrument, listed after
+        {"ticker": "THIRD", "perma_ticker": "US7", "start_date": date(2010, 1, 4),
+         "end_date": None},  # alive with FIRST: another company under the same permaTicker
+    )  # fmt: skip
+    out, stats = assign_listing_ids_counted(listings, None)
+    by = out.set_index("ticker")
+    assert by.loc["FIRST", "instrument_id"] == "EQ:TIINGO:US7"
+    assert by.loc["SECOND", "instrument_id"] == "EQ:TIINGO:US7"  # shared, not alphabetical luck
+    assert (
+        pd.isna(by.loc["THIRD", "instrument_id"])
+        and by.loc["THIRD", "no_id_reason"] == "perma_held"
+    )
+    assert stats["no_id_perma_held"] == 1
+
+
+def test_a_carried_id_is_never_upgraded_even_when_the_rules_now_give_another() -> None:
+    previous = _listing_rows(
+        {"ticker": "KEEP", "instrument_id": "EQ:TIINGO:US5", "id_source": "perma"},
+        {"ticker": "OLDSTYLE", "instrument_id": "EQ:TIINGO:US6"},  # a partition before id_source
+        {"ticker": "GONE", "source": "massive", "exchange": "NYSE",
+         "instrument_id": "EQ:BBG000GONE", "id_source": "figi", "end_date": date(2020, 5, 1)},
+    )  # fmt: skip
+    listings = _listing_rows(
+        # it delisted since (a new end date): the id stays; the rule would now give another
+        {"ticker": "KEEP", "figi": "BBG000KEEP", "end_date": date(2016, 1, 4)},
+        {"ticker": "OLDSTYLE", "perma_ticker": "US6"},
+        {"ticker": "GONE", "source": "massive", "exchange": "NYSE", "end_date": date(2020, 5, 1),
+         "figi": "BBG000GONE"},
+    )  # fmt: skip
+    history = _history(("EQ:BBG000KEEP", "KEEP", date(2000, 1, 3), None))
+    out, stats = assign_listing_ids_counted(listings, history, previous)
+    by = out.set_index("ticker")
+    assert by.loc["KEEP", "instrument_id"] == "EQ:TIINGO:US5"  # not EQ:BBG000KEEP
+    assert by.loc["KEEP", "id_source"] == "perma"
+    assert by.loc["OLDSTYLE", "id_source"] == "perma"  # inferred for an older partition
+    assert by.loc["GONE", "instrument_id"] == "EQ:BBG000GONE"  # a Massive row: (ticker, end)
+    assert stats["ids_carried"] == 3 and stats["ids_held"] == 1  # only KEEP differs
+
+
+def test_no_id_is_ever_the_symbol_id_and_a_null_start_or_an_out_of_scope_row_has_none() -> None:
+    listings = _listing_rows(
+        {"ticker": "NONE"},  # nothing to build an id from
+        {"ticker": "UNDATED", "start_date": None, "perma_ticker": "US2", "figi": "BBG000UND",
+         "no_id_reason": "perma_ambiguous"},
+        {"ticker": "OTC", "scope_reason": "other_exchange", "perma_ticker": "US3"},
+        {"ticker": "OK", "perma_ticker": "US4"},
+    )  # fmt: skip
+    out = assign_listing_ids(listings, None).set_index("ticker")
+    assert out["instrument_id"].dropna().tolist() == ["EQ:TIINGO:US4"]
+    assert out.loc["NONE", "no_id_reason"] == "no_perma"
+    assert out.loc["UNDATED", "no_id_reason"] == "perma_ambiguous"  # the reason it was given
+    assert out.loc["OTC", "no_id_reason"] == "out_of_scope"
+    assert not any(i == equity_id(t) for t, i in out["instrument_id"].dropna().items())

@@ -16,7 +16,8 @@ ALLOWED = (
     "src/algotrade/data/resolver.py",  # is this listing alive on S
     "src/algotrade/storage/tables/schemas/reference.py",  # declares the columns
     "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",  # listing -> id
-    "apps/ingestion/algotrade_ingestion/tasks/listings/",  # winners sample, coverage, delisted
+    # winners sample, coverage, delisted, the merge into the listing history (listing_merge)
+    "apps/ingestion/algotrade_ingestion/tasks/listings/",
     "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # listings_over: clip
     "libs/sources/",  # the vendor adapters that write the column (Tiingo, Massive inactive)
 )

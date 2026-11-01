@@ -104,13 +104,14 @@ class NoResponseError(LookupError):
 
 
 def stamp(
-    frame: pd.DataFrame, session_date: date, now: datetime, source: str, run_id: str
+    frame: pd.DataFrame, session_date: date, now: datetime, source: str | pd.Series, run_id: str
 ) -> pd.DataFrame:
-    """Add the point-in-time columns every stored row needs (ADR 0007)."""
+    """Add the point-in-time columns every stored row needs (ADR 0007). ``source`` is one name,
+    or one per row (a merged table: Tiingo's rows beside Massive's, ADR 0087)."""
     out = frame.copy()
     out["session_date"] = session_date
     out["knowledge_ts"] = pd.Timestamp(now)
-    out["source"] = source
+    out["source"] = source.to_numpy() if isinstance(source, pd.Series) else source
     out["run_id"] = run_id
     return out
 
@@ -362,7 +363,7 @@ class IngestRun:
     # ------------------------------------------------------------------ writes
 
     def stamped(
-        self, frame: pd.DataFrame, source: str, session: date | None = None
+        self, frame: pd.DataFrame, source: str | pd.Series, session: date | None = None
     ) -> pd.DataFrame:
         return stamp(frame, session or self.session, self.clock(), source, self.run_id)
 
@@ -370,11 +371,12 @@ class IngestRun:
         self,
         table: str,
         frame: pd.DataFrame,
-        source: str,
+        source: str | pd.Series,
         session: date | None = None,
         known: datetime | pd.Series | None = None,
     ) -> None:
-        """Stamp and write one partition (validated against the table schema). ``known``: the
+        """Stamp and write one partition (validated against the table schema). ``source``: one
+        name, or one per row (a Series of ``frame``'s length, like ``known``). ``known``: the
         ``knowledge_ts`` of the rows (one moment, or one per row) when it is not the write time (a
         row derived from stored data is knowable when the latest of that data was: the chain P&L,
         ADR 0053 amendment)."""
