@@ -40,8 +40,13 @@ def run(series: pd.DataFrame, session: date = END, **inputs: object) -> dict[str
     return {k: (None if pd.isna(v) else v) for k, v in frame.iloc[0].to_dict().items()}
 
 
-def trend_row(rv: float | None = 0.12, sma: float | None = 0.03) -> pd.DataFrame:
-    return pd.DataFrame([{"spx_realised_vol_20d": rv, "spx_close_vs_sma200": sma}])
+def trend_row(
+    rv: float | None = 0.12, sma: float | None = 0.03, day: date = DAYS[-1]
+) -> pd.DataFrame:
+    """A ``market_trend@v2`` row dated ``day`` (default: the VIX's observation date)."""
+    return pd.DataFrame(
+        [{"session_date": day, "spx_realised_vol_20d": rv, "spx_close_vs_sma200": sma}]
+    )
 
 
 def test_contango_and_the_shared_observation_date() -> None:
@@ -200,8 +205,10 @@ def test_calendar_flags() -> None:
     assert opex["in_opex_week"] is True
     monday = c.calendar_columns(None, date(2026, 10, 5))
     assert monday["weekday"] == 0 and monday["last_before_weekend"] is False
-    thursday_holiday = c.calendar_columns(None, date(2026, 11, 25))  # Thanksgiving week
-    assert thursday_holiday["last_before_weekend"] is False  # Friday trades, a short day
+    wednesday = c.calendar_columns(None, date(2026, 11, 25))  # Thanksgiving week: Thursday is shut
+    assert wednesday["last_before_weekend"] is False  # Friday trades, the week goes on
+    good_friday = c.calendar_columns(None, date(2026, 4, 2))  # Thursday before Good Friday
+    assert good_friday["last_before_weekend"] is True
 
 
 def test_season_share_is_of_the_names_with_an_expected_date() -> None:
@@ -239,3 +246,13 @@ def test_the_headline_regime_does_not_read_the_leaf() -> None:
     tables = {i.table for i in regime.GROUP.inputs}
     assert c.GROUP.table not in tables and c.GROUP.key == "market_conditions@v1"
     assert regime.GROUP.key == "regime@v3"
+
+
+def test_the_index_is_read_for_the_vix_date_never_the_sessions_own() -> None:
+    cheap_today = pd.concat(
+        [trend_row(rv=0.12), trend_row(rv=0.40, day=END)]
+    )  # a crash day: S only
+    got = run(macro(vix=20), **{TREND: cheap_today})
+    assert got["index_vrp_cheap_on"] is False and got["index_vrp_rich_on"] is True
+    only_today = trend_row(rv=0.40, day=END)
+    assert run(macro(vix=20), **{TREND: only_today})["index_vrp_cheap_on"] is None

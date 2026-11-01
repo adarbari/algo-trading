@@ -176,8 +176,8 @@ term = "Index options rich"
 short = "On when the VIX is at least 4 points above the S&P 500's realised volatility of the last 20 sessions."
 body = """
 Options priced well above the movement that actually happened leave a margin for the seller. It is
-off below that margin, and unknown when realised volatility is unknown. The realised figure ends a
-day later than the VIX close, so the gap is approximate.
+off below that margin, and unknown when realised volatility is unknown. Realised volatility is read
+for the VIX's own date, so both sides describe the same close.
 """
 see_also = ["index_vrp_cheap_on"]
 
@@ -208,7 +208,7 @@ term = "Rates rising fast"
 short = "On when the 10-year yield rose 50 basis points or more in 63 sessions, or the yield curve has been inverted for about a month."
 body = """
 Either part is enough. 2022 is the clear case in the sample. It is off when neither holds, and
-unknown when the yield change is unknown and the curve verdict is off or unknown.
+unknown when one part is unknown and the other is not on.
 """
 see_also = ["y10_chg_63d"]
 
@@ -278,10 +278,10 @@ see_also = ["fomc_cycle_week"]
 [[term]]
 id = "fomc_cycle_week"
 term = "FOMC cycle week"
-short = "Whole weeks since the latest Federal Reserve rate decision; 0 is the decision's own week."
+short = "Whole 7-day periods since the latest Federal Reserve rate decision; 0 is the first 6 days."
 body = """
 The Fed meets about every six weeks, so the value runs from 0 to about 6 and then restarts. Some
-setups skip the week before a decision. It is unknown when no earlier decision is known.
+setups skip the days before a decision. It is unknown when no earlier decision is known.
 """
 see_also = ["sessions_to_fomc"]
 

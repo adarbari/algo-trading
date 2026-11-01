@@ -13,8 +13,11 @@ Inputs: ``macro/series`` VIX, VIX3M, VIX9D, VIX6M and VVIX (Cboe closes, ``pit =
 
 Point in time. A VIX-family value is the latest observation known by the session; the shared
 observation date ``vix_obs_date`` is the VIX's, and a series that has no observation on that
-exact date is null (a ratio of two series is never taken across dates, never filled). Stale is
-null: when the newest VIX observation is more than ``MAX_AGE_SESSIONS`` old every VIX-derived
+exact date is null (a ratio of two series is never taken across dates, never filled); the
+S&P 500 trend and realised volatility are read from the ``market_trend@v2`` row dated
+``vix_obs_date``, never the session's own, so the VIX and the index describe the same close.
+Stale is null: when the newest VIX observation is more than ``MAX_AGE_SESSIONS`` old every
+VIX-derived
 column is null. Rolling windows count observations known by the session and are complete or
 null (``WINDOW`` observations of the VIX for the percentile, so the statistics are null for the
 first year of each series). No hysteresis: a verdict flips as its inputs do.
@@ -105,7 +108,9 @@ _CURVE_ON = indicators.GROUP.feature("curve_10y3m_on").key
 _OWN_VIX, _OWN_VIX3M, _OWN9D, _OWN_VVIX, _OWN_PCT = (  # the verdicts read the stored values
     f"{NAME}.{c}@v{VERSION}" for c in ("vix", "vix3m", "vix9d", "vvix", "vix_pct_252")
 )
-_OWN_HIGH, _OWN_MEDIAN = (f"{NAME}.{c}@v{VERSION}" for c in ("vix_high_20", "vix_median_252"))
+_OWN_HIGH, _OWN_MEDIAN, _OWN_CHG = (
+    f"{NAME}.{c}@v{VERSION}" for c in ("vix_high_20", "vix_median_252", "vix_chg_5d")
+)
 _YIELD = f"{TREASURY_10Y}.rate_par"
 _FOMC = f"{RELEASES}.release_date"
 _SEASON = earnings_expected.GROUP.feature("sessions_to_expected_report").key
@@ -299,7 +304,7 @@ FEATURES = (
         "Interest rates are rising fast: the 10-year yield is "
         "up 50 basis points or more in 63 sessions, or the yield curve has been inverted for "
         "about a month",
-        "neither the yield change nor the curve verdict is known",
+        "the yield change or the curve verdict is unknown and the other is not on",
         (_YIELD, _CURVE_ON),
     ),
     _open(
@@ -335,7 +340,7 @@ FEATURES = (
         "volatility outside a post-spike recovery, and the S&P 500 is not below its 200-day "
         "mean with VIX rising in the stress band",
         "a condition it needs is unknown and none of the others is on",
-        (_OWN_VIX, _OWN_VIX3M, _RV, _SMA),
+        (_OWN_VIX, _OWN_VIX3M, _OWN_HIGH, _OWN_MEDIAN, _OWN_CHG, _RV, _SMA),
     ),
     _open(
         "earnings_season_share",
@@ -361,8 +366,8 @@ FEATURES = (
         "fomc_cycle_week",
         "int",
         "count",
-        "Whole weeks since the latest FOMC decision on or "
-        "before the session (0: the decision's own week)",
+        "Whole 7-day periods since the latest FOMC decision on or "
+        "before the session (0: the first 6 days)",
         "no FOMC decision is known before the session",
         (_FOMC,),
         (0, 60),
@@ -564,6 +569,14 @@ def verdicts(v: Readings, y10: float, rv: float, sma: float,
     }
 
 
+def _row_on(frame: pd.DataFrame | None, column: str, day: date | None) -> float:
+    """``column`` of the row dated ``day`` (NaN: no such row, never another date's)."""
+    if frame is None or frame.empty or day is None or "session_date" not in frame.columns:
+        return np.nan
+    rows = frame[pd.to_datetime(frame["session_date"]).dt.date == day]
+    return _row(rows, column)
+
+
 def _row(frame: pd.DataFrame | None, column: str) -> float:
     if frame is None or frame.empty or column not in frame.columns:
         return np.nan
@@ -578,8 +591,8 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     ind_rows = inputs.get(indicators.GROUP.table)
     curve_on = _row(ind_rows, "curve_10y3m_on")
     y10 = y10_change(inputs.get(TREASURY_10Y), session)
-    states = verdicts(v, y10, _row(trend_rows, "spx_realised_vol_20d"),
-                      _row(trend_rows, "spx_close_vs_sma200"),
+    states = verdicts(v, y10, _row_on(trend_rows, "spx_realised_vol_20d", obs_date),
+                      _row_on(trend_rows, "spx_close_vs_sma200", obs_date),
                       None if np.isnan(curve_on) else bool(curve_on), params)  # fmt: skip
     row: dict[str, object] = {"instrument_id": market_id("US")}
     row.update({k: v[k] for k in STORED_NUMBERS})
@@ -603,7 +616,7 @@ GROUP = FeatureGroup(
     "sellers and the calendar distances; a leaf nothing in the headline regime reads",
     (
         Input(MACRO, lookback=LOOKBACK, required=False, ids=SERIES_IDS),
-        Input(trend.GROUP.table, lookback=_lookback, required=False),
+        Input(trend.GROUP.table, lookback=MAX_AGE_SESSIONS, required=False),
         Input(indicators.GROUP.table, lookback=_lookback, required=False),
         Input(TREASURY_10Y, lookback=YIELD_SESSIONS + 5, required=False),
         Input(RELEASES, lookback=0, required=False),
