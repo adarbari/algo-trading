@@ -235,7 +235,7 @@ book = true                     # store the daily mark path (2.5)
 take_profit = 0.5               # close when the mark has captured half the credit
 stop_loss = 2.0                 # close when the loss reaches 2 x the entry credit
 exit_dte = 21
-when = { any = [{ field = "position.distance_to_strike_pct", op = "lt", value = 0.02 }] }  # optional exit condition (2.4a)
+when = { any = [{ field = "position.distance_to_strike_pct", op = "gt", value = -0.02 }] }  # optional exit condition (2.4a)
 ```
 Strike rules are `delta`, `atm` and `otm_pct` only. There is no target-yield rule (fitness test) and
 no `roll` key.
