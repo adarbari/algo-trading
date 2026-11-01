@@ -69,6 +69,7 @@ def run_bars_history(ctx: TaskContext, p: Params) -> RunRecord:
         bool(p.get("include_tiers")),
         p.get("fill"),
         bool(p.get("from_listings")),
+        bool(p.get("actions_only")),
     )
 
 

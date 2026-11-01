@@ -60,6 +60,24 @@ say how many are left.
   both have with another ratio is an item ``split:<id>`` (``SPLIT_MISMATCH: <n> ...``) and
   counts in ``stats["split_mismatches"]``. Reported, never a failure and never a reason not
   to write: the bars are what the vendor sent.
+- **Dividends** (the history before Massive's): the days Tiingo's ``divCash`` is not 0 become
+  ``events/dividend`` rows (source ``tiingo``, ``cash_amount`` = ``divCash`` as given: per share
+  in the ex-date's share terms, unadjusted, as Massive's; every distribution of the day summed,
+  untyped, so a special counts as a regular one) only for ex-dates BEFORE the first ex-date
+  another source stored (Massive's coverage, 2024-09 on: its rows carry the declaration and pay
+  dates and the type Tiingo lacks; with none stored, every date) and with no stored dividend of
+  the instrument within ``NEAR_DAYS`` (one distribution dated apart would count twice in a
+  trailing sum). Point in time (ADR 0007, the one read rule of ``data.events``): Tiingo gives
+  the ex-date only, never when the dividend was declared, so each row's ``known_from`` is its
+  ex-date, the earliest day it is honestly knowable (it was declared earlier, by an unknown
+  margin). Readers by event date (a fact of record, ADR 0016: ``dividends@v2``, the price
+  adjustment) are unchanged; a reader by knowledge date (``dividend_schedule@v1``: the NEXT
+  ex-date) never sees a Tiingo row as upcoming. Published with the same run's bars and splits.
+- **Actions only** (``--actions-only``): the same requests, but only the splits and dividends
+  are stored (no bars, so no flags): the dividend history back to 2002 without rewriting the
+  bars. Its items are ``acts:<id>`` (resumable and skipped like ``hist:``, which they never
+  stand for: a later bars run still fetches the name) and count once with ``hist:`` against
+  the month's budget (one symbol).
 - **Bad-bar flags** (ADR 0061): the run judges the bars it adds together with the stored bars of
   the same names and the splits it stages (``bar_quality.plan_flags``) and publishes the
   ``events/bar_flag`` rows with the same run's bars (all or none). Found flags are a WARN: item
@@ -77,7 +95,7 @@ from typing import cast
 
 import pandas as pd
 
-from algotrade.data.events import read_events
+from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.listings.universe import listings_over
 from algotrade.data.prices import FLAGS_TABLE
 from algotrade.services.events.fill import FillCandidate, fill_order
@@ -90,12 +108,14 @@ from algotrade.services.events.scope import (
     scoped_instruments,
 )
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.schemas import KNOWN_FROM
 from algotrade_ingestion.tasks.framework.run import (
     FETCH_ERROR,
     IngestRun,
     NoResponseError,
     TaskContext,
     finished_runs,
+    resumable_run,
     status_label,
 )
 from algotrade_ingestion.tasks.framework.tiingo_budget import month_symbols
@@ -105,6 +125,8 @@ from algotrade_sources.framework.base import FetchRequest, Source
 TASK = "bars_history"
 BARS = "bars/1d"
 SPLITS = "events/split"
+DIVIDENDS = "events/dividend"
+HIST, ACTS = "hist:", "acts:"  # item prefixes: a bars run, an --actions-only run
 FLAGS = FLAGS_TABLE  # events/bar_flag: the bar-quality flags of the bars this run adds (ADR 0061)
 TASK_FLAGS = "bar_quality"  # their ``source``: the detector's name
 DEFAULT_SINCE = date(2018, 1, 1)
@@ -171,20 +193,23 @@ def _window(since: date, until: date) -> str:
     return f"{since.isoformat()}..{until.isoformat()}"
 
 
-def history_done(runs: Sequence[RunRecord], since: date, until: date) -> set[str]:
-    """Instrument ids an earlier finished run fetched for ``since..until`` or a wider window."""
+def history_done(
+    runs: Sequence[RunRecord], since: date, until: date, prefix: str = HIST
+) -> set[str]:
+    """Instrument ids an earlier finished run fetched for ``since..until`` or a wider window
+    (items ``prefix<id>``: ``hist:`` bars runs, ``acts:`` actions-only runs)."""
     done: set[str] = set()
     for record in runs:
         for key, status in record.items.items():
             label, _, window = status.partition(": ")
             first, _, last = window.partition("..")
             if (
-                key.startswith("hist:")
+                key.startswith(prefix)
                 and label in DONE
                 and first <= since.isoformat()
                 and last >= until.isoformat()
             ):
-                done.add(key.removeprefix("hist:"))
+                done.add(key.removeprefix(prefix))
     return done
 
 
@@ -253,13 +278,70 @@ def tiingo_split_rows(
     return pd.DataFrame(rows, columns=cols).assign(instrument_id=instrument_id)
 
 
+@dataclass(frozen=True)
+class StoredActions:
+    """What a run compares Tiingo's actions with: the stored ``events/split`` rows of the names
+    it fetches, the stored ``events/dividend`` rows by instrument, and ``dividends_before``: the
+    first ex-date a source other than Tiingo stored (None: none stored)."""
+
+    splits: pd.DataFrame
+    dividends: dict[str, pd.DataFrame]
+    dividends_before: date | None
+
+
+def stored_actions(
+    run: IngestRun, source_name: str, ids: Sequence[str], since: date, until: date
+) -> StoredActions:
+    """The stored splits and dividends of ``ids`` within ``NEAR_DAYS`` of ``since..until``, and
+    where a source other than ``source_name`` (this task's) starts its dividend history (read
+    over every instrument: Tiingo's own earlier rows never move it)."""
+    pad = timedelta(days=NEAR_DAYS)  # a stored action dated a few days apart from Tiingo's
+    splits = read_events(run.reader, SPLITS, since - pad, until + pad, ids).frame
+    every = read_events(run.reader, DIVIDENDS, *ALL_TIME).frame
+    others = every[every["source"].astype(str) != source_name] if len(every) else every
+    before = pd.Timestamp(others["ts"].min()).date() if len(others) else None
+    days = pd.to_datetime(every["ts"], utc=True).dt.date if len(every) else pd.Series()
+    near = every[(days >= since - pad) & (days <= until + pad)] if len(every) else every
+    by_id = {str(k): g for k, g in near.groupby("instrument_id")} if len(near) else {}
+    return StoredActions(splits, by_id, before)
+
+
+def tiingo_dividend_rows(
+    name: Name, tiingo: pd.DataFrame, stored: pd.DataFrame | None, first: date, last: date,
+    before: date | None,
+) -> pd.DataFrame:  # fmt: skip
+    """The ``events/dividend`` rows (``ts``, ``symbol``, ``cash_amount``, ``known_from``) to
+    write for one instrument from Tiingo's ``actions`` (``ts``, ``div_cash``) over
+    ``first..last``: an ex-date before ``before`` with no ``stored`` dividend of the instrument
+    within ``NEAR_DAYS`` (module doc). ``known_from`` is the ex-date: Tiingo has no declaration
+    date, and the ex-date is the earliest day the dividend is honestly known (ADR 0007)."""
+    known = (
+        {} if stored is None or stored.empty
+        else {pd.Timestamp(t).date(): 0.0 for t in stored["ts"]}
+    )  # fmt: skip
+    rows = []
+    for t, cash in zip(tiingo["ts"], tiingo["div_cash"], strict=True):
+        day = pd.Timestamp(t).date()
+        if (
+            cash > 0
+            and first <= day <= last
+            and (before is None or day < before)
+            and _near_stored(day, known) is None
+        ):
+            rows.append({"ts": pd.Timestamp(day, tz="UTC"), "symbol": name.symbol,
+                         "cash_amount": float(cash), KNOWN_FROM: day})  # fmt: skip
+    cols = ["ts", "symbol", "cash_amount", KNOWN_FROM]
+    return pd.DataFrame(rows, columns=cols).assign(instrument_id=name.instrument_id)
+
+
 def _fetch_name(
     run: IngestRun,
     source: Source,
     name: Name,
     since: date,
     until: date,
-    stored_splits: pd.DataFrame,
+    stored: StoredActions,
+    actions_only: bool = False,
 ) -> str:
     first = since if name.start is None else max(since, name.start)
     last = until if name.end is None else min(until, name.end)
@@ -281,13 +363,20 @@ def _fetch_name(
     bars, days = bars[inside], days[inside]
     if bars.empty:
         return f"NO_DATA: {_window(since, until)}"
-    frame = bars.drop(columns="symbol").assign(session_date=days)
-    run.stage_sessions(BARS, f"hist_{name.instrument_id}", frame, source.name)
-    mine = stored_splits[stored_splits["instrument_id"] == name.instrument_id]
+    if not actions_only:
+        frame = bars.drop(columns="symbol").assign(session_date=days)
+        run.stage_sessions(BARS, f"hist_{name.instrument_id}", frame, source.name)
+    mine = stored.splits[stored.splits["instrument_id"] == name.instrument_id]
     actions = normalized.parsed["actions"]
     splits = tiingo_split_rows(name.instrument_id, actions, mine, days.min(), days.max())
     if not splits.empty:  # only the ex-dates Massive's history lacks
         run.stage(SPLITS, f"split_{name.instrument_id}", splits, source.name)
+    dividends = tiingo_dividend_rows(
+        name, actions, stored.dividends.get(name.instrument_id), days.min(), days.max(),
+        stored.dividends_before,
+    )  # fmt: skip
+    if not dividends.empty:  # only the history before Massive's (module doc)
+        run.stage(DIVIDENDS, f"div_{name.instrument_id}", dividends, source.name)
     found = split_findings(actions, mine, days.min(), days.max())
     if found:
         shown = "; ".join(found[:3]) + ("; ..." if len(found) > 3 else "")
@@ -373,15 +462,19 @@ def _mismatches(items: dict[str, str]) -> tuple[int, list[str]]:
 
 
 def _fetch_pending(
-    run: IngestRun, source: Source, todo: Sequence[Name], since: date, until: date
+    run: IngestRun,
+    source: Source,
+    todo: Sequence[Name],
+    since: date,
+    until: date,
+    actions_only: bool = False,
 ) -> None:
-    ids = [n.instrument_id for n in todo]
-    pad = timedelta(days=NEAR_DAYS)  # a stored split dated a few days apart from Tiingo's
-    stored = read_events(run.reader, SPLITS, since - pad, until + pad, ids).frame
+    stored = stored_actions(run, source.name, [n.instrument_id for n in todo], since, until)
+    prefix = ACTS if actions_only else HIST
     failed_in_a_row = 0
     for i, name in enumerate(todo, 1):
-        item = f"hist:{name.instrument_id}"
-        fetch = partial(_fetch_name, run, source, name, since, until, stored)
+        item = f"{prefix}{name.instrument_id}"
+        fetch = partial(_fetch_name, run, source, name, since, until, stored, actions_only)
         status = run.attempt(item, fetch)
         failed_in_a_row = failed_in_a_row + 1 if status_label(status) == FETCH_ERROR else 0
         if i % CHECKPOINT_EVERY == 0:
@@ -401,6 +494,20 @@ def _fill_picks(
     return list(islice(waiting, fill))
 
 
+def _refuse_other_mode(ctx: TaskContext, until: date, actions_only: bool) -> None:
+    """An unfinished run of the other mode for ``until`` would be resumed (same task, same
+    session): an actions-only run would mark a bars run's staged names done and drop their bars;
+    a bars run would publish nothing for an actions-only run's names. Refuse instead."""
+    record = resumable_run(ctx.writer, TASK, until)
+    other = HIST if actions_only else ACTS
+    if record is not None and any(k.startswith(other) for k in record.items):
+        mode = "a bars" if actions_only else "an --actions-only"
+        raise ValueError(
+            f"{record.run_id} is {mode} run left unfinished for --until {until}: finish it in "
+            "its own mode first (or pass another --until)"
+        )
+
+
 def ingest_bars_history(
     ctx: TaskContext,
     source: Source,
@@ -412,20 +519,24 @@ def ingest_bars_history(
     include_tiers: bool = False,
     fill: int | None = None,
     from_listings: bool = False,
+    actions_only: bool = False,
 ) -> RunRecord:
     """Daily bars of the scope list, its funds' references and ``requested`` symbols (plus the
     tier A / B names with ``include_tiers``) from ``since`` to ``until`` (``limit``: fetch at
     most that many names this run; ``force``: also the names an earlier run fetched for the
     window; ``fill``: also the first ``fill`` names of the universe without history, most useful
     first; ``from_listings``: the listings of the universe over the window instead of the scope
-    list, see the module docstring). Never more than the month's remaining symbol budget."""
+    list, see the module docstring; ``actions_only``: store the splits and dividends, not the
+    bars). Never more than the month's remaining symbol budget."""
     if until < since:
         raise ValueError(f"--until {until} is before --since {since}")
     if from_listings and fill is not None:
         raise ValueError("--from-listings and --fill are two ways to pick names: use one")
+    _refuse_other_mode(ctx, until, actions_only)
     with IngestRun(ctx, TASK, until, resume=True) as run:
         runs = finished_runs(run.writer, TASK)
-        done: Collection[str] = set() if force else history_done(runs, since, until)
+        prefix = ACTS if actions_only else HIST
+        done: Collection[str] = set() if force else history_done(runs, since, until, prefix)
         picks = _fill_picks(run, until, done, max(0, fill)) if fill is not None else []
         never: list[Name] = []
         if from_listings:
@@ -455,18 +566,21 @@ def ingest_bars_history(
         pending = [
             n
             for n in names
-            if n.instrument_id not in done and f"hist:{n.instrument_id}" not in run.items
+            if n.instrument_id not in done and f"{prefix}{n.instrument_id}" not in run.items
         ]
         budget = ctx.settings.tiingo_monthly_symbol_budget
         remaining = max(0, budget - len(month_symbols(run)))
         todo = pending[: remaining if limit is None else min(remaining, max(0, limit))]
-        _fetch_pending(run, source, todo, since, until)
-        counts, added = _publish(run, source.name)
+        _fetch_pending(run, source, todo, since, until, actions_only)
+        counts, added = (
+            (dict[str, int](), pd.DataFrame()) if actions_only else _publish(run, source.name)
+        )
         run.stats.update(counts)
         run.stats["tiingo_split_rows"] = run.publish(SPLITS)  # pending, committed with the bars
+        run.stats["tiingo_dividend_rows"] = run.publish(DIVIDENDS)  # likewise
         run.stats.update(_publish_flags(ctx, run, added))  # likewise: bars, splits, flags
         mismatches, shown = _mismatches(run.items)
-        statuses = [status_label(run.items.get(f"hist:{n.instrument_id}", "")) for n in todo]
+        statuses = [status_label(run.items.get(f"{prefix}{n.instrument_id}", "")) for n in todo]
         left = len(pending) - sum(1 for s in statuses if s in DONE)
         picked = {p.instrument_id for p in picks}
         fetched = {n.instrument_id for n, s in zip(todo, statuses, strict=True) if s in DONE}
@@ -474,6 +588,7 @@ def ingest_bars_history(
         pace = ctx.settings.vendor("tiingo").min_interval_s or HOURLY_FREE_PACE_S
         run.stats.update(
             window=_window(since, until),
+            actions_only=actions_only,
             licence=ctx.settings.tiingo_licence,  # the rows' terms, in the run record
             symbols=len(names) + len(unknown),
             no_perma=len(never),
