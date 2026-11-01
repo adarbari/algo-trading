@@ -238,6 +238,10 @@ purpose = "the decision log: product-direction and policy decisions, by the owne
 kind = "log"
 
 [[docs_dir]]
+path = "docs/options"
+purpose = "the options-setups backend plan: the design behind ADR 0088 (share and option setups as positions and rules), its entities, stores and build slices E0 to E16"
+
+[[docs_dir]]
 path = "docs/edges"
 purpose = "the generated edge pages, one per family (a.md .. i.md, other.md for an edge with no family); rendered by make features-doc from config/site/edges/, indexed by docs/edges.md"
 

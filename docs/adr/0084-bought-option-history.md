@@ -1,5 +1,7 @@
 # ADR 0084: Bought end-of-day option history (HistoricalOptionData Level 2): a personal-licence store beside the Cboe chains
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): derivations from the bought history (the one personal-derived-data rule, two derivations, the import allowance extended to them).
+
 **Status:** proposed (2026-10-25; architect-reviewed once, findings applied). The owner chose the
 vendor after comparing HistoricalOptionData Level 2 ($1,495 once, 2002 to present) with ORATS ($599, 2007 on).
 Extends [0006](0006-storage-grains-and-adapters.md) (a grain), [0007](0007-point-in-time-data.md)
