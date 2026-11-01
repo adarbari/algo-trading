@@ -106,11 +106,12 @@ def listed_asof(listings: pd.DataFrame, session: date, sp500_tickers: Collection
     nasdaq = usable["exchange"].astype(str).str.upper().eq(NASDAQ)
     member = usable["ticker"].astype(str).isin(set(sp500_tickers))
     kept = usable[is_etf | nasdaq | member]
-    out = kept[COLUMNS].sort_values(["ticker", "start_date"], kind="stable")
+    out = kept[COLUMNS].sort_values("start_date", kind="stable")
     # One row per instrument: two listings of one id alive on S would count a name twice (the
-    # first by ticker stays; the merge keeps it from happening, this keeps a read honest).
-    twice = out["instrument_id"].duplicated()
-    out = out[~twice].reset_index(drop=True)
+    # latest start stays, as in ``SymbolResolver.from_listings``; the merge keeps it from
+    # happening, this keeps a read honest).
+    twice = out["instrument_id"].duplicated(keep="last")
+    out = out[~twice].sort_values(["ticker", "start_date"], kind="stable").reset_index(drop=True)
     stock = out["asset_type"].astype(str).eq(STOCK)
     return Universe(
         session, session, out, int((~has_id).sum()), undated=undated,
@@ -130,14 +131,40 @@ def universe_asof(reader: StoreReader, session: date) -> Universe:
     )  # fmt: skip
 
 
+def _one_row_per_listing(kept: pd.DataFrame) -> pd.DataFrame:
+    """One row per instrument for ``listings_over`` (datetime ``start_date`` / ``end_date``). The
+    listings of one permaTicker under one id (a ticker change: one company, listed in turn) are
+    one row spanning them all: the earliest start, the latest end (null if any is open), the
+    ticker of the latest start, ``reused`` if any is. Any other id keeps its first row."""
+    cols = ["instrument_id", "ticker", "perma_ticker", "start_date", "end_date", "reused"]
+    named = kept["perma_ticker"] != ""
+    rows = kept[named].sort_values("start_date", kind="stable")
+    keys = ["instrument_id", "perma_ticker"]
+    groups = rows.groupby(keys, sort=False)
+    span = pd.DataFrame(
+        {
+            "_start": groups["start_date"].min(),
+            "_end": groups["end_date"].apply(lambda s: pd.NaT if s.isna().any() else s.max()),
+            "_reused": groups["reused"].max(),
+        }
+    )
+    latest = groups.tail(1).set_index(keys).join(span).reset_index()
+    latest = latest.assign(
+        start_date=latest["_start"], end_date=latest["_end"], reused=latest["_reused"]
+    )
+    both = pd.concat([latest[cols], kept[~named][cols]], ignore_index=True)
+    return both.drop_duplicates("instrument_id")
+
+
 def listings_over(reader: StoreReader, since: date, until: date) -> tuple[pd.DataFrame, date]:
     """The listings that are in the universe on ANY session of ``since..until`` (exactly: a
     listing's dates clipped to the window, and for a stock that is neither on NASDAQ nor an ETF a
     S&P 500 interval of its ticker overlapping them) and the listing snapshot used. Columns:
     ``instrument_id``, ``ticker``, ``perma_ticker`` (``""`` when unknown), ``start_date``,
     ``end_date`` (null while open) and ``reused`` (another listing of the snapshot has the same
-    ticker). A listing with no start date is never in a window. For the bars backfill only (see
-    the module docstring)."""
+    ticker). The listings of one id and one permaTicker are one row spanning them (a ticker
+    change's bars are one series). A listing with no start date is never in a window. For the
+    bars backfill only (see the module docstring)."""
     frame, snap = listing_frame(reader)
     members, _ = read_snapshot(reader, MEMBERSHIP, None, REFERENCE_HINT)
     members = members[members["index_name"] == SP500]
@@ -169,7 +196,7 @@ def listings_over(reader: StoreReader, since: date, until: date) -> tuple[pd.Dat
     )
     overlapping = joined[(joined["_ms"] <= joined["_hi"]) & (joined["_me"] >= joined["_lo"])]
     member = out.index.isin(overlapping["index"])
-    kept = out[alive & (easy | member)].drop_duplicates("instrument_id")
+    kept = _one_row_per_listing(out[alive & (easy | member)])
     kept = kept.assign(
         start_date=kept["start_date"].dt.date,
         end_date=kept["end_date"].dt.date.where(kept["end_date"].notna(), None),
@@ -197,7 +224,8 @@ def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
     DELISTED)."""
     frame, _ = listing_frame(reader)
     has_id = frame["instrument_id"].notna() & (frame["instrument_id"].astype(str) != "")
-    rows = frame[has_id]
+    started = pd.to_datetime(frame["start_date"]) <= pd.Timestamp(session)
+    rows = frame[has_id & started]  # a listing that starts after ``session`` is not yet known
     # An id several listings share (a ticker change) is delisted only once every one has ended.
     ends = pd.to_datetime(rows["end_date"]).groupby(rows["instrument_id"].astype(str))
     stats = ends.agg(["count", "size", "max"])

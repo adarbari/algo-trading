@@ -314,12 +314,16 @@ def test_the_winners_sample_reads_only_tiingo_rows() -> None:
     assert set(frame["source"]) == {"tiingo"} and list(frame["ticker"]) == ["AAA"]
 
 
-def _shared_id_store(rows: list[tuple[str, str, date, date | None]]) -> StoreReader:
-    """Listings (id, ticker, start, end), all NASDAQ stocks of one snapshot."""
+def _shared_id_store(
+    rows: list[tuple[str, str, date, date | None]], perma: bool = False
+) -> StoreReader:
+    """Listings (id, ticker, start, end), all NASDAQ stocks of one snapshot; ``perma``: each
+    row's permaTicker is its id's (one company)."""
     now, day = pd.Timestamp("2026-10-05", tz="UTC"), date(2026, 10, 5)
     frame = pd.DataFrame(rows, columns=["instrument_id", "ticker", "start_date", "end_date"])
     frame = frame.assign(exchange="NASDAQ", asset_type="Stock", price_currency="USD",
-                         perma_ticker="", source="tiingo", ts=now, session_date=day,
+                         perma_ticker=frame["instrument_id"].str[3:] if perma else "",
+                         source="tiingo", ts=now, session_date=day,
                          knowledge_ts=now, run_id="r")  # fmt: skip
     frame["end_date"] = frame["end_date"].astype(object).where(frame["end_date"].notna(), None)
     members = pd.DataFrame(
@@ -337,12 +341,12 @@ def test_two_listings_of_one_id_alive_together_are_one_name_and_counted() -> Non
     reader = _shared_id_store(
         [
             ("EQ:X", "XYZ", date(2000, 1, 3), date(2025, 3, 1)),
-            ("EQ:X", "XYZQ", date(2000, 1, 3), date(2025, 6, 2)),  # the same id, alive together
+            ("EQ:X", "XYZQ", date(2001, 1, 3), date(2025, 6, 2)),  # the same id, alive together
             ("EQ:Y", "YYY", date(2000, 1, 3), None),
         ]
     )
-    got = universe_asof(reader, date(2024, 6, 3))
-    assert list(got.instruments["ticker"]) == ["XYZ", "YYY"] and got.duplicate_id == 1
+    got = universe_asof(reader, date(2024, 6, 3))  # the later start stays, as in the resolver
+    assert list(got.instruments["ticker"]) == ["XYZQ", "YYY"] and got.duplicate_id == 1
     later = universe_asof(reader, date(2025, 4, 1))  # only the second is still listed
     assert list(later.instruments["ticker"]) == ["XYZQ", "YYY"] and later.duplicate_id == 0
 
@@ -362,3 +366,56 @@ def test_a_shared_id_is_delisted_only_once_every_one_of_its_listings_has_ended()
         "EQ:W": date(2012, 1, 4),
     }  # FB: META is still listed
     assert delisted_by(reader, date(2011, 1, 1)) == {"EQ:Z": date(2010, 1, 4)}  # WB still listed
+
+
+def test_a_gap_relisting_after_the_session_does_not_hide_an_earlier_delisting() -> None:
+    reader = _shared_id_store(
+        [
+            ("EQ:G", "GAP", date(2000, 1, 3), date(2012, 1, 4)),
+            ("EQ:G", "GAP", date(2015, 1, 5), None),  # re-listed in 2015: unknown in 2013
+        ]
+    )
+    assert delisted_by(reader, date(2013, 1, 2)) == {"EQ:G": date(2012, 1, 4)}
+    assert delisted_by(reader, date(2016, 1, 4)) == {}  # open again once it has started
+
+
+def test_a_shared_id_keeps_the_span_of_all_its_listings_for_the_bars_backfill() -> None:
+    from algotrade.data.listings.universe import listings_over  # noqa: PLC0415
+
+    reader = _shared_id_store(
+        [
+            ("EQ:FB", "FB", date(2012, 5, 18), date(2022, 6, 8)),
+            ("EQ:FB", "META", date(2022, 6, 9), None),  # one company, two tickers in turn
+            ("EQ:Q", "QQQ", date(2000, 1, 3), date(2010, 1, 4)),
+            ("EQ:Q", "QQQ", date(2013, 1, 3), date(2020, 1, 3)),  # a gap re-listing
+            ("EQ:X", "XA", date(2001, 1, 3), None),
+        ],
+        perma=True,
+    )
+    over, _ = listings_over(reader, date(2010, 6, 1), date(2024, 1, 2))
+    by = over.set_index("instrument_id")
+    assert by.loc["EQ:FB", ["ticker", "start_date", "end_date"]].tolist() == [
+        "META",
+        date(2012, 5, 18),
+        None,
+    ]  # the earliest start, open because META is, the latest ticker
+    assert by.loc["EQ:Q", "start_date"] == date(2013, 1, 3)  # 2000-2010 is before the window
+    assert by.loc["EQ:Q", "end_date"] == date(2020, 1, 3) and by.loc["EQ:Q", "reused"]
+    assert len(over) == 3
+    wide, _ = listings_over(reader, date(1999, 1, 4), date(2024, 1, 2))
+    q = wide.set_index("instrument_id").loc["EQ:Q"]
+    assert (q["start_date"], q["end_date"]) == (date(2000, 1, 3), date(2020, 1, 3))
+
+
+def test_the_universe_keeps_the_latest_start_of_an_id_alive_twice_as_the_resolver_does() -> None:
+    from algotrade.data.listings.resolvers import listing_resolver  # noqa: PLC0415
+
+    reader = _shared_id_store(
+        [
+            ("EQ:X", "AAA", date(2000, 1, 3), None),
+            ("EQ:X", "ZZZ", date(2010, 1, 4), None),  # the later start, the later ticker
+        ]
+    )
+    got = universe_asof(reader, date(2012, 6, 1))
+    assert list(got.instruments["ticker"]) == ["ZZZ"] and got.duplicate_id == 1
+    assert listing_resolver(reader)(date(2012, 6, 1)).id_for("ZZZ") == "EQ:X"
