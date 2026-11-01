@@ -12,10 +12,12 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, provenance, runs, versions
+from algotrade.services.read.evaluation.positions import exit_rule
 from algotrade.services.read.evaluation.verdict import model as verdict_model
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.types.evaluation.compare import EdgeCompare
+from algotrade_api.graphql.types.evaluation.exit_rule import ExitRule
 from algotrade_api.graphql.types.evaluation.verdict import (
     EdgeDefinition,
     EdgeSettings,
@@ -380,3 +382,13 @@ class Edge:
     async def compare(self, info: Info) -> EdgeCompare | None:
         found = await off_loop(versions.load_compare, self.ctx, self.edge)
         return EdgeCompare.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The setup's historical exit rule at the served session, for a pick "
+        "(`instrumentId`, for the ATR fallback): the stop and the hold, long picks only; "
+        "null: no session is served"
+    )
+    async def exit_rule(self, info: Info, instrument_id: str | None = None) -> ExitRule | None:
+        read = await info.context.aread(None)
+        found = await off_loop(exit_rule.load_exit_rule, read, self.edge, instrument_id)
+        return ExitRule.of(found) if found is not None else None
