@@ -8,7 +8,7 @@ build slices: [options/backend-plan.md](../options/backend-plan.md). Extends
 criteria language), [0081](0081-stored-edge-picks.md) (picks), [0083](0083-workflow-first-trader-site.md)
 (Ideas, the historical exit rule) and [0084](0084-bought-option-history.md) (the bought history).
 **Amends** 0053, 0049, 0047, 0069 decision 4, 0073, 0081, 0064, 0074, 0075, 0050 decision 3, 0083
-decision 3, 0084 and, 0065 (#967, merged) (list under Amendments). Takes number 0088: 0087 is
+decision 3, 0084 and 0065 (#967, merged) (list under Amendments). Takes number 0088: 0087 is
 PR #968's, 0086 is on main.
 
 ## Context
@@ -110,7 +110,7 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
 14. **Base `delta_equivalent` (a)** for named option sleeves, variants and gates allowed for that base
     only. Lifts ADR 0073 decision 1's calendar-schedule, `excess_return` and no-variants limits for that
     base only.
-15. **Paper-derived structures use PR #967's post-publication basis (a), with a minimum and an early
+15. **Paper-derived structures use ADR 0065's post-publication (#967, merged) basis (a), with a minimum and an early
     start.** A gate or threshold chosen in this research is judged only on data the research did not
     see, and **no verdict is given until that holdout holds at least 3 months**; the verdict's own
     minimum-trade rules apply on top. The holdout may start before the Cboe start (owner: "Yes, start
