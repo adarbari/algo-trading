@@ -2801,6 +2801,11 @@ type Query {
   """
   appearance: Appearance!
 
+  """
+  The user's default Ideas tab (`stocks` / `premium`; null until they answered the sign-up question) and watchlist (instrument ids; ADR 0083 amendment 2026-11-01). Per user; the tickers come from the session's reference snapshot
+  """
+  traderPreferences: TraderPreferences!
+
   """The session `date` resolves to; null: nothing stored"""
   session(
     """
@@ -3999,6 +4004,14 @@ type TradeText {
 }
 
 """
+The user's two stored choices: the Ideas tab they open on (`stocks` or `premium`; null until they answered the sign-up question) and their watchlist (instrument ids only, at most 50; never a position, size or account)
+"""
+type TraderPreferences {
+  defaultTab: String
+  watchlist: [WatchedInstrument!]!
+}
+
+"""
 Features a page cannot show, and why in public words: `kind`, the Guide glossary term `guideTerm` that explains it, `kindText` the kind in generic words. `cause` is the chain behind it: admins only (null for anyone else)
 """
 type Unavailable {
@@ -4286,6 +4299,14 @@ type Viewer {
   name: String!
   role: String!
   workspaces: [String!]!
+}
+
+"""An instrument on the user's watchlist"""
+type WatchedInstrument {
+  instrumentId: String!
+
+  """The ticker in the session's reference snapshot; null when it has none"""
+  symbol: String
 }
 
 enum WindowUnit {
