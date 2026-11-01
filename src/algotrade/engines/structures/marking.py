@@ -14,7 +14,7 @@ and mid ask / 2 (a far out-of-the-money leg after a large move: the exit fallbac
 the entry."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 import numpy as np
@@ -71,7 +71,9 @@ class Marks:
     """The marks of a window, per name: ``spots`` the underlying's close at each session,
     ``entry_mid`` / ``entry_exec`` the position at S, ``exit_mid`` / ``exit_exec`` at T,
     ``at_expiry`` whether every held leg expired on T (valued at intrinsic), ``deltas`` the net
-    delta at each close but the last (NaN where a leg's delta cannot be computed)."""
+    delta at each close but the last (NaN where a leg's delta cannot be computed), ``mids`` the net
+    quoted mid at every close from S (index 0) to T, NaN where a leg is unquoted or the chain is
+    stale: the exit rules' ``position`` marks (a caller feeding them drops ``mids[0]``)."""
 
     spots: list[np.ndarray]
     entry_mid: np.ndarray
@@ -80,6 +82,7 @@ class Marks:
     exit_exec: np.ndarray
     at_expiry: np.ndarray
     deltas: list[np.ndarray]
+    mids: list[np.ndarray] = field(default_factory=list)  # the position's mid at each close
 
 
 def years(expiry: pd.Series, day: date) -> np.ndarray:
@@ -116,12 +119,13 @@ def _executable(qty: float, bid: np.ndarray, ask: np.ndarray, opening: bool) -> 
 
 def _hedge_path(
     days: Sequence[DayChain], w: Window, labels: Labels
-) -> tuple[list[np.ndarray], list[np.ndarray]]:
+) -> tuple[list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
     """The underlying's close on each session and, on each but the last, the position's net
     delta. The exit session's missing or stale chain is a reason of the name; one between the entry
     and the exit, or a delta that cannot be computed, is only a reason its hedge is missing."""
     spots = [np.array([days[0].spots.get(i, np.nan) for i in w.names], float)]
     deltas: list[np.ndarray] = []
+    mids: list[np.ndarray] = []
     every = np.arange(len(w.ok))
     for k, day in enumerate(days):
         ok_today = usable(day, w.names, labels)
@@ -131,6 +135,11 @@ def _hedge_path(
             (w.fail if last else w.fail_hedge)(every == i, why)
         if k:
             spots.append(np.array([day.spots.get(i, np.nan) for i in w.names], float))
+        net_mid = position_sum(
+            [leg.qty for leg in w.legs],
+            np.vstack([leg_quotes(day, leg.ids, lenient=True)["mid"].to_numpy() for leg in w.legs]),
+        )
+        mids.append(np.where(ok_today, net_mid, np.nan))  # a stale or missing chain is no mark
         if last:
             break
         per_leg = []
@@ -143,7 +152,7 @@ def _hedge_path(
         net = position_sum([leg.qty for leg in w.legs], np.nan_to_num(np.vstack(per_leg)))
         w.fail_hedge(ok_today & ~priced, f"NO_DELTA:{day.day}")
         deltas.append(np.where(priced & ok_today, net, np.nan))
-    return spots, deltas
+    return spots, deltas, mids
 
 
 def _exit_values(
@@ -184,8 +193,8 @@ def mark_window(days: Sequence[DayChain], w: Window, labels: Labels | None = Non
             ]
         ),
     )
-    spots, deltas = _hedge_path(days, w, labels)
+    spots, deltas, mids = _hedge_path(days, w, labels)
     exit_mid, exit_exec, at_expiry = _exit_values(days[-1], w, spots[-1])
     w.fail(~np.isfinite(entry_mid), "NO_ENTRY_QUOTE")
     w.fail(~np.isfinite(exit_mid), "NO_EXIT_QUOTE")
-    return Marks(spots, entry_mid, entry_exec, exit_mid, exit_exec, at_expiry, deltas)
+    return Marks(spots, entry_mid, entry_exec, exit_mid, exit_exec, at_expiry, deltas, mids)

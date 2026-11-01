@@ -165,3 +165,24 @@ def test_a_window_needs_option_legs_and_a_missing_entry_quote_is_a_reason() -> N
     w = window(*SPREAD)
     mark_window([chain(0, zero_bid={"P95"}), chain(1), chain(2)], w)
     assert w.reason[0] == "NO_ENTRY_QUOTE"
+
+
+def test_marks_carry_the_position_mid_at_every_close() -> None:
+    w = Window(
+        pd.Series([A]),
+        [LegColumn("P", -1.0, pd.Series(["OPT:P95"]), np.array([95.0]), pd.Series([EXPIRY]))],
+        np.array([True]), np.array([None], object), np.array([None], object),
+    )  # fmt: skip
+    marks = mark_window([chain(0), chain(1), chain(2)], w)
+    assert len(marks.mids) == 3
+    assert marks.mids[1][0] == pytest.approx(-mid(1, "P95"), abs=1e-6)
+
+
+def test_stale_middle_day_gives_no_mark() -> None:
+    w = Window(
+        pd.Series([A]),
+        [LegColumn("P", -1.0, pd.Series(["OPT:P95"]), np.array([95.0]), pd.Series([EXPIRY]))],
+        np.array([True]), np.array([None], object), np.array([None], object),
+    )  # fmt: skip
+    marks = mark_window([chain(0), chain(1, STALE), chain(2)], w)
+    assert np.isnan(marks.mids[1][0]) and np.isfinite(marks.mids[2][0])

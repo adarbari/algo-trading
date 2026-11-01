@@ -145,6 +145,7 @@ owner = ["src/algotrade/core/model/predicates.py"]
 allowed = [
     "src/algotrade/engines/selection/evaluate.py",  # the selection's per-rule funnel audit evaluates each top-level child
     "src/algotrade/engines/selection/cases.py",  # a case-valued parameter's rules at one session (ADR 0088)
+    "src/algotrade/engines/structures/exits.py",  # the ordered exit rules over a trade's closes (ADR 0088)
     "src/algotrade/strategies/screeners/rules/*",  # rule screens evaluate criteria, tiers and flags with it
     "src/algotrade/services/read/filtering/masks.py",  # a filter input is a rule on each row (ADR 0082)
 ]
