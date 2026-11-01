@@ -182,6 +182,7 @@ Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
 |---|---|---|---|---|
 | no earnings in the next N sessions (short options) | `gt 10` | soft | 2, EVENT_RISK | N is the holding period; 25 for a 30-day short option held to expiry; or feature.earnings_before_expiry eq false |
 | earnings this week (an event play) | `lte 5` | hard | - | suggest rollup.earnings@v1.date_confirmed eq true when the date must be right |
+| earnings more than 10 sessions away | `gt 10` | hard | - | the next report is not close: nothing to gap the price before a short-dated trade is closed |
 
 **When the reading lies**
 
@@ -424,6 +425,7 @@ Sources: Hull, Options, Futures and Other Derivatives: early exercise of America
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
 | a big positive earnings reaction (post-earnings drift) | `gte 0.05` | hard | - | the small-cap drift screen uses 0.05; combine with rollup.earnings_reaction@v2.reaction_status eq OK and a market cap ceiling |
+| a stock that gapped up on its earnings | `gt 0.03` | soft | 0.01 | illustrative: a rise of more than 3% beyond SPY over the report's two sessions; no published cut-off |
 
 **When the reading lies**
 

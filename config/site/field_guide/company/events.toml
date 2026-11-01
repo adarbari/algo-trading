@@ -30,6 +30,12 @@ op = "lte"
 value = 5
 mode = "hard"
 note = "suggest rollup.earnings@v1.date_confirmed eq true when the date must be right"
+[[field.use]]
+for = "earnings more than 10 sessions away"
+op = "gt"
+value = 10
+mode = "hard"
+note = "the next report is not close: nothing to gap the price before a short-dated trade is closed"
 
 [[field]]
 name = "feature.earnings_before_expiry"
@@ -264,6 +270,13 @@ op = "gte"
 value = 0.05
 mode = "hard"
 note = "the small-cap drift screen uses 0.05; combine with rollup.earnings_reaction@v2.reaction_status eq OK and a market cap ceiling"
+[[field.use]]
+for = "a stock that gapped up on its earnings"
+op = "gt"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "illustrative: a rise of more than 3% beyond SPY over the report's two sessions; no published cut-off"
 
 [[field]]
 name = "rollup.earnings_reaction@v2.reaction_status"
