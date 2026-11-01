@@ -133,6 +133,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/skew_history@v1",
     "rollups/instrument/swing_levels@v1",
     "rollups/instrument/trend_stats@v2",   # 328 MB
+    "rollups/instrument/vol_long@v1",
     "rollups/instrument/vol_stats@v1",   # 149 MB
     "rollups/instrument/volume@v1",
     "rollups/instrument/volume_profile@v1",   # 51 MB
