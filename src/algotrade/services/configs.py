@@ -10,7 +10,7 @@ from algotrade.config.strategy.resolve import CONFIG_KINDS, ResolvedConfig, reso
 from algotrade.config.strategy.schema import RULE_IMPLS, Selection
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
-from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
+from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, group_field, is_feature_field
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import catalogue_columns
 from algotrade.services.features import catalogue
@@ -32,12 +32,44 @@ def field_catalog(store: ConfigStore | None = None, user: str | None = None) -> 
 
 
 def catalog_of(fs: FeatureSet) -> FieldCatalog:
-    """``fs``'s per-instrument fields (market-entity features are not selectable per
-    instrument: ADR 0047)."""
+    """``fs``'s fields by level: the instrument fields as before (selections and screens), and
+    the market level's (stored market groups and market expression features), which only a rule
+    at a use site that ``LEVELS`` gives the market level may name (ADR 0047 amendment, ADR 0088).
+    Each field's licence (an expression: the strictest of its inputs) and each string field's
+    declared domain ride along."""
     expressions = {
         n: e.feature.dtype for n, e in fs.expressions.items() if e.feature.entity == "instrument"
     }
-    return FieldCatalog.build(catalogue_columns(), expressions, fs.moved_field)
+    market = {
+        group_field("market", key, c): t
+        for key, g in fs.code.items()
+        if g.entity == "market"
+        for c, t in g.columns.items()
+    }
+    market.update(
+        {f"feature.{n}": e.feature.dtype for n, e in fs.expressions.items()
+         if e.feature.entity == "market"}
+    )  # fmt: skip
+    licences: dict[str, str] = {}
+    domains: dict[str, tuple[str, ...]] = {}
+    for key, g in fs.code.items():
+        for f in g.features:
+            name = group_field(g.entity, key, f.name)
+            licences[name] = f.licence
+            if f.categories:
+                domains[name] = f.categories
+    for n, e in fs.expressions.items():
+        licences[f"feature.{n}"] = e.feature.licence
+        if e.feature.categories:
+            domains[f"feature.{n}"] = e.feature.categories
+    return FieldCatalog.build(
+        catalogue_columns(),
+        expressions,
+        fs.moved_field,
+        levels={"market": market},
+        licences=licences,
+        domains=domains,
+    )
 
 
 def resolve_config(
