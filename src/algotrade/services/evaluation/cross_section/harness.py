@@ -155,6 +155,7 @@ from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
     leg_blocks,
 )
+from algotrade.services.evaluation.evidence.contract import capital_basis_of
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from algotrade.services.evaluation.time_series.measures import deflate_trial, pbo_among
 from algotrade.services.features import catalogue
@@ -206,6 +207,7 @@ class VariantResult:
     licences: TrialLicences | None = None  # the trial's and its ledger columns' (ADR 0064)
     legs: tuple[LegDetail, ...] = ()  # the main edge variant's measured legs, for the ledger
     side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
+    capital_basis: str | None = None  # the trade contract's (ADR 0088); None for a book
     timing: Mapping[str, Any] | None = None  # a time-series edge: timing vs buy-and-hold Sharpe
     grid: int | None = (
         None  # an ensemble: the size of its pre-registered grid (ADR 0074); else None
@@ -608,6 +610,9 @@ def evaluate_edge(
                     measures,
                     edge_variant=scope.key,
                     side=scope.edge.outcome.result_side,
+                    capital_basis=None
+                    if scope.edge.outcome.kind == PORTFOLIO_KIND
+                    else capital_basis_of(scope.edge),
                     iv_source=scope.iv_field if needs_iv else None,
                     grid=len(variant.members) or None,
                     licences=trial_licences(

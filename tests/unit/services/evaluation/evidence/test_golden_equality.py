@@ -8,10 +8,12 @@ from datetime import date
 from typing import Any
 
 import pandas as pd
+import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.legs import key
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from tests.helpers.stored_frames import stamped
@@ -102,15 +104,41 @@ DIGESTS: dict[str, tuple[str, str]] = {  # (edge_eval, ledger), computed on orig
 }
 
 
-def test_each_outcome_kinds_scores_and_ledger_are_pinned() -> None:
+def _digests(evaluations: dict[str, EdgeEvaluation]) -> dict[str, tuple[str, str]]:
     got: dict[str, tuple[str, str]] = {}
-    for name, ev in _evaluations().items():
+    for name, ev in evaluations.items():
         ledger = trades_frame(ev, "r", AS_OF)
         got[name] = (
             _digest(edge_eval_frame(ev, "r", AS_OF)),
             _digest(ledger, LEDGER) if len(ledger) else "empty",
         )
-    assert got == DIGESTS, got
+    return got
+
+
+def _scored(evaluations: dict[str, EdgeEvaluation]) -> dict[str, str]:
+    """Every row of ``edge_eval`` but the random draws': the screeners', baselines' and costs'."""
+    out = {}
+    for name, ev in evaluations.items():
+        frame = edge_eval_frame(ev, "r", AS_OF)
+        out[name] = _digest(frame[~frame["role"].astype(str).str.startswith("random")])
+    return out
+
+
+def test_each_outcome_kinds_scores_and_ledger_are_pinned(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pinned under the leg version of origin/main (4): the leg key seeds a session's random
+    draws, so version 5 (E6a) re-draws them; the next test shows nothing else moved."""
+    monkeypatch.setattr(key, "LEG_VERSION", 4)
+    assert _digests(_evaluations()) == DIGESTS
+
+
+def test_version_5_moves_only_the_random_draws(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The leg bump (ADR 0088, E6a) reseeds the draws of a session (``random_picks.generator``);
+    every value, hit, measure and ledger row is the one of version 4 (the screeners', baselines'
+    and costs' ``edge_eval`` rows by digest, the ledger by the pinned digests)."""
+    now = _evaluations()
+    assert {n: d[1] for n, d in _digests(now).items()} == {n: d[1] for n, d in DIGESTS.items()}
+    monkeypatch.setattr(key, "LEG_VERSION", 4)
+    assert _scored(now) == _scored(_evaluations())
 
 
 def test_the_time_series_measures_and_windows_are_pinned() -> None:
