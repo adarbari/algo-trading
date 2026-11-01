@@ -726,6 +726,7 @@ for (const [state, newer, full, short] of PILL_STATES) {
   }) => {
     await mockDataStatus(page, state, newer);
     await page.goto('/ideas');
+    await page.keyboard.press('Shift'); // the footer's pill loads with the first interaction
     const pill = page.getByRole('button', { name: full });
     await expect(pill).toBeVisible();
     await expect(pill.getByText(short, { exact: true })).toBeVisible();
@@ -741,6 +742,7 @@ for (const [state, newer, full, short] of PILL_STATES) {
 test('Data-status pill: a tap opens the datasets inside the phone screen', async ({ page }) => {
   await mockDataStatus(page, 'PARTIAL', null);
   await page.goto('/ideas');
+  await page.keyboard.press('Shift'); // the footer's pill loads with the first interaction
   await page.getByRole('button', { name: 'Data: 22 Oct, partial' }).tap();
   const panel = page.getByRole('dialog', { name: 'Data status' });
   for (const name of ['Prices', 'Options chains', 'Fundamentals'])

@@ -31,11 +31,9 @@ const GuideSearchQuery = graphql(`
 /** The Tickers group for `q` (the server matches the whole universe); its code loads with the
  * first ticker search, not with the app. */
 export function useTickerGroups(q: string, size: number) {
-  const variables = { q, size };
   return useQuery({
-    queryKey: queryKeys.gql('TickerSearch', variables),
-    queryFn: async ({ queryKey }) =>
-      (await import('./ticker-query')).tickerGroups(variables, queryKey),
+    queryKey: ['ticker-search', q, size],
+    queryFn: async () => (await import('./ticker-query')).tickerGroups(q, size),
     enabled: q !== '',
     placeholderData: keepPreviousData,
   });
