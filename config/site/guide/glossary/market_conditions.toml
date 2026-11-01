@@ -1,5 +1,5 @@
 # L3 site setting: the Guide glossary of the market conditions (ADR 0051, ADR 0088): one [[term]]
-# for every column of market_conditions@v1 (config: features/rollups/market/edges/conditions.py),
+# for every column of market_conditions@v2 (config: features/rollups/market/edges/conditions.py),
 # shown by the help button where a setup's gate or slice names the column. A reason never gives a
 # VIX figure (the personal-use values); a verdict is our own aggregate. Typed by
 # src/algotrade/config/site/guide/glossary.py.

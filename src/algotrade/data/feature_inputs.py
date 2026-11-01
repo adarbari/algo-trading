@@ -188,7 +188,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.core.model.fields import COMPANY_TABLE, group_of_table
+from algotrade.core.model.fields import COMPANY_TABLE, REFERENCE_TABLE, group_of_table
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.data.analyst.reading import KINDS as ANALYST_KINDS
 from algotrade.data.analyst.reading import TABLE as ANALYST
@@ -217,11 +217,13 @@ from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows, tenor_history
 from algotrade.data.reference import (
+    REFERENCE_HINT,
     UNIVERSE_TABLE,
     company_sectors,
     ids_for_symbols,
     instruments,
     load_universe,
+    read_snapshot,
     symbol_ids,
 )
 from algotrade.data.rollups import rollup_rows
@@ -657,11 +659,14 @@ REFERENCE_FACTS = (
 
 def _reference_facts(reader: StoreReader, session: date) -> pd.DataFrame | None:
     try:
-        frame = instruments(reader, session)
+        frame, snap = read_snapshot(reader, REFERENCE_TABLE, session, REFERENCE_HINT)
     except MissingDataError:
         return None
     if "security_type" not in frame.columns:
         return None
+    if snap.pre_snapshot and "in_sp500" in frame.columns:
+        # a later snapshot's index list would be survivors
+        frame = frame.assign(in_sp500=pd.Series(pd.NA, index=frame.index, dtype="boolean"))
     return frame[[c for c in REFERENCE_FACTS if c in frame.columns]]
 
 

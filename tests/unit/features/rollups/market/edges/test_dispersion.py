@@ -81,10 +81,9 @@ def test_bars_after_the_session_are_ignored() -> None:
     base = d.mean_member_vol(universe(["A"]), ALL, bars({"A": zigzag(0.01)}), END, 1)
     path = zigzag(0.01) + [500.0] * 5
     assert d.mean_member_vol(universe(["A"]), ALL, bars({"A": path}, later), END, 1) == base
-    assert (
-        abs(base - d.mean_member_vol(universe(["A"]), ALL, bars({"A": zigzag(0.01)}), END, 1))
-        < 1e-12
-    )
+    assert d.mean_member_vol(universe(["A"]), ALL, bars({"A": path}, later), END, 1) != (
+        d.mean_member_vol(universe(["A"]), ALL, bars({"A": path}, later), later[-1], 1)
+    )  # the session picks the window: later bars are not read for END
 
 
 def test_the_ratio_is_index_over_members_and_unknown_without_either() -> None:
