@@ -98,3 +98,16 @@ def test_point_in_time_through_the_runner() -> None:
     assert out["target_dte"] == 30 and out["put_strike"] == pytest.approx(95.0, abs=3)
     assert str(frame["put_yield_ann"].dtype) == "float32"
     assert GROUPS["short_premium@v1"].table == "rollups/instrument/short_premium@v1"
+
+
+def test_a_curve_taken_from_after_the_session_gives_no_rows() -> None:
+    rows = chain_rows("EQ:A", END, 100.0, {E30: 0.25}, 0.03, strikes=FINE)
+    inputs = {
+        OPTIONS: pd.DataFrame(rows),
+        RATES: pd.DataFrame(
+            {"tenor_days": [30, 365], "rate_cont": [0.03, 0.03], "pre_snapshot": [True, True]}
+        ),
+        UNDERLYINGS: pd.DataFrame({"instrument_id": ["EQ:A"], "price": [100.0], "iv30": 30.0}),
+    }
+    out = sp.compute(inputs, END, None)
+    assert out.empty and list(out.columns) == ["instrument_id", *sp.COLUMNS]

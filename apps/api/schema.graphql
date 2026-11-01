@@ -1499,7 +1499,7 @@ type GridCell {
   breakeven: Float!
   pBelow: Float!
   spreadPct: Float!
-  openInterest: Int!
+  openInterest: Int
 }
 
 """

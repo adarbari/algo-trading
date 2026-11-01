@@ -34,7 +34,7 @@ class GridCell:
     breakeven: float
     p_below: float
     spread_pct: float
-    open_interest: int
+    open_interest: int | None
 
     @classmethod
     def of(cls, d: grid.GridCell) -> Self:

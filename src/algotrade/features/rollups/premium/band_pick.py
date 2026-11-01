@@ -69,7 +69,7 @@ class BandCell:
     breakeven: float
     p_below: float
     spread_pct: float
-    open_interest: int
+    open_interest: int | None  # None: the quote carries no open interest (never 0)
 
 
 @dataclass(frozen=True)
@@ -196,5 +196,5 @@ def pick_band(
                 0
             ]
         ),
-        open_interest=int(open_interest) if pd.notna(open_interest) else 0,
+        open_interest=int(open_interest) if pd.notna(open_interest) else None,
     )

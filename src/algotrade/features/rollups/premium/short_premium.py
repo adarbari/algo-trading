@@ -27,6 +27,7 @@ tolerances are part of v1: changing one is v2.
 from datetime import date
 from typing import cast
 
+import numpy as np
 import pandas as pd
 
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
@@ -129,6 +130,8 @@ def _row(
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     options, curve_rows = inputs[OPTIONS], inputs[RATES]
     assert options is not None and curve_rows is not None  # required inputs
+    if bool(curve_rows["pre_snapshot"].iloc[0]) if "pre_snapshot" in curve_rows else False:
+        return pd.DataFrame(columns=["instrument_id", *COLUMNS])  # a later curve is no curve
     curve = YieldCurve.from_days(curve_rows["tenor_days"], curve_rows["rate_cont"])
     underlyings = inputs.get(UNDERLYINGS)
     spots = positive_spots(underlyings)
@@ -146,7 +149,8 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         elif iid not in chains:
             row = {"premium_status": "NO_CHAIN"}
         else:
-            q = float(yields.get(iid, 0.0))
+            found = yields.get(iid)  # a missing or null yield prices with 0, like the grid
+            q = float(found) if found is not None and np.isfinite(found) else 0.0
             row = _row(chains[iid], session, float(spots[iid]), band_pick.OurDeltas(curve, q))
         rows.append({"instrument_id": iid, **row})
     return pd.DataFrame(rows).reindex(columns=["instrument_id", *COLUMNS])

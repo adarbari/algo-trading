@@ -5,6 +5,7 @@ its code: no partition, no row, not optionable, no spot, no expiry, a duplicate 
 one-sided chain, no strike near a band, an unknown report date, an IV rank still provisional."""
 
 import dataclasses
+import math
 from datetime import date, timedelta
 
 import numpy as np
@@ -22,6 +23,7 @@ from tests.helpers.rollup_store import chain_rows, quote_row, write_chains, writ
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 
 AAA, ETF = "EQ:AAA", "EQ:ETFX"
+DIVIDENDS_TABLE = "rollups/instrument/div_yield@v1"
 R = 0.03
 BUCKETS = (7, 14, 30, 45, 60, 90)
 EXPIRIES = {D1 + timedelta(days=d): 0.25 for d in BUCKETS}
@@ -86,16 +88,45 @@ def test_no_type_of_the_grid_carries_a_vendor_quote_field() -> None:
         assert not names & FORBIDDEN, (cls.__name__, names & FORBIDDEN)
 
 
-def test_the_030_day_cell_at_020_delta_is_the_short_premium_row() -> None:
-    g = good(grid(chain))
-    rows = write_and_compute(chain)
+def with_yield(value: float | None) -> object:
+    """The chain plus a stored dividend yield (None: no row; NaN: a row with a null yield)."""
+
+    def write(writer: StoreWriter) -> None:
+        chain(writer)
+        if value is not None:
+            row = {"instrument_id": AAA, "div_yield": value}
+            write_rows(writer, "rollups/instrument/div_yield@v1", D1, [row])
+
+    return write
+
+
+@pytest.mark.parametrize("stored", [None, 0.02, float("nan")], ids=["no row", "0.02", "null"])
+def test_the_030_day_cell_at_020_delta_is_the_short_premium_row(stored: float | None) -> None:
+    write = with_yield(stored)
+    g = good(grid(write))
+    rows = write_and_compute(write)
+    assert g.q_known is (stored is not None and not math.isnan(stored))
+    assert rows["premium_status"] == "OK"  # a null yield priced with 0, as the grid does
     for side, cells in (("put", g.puts), ("call", g.calls)):
         cell = cells[2][2]
         assert isinstance(cell, GridCell)
         assert rows[f"{side}_strike"] == cell.strike
         assert rows[f"{side}_breakeven"] == pytest.approx(cell.breakeven)
         assert rows[f"{side}_yield_ann"] == pytest.approx(cell.yield_ann)
-    assert rows["target_expiry"] == g.columns[2].expiry and rows["premium_status"] == "OK"
+    assert rows["target_expiry"] == g.columns[2].expiry
+
+
+def test_a_null_open_interest_is_none_never_zero() -> None:
+    def no_oi(writer: StoreWriter) -> None:
+        rows = chain_rows(AAA, D1, 100.0, EXPIRIES, R, strikes=STRIKES)
+        for row in rows:
+            row["open_interest"] = None
+        write_chains(writer, D1, rows, {AAA: 100.0})
+        write_curve(writer, D1, R)
+
+    g = good(grid(no_oi))
+    cells = [c for row in g.puts + g.calls for c in row if isinstance(c, GridCell)]
+    assert cells and all(c.open_interest is None for c in cells)
 
 
 def write_and_compute(write: object) -> pd.Series:
@@ -103,12 +134,13 @@ def write_and_compute(write: object) -> pd.Series:
     options = reader.table("chains/option_quotes", D1)
     quotes = reader.table("chains/underlying_quotes", D1)
     curve = reader.table("rates/treasury", D1)
+    dividends = reader.table(DIVIDENDS_TABLE, D1)
     assert options is not None and quotes is not None and curve is not None
     inputs = {
         OPTIONS: options,
         RATES: curve,
         UNDERLYINGS: quotes,
-        DIVIDENDS: None,
+        DIVIDENDS: dividends,
     }
     row = short_premium.compute(inputs, D1, None).set_index("instrument_id").loc[AAA]
     assert isinstance(row, pd.Series)
@@ -163,7 +195,7 @@ def test_no_positive_spot_is_not_priced() -> None:
         write_curve(writer, D1, R)
 
     found = grid(no_spot)
-    assert isinstance(found, Unknown) and found.code is UnknownCode.NOT_APPLICABLE
+    assert isinstance(found, Unknown) and found.code is UnknownCode.NO_ROW
 
 
 def test_a_bucket_without_an_expiry_or_with_a_duplicate_is_a_gap_column() -> None:

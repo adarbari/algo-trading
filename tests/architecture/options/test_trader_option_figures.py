@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from graphql import (
+    GraphQLError,
     GraphQLNamedType,
     GraphQLObjectType,
     GraphQLSchema,
@@ -76,12 +77,23 @@ def test_the_option_grid_reaches_no_raw_quote_field(schema: GraphQLSchema) -> No
         assert not fields & FORBIDDEN, f"{name} carries a raw quote field: {fields & FORBIDDEN}"
 
 
-def test_the_grid_cell_is_derived_figures_only(schema: GraphQLSchema) -> None:
-    cell = schema.type_map["GridCell"]
-    assert set(cell.fields) == {  # type: ignore[attr-defined]
-        "band", "strike", "delta", "iv", "mid", "roc", "yieldAnn", "breakeven", "pBelow",
-        "spreadPct", "openInterest",
+def test_the_grid_types_carry_exactly_these_fields(schema: GraphQLSchema) -> None:
+    expected = {
+        "GridCell": {
+            "band", "strike", "delta", "iv", "mid", "roc", "yieldAnn", "breakeven", "pBelow",
+            "spreadPct", "openInterest",
+        },
+        "GridExpiry": {
+            "bucket", "expiry", "days", "reportInside", "reportInsideUnknown", "gap",
+        },
+        "OptionGrid": {
+            "underlyingId", "session", "pricedAt", "qKnown", "bands", "columns", "puts", "calls",
+        },
     }  # fmt: skip
+    for name, fields in expected.items():
+        found = schema.type_map[name]
+        assert isinstance(found, GraphQLObjectType)
+        assert set(found.fields) == fields, name
 
 
 def _documents() -> dict[str, str]:
@@ -96,7 +108,9 @@ def _documents() -> dict[str, str]:
     for path in WEB_SRC.rglob("*.ts*"):
         if "generated" in path.parts or re.search(r"\.(test|stories)\.", path.name):
             continue
-        for text in HAND_WRITTEN.findall(path.read_text()):
+        for raw in HAND_WRITTEN.findall(path.read_text()):
+            # a ${FIELDS} interpolation is a shared field list: a stand-in keeps the document valid
+            text = re.sub(r"\$\{[^}]*\}", "__typename", raw)
             head = re.search(r"\b(?:query|mutation)\s+(\w+)", text)
             if head:
                 found.setdefault(head.group(1), text)
@@ -117,23 +131,30 @@ class _ReadsType(Visitor):
             self.parents.add(getattr(parent, "name", ""))
 
 
-def _operations_reading(schema: GraphQLSchema, types: frozenset[str]) -> set[str]:
-    out = set()
-    for name, text in _documents().items():
-        fragments = "\n".join(_documents().get(n, "") for n in re.findall(r"\.\.\.(\w+)", text))
+def _operations_reading(
+    schema: GraphQLSchema, types: frozenset[str]
+) -> tuple[set[str], dict[str, str]]:
+    """(operations selecting a field of ``types``, the operations that did not parse)."""
+    documents = _documents()
+    out: set[str] = set()
+    failed: dict[str, str] = {}
+    for name, text in documents.items():
+        fragments = "\n".join(documents.get(n, "") for n in re.findall(r"\.\.\.(\w+)", text))
         info = TypeInfo(schema)
         reads = _ReadsType(info)
         try:
             visit(parse(text + "\n" + fragments), TypeInfoVisitor(info, reads))
-        except Exception:  # a fragment the parse cannot see: judged on the rest
+        except GraphQLError as error:
+            failed[name] = error.message
             continue
         if reads.parents & types:
             out.add(name)
-    return out
+    return out, failed
 
 
 def test_only_the_admin_options_tab_reads_a_raw_quote(schema: GraphQLSchema) -> None:
-    found = _operations_reading(schema, RAW_QUOTE_TYPES)
+    found, failed = _operations_reading(schema, RAW_QUOTE_TYPES)
+    assert failed == {}, f"operations the check could not read: {failed}"
     assert found == RAW_QUOTE_OPERATIONS, (
         f"web operations reading a raw OptionQuote: {sorted(found)}; a trader screen shows "
         "derived figures only (Instrument.optionGrid). Shrink RAW_QUOTE_OPERATIONS, never grow it."

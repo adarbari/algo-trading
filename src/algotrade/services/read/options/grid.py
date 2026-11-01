@@ -21,9 +21,10 @@ is not here: a page reads it by name (``feature.iv_rank``, ADR 0038), UNKNOWN wi
 until its history is long enough.
 
 Gaps are ``Unknown`` (``values.py``): no chain or rate partition NO_PARTITION (never r = 0), no
-chain rows NO_ROW (NOT_APPLICABLE for a name that is not optionable), no usable spot, no
-expiry near a bucket, an expiry an earlier bucket took, or no strike near a band
-NOT_APPLICABLE (the cause says which), a one-sided quote or a failed vol inversion ILLIQUID.
+chain rows or no usable spot NO_ROW (a name that is not optionable NOT_APPLICABLE), no expiry
+near a bucket, an expiry an earlier bucket took, or no strike near a band NOT_APPLICABLE (the
+cause says which), a one-sided quote or a failed vol inversion ILLIQUID. A missing open interest
+is None, never 0.
 
 The grid is cached for the session (``ResultCache``, keyed on the published state, ADR 0022).
 """
@@ -141,7 +142,7 @@ def _spot(ctx: ReadContext, underlying_id: str) -> float | Unknown:
     if underlying_id in spots.index:
         return float(spots[underlying_id])
     why = f"{UNDERLYING_QUOTES} has no positive price of {underlying_id} for {ctx.session.date}"
-    return _gap(ctx, UnknownCode.NOT_APPLICABLE, "NO_SPOT", why, UNDERLYING_QUOTES)
+    return _gap(ctx, UnknownCode.NO_ROW, "NO_SPOT", why, UNDERLYING_QUOTES)
 
 
 def _no_chain(ctx: ReadContext, underlying_id: str, optionable: FeatureValue) -> Unknown:
