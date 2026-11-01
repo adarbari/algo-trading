@@ -28,20 +28,13 @@ export const TRADER: Workspace = {
       label: 'Ideas',
     },
     {
-      path: '/screeners',
-      label: 'Screeners',
-    },
-    {
       path: '/edges',
-      label: 'Edges',
+      label: 'Setups',
     },
     {
-      path: '/explore',
-      label: 'Explore',
-    },
-    {
-      path: '/regime',
-      label: 'Regime',
+      // The Test flow (V9 moves it to /test and redirects /screeners there).
+      path: '/screeners',
+      label: 'Test',
     },
     {
       path: '/calendar',

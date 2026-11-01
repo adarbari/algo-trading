@@ -29,8 +29,8 @@ import { useEffect } from 'react';
 
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
-import { GuideSearchProvider } from '@/features/guide-search';
-import { SystemStatusStrip } from '@/widgets/status-strip';
+import { BarSearchButton, GuideSearchProvider } from '@/features/guide-search';
+import { SiteFooter, SystemStatusStrip } from '@/widgets/status-strip';
 import { ThemeChoice } from '@/widgets/theme-choice';
 
 import {
@@ -80,6 +80,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
       >
         <AppShell
           strip={viewer ? <SystemStatusStrip admin={canEnter(viewer, 'admin')} /> : null}
+          footer={viewer ? <SiteFooter admin={canEnter(viewer, 'admin')} /> : null}
           topBar={
             <TopBar
               brand={<Mono weight="medium">algotrade</Mono>}
@@ -96,6 +97,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
               end={
                 viewer && (
                   <Stack direction="row" gap={2} align="center">
+                    <BarSearchButton />
                     <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
                     <AccountMenu
                       name={viewer.name}

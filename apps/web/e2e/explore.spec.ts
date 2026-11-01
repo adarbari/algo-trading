@@ -143,31 +143,18 @@ test('one ticker opens on its overview', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('search adds a ticker as a tab: type, arrows, Enter; / focuses the box', async ({ page }) => {
+test('the bar search opens a ticker in Explore: type, arrows, Enter', async ({ page }) => {
   await page.goto('/explore?sel=AAPL');
-  const box = page.getByRole('combobox', { name: 'Search tickers' });
-  await expect(box).toBeVisible();
-  await page.keyboard.press('/');
-  await expect(box).toBeFocused();
+  await page.getByRole('button', { name: 'Search' }).click();
+  const box = page.getByRole('searchbox', { name: 'Search' });
   await box.fill('nvda');
-  const options = page.getByRole('option');
-  await expect(options.first()).toContainText('NVDA');
+  const tickers = page.getByRole('region', { name: 'Tickers' });
+  await expect(tickers.getByRole('link').first()).toContainText('NVDA');
   await expectAccessible(page);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/sel=AAPL%2CNVDA|sel=AAPL,NVDA/);
+  await expect(page).toHaveURL(/sel=NVDA/);
   await expect(page).toHaveURL(/focus=NVDA/);
-  await expect(open(page).getByRole('tab')).toHaveText(['AAPL', 'NVDA']);
-  await expect(open(page).getByRole('tab', { name: 'NVDA' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-  await expect(box).toHaveValue('');
-  // Escape closes the list and leaves the box.
-  await box.fill('msft');
-  await expect(options.first()).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(options).toHaveCount(0);
   // No console-error check: the mocks record only AAPL's detail reads, so NVDA's 404.
 });
 

@@ -49,11 +49,38 @@ function setup(navigate = vi.fn()) {
   return { navigate };
 }
 
-const BOX = { name: 'Search the Guide', hidden: false } as const;
+const BOX = { name: 'Search', hidden: false } as const;
+
+/** Serve `guide` for the Guide search and the ticker table the given rows (none by default). */
+function serve(guide: unknown, rows: { symbol: string; name: string }[] = []) {
+  GQL.mockImplementation(((_doc: unknown, variables: Record<string, unknown>) =>
+    Promise.resolve('limit' in variables ? guide : tableOf(rows))) as never);
+}
+const tableOf = (rows: { symbol: string; name: string }[]) => ({
+  table: {
+    session: { date: '2026-10-30', unavailable: [] },
+    universeSnapshot: null,
+    preSnapshot: null,
+    sort: null,
+    total: rows.length,
+    page: 1,
+    size: rows.length,
+    unavailable: [],
+    columns: [],
+    instruments: rows.map((r) => ({ instrumentId: `EQ:${r.symbol}`, ...r })),
+    rows: rows.map(() => []),
+    unknown: rows.map(() => []),
+    reasons: rows.map(() => []),
+    kinds: rows.map(() => []),
+    facets: [],
+    kindTexts: [],
+  },
+});
+const guideCalls = () => GQL.mock.calls.filter(([, v]) => 'limit' in (v as object));
 
 beforeEach(() => {
   GQL.mockReset();
-  GQL.mockResolvedValue(SERVED);
+  serve(SERVED);
 });
 
 afterEach(() => {
@@ -66,7 +93,7 @@ describe('Guide search', () => {
     const user = userEvent.setup();
     expect(screen.queryByRole('dialog')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Search the Guide' }));
-    expect(await screen.findByRole('dialog', { name: 'Search the Guide' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Search' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     await user.keyboard('{Control>}k{/Control}');
@@ -88,9 +115,9 @@ describe('Guide search', () => {
       await vi.advanceTimersByTimeAsync(250);
     });
     await waitFor(() => {
-      expect(GQL).toHaveBeenCalledTimes(1);
+      expect(guideCalls()).toHaveLength(1);
     });
-    expect(GQL.mock.calls[0]?.[1]).toEqual({ q: 'volume', limit: 6 });
+    expect(guideCalls()[0]?.[1]).toEqual({ q: 'volume', limit: 6 });
   });
 
   it('shows the server’s groups in its order with their titles, snippets and links', async () => {
@@ -113,8 +140,20 @@ describe('Guide search', () => {
     await expectNoA11yViolations(document.body);
   });
 
+  it('lists matching tickers first, each opening it in Explore', async () => {
+    serve(SERVED, [{ symbol: 'VLO', name: 'Valero Energy' }]);
+    setup();
+    const user = userEvent.setup();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('searchbox', BOX), 'vlo');
+    const tickers = within(await screen.findByRole('region', { name: 'Tickers' }));
+    expect(tickers.getByText('Valero Energy')).toBeInTheDocument();
+    expect(tickers.getByRole('link')).toHaveAttribute('href', '/explore?sel=VLO&focus=VLO');
+    expect(screen.getAllByRole('region')[0]).toHaveAccessibleName('Tickers');
+  });
+
   it('groups the mechanisms and the edges, each hit linking to its Guide page', async () => {
-    GQL.mockResolvedValue({
+    serve({
       guideSearch: {
         query: 'drift',
         groups: [
@@ -149,12 +188,12 @@ describe('Guide search', () => {
     await user.type(await screen.findByRole('searchbox', BOX), 'drift');
     const mechanisms = within(await screen.findByRole('region', { name: 'Mechanisms' }));
     expect(mechanisms.getByRole('link')).toHaveAttribute('href', '/guide/edges/m/slow_to_update');
-    const edges = within(screen.getByRole('region', { name: 'Edges' }));
-    expect(edges.getByRole('link')).toHaveAttribute('href', '/guide/edges/pead');
+    const edges = within(screen.getByRole('region', { name: 'Setups' }));
+    expect(edges.getByRole('link')).toHaveAttribute('href', '/edges?edge=pead');
   });
 
   it('shows a screener category as a Screener categories result linking to its page', async () => {
-    GQL.mockResolvedValue({
+    serve({
       guideSearch: {
         query: 'income',
         groups: [
@@ -210,7 +249,7 @@ describe('Guide search', () => {
   });
 
   it('says when nothing matches, and offers a retry when the read fails', async () => {
-    GQL.mockResolvedValue({ guideSearch: { query: 'zzzz', groups: [] } });
+    serve({ guideSearch: { query: 'zzzz', groups: [] } });
     setup();
     const user = userEvent.setup();
     await user.keyboard('{Control>}k{/Control}');

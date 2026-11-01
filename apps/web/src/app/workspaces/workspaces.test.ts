@@ -8,6 +8,10 @@ describe('workspaces', () => {
     expect(TRADER.sections[0]?.path).toBe('/ideas');
   });
 
+  it('shows Ideas, Setups, Test and Calendar on the bar', () => {
+    expect(TRADER.sections.map((s) => s.label)).toEqual(['Ideas', 'Setups', 'Test', 'Calendar']);
+  });
+
   it('keeps admin sections under /admin and every path unique', () => {
     expect(ADMIN.sections.every((s) => s.path.startsWith('/admin/'))).toBe(true);
     const paths = WORKSPACES.flatMap((w) => w.sections.map((s) => s.path));
@@ -15,7 +19,7 @@ describe('workspaces', () => {
   });
 
   it('finds a section by path and fails loudly for an unknown one', () => {
-    expect(section(TRADER, '/explore').label).toBe('Explore');
-    expect(() => section(ADMIN, '/explore')).toThrow(/no section/);
+    expect(section(TRADER, '/edges').label).toBe('Setups');
+    expect(() => section(TRADER, '/explore')).toThrow(/no section/);
   });
 });

@@ -14,3 +14,13 @@ export function GuideSearchButton() {
     </Button>
   );
 }
+
+/** The search box of the top bar: a compact button that opens the dialog (⌘K does too). */
+export function BarSearchButton() {
+  const open = useOpenGuideSearch();
+  return (
+    <Button icon="search" size="sm" onClick={open} aria-keyshortcuts="Control+K Meta+K">
+      Search
+    </Button>
+  );
+}
