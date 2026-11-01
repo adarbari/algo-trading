@@ -1308,6 +1308,7 @@ Source: `design-system/components/ProseList`
 | `items` | `readonly ProseListItem[]` | yes |  |
 | `ordered` | `boolean` | no | Numbered instead of bulleted (a fixed order the reader follows). |
 | `'aria-label'` | `string` | no | Accessible name of the list, when the surrounding heading does not name it. |
+| `marker` | `'disc' \| 'box'` | no | `disc` (default) or `box`: an empty box before each line, a "before you act" checklist. |
 
 ### RangeFilter
 
@@ -1656,6 +1657,7 @@ Source: `design-system/components/Tabs`
 | `label` | `string` | yes | Accessible name of the tab list, e.g. "View". |
 | `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
 | `size` | `'sm' \| 'md'` | no | Text size: `md` (default) or `sm` (dense toolbars). |
+| `variant` | `'underline' \| 'segmented'` | no | `underline` (default) or `segmented`: pills in one bordered track (a page's views: Stocks, Premium, Past lists). |
 
 ### TaggedSentence
 

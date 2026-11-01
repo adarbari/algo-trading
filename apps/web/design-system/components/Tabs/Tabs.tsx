@@ -27,9 +27,19 @@ export interface TabsProps {
   children?: ReactNode;
   /** Text size: `md` (default) or `sm` (dense toolbars). */
   size?: 'sm' | 'md';
+  /** `underline` (default) or `segmented`: pills in one bordered track (a page's views: Stocks, Premium, Past lists). */
+  variant?: 'underline' | 'segmented';
 }
 
-export function Tabs({ items, value, onChange, label, children, size = 'md' }: TabsProps) {
+export function Tabs({
+  items,
+  value,
+  onChange,
+  label,
+  children,
+  size = 'md',
+  variant = 'underline',
+}: TabsProps) {
   const base = useId();
   const refs = useRef(new Map<string, HTMLButtonElement>());
   const enabled = items.filter((item) => !item.disabled);
@@ -62,7 +72,13 @@ export function Tabs({ items, value, onChange, label, children, size = 'md' }: T
   const hasPanel = children !== undefined;
   return (
     <div className={styles.root}>
-      <div className={styles.list} role="tablist" aria-label={label} data-size={size}>
+      <div
+        className={styles.list}
+        role="tablist"
+        aria-label={label}
+        data-size={size}
+        data-variant={variant}
+      >
         {items.map((item) => {
           const selected = item.id === value;
           return (
