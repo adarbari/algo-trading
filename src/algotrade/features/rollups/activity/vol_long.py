@@ -22,6 +22,7 @@ import pandas as pd
 
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
+from algotrade.features.rollups.activity.vol_stats import hv_feature
 from algotrade.features.rollups.price.price_stats import Matrix, Panel, bars_rows
 from algotrade.quant import realized_vol
 
@@ -40,15 +41,7 @@ def _gap(n: int) -> str:
 
 
 FEATURES = (
-    *(
-        Feature(
-            f"hv{n}", "float32", "decimal",
-            f"Close-to-close realised volatility: sample stdev of the last {n} log returns x "
-            f"sqrt({PERIODS_PER_YEAR})",
-            _gap(n + 1), valid_range=(0, 5), inputs=(CLOSE,),
-        )
-        for n in HV_WINDOWS
-    ),
+    *(hv_feature(n) for n in HV_WINDOWS),
     Feature(
         f"downside_dev_{DOWNSIDE_WINDOW}", "float32", "decimal",
         f"Downside deviation: the root mean square of the last {DOWNSIDE_WINDOW} negative log "
