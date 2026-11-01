@@ -22,7 +22,7 @@ mechanism_kind = "liquidity_provision"
 asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09) gives SPY its
-outcome history. The trigger is the market_triggers@v1 spike (ADR 0075): the first session with a VIX
+outcome history. The trigger is the market_triggers@v2 spike (ADR 0075): the first session with a VIX
 close of at least 30 and VIX / VIX3M above 1 after at least 21 sessions without one, both from the
 macro table (FRED VIXCLS and VXVCLS, personal use only, so the edge's evidence is personal-licence).
 The decision session D is the session the reading was first known (the day after its close, the series'
@@ -56,14 +56,14 @@ start_offset_sessions = 1
 outcome = """SPY's raw return (benchmark none) over the 63 sessions after a VIX spike, from the entry close
 (the session after the day the spike was first known), against its own return over the same number of
 sessions outside every window; no cost is deducted from a timed position (ADR 0073)."""
-trigger_timing = """The spike is read at the decision session D from market_triggers@v1
+trigger_timing = """The spike is read at the decision session D from market_triggers@v2
 (sessions_since_vix_spike = 0): a VIX close of at least 30 with VIX / VIX3M above 1 after 21 quiet
 sessions, known from the session after its date (the series' one-day release lag, no revisions). The
 entry session S = D + 1 (start_offset_sessions = 1). A stale VIX or VIX3M reading (more than 3 sessions
 old) is UNKNOWN, never 'no spike'. No fact after D places a window."""
 replication = """The practitioner rule: buy SPY when VIX is above 30 and VIX / VIX3M above 1 and hold 21 to
 63 sessions (the page's Cboe and SentimentTrader tables). Here the same trigger is the one in
-market_triggers@v1 and SPY is held 63 sessions, compared with its own other stretches; no exit rule and
+market_triggers@v2 and SPY is held 63 sessions, compared with its own other stretches; no exit rule and
 no cash leg are tested."""
 expected_size = """The page quotes hit rates of 65 to 75 percent at three months for VIX above 30 entries
 since 1990, not verified and over 20 to 30 clustered events, and gives no return figure, so none is set.

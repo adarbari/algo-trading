@@ -157,3 +157,13 @@ def test_the_vix_spike_columns_do_not_change_with_the_longer_input() -> None:
     both = row(series({130: HIGH}, LONG))  # inside the v1 window (with its 21 sessions of history)
     assert both["vix_spike_date"] == next_session(LONG[130])
     assert row(series({40: HIGH}, LONG))["vix_spike_date"] is None  # older than LOOKBACK
+
+
+def test_a_post_spike_contango_older_than_the_lookback_is_not_seen() -> None:
+    days = sessions_ending(END, 650)[:-1]  # enough history for a trigger 300+ sessions back
+    old = row(series(episode(300), days))  # known 344 sessions before END: outside LOOKBACK
+    assert old["post_spike_contango_date"] is None
+    assert old["sessions_since_post_spike_contango"] == triggers.NONE_SEEN
+    seen = row(series(episode(349), days))  # known 295 sessions before END
+    assert seen["post_spike_contango_date"] == next_session(days[354])
+    assert seen["sessions_since_post_spike_contango"] <= triggers.LOOKBACK
