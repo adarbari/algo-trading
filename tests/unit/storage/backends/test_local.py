@@ -19,6 +19,7 @@ from typing import Any
 
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import pytest
 
@@ -470,3 +471,39 @@ def test_a_scan_of_job_records_does_not_evict_the_nightly_records(
     assert len(hot) == 9
     assert len(runs.find("job:edge-eval")) == 17
     assert set(runs._parsed) == hot
+
+
+def _clustered(path: Path) -> pa.Table:
+    """Three series, one row group each (the file a ``cluster_by = instrument_id`` table has)."""
+    ids = ["MACRO:A"] * 3 + ["MACRO:B"] * 2 + ["MACRO:C"] * 4
+    table = pa.table({"instrument_id": ids, "value": [float(i) for i in range(len(ids))]})
+    writer = pq.ParquetWriter(path, table.schema)
+    for first, last in ((0, 3), (3, 5), (5, 9)):
+        writer.write_table(table.slice(first, last - first))
+    writer.close()
+    return table
+
+
+def test_a_clustered_file_read_for_one_id_decodes_only_its_row_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "v.parquet"
+    _clustered(path)
+    asked: list[list[int]] = []
+    original = pq.ParquetFile.read_row_groups
+
+    def spy(self: pq.ParquetFile, row_groups: list[int], *args: object, **kw: object) -> pa.Table:
+        asked.append(list(row_groups))
+        return original(self, row_groups, *args, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pq.ParquetFile, "read_row_groups", spy)
+    only = _read_file(path, ["MACRO:B"], ["value"])
+    assert asked == [[1]] and only.column("value").to_pylist() == [3.0, 4.0]
+    both = _read_file(path, ["MACRO:C", "MACRO:A"], None)
+    assert asked[-1] == [0, 2]  # file order, whatever the order asked
+    full = _read_file(path, None, None)
+    assert both.equals(
+        full.filter(pc.is_in(full.column("instrument_id"), pa.array(["MACRO:A", "MACRO:C"])))
+    )
+    assert _read_file(path, [], None).num_rows == 0 and asked[-1] == []
+    assert _read_file(path, ["MACRO:Z"], None).num_rows == 0

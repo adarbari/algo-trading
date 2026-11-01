@@ -777,6 +777,14 @@ follow-up PR).
 - Note: recorded in ADR 0083, which supersedes the 2026-10-22 "Ideas ranking rule, store and licence" index decision. The legal rules are research, not counsel's opinion.
 - Reasoning: the research found two open jobs at $20-100 (an evidence-backed shortlist, an honest test); the bar follows them and the list rests only on stored verdicts.
 
+## 2026-11-01 | French factors (ADR 0089) | Residual returns v2, licence, point in time
+- Question: how should Kenneth French's daily factors make residual returns measurable before 2013, and under which licence and point-in-time rules?
+- Options: (i) French factors before 2013-05 and ETFs after (a splice), or (ii) French factors throughout, as v2 beside v1; licence `personal` or `open`; the lag and `knowledge_ts` rules.
+- Decision: (ii), with `factor_betas@v2` and `residual_returns@v2` beside v1 and v1 unchanged. Licence `personal` (no terms stated, CRSP-derived; loosening it means scoring the v2 verdicts again). Lag of 70 days, `revised = true`, each pull's changed values stored as a new vintage. A v2 label's `knowledge_ts` is the later of the window close and the vintage date (a 0053 amendment).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Owner action: email kfrench@dartmouth.edu asking to use the daily files as regression inputs on a paid US ideas site that serves only our betas and residuals, with attribution. A yes makes the series `open`.
+- Reasoning: a splice puts a structural break in the label in 2013 (long-only ETF spreads vs long-short research factors), and CAPE set the precedent for the licence.
 ## 2026-11-01 | Options-setups backend ADR 0088 | licence of market states, scope of the strictest-field rule, gate licence, holdout dates
 - Question: (A) are the stored `market_conditions@v1` states open or personal; (B) does the strictest-field licence rule reach screener and universe fields; (C) does it apply to a gate; (D) what `holdout_from` does each research source give?
 - Options: A open (recommended) or personal; B gate/entry/case/exit only (recommended) or every site; C confirm the reading or not; D per-source dates.

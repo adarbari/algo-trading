@@ -23,6 +23,10 @@ data writes nothing:
   stored vintage is itself dated after the session (an observation not public yet), which no
   session has read, so the corrected value takes that key.
 
+A ``revised`` series (a file re-estimated in place) that already has stored vintages adds a
+first-seen observation dated ``max(obs + lag, run session)``: a session before the run never saw
+it, however old the observation. The first fetch (a backfill) keeps ``obs + lag``.
+
 Values are stored as published (the registry's ``transform`` is how the macro feature group
 reads them, not an ingestion step).
 """
@@ -92,17 +96,22 @@ def _as_dates(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def rows_to_write(target: pd.DataFrame, stored: pd.DataFrame, session: date) -> pd.DataFrame:
+def rows_to_write(
+    target: pd.DataFrame, stored: pd.DataFrame, session: date, live: bool = False
+) -> pd.DataFrame:
     """The rows of ``target`` (``vintage_rows``) the table needs, given ``stored`` (its
     ``COLUMNS`` for the same series; ``data.macro.series.stored_vintages``): none when nothing
-    changed. ``COLUMNS``, dates as ``date``."""
+    changed. ``live``: the series is revised in place and already stored, so an observation
+    first seen now is known from the run's session at the earliest, never from the earlier
+    ``obs + lag`` (that would let a past session see a value fetched later). ``COLUMNS``, dates
+    as ``date``."""
     if target.empty:
         return target
     wanted, held = _as_dates(target), _as_dates(stored)
     new = pd.concat(
         [
             _new_alfred(wanted[wanted["vintage_kind"] == ALFRED], held),
-            _changed_lagged(wanted[wanted["vintage_kind"] == LAGGED], held, session),
+            _changed_lagged(wanted[wanted["vintage_kind"] == LAGGED], held, session, live),
         ],
         ignore_index=True,
     )
@@ -126,9 +135,12 @@ def _new_alfred(rows: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
     return merged[~unchanged & ~erased].drop(columns=["held", "_merge"])
 
 
-def _changed_lagged(rows: pd.DataFrame, held: pd.DataFrame, session: date) -> pd.DataFrame:
+def _changed_lagged(
+    rows: pd.DataFrame, held: pd.DataFrame, session: date, live: bool = False
+) -> pd.DataFrame:
     """``rows`` with no stored ``lagged`` vintage of the observation, or whose value differs
-    from the newest one: those become the new vintage (dated ``session``, see the module)."""
+    from the newest one: those become the new vintage (dated ``session``, see the module). A
+    ``live`` series' first-seen observation is dated ``max(obs + lag, session)``."""
     if rows.empty:
         return rows
     lagged = held[held["vintage_kind"] == LAGGED].sort_values("vintage_date", kind="stable")
@@ -141,6 +153,9 @@ def _changed_lagged(rows: pd.DataFrame, held: pd.DataFrame, session: date) -> pd
     today, stored_on = pd.Timestamp(session), changed["held_vintage"]
     corrected = stored_on.where(stored_on.isna() | (stored_on >= today), today)  # the later one
     changed["vintage_date"] = corrected.fillna(changed["vintage_date"])
+    if live:  # a first-seen observation is known from the run at the earliest
+        late = stored_on.isna() & (changed["vintage_date"] < today)
+        changed["vintage_date"] = changed["vintage_date"].mask(late, today)
     return changed.drop(columns=["held", "held_vintage"])
 
 

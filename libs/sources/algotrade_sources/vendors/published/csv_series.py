@@ -24,7 +24,7 @@ from algotrade_sources.framework.series import (
     normalise_series_frame,
     series_request,
 )
-from algotrade_sources.vendors.published.parsers import PARSERS
+from algotrade_sources.vendors.published.parsers import PARSERS, SECTIONED
 
 SOURCE = "published"
 DATASET = "series_file"
@@ -46,7 +46,7 @@ def parse_series(request: SeriesRequest, payload: bytes) -> pd.DataFrame:
         raise _refused(request, payload, "the file is empty")
     if payload.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<"):
         raise _refused(request, payload, "an HTML page, not the table")
-    table = parser(payload)
+    table = parser(payload, request.section) if request.parser in SECTIONED else parser(payload)
     missing = [c for c in (request.date_column, request.value_column) if c not in table.columns]
     if missing:
         raise _refused(

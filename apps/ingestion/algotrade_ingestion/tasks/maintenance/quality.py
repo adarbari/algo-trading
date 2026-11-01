@@ -29,7 +29,8 @@ from algotrade.data.chains import (
 )
 from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.futures.curves import futures_curve
-from algotrade.data.macro.series import latest_vintages, stored_vintages
+from algotrade.data.macro.series import COLUMNS as MACRO_COLUMNS
+from algotrade.data.macro.series import latest_vintages, stored_keys, stored_vintages
 from algotrade.data.reference import snapshot
 from algotrade.data.volatility import ibkr_iv30
 from algotrade.services.features import site_features
@@ -350,6 +351,7 @@ def check_futures_curves(reader: StoreReader, session: date, s: SourcesSettings)
 MACRO_TASK = "macro"  # the macro task's run-record job name (tasks/macro/series.py)
 CALENDAR_TASK = "macro_calendar"  # the macro-calendar task's job name (tasks/macro/calendar.py)
 CALENDAR_TABLE = "events/macro_release"  # the table it owns
+FETCHED = ("OK", "UNCHANGED")  # a macro item status of a series fetched in that run
 EXAMPLES_MACRO = 6  # stale or shrunken series named in a detail
 
 
@@ -369,19 +371,73 @@ def macro_checks(
     vintages than an earlier ``macro`` run recorded (a stored vintage is never removed: ADR
     0048). Fetchable: its source is enabled in ``sources.toml`` and the latest macro run did
     not skip it (no credential); the skipped ones are named in the detail, and when every
-    enabled series was skipped the check WARNs instead of failing."""
+    enabled series was skipped the check WARNs instead of failing. The research series (the
+    ``[[file]]`` blocks of ``config/site/series/*.toml``, ADR 0089) are left out of both and
+    graded by ``_macro_research``."""
     enabled = [x for x in macro.series if s.vendor(x.source).enabled]
     if not enabled:
         return []
     runs = reader.runs(MACRO_TASK)
-    named = {x.key for x in enabled}
+    regular = [x for x in enabled if not x.research]
+    research = [x for x in enabled if x.research]
+    named = {x.key for x in regular}
     skipped = {k: v for k, v in _skipped_series(runs).items() if k in named}
-    fetchable = [x for x in enabled if x.key not in skipped]
-    stored = stored_vintages(reader, [x.instrument_id for x in enabled])
+    fetchable = [x for x in regular if x.key not in skipped]
+    ids = [x.instrument_id for x in regular]
+    stored = stored_vintages(reader, ids) if ids else pd.DataFrame(columns=MACRO_COLUMNS)
+    due = _research_due(runs, session, research)
+    keys = stored_keys(reader, [x.instrument_id for x in due])  # key columns only, no values
+    held = pd.concat([stored[["instrument_id"]], keys[["instrument_id"]]], ignore_index=True)
     return [
         _macro_fresh(stored, session, s.max_macro_stale_share, fetchable, skipped),
-        _macro_vintages(stored, runs, enabled),
+        _macro_vintages(held, runs, [*regular, *due]),
+        *_macro_research(keys, session, research, due),
     ]
+
+
+def _research_due(
+    runs: list[RunRecord], session: date, research: list[MacroSeries]
+) -> list[MacroSeries]:
+    """The research series a ``macro`` run of ``session`` fetched: only on such a night (about
+    once a month, ``refetch_days``) are they read and graded."""
+    fetched = {
+        key
+        for run in runs
+        if run.status in PUBLISHED and run.session_date == session
+        for key, status in run.items.items()
+        if status_label(status) in FETCHED
+    }
+    return [x for x in research if x.key in fetched]
+
+
+def _macro_research(
+    keys: pd.DataFrame, session: date, research: list[MacroSeries], due: list[MacroSeries]
+) -> list[Check]:
+    """The series expanded from the ``[[file]]`` blocks of ``config/site/series/*.toml`` (ADR
+    0089): each against its own ``stale_after_days`` and WARN only (they sit outside
+    ``max_macro_stale_share``), graded on a night a ``macro`` run of the session fetched them
+    (about once a month, ``refetch_days``); other nights say so and read nothing (their vintage
+    counts are checked on those nights too, by ``macro_checks``). ``keys``: their stored key
+    columns."""
+    if not research:
+        return []
+    name = "macro_research_fresh"
+    if not due:
+        note = f"{len(research)} research series not graded: no macro run of {session} fetched them"
+        return [Check(name, "PASS", note)]
+    known = keys[keys["vintage_date"] <= session]
+    newest = known.groupby("instrument_id")["obs_date"].max()
+    stale = [
+        x.key
+        for x in due
+        if x.instrument_id not in newest.index
+        or (session - newest[x.instrument_id]).days > x.stale_after_days
+    ]
+    detail = f"{len(stale)} of {len(due)} fetched research series stale ({len(research)} declared)"
+    if stale:
+        named = ", ".join(stale[:EXAMPLES_MACRO]) + (" ..." if len(stale) > EXAMPLES_MACRO else "")
+        return [Check(name, "WARN", f"{detail}: {named}")]
+    return [Check(name, "PASS", detail)]
 
 
 VX_TASK = "vx_futures"  # the vx-futures task's job name (tasks/market/volatility/)
