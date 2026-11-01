@@ -23,7 +23,20 @@ afterEach(() => {
 });
 
 describe('AdminIngestionPage', () => {
-  it('lays out every section and passes the selected cell down', () => {
+  it('shows the tonight view first and each other view on its tab', async () => {
+    render(<AdminIngestionPage onSelectCell={vi.fn()} onClearCell={vi.fn()} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Nightly run' })).toBeInTheDocument();
+    for (const name of ['summary', 'runs', 'quality', 'chains']) {
+      expect(document.body).toHaveTextContent(`[${name}]`);
+    }
+    expect(document.body).not.toHaveTextContent('[verification]');
+    await userEvent.click(screen.getByRole('tab', { name: 'Checks against IBKR' }));
+    expect(document.body).toHaveTextContent('[verification]');
+    await userEvent.click(screen.getByRole('tab', { name: 'Review items' }));
+    expect(document.body).toHaveTextContent('[review]');
+  });
+
+  it('opens the coverage view with the selected cell', () => {
     render(
       <AdminIngestionPage
         selected={{ dataset: 'bars/1d', session: '2026-10-02' }}
@@ -31,18 +44,7 @@ describe('AdminIngestionPage', () => {
         onClearCell={vi.fn()}
       />,
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Ingestion' })).toBeInTheDocument();
-    for (const name of [
-      'summary',
-      'grid bars/1d',
-      'drilldown',
-      'known',
-      'chains',
-      'quality',
-      'verification',
-      'review',
-      'runs',
-    ]) {
+    for (const name of ['grid bars/1d', 'drilldown', 'known']) {
       expect(document.body).toHaveTextContent(`[${name}]`);
     }
   });

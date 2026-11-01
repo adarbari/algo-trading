@@ -72,7 +72,7 @@ test('an admin signs in and reaches the Admin workspace', async ({ page }) => {
   await expect(page.getByRole('radio', { name: 'Admin' })).toBeVisible();
   await page.keyboard.press('Escape');
   await page.goto('/admin/ingestion');
-  await expect(page.getByRole('heading', { level: 1, name: 'Ingestion' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Nightly run' })).toBeVisible();
 });
 
 test('a valid sign-in the registry does not know is told to ask an admin', async ({ page }) => {
