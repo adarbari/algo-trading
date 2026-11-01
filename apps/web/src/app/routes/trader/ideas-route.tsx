@@ -49,6 +49,9 @@ function IdeasRoute() {
       onScreeners={() => void navigate({ to: '/screeners' })}
       onOpenRegime={() => void navigate({ to: '/regime' })}
       onOpenEdge={(edge) => void navigate({ to: '/edges', search: { edge } })}
+      onOpenIdea={(symbol, setup) =>
+        void navigate({ to: '/ideas/$symbol', params: { symbol }, search: { setup } })
+      }
       onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
       onOpen={(symbol, via) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol, via } })

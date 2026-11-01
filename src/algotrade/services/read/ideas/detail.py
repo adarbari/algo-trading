@@ -46,11 +46,12 @@ OWN_EARNINGS = ("own_earnings", "reference_earnings")
 @dataclass(frozen=True)
 class IdeaWhy:
     """Why the name is here: the setup's ``thesis`` and ``mechanism``, the ``decision`` of its
-    basis screener for the name and the ``criteria`` it met (``unknown``: the pick's row could not
-    be read)."""
+    ``basis_screener`` (the screener the verdict rests on) for the name and the ``criteria`` it
+    met (``unknown``: the pick's row could not be read)."""
 
     thesis: str
     mechanism: str
+    basis_screener: str
     decision: str | None
     criteria: tuple[CriterionResult, ...]
     unknown: Unknown | None = None
@@ -135,8 +136,12 @@ def _why(
         text = f"{setup.basis_screener} has no readable row for the pick at {ctx.session.date}"
         cause = run_cause(setup.basis_screener, text, ctx.session.date)
         unknown = Unknown(UnknownCode.NOT_STORED, cause)
-        return IdeaWhy(edge.thesis, edge.mechanism, None, (), pick.unknown or unknown)
-    return IdeaWhy(edge.thesis, edge.mechanism, result.decision, tuple(result.criteria))
+        return IdeaWhy(
+            edge.thesis, edge.mechanism, setup.basis_screener, None, (), pick.unknown or unknown
+        )
+    return IdeaWhy(
+        edge.thesis, edge.mechanism, setup.basis_screener, result.decision, tuple(result.criteria)
+    )
 
 
 def _risks(

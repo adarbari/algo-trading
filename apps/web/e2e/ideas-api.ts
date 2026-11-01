@@ -213,6 +213,71 @@ function setupIdeas(tab: string | undefined, mode: 'listed' | 'unproven'): unkno
   };
 }
 
+/** The `IdeaDetail` answer: AAPL under the one qualifying setup (null for any other name). */
+function ideaDetail(symbol: string | undefined): unknown {
+  if (symbol !== 'AAPL') return { data: { idea: null } };
+  const setup = {
+    edgeId: 'drift',
+    edgeName: 'Post-earnings drift',
+    tab: 'STOCKS',
+    level: 'works',
+    place: 1,
+  };
+  return {
+    data: {
+      idea: {
+        session: '2026-10-02',
+        instrumentId: 'EQ:AAPL',
+        tab: 'STOCKS',
+        instrument: { symbol: 'AAPL', name: 'Apple Inc.' },
+        setup,
+        setups: [setup],
+        why: {
+          thesis: 'Prices adjust slowly after a surprise.',
+          mechanism: 'm',
+          basisScreener: 'vrp-scanner',
+          decision: 'QUALIFIED',
+          criteria: [],
+          unknown: null,
+        },
+        exitRule: {
+          edgeId: 'drift',
+          holdSessions: 5,
+          winners: 80,
+          inSampleOnly: false,
+          stop: {
+            kind: 'HISTORY',
+            fraction: 0.062,
+            atr: null,
+            multiple: null,
+            winners: 80,
+            beyond: 0.2,
+          },
+          unknown: null,
+        },
+        evidence: {
+          level: 'works',
+          result: 'Held out: lift 3.2 points on 120 trades.',
+          basis: 'screen, 5 trading days',
+          basisHorizon: 5,
+          liftPts: 3.2,
+          lift: 0.1,
+          trades: 300,
+          oosTrades: 120,
+        },
+        risks: {
+          persistence: 'Slow-moving holders.',
+          holdEnds: '2026-10-09',
+          watchOut: [],
+          events: [],
+          unknown: null,
+        },
+        learn: 'drift',
+      },
+    },
+  };
+}
+
 export async function mockIdeasApi(
   page: Page,
   edgeDesk: unknown = NO_EDGE_DESK,
@@ -283,6 +348,12 @@ export async function mockIdeasApi(
             },
           },
         },
+      });
+      return;
+    }
+    if (/query\s+IdeaDetail\b/.test(body?.query ?? '')) {
+      await route.fulfill({
+        json: ideaDetail((body?.variables as { symbol?: string } | undefined)?.symbol),
       });
       return;
     }

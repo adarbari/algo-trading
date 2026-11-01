@@ -102,3 +102,49 @@ The count is of picks, never of which names. The list is renumbered without them
 """
 next = "Nothing to do: the list shows everything your licences allow."
 see_also = ["withheld_screener", "ideas_listed"]
+
+[[term]]
+id = "idea_why"
+term = "Why it is here"
+short = "The setup's thesis and the screener criteria this name met tonight."
+body = """
+A setup picks names that share a measurable pattern. The thesis says what the pattern is and why it might pay. The criteria list shows each rule of the setup's screener, the value this name has and whether it passed. A near miss is marked as such. The text is the setup's own, the same for every name it picks, so read the criteria to see how this name differs from the next one. Don't read a pass as a forecast: the pattern held on average in the past, and any single name can still go the other way.
+"""
+see_also = ["idea_evidence", "idea_risks", "verdict", "near_miss"]
+
+[[term]]
+id = "idea_exit_rule"
+term = "Historical exit rule"
+short = "How the setup's past winners behaved: how far they dipped and how long they were held."
+body = """
+The stop distance is the drawdown that 80% of the setup's winning trades never went past, measured from the entry close. The other 20% went past it. The hold is the number of sessions the verdict was judged over. Both come from the setup's backtest, and a stop from fewer winning trades than a set minimum falls back to a multiple of the stock's recent average range. The page says which. The rule describes the past; it is not an instruction, and it knows nothing about the size you trade or your account. Don't treat the stop as a limit on loss: a price can gap through it.
+"""
+next = "Copy the rule as text to keep it with your own notes."
+see_also = ["idea_evidence", "idea_risks"]
+
+[[term]]
+id = "idea_evidence"
+term = "Evidence behind the setup"
+short = "The stored verdict the setup was listed on, with the figures it rests on, all backtested (hypothetical)."
+body = """
+The verdict is works or promising. The lift is how many points the setup's picks beat the base rate by on data held out from the search. The out-of-sample trades are how many trades that figure rests on. A lift on fewer than about 30 trades is noise. Every figure here is a backtest on past data, not a forecast and not a live record. The setup's own page holds the full evidence, including the curve and how sure the result is. Don't compare lifts of setups with different holds as if they were the same unit.
+"""
+see_also = ["verdict", "out_of_sample", "lift", "edge_how_sure", "base_rate", "live_record"]
+
+[[term]]
+id = "idea_risks"
+term = "What could go wrong"
+short = "Why the setup's edge should last, so what would end it, and the events inside the hold."
+body = """
+The first line is the setup's reason for persisting. If that reason stops being true, the pattern may stop paying. Below it come the name's own earnings reports that fall before the hold ends, because a report can move the price more than the pattern does. Watch-outs mark liquidity and other flags the screener raised. When an input is not stored, the section says so instead of showing an empty list. Don't read an empty list of events as a clear calendar.
+"""
+see_also = ["idea_exit_rule", "idea_evidence"]
+
+[[term]]
+id = "idea_learn"
+term = "Learn this setup"
+short = "The setup's own pages: its Guide entry, and its rules and track record."
+body = """
+Every idea comes from one setup, and the setup is where the evidence lives. Its Guide entry explains the mechanism in plain words and where it fails. Its page shows the rules, the history by year and regime, and how it has done since it was frozen. Read it once before relying on any pick from it.
+"""
+see_also = ["idea_evidence", "verdict"]

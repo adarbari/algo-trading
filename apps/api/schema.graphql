@@ -2304,11 +2304,12 @@ enum IdeaTab {
 }
 
 """
-Why the name is here: the setup's `thesis` and `mechanism`, the screener's `decision` for the name and the `criteria` it met; `unknown` when the pick's row could not be read
+Why the name is here: the setup's `thesis` and `mechanism`, its `basisScreener`'s `decision` for the name and the `criteria` it met; `unknown` when the pick's row could not be read
 """
 type IdeaWhy {
   thesis: String!
   mechanism: String!
+  basisScreener: String!
   decision: String
   criteria: [CriterionResult!]!
   unknown: Unknown

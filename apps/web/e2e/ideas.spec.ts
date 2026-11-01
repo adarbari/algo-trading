@@ -254,7 +254,7 @@ test('a tab with qualifying setups lists their picks by setup, beside a detail',
   await expect(page.getByText('Unproven')).toHaveCount(0);
   await page.getByRole('row', { name: /AAPL/ }).click();
   await expect(page.getByRole('button', { name: 'Open AAPL' })).toBeVisible();
-  await page.getByRole('button', { name: 'Open AAPL' }).click();
+  await page.getByRole('button', { name: 'Open AAPL in Explore' }).click();
   await expect(page).toHaveURL(/\/explore\?.*sel=AAPL/);
   expect(errors).toEqual([]);
 });
@@ -267,4 +267,36 @@ test('the Premium tab is its Unproven section, kept in the URL', async ({ page }
   await expect(page.getByText('Unproven', { exact: true })).toBeVisible();
   await expect(page.getByText('1 no readable verdict')).toBeVisible();
   await expectAccessible(page);
+});
+
+test('a pick opens its idea page: five sections, the exit rule labelled and copyable', async ({
+  page,
+}) => {
+  await mockIdeasApi(page, undefined, 'listed');
+  const errors = collectErrors(page);
+  await page.goto('/ideas');
+  await page.getByRole('row', { name: /AAPL/ }).click();
+  await page.getByRole('button', { name: 'Open the idea' }).click();
+  await expect(page).toHaveURL(/\/ideas\/AAPL\?setup=drift/);
+  await expect(page.getByRole('heading', { level: 1, name: /AAPL/ })).toBeVisible();
+  for (const title of [
+    'Why it is here',
+    'Historical exit rule',
+    'Evidence',
+    'What could go wrong',
+    'Learn this setup',
+  ]) {
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  }
+  await expect(page.getByText('6.2%')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy exit rule as text' })).toBeVisible();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
+test('a name no setup picked says so, with the way back to Ideas', async ({ page }) => {
+  await page.goto('/ideas/ZZZZ');
+  await expect(page.getByText('No setup picked this name for this session.')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to Ideas' }).click();
+  await expect(page).toHaveURL(/\/ideas$/);
 });
