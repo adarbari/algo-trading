@@ -6,6 +6,7 @@
  * has zoom buttons for fingers; the ingestion drill-down opens as a sheet; a tooltip opens on
  * a tap; the keyboard hints are gone; a narrow table shows its essential columns with the picker; a Regime card's help opens as a sheet.
  */
+import { mockIdeasApi } from './ideas-api';
 import { expect, test, type Page } from '@playwright/test';
 
 import { WORKSPACES } from '../src/app/workspaces/workspaces';
@@ -125,19 +126,19 @@ test('Ideas: the filter bar is one Filters button and a sheet, "Show N results" 
   ).toBeVisible();
 });
 
-test('Ideas: the screener chips wrap inside the screen and a tapped one opens the screener', async ({
+test('Ideas: a setup group fits the screen and a tapped pick opens its detail in a sheet', async ({
   page,
 }) => {
+  await mockIdeasApi(page, undefined, 'listed');
   await page.goto('/ideas');
   const innerWidth = await page.evaluate(() => window.innerWidth);
-  const items = page.getByRole('list', { name: 'Screeners' }).getByRole('listitem');
-  await expect(items).toHaveCount(4);
-  for (const item of await items.all()) {
-    const box = await item.boundingBox();
-    expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
-  }
-  await items.first().getByRole('link').tap();
-  await expect(page).toHaveURL(/\/screeners\/vrp-scanner/);
+  await expect(page.getByText('Post-earnings drift')).toBeVisible();
+  const box = await page.getByText('Post-earnings drift').boundingBox();
+  expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  await page.getByRole('row', { name: /AAPL/ }).tap();
+  await expect(page.getByRole('dialog', { name: 'AAPL' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'AAPL' }).getByRole('button', { name: 'Open AAPL' }).tap();
+  await expect(page).toHaveURL(/\/explore/);
 });
 
 test('Screener results: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({

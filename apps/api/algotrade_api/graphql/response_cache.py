@@ -284,6 +284,7 @@ TODAY_OPERATIONS: frozenset[str] = frozenset({"LlmUsage"})
 RUN_OPERATIONS: frozenset[str] = frozenset(
     {
         "IdeasPage",
+        "SetupIdeas",
         "StatusStrip",
         "DataStatus",
         "ScreenerConfigs",
