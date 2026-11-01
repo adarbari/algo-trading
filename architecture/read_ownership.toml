@@ -212,6 +212,14 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "load_known_coverage" }]
 
 [[responsibility]]
+id = "pick-positions"
+description = "The position a setup publishes for a pick (services/read/evaluation/positions/, ADR 0083 decision 3, ADR 0088): its historical exit rule, the 80th percentile of the max_drawdown of the verdict basis's winning long trades in the canonical run (read through runs.load_run_trades only, canonical run ending by the session, trades that exited by it), the 2 x ATR(14) fallback below [exit_rule] min_winners, a setup's declared stop published as it is, the hold the verdict's basis_horizon; UNKNOWN with its reason, never filled; the example position joins in E9"
+owner = ["src/algotrade/services/read/evaluation/positions/exit_rule.py"]
+allowed = ["apps/api/algotrade_api/graphql/*"]  # Edge.exitRule serves it: one loader call
+section = "docs/adr/0083-workflow-first-trader-site.md#decision"
+detect = [{ call = "load_exit_rule" }, { call = "exit_rule_at" }]
+
+[[responsibility]]
 id = "pick-streaks"
 description = "How long a ticker has stayed on a screener's pick list and whether it is new to it (services/read/screens/streaks.py, ADR 0082 filter days_picked): a walk back through the chain of a run's previous runs (runs.load_previous_run: each run's own previous run, never the screener's latest, so a later run never changes an earlier session's value) over each run's picked rows, ending at the first run that did not pick the ticker and capped at 20; UNKNOWN (None, never 0 or a short streak) when the walk reaches a run withheld from the viewer or the end of the chain before the streak ends; a screener's results use it (Ideas is held until the streaks are precomputed at ingestion, decided 2026-10-24); new_today is the one-step form"
 owner = ["src/algotrade/services/read/screens/streaks.py"]

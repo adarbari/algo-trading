@@ -721,6 +721,7 @@ class TradeRow:
     reference: TradeCell
     touch: TradeCell
     source: str = "backtest"
+    side: str = "long"  # ``long`` | ``short`` per pick (rows from before sides: ``long``)
     symbol: TradeText = TradeText()  # filled by the ledger read from the reference snapshot
     company: TradeText = TradeText()
     symbol_as_of: date | None = None  # the reference snapshot the ticker was read from
@@ -777,6 +778,7 @@ def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
         adv_usd=cell("adv_usd_20d"),
         reference=cell("reference"),
         touch=cell("touch", _flag),
+        side=str(to_scalar(row.get("side")) or "long"),
     )
 
 

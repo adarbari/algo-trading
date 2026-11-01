@@ -127,6 +127,11 @@ values = { PRICES = "term:dataset_status", OPTIONS_CHAINS = "term:dataset_status
 names = { PRICES = "Prices", OPTIONS_CHAINS = "Option chains", FUNDAMENTALS = "Fundamentals" }
 
 [[enum]]
+source = "graphql:StopKind"
+values = { HISTORY = "term:exit_stop_history", FALLBACK = "term:exit_stop_fallback", DECLARED = "term:exit_stop_declared" }
+names = { HISTORY = "Historical stop", FALLBACK = "Fallback stop", DECLARED = "Declared stop" }
+
+[[enum]]
 source = "graphql:UnavailableKind"
 exempt = "covered by GUIDE_TERMS (one glossary term per kind), kept complete by tests/unit/services/read/availability/test_cause.py"
 
