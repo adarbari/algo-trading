@@ -25,10 +25,6 @@ vi.mock('@/widgets/regime-indicators', async () => {
   const { Text } = await import('@algotrade/ui');
   return { RegimeIndicators: () => <Text>indicators widget</Text> };
 });
-vi.mock('@/widgets/regime-sizing', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return { RegimeSizing: () => <Text>sizing widget</Text> };
-});
 vi.mock('@/widgets/regime-timing', async () => {
   const { Text } = await import('@algotrade/ui');
   return { RegimeTiming: () => <Text>timing widget</Text> };
@@ -42,7 +38,6 @@ describe('RegimePage', () => {
     expect(nav.querySelectorAll('a')).toHaveLength(3);
     const order = [
       'header widget',
-      'sizing widget',
       'indicators widget',
       'legend widget',
       'cycles widget',
@@ -60,9 +55,9 @@ describe('RegimePage', () => {
       ).toBeTruthy();
     });
     expect(screen.getByRole('region', { name: 'Now' })).toContainElement(nodes[0] as HTMLElement);
-    expect(screen.getByRole('region', { name: 'Why' })).toContainElement(nodes[2] as HTMLElement);
+    expect(screen.getByRole('region', { name: 'Why' })).toContainElement(nodes[1] as HTMLElement);
     expect(screen.getByRole('region', { name: 'History' })).toContainElement(
-      nodes[6] as HTMLElement,
+      nodes[5] as HTMLElement,
     );
     await expectNoA11yViolations(container);
   });
