@@ -8,7 +8,7 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { filterSearch } from '@/features/filter-bar';
-import { parseIdeasSearch } from '@/entities/idea';
+import { parseIdeasSearch, type IdeaTab } from '@/entities/idea';
 import type { TopIdeasSearch, TopIdeasSearchPatch } from '@/widgets/top-ideas';
 
 import { traderRoute } from './layout-route';
@@ -19,9 +19,8 @@ const IdeasPage = lazyPage(() => import('@/pages/trader-ideas'), 'IdeasPage');
 
 /** The page's chunks load in the loader (so the page renders unsuspended) and its reads start
  * with them, not when the widgets mount; the hooks join the requests in flight. */
-const loading = pageRoute(IdeasPage, (page, client) => {
-  page.prefetchIdeasReads(client);
-  return page.preloadEdgeSignals();
+const loading = pageRoute(IdeasPage, (page, client, deps: { tab: IdeaTab | undefined }) => {
+  page.prefetchIdeasReads(client, deps.tab);
 });
 
 /** The search params after a patch: `undefined` removes a key. */
@@ -50,7 +49,6 @@ function IdeasRoute() {
       onScreeners={() => void navigate({ to: '/screeners' })}
       onOpenRegime={() => void navigate({ to: '/regime' })}
       onOpenEdge={(edge) => void navigate({ to: '/edges', search: { edge } })}
-      onOpenEdges={() => void navigate({ to: '/edges' })}
       onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
       onOpen={(symbol, via) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol, via } })
@@ -63,6 +61,7 @@ export const ideasRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'ideas',
   validateSearch,
+  loaderDeps: ({ search }) => ({ tab: search.tab }),
   ...loading,
   component: IdeasRoute,
 });
