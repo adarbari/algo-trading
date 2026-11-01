@@ -1,0 +1,44 @@
+# L3 site setting: the Guide glossary, a setup's historical exit rule (ADR 0083 decision 3, ADR 0051). One [[term]]
+# each: id, term, short (one sentence), body, next, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+# The three stop kinds of the exit rule's `kind` (services/read/evaluation/positions/exit_rule.py).
+
+[[term]]
+id = "exit_stop_history"
+term = "Historical stop"
+short = "The drawdown that most of the setup's winning trades never went past, taken from its own tested history."
+body = """
+The stop is the 80th percentile of the dip each winning trade took before it won, over the trades the setup's verdict rests on. A stop of 7% below the entry close means 80% of the winners never fell further than that, and 20% did. It is a distance measured on past trades, not a prediction for this pick. It rests on the number of winning trades shown beside it: with few, it is noise, which is why a setup below the minimum shows the fallback instead. Don't read it as the loss a pick will stop at: a pick that falls further can still recover.
+"""
+next = "Compare the stop with the setup's losing trades in its ledger before relying on the distance."
+see_also = ["exit_stop_fallback", "exit_hold"]
+
+[[term]]
+id = "exit_stop_fallback"
+term = "Fallback stop"
+short = "Two times the name's 14-day average true range, shown when the setup has too few winning trades to measure a stop."
+body = """
+The setup has fewer winning trades than the minimum the percentile needs, so its own history cannot set a distance. The fallback is 2 x the name's average true range over 14 sessions, in dollars per share, read at the session. It says how far this name usually moves in a day or two, nothing about the setup. A name with a quiet last month gets a tight fallback that an ordinary swing can cross. It is not from this setup's history.
+"""
+next = "Treat the distance as a volatility yardstick and wait for the setup to gather more winning trades."
+see_also = ["exit_stop_history", "exit_hold"]
+
+[[term]]
+id = "exit_stop_declared"
+term = "Declared stop"
+short = "The stop the setup's own document declares, published as written because the backtest used it."
+body = """
+Some setups declare their own exit as part of the rule that was tested. The page shows that rule as written, so the trader sees what the backtest did rather than a distance measured afterwards. A declared stop replaces the historical one for that setup. It is exactly as good as the test that used it: check the setup's verdict and sample size.
+"""
+next = "Read the setup's evidence to see how often the declared stop was reached."
+see_also = ["exit_stop_history", "exit_hold"]
+
+[[term]]
+id = "exit_hold"
+term = "Hold"
+short = "How many trading sessions the setup holds a pick, the holding period its verdict was judged on."
+body = """
+The hold is the horizon of the setup's verdict basis: a hold of 20 means the tested trade closed on the 20th session after entry. It counts exchange sessions, so a weekend adds nothing. The statistics shown for the setup are for that holding period only. A different hold is a different test. Don't stretch it: the evidence says nothing about trades held longer.
+"""
+next = "Open the setup's evidence to see the results at this holding period."
+see_also = ["exit_stop_history", "verdict_basis"]
