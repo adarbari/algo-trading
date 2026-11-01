@@ -64,7 +64,7 @@ describe('FilterChips', () => {
       expect(screen.getByText(/removes 1,200/)).toBeInTheDocument();
       expect(screen.getByText(/3 unknown/)).toBeInTheDocument();
       expect(screen.queryByText(/removes 9/)).toBeNull();
-      const off = screen.getByRole('button', { name: /^DTE \.\.14, off/ });
+      const off = screen.getByRole('button', { name: /^DTE \.\.14 off/ });
       expect(off).toHaveAttribute('aria-pressed', 'false');
       expect(screen.getByRole('button', { name: /^Decision Qualified/ })).toHaveAttribute(
         'aria-pressed',
