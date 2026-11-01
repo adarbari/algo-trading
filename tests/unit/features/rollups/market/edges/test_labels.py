@@ -125,9 +125,11 @@ def test_unknown_inputs_with_nothing_off_make_the_label_unknown() -> None:
 def test_the_bands_follow_the_verdict_thresholds() -> None:
     wide = replace(B, contango_below=0.99, vix_low_pct=60.0, vrp_rich_at=1.0, backwardation_at=1.1)
     ok = replace(OFF, vix=15.0, ratio=0.97, pct_252=50.0, vrp=2.0, sma_200=0.02)
-    assert lb.classify(ok, B) != "R1" and lb.classify(ok, wide) == "R1"  # contango_below, vrp_rich
+    assert lb.classify(ok, B) != "R1" and lb.classify(ok, wide) == "R1"  # contango_below
     low = replace(OFF, vix=13.0, ratio=0.9, pct_252=40.0, vrp=1.0)
     assert lb.classify(low, B) != "R2" and lb.classify(low, wide) == "R2"  # vix_low_pct
+    shock = replace(OFF, sma_200=-0.08, rate_shock=True, vix=30.0, vrp=2.0, ratio=0.9)
+    assert lb.classify(shock, B) != "R5" and lb.classify(shock, wide) == "R5"  # vrp_rich_at
     spike = replace(OFF, ratio=1.05, run=3.0, chg_5d=0.5, sma_200=0.0)
     assert lb.classify(spike, B) == "R7" and lb.classify(spike, wide) != "R7"  # backwardation_at
 
