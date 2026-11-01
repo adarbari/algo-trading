@@ -104,7 +104,6 @@ type Documents = {
     "\n  query InstrumentEventList($key: String!) {\n    instrument(key: $key) {\n      instrumentId\n      events {\n        table\n        kind\n        date\n        ts\n        values\n        sourceUrl\n        confirmed\n      }\n      eventStudy {\n        session\n        ahead {\n          date\n          time\n          kind\n          label\n          sourceUrl\n        }\n        filings {\n          filingDate\n          form\n          label\n          sourceUrl\n        }\n      }\n    }\n  }\n": typeof types.InstrumentEventListDocument,
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": typeof types.GuideHelpFieldDocument,
     "\n  query GuideSearch($q: String!, $limit: Int!) {\n    guideSearch(q: $q, limit: $limit) {\n      query\n      groups {\n        kind\n        hits {\n          kind\n          id\n          title\n          snippet\n        }\n      }\n    }\n  }\n": typeof types.GuideSearchDocument,
-    "\n  query TickerSearch($q: String!, $size: Int!) {\n    table(columns: [], q: $q, size: $size) {\n      instruments {\n        instrumentId\n        symbol\n        name\n      }\n    }\n  }\n": typeof types.TickerSearchDocument,
     "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n": typeof types.MyFeatureRequestsDocument,
 };
 const documents: Documents = {
@@ -196,7 +195,6 @@ const documents: Documents = {
     "\n  query InstrumentEventList($key: String!) {\n    instrument(key: $key) {\n      instrumentId\n      events {\n        table\n        kind\n        date\n        ts\n        values\n        sourceUrl\n        confirmed\n      }\n      eventStudy {\n        session\n        ahead {\n          date\n          time\n          kind\n          label\n          sourceUrl\n        }\n        filings {\n          filingDate\n          form\n          label\n          sourceUrl\n        }\n      }\n    }\n  }\n": types.InstrumentEventListDocument,
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": types.GuideHelpFieldDocument,
     "\n  query GuideSearch($q: String!, $limit: Int!) {\n    guideSearch(q: $q, limit: $limit) {\n      query\n      groups {\n        kind\n        hits {\n          kind\n          id\n          title\n          snippet\n        }\n      }\n    }\n  }\n": types.GuideSearchDocument,
-    "\n  query TickerSearch($q: String!, $size: Int!) {\n    table(columns: [], q: $q, size: $size) {\n      instruments {\n        instrumentId\n        symbol\n        name\n      }\n    }\n  }\n": types.TickerSearchDocument,
     "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n": types.MyFeatureRequestsDocument,
 };
 
@@ -552,10 +550,6 @@ export function graphql(source: "\n  query GuideHelpField($name: FeatureName!) {
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GuideSearch($q: String!, $limit: Int!) {\n    guideSearch(q: $q, limit: $limit) {\n      query\n      groups {\n        kind\n        hits {\n          kind\n          id\n          title\n          snippet\n        }\n      }\n    }\n  }\n"): typeof import('./graphql').GuideSearchDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query TickerSearch($q: String!, $size: Int!) {\n    table(columns: [], q: $q, size: $size) {\n      instruments {\n        instrumentId\n        symbol\n        name\n      }\n    }\n  }\n"): typeof import('./graphql').TickerSearchDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
