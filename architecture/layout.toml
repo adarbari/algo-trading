@@ -420,7 +420,7 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/) and its time-series base (time_series/); the forward paper record of the edges a user follows (forward/); learned edge scorers (training/); the winners study's discovery (discovery/)"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/) and its time-series base (time_series/); the forward paper record of the edges a user follows (forward/); the trade contract (evidence/); learned edge scorers (training/); the winners study's discovery (discovery/)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
@@ -453,6 +453,11 @@ purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): th
 [[dir]]
 path = "src/algotrade/services/evaluation/edge_picks"
 purpose = "what each site edge took at a session (ADR 0081): the decision by the harness's one pick rule over its screener's run, its universe and its schedule (night.py: picked / not_decision_day / unjudged / skipped with the reason) and the stamped results/edge_picks rows of it (frame.py); published by the edge-picks ingestion task, read only by services/read/evaluation/pick_edges.py"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/evidence"
+purpose = "the evidence of a setup (ADR 0088, design 2.5a / 2.6): the common trade contract TRADE_COLUMNS every outcome shape maps to (contract.py: columns, capital bases, price sources, the validator) and the mapping of each shape, share returns, option P&L, expires_otm / hit_target with no capital, the model P&L, a pair as one row, the time-series windows and a book's series for the evidence only (shapes.py); pure over frames, never a store or data.outcomes"
+contracts = ["The trade evidence reads only frames: no store, no outcomes reader, no harness internals (ADR 0088)"]
 
 [[dir]]
 path = "src/algotrade/services/evaluation/forward"

@@ -420,6 +420,19 @@ section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-06-
 detect = [{ call = "ChatCompletions" }, { call = "build_text_model" }, { call = "ClaudeCli" }, { call = "build_claude_cli" }, { string = "chat/completions" }]
 
 [[responsibility]]
+id = "trade-evidence"
+description = "The common trade contract of every setup (ADR 0088, design 2.5a): TRADE_COLUMNS, one frozen column set (entry and exit session, exit kind, value / hit / excluded as the harness scored them, capital basis and capital, return on capital before cost and at the document's cost, max adverse, the underlying's return, price source, the outcome row's licence) and the one mapping of every outcome shape to it: share returns (notional, bars), option_pnl (the template's collateral, v2 price source), expires_otm and hit_target (capital basis none, no return on capital), option_model_pnl (price source model), pair_spread (its two legs as one row), the time-series windows, and a portfolio_return book's per-session series (capital basis book, for the evidence only, never ledger rows); pure over frames; the harness picks, the paper settlement and the time-series valuation call it right after scoring"
+owner = ["src/algotrade/services/evaluation/evidence/*"]
+allowed = [
+    "src/algotrade/services/evaluation/cross_section/measuring.py",  # the caller: each session's picks become trades
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # records the edge's capital basis on its result
+    "src/algotrade/services/evaluation/forward/settle.py",  # the caller: a settled paper trade's contract columns
+    "src/algotrade/services/evaluation/time_series/evaluate.py",  # the caller: a time-series edge's windows as trades
+]
+section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
+detect = [{ call = "trade_frame" }, { call = "series_trades" }, { call = "book_trades" }, { call = "capital_basis_of" }]
+
+[[responsibility]]
 id = "virtual-feature-reads"
 description = "Read expression features on read (selections, FeatureView, series): load only the stored columns their formulas need (data.rollups.feature_rows, column-pruned) and evaluate them through the FeatureSet"
 owner = ["src/algotrade/services/features.py", "src/algotrade/data/rollups.py"]
