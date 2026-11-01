@@ -76,6 +76,17 @@ def close_to_close(
     return _annualise(_rolling_var(returns, window, 1), periods_per_year)
 
 
+def downside_deviation(
+    close: npt.ArrayLike, window: int, periods_per_year: int = TRADING_DAYS
+) -> Array:
+    """Annualised downside deviation of the last ``window`` log close-to-close returns: the root
+    mean square of ``min(r, 0)`` (target 0, a gain counts as 0, NaN in the window gives NaN)."""
+    _check_window(window, 1)
+    (c,) = _prices(close)
+    losses = np.minimum(np.diff(np.log(c), axis=0), 0.0)
+    return _annualise(_rolling_mean(losses**2, window, 1), periods_per_year)
+
+
 def parkinson(
     high: npt.ArrayLike, low: npt.ArrayLike, window: int, periods_per_year: int = TRADING_DAYS
 ) -> Array:
