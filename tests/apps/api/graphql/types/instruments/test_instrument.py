@@ -3,6 +3,8 @@ events, option chain and quotes, ETF holdings, price and feature series, each fo
 session (chains exactly that session, holdings as of the issuer's date it sees), through the
 request's dataloaders (a batch of instruments reads each once)."""
 
+import pytest
+
 from tests.apps.api.graphql.conftest import Graph
 from tests.helpers.api_store import END, PREVIOUS
 
@@ -174,8 +176,8 @@ def test_feature_series_refuses_unknown_and_instrument_names(graph: Graph) -> No
     assert fact["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
 
 
-def test_picked_by_is_the_inverse_of_ideas_and_empty_when_no_setup_qualifies(
-    graph: Graph,
+def test_picked_by_lists_the_setups_the_read_returns_and_is_empty_when_none_qualifies(
+    graph: Graph, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`Instrument.pickedBy` reads through `services/read/ideas/inverse.py`: on the golden store
     no setup has a stored verdict, so it is an empty list, never an error."""
@@ -185,3 +187,22 @@ def test_picked_by_is_the_inverse_of_ideas_and_empty_when_no_setup_qualifies(
     )
     assert "errors" not in found
     assert found["data"]["instrument"]["pickedBy"] == []
+    # A qualifying setup (the licence filter is the read's: a withheld pick is not in it).
+    from algotrade.services.read.ideas import inverse  # noqa: PLC0415
+
+    hit = inverse.InstrumentSetup("earnings_drift", "Earnings drift", "stocks", "promising", 2)
+    monkeypatch.setattr(inverse, "load_setups_of_instrument", lambda ctx, iid: (hit,))
+    again = graph(
+        "query($key: String!) { instrument(key: $key) "
+        "{ pickedBy { edgeId edgeName place level tab } } }",
+        {"key": "AAA"},
+    )
+    assert again["data"]["instrument"]["pickedBy"] == [
+        {
+            "edgeId": "earnings_drift",
+            "edgeName": "Earnings drift",
+            "place": 2,
+            "level": "promising",
+            "tab": "stocks",
+        }
+    ]

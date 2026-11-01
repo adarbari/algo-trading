@@ -32,8 +32,9 @@ if TYPE_CHECKING:  # the screens' types name Instrument: resolved lazily (no imp
 
 
 @strawberry.type(
-    description="A qualifying setup that picked the instrument: its `place` in the `tab`'s list "
-    "and the `level` (verdict) it qualifies at"
+    description="A qualifying setup that picked the instrument: its own `place` among that "
+    "setup's picks (not its rank in the tab's capped Ideas list) in the `tab`, and the `level` "
+    "(verdict) it qualifies at"
 )
 class PickingSetup:
     edge_id: str
@@ -186,11 +187,9 @@ class Instrument:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The setups with a stored verdict of Works or Promising that picked it in "
-        "the session (ADR 0083 decision 2: the inverse of Ideas, same licence filter), "
-        "strongest first; empty: none did"
+        "the session (the picks Ideas is built from, same licence filter, each at the setup's "
+        "own place: the tab's cap of 15 is not applied), strongest first; empty: none did"
     )
     async def picked_by(self, info: Info) -> list[PickingSetup]:
-        return [
-            PickingSetup.of(d)
-            for d in inverse.load_setups_of_instrument(self.ctx, self.instrument_id)
-        ]
+        found = await off_loop(inverse.load_setups_of_instrument, self.ctx, self.instrument_id)
+        return [PickingSetup.of(d) for d in found]

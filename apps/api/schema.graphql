@@ -2426,7 +2426,7 @@ type Instrument {
   screenerHits: [ScreenerHit!]!
 
   """
-  The setups with a stored verdict of Works or Promising that picked it in the session (ADR 0083 decision 2: the inverse of Ideas, same licence filter), strongest first; empty: none did
+  The setups with a stored verdict of Works or Promising that picked it in the session (the picks Ideas is built from, same licence filter, each at the setup's own place: the tab's cap of 15 is not applied), strongest first; empty: none did
   """
   pickedBy: [PickingSetup!]!
 }
@@ -2828,7 +2828,7 @@ type PickedBy {
 }
 
 """
-A qualifying setup that picked the instrument: its `place` in the `tab`'s list and the `level` (verdict) it qualifies at
+A qualifying setup that picked the instrument: its own `place` among that setup's picks (not its rank in the tab's capped Ideas list) in the `tab`, and the `level` (verdict) it qualifies at
 """
 type PickingSetup {
   edgeId: String!
