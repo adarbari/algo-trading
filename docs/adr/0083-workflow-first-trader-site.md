@@ -1,6 +1,7 @@
 # ADR 0083: The workflow-first trader site: Ideas, Setups, Test, Calendar; what Ideas is; the historical exit rule; the product rules
 
 **Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): decision 3: the exit rule over the contract's `max_adverse` for both kinds, an option setup publishes its own exits, short and book picks shown.
+**Amended 2026-11-01** (owner decisions, final; [below](#amendment-2026-11-01-the-evening-desk-site-owner-decisions)): (a) Ideas has Stocks | Premium tabs, (b) a per-pick idea page, (c) a watchlist, (d) the sign-up answer as a preference; option screens show derived figures only. Build plan: [ui/evening-desk-plan.md](../ui/evening-desk-plan.md).
 
 **Status:** accepted (2026-10-24; owner decisions, taken after the use-case research and the
 workflow design; an architect reviewed the build slices). Amends
@@ -182,3 +183,49 @@ still owed before anyone is charged.
 - Not decided here (each its own ADR): past lists and the scorecard, the nightly brief's
   delivery, sign-up and billing and the US-only gate, per-owner pick rows and own-setup verdicts,
   and the size of the Unproven section (it keeps today's rule).
+
+## Amendment 2026-11-01: the Evening Desk site (owner decisions)
+Decided by the owner on 2026-11-01 after the Evening Desk mockups (ADR 0085 re-skinned the tokens;
+these decisions move the screens); final, logged in `docs/decisions/log.md`. Build slices:
+[ui/evening-desk-plan.md](../ui/evening-desk-plan.md). Nothing in decisions 1-4 above is relaxed:
+the list is one nightly list per tab for everyone, filtered per viewer only, and no position,
+size, basis or account figure is stored.
+
+- **(a) Ideas has two tabs, Stocks and Premium.** A setup belongs to the tab of its position's
+  kind (ADR 0088 decision 3: share legs -> Stocks, any option leg -> Premium). Decision 2 applies
+  per tab: the same ranking rule, cap 15 per tab, the licence filter before each cap, and the
+  Unproven fallback decided per tab (a tab with no qualifying setup shows its Unproven section,
+  the other tab may not). An Unproven screener's tab is the tab of the setups it implements; a
+  screener implementing none is Stocks, and one behind setups of both kinds is in both tabs'
+  Unproven sections. Besides the run's `field_licences`, the filter drops a pick whose verdict
+  rests on evidence under a licence the viewer does not hold (a verdict judged on the bought
+  option history is personal, ADR 0088 decision 12). Until an option setup has a stored `works` / `promising`
+  verdict (ADR 0088: not before a 3-month unseen holdout, the earliest 2027-01-26) Premium is the
+  Unproven section. The tab is URL state (`?tab=stocks|premium`); with none in the URL the
+  viewer's preference (d) picks it, and with no preference, Stocks.
+- **(b) A per-pick idea page** (`/ideas/$symbol`, the setup as `?setup=<edge_id>`, default the
+  pick's best setup by the ranking rule). Its sections are filled from the setup, never written
+  per pick: *why it is here* (the setup's thesis and the screener criteria this name met at S),
+  *the setup's historical exit rule* (decision 3; the owner's shorthand "the plan" is shown under
+  that label, decision 4's wording rule stands), *evidence* (the verdict and its labelled
+  statistics, decision 4), *what could go wrong* (the setup's documented risks and the ticker's
+  known events before the hold ends) and *learn this setup* (its Guide entry). One read object;
+  a section whose input is missing is UNKNOWN with its reason.
+- **(c) A watchlist**: a per-user list of instruments in the user's own config (ADR 0029 user
+  configs, written only through `services/authoring`, ADR 0005), tickers resolved through
+  `SymbolResolver` and stored as `instrument_id` (ADR 0018). Tickers only: no quantity, cost basis,
+  entry, position or note; at most 50 (Fable, pending owner confirmation). On Ideas it is a filter: it narrows the viewer's list after the cap,
+  never adds a pick below the cap, never changes a rank, and names it hides are not counted
+  among the list's left-out reasons. The Ideas response cache is keyed by it (ADR 0077).
+- **(d) The sign-up answer is a preference.** One question at the first signed-in visit (what the
+  trader mainly trades: shares or options premium) is stored in `preferences.toml` (ADR 0032) and
+  only sets the default Ideas tab; it is changed in Settings. It is not a risk profile and gates
+  nothing.
+- **Option quotes are shown as derived figures only (B).** The Cboe feed is not licensed for
+  display (`docs/data/vendors.md`), so trader option screens show only our own figures computed
+  from it (yield %, return on collateral, delta bands, IV and its rank, the structure's credit and
+  collateral as a computed figure), never a raw bid, ask, last or quote size; the existing raw
+  columns leave the trader UI in the slice that replaces them (plan V6). Which derived figures
+  qualify (a mid we compute, spread as % of mid, open interest and volume, a straddle from mids)
+  and the raw views staying admin-only were decided by Fable for the owner, pending owner
+  confirmation (log, 2026-11-01).
