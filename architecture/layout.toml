@@ -132,7 +132,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/strategy"
-purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog, rule-screen spec parser"
+purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog per use site, the feature levels it reads (levels.py, ADR 0088), rule-screen spec parser"
 
 [[dir]]
 path = "src/algotrade/core"

@@ -55,6 +55,13 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "position_of" }, { call = "parse_templates" }]
 
 [[responsibility]]
+id = "rule-use-sites"
+description = "Which fields a rule may name at each use site (ADR 0088, design 2.13, 2.15): `LEVELS` (config/strategy/levels.py) declares each feature level once (field heads, stored or computed provider named by a string, join, the sites that may read it), `FieldCatalog` (catalog.py) is built per site from `LEVELS[*].scopes` (instrument-only at `screener` / `universe`; market, position and portfolio fields where a level's scopes say), carries each field's licence (an expression takes the strictest of its inputs) and each string field's declared domain, and makes the gate / entry / case / exit sites fail closed (no `is_null` / `not_null`, `ne` / `not_in` on a string only over a declared domain with an out-of-domain value read as missing, the gate reads only open data); callers never test a field head or a level by name"
+owner = ["src/algotrade/config/strategy/catalog.py", "src/algotrade/config/strategy/levels.py"]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "levels_at" }, { call = "domain_read" }]
+
+[[responsibility]]
 id = "screen-spec"
 description = "Parse and validate a rule screen (ADR 0029): criteria with HARD / SOFT (tolerance band) / SCORE modes, tiers, flags, classify, columns, tie-break; the boolean groups of criteria (ADR 0071: all / any / none by reference, one parent, acyclic, depth 4); fail closed against the field catalogue; the pure ScreenSpec values"
 owner = [
