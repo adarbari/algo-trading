@@ -8,9 +8,9 @@ from datetime import date
 
 import pytest
 
-from algotrade.config.edges.chain import tenor_sessions
 from algotrade.config.edges.document import CLOSED, MODEL_KIND, Edge
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.positions.chain import tenor_sessions
 from algotrade.config.edges.schedules.events import event_class, event_subtype
 from algotrade.config.strategy.schema import Selection
 from algotrade.config.user import UserContext

@@ -870,7 +870,7 @@ It is a second outcomes grain and a second outcome kind; the first is unchanged.
    bid in, ask out (the stored quote is symmetric around the mid). `cost_bps` is charged once on
    top. Unit `pnl`, so the trial statistics read the picks' mean P&L, never the win rate
    (`counts_wins` is false), as for `option_model_pnl`.
-7. **Document.** `[outcome] kind = "option_pnl"` (`config/edges/chain.py`): `structure` in
+7. **Document.** `[outcome] kind = "option_pnl"` (`config/edges/positions/chain.py`): `structure` in
    `atm_straddle_long | atm_straddle_short | delta_hedged_atm | delta_hedged_atm_short |
    put_short`, `tenor_days` (required, calendar days), `strike_delta` for `put_short` only,
    `benchmark = "none"`, no implied-vol field. An edge and its `[[variants]]` are all

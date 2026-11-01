@@ -11,10 +11,10 @@ from datetime import date
 
 import pytest
 
-from algotrade.config.edges.chain import MODEL_STRUCTURES
 from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, Edge
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.portfolio import MIX, PORTFOLIO_KIND
+from algotrade.config.edges.positions.chain import MODEL_STRUCTURES
 from algotrade.config.edges.schedules.markets import MARKET_TRIGGERS, market_trigger
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between

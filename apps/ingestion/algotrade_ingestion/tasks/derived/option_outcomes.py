@@ -23,9 +23,9 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.config.edges.chain import CHAIN_KIND, grain_structure
 from algotrade.config.edges.document import CLOSED
 from algotrade.config.edges.loading import Documents, load_edges
+from algotrade.config.edges.positions.chain import CHAIN_KIND, grain_structure
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.time.calendar import close_time, sessions_between, sessions_ending
