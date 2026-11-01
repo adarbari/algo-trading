@@ -8,12 +8,10 @@ from datetime import date
 from typing import Any
 
 import pandas as pd
-import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
-from algotrade.services.evaluation.cross_section.legs import key
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from tests.helpers.stored_frames import stamped
@@ -130,21 +128,10 @@ def _scored(evaluations: dict[str, EdgeEvaluation]) -> dict[str, str]:
     return out
 
 
-def test_each_outcome_kinds_scores_and_ledger_are_pinned(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pinned under the leg version of origin/main (4): the leg key seeds a session's random
-    draws, so version 5 (E6a) re-draws them; the next test shows nothing else moved."""
-    monkeypatch.setattr(key, "LEG_VERSION", 4)
+def test_each_outcome_kinds_scores_and_ledger_are_pinned() -> None:
+    """Pinned as computed: the draws are seeded by ``DRAW_LEG_VERSION``, so the leg bump (E6a)
+    moves no random draw and no stored verdict."""
     assert _digests(_evaluations()) == DIGESTS
-
-
-def test_version_5_moves_only_the_random_draws(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The leg bump (ADR 0088, E6a) reseeds the draws of a session (``random_picks.generator``);
-    every value, hit, measure and ledger row is the one of version 4 (the screeners', baselines'
-    and costs' ``edge_eval`` rows by digest, the ledger by the pinned digests)."""
-    now = _evaluations()
-    assert {n: d[1] for n, d in _digests(now).items()} == {n: d[1] for n, d in DIGESTS.items()}
-    monkeypatch.setattr(key, "LEG_VERSION", 4)
-    assert _scored(now) == _scored(_evaluations())
 
 
 def test_the_time_series_measures_and_windows_are_pinned() -> None:

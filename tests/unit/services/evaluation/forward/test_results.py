@@ -580,3 +580,5 @@ def test_a_settled_option_trade_has_its_return_on_capital_and_no_underlying_retu
     assert pd.isna(top["return"])  # the chain grain's return is the option's, never the name's
     assert top["return_on_capital"] == pytest.approx((9.5 - 0.4) / 95)
     assert (top["exit_kind"], top["price_source"]) == ("HORIZON", "option_history")
+    # the figure is read from bought history: the row is personal, whatever the signal's licence
+    assert set(settled["licence"]) == {"personal"}

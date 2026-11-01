@@ -81,6 +81,7 @@ class Settled:
     exit_kind: str | None = None  # the trade contract's (ADR 0088, 2.5a), for a settled trade
     return_on_capital: float | None = None
     price_source: str | None = None
+    outcome_licence: str | None = None  # the outcome row's licence (bought history is personal)
 
 
 def outcome_hash(edge: Edge) -> str:
@@ -184,6 +185,7 @@ def settle_group(
                 _finite_text(trade["exit_kind"]),
                 _finite(trade["return_on_capital"]),
                 _finite_text(trade["price_source"]),
+                _finite_text(trade["outcome_licence"]),
             )
         )
     return out

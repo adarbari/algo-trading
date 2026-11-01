@@ -161,7 +161,7 @@ def trade_frame(
     figures: dict[str, Any]
     if o.kind == CHAIN_KIND:
         figures = _options(stored, cost)
-        source = _strings(stored, "price_source", "")  # type: ignore[assignment]
+        source = _strings(stored, "price_source", "cboe")  # type: ignore[assignment]
         licence = _strings(stored, "licence", OPEN)
         exits = _dates(stored["exit_session"]) if "exit_session" in stored.columns else [None] * n
     elif o.kind == "excess_return":

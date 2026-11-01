@@ -29,6 +29,7 @@ from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.paper import LOOKBACK_DAYS, job_name, read_stored
+from algotrade.features.framework.feature import strictest
 from algotrade.services.evaluation.forward.settle import (
     GRACE_SESSIONS,
     OPEN,
@@ -124,6 +125,12 @@ def _settlements(
             )  # fmt: skip
             row["return"] = float("nan") if done.raw_return is None else done.raw_return
             row["exit_kind"], row["price_source"] = done.exit_kind, done.price_source
+            if (
+                done.outcome_licence
+            ):  # the figure's own licence joins the signal's (bought: personal)
+                row["licence"] = strictest(
+                    (str(row.get("licence") or "open"), done.outcome_licence)
+                )
             row["return_on_capital"] = (
                 float("nan") if done.return_on_capital is None else done.return_on_capital
             )

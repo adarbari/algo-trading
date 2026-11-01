@@ -18,6 +18,7 @@ from algotrade.services.evaluation.cross_section.hit import apply_outcome, short
 from algotrade.services.evaluation.evidence import shapes
 from algotrade.services.evaluation.evidence.contract import (
     COLUMN_NAMES,
+    PRICE_SOURCES_ALL,
     capital_basis_of,
     trade_problems,
 )
@@ -195,6 +196,11 @@ def test_an_option_licence_and_source_come_from_the_row() -> None:
     assert set(f["price_source"]) == {"option_history"} and set(f["outcome_licence"]) == {
         "personal"
     }
+
+
+def test_a_null_option_price_source_is_cboe_never_an_empty_string() -> None:
+    f = _option(_option_rows(price_source=None))
+    assert set(f["price_source"]) == {"cboe"} <= set(PRICE_SOURCES_ALL)
 
 
 @pytest.mark.parametrize("collateral", [None, 0.0, -5.0, float("inf")])

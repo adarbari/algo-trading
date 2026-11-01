@@ -58,6 +58,8 @@ from algotrade.services.evaluation.cross_section.hit import (
     short_view,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
+    DRAW_LEG_VERSION,
+    LEG_VERSION,
     leg_key,
     universe_hash,
 )
@@ -669,28 +671,44 @@ class _RandomSpec:
     costs: tuple[float, ...]
     adv_floor: float | None = None  # a short leg's least dollar volume (in the key of its legs)
     keys: dict[tuple[str, str], str] = field(default_factory=dict)  # (scope, variant) -> leg key
+    draw_keys: dict[tuple[str, str], str] = field(default_factory=dict)  # same, for the draws
 
     def key_for(self, scope: "_Scope", variant: "Variant") -> str:
-        """The leg key of one scope's screener: what its legs (and draws) are a function of."""
+        """The leg key of one scope's screener: what its legs are a function of."""
         found = self.keys.get((scope.key, variant.id))
         if found is None:
-            found = self.keys[scope.key, variant.id] = leg_key(
-                _trial_hash(scope, variant),
-                universe_hash(scope.universe),
-                scope.iv_field,
-                scope.edge.event_class,
-                scope.edge.outcome.start_offset_sessions,
-                self.draws,
-                self.expr_hash,
-                scope.edge.top_k,
-                scope.edge.base,
-                scope.edge.picks,
-                self.costs,
-                None if scope.edge.outcome.side == LONG else self.adv_floor,
-                scope.edge.event_subtype,
-                scope.edge.outcome.hold_rank,
+            found = self.keys[scope.key, variant.id] = self._key(scope, variant, LEG_VERSION)
+        return found
+
+    def draw_key_for(self, scope: "_Scope", variant: "Variant") -> str:
+        """The key that seeds the draws: ``key_for`` at the frozen ``DRAW_LEG_VERSION``."""
+        found = self.draw_keys.get((scope.key, variant.id))
+        if found is None:
+            found = self.draw_keys[scope.key, variant.id] = self._key(
+                scope, variant, DRAW_LEG_VERSION
             )
         return found
+
+    def _key(self, scope: "_Scope", variant: "Variant", leg_version: int) -> str:
+        """One leg key at ``leg_version``."""
+        key = leg_key(
+            _trial_hash(scope, variant),
+            universe_hash(scope.universe),
+            scope.iv_field,
+            scope.edge.event_class,
+            scope.edge.outcome.start_offset_sessions,
+            self.draws,
+            self.expr_hash,
+            scope.edge.top_k,
+            scope.edge.base,
+            scope.edge.picks,
+            self.costs,
+            None if scope.edge.outcome.side == LONG else self.adv_floor,
+            scope.edge.event_subtype,
+            scope.edge.outcome.hold_rank,
+            leg_version,
+        )
+        return key
 
 
 def _measure(
@@ -895,7 +913,7 @@ def _measure_random(
     names = names_for(p.scope.edge, eligible, event_names)
     res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
     counted = res[res["excluded"] == ""]
-    key, label = spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
+    key, label = spec.draw_key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
     rng = generator(key, label, p.horizon, leg.decision)
     side = p.scope.edge.outcome.side
     if side == LONG:  # the sector-matched draws are the long leg's (a short leg has none)

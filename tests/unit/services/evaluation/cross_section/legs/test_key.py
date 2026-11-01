@@ -64,6 +64,19 @@ def test_leg_v5_is_a_new_key_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
     assert leg_key(**BASE) != v4  # type: ignore[arg-type]
 
 
+DRAW_KEY = "0d63c752da98a108fe3dcbd0a776618d03207c1d0c82e7e9ffe58afb98bc6e9f"
+
+
+def test_the_draw_key_is_frozen_at_leg_version_4(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The draws are seeded by the key at ``DRAW_LEG_VERSION``: pinned, and a ``LEG_VERSION``
+    bump (or any value) leaves it unchanged; only ``SEED_VERSION`` re-seeds."""
+    assert key.DRAW_LEG_VERSION == 4
+    draw = leg_key(**BASE, leg_version=key.DRAW_LEG_VERSION)  # type: ignore[arg-type]
+    assert draw == DRAW_KEY
+    monkeypatch.setattr(key, "LEG_VERSION", 99)
+    assert leg_key(**BASE, leg_version=key.DRAW_LEG_VERSION) == DRAW_KEY  # type: ignore[arg-type]
+
+
 def test_leg_v4_is_a_new_key_scheme() -> None:
     """ADR 0064 decision 4: a v1 leg (no picks, no hits per cost level) is never reused; ADR 0053
     amendment 2026-10-18: nor a v2 one (no sector-stratified draws), nor a v3 one (no buy/hold
