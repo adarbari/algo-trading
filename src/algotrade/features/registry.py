@@ -52,6 +52,7 @@ from algotrade.features.rollups.corporate import (
     earnings,
     earnings_expected,
     earnings_reaction,
+    earnings_reaction_session,
     earnings_schedule,
     financials,
     fundamentals,
@@ -77,8 +78,8 @@ from algotrade.features.rollups.market import (
     macro_asof,
     regime,
     trend,
-    triggers,
 )
+from algotrade.features.rollups.market.edges import triggers
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,
@@ -143,6 +144,7 @@ GROUPS: dict[str, FeatureGroup] = {
             price_history.GROUP,
             earnings.GROUP,
             earnings_reaction.GROUP,
+            earnings_reaction_session.GROUP,
             earnings_schedule.GROUP,
             earnings_expected.GROUP,
             earnings_surprise.GROUP,

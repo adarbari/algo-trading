@@ -11,7 +11,7 @@ from algotrade.config.edges.document import QUALITY_BAR, parse_edge
 from algotrade.config.edges.schedules import markets
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.features.rollups.market import triggers
+from algotrade.features.rollups.market.edges import triggers
 
 NAMED = {"where": {"all": [{"field": "instrument.symbol", "op": "in", "value": ["SPY", "QQQ"]}]}}
 
