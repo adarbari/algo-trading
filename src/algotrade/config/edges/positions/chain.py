@@ -1,14 +1,14 @@
 """The option outcomes of an edge document beyond ``expires_otm``: the horizon check of
 ``option_model_pnl`` (``tenor_sessions``, ``check_tenor``: its implied-vol field's tenor) and the
-``option_pnl`` outcome of an edge document (ADR 0053 amendment, EB H13): a P&L of an option
-structure from the stored chains (``outcomes/option/structure_pnl@v1``), basis ``chain``, beside
-``option_model_pnl`` (a modelled P&L, basis ``model``).
+``option_pnl`` outcome of an edge document (ADR 0053 amendment, EB H13; ADR 0088): the P&L of a
+position template (``position``, ``config/site/positions/templates.toml``) from the stored chains
+(``outcomes/option/structure_pnl@v2``), basis ``chain``, beside ``option_model_pnl`` (a modelled
+P&L, basis ``model``).
 
-    structure     one of ``CHAIN_STRUCTURES``: an at-the-money straddle held long or short,
-                  delta-hedged daily long or short (our own delta from each session's chain), or a
-                  short put chosen by its own delta (``strike_delta``, required for it only)
-    tenor_days    the tenor rule: the contracts expire on the first listed date at least this many
+    position      the template of the legs held (required; the old ``structure`` enum is gone)
+    tenor_days    the tenor rule: the contracts expire on the first allowed date at least this many
                   calendar days after the entry session and not before the window's end
+    strike_delta  replaces the delta of the template's short delta legs (``position/key.py``)
     horizon_sessions, benchmark ``"none"``, ``start_offset_sessions``, ``cost_bps``, ``side`` as
                   for any outcome; it reads no implied-vol field and sets no ``otm_pct``
 
@@ -17,6 +17,7 @@ pre-frozen basis exists and every row is out of sample (ADR 0065 amendment).
 """
 
 import re
+from typing import NoReturn
 
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
@@ -29,49 +30,18 @@ MODEL_STRUCTURES = (
 )  # fmt: skip
 CHAIN_KIND = "option_pnl"
 CHAIN_BASIS = "chain"  # what a P&L of quoted prices is labelled (results and UI)
-CHAIN_STRUCTURES = (
-    "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
-    "put_short",
-)  # fmt: skip
-SHORT_STRUCTURES = ("atm_straddle_short", "delta_hedged_atm_short", "put_short")
-HEDGED_STRUCTURES = ("delta_hedged_atm", "delta_hedged_atm_short")
 MAX_TENOR_DAYS = 400
 
 
-def grain_structure(structure: str, strike_delta: float | None) -> str:
-    """The structure the grain stores (held long) for a document ``structure``: ``atm_straddle``,
-    or ``put_delta_NN`` for the short put of delta ``NN / 100``."""
-    if structure not in CHAIN_STRUCTURES:
+def check_chain(o: Table) -> NoReturn:
+    """An ``option_pnl`` outcome names a ``position`` template (ADR 0088, E4): the legs, not an
+    older ``structure``, say what is held. Always raises, naming the file and key."""
+    if "structure" in o.names():
         raise ConfigurationError(
-            f"option_pnl structure {structure!r}: an outcome that names a position template is "
-            f"not measured until the option engine reads it (ADR 0088, E3a / E4)"
+            f"{o.where} structure: an option_pnl names a position template (position = ...), "
+            f"the structure enum is gone (ADR 0088)"
         )
-    if structure == "put_short":
-        assert strike_delta is not None
-        return f"put_delta_{round(strike_delta * 100):02d}"
-    return "atm_straddle"
-
-
-def check_chain(
-    o: Table, structure: str | None, delta: float | None, pct: float | None, iv_field: str | None
-) -> tuple[str, float | None, float | None, str | None]:
-    """``(structure, strike_delta, otm_pct, iv_field)`` of an ``option_pnl`` outcome, or a
-    ``ConfigurationError`` naming the file and key."""
-    if structure is None:
-        raise ConfigurationError(f"{o.where} structure: required for an option_pnl outcome")
-    if pct is not None or iv_field is not None:
-        key = "otm_pct" if pct is not None else "iv_field"
-        raise ConfigurationError(f"{o.where} {key}: an option_pnl reads quoted prices, it has none")
-    if structure == "put_short":
-        if delta is None or not 0.05 <= round(delta, 2) <= 0.5:
-            raise ConfigurationError(
-                f"{o.where} strike_delta: a put_short names the put's delta, 0.05 to 0.5, "
-                f"got {delta}"
-            )
-        delta = round(delta, 2)
-    elif delta is not None:
-        raise ConfigurationError(f"{o.where} strike_delta: only a put_short has a strike")
-    return structure, delta, None, None
+    raise ConfigurationError(f"{o.where} position: required for an option_pnl outcome")
 
 
 def check_positioned(
@@ -80,8 +50,8 @@ def check_positioned(
     """``(None, strike_delta, None, None)`` of an ``option_pnl`` outcome that names a ``position``
     template (ADR 0088): the legs, not a ``structure``, say what is held; ``strike_delta`` (0.05 to
     0.5) overrides the template's delta legs."""
-    if "structure" in o.names():
-        raise ConfigurationError(f"{o.where} position: not with structure")
+    if "position" not in o.names() or "structure" in o.names():
+        check_chain(o)
     if pct is not None or iv_field is not None:
         key = "otm_pct" if pct is not None else "iv_field"
         raise ConfigurationError(f"{o.where} {key}: an option_pnl reads quoted prices, it has none")
@@ -120,8 +90,8 @@ def chain_kind_mixed(kinds: set[str]) -> bool:
 
 def structures_of(kind: str, otm: tuple[str, ...], model: tuple[str, ...]) -> tuple[str, ...]:
     """The structure values an outcome of ``kind`` may name (``otm``: expires_otm's, ``model``:
-    option_model_pnl's)."""
-    return {"expires_otm": otm, CHAIN_KIND: CHAIN_STRUCTURES}.get(kind, model)
+    option_model_pnl's; an option_pnl names a position, no structure)."""
+    return {"expires_otm": otm, CHAIN_KIND: ()}.get(kind, model)
 
 
 # The implied vol is one tenor (``iv30``: 30 calendar days, about 21 sessions) and prices every
@@ -165,13 +135,9 @@ def option_fields(o: Table, kind: str) -> tuple[str | None, float | None, float 
     delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
     iv_field = " ".join(o.text("iv_field", "").split()) or None
     structures = structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
-    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
     if kind == CHAIN_KIND:
-        return (
-            check_positioned(o, delta, pct, iv_field)
-            if "position" in o.names()
-            else check_chain(o, structure, delta, pct, iv_field)
-        )
+        return check_positioned(o, delta, pct, iv_field)
+    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
     if kind not in ("expires_otm", "option_model_pnl", CHAIN_KIND):
         for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
             if value is not None:

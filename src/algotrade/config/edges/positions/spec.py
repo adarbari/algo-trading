@@ -22,6 +22,7 @@ from algotrade.config.edges.positions.fields import fields_for, is_credit
 from algotrade.config.edges.positions.templates import (
     RETURN_KINDS,
     SIDE_TEMPLATES,
+    Leg,
     Templates,
     check_known,
 )
@@ -62,6 +63,10 @@ class PositionSpec:
     cases: tuple[
         CaseValue, ...
     ] = ()  # the case-valued parameters (their defaults are the literals)
+    # filled by the edge loader after ``check_edge`` (positions/key.py: the template's legs as the
+    # outcome resolves them, and its collateral), so a reader keys a trade without the templates
+    legs: tuple[Leg, ...] = ()
+    collateral: str = ""
 
 
 def spec_of(

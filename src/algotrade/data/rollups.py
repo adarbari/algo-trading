@@ -164,6 +164,20 @@ def group_view(
     return out, tuple(sorted(missing))
 
 
+def group_stamp(reader: StoreReader, session: date, fields: Sequence[str]) -> datetime | None:
+    """The latest ``knowledge_ts`` among the partitions of ``session`` that ``fields`` (feature
+    group fields only) are read from; ``None`` when none of them has one. One column read per
+    table, so a caller can stamp a row derived from ``group_view`` by what it read."""
+    latest: datetime | None = None
+    for table in _by_table(fields):
+        frame = reader.table_range(table, session, session, None, None, ["knowledge_ts"])
+        if frame is None or frame.empty:
+            continue
+        stamp = pd.Timestamp(frame["knowledge_ts"].max()).to_pydatetime()
+        latest = stamp if latest is None else max(latest, stamp)
+    return latest
+
+
 def group_rows(
     reader: StoreReader,
     start: date,

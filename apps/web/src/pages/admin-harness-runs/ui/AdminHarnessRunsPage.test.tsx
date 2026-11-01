@@ -7,6 +7,7 @@ import { AdminHarnessRunsPage } from './AdminHarnessRunsPage';
 vi.mock('@/widgets/harness-run-list', () => ({
   HarnessRunList: ({ selected }: { selected: string | null }) => `[list ${selected ?? 'none'}]`,
 }));
+vi.mock('@/widgets/harness-run-summary', () => ({ HarnessRunSummary: () => '[summary]' }));
 vi.mock('@/widgets/harness-run-detail', () => ({
   HarnessRunDetail: ({ id }: { id: string | null }) => `[detail ${id ?? 'none'}]`,
 }));
@@ -18,7 +19,8 @@ afterEach(() => {
 describe('AdminHarnessRunsPage', () => {
   it('lays out the list and the detail and passes the chosen run down', () => {
     render(<AdminHarnessRunsPage selected="r1" onSelect={vi.fn()} onClear={vi.fn()} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Edge runs' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Evaluations' })).toBeInTheDocument();
+    expect(document.body).toHaveTextContent('[summary]');
     expect(document.body).toHaveTextContent('[list r1]');
     expect(document.body).toHaveTextContent('[detail r1]');
   });

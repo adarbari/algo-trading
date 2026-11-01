@@ -273,3 +273,29 @@ def make_unclustered(directory: Path) -> None:
         data = pq.read_table(path)
         data = data.take(list(range(data.num_rows))[::-1])  # not in instrument order
         pq.write_table(data, path, compression="zstd", row_group_size=1 << 20)
+
+
+def structure_pnl_row(
+    instrument: str = "EQ:A",
+    key: str = "k",
+    session: date = date(2026, 10, 5),
+    hold: int = 5,
+    **overrides: object,
+) -> dict[str, object]:
+    """One COMPLETE ``structure_pnl@v2`` row (a short put held to its horizon) with every
+    required column; ``overrides`` replace any column."""
+    row: dict[str, object] = {
+        "instrument_id": instrument, "ts": pd.Timestamp(session, tz="UTC"), "position_key": key,
+        "price_source": "cboe", "licence": "open", "window_end": date(2026, 10, 12),
+        "hold_sessions": hold, "leg_kinds": ["option"], "leg_contract_ids": ["OPT:A"],
+        "leg_rights": ["P"], "leg_strikes": [95.0], "leg_expiries": [date(2026, 11, 20)],
+        "leg_qty": [-1.0], "leg_entry_mid": [2.0], "leg_entry_half_spread": [0.05],
+        "leg_entry_delta": [-0.3], "entry_spot": 100.0, "entry_net_mid": -2.0,
+        "entry_half_spread": 0.05, "collateral": 95.0, "notional": 100.0,
+        "exit_session": date(2026, 10, 12), "exit_kind": "HORIZON", "exit_basis": "QUOTE",
+        "exit_net_mid": -1.5, "exit_half_spread": 0.05, "expired_otm": False,
+        "exit_unknown_closes": 0, "pnl_mid": 0.5, "option_pnl": 0.5, "stock_pnl": 0.0,
+        "outcome_status": "COMPLETE", "outcome_reason": None,
+        **overrides,
+    }  # fmt: skip
+    return row

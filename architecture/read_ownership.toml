@@ -184,7 +184,7 @@ detect = [{ call = "site_screeners" }, { call = "rule_text" }, { call = "load_gu
 
 [[responsibility]]
 id = "ideas-list"
-description = "The Ideas list (ADR 0029): the viewer's screener pool built from the rule screens' runs for exactly the session (ADR 0036: a screener with no run for it is NOT_RUN, no lookback; a run withheld by a licence is WITHHELD and contributes nothing), ranked by the pure rule of services/ideas (ideas-ranking), each idea served with its best pick (values, regime, size multiplier, metrics, watch-outs, facts) and picked_by; per-screener picked counts and first picks; never recomputes a screen (read-model PR 5); ideas.priority is retired from PR B (the loader reads it until then)"
+description = "The Unproven section of Ideas (ADR 0029, narrowed by ADR 0083 decision 2 and its amendment (a): shown for a tab only while no setup of it qualifies, `only` narrows it to the tab's screeners): the viewer's screener pool built from the rule screens' runs for exactly the session (ADR 0036: a screener with no run for it is NOT_RUN, no lookback; a run withheld by a licence is WITHHELD and contributes nothing), ranked by the pure rule of services/ideas (ideas-ranking), each idea served with its best pick (values, regime, size multiplier, metrics, watch-outs, facts) and picked_by; per-screener picked counts and first picks; never recomputes a screen (read-model PR 5); ideas.priority is retired from PR B (the loader reads it until then)"
 owner = ["src/algotrade/services/read/screens/ideas.py"]
 allowed = [
     "apps/api/algotrade_api/graphql/*",  # Query.ideas serves it (one loader call per resolver)
@@ -192,6 +192,16 @@ allowed = [
 ]
 section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
 detect = [{ call = "load_ideas" }]
+
+[[responsibility]]
+id = "ideas-setup-picks"
+description = "Ideas from the picks of setups with a good stored verdict (ADR 0083 decision 2 and amendment (a), services/read/ideas/): per tab (Stocks, Premium from the setup's position kind) the site setups whose stored verdict headline, read point in time (the canonical run committed on or before the session), is works / promising, each with the picks its basis screener's run gave it through pick_edges.load_pick_edges (never the table), one pure ranking rule (services/ideas/setup_rule.py: verdict level, lift, trades, edge id, place, instrument id; RULE_VERSION), a ticker several setups picked one idea with the others as also_in, a pick of a run the viewer's licences withhold dropped before the cap of 15, a setup whose evidence licence the viewer lacks never listed (load_edges), a night the step did not store UNKNOWN not empty, setups left out for want of a readable verdict counted by kind; the inverse reads: a setup's picks and the setups that picked an instrument"
+owner = ["src/algotrade/services/read/ideas/*"]
+allowed = [
+    "apps/api/algotrade_api/graphql/*",  # Query.setupIdeas serves it (one loader call per resolver)
+]
+section = "docs/adr/0083-workflow-first-trader-site.md#decision"
+detect = [{ call = "load_setup_picks" }, { call = "load_session_setups" }]
 
 [[responsibility]]
 id = "known-value-coverage-read"
