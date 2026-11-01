@@ -7,7 +7,9 @@ long picks, the data missing). A row counts toward an edge when its id is in tha
 its place there. Read for the served session only (ADR 0036): a run of another session, a session
 the step has not stored, an edge with no row (a user's own edge, a new edge, a skipped night)
 says ``not_stored``, never an older night's picks. A row the regime gate PAUSED is ``paused`` and
-one whose rank is withheld by a licence ``withheld``: neither is counted or placed. It reads no
+one whose rank is withheld by a licence ``withheld``: neither is counted or placed. An edge
+whose evidence the viewer lacks the licence of is not listed at all, so it adds no pick (ADR 0084
+decision 1: ``evidence_licence``). It reads no
 outcome: it says what the edge would take, not what it has already earned."""
 
 from collections.abc import Mapping, Sequence
@@ -16,7 +18,7 @@ from typing import Any
 
 from algotrade.config.user import SITE_USER
 from algotrade.services.read.context import ReadContext, partition
-from algotrade.services.read.evaluation.edges import parsed_edges
+from algotrade.services.read.evaluation.edges import load_edges, parsed_edges
 from algotrade.services.read.screens.runs import ScreenerRun
 from algotrade.services.read.values import Unknown
 
@@ -96,6 +98,8 @@ def load_pick_edges(
     edges = [e for e in parsed_edges(ctx, ctx.user.user_id) if run.config_id in e.screeners]
     if not edges or not picks:
         return {}
+    shown = {e.id for e in load_edges(ctx, [e.id for e in edges])}  # evidence the viewer may see
+    edges = [e for e in edges if e.id in shown]
     stored = _stored(ctx, run)
     out: dict[str, tuple[PickEdge, ...]] = {}
     for iid, decision, rank in picks:

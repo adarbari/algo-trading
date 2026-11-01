@@ -44,3 +44,15 @@ def test_a_screen_reading_a_personal_feature_makes_the_score_and_the_trial_perso
 def test_a_personal_implied_vol_makes_the_value_and_the_trial_personal() -> None:
     found = licences(PRICE, "personal")
     assert (found.trial, found.value, found.score) == ("personal", "personal", "open")
+
+
+def test_a_personal_outcome_makes_the_trial_personal_and_nothing_else() -> None:
+    store = configs(PRICE)
+    resolved = resolve_config(store, "momo", USER)
+    universe = parse_selection(ACTIVE, "active")
+    found = trial_licences(
+        catalogue(store, "site"), edge(), universe, [resolved], None, outcome="personal"
+    )
+    assert (found.trial, found.outcome) == ("personal", "personal")
+    assert (found.value, found.score, found.adv) == ("open",) * 3  # the columns keep their own
+    assert licences(PRICE, None).outcome == "open"

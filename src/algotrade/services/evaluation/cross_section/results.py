@@ -21,6 +21,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN, job_name
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.features.framework.feature import strictest
 from algotrade.services.evaluation.cross_section.detail import series, trades, verdict
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
@@ -105,6 +106,7 @@ def _row(
         "iv_source": result.iv_source if result else None,
         "side": result.side if result else side,
         "licence": result.licence if result else None,
+        "evidence_licence": result.licences.outcome if result and result.licences else None,
         **_projection(m, result),
         # Filled by an expires_otm outcome only (ADR 0053 amendment 2026-10-08).
         "reference_rate": _nan(m.reference_rate),
@@ -373,6 +375,9 @@ def write_edge_eval(
         "range": [evaluation.start.isoformat(), evaluation.end.isoformat()],
         "as_of": evaluation.as_of.isoformat(),
         "trials_counted": evaluation.trials,
+        "evidence_licence": strictest(
+            r.licences.outcome for r in evaluation.results if r.licences is not None
+        ),
         "trials": [_trial(evaluation, r) for r in evaluation.results],
         "start_sessions": dict(evaluation.start_sessions),
         "unclosed_sessions": dict(evaluation.unclosed_sessions),

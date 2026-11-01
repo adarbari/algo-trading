@@ -10,25 +10,44 @@ per-name value by the licence recorded here, never by a column's name."""
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
+import pandas as pd
+
 from algotrade.config.edges.document import Edge
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import strictest
+from algotrade.features.framework.feature import LICENCES, strictest
 from algotrade.services.evaluation.cross_section.reads.session import ADV_FIELD
 from algotrade.services.selection import selection_fields
 
 OPEN = "open"
+STRICTEST = LICENCES[-1]
 
 
 @dataclass(frozen=True)
 class TrialLicences:
-    """``trial``: the trial's own; ``value``, ``score``, ``adv``: the ledger columns'."""
+    """``trial``: the trial's own; ``value``, ``score``, ``adv``: the ledger columns'; ``outcome``:
+    the strictest licence of the outcome rows the run joined (ADR 0084 decision 1, ADR 0088
+    decision 20): what gates the setup's verdict and picks, as the screen's and universe's
+    fields keep their per-column redaction (decision B); it is part of ``trial``."""
 
     trial: str
     value: str
     score: str
     adv: str
+    outcome: str = OPEN
+
+
+def outcome_licence(rows: pd.DataFrame) -> str:
+    """The strictest licence an outcome partition's rows record (a ``licence`` column; none, or a
+    null in it, reads as open: ``forward_returns@v2`` has none). Per row, never by the table's
+    name, so a share outcome over 2015 stays open and an option outcome priced from the bought
+    history is personal (ADR 0084 decision 1)."""
+    if "licence" not in rows.columns:
+        return OPEN
+    return strictest(  # a value that is no known licence is the strictest: fail closed
+        str(x) if str(x) in LICENCES else STRICTEST for x in rows["licence"].dropna().unique()
+    )
 
 
 def _of(features: FeatureSet, fields: Iterable[str]) -> str:
@@ -51,18 +70,20 @@ def trial_licences(
     universe: Selection,
     configs: Sequence[ResolvedConfig],
     iv_licence: str | None,
+    outcome: str = OPEN,
 ) -> TrialLicences:
     """The licences of one trial (a screener or baseline of one edge variant; an ensemble's are
     those of every screener of its grid, the strictest); ``iv_licence``: its implied-vol field's
-    (None: the outcome reads none)."""
+    (None: the outcome reads none); ``outcome``: that of the outcome rows joined."""
     score = strictest(_of(features, screen_fields(c, edge)) for c in configs)
     universe_licence = _of(features, selection_fields(universe))
     value = iv_licence or OPEN
     return TrialLicences(
-        trial=strictest((value, score, universe_licence)),
+        trial=strictest((value, score, universe_licence, outcome)),
         value=value,
         score=score,
         adv=_of(features, (ADV_FIELD,)),
+        outcome=outcome,
     )
 
 

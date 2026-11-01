@@ -74,7 +74,9 @@ class EdgeRun:
     ``local`` fallback), read as the site's and never rewritten; ``trigger``: what started it
     (``nightly`` | ``ui`` | ``cli``; None for a run from before it was recorded);
     ``screener_hashes``: each screener's config hash as the run resolved it (empty for a run from
-    before it was recorded), what the provenance line compares the current configs with."""
+    before it was recorded), what the provenance line compares the current configs with;
+    ``evidence_licence``: the strictest licence of the outcome rows the run joined (``open``
+    for a run from before it): a viewer who lacks it is not served the setup (ADR 0084 d1)."""
 
     run_id: str
     edge_id: str
@@ -93,6 +95,7 @@ class EdgeRun:
     legacy_owner: str | None = None
     trigger: str | None = None
     screener_hashes: tuple[tuple[str, str], ...] = ()
+    evidence_licence: str = "open"  # the strictest licence of the outcome rows it joined (E1)
 
 
 @dataclass(frozen=True)
@@ -256,6 +259,7 @@ def run_of_record(
         legacy_owner=legacy_owner,
         trigger=stats.get("trigger"),
         screener_hashes=tuple(sorted((stats.get("screener_hashes") or {}).items())),
+        evidence_licence=str(stats.get("evidence_licence") or "open"),
     )
 
 
@@ -375,7 +379,7 @@ def _site_trials(ctx: Stores) -> int:
     )
 
     def count() -> int:
-        edges = [e for e in load_edges(ctx) if not e.mine and e.id in site]
+        edges = [e for e in load_edges(ctx, gated=False) if not e.mine and e.id in site]
         found = (load_canonical_run(ctx, e).run for e in edges)
         return sum(r.trials_counted or 0 for r in found if r is not None)
 

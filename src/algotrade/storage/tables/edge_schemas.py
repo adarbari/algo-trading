@@ -33,6 +33,9 @@ from algotrade.storage.tables.spec import fixed, floats, strings
 # ``side`` (ADR 0053 amendment, outcome sides): the outcome's side, ``long``, ``short`` or
 # ``long_short``; null in rows written before sides, read as ``long``. A ``long_short`` row has no
 # hit rate, base rate or lift (null: a spread has none); a ``short`` row's are the short's.
+# ``evidence_licence`` (ADR 0084 decision 1): the strictest licence of the outcome rows the trial
+# joined, part of ``licence``; it alone gates the setup's verdict and picks for a viewer; null in
+# rows written before the column, read as open.
 EDGE_EVAL = fixed(
     "results/edge_eval",
     "results",
@@ -42,7 +45,7 @@ EDGE_EVAL = fixed(
     ),
     *strings("edge_id", "user_id", "variant", "slice_kind", "slice_value"),
     *strings("role", "config_hash", "run_config_hash", "benchmark"),
-    *strings("edge_variant", "iv_source", "licence", "side"),
+    *strings("edge_variant", "iv_source", "licence", "evidence_licence", "side"),
     "horizon_sessions int64!",
     "range_from date!",
     "range_to date",
