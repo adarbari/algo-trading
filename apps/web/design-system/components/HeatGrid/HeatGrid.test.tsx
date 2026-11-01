@@ -110,4 +110,27 @@ describe('HeatGrid', () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  it('shows a graded cell with its second line and flag in its name', async () => {
+    const { container } = render(
+      <HeatGrid
+        label="Yield"
+        legend={false}
+        columns={[{ id: 'a', label: 'Fri 20 Nov', sub: '28 days' }]}
+        rows={[
+          {
+            id: 'r',
+            label: 'Middle',
+            cells: {
+              a: { status: 'complete', text: '12.2%', level: 2, sub: 'strike 78', flag: 'report' },
+            },
+          },
+        ]}
+      />,
+    );
+    const cell = screen.getByRole('gridcell', { name: /12\.2%, strike 78, report/ });
+    expect(cell).toHaveAttribute('data-level', '2');
+    expect(screen.getByRole('columnheader', { name: /28 days/ })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
 });

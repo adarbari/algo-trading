@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
+import { narrow } from '../../testing';
 import {
   HeatGrid,
   type HeatGridCell,
@@ -106,3 +107,49 @@ export const Dense: Story = {
     })),
   },
 };
+
+const yieldCell = (text: string, level: 1 | 2 | 3, sub: string, flag?: string): HeatGridCell => ({
+  status: 'complete',
+  text,
+  level,
+  sub,
+  flag,
+});
+
+const yieldProps = {
+  legend: false,
+  label: 'Yearly rate by delta and expiry',
+  rowHeader: 'How far out',
+  statusLabels: { complete: 'yearly rate' },
+  selected: { row: 'mid', column: 'nov6' },
+  columns: [
+    { id: 'oct30', label: 'Fri 30 Oct', sub: '7 days' },
+    { id: 'nov6', label: 'Fri 6 Nov', sub: '14 days' },
+    { id: 'nov20', label: 'Fri 20 Nov', sub: '28 days · includes report' },
+  ],
+  rows: [
+    {
+      id: 'far',
+      label: 'Further out (0.15)',
+      cells: {
+        oct30: yieldCell('16.0%', 3, 'strike 81'),
+        nov6: yieldCell('9.1%', 2, 'strike 79.5'),
+        nov20: yieldCell('7.4%', 1, 'strike 76.5', 'report'),
+      },
+    },
+    {
+      id: 'mid',
+      label: 'Middle (0.20)',
+      cells: {
+        oct30: yieldCell('22.2%', 3, 'strike 81.5'),
+        nov6: yieldCell('15.1%', 3, 'strike 80.5'),
+        nov20: yieldCell('12.2%', 2, 'strike 78', 'report'),
+      },
+    },
+  ],
+} satisfies Partial<HeatGridProps>;
+
+/** Graded cells: a yield with its strike, tinted by level, a flag where the span holds a report. */
+export const Graded: Story = { args: yieldProps };
+
+export const GradedNarrow: Story = { args: yieldProps, decorators: [narrow] };

@@ -17,11 +17,19 @@ export interface HeatGridCell {
   status: HeatStatus;
   /** Short value shown in the cell (e.g. completeness `99.7`). */
   text?: string;
+  /** Graded fill, 1 (faint) to 3 (strong), for a cell that holds a figure rather than a status (a yield). */
+  level?: 1 | 2 | 3;
+  /** A second line in the cell (`strike 81`). */
+  sub?: string;
+  /** A short flag in the cell's corner (`report`). */
+  flag?: string;
 }
 
 export interface HeatGridColumn {
   id: string;
   label: string;
+  /** A second line under the header (`7 days`). */
+  sub?: string;
 }
 
 export interface HeatGridRow {
@@ -179,6 +187,7 @@ export function HeatGrid({
             {columns.map((column) => (
               <div key={column.id} className={styles.columnHeader} role="columnheader">
                 {column.label}
+                {column.sub !== undefined && <span className={styles.sub}>{column.sub}</span>}
               </div>
             ))}
           </div>
@@ -201,9 +210,10 @@ export function HeatGrid({
                     className={`${styles.cell} ${toneStyles.tone}`}
                     role="gridcell"
                     data-tone={TONE[cell.status]}
+                    data-level={cell.level}
                     data-loading={loading || undefined}
                     aria-selected={isSelected}
-                    aria-label={`${row.label}, ${column.label}: ${words[cell.status]}${cell.text ? ` ${cell.text}` : ''}`}
+                    aria-label={`${row.label}, ${column.label}: ${words[cell.status]}${cell.text ? ` ${cell.text}` : ''}${cell.sub ? `, ${cell.sub}` : ''}${cell.flag ? `, ${cell.flag}` : ''}`}
                     tabIndex={isActive ? 0 : -1}
                     onClick={() => {
                       setFocus({ r, c });
@@ -216,7 +226,17 @@ export function HeatGrid({
                       if (!isActive) setFocus({ r, c });
                     }}
                   >
-                    {loading ? null : cell.text}
+                    {loading ? null : (
+                      <>
+                        <span className={styles.figure}>
+                          {cell.text}
+                          {cell.flag !== undefined && (
+                            <span className={styles.flag}>{cell.flag}</span>
+                          )}
+                        </span>
+                        {cell.sub !== undefined && <span className={styles.sub}>{cell.sub}</span>}
+                      </>
+                    )}
                   </div>
                 );
               })}
