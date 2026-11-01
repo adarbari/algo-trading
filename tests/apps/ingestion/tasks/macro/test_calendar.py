@@ -384,3 +384,51 @@ def test_a_stored_fomc_row_not_in_the_list_is_retired_as_moved_from_the_run_sess
     assert "moved" not in set(before["status"])
     assert set(daily["release_date"]) <= set(before["release_date"])
     assert ingest_macro_calendar(ctx, REGISTRY, S2, only=["FOMC"]).items["FOMC"] == "UNCHANGED"
+
+
+# ----------------------------------------------------------------------------- declared years
+
+
+def declared_registry() -> MacroReleases:
+    year = {"source": "u", "inferred": True}
+    return MacroReleases.from_document(
+        {
+            "release": [
+                {
+                    **entry("FOMC", source="dates", time_et="14:00"),
+                    "dates": [date(2019, 1, 30), date(2026, 1, 28), date(2026, 10, 28)],
+                    "year": [
+                        {"year": 2019, "known_from": date(2018, 12, 31), **year},
+                        {"year": 2026, "known_from": date(2025, 12, 31), **year},
+                    ],
+                }
+            ]
+        }
+    )
+
+
+def test_a_declared_year_is_scheduled_from_its_publication_then_released_from_the_date() -> None:
+    spec = declared_registry().releases[0]
+    rows = release_rows(spec, spec.dates, S1)
+    got = list(zip(rows["release_date"], rows["status"], rows["known_from"], strict=True))
+    assert got == [
+        (date(2019, 1, 30), "scheduled", date(2018, 12, 31)),
+        (date(2019, 1, 30), "released", date(2019, 1, 30)),
+        (date(2026, 1, 28), "scheduled", date(2025, 12, 31)),
+        (date(2026, 1, 28), "released", date(2026, 1, 28)),
+        (date(2026, 10, 28), "scheduled", date(2025, 12, 31)),
+    ]
+
+
+def test_a_dates_release_stores_history_beyond_the_window_in_two_runs_then_nothing() -> None:
+    ctx = context(Feed())
+    registry = declared_registry()
+    first = ingest_macro_calendar(ctx, registry, S1, only=["FOMC"])
+    assert first.items["FOMC"] == "OK: 3 rows"  # 2019 is seven years back: no look-back limit
+    assert set(stored(ctx, "FOMC")["status"]) == {"scheduled"}
+    second = ingest_macro_calendar(ctx, registry, S1, only=["FOMC"])
+    assert second.items["FOMC"] == "OK: 2 rows"  # the two past dates turn released
+    done = stored(ctx, "FOMC")
+    assert list(done["status"]) == ["released", "released", "scheduled"]
+    assert list(done["known_from"]) == [date(2019, 1, 30), date(2026, 1, 28), date(2025, 12, 31)]
+    assert ingest_macro_calendar(ctx, registry, S1, only=["FOMC"]).items["FOMC"] == "UNCHANGED"
