@@ -17,8 +17,9 @@ exact date is null (a ratio of two series is never taken across dates, never fil
 S&P 500 trend and realised volatility are read from the ``market_trend@v2`` row dated
 ``vix_obs_date``, never the session's own, so the VIX and the index describe the same close.
 Stale is null: when the newest VIX observation is more than ``MAX_AGE_SESSIONS`` old every
-VIX-derived
-column is null. Rolling windows count observations known by the session and are complete or
+VIX-derived column is null. The rate inputs (``y10_chg_63d``, the inverted-curve verdict) are
+read at the session itself and never combined with the VIX-dated inputs in one verdict.
+Rolling windows count observations known by the session and are complete or
 null (``WINDOW`` observations of the VIX for the percentile, so the statistics are null for the
 first year of each series). No hysteresis: a verdict flips as its inputs do.
 
