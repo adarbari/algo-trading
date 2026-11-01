@@ -69,6 +69,10 @@ path = "config/site/filters"
 purpose = "filter definitions, one <surface>.toml per table, list or feed (ADR 0082): the surface's [[column]]s and its [[filter]]s (id, label, group, kind, field, options, bins, window_unit, guide), typed by src/algotrade/config/filters/definitions.py; ideas.toml, screener_results.toml, universe.toml, screeners.toml, edges.toml and edge_trades.toml are the Ideas list's, a screener's results table's, the Explore table's, the Screeners list's, the Edges list's and an edge's trade ledger's"
 
 [[config_dir]]
+path = "config/site/positions"
+purpose = "position templates (ADR 0088): templates.toml, the [[template]]s (id, legs of shares or options with their strike rule, collateral) an edge outcome names by `position`, typed by src/algotrade/config/edges/positions/templates.py"
+
+[[config_dir]]
 path = "config/site/ranking"
 purpose = "ranking parameters, one <name>.toml per ranked list: ideas.toml, the Ideas ranking rule (site_top 5, user_top 20, user_weight 3; owner decision 2026-10-22), typed by src/algotrade/config/ranking/ideas.py, read by services/ideas/rule.py"
 

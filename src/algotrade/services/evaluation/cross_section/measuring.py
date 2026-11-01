@@ -15,10 +15,10 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.edges.chain import CHAIN_KIND
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import LONG, LONG_SHORT, SHORT, identity_dict
 from algotrade.config.edges.portfolio import CASH, ENSEMBLE, PORTFOLIO_KIND, blend
+from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
@@ -713,7 +713,7 @@ def _measure(
 
 def _chain(plans: Sequence[_Plan]) -> bool:
     """Whether the plans' outcomes are option P&Ls read from the chain grain (an edge's variants
-    are all of one kind, ``config/edges/chain.check_kinds``)."""
+    are all of one kind, ``config/edges/positions/chain.check_kinds``)."""
     return any(p.scope.edge.outcome.kind == CHAIN_KIND for p in plans)
 
 

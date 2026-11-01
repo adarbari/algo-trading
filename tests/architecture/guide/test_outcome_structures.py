@@ -5,8 +5,13 @@ The kinds themselves are covered through ``EdgeSettings.kind`` in ``guide_covera
 
 import pytest
 
-from algotrade.config.edges.chain import CHAIN_BASIS, CHAIN_STRUCTURES, MODEL_STRUCTURES, STRUCTURES
 from algotrade.config.edges.document import MODEL_BASIS
+from algotrade.config.edges.positions.chain import (
+    CHAIN_BASIS,
+    CHAIN_STRUCTURES,
+    MODEL_STRUCTURES,
+    STRUCTURES,
+)
 from algotrade.config.site.guide.glossary import GlossaryTerm, load_guide_glossary
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.schemas import OPTION_PNL_REASONS, OPTION_PNL_STATUSES

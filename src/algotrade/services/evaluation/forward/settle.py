@@ -25,10 +25,10 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.edges.chain import CHAIN_KIND
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (

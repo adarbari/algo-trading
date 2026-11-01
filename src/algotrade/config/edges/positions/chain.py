@@ -69,6 +69,22 @@ def check_chain(
     return structure, delta, None, None
 
 
+def check_positioned(
+    o: Table, delta: float | None, pct: float | None, iv_field: str | None
+) -> tuple[None, float | None, None, None]:
+    """``(None, strike_delta, None, None)`` of an ``option_pnl`` outcome that names a ``position``
+    template (ADR 0088): the legs, not a ``structure``, say what is held; ``strike_delta`` (0.05 to
+    0.5) overrides the template's delta legs."""
+    if "structure" in o.names():
+        raise ConfigurationError(f"{o.where} position: not with structure")
+    if pct is not None or iv_field is not None:
+        key = "otm_pct" if pct is not None else "iv_field"
+        raise ConfigurationError(f"{o.where} {key}: an option_pnl reads quoted prices, it has none")
+    if delta is not None and not 0.05 <= round(delta, 2) <= 0.5:
+        raise ConfigurationError(f"{o.where} strike_delta: 0.05 to 0.5, got {delta}")
+    return None, None if delta is None else round(delta, 2), None, None
+
+
 def chain_tenor(o: Table, kind: str) -> int | None:
     """The ``tenor_days`` of an ``option_pnl`` outcome (required, 1 to ``MAX_TENOR_DAYS``); None
     for any other kind, which may not name one."""
@@ -146,7 +162,11 @@ def option_fields(o: Table, kind: str) -> tuple[str | None, float | None, float 
     structures = structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
     structure = o.choice("structure", "", structures) if "structure" in o.names() else None
     if kind == CHAIN_KIND:
-        return check_chain(o, structure, delta, pct, iv_field)
+        return (
+            check_positioned(o, delta, pct, iv_field)
+            if "position" in o.names()
+            else check_chain(o, structure, delta, pct, iv_field)
+        )
     if kind not in ("expires_otm", "option_model_pnl", CHAIN_KIND):
         for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
             if value is not None:

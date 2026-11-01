@@ -64,6 +64,7 @@ SITE_FOLDERS = {
     "regime": "regime",
     "events": "events",
     "studies": "studies",
+    "positions": "positions",
     "ranking": "ranking",
     "filters": "filters",
     "guide": "guide",
@@ -80,7 +81,7 @@ NESTED = (
     "field_guide",
 )  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
-    "defaults", "settings", "field_guide", "regime", "events", "studies", "ranking",
+    "defaults", "settings", "field_guide", "regime", "events", "studies", "positions", "ranking",
     "filters", "guide",
     "guide_screeners", "guide_glossary", "guide_glossary_edges", "guide_mechanisms", "guide_ideas",
 )  # fmt: skip

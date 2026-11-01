@@ -167,13 +167,14 @@ from algotrade.storage.tables.result_writer import ResultWriter
 # A fitness test classifies every field: a new one fails until it is named here.
 RUN_INPUTS = (
     "id", "outcome", "schedule", "universe", "top_k", "screeners", "baselines", "frozen_from",
-    "site_frozen_from", "base", "picks", "variants", "scorer_features", "ensemble",
+    "site_frozen_from", "base", "picks", "variants", "scorer_features", "ensemble", "gate",
+    "variant_grid", "position_baselines",
 )  # fmt: skip
 BOOKKEEPING = (
     "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
     "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
     "audit", "owner", "published", "family", "oos_class",
-    "mechanism_kind", "asset_class", "plain_reason",
+    "mechanism_kind", "asset_class", "plain_reason", "verdict_profile",
 )  # fmt: skip
 # The one fixed implied-vol field of a run is never a field mixing sources by name or by rule.
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
