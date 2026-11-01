@@ -133,6 +133,8 @@ class EdgeVerdict:
     decay: EdgeDecay | None = None  # the paper's figure against the in- and out-of-sample ones
     basis_why: str = ""  # a basis chosen among several: the in-sample lifts it was chosen on
     side: str = "long"  # the basis's outcome side: long | short | long_short (ADR 0053 amendment)
+    basis_screener: str | None = None  # the basis's screener (``basis`` in words), None: no basis
+    basis_horizon: int | None = None  # the basis's holding period in trading days
 
 
 def _pct(x: float | None) -> str:
@@ -245,10 +247,13 @@ class EdgeSummary:
     oos_trades: int | None
     lift: float | None
     lift_pts: float | None
+    basis_screener: str | None = None  # the screener the verdict was judged on (ADR 0083 d2)
+    basis_horizon: int | None = None  # and its holding period in trading days
 
 
 def summary_of(v: EdgeVerdict) -> EdgeSummary:
     """The headline fields of ``v``."""
     return EdgeSummary(
-        v.edge_id, v.verdict, v.result, v.basis, v.trades, v.oos_trades, v.lift, v.lift_pts
-    )
+        v.edge_id, v.verdict, v.result, v.basis, v.trades, v.oos_trades, v.lift, v.lift_pts,
+        v.basis_screener, v.basis_horizon,
+    )  # fmt: skip

@@ -146,8 +146,20 @@ def test_the_stored_headline_equals_the_live_judgement_field_by_field(
     stored = load_stored_summary(ctx, site_edge(ctx))
     assert stored == live
     assert versions.load_summary(ctx, site_edge(ctx)) == live
-    for field in ("trades", "oos_trades", "lift", "lift_pts", "basis"):
+    for field in (
+        "trades",
+        "oos_trades",
+        "lift",
+        "lift_pts",
+        "basis",
+        "basis_screener",
+        "basis_horizon",
+    ):
         assert getattr(stored, field) == getattr(live, field)  # None stays None, never 0 or NaN
+    if live.basis is not None:  # the words and the two keys name the one basis (ADR 0083 d2)
+        assert live.basis == f"{live.basis_screener}, {live.basis_horizon} trading days"
+    else:
+        assert live.basis_screener is None and live.basis_horizon is None
     if name == "null figures":
         assert stored is not None and stored.oos_trades is None and stored.lift is None
 

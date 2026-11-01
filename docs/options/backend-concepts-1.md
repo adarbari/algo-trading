@@ -424,8 +424,8 @@ over the trade contract (2.5a):
   - **Point in time:** the canonical run's `range_to <= S` and only trades with `exit_session <= S`
     (ADR 0083's bounds); a past-session test.
   - **Two slices (G-M3).** The stop rests on the verdict's basis (`basis_screener`,
-    `basis_horizon`), which `results/edge_verdict` does not store yet (`edge_schemas.py:308-321`;
-    ADR 0083 decision 2 adds them with a `JUDGE_VERSION` bump, the trader-site track's Ideas slice,
+    `basis_horizon`), which `results/edge_verdict` stores since T-basis (`edge_schemas.py`;
+    ADR 0083 decision 2 added them with a `JUDGE_VERSION` bump, the trader-site track's Ideas slice,
     "T-basis" below). **E12a, shares** reads `edge_trades.max_drawdown` (exists) and needs only
     T-basis and E2's folder: it is the trader-site track's exit-rule slice (one PR, never twice) and
     waits on nothing in the option engine. **E12b, options** reads v2 `max_adverse` and the declared

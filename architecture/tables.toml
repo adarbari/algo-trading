@@ -711,7 +711,7 @@ name = "results/edge_verdict"
 owner = "src/algotrade/storage/tables/result_writer.py"
 also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/edges/verdicts.py"]
 per_session = false
-note = "the stored headline of a site edge's verdict (ADR 0053 amendment 2026-10-22): one row per (edge, judged run, fingerprint) with the label, one-line result, basis, trades and lift of the canonical run, no haircut; partition = the judged run's range end, runs merge per key, knowledge_ts = the write instant; framed only by services/evaluation/cross_section/detail/verdict.py from the one judge and written in the edge-eval run's publish (and by the edge-verdicts task), read only by services/read/evaluation/verdict/stored.py, which uses a row only when its fingerprint matches and judges live otherwise; ML never writes it"
+note = "the stored headline of a site edge's verdict (ADR 0053 amendment 2026-10-22): one row per (edge, judged run, fingerprint) with the label, one-line result, basis (in words, and as `basis_screener` + `basis_horizon`, ADR 0083 d2), trades and lift of the canonical run, no haircut; partition = the judged run's range end, runs merge per key, knowledge_ts = the write instant; framed only by services/evaluation/cross_section/detail/verdict.py from the one judge and written in the edge-eval run's publish (and by the edge-verdicts task), read only by services/read/evaluation/verdict/stored.py, which uses a row only when its fingerprint matches and judges live otherwise; ML never writes it"
 
 [[table]]
 name = "results/edge_picks"

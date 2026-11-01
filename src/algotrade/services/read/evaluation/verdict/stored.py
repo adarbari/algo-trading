@@ -40,6 +40,7 @@ def _summary(edge_id: str, row: dict[str, Any]) -> EdgeSummary:
     row that does not decode (the caller then judges live)."""
     trades, oos_trades = _none(row["trades"]), _none(row["oos_trades"])
     lift, lift_pts = _none(row["lift"]), _none(row["lift_pts"])
+    horizon = _none(row.get("basis_horizon"))
     verdict, result = row["verdict"], row["result"]
     if not isinstance(verdict, str) or not isinstance(result, str) or not verdict:
         raise TypeError("a stored verdict row without its level or result")
@@ -52,6 +53,8 @@ def _summary(edge_id: str, row: dict[str, Any]) -> EdgeSummary:
         None if oos_trades is None else int(oos_trades),
         None if lift is None else float(lift),
         None if lift_pts is None else float(lift_pts),
+        _none(row.get("basis_screener")),
+        None if horizon is None else int(horizon),
     )
 
 
