@@ -1,4 +1,4 @@
-"""``market_conditions@v1``: the market a setup enters, one ``MKT:US`` row per session (ADR 0088,
+"""``market_conditions@v2``: the market a setup enters, one ``MKT:US`` row per session (ADR 0088,
 design section 2.1): the VIX-family statistics, the dimension states D1-D11 as open ``_on``
 verdicts, the stand-aside verdict ``short_premium_allowed``, the 10-year yield change, the
 share of the universe about to report and the calendar distances. A **leaf** group: nothing in
@@ -29,8 +29,11 @@ reason names the condition ("the VIX curve is inverted"), never a value.
 
 A verdict is null (UNKNOWN) when an input it needs is null; the Kleene helpers of
 ``indicators`` (``compare``, ``either``, ``both``) combine them. The thresholds are ``Params``
-(``config/site/rollups.toml ["market_conditions@v1"]``); changing one is
-``market_conditions@v2``.
+(``config/site/rollups.toml ["market_conditions@v2"]``); changing one is
+``market_conditions@v3``.
+
+v2 added ``realised_corr_ratio_21`` (design D6, ``dispersion``) to v1's columns; v1 was never
+stored, so there is no v1 table to supersede.
 """
 
 from dataclasses import dataclass
@@ -51,12 +54,16 @@ from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.corporate import earnings_expected
 from algotrade.features.rollups.market import indicators, trend
+from algotrade.features.rollups.market.edges.dispersion import CLOSES, mean_member_vol
 from algotrade.features.rollups.market.indicators import Verdict, both, compare, either
 from algotrade.features.rollups.market.macro import MACRO
 from algotrade.features.rollups.market.observations import Series, as_series, fresh
 
 NAME = "market_conditions"
-VERSION = 1
+VERSION = 2
+BARS = "bars/1d"
+UNIVERSE = "universe"
+REFERENCE = "instruments/reference"
 TREASURY_10Y = "rates/treasury_10y"  # the 10-year par yield of each stored curve, by curve date
 RELEASES = "events/macro_release"
 MAX_AGE_SESSIONS = 3  # the newest VIX observation older than this is stale
@@ -89,12 +96,15 @@ class Params:
     )
     vvix_high_above: float = 110.0  # D11: VVIX above this is high
     stress_at: float = 35.0  # R-A: VIX at or above this is the STRESS band (as ``vix_band``)
+    corr_min_members: int = 50  # D6: complete stocks the mean member volatility needs
 
     def __post_init__(self) -> None:
         if not 0 <= self.vix_low_pct < self.vix_high_pct <= 100:
             raise ValueError("need 0 <= vix_low_pct < vix_high_pct <= 100")
         if not 0 < self.recovery_off_high < 1:
             raise ValueError("recovery_off_high must be in (0, 1)")
+        if self.corr_min_members < 1:
+            raise ValueError("corr_min_members must be >= 1")
 
 
 D = Params()
@@ -354,6 +364,18 @@ FEATURES = (
         (_SEASON,),
         (0, 1),
     ),
+    _personal(
+        "realised_corr_ratio_21",
+        "float32",
+        "ratio",
+        "The S&P 500's realised volatility over the last 21 closes divided by the mean realised "
+        "volatility of its member stocks over the same closes: near 1 when the names move "
+        "together, low (0.3 or less) when they move apart (high dispersion)",
+        "the S&P 500 realised volatility is unknown, or fewer than 50 stocks have a bar on "
+        "each of the last 21 sessions, or no universe or reference snapshot is known",
+        (_RV, f"{BARS}.close", f"{UNIVERSE}.instrument_id", f"{REFERENCE}.in_sp500"),
+        (0, 5),
+    ),
     _open(
         "sessions_to_fomc",
         "int",
@@ -600,9 +622,24 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     row["vix_obs_date"] = obs_date
     row["y10_chg_63d"] = y10
     row.update(states)
+    row["realised_corr_ratio_21"] = corr_ratio(
+        _row_on(trend_rows, "spx_realised_vol_20d", session),
+        mean_member_vol(
+            inputs.get(UNIVERSE),
+            inputs.get(REFERENCE),
+            inputs.get(BARS),
+            session,
+            params.corr_min_members,
+        ),
+    )
     row["earnings_season_share"] = season_share(inputs.get(earnings_expected.GROUP.table))
     row.update(calendar_columns(inputs.get(RELEASES), session))
     return pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
+
+
+def corr_ratio(index_vol: float, member_vol: float) -> float:
+    """Index over mean member volatility (NaN when either is unknown or the members are flat)."""
+    return index_vol / member_vol if member_vol > 0 else np.nan
 
 
 def _lookback(p: Params) -> int:
@@ -622,6 +659,9 @@ GROUP = FeatureGroup(
         Input(TREASURY_10Y, lookback=YIELD_SESSIONS + 5, required=False),
         Input(RELEASES, lookback=0, required=False),
         Input(earnings_expected.GROUP.table, lookback=_lookback, required=False),
+        Input(BARS, lookback=CLOSES - 1, required=False),
+        Input(UNIVERSE, required=False),
+        Input(REFERENCE, required=False),
     ),
     FEATURES,
     compute,

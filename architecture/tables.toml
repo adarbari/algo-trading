@@ -640,9 +640,9 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "ADR 0075, ADR 0088: the VIX spike and post-spike contango triggers of the on_market time-series edges, from FRED VIXCLS and VXVCLS (personal licence); v2 added the post-spike columns, v1 rows on the owner's store are superseded and read by nothing (backfill v2 with market-rollups --only market_triggers@v2 before the edges run, then delete v1 by hand)"
 
 [[table]]
-name = "rollups/market/market_conditions@v1"
+name = "rollups/market/market_conditions@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
-note = "ADR 0088: the market a setup enters (a leaf nothing in the headline regime reads): VIX-family statistics (personal licence), the open _on verdicts and short_premium_allowed, the 10-year yield change, earnings_season_share and the calendar distances; backfilled from the VIX series' start with market-rollups --only market_conditions@v1"
+note = "ADR 0088: the market a setup enters (a leaf nothing in the headline regime reads): VIX-family statistics (personal licence), the open _on verdicts and short_premium_allowed, the 10-year yield change, earnings_season_share and the calendar distances; backfilled from the VIX series' start with market-rollups --only market_conditions@v2"
 
 [[table]]
 name = "rollups/market/regime_indicators@v1"

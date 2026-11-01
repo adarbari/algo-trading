@@ -651,7 +651,7 @@ STATEMENTS_ACCEPTED = f"{STATEMENTS}_accepted"
 STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
 REFERENCE_FACTS = (
     "instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse", "cik",
-    "share_class_figi",
+    "share_class_figi", "in_sp500",
 )  # fmt: skip
 
 

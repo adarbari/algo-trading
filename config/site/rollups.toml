@@ -206,7 +206,7 @@ spx_trend_below = 0.0        # the S&P 500 below its 200-day mean
 vix_term_above = 1.0         # VIX above VIX3M (backwardation)
 breadth_below = 0.40         # fewer than 40% of the universe above their 200-day mean
 
-["market_conditions@v1"]     # the market a setup enters (ADR 0088; research-options-regimes.md section 1)
+["market_conditions@v2"]     # the market a setup enters (ADR 0088; research-options-regimes.md section 1)
 contango_below = 0.95        # D2: VIX / VIX3M below this is contango
 backwardation_at = 1.0       # D2: VIX / VIX3M at or above this is backwardation (= the vix_term card)
 kink_at = 1.0                # D2: VIX9D / VIX at or above this is a front kink
@@ -218,6 +218,7 @@ recovery_off_high = 0.25     # D7: VIX at least this far below its 20-observatio
 rate_shock_at = 0.005        # D8: the 10-year yield up this much (50 bp) over 63 sessions
 vvix_high_above = 110.0      # D11: VVIX above this is high
 stress_at = 35.0             # R-A: VIX at or above this is the STRESS band (as vix_band's stress_at)
+corr_min_members = 50        # D6: complete stocks the mean member volatility of realised_corr_ratio_21 needs
 
 ["regime@v3"]                # the regime scores and label (plan section 4: the macro tiers and the
                              # curve's memory set on the 1971-2026 episode scorecard, the measured

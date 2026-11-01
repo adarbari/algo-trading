@@ -266,6 +266,19 @@ the figure describes the names the calendar covers. It is unknown when no name h
 see_also = ["in_opex_week"]
 
 [[term]]
+id = "realised_corr_ratio_21"
+term = "Realised correlation ratio"
+short = "The S&P 500's realised volatility divided by the average realised volatility of its stocks, over the last 21 closes."
+body = """
+Near 1 means the stocks move together, as in a sell-off. Near 0.3 or less means they move apart, so
+the index is quiet while single names are wild. The figure is unknown when fewer than 50 members
+have all 21 closes. The stock list is the S&P 500 members in the session's snapshot, so it is
+unknown before the first snapshot. Check it beside the VIX before reading a calm index as a calm
+market.
+"""
+see_also = ["index_vrp_rich_on", "vix"]
+
+[[term]]
 id = "sessions_to_fomc"
 term = "Sessions to FOMC"
 short = "How many sessions until the next Federal Reserve rate decision known by the session; 0 means today."
