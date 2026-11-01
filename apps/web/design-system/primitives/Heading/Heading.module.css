@@ -1,7 +1,7 @@
 /* Heading: semibold section titles from tokens. Data attributes set by Heading.tsx. */
 .heading {
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
   font-feature-settings: var(--font-features);
   font-variant-numeric: tabular-nums;

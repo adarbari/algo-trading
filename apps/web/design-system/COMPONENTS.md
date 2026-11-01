@@ -72,7 +72,7 @@ Source: `design-system/primitives/Heading`
 
 ### Mono
 
-Mono: IBM Plex Mono for tickers, contract symbols, ids, hashes and code. `code` marks it up as code; otherwise a span. Size, weight and tone as Text.
+Mono: DM Mono for tickers, contract symbols, ids, hashes and code. `code` marks it up as code; otherwise a span. Size, weight and tone as Text.
 
 Source: `design-system/primitives/Mono`
 
