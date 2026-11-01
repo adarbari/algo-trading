@@ -98,10 +98,16 @@ DIGESTS: dict[str, tuple[str, str]] = {  # (edge_eval, ledger), computed on orig
     "long_short": ("2f02dfade59107a7", "5625c55ec76c7220"),
     "hit_target": ("4fa2a61dac328851", "ab73369e4bc0aff1"),
     "expires_otm": ("22d2faaee8d62085", "d92e6cd61083351c"),
-    "option_pnl": ("3fbfc5c8a5dc6315", "fb1b98343b50af6b"),
+    "option_pnl": ("3fbfc5c8a5dc6315", "5bceadef7c7c768b"),
     "pair_spread": ("8d8b92b65a0090dc", "1ace53a0cd9957fb"),
     "portfolio_return": ("320e2349658aa2b8", "empty"),  # a book has no ledger rows
 }
+
+
+def _ledger_columns(name: str) -> list[str]:
+    """The ledger columns of origin/main; an option trade's ``exit_session`` is now its own
+    (stored, ADR 0088 2.5a), not S + h sessions, so it is left out of that edge's digest."""
+    return [c for c in LEDGER if not (name == "option_pnl" and c == "exit_session")]
 
 
 def _digests(evaluations: dict[str, EdgeEvaluation]) -> dict[str, tuple[str, str]]:
@@ -110,7 +116,7 @@ def _digests(evaluations: dict[str, EdgeEvaluation]) -> dict[str, tuple[str, str
         ledger = trades_frame(ev, "r", AS_OF)
         got[name] = (
             _digest(edge_eval_frame(ev, "r", AS_OF)),
-            _digest(ledger, LEDGER) if len(ledger) else "empty",
+            _digest(ledger, _ledger_columns(name)) if len(ledger) else "empty",
         )
     return got
 
