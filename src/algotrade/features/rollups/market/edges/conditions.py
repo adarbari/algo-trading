@@ -36,7 +36,7 @@ v2 added ``realised_corr_ratio_21`` (design D6, ``dispersion``) to v1's columns;
 stored, so there is no v1 table to supersede.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date, timedelta
 from typing import Any
 
@@ -88,36 +88,18 @@ FOMC_KEY = "FOMC"
 
 
 @dataclass(frozen=True)
-class Params:
-    """The verdict thresholds (research-options-regimes.md section 1, dimensions D1-D11)."""
+class Params(Bands):
+    """The verdict thresholds (research-options-regimes.md section 1, dimensions D1-D11): the
+    label bands of ``labels.Bands`` (contango, backwardation, rich vol, low VIX, stress, ...)
+    plus the thresholds only a verdict reads."""
 
-    contango_below: float = 0.95  # D2: VIX / VIX3M below this is contango
-    backwardation_at: float = 1.0  # D2: VIX / VIX3M at or above this is backwardation
     kink_at: float = 1.0  # D2: VIX9D / VIX at or above this is a front kink
-    vrp_rich_at: float = 4.0  # D3: VIX minus realised vol, points, at or above: rich
-    vrp_cheap_below: float = 0.0  # D3: ... below this: cheap
-    vix_low_pct: float = 20.0  # D1: VIX percentile of its last 252 observations below: low
-    vix_high_pct: float = 80.0  # D1: ... above: high
+    vrp_cheap_below: float = 0.0  # D3: VIX minus realised vol below this: cheap
+    vix_high_pct: float = 80.0  # D1: VIX percentile of its last 252 observations above: high
     recovery_off_high: float = 0.25  # D7: VIX at least this far below its 20-observation high
-    rate_shock_at: float = (
-        0.005  # D8: the 10-year yield up this much (decimal: 50 bp) in 63 sessions
-    )
+    rate_shock_at: float = 0.005  # D8: the 10-year yield up this much (50 bp) in 63 sessions
     vvix_high_above: float = 110.0  # D11: VVIX above this is high
-    stress_at: float = 35.0  # R-A: VIX at or above this is the STRESS band (as ``vix_band``)
     corr_min_members: int = 50  # D6: complete stocks the mean member volatility needs
-    # The label bands (``labels.Bands``; ``stress_at`` above is shared):
-    calm_below: float = 25.0  # D1: VIX below this is CALM
-    near_trend: float = -0.05  # D4: above the 200-day mean, or no further below it than this
-    correction_lo: float = -0.15  # D4: a correction is a drawdown from this ...
-    correction_hi: float = -0.05  # ... to this
-    breadth_narrow: float = 0.50  # D5: fewer than this share above their 200-day mean
-    breadth_bear: float = 0.30  # D5: fewer than this share in a bear trend
-    corr_low: float = 0.30  # D6: the realised correlation ratio below this is dispersion
-    backwardation_days: int = 10  # R6: inverted for this many closes; R7: fewer
-    spike_chg: float = 0.40  # R7: VIX up this much over 5 observations
-    thin_vrp: float = 2.0  # R2: VIX minus realised volatility below this is thin
-    season_share: float = 0.15  # R9: this share of names about to report
-    fomc_days: int = 5  # R10: an FOMC decision within this many sessions
 
     def __post_init__(self) -> None:
         if not 0 <= self.vix_low_pct < self.vix_high_pct <= 100:
@@ -131,16 +113,7 @@ class Params:
 
     def bands(self) -> Bands:
         """The label thresholds of these parameters."""
-        return Bands(
-            calm_below=self.calm_below, stress_at=self.stress_at, near_trend=self.near_trend,
-            correction_lo=self.correction_lo, correction_hi=self.correction_hi,
-            breadth_narrow=self.breadth_narrow, breadth_bear=self.breadth_bear,
-            corr_low=self.corr_low, backwardation_days=self.backwardation_days,
-            spike_chg=self.spike_chg, thin_vrp=self.thin_vrp, season_share=self.season_share,
-            fomc_days=self.fomc_days, contango_below=self.contango_below,
-            backwardation_at=self.backwardation_at, vrp_rich_at=self.vrp_rich_at,
-            vix_low_pct=self.vix_low_pct,
-        )  # fmt: skip
+        return Bands(**{f.name: getattr(self, f.name) for f in fields(Bands)})
 
 
 D = Params()
