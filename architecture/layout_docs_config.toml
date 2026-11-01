@@ -250,5 +250,9 @@ path = "docs/edge-ideas"
 purpose = "the edge idea catalogue: researched hypotheses not yet filed as edge documents, one page per family with evidence, data needs and a verdict, and the index ranking them (docs/edges-plan.md quality bar; an idea becomes config/site/edges/<id>/edge.toml when it is picked up)"
 
 [[docs_dir]]
+path = "docs/edge-evidence"
+purpose = "hand-written inputs to the edge evidence rules: the per-setup research table (paper, sample period, rule, match, variants, independent out-of-sample decisions) behind the post-publication basis of the ADR 0065 amendment 2026-10-25"
+
+[[docs_dir]]
 path = "docs/drafting"
 purpose = "the text-model drafting ('Describe it') plans and specs (ADR 0041)"
