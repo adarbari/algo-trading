@@ -11,7 +11,7 @@ series' instrument id (``MACRO:<KEY>`` / ``IDX:<KEY>``) comes from ``kind`` and 
 
 import re
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
@@ -128,6 +128,20 @@ class MacroSettings:
         if found is None:
             raise KeyError(f"no series {key!r} in {WHERE}")
         return found
+
+    @classmethod
+    def from_documents(
+        cls, main: Mapping[str, Any] | None, families: Sequence[Mapping[str, Any] | None]
+    ) -> "MacroSettings":
+        """``main`` (``macro.toml``) with the ``[[series]]`` of each family file after its own."""
+        series = list((main or {}).get("series") or [])
+        for family in families:
+            Table(family, "series/*.toml").only(("series",))
+            extra = (family or {}).get("series") or []
+            if not isinstance(extra, list):
+                raise ConfigurationError("series/*.toml series: expected a list of tables")
+            series += extra
+        return cls.from_document({**(main or {}), "series": series} if series else main)
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "MacroSettings":

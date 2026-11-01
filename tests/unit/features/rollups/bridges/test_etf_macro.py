@@ -9,14 +9,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from algotrade.config.site.macro import MacroSettings
+from algotrade.config.site.settings import load_macro
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import feature_inputs as inputs
 from algotrade.features.rollups.bridges import etf_macro as em
 from algotrade.features.rollups.bridges import etf_map
+from algotrade.storage.configs.files import FileConfigStore
 from tests.helpers.rollup_store import END, store
 from tests.helpers.stored_frames import stamped
-from tests.unit.config.site.test_settings import site
 
 D = em.D
 REPO = Path(__file__).resolve().parents[5]
@@ -191,7 +191,7 @@ def test_the_map_is_pinned_to_the_version() -> None:
 
 
 def test_licences_and_staleness_classes_follow_macro_toml() -> None:
-    settings = MacroSettings.from_document(site("macro"))
+    settings = load_macro(FileConfigStore(REPO / "config", local=False))
     by_key = {s.key: s for s in settings.series}
     personal = {k for k, s in by_key.items() if s.licence == "personal"}
     used = {u.key for u in em.USES.values()}
