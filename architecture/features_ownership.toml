@@ -68,6 +68,17 @@ section = "docs/data/vendors.md#what-reads-it-filing-text-similarity-eb-f-pr-1"
 detect = [{ call = "compare_filings" }]
 
 [[responsibility]]
+id = "option-band-pick"
+description = "The one pick of a short option at a delta band and an expiry bucket (features/rollups/premium/band_pick.py): the listed expiry nearest a target within 30% of it and distinct across buckets, the strike chosen by wing_search.select_legs with our own delta (the wings' convention, solved once per pool), a miss as ILLIQUID or NO_STRIKE, and the figures of the sold option from quant.options.premium. The option grid (services/read/options/grid.py) and short_premium@v1 both call it, so a list and the grid never disagree; neither re-implements a picker"
+owner = ["src/algotrade/features/rollups/premium/band_pick.py"]
+allowed = [
+    "src/algotrade/features/rollups/premium/short_premium.py",  # the group: picks the 30-day expiry and the 0.20 band through it
+    "src/algotrade/services/read/options/grid.py",  # the grid: every bucket and band through it
+]
+section = "docs/ui/evening-desk-plan.md#4-data-gaps-each-inside-the-slice-that-needs-it"
+detect = [{ call = "pick_band" }, { call = "pick_expiry" }, { call = "bucket_expiries" }]
+
+[[responsibility]]
 id = "rollup-computation"
 description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0055), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity. The earnings report window (the E-1 to E+1 excess return, pre-event ADV and volume ratio) is computed once, in earnings_reaction@v2 (corporate/); EV2's event_reaction@v1 must read that group, never recompute the window. The earnings surprise (the reported EPS against the calendar's consensus forecast, computed from the two numbers, never the vendor's value, which is used only to detect a lost sign) is computed once, in earnings_surprise@v1, and the revision of the next report's forecast across the nightly snapshots (same fiscal quarter, carried-forward rows not observations) once, in earnings_revisions@v1 (both in consensus/); the analyst estimates (FY1 / FY2 from the fiscal year end of the last annual report known) and price targets of our own FMP snapshots, else Yahoo's per name (ADR 0080: one vendor per name and kind, chosen once in consensus/analyst_status.py), once each, in analyst_estimates@v2 and analyst_targets@v2 (consensus/), the analysts' strong buy to strong sell counts, mean rating and its 90-day change of our own Finnhub snapshots, else Yahoo's per name (ADR 0080), once in analyst_ratings@v2, and the revisions of the FY1 consensus (same fiscal year end, from the newest snapshot's day) once in analyst_revisions@v3 (both in consensus/); their population and status rules (OK, STALE, NOT_COVERED, NOT_FETCHED; per vendor) and the window of an earlier snapshot once in consensus/analyst_status.py"
 owner = [

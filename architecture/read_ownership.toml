@@ -212,6 +212,13 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "load_known_coverage" }]
 
 [[responsibility]]
+id = "option-grid-read"
+description = "The option grid of an underlying for the session (services/read/options/grid.py, ADR 0083 amendment 2026-11-01, plan V6): puts and calls at our delta bands (0.10 to 0.30) and expiry buckets (about 7, 14, 30, 45, 60, 90 days), each cell derived figures only (our mid, delta and IV, return on collateral, yield a year, breakeven, the chance below the strike, spread as a share of the mid, open interest), never a vendor bid, ask, last or size; read from exactly the session's chain, spot and Treasury curve (no chain or rate partition is NO_PARTITION, never r = 0); a gap an Unknown (NO_ROW, NOT_APPLICABLE, ILLIQUID), a report inside the expiry from the next report date by catalogue name (UNKNOWN, never False, when not known) and the IV rank from iv_history@v2 (UNKNOWN until its history is long enough). Picking and the figures are option-band-pick"
+owner = ["src/algotrade/services/read/options/grid.py"]
+section = "docs/api/read-model.md#graphql-conventions"
+detect = [{ call = "load_option_grid" }]
+
+[[responsibility]]
 id = "pick-positions"
 description = "The position a setup publishes for a pick (services/read/evaluation/positions/, ADR 0083 decision 3, ADR 0088): its historical exit rule, the 80th percentile of the max_drawdown of the verdict basis's winning long trades in the canonical run (read through runs.load_run_trades only, canonical run ending by the session, trades that exited by it), the 2 x ATR(14) fallback below [exit_rule] min_winners, a setup's declared stop published as it is, the hold the verdict's basis_horizon; UNKNOWN with its reason, never filled; the example position joins in E9"
 owner = ["src/algotrade/services/read/evaluation/positions/exit_rule.py"]
