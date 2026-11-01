@@ -47,6 +47,13 @@ type AheadEvent {
   sourceUrl: String
 }
 
+"""Another setup that picked the ticker, at its `place` there"""
+type AlsoIn {
+  edgeId: String!
+  edgeName: String!
+  place: Int!
+}
+
 """
 The theme the user chose: `light`, `dark` or `system` (the device decides); `system` when nothing valid is stored
 """
@@ -2276,6 +2283,12 @@ type IdeaScreener {
   withheld: Boolean!
 }
 
+"""An Ideas tab: Stocks (share setups) or Premium (option setups)"""
+enum IdeaTab {
+  STOCKS
+  PREMIUM
+}
+
 """
 The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
 """
@@ -2490,6 +2503,12 @@ type LadderRung {
   spans: [AheadEvent!]!
   clear: Boolean!
   marked: Boolean!
+}
+
+"""Setups (or, for `licence`, picks) left out of the list for `kind`"""
+type LeftOut {
+  kind: String!
+  count: Int!
 }
 
 """
@@ -2863,6 +2882,33 @@ type Quantile {
 """Reads for the web app, each for one session (ADR 0036)"""
 type Query {
   """
+  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list before it is paged: `total` then counts the ideas that pass, `facets` the counts (ADR 0082); a cursor is only good for the filters it was issued under. `tab` keeps the screeners of that tab (the Unproven section of `setupIdeas`, ADR 0083); none: every screener. Null: nothing stored
+  """
+  ideas(
+    first: Int! = 50
+    after: String = null
+    filters: [FilterInput!] = null
+    tab: IdeaTab = null
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Ideas
+
+  """
+  One Ideas tab (Stocks or Premium) for the session, built from the picks of the setups whose stored verdict is works or promising, one ranking rule, at most 15 (ADR 0083 decision 2): the setups with what each picked, the ideas, and the setups and picks left out by kind. `state` unproven: no setup of the tab qualifies, the page shows `ideas(tab)` as Unproven. Null: nothing stored
+  """
+  setupIdeas(
+    tab: IdeaTab!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): SetupIdeas
+
+  """
   Who this request is for: the signed-in registry user, their role and workspaces (ADR 0040; not session data)
   """
   viewer: Viewer!
@@ -2928,20 +2974,6 @@ type Query {
     """
     date: Date = null
   ): EventCalendar
-
-  """
-  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list before it is paged: `total` then counts the ideas that pass, `facets` the counts (ADR 0082); a cursor is only good for the filters it was issued under. Null: nothing stored
-  """
-  ideas(
-    first: Int! = 50
-    after: String = null
-    filters: [FilterInput!] = null
-
-    """
-    the session to read (default: the latest with bars); every value below is for exactly this date
-    """
-    date: Date = null
-  ): Ideas
 
   """
   The US market for the session: the market-entity features by catalogue name (ADR 0047). Null: nothing stored
@@ -3911,6 +3943,52 @@ type Session {
   How complete this session's data is (prices, option chains, fundamentals) and how many of the viewer's screeners it touches: for every viewer, from run records alone; a dataset with no record is UNKNOWN, never 0%
   """
   dataStatus: DataStatus!
+}
+
+"""
+A setup of the tab with what it picked tonight. `state`: picked, nothing_picked, not_a_decision_day or unknown (`unknown` says why: the night was not stored, never read as no picks); `picked`: its picks on the viewer's list before the cap, `shown`: the ideas under the cap that rank under it. `level` is the stored verdict (works or promising); the figures are labelled backtested (hypothetical) on the page
+"""
+type SetupGroup {
+  edgeId: String!
+  name: String!
+  level: String!
+  liftPts: Float
+  oosTrades: Int
+  basisScreener: String!
+  basisHorizon: Int
+  state: String!
+  unknown: Unknown
+  picked: Int!
+  shown: Int!
+}
+
+"""
+A ticker at its best pick: the setup it ranks under (`setupId`), its `place` there, the other setups that picked it, the stored `result` of that pick (null: its row could not be read) and its display `metrics` and `watchOut` ids
+"""
+type SetupIdea {
+  rank: Int!
+  instrumentId: String!
+  instrument: Instrument
+  setupId: String!
+  place: Int!
+  alsoIn: [AlsoIn!]!
+  result: ScreenResult
+  metrics: [IdeaMetric!]!
+  watchOut: [String!]!
+}
+
+"""
+The Ideas of one tab for the session. `state`: listed (a setup qualifies; a night that picks nothing is an empty list, never a fall back) or unproven (none does: the page shows `Query.ideas(tab)` as Unproven). `groups` the qualifying setups, strongest evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; `leftOut` counts by kind; `ruleVersion` the ranking rule's
+"""
+type SetupIdeas {
+  session: Date!
+  tab: IdeaTab!
+  state: String!
+  ruleVersion: Int!
+  groups: [SetupGroup!]!
+  ideas: [SetupIdea!]!
+  total: Int!
+  leftOut: [LeftOut!]!
 }
 
 """A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""

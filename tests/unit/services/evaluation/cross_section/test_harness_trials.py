@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from algotrade.config.edges.positions.key import position_key
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import next_session
@@ -32,7 +33,8 @@ from algotrade.services.evaluation.cross_section.harness import (
 from algotrade.services.evaluation.cross_section.legs.key import leg_key
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
-from tests.helpers.stored_frames import stamped
+from algotrade.storage.tables.schemas import STRUCTURE_PNL
+from tests.helpers.stored_frames import stamped, structure_pnl_row
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
@@ -391,31 +393,28 @@ def build_pair_without(rows_of: Any) -> World:
 
 CHAIN_OUTCOME = {
     "kind": "option_pnl", "horizon_sessions": [2], "benchmark": "none", "tenor_days": 30,
-    "structure": "atm_straddle_long", "start_offset_sessions": 1,
+    "position": "short_put", "strike_delta": 0.25, "start_offset_sessions": 1,
 }  # fmt: skip
 
 
 def _chain_row(iid: str, i: int, day: date) -> dict[str, Any]:
-    """Name i earns (i - 9.5)% of the stock on the mid, with a 0.2 half-spread at entry and exit."""
-    pnl = (i - 9.5) / 100
-    return {
-        "instrument_id": iid, "ts": datetime.combine(day, datetime.min.time(), UTC),
-        "structure": "atm_straddle", "tenor_days": 30, "horizon_sessions": 2,
-        "window_end": day + timedelta(days=2), "call_id": "C", "put_id": "P",
-        "expiry": day + timedelta(days=30), "strike": 100.0, "entry_spot": 100.0,
-        "entry_mid": 5.0, "entry_ask": 5.2, "exit_spot": 100.0, "exit_mid": 5.0 + 100 * pnl,
-        "exit_bid": 4.8 + 100 * pnl, "exit_kind": "QUOTE", "pnl_per_premium": pnl / 0.05,
-        "pnl_exec_per_premium": pnl / 0.05, "pnl_per_underlying": pnl,
-        "hedged_pnl_per_premium": pnl, "hedged_pnl_per_underlying": pnl,
-        "outcome_status": "COMPLETE", "outcome_reason": None,
-    }  # fmt: skip
+    """Name i earns (i - 9.5)% of the stock on the mid, with a 0.2 half-spread at entry and exit.
+    The sessions are before the first stored chain, so the rows are bought history (one source per
+    session, H6), whose licence is personal."""
+    key = position_key(edge(outcome=CHAIN_OUTCOME).outcome, 2)
+    return structure_pnl_row(
+        iid, key, day, hold=2, ts=datetime.combine(day, datetime.min.time(), UTC),
+        window_end=day + timedelta(days=2), price_source="option_history", licence="personal",
+        entry_spot=100.0, entry_half_spread=0.2, exit_half_spread=0.2, pnl_mid=i - 9.5,
+        option_pnl=i - 9.5,
+    )  # fmt: skip
 
 
 def _with_chain_outcomes(w: World) -> World:
     for day in [*DAYS, next_session(DAYS[-1])]:
         rows = [_chain_row(iid, i, day) for i, iid in enumerate(IDS)]
         frame = stamped(rows, day, f"cp-{day}")
-        w.writer.write_table("outcomes/option/structure_pnl@v1", day, f"cp-{day}", frame)
+        w.writer.write_table(STRUCTURE_PNL, day, f"cp-{day}", frame)
     return w
 
 
@@ -430,6 +429,7 @@ def test_an_option_pnl_edge_is_scored_on_the_chain_grain_net_of_the_quoted_sprea
     # the value is the P&L over the entry spot less the half-spreads (0.2 + 0.2 over 100)
     assert m.mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004)
     assert (m.sessions, m.picks, m.hits) == (4, 20, 20) and ev.unclosed_sessions == {2: 0}
+    assert r.licence == "personal"  # the trade rows are bought history: their licence is read
 
 
 def test_an_option_pnl_edge_with_no_chain_outcome_stored_is_missing_data() -> None:
@@ -445,10 +445,10 @@ def test_outcome_rows_recording_a_personal_licence_make_the_trial_personal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """ADR 0084 decision 1: the trial's licence includes the strictest licence of the outcome
-    rows of every entry session, recorded as ``evidence_licence``. No stored outcome table has a
-    ``licence`` column yet (``structure_pnl@v2``, E4, is the first), so the column read is
-    stood in for; it is made for every entry session, never only the ones a chunk reads, so a
-    run that reuses its stored legs keeps the licence."""
+    rows of every entry session, recorded as ``evidence_licence``. ``forward_returns@v2`` has no
+    ``licence`` column (its rows are open), so the read is stood in for; it is made for every
+    entry session, never only the ones a chunk reads, so a run that reuses its stored legs keeps
+    the licence."""
     asked: list[set[Any]] = []
 
     def tagged(reader: Any, chain: bool, sessions: Any, as_of: Any = None) -> list[Any]:

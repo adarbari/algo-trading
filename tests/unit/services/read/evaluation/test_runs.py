@@ -718,3 +718,25 @@ def test_run_of_record_is_the_run_the_reader_builds_without_a_store_read(
     built = run_of_record(record, edge, "site")
     assert built == load_canonical_run(ctx, edge).run
     assert built.trigger == "nightly" and built.after_session is False
+
+
+class _Committed:
+    """A committed run as ``load_canonical_run`` filters it."""
+
+    def __init__(self, run_id: str, after_session: bool) -> None:
+        self.run_id, self.exploratory, self.after_session = run_id, False, after_session
+
+
+def test_bounded_canonical_run_skips_a_run_committed_after_the_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0083 decision 2 (point in time): bounded, the newest run is skipped for the older one;
+    with only newer runs there is none."""
+    edge: Any = type("E", (), {"id": "e1", "frozen_from": date(2026, 1, 1)})()
+    found = [_Committed("new", True), _Committed("old", False)]
+    monkeypatch.setattr(runs_module, "_committed", lambda ctx, e, owner: found)
+    assert runs_module.load_canonical_run(None, edge).run.run_id == "new"  # type: ignore[arg-type, union-attr]
+    assert runs_module.load_canonical_run(None, edge, bounded=True).run.run_id == "old"  # type: ignore[arg-type, union-attr]
+    found[:] = [_Committed("new", True)]
+    only_newer = runs_module.load_canonical_run(None, edge, bounded=True)  # type: ignore[arg-type]
+    assert only_newer.run is None and only_newer.not_run is not None

@@ -11,7 +11,6 @@ import pytest
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.edges.positions.chain import grain_structure
 from algotrade.config.edges.positions.spec import ExitSettings, PositionSpec, check_edge
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
@@ -44,7 +43,7 @@ def test_a_position_round_trips() -> None:
 @pytest.mark.parametrize(
     ("changes", "match"),
     [
-        ({"structure": "put_short"}, "not with structure"),
+        ({"structure": "put_short"}, "names a position template"),
         ({"start_offset_sessions": 0}, "start_offset_sessions: the screen runs after"),
         ({"exit": {}}, "names none of"),
         ({"exit": {"take_profit": 1.5}}, "take_profit"),
@@ -135,10 +134,14 @@ def test_a_gate_is_parsed_but_refused_until_a_run_applies_it() -> None:
         parse_edge(document(gate={"all": []}), "drift", WHERE)
 
 
-def test_a_positioned_option_outcome_is_not_measured_as_another_structure() -> None:
-    o = parse_edge(put(), "drift", WHERE).outcome
-    with pytest.raises(ConfigurationError, match="not measured until the option engine"):
-        grain_structure(o.structure or "", o.strike_delta)
+def test_an_option_pnl_names_a_position_the_structure_enum_is_gone() -> None:
+    old = {k: v for k, v in PUT.items() if k not in ("position", "expiry_cycle", "exit")}
+    old |= {"structure": "put_short", "book": None, "skip_report_in_life": None}
+    with pytest.raises(ConfigurationError, match="names a position template"):
+        parse_edge(document(schedule="every_session", outcome={**old}), "drift", WHERE)
+    nothing = {k: v for k, v in old.items() if k != "structure"}
+    with pytest.raises(ConfigurationError, match="position: required for an option_pnl"):
+        parse_edge(document(schedule="every_session", outcome=nothing), "drift", WHERE)
 
 
 def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> None:

@@ -58,13 +58,14 @@ def _summary(edge_id: str, row: dict[str, Any]) -> EdgeSummary:
     )
 
 
-def load_stored_summary(ctx: Stores, edge: Edge) -> EdgeSummary | None:
+def load_stored_summary(ctx: Stores, edge: Edge, bounded: bool = False) -> EdgeSummary | None:
     """The stored headline of ``edge``'s canonical run, or None: judge live. None for an own
     edge or hidden copy, a run that is missing or has its out-of-sample result hidden, a row that
-    is absent, whose fingerprint differs, or that cannot be read or decoded."""
+    is absent, whose fingerprint differs, or that cannot be read or decoded. ``bounded``: the
+    canonical run is the latest committed on or before the session (``load_canonical_run``)."""
     if edge.mine:
         return None  # a user's own edge and a hidden copy are always judged live
-    run = runs.load_canonical_run(ctx, edge).run  # memoised per request
+    run = runs.load_canonical_run(ctx, edge, bounded).run  # memoised per request
     if run is None or run.oos_hidden:
         return None  # the live path answers "no run" cheaply
     try:  # anything that can raise (the digest, the hash, the read, the decode) is a miss
