@@ -1,0 +1,317 @@
+# L3 site setting: the Guide glossary of the market conditions (ADR 0051, ADR 0088): one [[term]]
+# for every column of market_conditions@v1 (config: features/rollups/market/edges/conditions.py),
+# shown by the help button where a setup's gate or slice names the column. A reason never gives a
+# VIX figure (the personal-use values); a verdict is our own aggregate. Typed by
+# src/algotrade/config/site/guide/glossary.py.
+
+[[term]]
+id = "vix"
+term = "Cboe VIX index"
+short = "The market's expected move of the S&P 500 over the next 30 days, in percent a year."
+body = """
+The VIX is the Cboe index of 30-day implied volatility on the S&P 500. A reading of 20 means options
+price a yearly pace of 20%, and 12 is calm while 35 is stress. The value is the close on the VIX
+observation date, which is the previous session's close. It is unknown when the newest close is more
+than 3 sessions old.
+"""
+see_also = ["vix_obs_date", "vix_pct_252", "vix3m"]
+
+[[term]]
+id = "vix3m"
+term = "VIX3M"
+short = "The market's expected move of the S&P 500 over the next 3 months, in percent a year."
+body = """
+VIX3M is the Cboe index of 3-month implied volatility on the S&P 500. The VIX divided by it is the
+slope of the volatility curve: below 1 slopes up, above 1 is inverted. It is the close on the shared
+date, and unknown when it has none.
+"""
+see_also = ["vix", "vix_contango_on", "backwardation_run"]
+
+[[term]]
+id = "vix9d"
+term = "VIX9D"
+short = "The market's expected move of the S&P 500 over the next 9 days, in percent a year."
+body = """
+VIX9D is the Cboe index of 9-day implied volatility on the S&P 500. A reading of 20 means options
+price a yearly pace of 20%. It starts in 2011, so it is unknown before then. The figure is the close
+on the same date as the VIX the other columns use, never an older close. Compare it with the VIX to
+see whether the next week is priced as calmer or rougher than the next month.
+"""
+see_also = ["vix_front_kink_on", "vix_obs_date"]
+
+[[term]]
+id = "vix6m"
+term = "VIX6M"
+short = "The market's expected move of the S&P 500 over the next 6 months, in percent a year."
+body = """
+VIX6M is the Cboe index of 6-month implied volatility on the S&P 500, read the same way as the VIX.
+It starts in 2008, so it is unknown before then. It is the close on the shared date. A reading well
+above the VIX says the market expects calm now and more movement later.
+"""
+see_also = ["vix_obs_date", "vix_contango_on"]
+
+[[term]]
+id = "vvix"
+term = "VVIX"
+short = "How much the VIX itself is expected to move, as a Cboe index."
+body = """
+VVIX measures the implied volatility of options on the VIX. A reading near 80 is quiet, near 110 is
+high, and a spike usually comes with a fall in the S&P 500. It starts in 2006, so it is unknown
+before then. It is the close on the shared date. A high VVIX means the VIX itself can jump, which
+makes short-volatility trades riskier.
+"""
+see_also = ["vvix_high_on", "vvix_pct_252"]
+
+[[term]]
+id = "vix_obs_date"
+term = "VIX observation date"
+short = "The date of the VIX close that the other volatility columns share."
+body = """
+The VIX is published after the close, so the session sees the close of the day before. This column
+holds that date. Every VIX-family column is the close on this exact date, and a series with no close
+on it is unknown, never filled from an earlier day. When the newest VIX close is more than 3
+sessions old, the whole group is unknown.
+"""
+see_also = ["vix9d", "vix6m", "vvix"]
+
+[[term]]
+id = "vix_pct_252"
+term = "VIX one-year percentile"
+short = "Where today's VIX ranks among its last 252 closes, from 0 (lowest) to 100 (highest)."
+body = """
+A reading of 10 means the VIX is lower than 90% of the closes in the past year; 90 means it is
+higher than 90% of them. The rank is unknown until 252 closes are known. A low rank can still be a
+high VIX in a stressed year, so read it with the VIX level and the one-year median.
+"""
+see_also = ["vix_low_on", "vix_high_on", "vix_median_252"]
+
+[[term]]
+id = "vix_median_252"
+term = "VIX one-year median"
+short = "The middle VIX close of the last 252 closes."
+body = """
+Half of the year's closes were below this level and half above. It is the baseline the post-spike
+recovery verdict compares the VIX with. It is unknown until 252 closes are known.
+"""
+see_also = ["post_spike_recovery_on", "vix_pct_252"]
+
+[[term]]
+id = "vix_high_20"
+term = "VIX 20-day high"
+short = "The highest VIX close of the last 20 closes."
+body = """
+It marks the top of the latest spike. The post-spike recovery verdict asks how far the VIX has
+fallen from it. It is unknown until 20 closes are known.
+"""
+see_also = ["post_spike_recovery_on"]
+
+[[term]]
+id = "vix_chg_5d"
+term = "VIX 5-day change"
+short = "The VIX close over its close five closes earlier, minus 1."
+body = """
+A value of 0.25 means the VIX rose 25% in five closes. The stand-aside verdict uses its sign: a
+rising VIX in the stress band under a falling market is a reason not to sell premium. It is unknown
+until six closes are known.
+"""
+see_also = ["short_premium_allowed"]
+
+[[term]]
+id = "backwardation_run"
+term = "Days in backwardation"
+short = "How many closes in a row the VIX has been at or above the 3-month VIX."
+body = """
+When the VIX sits above the 3-month VIX the curve is inverted: the market prices more movement now
+than later, which is how a sell-off looks. A count of 0 means the curve slopes up. The count is
+unknown when the 3-month VIX has no close on the shared date.
+"""
+see_also = ["vix_contango_on", "short_premium_allowed"]
+
+[[term]]
+id = "vvix_pct_252"
+term = "VVIX one-year percentile"
+short = "Where today's VVIX ranks among its last 252 closes, from 0 to 100."
+body = """
+It reads like the VIX one-year percentile but for the volatility of volatility. It is unknown until
+252 VVIX closes are known, and before the series starts in 2006.
+"""
+see_also = ["vvix", "vix_pct_252"]
+
+[[term]]
+id = "y10_chg_63d"
+term = "10-year yield change"
+short = "How far the 10-year Treasury yield moved in 63 sessions, as a fraction."
+body = """
+A value of 0.005 means the yield rose 50 basis points, half a percentage point, in about three
+months. Fast rises hurt bonds and long-duration stocks together. It is unknown when either end has
+no stored Treasury curve within 5 days, which includes dates before the curve history starts.
+"""
+see_also = ["rate_shock_on"]
+
+[[term]]
+id = "vix_contango_on"
+term = "VIX curve slopes up"
+short = "On when the VIX is below 95% of the 3-month VIX: options price calm now and more movement later."
+body = """
+This is the normal state of the market. Selling volatility has historically paid best here, because
+the premium collected is larger than the movement that follows. It is off when the curve is flat or
+inverted, and unknown when the 3-month VIX has no close on the shared date.
+"""
+see_also = ["backwardation_run", "short_premium_allowed"]
+
+[[term]]
+id = "vix_front_kink_on"
+term = "VIX front-end stress"
+short = "On when the 9-day VIX is at or above the 30-day VIX: the next week is priced as rough as the next month."
+body = """
+A kink at the short end often appears shortly before a known event or in the first days of a sell-
+off. It is off when the next week is priced calmer than the next month, and unknown before VIX9D
+starts in 2011.
+"""
+see_also = ["vix9d"]
+
+[[term]]
+id = "index_vrp_rich_on"
+term = "Index options rich"
+short = "On when the VIX is at least 4 points above the S&P 500's realised volatility of the last 20 sessions."
+body = """
+Options priced well above the movement that actually happened leave a margin for the seller. It is
+off below that margin, and unknown when realised volatility is unknown. The realised figure ends a
+day later than the VIX close, so the gap is approximate.
+"""
+see_also = ["index_vrp_cheap_on"]
+
+[[term]]
+id = "index_vrp_cheap_on"
+term = "Index options cheap"
+short = "On when the VIX is below the S&P 500's realised volatility of the last 20 sessions."
+body = """
+Options priced under the movement that actually happened offer the seller no margin. It also appears
+soon after a spike, when realised volatility still carries the shock, so the stand-aside verdict
+ignores it during a post-spike recovery. It is unknown when realised volatility is unknown.
+"""
+see_also = ["index_vrp_rich_on", "post_spike_recovery_on", "short_premium_allowed"]
+
+[[term]]
+id = "post_spike_recovery_on"
+term = "Volatility recovering"
+short = "On when the VIX is 25% or more below its 20-day high, the curve slopes up, and the VIX is above its one-year median."
+body = """
+It describes the weeks after a spike when fear is fading but not gone. Every part must hold, so it
+turns off when the curve inverts again. It is unknown until the one-year window is complete.
+"""
+see_also = ["vix_high_20", "vix_median_252", "vix_contango_on"]
+
+[[term]]
+id = "rate_shock_on"
+term = "Rates rising fast"
+short = "On when the 10-year yield rose 50 basis points or more in 63 sessions, or the yield curve has been inverted for about a month."
+body = """
+Either part is enough. 2022 is the clear case in the sample. It is off when neither holds, and
+unknown when the yield change is unknown and the curve verdict is off or unknown.
+"""
+see_also = ["y10_chg_63d"]
+
+[[term]]
+id = "vvix_high_on"
+term = "Volatility of volatility high"
+short = "On when VVIX is above 110."
+body = """
+A high VVIX means the VIX can jump in either direction, so a short-volatility position can lose
+fast. It is off at or below 110, and unknown before VVIX starts in 2006.
+"""
+see_also = ["vvix", "vvix_pct_252"]
+
+[[term]]
+id = "vix_low_on"
+term = "VIX low for the year"
+short = "On when the VIX ranks below the 20th percentile of its last 252 closes."
+body = """
+Low volatility pays sellers little and tends to precede a jump, so setups often skip it or size it
+differently. It is off at the 20th percentile or above, and unknown until 252 closes are known.
+"""
+see_also = ["vix_pct_252", "vix_high_on"]
+
+[[term]]
+id = "vix_high_on"
+term = "VIX high for the year"
+short = "On when the VIX ranks above the 80th percentile of its last 252 closes."
+body = """
+A high rank pays sellers more but marks a market under stress. It is off at the 80th percentile or
+below, and unknown until 252 closes are known.
+"""
+see_also = ["vix_pct_252", "vix_low_on"]
+
+[[term]]
+id = "short_premium_allowed"
+term = "Short premium allowed"
+short = "On when none of the three stand-aside signals holds for selling options: curve inverted, options cheap, or a falling market with rising VIX."
+body = """
+There are three signals. One: the VIX is at or above the 3-month VIX. Two: options are cheap against
+realised volatility outside a post-spike recovery. Three: the S&P 500 is below its 200-day mean and
+the VIX is rising in the stress band. Off means one holds. A setup that gates on this column skips
+that day. It is a market-wide state, not advice about a trade. It is unknown when a signal is
+unknown and none of the others is on.
+"""
+see_also = ["vix_contango_on", "index_vrp_cheap_on", "post_spike_recovery_on"]
+
+[[term]]
+id = "earnings_season_share"
+term = "Earnings season share"
+short = "The share of names with an expected report date that report within the next 10 sessions."
+body = """
+A value of 0.15 is about peak season. Names with no expected date are left out of both counts, so
+the figure describes the names the calendar covers. It is unknown when no name has an expected date.
+"""
+see_also = ["in_opex_week"]
+
+[[term]]
+id = "sessions_to_fomc"
+term = "Sessions to FOMC"
+short = "How many sessions until the next Federal Reserve rate decision known by the session; 0 means today."
+body = """
+The decision dates are published a year ahead. The column reads only dates already known on the
+session, so history never uses a date announced later. It is unknown when no future date is known.
+"""
+see_also = ["fomc_cycle_week"]
+
+[[term]]
+id = "fomc_cycle_week"
+term = "FOMC cycle week"
+short = "Whole weeks since the latest Federal Reserve rate decision; 0 is the decision's own week."
+body = """
+The Fed meets about every six weeks, so the value runs from 0 to about 6 and then restarts. Some
+setups skip the week before a decision. It is unknown when no earlier decision is known.
+"""
+see_also = ["sessions_to_fomc"]
+
+[[term]]
+id = "in_opex_week"
+term = "Monthly expiry week"
+short = "On when the session is one of the five sessions ending on the month's standard option expiry, the third Friday."
+body = """
+Expiry weeks carry heavier option trading and pinning around round strikes. The flag comes from the
+exchange calendar, so it is never unknown.
+"""
+see_also = ["last_before_weekend"]
+
+[[term]]
+id = "weekday"
+term = "Weekday"
+short = "The day of the week of the session: 0 is Monday and 4 is Friday."
+body = """
+A setup can gate on the weekday to avoid or choose days, such as skipping Fridays before a weekend.
+It comes from the calendar, so it is never unknown.
+"""
+see_also = ["last_before_weekend"]
+
+[[term]]
+id = "last_before_weekend"
+term = "Last session before a weekend"
+short = "On when the next session falls in a later week than this one."
+body = """
+It is usually a Friday, and a Thursday when a holiday closes the Friday. Time decay over the weekend
+works for a seller of options, which is why setups gate on it. It comes from the calendar, so it is
+never unknown.
+"""
+see_also = ["weekday", "in_opex_week"]

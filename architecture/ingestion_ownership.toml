@@ -338,6 +338,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the calendar (macro_calendar_future)
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
+    "src/algotrade/features/rollups/market/edges/conditions.py",  # names the feature input of the stored calendar (known_from <= session) for the FOMC distances (ADR 0088); reads only, the table's one writer stays macro/calendar.py
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
