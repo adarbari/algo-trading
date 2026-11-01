@@ -128,7 +128,7 @@ id = "return_on_collateral"
 term = "Return on collateral"
 short = "The premium over what backs the position: a put's premium over its strike, a call's over the share price."
 body = """
-A cash-secured put sets aside the strike price to buy the shares if they are assigned, so its premium is measured against that cash. A covered call is backed by the shares, so its premium is measured against the share price. It is a return for the whole period to the expiry, not a year.
+A cash-secured put sets aside the strike price to take the shares if they are assigned, so its premium is measured against that cash. A covered call is backed by the shares, so its premium is measured against the share price. It is a return for the whole period to the expiry, not a year.
 """
 see_also = ["yield_a_year"]
 
