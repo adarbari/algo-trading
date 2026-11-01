@@ -769,3 +769,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's words in chat, 2026-11-01: "Ideally anything delisted if the setup suggests buying them it is a problem we should pick any options which penalizes picking a delisted stock is traded" and "let us pull the data. we still have enough time to do it. Let us start the backfill immediately." Decisions 3 to 5 of the ADR stay open.
+
+## 2026-11-01 | Survivorship-free listing history (ADR 0087) | Decisions 3 to 5
+- Question: (3) hold the 2010 `outcomes` backfill and `evaluate-edges` until the backfills (PR3) are done; (4) ETF closures before 2016 stay out of the universe, disclosed; (5) Norgate Platinum ($630 a year, Personal Use licence)?
+- Options: as recommended in the ADR / the alternatives named there.
+- Decision: (3) hold, as recommended. (4) stay out, disclosed, as recommended. (5) not now, as recommended; at most an owner-only cross-check.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-11-01: "3 to 5 aligned with your suggestion."

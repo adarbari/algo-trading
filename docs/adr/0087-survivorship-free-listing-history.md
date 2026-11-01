@@ -1,6 +1,6 @@
 # ADR 0087: Survivorship-free listing history: Massive inactive tickers, delisting events and the delisting return
 
-**Status:** proposed (2026-10-24; owner decisions 1 and 2 taken 2026-11-01, 3 to 5 below open). Amends
+**Status:** proposed (2026-10-24; owner decisions 1 to 5 below taken 2026-11-01). Amends
 [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) ("Eligible names", the 2026-10-09
 amendment on historical eligibility, the DELISTED outcome), [0013](0013-universe.md) (the universe is
 survivors and the delisted alike), [0018](0018-figi-instrument-ids.md) (the id order for historic listings)
@@ -102,7 +102,7 @@ plan (ends 2026-11-09; the free tier would take about 20 months); SEC submission
 60 minutes, free; then the pending `outcomes` backfill from 2010 once (bars grow about 12%).
 
 ## Owner decisions
-Taken by the owner in the session's chat on 2026-11-01 (their words quoted):
+Taken by the owner in the session's chat on 2026-11-01:
 1. **Delisting return of a bankruptcy or listing-standards delisting with no OTC print: decided, option (a)**,
    the CRSP-style replacement, -30% NYSE / AMEX and -55% NASDAQ (Shumway 1997; Shumway and Warther 1999), the
    zero figure shown beside the verdict. Owner: "Ideally anything delisted if the setup suggests buying them it is
@@ -111,14 +111,12 @@ Taken by the owner in the session's chat on 2026-11-01 (their words quoted):
    Let us start the backfill immediately." The Massive list was started the same day. The Tiingo bars for the new
    ids need PR2's ids first, so they start when PR2 has merged; the Power plan ends 2026-11-09, and if PR2 and that
    pull cannot both finish before then, the renewal is raised again with the owner (it is not assumed either way).
-
-Still open (recommended answers; not yet taken):
-3. **Hold the 2010 `outcomes` backfill and `evaluate-edges` until PR3 is done** (recommended): otherwise the first
+3. **Hold the 2010 `outcomes` backfill and `evaluate-edges` until PR3 is done: decided, as recommended**: otherwise the first
    verdicts are survivor-tilted and are re-run.
-4. **ETF closures before 2016 stay out of the universe, disclosed** (matters only for ETF edges).
-5. **Norgate Platinum ($630 a year; delisted names to 1990, index history):** its licence is Personal Use only (no
+4. **ETF closures before 2016 stay out of the universe, disclosed: decided, as recommended** (matters only for ETF edges).
+5. **Norgate Platinum ($630 a year; delisted names to 1990, index history): decided, not now, as recommended.** Its licence is Personal Use only (no
    commercial use, no redistribution, derived data not stated to be showable to others), so it is not a source for
-   statistics shown to paying users. At most an owner-only cross-check; not now (recommended).
+   statistics shown to paying users. At most an owner-only cross-check.
 
 ## Consequences
 - Free sources only (Massive, EDGAR, Tiingo already held); no new paid dependency unless decision 5 changes.
