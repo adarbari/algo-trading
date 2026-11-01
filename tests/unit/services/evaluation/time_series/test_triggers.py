@@ -11,7 +11,7 @@ import pytest
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session, previous_session, sessions_between
 from algotrade.data import StoreReader
-from algotrade.features.rollups.market.triggers import NONE_SEEN
+from algotrade.features.rollups.market.edges.triggers import NONE_SEEN
 from algotrade.services.evaluation.time_series import triggers
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from algotrade.services.evaluation.time_series.periods import Period
