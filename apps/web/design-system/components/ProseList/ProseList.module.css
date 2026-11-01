@@ -24,3 +24,9 @@
 .item::marker {
   color: var(--color-muted);
 }
+
+/* A checklist: an empty box (a text glyph in the marker) before each line. */
+.list[data-marker='box'] {
+  padding-inline-start: var(--space-6);
+  list-style: '\2610\00a0\00a0';
+}

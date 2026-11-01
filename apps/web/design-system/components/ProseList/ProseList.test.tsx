@@ -22,6 +22,11 @@ describe('ProseList', () => {
     expect(screen.getByRole('list').tagName).toBe('OL');
   });
 
+  it('marks a checklist', () => {
+    render(<ProseList items={items} marker="box" />);
+    expect(screen.getByRole('list')).toHaveAttribute('data-marker', 'box');
+  });
+
   it('renders nothing without items', () => {
     const { container } = render(<ProseList items={[]} />);
     expect(container).toBeEmptyDOMElement();
