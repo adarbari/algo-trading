@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-729 stored features in 91 groups, in dependency order; 164 expression features.
+736 stored features in 93 groups, in dependency order; 164 expression features.
 
 ## `option_liquidity@v1`
 
@@ -128,6 +128,17 @@ How the last earnings report moved the price against SPY and the volume it drew,
 | `abs_move_max_8` | window | float32 | decimal | open | >= 0 | Largest absolute move (E-1 to E+1, raw) of the last 8 reports with a closed window: the worst surprise the name has had | no report known by the session has a closed window with both bars (abs_moves_counted is 0) | `bars/1d.close`, `events/earnings.ts` |
 | `signed_move_mean_8` | window | float32 | decimal | open | >= -1 | Mean signed move (E-1 to E+1, raw, a fall is negative) of the last 8 reports with a closed window: whether the name has tended to rise or fall on reports | no report known by the session has a closed window with both bars (abs_moves_counted is 0) | `bars/1d.close`, `events/earnings.ts` |
 | `up_moves_8` | window | int | count | open | 0 .. 8 | How many of the last 8 reports with a closed window moved the price up (E+1 close above E-1 close); abs_moves_counted minus this is the falls and flat ones | never (0 when no report has a closed window on the history) | `bars/1d.close`, `events/earnings.ts` |
+
+## `earnings_reaction_session@v1`
+
+The session the newest earnings report's price reaction lands on, from the report's time of day (before the open or after the close). Stored as `rollups/instrument/earnings_reaction_session@v1`; reads `events/earnings`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `reaction_session_status` | label | str | category | open | OK, PENDING, UNKNOWN_TIME | OK: the newest report's reaction session is known and has come; PENDING: it is after the session (an after-hours report made today); UNKNOWN_TIME: the calendar gave no before-open or after-close time for the report | never | `events/earnings.ts`, `events/earnings.time` |
+| `reaction_report_time` | label | str | category | open | pre_market, after_hours, unknown | The time of day the newest report was made, as the calendar row known by the session gave it: pre_market (before the open), after_hours (after the close) or unknown | never | `events/earnings.time` |
+| `reaction_session_date` | window | date | date | open |  | The session the newest report's price reaction happens on: the report's own session for a pre-market report, the next for an after-hours one | the newest report's reaction session is not yet here (PENDING) or its time is unknown | `events/earnings.ts`, `events/earnings.time` |
+| `sessions_since_reaction_session` | window | int | sessions | open | >= 0 | Exchange sessions from the newest report's reaction session up to the session (0: the session is that day) | the newest report's reaction session is not yet here (PENDING) or its time is unknown | `events/earnings.ts`, `events/earnings.time` |
 
 ## `earnings_schedule@v1`
 
@@ -495,6 +506,16 @@ Wilder ATR over 5 / 20, realised vol over 10 / 60, the hv20 and volume percentil
 | `adv_shares_60d` | window | float32 | shares | open | >= 0 | Mean share volume over the last 60 sessions, the session included | a session among the last 60 has no bar (a gap), or the history is shorter | `bars/1d.volume` |
 | `volume_pctile_252d` | window | float32 | decimal | open | 0 .. 1 | Share of the 252 sessions before the session whose share volume was strictly below the session's: 0.98 means only 2% of the year's sessions traded more | the session's volume is unknown, or fewer than 240 of the 252 sessions before it have one | `bars/1d.volume` |
 | `pocket_pivot` | window | bool | flag | open |  | The pocket pivot: the close is above the previous close and the session's volume is above the volume of every down-close session among the 10 sessions before it (Morales and Kacher); false on a down day, or when the last 10 sessions had no down close to beat | a session among the last 12 has no bar (a gap), or the history is shorter | `bars/1d.close`, `bars/1d.volume` |
+
+## `vol_long@v1`
+
+Close-to-close realised volatility over 126 and 252 sessions and the 252-session downside deviation, beside vol_stats@v1's 10 and 60. Stored as `rollups/instrument/vol_long@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `hv126` | window | float32 | decimal | open | 0 .. 5 | Close-to-close realised volatility: sample stdev of the last 126 log returns x sqrt(252) | a session among the last 127 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `hv252` | window | float32 | decimal | open | 0 .. 5 | Close-to-close realised volatility: sample stdev of the last 252 log returns x sqrt(252) | a session among the last 253 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `downside_dev_252` | window | float32 | decimal | open | 0 .. 5 | Downside deviation: the root mean square of the last 252 negative log returns (non-negative returns count as 0) x sqrt(252) | a session among the last 253 has no bar (a gap), or the history is shorter | `bars/1d.close` |
 
 ## `swing_levels@v1`
 

@@ -92,6 +92,12 @@ EVENT_FIELDS: Mapping[str, EventField] = {
         sign=1,
         announced_ahead=False,
     ),
+    "earnings_reaction_session": EventField(
+        "rollup.earnings_reaction_session@v1.sessions_since_reaction_session",
+        "rollup.earnings_reaction_session@v1.reaction_session_date",
+        sign=1,
+        announced_ahead=False,
+    ),
     "earnings_expected": EventField(
         "rollup.earnings_expected@v1.sessions_to_expected_report",
         "rollup.earnings_expected@v1.expected_report_date",

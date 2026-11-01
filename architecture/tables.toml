@@ -245,6 +245,11 @@ name = "rollups/instrument/earnings_reaction@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/earnings_reaction_session@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "F10: the session a report's reaction lands on, from the calendar row's time of day (pre_market: the report's session, after_hours: the next, else unknown); read by the on_event:earnings_reaction_session schedule"
+
+[[table]]
 name = "rollups/instrument/analyst_estimates@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0068, 0080: FY1 / FY2 consensus EPS and revenue from our own analyst snapshots (analyst/estimate_snapshots), FMP first then Yahoo per name (estimates_source); licence yahoo (owner only, the stricter of the two vendors), optional"
@@ -517,6 +522,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 [[table]]
 name = "rollups/instrument/vol_stats@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/vol_long@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the long realised-volatility windows (hv126, hv252, downside deviation over 252) beside vol_stats@v1, a leaf so vol_stats is never bumped (ADR 0088, design F6); backfill with rollups --only vol_long@v1"
 
 [[table]]
 name = "rollups/instrument/volume_profile@v1"
