@@ -185,3 +185,135 @@ def test_year_turn_spans_december_and_january_and_is_found_once() -> None:
 
 def test_window_names_do_not_clash_with_the_document_schedules() -> None:
     assert not set(WINDOW_NAMES) & set(SCHEDULES)
+
+
+# Hand-listed: the first session after each month's third Friday (month, day), checked against the
+# printed 2020-2026 calendars (Martin Luther King, Presidents, Good Friday, Juneteenth from 2022).
+AFTER_EXPIRY = {
+    2020: [
+        (1, 21),
+        (2, 24),
+        (3, 23),
+        (4, 20),
+        (5, 18),
+        (6, 22),
+        (7, 20),
+        (8, 24),
+        (9, 21),
+        (10, 19),
+        (11, 23),
+        (12, 21),
+    ],
+    2021: [
+        (1, 19),
+        (2, 22),
+        (3, 22),
+        (4, 19),
+        (5, 24),
+        (6, 21),
+        (7, 19),
+        (8, 23),
+        (9, 20),
+        (10, 18),
+        (11, 22),
+        (12, 20),
+    ],
+    2022: [
+        (1, 24),
+        (2, 22),
+        (3, 21),
+        (4, 18),
+        (5, 23),
+        (6, 21),
+        (7, 18),
+        (8, 22),
+        (9, 19),
+        (10, 24),
+        (11, 21),
+        (12, 19),
+    ],
+    2023: [
+        (1, 23),
+        (2, 21),
+        (3, 20),
+        (4, 24),
+        (5, 22),
+        (6, 20),
+        (7, 24),
+        (8, 21),
+        (9, 18),
+        (10, 23),
+        (11, 20),
+        (12, 18),
+    ],
+    2024: [
+        (1, 22),
+        (2, 20),
+        (3, 18),
+        (4, 22),
+        (5, 20),
+        (6, 24),
+        (7, 22),
+        (8, 19),
+        (9, 23),
+        (10, 21),
+        (11, 18),
+        (12, 23),
+    ],
+    2025: [
+        (1, 21),
+        (2, 24),
+        (3, 24),
+        (4, 21),
+        (5, 19),
+        (6, 23),
+        (7, 21),
+        (8, 18),
+        (9, 22),
+        (10, 20),
+        (11, 24),
+        (12, 22),
+    ],
+    2026: [
+        (1, 20),
+        (2, 23),
+        (3, 23),
+        (4, 20),
+        (5, 18),
+        (6, 22),
+        (7, 20),
+        (8, 24),
+        (9, 21),
+        (10, 19),
+        (11, 23),
+        (12, 21),
+    ],
+}
+
+
+@pytest.mark.parametrize("year", sorted(AFTER_EXPIRY))
+def test_after_monthly_expiry_matches_the_hand_listed_dates(year: int) -> None:
+    got = windows("after_monthly_expiry", date(year, 1, 1), date(year, 12, 31))
+    assert [(w[0].month, w[0].day) for w in got] == AFTER_EXPIRY[year]
+    assert all(len(w) == 1 for w in got)
+
+
+def test_after_monthly_expiry_skips_holidays() -> None:
+    day = lambda y, m: next(  # noqa: E731
+        w[0]
+        for w in windows("after_monthly_expiry", date(y, m, 1), date(y, m, 28))
+        if w[0].month == m
+    )
+    # Good Friday 2025-04-18 is the third Friday: expiry Thursday the 17th, the next session Monday
+    assert day(2025, 4) == date(2025, 4, 21)
+    # Juneteenth 2026-06-19 is the third Friday: expiry Thursday the 18th, Friday closed too
+    assert day(2026, 6) == date(2026, 6, 22)
+    # Martin Luther King Day follows the third Friday of January 2026
+    assert day(2026, 1) == date(2026, 1, 20)
+
+
+def test_after_monthly_expiry_is_known_before_the_range_ends() -> None:
+    # a pure calendar: a window does not depend on the range's end, so no lookahead
+    short = windows("after_monthly_expiry", date(2026, 1, 1), date(2026, 3, 31))
+    full = windows("after_monthly_expiry", date(2026, 1, 1), date(2026, 12, 31))
+    assert full[: len(short)] == short

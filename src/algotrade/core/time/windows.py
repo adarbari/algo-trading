@@ -11,6 +11,9 @@ outcome window starts at S's close) and its decision session D is the one before
   last), 4 sessions
 - ``opex_week``: the 5 sessions ending on the month's option expiry (Monday to Friday; after a
   Thursday expiry the window starts on the Friday before)
+- ``after_monthly_expiry``: the first session after the month's option expiry (the date the Cboe
+  PUT index rolls; after a Thursday expiry that is the Friday, or the next session when the Friday
+  is closed), 1 session
 - ``quarter_end``: the last 5 sessions of March, June, September and December
 - ``pre_month_end``: the last 3 sessions of every month, 3 sessions (not ``month_end``: that is the
   rebalance schedule of an edge document, ADR 0075)
@@ -20,7 +23,8 @@ outcome window starts at S's close) and its decision session D is the one before
   as a day of mourning or a storm, was not known ahead and is no holiday here), 1 session
 
 Windows of one kind never overlap: ``turn_of_month`` windows are a month apart, ``opex_week``
-windows end on different months' expiries, ``quarter_end`` windows a quarter apart,
+windows end on different months' expiries, ``after_monthly_expiry`` windows are single sessions of
+distinct months, ``quarter_end`` windows a quarter apart,
 ``pre_month_end`` windows a month apart, ``year_turn`` windows a year apart and ``pre_holiday``
 windows are single sessions of distinct days.
 
@@ -49,6 +53,7 @@ CALENDAR = "calendar:"
 WINDOW_LENGTHS: dict[str, int] = {
     "turn_of_month": 4,
     "opex_week": 5,
+    "after_monthly_expiry": 1,
     "quarter_end": 5,
     "pre_month_end": 3,
     "year_turn": 10,
@@ -81,11 +86,13 @@ def _holiday_eves(year: int) -> list[date]:
     return sorted({previous_session(d) for d in scheduled})
 
 
-def _year_windows(name: str, year: int) -> list[list[date]]:
+def _year_windows(name: str, year: int) -> list[list[date]]:  # noqa: PLR0911
     if name == "turn_of_month":
         return [_starting_at(last_session_of_month(year, m), 4) for m in range(1, 13)]
     if name == "opex_week":
         return [sessions_ending(monthly_expiry(year, m), 5) for m in range(1, 13)]
+    if name == "after_monthly_expiry":
+        return [[next_session(monthly_expiry(year, m))] for m in range(1, 13)]
     if name == "quarter_end":
         return [sessions_ending(last_session_of_month(year, m), 5) for m in _QUARTER_MONTHS]
     if name == "pre_month_end":

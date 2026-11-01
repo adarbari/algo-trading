@@ -16,6 +16,7 @@ BANDS = ("short", "medium", "long")  # the holding bands of the Guide's filter, 
 CALENDAR_WORDS = {
     "turn_of_month": "Around the turn of the month",
     "opex_week": "In option-expiration week",
+    "after_monthly_expiry": "On the first session after a monthly option expiry",
     "quarter_end": "Around each quarter end",
     "pre_month_end": "In the last sessions before a month end",
     "year_turn": "Around the turn of the year",

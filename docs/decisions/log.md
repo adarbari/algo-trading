@@ -816,3 +816,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's word in chat, 2026-11-01: "Yes, all three" (the architect's recommendations). `SHARE_CONCEPTS_VERSION_DATE` = 2026-11-02, the first nightly with the merged code.
+
+## 2026-11-01 | Setups as positions and rules (ADR 0088) | Exits as values or rules, share path exits in P1, X1 monthly entry
+- Question: (a) can an exit (and an entry) be a fixed value or a rule; (b) do share setups get path-aware exits in P1 or P2; (c) does X1 `index_put_write` enter every session or monthly?
+- Options: (a) values only / values or rules; (b) P2 / P1; (c) `every_session` / the Cboe PUT roll date with the ladder as a variant.
+- Decision: (a) both: a fixed value or a rule, compiled to one ordered list (ADR 0088 decision 4). (b) P1: build-table row E3c, a share path walker over `bars/1d` reusing E3b's exit evaluator, its trades in the trade contract, needing E3b and E6a, architect review (point in time); a setup without `[outcome.exit]` changes no stored verdict. (c) X1 enters on `calendar:after_monthly_expiry` (the first session after the monthly expiry, gated); the every-session ladder becomes a variant.
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in chat, 2026-11-01: `every_session` opens overlapping puts daily, so a fixed monthly entry matching the PUT index is the honest baseline; exits and entries are values or rules alike; share setups should get rule exits now. Recorded in `docs/options/backend-build.md` and `backend-concepts-1.md` (2.4a).

@@ -24,6 +24,16 @@ next = "Compare the picks with the base rate of the same week, then check the re
 see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]
 
 [[term]]
+id = "calendar_after_monthly_expiry"
+term = "First session after monthly expiry"
+short = "The edge opens on the first trading day after a month's standard option expiry, the day the Cboe PUT index rolls."
+body = """
+This schedule opens one trade a month, on the first session after the monthly option expiry. The expiry is the third Friday, or the Thursday when the Friday is a market holiday (Good Friday, Juneteenth). The Cboe PUT index sells a new put on that day, so a short-put setup that copies it enters then. The calendar fixes the date ahead, so nothing about it is known late. Windows are a month apart, so each is one independent trade. Example: for April 2025 the expiry is Thursday 17 April and the entry day is Monday 21 April. A year holds only 12 entries, so fewer than 100 trades is thin. Check the result by year before trusting a small lift.
+"""
+next = "Read the result with the trades behind it, then check it by year."
+see_also = ["base_rate", "out_of_sample", "calendar_opex_week"]
+
+[[term]]
 id = "calendar_quarter_end"
 term = "Quarter-end window"
 short = "The edge is held for the last five trading days of March, June, September and December."
