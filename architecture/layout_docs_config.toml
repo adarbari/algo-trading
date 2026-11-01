@@ -82,7 +82,7 @@ purpose = "event-sensitivity track settings: the scope list of names the event s
 
 [[config_dir]]
 path = "config/site/macro"
-purpose = "published files expanded into macro series (ADR 0089), one <source>.toml per source: [defaults] for the series fields and a [[file]] per file (prefix, url, parser, section, the columns it takes), each column a series keyed <prefix>_<COLUMN> (src/algotrade/config/site/macro.py); french.toml is Kenneth French's daily factor and industry files. macro.toml, at its 1000-line cap, keeps the one-series-per-entry declarations"
+purpose = "published files expanded into macro series (ADR 0087), one <source>.toml per source: [defaults] for the series fields and a [[file]] per file (prefix, url, parser, section, the columns it takes), each column a series keyed <prefix>_<COLUMN> (src/algotrade/config/site/macro.py); french.toml is Kenneth French's daily factor and industry files. macro.toml, at its 1000-line cap, keeps the one-series-per-entry declarations"
 
 [[config_dir]]
 path = "config/site/guide"

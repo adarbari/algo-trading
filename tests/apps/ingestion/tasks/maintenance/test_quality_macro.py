@@ -130,7 +130,7 @@ def record_fetch(reader: StoreReader, keys: list[str], session: date = D) -> Non
 
 
 def test_a_french_file_a_month_behind_is_not_stale() -> None:
-    """ADR 0089: French's daily files end about a month before the session and each day is known
+    """ADR 0087: French's daily files end about a month before the session and each day is known
     from observation + 70 days (``lagged``), so the newest value a session knows is 70 days old,
     and the pull every 28 days lets that drift to about 90: inside the monthly 103-day window.
     A ``daily`` series (stale after 74 days) would flag the 95-day case."""
@@ -164,6 +164,20 @@ def test_research_series_are_graded_only_on_a_night_they_were_fetched() -> None:
         "macro_research_fresh"
     ]
     assert status == "WARN" and "1 of 1 fetched" in detail and "FF3_SMB" in detail
+
+
+def test_research_series_lose_no_vintages_on_the_nights_they_are_graded() -> None:
+    macro = MacroSettings.from_document({}, {"french": BLOCK})
+    reader = french_store(macro, D - timedelta(days=32))  # 300 vintages each
+    record_run(reader, {"FF3_SMB": 301}, RunStatus.COMPLETE)  # a run once held one more
+    quiet = by_name(macro_checks(reader, D, SourcesSettings(), macro))
+    assert "macro_vintages" in quiet and quiet["macro_vintages"][0] == "PASS"  # not read tonight
+    record_fetch(reader, ["FF3_SMB", "FF3_HML"])
+    checks = by_name(macro_checks(reader, D, SourcesSettings(), macro))
+    assert (
+        checks["macro_vintages"][0] == "FAIL"
+        and "FF3_SMB (300 < 301)" in checks["macro_vintages"][1]
+    )
 
 
 def test_research_series_stay_out_of_the_stale_share_and_are_read_without_values(

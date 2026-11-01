@@ -4,10 +4,13 @@
 # keyed <prefix>_<COLUMN> (src/algotrade/config/site/macro.py), values in PERCENT as published.
 #
 # The library has no vintages and is re-estimated: each pull stores a changed value as a new
-# `lagged` vintage dated the run's session (never before the fetch), and a day first seen takes
-# the observation date + release_lag_days. French posts a month's files about a month after it
-# ends (CRSP), so 70 days is about twice that and errs late; the files are pulled at most every 28
-# days (refetch_days) because their terms are unconfirmed. cadence = "monthly": a daily series'
+# `lagged` vintage dated the run's session (never before the fetch). A day first seen in the
+# first fetch (the backfill) takes the observation date + release_lag_days; a day first seen on a
+# later pull takes max(that, the run's session): it was not public before the pull, whatever its
+# age. French posts a month's files about a month after it ends (CRSP): a day of the 1st is out
+# from about the 1st of the second month after, a real lag of about 60 days, so 70 leaves about
+# 10 days of slack for the backfill's dates. The files are pulled at most every 28 days
+# (refetch_days) because their terms are unconfirmed. cadence = "monthly": a daily series'
 # 3-day staleness margin would flag every French series for weeks before each monthly update
 # (stale after 31 + 70 + 2 = 103 days). The missing marks -99.99 and -999 are no value.
 

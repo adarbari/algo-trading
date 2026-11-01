@@ -131,7 +131,7 @@ def test_the_document_shape_is_checked() -> None:
         MacroSettings.from_document({"series": {"key": "X"}})
 
 
-# --- config/site/macro/<name>.toml: a published file expanded into one series per column (ADR 0089)
+# --- config/site/macro/<name>.toml: a published file expanded into one series per column (ADR 0087)
 
 BLOCK = {
     "defaults": {

@@ -1,4 +1,4 @@
-"""``french_zip`` (Kenneth French's data library, ADR 0089) against the seven daily US files
+"""``french_zip`` (Kenneth French's data library, ADR 0087) against the seven daily US files
 recorded 2026-11-01 (vintage 202609 CRSP; trimmed to the preamble, the first and last ten rows of
 each section and the footer) and every series of ``config/site/macro/french.toml`` against its
 file; plus the parser's rules on small synthetic zips. CI never calls the network."""
@@ -138,3 +138,10 @@ def test_the_shipped_registry_reads_every_series_from_its_recorded_file() -> Non
     # one request per zip per run: the industry zips serve two blocks
     assert len({s.url for s in registry}) == 7
     assert {s.section for s in registry if s.key.startswith(("IND12EW", "IND49EW"))} == {2}
+
+
+def test_a_caller_changing_the_table_never_changes_the_next_read() -> None:
+    payload = zipped(",X\n20260102,1\n")
+    table = french(payload)
+    table["X"] = "changed"
+    assert french(payload)["X"].tolist() == ["1"]  # the cached table is not shared

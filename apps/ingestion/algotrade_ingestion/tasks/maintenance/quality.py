@@ -372,7 +372,7 @@ def macro_checks(
     0048). Fetchable: its source is enabled in ``sources.toml`` and the latest macro run did
     not skip it (no credential); the skipped ones are named in the detail, and when every
     enabled series was skipped the check WARNs instead of failing. The research series of
-    ``config/site/macro/`` (ADR 0089) are left out of both and graded by ``_macro_research``."""
+    ``config/site/macro/`` (ADR 0087) are left out of both and graded by ``_macro_research``."""
     enabled = [x for x in macro.series if s.vendor(x.source).enabled]
     if not enabled:
         return []
@@ -384,22 +384,21 @@ def macro_checks(
     fetchable = [x for x in regular if x.key not in skipped]
     ids = [x.instrument_id for x in regular]
     stored = stored_vintages(reader, ids) if ids else pd.DataFrame(columns=MACRO_COLUMNS)
-    checks = [
+    due = _research_due(runs, session, research)
+    keys = stored_keys(reader, [x.instrument_id for x in due])  # key columns only, no values
+    held = pd.concat([stored[["instrument_id"]], keys[["instrument_id"]]], ignore_index=True)
+    return [
         _macro_fresh(stored, session, s.max_macro_stale_share, fetchable, skipped),
-        _macro_vintages(stored, runs, regular),
+        _macro_vintages(held, runs, [*regular, *due]),
+        *_macro_research(keys, session, research, due),
     ]
-    return [*checks, *_macro_research(reader, runs, session, research)]
 
 
-def _macro_research(
-    reader: StoreReader, runs: list[RunRecord], session: date, research: list[MacroSeries]
-) -> list[Check]:
-    """The series expanded from ``config/site/macro/*.toml`` (ADR 0089): each against its own
-    ``stale_after_days`` and WARN only (they sit outside ``max_macro_stale_share``), graded on a
-    night a ``macro`` run of the session fetched them (about once a month, ``refetch_days``);
-    other nights say so and read nothing. Only the key columns are read."""
-    if not research:
-        return []
+def _research_due(
+    runs: list[RunRecord], session: date, research: list[MacroSeries]
+) -> list[MacroSeries]:
+    """The research series a ``macro`` run of ``session`` fetched: only on such a night (about
+    once a month, ``refetch_days``) are they read and graded."""
     fetched = {
         key
         for run in runs
@@ -407,12 +406,23 @@ def _macro_research(
         for key, status in run.items.items()
         if status_label(status) in FETCHED
     }
-    due = [x for x in research if x.key in fetched]
+    return [x for x in research if x.key in fetched]
+
+
+def _macro_research(
+    keys: pd.DataFrame, session: date, research: list[MacroSeries], due: list[MacroSeries]
+) -> list[Check]:
+    """The series expanded from ``config/site/macro/*.toml`` (ADR 0087): each against its own
+    ``stale_after_days`` and WARN only (they sit outside ``max_macro_stale_share``), graded on a
+    night a ``macro`` run of the session fetched them (about once a month, ``refetch_days``);
+    other nights say so and read nothing (their vintage counts are checked on those nights too,
+    by ``macro_checks``). ``keys``: their stored key columns."""
+    if not research:
+        return []
     name = "macro_research_fresh"
     if not due:
         note = f"{len(research)} research series not graded: no macro run of {session} fetched them"
         return [Check(name, "PASS", note)]
-    keys = stored_keys(reader, [x.instrument_id for x in due])
     known = keys[keys["vintage_date"] <= session]
     newest = known.groupby("instrument_id")["obs_date"].max()
     stale = [

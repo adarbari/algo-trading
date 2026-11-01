@@ -952,7 +952,7 @@ def load_field_guide(configs: SiteDocuments) -> FieldGuideSettings:
 
 
 def load_macro(configs: SiteDocuments) -> MacroSettings:
-    """``macro.toml`` and ``config/site/macro/*.toml`` (ADR 0048, 0089); missing: no series."""
+    """``macro.toml`` and ``config/site/macro/*.toml`` (ADR 0048, 0087); missing: no series."""
     return MacroSettings.from_configs(site_document(configs.load, "macro"), configs)
 
 

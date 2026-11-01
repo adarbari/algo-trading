@@ -86,6 +86,7 @@ def _request(spec: MacroSeries, session: date, since: date | None) -> SeriesRequ
         date_column=spec.date_column,
         value_column=spec.value_column,
         parser=spec.parser,
+        section=spec.section,
         vintages=spec.pit == "alfred",  # a lag series: FRED's current values, one plain request
         start=None if spec.pit == "alfred" else since,
     )
@@ -123,7 +124,7 @@ def _fetch_one(
     target = vintage_rows(spec, fetched)
     if since is not None:
         target = target[target["obs_date"] >= since]
-    new = rows_to_write(target, stored, run.session)
+    new = rows_to_write(target, stored, run.session, spec.revised and not stored.empty)
     if new.empty:
         return "UNCHANGED"
     run.stage(TABLE, spec.key, new, source.name)

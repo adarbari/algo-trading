@@ -103,7 +103,7 @@ class MacroSeries:
     revised: bool = False
     refetch_days: int = 0  # a published file: read again after this many days (0: by cadence)
     research: bool = (
-        False  # expanded from a ``macro/<name>.toml`` [[file]] (ADR 0089), not an entry
+        False  # expanded from a ``macro/<name>.toml`` [[file]] (ADR 0087), not an entry
     )
 
     @property

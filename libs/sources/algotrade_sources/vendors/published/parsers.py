@@ -124,7 +124,7 @@ def _french_section(payload: bytes, section: int) -> pd.DataFrame:
 
 def parse_french_zip(payload: bytes, section: int = 1) -> pd.DataFrame:
     """One section of a French data-library zip (the module docstring says how it is found)."""
-    return _french_section(payload, section)
+    return _french_section(payload, section).copy()  # the cached table is shared: never hand it out
 
 
 SECTIONED = frozenset({"french_zip"})  # parsers that take the registry's ``section``

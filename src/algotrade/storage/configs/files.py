@@ -11,7 +11,7 @@ site/field_guide/<group>/<file>.toml       L3 field guide, one folder per theme 
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/macro/<name>.toml                     L3 published files expanded into macro series, one
-                                           file per source (kind ``macro``, ADR 0089)
+                                           file per source (kind ``macro``, ADR 0087)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
 site/guide/start.toml                      L3 Guide Start here pages (kind ``guide``)
 site/guide/glossary/<theme>.toml           L3 Guide glossary, one file per theme (kind
