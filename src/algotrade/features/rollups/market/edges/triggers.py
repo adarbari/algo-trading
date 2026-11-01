@@ -68,7 +68,7 @@ NONE_SEEN = LOOKBACK + 1  # sessions_since_vix_spike when the readings are fresh
 VIX, VIX3M = ID["VIX"], ID["VIX3M"]
 _UNKNOWN = (
     "VIX or VIX3M has no observation known by the session, or its newest is more than "
-    f"{MAX_AGE_SESSIONS} sessions old (stale: nothing is read, never 'no spike')"
+    f"{MAX_AGE_SESSIONS} sessions old (stale: nothing is read, never 'no trigger')"
 )
 _NONE = f"{_UNKNOWN}; or no spike in the last {LOOKBACK} sessions of observations"
 _SINCE_NONE = _UNKNOWN
