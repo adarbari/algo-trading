@@ -71,6 +71,7 @@ detect = [{ call = "fields_for" }]
 id = "position-templates"
 description = "Position templates (ADR 0088, design 2.4): config/site/positions/templates.toml typed fail closed into frozen Templates (legs: shares of a signed quantity, or an option chosen by a delta / atm / otm_pct strike rule, never a target yield; the collateral rule), checked against an edge's `position` and `position:<id>` baselines where the edge loads, and `position_of(outcome)`, the one function that names the templates an outcome holds (the `position` key, else the template of a return outcome's side); the read model, the trade contract and the engine call it, never re-derive a side to a position"
 owner = ["src/algotrade/config/edges/positions/templates.py"]
+allowed = ["src/algotrade/services/read/ideas/setups.py"]  # the Ideas tab of a setup is the kind of its position (ADR 0083 amendment (a))
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "position_of" }, { call = "parse_templates" }]
 

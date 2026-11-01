@@ -339,14 +339,21 @@ def load_runs_of(ctx: Stores, edge_id: str) -> tuple[EdgeRun, ...]:
     return load_edge_runs(ctx, edge) if edge is not None else ()
 
 
-def load_canonical_run(ctx: Stores, edge: Edge) -> CanonicalRun:
+def load_canonical_run(ctx: Stores, edge: Edge, bounded: bool = False) -> CanonicalRun:
     """The latest committed run of the site user whose split is ``edge.frozen_from``; else
-    ``NOT_RUN`` (no frozen period, or no run at it): never an exploratory or older split."""
+    ``NOT_RUN`` (no frozen period, or no run at it): never an exploratory or older split.
+    ``bounded``: only a run committed on or before the request's session (``after_session`` is
+    False), for a read that is point in time (ADR 0083 decision 2: Ideas); a newer run is then
+    no run, never used."""
     job = job_name(edge.id, SITE_USER)
     if edge.frozen_from is None:
         why = f"{edge.id} has no frozen period, so no run is canonical"
     else:
-        found = [r for r in _committed(ctx, edge, SITE_USER) if not r.exploratory]
+        found = [
+            r
+            for r in _committed(ctx, edge, SITE_USER)
+            if not r.exploratory and not (bounded and r.after_session)
+        ]
         if found:
             return CanonicalRun(found[0], None)
         why = f"{edge.id} has no committed run at its frozen period from {edge.frozen_from}"
