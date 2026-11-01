@@ -6,7 +6,14 @@ import numpy as np
 import pytest
 
 from algotrade.quant.black_scholes import greeks, price
-from algotrade.quant.edges.chain_pnl import hedged_pnl, intrinsic, leg_delta, long_pnl
+from algotrade.quant.edges.chain_pnl import (
+    hedged_pnl,
+    intrinsic,
+    leg_delta,
+    leg_greeks,
+    long_pnl,
+    position_sum,
+)
 
 
 def test_long_pnl_per_premium_executable_and_per_underlying() -> None:
@@ -67,3 +74,24 @@ def test_a_missing_delta_or_spot_makes_the_hedged_pnl_nan() -> None:
     spots = np.array([[100.0, 102.0], [100.0, np.nan]])
     deltas = np.array([[np.nan], [0.5]])
     assert np.isnan(hedged_pnl([1.0, 1.0], [2.0, 2.0], spots, deltas)).all()
+
+
+def test_leg_greeks_are_the_models_at_the_vol_the_mid_implies() -> None:
+    spot, strike, t, vol = 100.0, 105.0, 45 / 365, 0.28
+    mid = float(price(spot, strike, t, 0.0, 0.0, vol, True))
+    g = leg_greeks(mid, spot, strike, t, True)
+    want = greeks(spot, strike, t, 0.0, 0.0, vol, True)
+    for ours, theirs in ((g.delta, want.delta), (g.gamma, want.gamma), (g.vega, want.vega),
+                         (g.theta, want.theta)):  # fmt: skip
+        assert float(ours) == pytest.approx(float(theirs), rel=1e-6)
+
+
+def test_a_leg_with_no_solvable_vol_has_nan_gamma_vega_theta_never_zero() -> None:
+    g = leg_greeks(np.nan, 100.0, 105.0, 45 / 365, True)
+    assert np.isnan([g.delta, g.gamma, g.vega, g.theta]).all()
+
+
+def test_position_sum_weights_each_leg_by_its_quantity_and_nan_poisons() -> None:
+    values = np.array([[2.0, 3.0], [0.5, np.nan]])  # (legs, names)
+    out = position_sum([-1.0, 1.0], values)
+    assert out[0] == pytest.approx(-1.5) and np.isnan(out[1])  # a short and a long leg

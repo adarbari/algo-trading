@@ -11,11 +11,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from algotrade.config.edges.positions.templates import Leg
+from algotrade.engines.structures.chain import DayChain
+from algotrade.features.rollups.options.wing_search import select_legs
 from algotrade.quant.black_scholes import greeks, price
 from algotrade.storage.tables.schemas import OPTION_PNL_REASONS
 from algotrade_ingestion.tasks.derived.option_paths import (
     ATM_STRADDLE,
-    DayChain,
     structure_of,
     structure_rows,
 )
@@ -222,3 +224,25 @@ def test_structure_keys() -> None:
     with pytest.raises(ValueError, match="unknown chain structure"):
         structure_of("iron_condor")
     assert np.isfinite(structure_of(ATM_STRADDLE).call)
+
+
+def test_the_template_selector_agrees_with_the_v1_pick_for_a_delta_put_and_an_atm_straddle() -> (
+    None
+):
+
+    chain0 = _chain(0).options.assign(open_interest=1)
+    session = DAYS[0]
+    put = select_legs(
+        chain0, [Leg("option", 1, "P", "delta", delta=0.25)], SPOTS[0], session, 30, "any"
+    )
+    v1 = rows_of(_window(), "put_delta_25", 30)[0].iloc[0]
+    assert put.legs[0].instrument_id == v1["put_id"]
+    atm = select_legs(
+        chain0,
+        [Leg("option", 1, "C", "atm"), Leg("option", 1, "P", "atm")],
+        SPOTS[0], session, 30, "any",
+    )  # fmt: skip
+    straddle = rows_of(_window(), ATM_STRADDLE, 30)[0].iloc[0]
+    assert (atm.legs[0].instrument_id, atm.legs[1].instrument_id) == (
+        straddle["call_id"], straddle["put_id"],
+    )  # fmt: skip
