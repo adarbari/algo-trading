@@ -1,0 +1,66 @@
+# Options pricing earnings cheap (options-setups design S3, second step; the setting a buyer of the report looks for, and a name to leave out of a sale): the same base as earnings_move_rich, with a straddle at 0.8 times or less the mean absolute move on its last eight reports (feature.earnings_move_cheap). Ranked by that ratio, lowest first. A missing value never passes (ADR 0030). What it does not check: whether the past moves were one outlier report, the chain's spreads, or what the report will bring.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "earnings_move_cheap"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Options pricing earnings cheap"
+description = "S&P 500 stocks whose options price the next report well below the name's own past earnings moves."
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.sp500]
+field = "instrument.in_sp500"
+op = "eq"
+value = true
+
+[criteria.optionable]
+field = "instrument.optionable"
+op = "eq"
+value = true
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+
+[criteria.execution]
+field = "feature.option_tier"
+op = "in"
+value = ["A", "B"]
+label = "Option execution tier A or B"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.earnings_move_cheap]
+field = "feature.earnings_move_cheap"
+op = "eq"
+value = true
+
+[columns]
+close = "rollup.price_stats@v2.close"
+earnings_move_ratio = "feature.earnings_move_ratio"
+implied_move = "rollup.implied_move@v1.implied_move"
+abs_move_mean_8 = "rollup.earnings_reaction@v2.abs_move_mean_8"
+abs_move_median_8 = "rollup.earnings_reaction@v2.abs_move_median_8"
+abs_moves_counted = "rollup.earnings_reaction@v2.abs_moves_counted"
+move_dte = "rollup.implied_move@v1.move_dte"
+days_to_earnings = "rollup.earnings@v1.days_to_earnings"
+option_tier = "feature.option_tier"
+
+[rank]
+tie_break = "feature.earnings_move_ratio"
+tie_break_order = "asc"

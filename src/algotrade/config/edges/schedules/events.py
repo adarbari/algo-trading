@@ -18,6 +18,10 @@ ON_EVENT = "on_event:"
 EVENT_CLASSES: Mapping[str, str] = {
     "earnings_reaction": "a reported result's two-session reaction (earnings_reaction@v2); "
     "anchor: the reaction's last session, E+1 (E: the report date)",
+    "earnings_reaction_session": "a reported result's reaction session "
+    "(earnings_reaction_session@v1), from the report's time of day (opt-in; an unknown time is "
+    "skipped); anchor: the report's own session for a pre-market report, the next for an "
+    "after-hours one",
     "earnings_expected": "a next report expected, scheduled or from the year-ago report "
     "(earnings_expected@v1); anchor: the expected report date's session",
     "index_change": "an S&P 500 membership change (index_changes@v1); anchor: the session it is "
