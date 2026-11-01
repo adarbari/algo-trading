@@ -94,11 +94,15 @@ purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, fiel
 
 [[config_dir]]
 path = "config/site/guide/glossary"
-purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-line aim per file; the day, the rule grammar, a screen's result, why a value is not available, edges, the evidence behind a verdict, the text model's cost, Describe it's review panel, the shared filter bar's words, the facts of an open position): the app's own words, [[term]] each (loaded by config/site/guide/glossary.py in file-name order; fitness tests: ids and terms unique across the files)"
+purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-line aim per file; the day, the rule grammar, a screen's result, why a value is not available, edges, the evidence behind a verdict, the text model's cost, Describe it's review panel, the shared filter bar's words): the app's own words, [[term]] each (loaded by config/site/guide/glossary.py in file-name order; fitness tests: ids and terms unique across the files)"
 
 [[config_dir]]
 path = "config/site/guide/glossary/edges"
 purpose = "the Guide's glossary of the edges (ADR 0051, ADR 0064), one <theme>.toml per theme: the edge page, its evidence and curve, the live record, the outlook and haircut, the ledger and variants, cost and capacity, where the result worked (loaded after the glossary folder; kind guide_glossary_edges)"
+
+[[config_dir]]
+path = "config/site/guide/glossary/setups"
+purpose = "the Guide's glossary of a setup's parts (ADR 0051, ADR 0088), one <theme>.toml per theme: the rule grammar and the facts of an open position (loaded after the edges subfolder; kind guide_glossary_setups)"
 
 [[config_dir]]
 path = "config/site/guide/mechanisms"

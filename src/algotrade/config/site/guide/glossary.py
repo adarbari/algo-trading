@@ -26,6 +26,8 @@ from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "guide_glossary"  # the config store's kind: site/guide/glossary/<theme>.toml
 EDGES_FOLDER = "guide_glossary_edges"  # the edges' terms: site/guide/glossary/edges/<theme>.toml
+SETUPS_FOLDER = "guide_glossary_setups"  # a setup's parts: site/guide/glossary/setups/<theme>.toml
+SUBFOLDERS = {EDGES_FOLDER: "edges", SETUPS_FOLDER: "setups"}  # kind -> its name prefix
 TERM_KEYS = ("id", "term", "short", "body", "next", "see_also")
 
 
@@ -91,11 +93,11 @@ class GuideGlossary:
 
 
 def load_guide_glossary(configs: Documents) -> GuideGlossary:
-    """``config/site/guide/glossary/*.toml`` then ``edges/*.toml``, each in file-name order;
-    none: no terms."""
+    """``config/site/guide/glossary/*.toml`` then ``edges/*.toml`` then ``setups/*.toml``, each
+    in file-name order; none: no terms."""
     docs = {
-        (n if kind == FOLDER else f"edges/{n}"): configs.load("site", kind, n)
-        for kind in (FOLDER, EDGES_FOLDER)
+        (n if kind == FOLDER else f"{SUBFOLDERS[kind]}/{n}"): configs.load("site", kind, n)
+        for kind in (FOLDER, *SUBFOLDERS)
         for n in configs.names("site", kind)
     }
     return GuideGlossary.from_documents(docs)
