@@ -219,6 +219,18 @@ rate_shock_at = 0.005        # D8: the 10-year yield up this much (50 bp) over 6
 vvix_high_above = 110.0      # D11: VVIX above this is high
 stress_at = 35.0             # R-A: VIX at or above this is the STRESS band (as vix_band's stress_at)
 corr_min_members = 50        # D6: complete stocks the mean member volatility of realised_corr_ratio_21 needs
+calm_below = 25.0            # D1 (label): VIX below this is CALM
+near_trend = -0.05           # D4 (label): above the 200-day mean, or no further below it than this
+correction_lo = -0.15        # D4 (label): a correction is a drawdown from this ...
+correction_hi = -0.05        # ... to this
+breadth_narrow = 0.50        # D5 (label): fewer than this share above their 200-day mean
+breadth_bear = 0.30          # D5 (label): fewer than this share in a bear trend
+corr_low = 0.30              # D6 (label): the realised correlation ratio below this is dispersion
+backwardation_days = 10      # R6: inverted for this many closes; R7: fewer
+spike_chg = 0.40             # R7: VIX up this much over 5 observations
+thin_vrp = 2.0               # R2: VIX minus realised volatility below this is thin
+season_share = 0.15          # R9: this share of names about to report is earnings season
+fomc_days = 5                # R10: an FOMC decision within this many sessions is an event week
 
 ["regime@v3"]                # the regime scores and label (plan section 4: the macro tiers and the
                              # curve's memory set on the 1971-2026 episode scorecard, the measured
