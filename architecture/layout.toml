@@ -72,7 +72,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges/positions"
-purpose = "positions of an edge document (ADR 0088), split from config/edges (at its module cap): the site's position templates and position_of (templates.py), the position key, option parameters and [outcome.exit] of an outcome (spec.py), the variant grids (grid.py), the published exit rule's settings (exit_rule.py) and the option_pnl outcome's structures, tenor rule and checks (chain.py, moved here)"
+purpose = "positions of an edge document (ADR 0088), split from config/edges (at its module cap): the site's position templates and position_of (templates.py), the position key of a stored option trade (key.py), the option parameters and [outcome.exit] of an outcome (spec.py), the variant grids (grid.py), the published exit rule's settings (exit_rule.py) and the option_pnl outcome's structures, tenor rule and checks (chain.py, moved here)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
@@ -245,7 +245,7 @@ purpose = "the selection engine: evaluate a Selection with a per-rule audit"
 
 [[dir]]
 path = "src/algotrade/engines/structures"
-purpose = "the option-structure engine (ADR 0088, design 2.4): marks a position of option legs (and a share leg held with them) through its window from the chains the caller loads, the quoted and intrinsic exit value, the exit fallback for a thin quote, the daily hedge's net delta and the reasons a name is unmeasured (marking.py, chain.py); pure: features, config and quant only"
+purpose = "the option-structure engine (ADR 0088, design 2.4): marks a position of option legs (and a share leg held with them) through its window from the chains the caller loads, the quoted and intrinsic exit value, the exit fallback for a thin quote, the daily hedge's net delta and the reasons a name is unmeasured (marking.py, chain.py), the exit scan and position fields (exits.py, position_fields.py), settlement (settlement.py) and a window's trades: legs chosen, exits, values and collateral (trades.py); pure: features, config and quant only"
 contracts = ["The option-structure engine is pure: features, config, quant and core only (no data, storage or services; ADR 0088)"]
 
 [[dir]]

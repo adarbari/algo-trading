@@ -103,7 +103,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate((t) => {
       document.documentElement.setAttribute('data-theme', t);
     }, theme);
-    await expect(page.getByRole('heading', { level: 1, name: 'Edge runs' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Evaluations' })).toBeVisible();
     const list = page.getByRole('grid', { name: 'Edge runs' });
     await expect(list).toContainText('run-a');
     await expect(list).toContainText('EXPLORATORY');
