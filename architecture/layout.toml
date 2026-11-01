@@ -303,7 +303,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/market/edges"
-purpose = "market facts setups read: the triggers of ADR 0075 and the market conditions setups gate on (ADR 0088); one leaf feature group per module (its documented FEATURES, a pure compute and its GROUP declaration) that no headline-regime group reads, so a version bump here never reaches regime@v3"
+purpose = "market facts setups read: the triggers of ADR 0075 and the market conditions setups gate on; one leaf feature group per module (its documented FEATURES, a pure compute and its GROUP declaration) that no headline-regime group reads, so a version bump here never reaches regime@v3"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
