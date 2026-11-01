@@ -341,6 +341,13 @@ def test_no_decoys_never_block_works() -> None:
     }
 
 
+def test_the_verdict_carries_its_basis_screener_and_horizon_beside_the_words() -> None:
+    v = verdict(result())
+    assert (v.basis_screener, v.basis_horizon) == ("scr", 20)
+    assert v.basis == "scr, 20 trading days"
+    assert verdict(None).basis_screener is None  # no result: no basis
+
+
 def test_a_basis_chosen_among_several_says_what_it_was_chosen_on() -> None:
     rows = grid({15: 0.485, 21: 0.512, 31: 0.499}, {15: 0.53, 21: 0.52, 31: 0.60})
     choice = choose_basis(rows, T)

@@ -84,6 +84,8 @@ def verdict_frame(
         "verdict": summary.verdict,
         "result": summary.result,
         "basis": summary.basis,
+        "basis_screener": summary.basis_screener,
+        "basis_horizon": summary.basis_horizon,
         "trades": summary.trades,
         "oos_trades": summary.oos_trades,
         "lift": summary.lift,
@@ -91,7 +93,11 @@ def verdict_frame(
         "licence": licence,
     }
     frame = pd.DataFrame([row])
-    for column in ("trades", "oos_trades"):  # a null count stays null, never a float or a 0
+    for column in (
+        "trades",
+        "oos_trades",
+        "basis_horizon",
+    ):  # a null count stays null, never a float or a 0
         frame[column] = frame[column].astype("Int64")
     frame["session_date"] = run.range_to
     frame["knowledge_ts"] = pd.Timestamp(now)
@@ -165,7 +171,7 @@ def rejudged_frame(
 
 
 def _whole(value: Any) -> int | None:
-    return None if pd.isna(value) else int(value)
+    return None if value is None or pd.isna(value) else int(value)
 
 
 def _real(value: Any) -> float | None:
@@ -190,6 +196,8 @@ def summaries_of(table: pd.DataFrame | None) -> dict[tuple[str, str, str], EdgeS
             r["edge_id"], r["verdict"], r["result"],
             None if pd.isna(r["basis"]) else r["basis"],
             _whole(r["trades"]), _whole(r["oos_trades"]), _real(r["lift"]), _real(r["lift_pts"]),
+            None if pd.isna(r.get("basis_screener")) else r["basis_screener"],
+            _whole(r.get("basis_horizon")),
         )  # fmt: skip
     return found
 

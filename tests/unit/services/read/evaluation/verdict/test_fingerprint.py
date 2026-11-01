@@ -477,6 +477,11 @@ EXPECTED: dict[int, dict[str, tuple[Any, ...]]] = {
 }
 
 
+# Version 2 (ADR 0083 d2) only adds ``basis_screener`` and ``basis_horizon``: every label, result,
+# basis and figure is the version 1 golden, so no verdict changes (the new keys are checked below).
+EXPECTED[2] = EXPECTED[1]
+
+
 def _headline(name: str) -> tuple[Any, ...]:
     case = dict(CASES[name])
     rows = case.pop("rows")
@@ -494,6 +499,17 @@ def test_a_judge_change_without_a_version_bump_fails() -> None:
         "the judge's output changed under an unchanged JUDGE_VERSION: bump it and add the new "
         "expectations to EXPECTED"
     )
+
+
+def test_the_basis_keys_name_the_basis_of_every_case() -> None:
+    for name, spec in CASES.items():
+        case = dict(spec)
+        rows = case.pop("rows")
+        s = summary_of(judge("e", rows, SPLIT, T, headline=True, **case))
+        if s.basis is None:
+            assert (s.basis_screener, s.basis_horizon) == (None, None), name
+        else:
+            assert s.basis == f"{s.basis_screener}, {s.basis_horizon} trading days", name
 
 
 def test_a_hidden_and_a_revealed_copy_of_one_run_fingerprint_differently() -> None:

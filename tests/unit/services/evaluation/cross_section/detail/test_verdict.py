@@ -79,8 +79,9 @@ def test_the_published_row_equals_the_readers_judgement_of_the_committed_rows(
         None if row["oos_trades"] != row["oos_trades"] else int(row["oos_trades"]),
         None if row["lift"] != row["lift"] else float(row["lift"]),
         None if row["lift_pts"] != row["lift_pts"] else float(row["lift_pts"]),
+        row["basis_screener"], int(row["basis_horizon"]),
     )  # fmt: skip
-    assert got == live  # the same bytes the reader would judge
+    assert got == live and got.basis_screener is not None  # the same bytes the reader would judge
     assert row["fingerprint"] == stamp.fingerprint(
         judge_call(found, run, True), run, load_verdict(ctx.configs)
     )

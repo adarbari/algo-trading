@@ -21,7 +21,7 @@ from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.runs import EdgeRun
 from algotrade.services.read.evaluation.verdict.rule import JudgeCall
 
-JUDGE_VERSION = 1  # bump on a semantic change of the judge outside JUDGED_CODE (a parse, a column)
+JUDGE_VERSION = 2  # bump on a semantic change of the judge outside JUDGED_CODE (a parse, a column)
 
 # Modules of the package that read a stored headline and never judge (``stored.py``): they are
 # no part of the judge, so editing one neither changes the digest nor needs a re-judge.

@@ -378,13 +378,19 @@ def judge(
     if c is None:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs else ""
         reason = f"The official result has no out-of-sample figures for {on}{lost}"
-        return replace(_waiting(edge_id, reason), basis=on)
+        return replace(
+            _waiting(edge_id, reason), basis=on,
+            basis_screener=choice.key[0], basis_horizon=choice.key[1],
+        )  # fmt: skip
     facts = facts or EdgeFacts()
     judged = _judge_candidate(
         replace(c, chain=facts.chain), t, draws, decoys, lost_inputs, facts, headline
     )
     years = () if headline else _years(c, split, range_to)
-    return replace(judged, edge_id=edge_id, years=years, basis_why=choice.why)
+    return replace(
+        judged, edge_id=edge_id, years=years, basis_why=choice.why,
+        basis_screener=choice.key[0], basis_horizon=choice.key[1],
+    )  # fmt: skip
 
 
 def _inputs(ctx: Stores, run: runs.EdgeRun) -> tuple[tuple[EdgeRow, ...], Draws]:
