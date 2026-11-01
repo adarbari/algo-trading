@@ -218,6 +218,17 @@ def sessions_to(start: date, end: date) -> int:
     return len(sessions_between(start + timedelta(1), end))
 
 
+def session_weekday(day: date) -> int:
+    """The weekday of ``day``: 0 Monday to 6 Sunday (an exchange session is 0 to 4)."""
+    return day.weekday()
+
+
+def is_last_session_of_week(day: date) -> bool:
+    """Whether the next session after ``day`` falls in a later week (a Friday, or the Thursday
+    before a Friday holiday)."""
+    return session_weekday(next_session(day)) < session_weekday(day)
+
+
 def session_offset(start: date, end: date) -> int:
     """Exchange sessions from ``start`` to ``end`` (negative when ``end`` is before it)."""
     return sessions_to(start, end) if end >= start else -sessions_to(end, start)
