@@ -42,6 +42,14 @@ beforeEach(() => {
 });
 
 describe('EarningsWeek', () => {
+  it('says so, and asks for no table, when nobody reports', () => {
+    hooks.useEventCalendar.mockReturnValue(fakeQuery(null));
+    hooks.table.mockClear();
+    render(<EarningsWeek />);
+    expect(screen.getByText('No report in the next five sessions')).toBeInTheDocument();
+    expect(hooks.table).not.toHaveBeenCalled();
+  });
+
   it('asks the feature table for the reporters, with the priced and the usual move', () => {
     render(<EarningsWeek />);
     expect(screen.getByText(/Earnings · .* to .* \| AAPL/)).toBeInTheDocument();

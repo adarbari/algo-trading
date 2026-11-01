@@ -5,7 +5,7 @@
  * the feature table (ADR 0038), so a fact not stored yet is UNKNOWN with its reason, never a
  * blank. Says nothing about direction.
  */
-import { formatValue, Banner, Stack, Text } from '@algotrade/ui';
+import { formatValue, Banner, EmptyState, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { earningsWeek, gapLines, useEventCalendar } from '@/entities/event';
@@ -36,6 +36,25 @@ export function EarningsWeek() {
   const week = useMemo(() => (calendar.data ? earningsWeek(calendar.data) : null), [calendar.data]);
   const gaps = useMemo(() => gapLines(calendar.data?.gaps ?? []), [calendar.data]);
   const [columns, setColumns] = useState<string[]>(EARNINGS_WEEK_COLUMNS);
+  const settled = !calendar.isPending && !source.loading;
+  if (settled && (week?.symbols.length ?? 0) === 0) {
+    return (
+      <Stack gap={2}>
+        <CalendarSourcePicker
+          value={source.value}
+          screeners={source.screeners}
+          onChange={source.setValue}
+        />
+        {source.message !== null && <Banner tone="info">{source.message}</Banner>}
+        <EmptyState
+          bordered
+          icon="search"
+          title="No report in the next five sessions"
+          description="None of these names has a report date in the next five sessions."
+        />
+      </Stack>
+    );
+  }
   return (
     <FeatureTable
       label={week ? `Earnings · ${dayText(week.from)} to ${dayText(week.to)}` : 'Earnings week'}
