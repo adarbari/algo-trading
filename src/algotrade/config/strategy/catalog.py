@@ -109,6 +109,14 @@ class FieldCatalog:
             raise ConfigurationError(
                 f"fields of undeclared levels {unknown} (config/strategy/levels.py)"
             )
+        heads = {level.key: level.heads for level in declared}
+        for key, named in (levels or {}).items():
+            stray = [f for f in named if f.partition(".")[0] not in (*heads[key], "feature")]
+            if stray:
+                raise ConfigurationError(
+                    f"{key}-level fields {stray[:3]} do not start with a head of the level "
+                    f"{list(heads[key])} (config/strategy/levels.py)"
+                )
         everything = [fields, *(levels or {}).values()]
         bad = sorted({t for group in everything for t in group.values() if t not in FIELD_TYPES})
         if bad:
@@ -181,11 +189,22 @@ class FieldCatalog:
                 f"{path}: {rule.describe()}: {rule.op} on a string field needs a declared domain "
                 f"({rule.field!r} has none); use eq or in"
             )
-        if site in OPEN_ONLY_SITES and self.licences.get(rule.field, "open") != "open":
+        if site in OPEN_ONLY_SITES and self.licences.get(rule.field) != "open":
+            given = self.licences.get(rule.field)
+            why = "has no declared licence" if given is None else f"is {given}-licensed"
             raise ConfigurationError(
-                f"{path}: field {rule.field!r} is {self.licences[rule.field]}-licensed; a rule "
-                f"at the {site!r} site reads only open data"
+                f"{path}: field {rule.field!r} {why}; a rule at the {site!r} site reads only "
+                f"openly licensed data"
             )
+        domain = self.domains.get(rule.field)
+        if kind == "str" and domain is not None and rule.op not in NO_VALUE_OPS:
+            values = rule.value if isinstance(rule.value, tuple) else (rule.value,)
+            outside = [v for v in values if v not in domain]
+            if outside:
+                raise ConfigurationError(
+                    f"{path}: {rule.describe()}: {outside} is not a value of {rule.field!r} "
+                    f"(declared: {list(domain)}); a misspelt label would decide the rule"
+                )
 
     def _check_rule(self, rule: Rule, path: str, site: str = SCREENER) -> None:
         kind = self.check_field(rule.field, path, site)

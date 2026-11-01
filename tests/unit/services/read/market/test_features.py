@@ -73,9 +73,11 @@ def test_names_outside_the_entitys_catalogue_are_refused() -> None:
         load_market_feature_values(ctx, ["instrument.symbol"])
     with pytest.raises(UnknownFeatureError, match=r"unknown market feature 'feature\.pct_from"):
         load_market_feature_values(ctx, ["feature.pct_from_high_52w"])
-    with pytest.raises(UnknownFeatureError, match=r"unknown field 'market\.market_counts"):
+    with pytest.raises(
+        UnknownFeatureError, match=r"field 'market\.market_counts.*market-level field"
+    ):
         load_feature_values(ctx, ["EQ:AAA"], [NAMES])
-    with pytest.raises(UnknownFeatureError, match=r"unknown field 'feature\.share'"):
+    with pytest.raises(UnknownFeatureError, match=r"field 'feature\.share'.*market-level field"):
         load_feature_values(ctx, ["EQ:AAA"], [SHARE])
     with pytest.raises(ValueError, match="a market read names its ids"):
         load_feature_values(ctx, None, [NAMES], entity="market")
