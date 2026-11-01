@@ -37,6 +37,7 @@ TEMPLATES = parse_templates(
 def _templates(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(setups, "load_templates", lambda configs: TEMPLATES)
     CTX.configs = None
+    CTX.memo = {}
 
 
 @pytest.mark.parametrize(

@@ -195,13 +195,13 @@ detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
 id = "ideas-setup-picks"
-description = "Ideas from the picks of setups with a good stored verdict (ADR 0083 decision 2 and amendment (a), services/read/ideas/): per tab (Stocks, Premium from the setup's position kind) the site setups whose stored verdict headline, read point in time (the canonical run committed on or before the session), is works / promising, each with the picks its basis screener's run gave it through pick_edges.load_pick_edges (never the table), one pure ranking rule (services/ideas/setup_rule.py: verdict level, lift, trades, edge id, place, instrument id; RULE_VERSION), a ticker several setups picked one idea with the others as also_in, a pick of a run the viewer's licences withhold dropped before the cap of 15, a setup whose evidence licence the viewer lacks never listed (load_edges), a night the step did not store UNKNOWN not empty, setups left out for want of a readable verdict counted by kind; the inverse reads: a setup's picks and the setups that picked an instrument"
+description = "Ideas from the picks of setups with a good stored verdict (ADR 0083 decision 2 and amendment (a), services/read/ideas/): per tab (Stocks, Premium from the setup's position kind) the site setups whose stored verdict headline, read point in time (the canonical run committed on or before the session), is works / promising, each with the picks its basis screener's run gave it through pick_edges.load_pick_edges (never the table), one pure ranking rule (services/ideas/setup_rule.py: verdict level, lift, trades, edge id, place, instrument id; RULE_VERSION), a ticker several setups picked one idea with the others as also_in, a pick of a run the viewer's licences withhold dropped before the cap of 15, a setup whose evidence licence the viewer lacks never listed (load_edges), a night the step did not store UNKNOWN not empty, setups left out for want of a readable verdict counted by kind; the inverse reads: a setup's picks and the setups that picked an instrument; one idea's page (detail.py, IdeaDetail, plan V4): under the setup asked for or the best that picked the ticker, the sections filled from the setup (thesis and the criteria the name met, positions.exit_rule's historical exit rule, the stored verdict headline, the setup's persistence reason and the name's own earnings before the hold ends, the setup to learn), a missing input UNKNOWN with its reason, no page for a ticker no qualifying setup picked at the session"
 owner = ["src/algotrade/services/read/ideas/*"]
 allowed = [
     "apps/api/algotrade_api/graphql/*",  # Query.setupIdeas serves it (one loader call per resolver)
 ]
 section = "docs/adr/0083-workflow-first-trader-site.md#decision"
-detect = [{ call = "load_setup_picks" }, { call = "load_session_setups" }]
+detect = [{ call = "load_setup_picks" }, { call = "load_session_setups" }, { call = "load_idea_detail" }]
 
 [[responsibility]]
 id = "known-value-coverage-read"
@@ -215,7 +215,10 @@ detect = [{ call = "load_known_coverage" }]
 id = "pick-positions"
 description = "The position a setup publishes for a pick (services/read/evaluation/positions/, ADR 0083 decision 3, ADR 0088): its historical exit rule, the 80th percentile of the max_drawdown of the verdict basis's winning long trades in the canonical run (read through runs.load_run_trades only, canonical run ending by the session, trades that exited by it), the 2 x ATR(14) fallback below [exit_rule] min_winners, a setup's declared stop published as it is, the hold the verdict's basis_horizon; UNKNOWN with its reason, never filled; the example position joins in E9"
 owner = ["src/algotrade/services/read/evaluation/positions/exit_rule.py"]
-allowed = ["apps/api/algotrade_api/graphql/*"]  # Edge.exitRule serves it: one loader call
+allowed = [
+    "apps/api/algotrade_api/graphql/*",  # Edge.exitRule serves it: one loader call
+    "src/algotrade/services/read/ideas/detail.py",  # the idea page's exit-rule section (plan V4)
+]
 section = "docs/adr/0083-workflow-first-trader-site.md#decision"
 detect = [{ call = "load_exit_rule" }, { call = "exit_rule_at" }]
 

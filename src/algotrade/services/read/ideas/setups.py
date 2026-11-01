@@ -19,7 +19,7 @@ from enum import StrEnum
 from algotrade.config.edges.positions.templates import load_templates, position_of
 from algotrade.config.user import SITE_USER
 from algotrade.services.ideas.setup_rule import LEVEL_ORDER, SetupStanding
-from algotrade.services.read.context import ReadContext
+from algotrade.services.read.context import ReadContext, once_per_request
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge, load_edges, parsed_edges
 from algotrade.services.read.evaluation.verdict import EdgeSummary, load_stored_summary
@@ -94,7 +94,13 @@ def in_tab(ctx: ReadContext, tab: str) -> Callable[[str], bool]:
 
 
 def load_session_setups(ctx: ReadContext) -> SessionSetups:
-    """The qualifying setups of ``ctx.session`` and the left-out ones, for the viewer."""
+    """The qualifying setups of ``ctx.session`` and the left-out ones, for the viewer (read once
+    per request: a page asks for the list, the groups and a detail)."""
+    key = ("session-setups", ctx.user.user_id, ctx.session.date)
+    return once_per_request(ctx, key, lambda: _load_session_setups(ctx))
+
+
+def _load_session_setups(ctx: ReadContext) -> SessionSetups:
     visible = {e.id: e for e in load_edges(ctx) if not e.mine}
     qualifying: list[QualifyingSetup] = []
     left: dict[tuple[str, str], list[str]] = {}

@@ -2235,11 +2235,54 @@ type Idea {
 }
 
 """
+One idea's page for the session, shown under `setup` (the best that picked it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is the setup's id, the key of its Guide entry
+"""
+type IdeaDetail {
+  session: Date!
+  instrumentId: String!
+  instrument: Instrument
+  tab: IdeaTab!
+  setup: InstrumentSetup!
+  setups: [InstrumentSetup!]!
+  why: IdeaWhy!
+  exitRule: ExitRule!
+  evidence: IdeaEvidence!
+  risks: IdeaRisks!
+  learn: String!
+  metrics: [IdeaMetric!]!
+}
+
+"""
+The stored verdict headline of the setup: every figure is backtested (hypothetical), never a forecast. `liftPts`: the out-of-sample lift in points; `oosTrades` and `trades`: the trades behind it; null: not measured
+"""
+type IdeaEvidence {
+  level: String!
+  result: String!
+  basis: String
+  basisHorizon: Int
+  liftPts: Float
+  lift: Float
+  trades: Int
+  oosTrades: Int
+}
+
+"""
 A stored display value of an idea's best pick: a screener column or a criterion's value, by name
 """
 type IdeaMetric {
   name: String!
   value: JSON!
+}
+
+"""
+What could go wrong: `persistence` (why the setup's edge should last, so what would end it), the name's own earnings `events` before the hold ends on `holdEnds`, and the pick's `watchOut` ids; `unknown` when the hold is not known
+"""
+type IdeaRisks {
+  persistence: String!
+  holdEnds: Date
+  events: [AheadEvent!]!
+  watchOut: [String!]!
+  unknown: Unknown
 }
 
 """
@@ -2258,6 +2301,17 @@ type IdeaScreener {
 enum IdeaTab {
   STOCKS
   PREMIUM
+}
+
+"""
+Why the name is here: the setup's `thesis` and `mechanism`, the screener's `decision` for the name and the `criteria` it met; `unknown` when the pick's row could not be read
+"""
+type IdeaWhy {
+  thesis: String!
+  mechanism: String!
+  decision: String
+  criteria: [CriterionResult!]!
+  unknown: Unknown
 }
 
 """
@@ -2405,6 +2459,17 @@ type InstrumentEvents {
   ladder: [LadderRung!]!
   reference: FundReference
   gaps: [EventGap!]!
+}
+
+"""
+A qualifying setup that picked the idea: its `place` among the setup's picks, `tab` and verdict `level` (works or promising)
+"""
+type InstrumentSetup {
+  edgeId: String!
+  edgeName: String!
+  tab: IdeaTab!
+  level: String!
+  place: Int!
 }
 
 """
@@ -2853,6 +2918,19 @@ type Query {
     """
     date: Date = null
   ): SetupIdeas
+
+  """
+  One idea's page for the session: the ticker (or instrument id) `symbol` as picked by a qualifying setup, shown under `setup` (default: the best by the Ideas rule), with why it is here, the setup's historical exit rule, its evidence, what could go wrong and the setup to learn (ADR 0083). Null: the name is unknown, no setup picked it at the session, or `setup` is not one that did
+  """
+  idea(
+    symbol: String!
+    setup: String = null
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): IdeaDetail
 
   """
   Who this request is for: the signed-in registry user, their role and workspaces (ADR 0040; not session data)

@@ -27,7 +27,11 @@ from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import Edge
-from algotrade.services.read.evaluation.verdict import EdgeSummary, load_edge_summary
+from algotrade.services.read.evaluation.verdict import (
+    EdgeSummary,
+    load_edge_summary,
+    load_stored_summary,
+)
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.values import Unknown, UnknownCode
 
@@ -138,18 +142,25 @@ def exit_rule_at(
     edge: Edge,
     instrument_id: str | None = None,
     declared: Stop | None = None,
+    bounded: bool = False,
 ) -> ExitRule:
     """The exit rule of ``edge`` at ``ctx.session``; ``instrument_id``: the pick, for the ATR
     fallback; ``declared``: the setup's own stop, published as it is when given. Nothing, the
-    hold included, is read from a canonical run that ends after the session."""
-    canonical = runs.load_canonical_run(ctx, edge)
+    hold included, is read from a canonical run that ends after the session. ``bounded``: the
+    canonical run is the latest committed on or before the session (as Ideas reads the verdict,
+    ``runs.load_canonical_run``), so the rule and the verdict it sits beside name one run."""
+    canonical = (
+        runs.load_canonical_run(ctx, edge, True) if bounded else runs.load_canonical_run(ctx, edge)
+    )
     run = canonical.run
     if run is None:
         return ExitRule(edge.id, None, None, canonical.not_run)
     if run.range_to > ctx.session.date:  # its verdict, basis and ledger are not known then
         why = f"the canonical run ends {run.range_to}, after the session {ctx.session.date}"
         return ExitRule(edge.id, None, None, _unknown(edge, UnknownCode.NOT_RUN, why))
-    summary = load_edge_summary(ctx, edge)
+    summary = (
+        load_stored_summary(ctx, edge, bounded=True) if bounded else None
+    ) or load_edge_summary(ctx, edge)
     if summary.basis_screener is None or summary.basis_horizon is None:
         why = f"{edge.id} has no verdict basis ({summary.result})"
         return ExitRule(edge.id, None, None, _unknown(edge, UnknownCode.NOT_RUN, why))
