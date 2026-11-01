@@ -41,11 +41,18 @@ def run(series: pd.DataFrame, session: date = END, **inputs: object) -> dict[str
 
 
 def trend_row(
-    rv: float | None = 0.12, sma: float | None = 0.03, day: date = DAYS[-1]
+    rv: float | None = 0.12, sma: float | None = 0.03, day: date = DAYS[-1], source: str = "bars"
 ) -> pd.DataFrame:
     """A ``market_trend@v2`` row dated ``day`` (default: the VIX's observation date)."""
     return pd.DataFrame(
-        [{"session_date": day, "spx_realised_vol_20d": rv, "spx_close_vs_sma200": sma}]
+        [
+            {
+                "session_date": day,
+                "spx_realised_vol_20d": rv,
+                "spx_close_vs_sma200": sma,
+                "spx_source": source,
+            }
+        ]
     )
 
 
@@ -280,3 +287,5 @@ def test_the_corr_ratio_uses_the_index_vol_over_the_members_vol() -> None:
     got = run(macro(), **inputs)
     assert got["realised_corr_ratio_21"] == pytest.approx(0.5, rel=1e-3)
     assert run(macro())["realised_corr_ratio_21"] is None  # no bars, no universe
+    level = {**inputs, TREND: trend_row(rv=members / 2, day=END, source="index")}
+    assert run(macro(), **level)["realised_corr_ratio_21"] is None  # window ends a session early

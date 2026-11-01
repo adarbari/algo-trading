@@ -699,3 +699,18 @@ def test_first_vintages_are_each_series_earliest_alfred_vintage_known_by_the_ses
     only = inputs.load_input(reader, inputs.MACRO_FIRST_VINTAGES, [END], 0, ids=("MACRO:LATE",))
     assert only.at(END, 0) is None and only.at(END + timedelta(days=3), 0) is not None
     assert inputs.has_input(inputs.MACRO_FIRST_VINTAGES)
+
+
+def test_reference_input_blanks_the_index_flag_before_the_first_snapshot() -> None:
+    writer, reader = store()
+    rows = [
+        {"instrument_id": "EQ:A", "symbol": "A", "name": "A", "asset_class": "equity",
+         "multiplier": 1.0, "security_type": "COMMON_STOCK", "status": "ACTIVE",
+         "is_leveraged": False, "is_inverse": False, "optionable": True, "in_sp500": True},
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
+    before = END - timedelta(days=30)  # the earliest snapshot stands in: its list is survivors
+    early = inputs.load_input(reader, "instruments/reference", [before], 0).at(before, 0)
+    assert early is not None and early["in_sp500"].isna().all()
+    on = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
+    assert on is not None and bool(on.iloc[0]["in_sp500"])

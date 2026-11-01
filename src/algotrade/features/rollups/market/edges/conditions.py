@@ -371,9 +371,17 @@ FEATURES = (
         "The S&P 500's realised volatility over the last 21 closes divided by the mean realised "
         "volatility of its member stocks over the same closes: near 1 when the names move "
         "together, low (0.3 or less) when they move apart (high dispersion)",
-        "the S&P 500 realised volatility is unknown, or fewer than 50 stocks have a bar on "
-        "each of the last 21 sessions, or no universe or reference snapshot is known",
-        (_RV, f"{BARS}.close", f"{UNIVERSE}.instrument_id", f"{REFERENCE}.in_sp500"),
+        "the S&P 500 realised volatility is unknown (or came from the index level, whose 20 "
+        f"returns end a session before the stocks'), or fewer than {D.corr_min_members} "
+        "members have a bar on each of the last 21 sessions, or no universe or reference "
+        "snapshot is known before the session",
+        (
+            _RV,
+            f"{BARS}.close",
+            f"{UNIVERSE}.instrument_id",
+            f"{UNIVERSE}.asset_class",
+            f"{REFERENCE}.in_sp500",
+        ),
         (0, 5),
     ),
     _open(
@@ -623,7 +631,7 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     row["y10_chg_63d"] = y10
     row.update(states)
     row["realised_corr_ratio_21"] = corr_ratio(
-        _row_on(trend_rows, "spx_realised_vol_20d", session),
+        _index_vol_on_bars(trend_rows, session),
         mean_member_vol(
             inputs.get(UNIVERSE),
             inputs.get(REFERENCE),
@@ -635,6 +643,17 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     row["earnings_season_share"] = season_share(inputs.get(earnings_expected.GROUP.table))
     row.update(calendar_columns(inputs.get(RELEASES), session))
     return pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
+
+
+def _index_vol_on_bars(trend_rows: pd.DataFrame | None, session: date) -> float:
+    """The S&P 500's 20-session realised volatility of ``session``'s trend row when it was
+    measured from SPY's bars (closes through ``session``, like the stocks'); NaN when it came
+    from the index level, whose pit lag ends the window a session earlier."""
+    if trend_rows is None or trend_rows.empty or "spx_source" not in trend_rows.columns:
+        return np.nan
+    day = pd.to_datetime(trend_rows["session_date"]).dt.date
+    rows = trend_rows[(day == session) & (trend_rows["spx_source"] == "bars")]
+    return _row(rows, "spx_realised_vol_20d")
 
 
 def corr_ratio(index_vol: float, member_vol: float) -> float:
