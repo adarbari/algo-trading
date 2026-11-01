@@ -767,5 +767,6 @@ follow-up PR).
 - Options: A open (recommended) or personal; B gate/entry/case/exit only (recommended) or every site; C confirm the reading or not; D per-source dates.
 - Decision: A open; B gate, entry, case and exit only (0064 decision 10 not amended); C confirmed, a gate's fields are recorded in the trial licence; D first session after each source's data end: 2026-10-26 default for the three option-setups research files (earliest verdict 2027-01-26), Spintwig 2025-01-02, Lambda 2026-01-02, ORATS-only earnings 2026-03-02, AI study 2026-11-02.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation (reversible; the owner was asleep)
+- status: pending owner confirmation
+- Note: reversible; decided while the owner was asleep.
 - Reasoning: A follows the `regime@v3.label` precedent and flips by `Feature.licence` with no recompute; B keeps existing setups visible; C follows from a gate being a rule; D never lets a gate be judged on data its research read. Recorded in ADR 0088 (PR #984).
