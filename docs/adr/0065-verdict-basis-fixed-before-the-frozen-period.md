@@ -229,7 +229,7 @@ they get their own basis, name and ceiling, and never replace the forward one.
    The harness stamps each run `universe_basis`: `survivors` is today's rule (ADR 0053 amendment
    2026-10-09, historical eligibility: names alive in the listing history, delisted ones included, with
    today's flags or a liquidity proxy: a disclosed lookahead tilt; the run's `historical_identity` text is
-   the caveat shown); `free` is ADR 0084 decision 6 (listing history, delisted bars and events, `forward_returns@v3`, security types, each above its threshold in `verdict.toml [universe_basis]`; the gaps in `universe_basis_gaps`). Every run is `survivors` until then. A
+   the caveat shown); `free` is ADR 0087 decision 6 (listing history, delisted bars and events, `forward_returns@v3`, security types, each above its threshold in `verdict.toml [universe_basis]`; the gaps in `universe_basis_gaps`). Every run is `survivors` until then. A
    `survivors` run adds the Works criterion `survivorship_free` (unmet), so the ceiling is Promising; for
    an outcome side `short` (the names that failed are the best shorts and the least likely to be in the
    data) its level is at most Not enough data, never Not working; a `long` Not working stands, labelled.
@@ -295,5 +295,5 @@ labelled columns, forward first. (4) Works on this basis is deflated by the site
 per paper: `lazy_prices_10k_change` only, not `risk_factor_change`. (6) The per-setup attestation that the
 parameters were set from the paper's text, not tuned on the store, is given at registration. (7) A closed
 window that stops at `frozen_from`. (8) A `short`-side setup on a survivors-only universe is capped at Not enough
-data, never Not working. The survivorship-free universe is the listing history of ADR 0084 (PR 968), which defines
+data, never Not working. The survivorship-free universe is the listing history of ADR 0087 (PR 968), which defines
 `universe_basis`; the harness stamp is added by the implementation PR.
