@@ -808,3 +808,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's word in chat, 2026-11-01: "3 to 5 aligned with your suggestion."
+
+## 2026-11-01 | fundamentals@v5 IFRS share count (PR #965) | refetch and backfill, retiring v4, the net_share_issuance frozen period
+- Question: (1) authorise the live-store refetch and history backfill; (2) retire `fundamentals@v4`; (3) how to treat the `net_share_issuance` edge's frozen period (from 2026-04-01) now that its input moves to v5?
+- Options: as recommended by the architect re-review / the alternatives (no backfill, keep v4, restart the frozen period).
+- Decision: (1) yes: `shares --force`, then the rollups backfill `--only fundamentals@v5`; (2) yes, retired only after the v5 backfill covers the full history (`retire-features --dry-run` first); (3) keep `frozen_from = 2026-04-01`: v4 values carry over unchanged and v5 only adds names that had no count, recorded as a coverage change in the edge notes and the run's trial log.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-11-01: "Yes, all three" (the architect's recommendations). `SHARE_CONCEPTS_VERSION_DATE` = 2026-11-02, the first nightly with the merged code.
