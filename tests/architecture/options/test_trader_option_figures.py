@@ -96,6 +96,29 @@ def test_the_grid_types_carry_exactly_these_fields(schema: GraphQLSchema) -> Non
         assert set(found.fields) == fields, name
 
 
+TEMPLATE_CONST = re.compile(r"const\s+(\w+)\s*=\s*`([^`]*)`")
+
+
+def _template_constants(source: str) -> dict[str, str]:
+    """The ``const NAME = `...` `` template strings of one file: the shared field lists and
+    fragments a hand-written operation interpolates."""
+    return dict(TEMPLATE_CONST.findall(source))
+
+
+def _resolve_interpolations(text: str, constants: dict[str, str], depth: int = 0) -> str:
+    """Substitute each ``${NAME}`` with the constant it names, recursively, so a fragment that
+    reads a raw quote is seen; a name that is not a template constant in the file becomes a
+    ``__typename`` stand-in (keeps the document valid)."""
+
+    def one(m: re.Match[str]) -> str:
+        found = constants.get(m.group(1).strip())
+        if found is None or depth > 5:
+            return "__typename"
+        return _resolve_interpolations(found, constants, depth + 1)
+
+    return re.sub(r"\$\{([^}]*)\}", one, text)
+
+
 def _documents() -> dict[str, str]:
     """Every operation the web sends by name: the generated documents of gql.ts and the
     hand-written ``query <Name>`` template strings (tests and stories apart)."""
@@ -108,9 +131,9 @@ def _documents() -> dict[str, str]:
     for path in WEB_SRC.rglob("*.ts*"):
         if "generated" in path.parts or re.search(r"\.(test|stories)\.", path.name):
             continue
-        for raw in HAND_WRITTEN.findall(path.read_text()):
-            # a ${FIELDS} interpolation is a shared field list: a stand-in keeps the document valid
-            text = re.sub(r"\$\{[^}]*\}", "__typename", raw)
+        source = path.read_text()
+        for raw in HAND_WRITTEN.findall(source):
+            text = _resolve_interpolations(raw, _template_constants(source))
             head = re.search(r"\b(?:query|mutation)\s+(\w+)", text)
             if head:
                 found.setdefault(head.group(1), text)
@@ -175,3 +198,20 @@ def test_the_raw_quote_fields_are_confined_to_the_stored_quote_type(schema: Grap
 def test_the_forbidden_list_is_not_stale() -> None:
     assert Path(SCHEMA).is_file() and GQL_TS.is_file()
     assert set(_documents()) >= RAW_QUOTE_OPERATIONS
+
+
+def test_an_interpolated_fragment_that_reads_a_raw_quote_is_seen(schema: GraphQLSchema) -> None:
+    """The gap of PR #1023: a hand-written operation pulling a shared fragment must be caught."""
+    source = (
+        "const QUOTE = `bid ask`\n"
+        "const OUTER = `chain { quotes(expiry: $e) { ${QUOTE} } }`\n"
+        "const DOC = `query Sneaky($k: String!, $e: Date!) { instrument(key: $k) { ${OUTER} } }`"
+    )
+    text = _resolve_interpolations(
+        "query Sneaky($k: String!, $e: Date!) { instrument(key: $k) { ${OUTER} } }",
+        _template_constants(source),
+    )
+    info = TypeInfo(schema)
+    reads = _ReadsType(info)
+    visit(parse(text), TypeInfoVisitor(info, reads))
+    assert reads.parents & RAW_QUOTE_TYPES
