@@ -50,7 +50,7 @@ def _tonight(night: dict[str, Any] | None, edge_id: str) -> tuple[str, str]:
         return NOT_RUN, ""
     said = night.get("tonight", {}).get(edge_id)
     if not isinstance(said, dict):
-        return NOT_RECORDING, ""  # the night ran, but the edge was not evidenced or live
+        return NOT_RECORDING, ""  # the night ran, but the edge is not open for recording
     return str(said.get("state", NOT_RUN)), str(said.get("reason", ""))
 
 
@@ -68,7 +68,7 @@ class FollowedEdge:
     ``tonight`` is what the nightly did for it on the session, so an empty buy list says why:
     ``signalled``, ``no_picks`` (due, the screen qualified none), ``not_due`` (its schedule does
     not fire), ``skipped`` (due but could not be signalled: ``tonight_reason`` says why) or
-    ``not_recording`` (the owner's night ran, but the edge is not evidenced or live) or ``not_run``
+    ``not_recording`` (the owner's night ran, but the edge is not open for recording) or ``not_run``
     (no nightly run for the session). ``missed``: due sessions since the previous
     night that nobody signalled."""
 

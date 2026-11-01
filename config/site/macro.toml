@@ -33,7 +33,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -43,7 +42,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -53,7 +51,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 licence = "personal"
 terms = "ICE BofA indices via FRED: personal use only (ICE notice on each series page)"
 
@@ -64,7 +61,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 licence = "personal"
 terms = "ICE BofA indices via FRED: personal use only (ICE notice on each series page)"
 
@@ -75,7 +71,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 licence = "personal"
 terms = "Moody's data via FRED: personal use only (copyright notice on the series page)"
 
@@ -86,7 +81,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -106,7 +100,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 # --- Allocation inputs (EB E5 bridge; FRED-checked 2026-10-18): the broad dollar (H.10 posts it weekly)
@@ -172,7 +165,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 5
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -182,7 +174,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 5
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -192,7 +183,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 5
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -202,7 +192,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 5
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -212,7 +201,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 6
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -222,7 +210,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 5
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -232,7 +219,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 1
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -242,7 +228,6 @@ kind = "macro"
 cadence = "weekly"
 release_lag_days = 1
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -264,7 +249,6 @@ kind = "macro"
 cadence = "monthly"
 release_lag_days = 40
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -274,7 +258,6 @@ kind = "macro"
 cadence = "monthly"
 release_lag_days = 40
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -314,7 +297,6 @@ kind = "macro"
 cadence = "monthly"
 release_lag_days = 60
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -364,7 +346,6 @@ kind = "macro"
 cadence = "monthly"
 release_lag_days = 40
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -374,7 +355,6 @@ kind = "macro"
 cadence = "monthly"
 release_lag_days = 125  # a lagged row (before ALFRED's first vintage) holds the final value, known 120+ days on
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -384,7 +364,6 @@ kind = "macro"
 cadence = "quarterly"
 release_lag_days = 45
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 [[series]]
@@ -394,7 +373,6 @@ kind = "macro"
 cadence = "quarterly"
 release_lag_days = 125  # a lagged row (before ALFRED's first vintage) holds the final value, known 120+ days on
 pit = "alfred"
-transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
 # --- Published files (RG3b; docs/market-regime-plan.md 3E and 3F). Fetched whole by the
@@ -408,13 +386,11 @@ kind = "macro"
 cadence = "monthly"
 release_lag_days = 45         # obs dated the 1st; the Fed posts it irregularly, from the 4th
 pit = "lag"                   # business day of the next month: a month and two weeks
-transform = "level"
 revised = true
 terms = "Federal Reserve Board FEDS Notes data (https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html): public Fed data, cite Gilchrist and Zakrajsek (2012) and Favara et al. (2016)"
 url = "https://www.federalreserve.gov/econres/notes/feds-notes/ebp_csv.csv"
 date_column = "date"          # m/d/yyyy, the first of the month
 value_column = "ebp"
-parser = "csv"
 
 [[series]]
 key = "EBP_RECESSION_PROB"    # the Fed's 12-month recession probability from the EBP (0-1)
@@ -423,13 +399,11 @@ kind = "macro"
 cadence = "monthly"
 release_lag_days = 45
 pit = "lag"
-transform = "level"
 revised = true
 terms = "Federal Reserve Board FEDS Notes data (https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html): public Fed data, cite Gilchrist and Zakrajsek (2012) and Favara et al. (2016)"
 url = "https://www.federalreserve.gov/econres/notes/feds-notes/ebp_csv.csv"
 date_column = "date"
 value_column = "est_prob"
-parser = "csv"
 
 [[series]]
 key = "OFR_FSI"               # OFR Financial Stress Index, daily, 2000- (re-estimated: revised)
@@ -438,13 +412,11 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 5          # posted on business days a day or more after the close (a
 pit = "lag"                   # Thursday value appeared on the Monday): conservative
-transform = "level"
 revised = true
 terms = "Office of Financial Research (https://www.financialresearch.gov/financial-stress-index/): US government work, informational only, no warranty; cite \"OFR Financial Stress Index\""
 url = "https://www.financialresearch.gov/financial-stress-index/data/fsi.csv"
 date_column = "Date"
 value_column = "OFR FSI"
-parser = "csv"
 
 [[series]]
 key = "EPU_DAILY"             # daily US Economic Policy Uncertainty index, 1985-
@@ -453,7 +425,6 @@ kind = "macro"
 cadence = "daily"
 release_lag_days = 2          # posted the next day; newspaper counts can be revised
 pit = "lag"
-transform = "level"
 revised = true
 terms = "Baker, Bloom and Davis (https://www.policyuncertainty.com): Creative Commons Attribution 4.0, cite Baker, Bloom and Davis (2016)"
 url = "https://www.policyuncertainty.com/media/All_Daily_Policy_Data.csv"
@@ -474,7 +445,6 @@ kind = "index"
 cadence = "daily"
 release_lag_days = 1          # FRED posts a day's close the next business day
 pit = "lag"
-transform = "level"
 licence = "personal"
 terms = "S&P Dow Jones Indices via FRED: personal use only, display only (copyright notice on the series page)"
 
@@ -486,7 +456,6 @@ kind = "index"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 licence = "personal"
 terms = "Nasdaq data via FRED: personal use only (copyright notice on the series page)"
 
@@ -498,7 +467,6 @@ kind = "index"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 licence = "personal"
 terms = "Cboe data via FRED: personal use only (copyright notice on the series page)"
 
@@ -510,59 +478,10 @@ kind = "index"
 cadence = "daily"
 release_lag_days = 1
 pit = "lag"
-transform = "level"
 licence = "personal"
 terms = "Cboe data via FRED: personal use only (copyright notice on the series page)"
 
-# Cboe's own history files (EB D3): the term-structure indices FRED does not carry (VIX itself and
-# VIX3M stay FRED's above: both give the same close). One static CSV per index on Cboe's CDN,
-# fetched whole, `MM/DD/YYYY` dates. The file of a session is last modified about 17:30 New York
-# time that day (measured 2026-10-17), so a one-day lag errs late. The VX futures by expiry are
-# `volatility/vx_futures` (the `vx-futures` task), not series.
-[[series]]
-key = "VIX9D"                 # Cboe 9-day VIX close (2011-)
-source = "published"
-kind = "index"
-cadence = "daily"
-release_lag_days = 1
-pit = "lag"
-transform = "level"
-licence = "personal"
-terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
-url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX9D_History.csv"
-date_column = "DATE"
-value_column = "CLOSE"
-parser = "csv"
-
-[[series]]
-key = "VIX6M"                 # Cboe 6-month VIX close (2008-)
-source = "published"
-kind = "index"
-cadence = "daily"
-release_lag_days = 1
-pit = "lag"
-transform = "level"
-licence = "personal"
-terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
-url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX6M_History.csv"
-date_column = "DATE"
-value_column = "CLOSE"
-parser = "csv"
-
-[[series]]
-key = "VVIX"                  # Cboe VIX-of-VIX close (2006-; the file has the close only)
-source = "published"
-kind = "index"
-cadence = "daily"
-release_lag_days = 1
-pit = "lag"
-transform = "level"
-licence = "personal"
-terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
-url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VVIX_History.csv"
-date_column = "DATE"
-value_column = "VVIX"
-parser = "csv"
+# The Cboe index files (EB D3, ADR 0084) are in series/cboe.toml (this file is at the line cap).
 
 # --- Country CAPE (EB D7; docs/edge-ideas/build-plan.md). Barclays' Shiller CAPE file, one
 # column per country, month-end dates 1981-12-: MSCI country indices in local currency over
@@ -583,7 +502,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -599,7 +517,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -615,7 +532,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -631,7 +547,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -647,7 +562,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -663,7 +577,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -679,7 +592,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -695,7 +607,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -711,7 +622,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -727,7 +637,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -743,7 +652,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -759,7 +667,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -775,7 +682,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -791,7 +697,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -807,7 +712,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -823,7 +727,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -839,7 +742,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -855,7 +757,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -871,7 +772,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -887,7 +787,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -903,7 +802,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -919,7 +817,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -935,7 +832,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -951,7 +847,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -967,7 +862,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
@@ -983,7 +877,6 @@ cadence = "monthly"
 release_lag_days = 45
 refetch_days = 28
 pit = "lag"
-transform = "level"
 licence = "personal"
 revised = true
 terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"

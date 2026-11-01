@@ -1,6 +1,6 @@
 # ADR 0053: Edges: hypotheses with evidence, an outcomes grain and one point-in-time harness
 
-**Status:** accepted, amended by [0065](0065-verdict-basis-fixed-before-the-frozen-period.md) (the verdict's basis) (2026-10-07; owner decisions 2026-10-06 and 2026-10-07; the plan and items
+**Status:** accepted, amended by [0083](0083-workflow-first-trader-site.md) (`results/edge_verdict` gains `basis_screener` and `basis_horizon`), amended by [0065](0065-verdict-basis-fixed-before-the-frozen-period.md) (the verdict's basis; and, amendment 2026-10-25, a post-publication basis for research setups) (2026-10-07; owner decisions 2026-10-06 and 2026-10-07; the plan and items
 are [edges-plan.md](../edges-plan.md), the long form is the owner's PRD "Winners-Derived Screener:
 Product Requirements"; the open decisions below are the owner's before the item that needs each); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (the optional `[published]` table of an edge document); amended 2026-10-22 (the stored verdict headline, `results/edge_verdict`).
 Extends [0005](0005-ingestion-is-the-only-writer.md) (ingestion writes the outcomes),
@@ -500,8 +500,8 @@ for one thing is removed.
    the files, idempotently and atomically. Both go once every file is migrated (PR 5).
 6. **Paper trades follow the edge's owner (replaces the follow-based rule of the 2026-10-09
    amendment, item 7; owner decision 2026-10-10).** An edge records while its status is
-   `evidenced` or `live` (`config.edges.loading.RECORDING`); a user cannot set `evidenced`, so
-   their own edge records from `live`. The record's owner is `site` for a site edge, else the
+   `evidenced` or `live` (`RECORDING`; a site edge from `candidate`, ADR 0064 amendment
+   2026-10-24); a user cannot set `evidenced`, so their own edge records from `live`. The record's owner is `site` for a site edge, else the
    user whose edge it is: `results/edge_paper` and its key are unchanged, `user_id` now means the
    record owner (no migration), and the nightly runs one `edge-signals` job per record owner
    (`site` first), under that owner's context, so a follower's own presets and universes never

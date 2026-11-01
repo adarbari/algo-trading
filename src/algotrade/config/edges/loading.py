@@ -55,6 +55,21 @@ USER_STATUSES = ("researching", "candidate", "live", "retired", "rejected")  # a
 # The statuses an edge takes new paper picks in, for its OWNER's record (ADR 0053 amendment
 # 2026-10-10: a user cannot set ``evidenced``, so their own edge records from ``live``).
 RECORDING = ("evidenced", "live")
+# A site setup records from ``candidate`` (ADR 0064 amendment 2026-10-24: the forward record is the
+# product's evidence and a day not recorded cannot be recovered; "recording" is a notion of its
+# own, never a verdict: ``evidenced`` still means the verdict cleared its bar).
+SITE_RECORDING = ("candidate", *RECORDING)
+
+
+def records_paper(status: str, site: bool) -> bool:
+    """Whether an edge with ``status`` takes new paper picks for its record owner's record: a SITE
+    edge (``site``) from ``candidate`` to ``live``, a user's own edge from ``live`` only (a user
+    cannot set ``evidenced``; a draft or candidate of theirs is no one's evidence). A
+    ``researching``, ``retired``, ``rejected`` or ``blocked`` edge takes none (its open trades
+    still settle)."""
+    return status in (SITE_RECORDING if site else RECORDING)
+
+
 MAX_CHAIN = 8  # a copy of a copy of ...: deeper is a mistake (and a cycle is refused earlier)
 
 

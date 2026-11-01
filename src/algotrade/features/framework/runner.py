@@ -68,6 +68,8 @@ def _check_point_in_time(
     for column in (known, "day"):
         if column in frame.columns and len(frame):
             latest = frame[column].iloc[-1]
+            if pd.isna(latest):  # a row stored without ``known_from``: known from its partition
+                continue
             later = latest > pd.Timestamp(session) if column == "day" else latest > session
             if later:
                 raise AssertionError(f"{rollup.key}: {table} rows from {latest} reached {session}")

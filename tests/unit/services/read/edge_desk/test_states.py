@@ -20,6 +20,7 @@ from tests.unit.services.read.edge_desk.conftest import (
     NEXT,
     NO_CUTOFF,
     SESSION,
+    SITE_DRIFT,
     closed_trades,
     context,
     store,
@@ -50,7 +51,7 @@ def test_an_edge_with_no_paper_trades_has_no_live_record(backend: MemoryBackend)
     assert (live.state, live.closed, live.win_rate) == ("no_trades", 0, None)
 
 
-def test_a_site_edge_nobody_follows_is_judged_but_a_candidate_is_not_recorded(
+def test_a_site_edge_nobody_follows_is_judged_and_so_is_a_candidate_but_a_draft_is_not_recorded(
     backend: MemoryBackend,
 ) -> None:
     store(backend, closed_trades(4, 16))
@@ -60,8 +61,11 @@ def test_a_site_edge_nobody_follows_is_judged_but_a_candidate_is_not_recorded(
         ("drift", "below", False)
     ]
     (candidate,) = load_edge_desk(context(backend, follow=None, extra=CANDIDATE)).live_states
-    assert (candidate.state, candidate.closed, candidate.followed) == ("not_recording", 0, False)
-    assert "evidenced" in candidate.headline and candidate.state in LIVE_STATES
+    assert (candidate.state, candidate.closed, candidate.followed) == ("below", 20, False)
+    draft = {SITE_DRIFT: {**EDGE, "status": "researching"}}
+    (idle,) = load_edge_desk(context(backend, follow=None, extra=draft)).live_states
+    assert (idle.state, idle.closed, idle.followed) == ("not_recording", 0, False)
+    assert "not open" in idle.headline and idle.state in LIVE_STATES
 
 
 def test_a_settlement_a_later_night_recorded_is_not_in_a_finished_sessions_state(
@@ -114,8 +118,8 @@ def test_the_session_cutoff_is_the_first_completed_nightlys_finish(backend: Memo
     assert session_cutoff(records, date(2026, 10, 1)) is None
 
 
-def _as_site(backend: MemoryBackend) -> ReadContext:
-    me = context(backend, extra=SITE_EVIDENCED)
+def _as_site(backend: MemoryBackend, extra: dict | None = None) -> ReadContext:  # type: ignore[type-arg]
+    me = context(backend, extra=extra or SITE_EVIDENCED)
     stores = open_stores(StoreReader(backend), me.configs, UserContext(SITE_USER))
     return ReadContext(
         stores.reader, stores.configs, stores.user, me.session, stores.features, stores.cache
@@ -129,15 +133,47 @@ def test_below_range_names_only_the_record_owners_edges(backend: MemoryBackend) 
     assert below_range(context(backend, extra=SITE_EVIDENCED)) == ()
 
 
+def test_below_range_names_no_candidate_whose_record_is_unproven(backend: MemoryBackend) -> None:
+    store(backend, closed_trades(4, 16))
+    assert below_range(_as_site(backend, extra=CANDIDATE)) == ()
+
+
 def test_below_range_is_empty_while_the_edge_is_on_track(backend: MemoryBackend) -> None:
     store(backend, closed_trades(12, 8))
     assert below_range(_as_site(backend)) == ()
 
 
-def test_a_followed_candidate_reads_not_recording_a_follow_records_nothing(
+def test_a_followed_draft_reads_not_recording_a_follow_records_nothing(
     backend: MemoryBackend,
 ) -> None:
     store(backend, closed_trades(12, 8))
-    desk = load_edge_desk(context(backend, extra=CANDIDATE))  # followed, but a candidate
+    draft = {SITE_DRIFT: {**EDGE, "status": "researching"}}
+    desk = load_edge_desk(context(backend, extra=draft))  # followed, but a draft
     (live,) = desk.live_states
     assert (live.state, live.closed) == ("not_recording", 0)
+
+
+def test_a_name_picked_from_data_the_viewer_has_no_licence_for_is_not_read_nor_counted(
+    backend: MemoryBackend,
+) -> None:
+    """The licence recorded at the signal decides (ADR 0064 decision 10): a candidate's record
+    over personal-licence data reads as no trades to a viewer who holds none, whole."""
+    rows = [t | {"licence": "personal"} for t in closed_trades(12, 8)]
+    store(backend, rows)
+    (live,) = load_edge_desk(context(backend, extra=CANDIDATE)).live_states
+    assert (live.state, live.closed) == ("no_trades", 0)
+
+
+def test_a_name_picked_from_open_data_is_read_whole(backend: MemoryBackend) -> None:
+    store(backend, [t | {"licence": "open"} for t in closed_trades(12, 8)])
+    (live,) = load_edge_desk(context(backend, extra=CANDIDATE)).live_states
+    assert live.closed == 20
+
+
+def test_below_range_judges_a_record_whose_names_a_viewer_could_not_read(
+    backend: MemoryBackend,
+) -> None:
+    """The nightly's line names an edge, never a name: the site user holds no licence, and a
+    setup read from personal data is still named when its record is below the range."""
+    store(backend, [t | {"licence": "personal"} for t in closed_trades(4, 16)])
+    assert [s.edge_id for s in below_range(_as_site(backend))] == ["drift"]

@@ -267,8 +267,9 @@ def _audit_failure(edge_id: str, differing: list[LegDifference]) -> str:
 
 def edge_signals_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``session`` (ISO date: tonight's); the job's user is the RECORD owner (``site`` or
-    a user). The picks at it of the owner's evidenced or live edges and the open paper trades its
-    rows hold whose outcomes close, published atomically into ``results/edge_paper``."""
+    a user). The picks at it of the owner's open edges (``loading.records_paper``) and the open
+    paper trades its rows hold whose outcomes close, published atomically into
+    ``results/edge_paper``."""
     night, record = run_night(
         ctx.resources["reader"],
         ctx.resources["writer"],

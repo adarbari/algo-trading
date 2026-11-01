@@ -9,7 +9,7 @@ from datetime import date
 import pandas as pd
 
 from algotrade.core.time.calendar import next_session, sessions_ending
-from algotrade.features.rollups.market import triggers
+from algotrade.features.rollups.market.edges import triggers
 from algotrade.features.rollups.market.observations import as_series
 
 END = date(2026, 10, 2)

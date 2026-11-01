@@ -189,11 +189,16 @@ purpose = "reads of events/insider_transaction (Form 4, EB D6): the lines a sess
 
 [[dir]]
 path = "src/algotrade/data/listings"
-purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
+purpose = "reads of instruments/listing_history, instruments/index_membership and instruments/delisted_tickers (ADR 0018 amendment, ADR 0087): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names; Massive's delisted tickers (read_delisted_tickers, identity only)"
 
 [[dir]]
 path = "src/algotrade/data/macro"
 purpose = "reads of macro series and index levels (macro/series, ADR 0048): each observation's latest vintage a session knew, and the pit = lag vintage rule"
+
+[[dir]]
+path = "src/algotrade/data/option_history"
+purpose = "the bought option history's store and reads (ADR 0084): the sentinel-marked root on the external drive (ALGOTRADE_OPTION_HISTORY_URL), the session's quotes, underlying days and option statistics; personal licence, importable only by ingestion's import and checks; data/ is at its module cap, so this is a folder"
+contracts = ["Option history is quarantined: only ingestion reads it (ADR 0084)"]
 
 [[dir]]
 path = "src/algotrade/data/outcomes"
@@ -293,7 +298,12 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/market"
-purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus tickers.py, the ticker -> id lookup and close panel they share (the relative-strength groups use it too)"
+purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus edges/ (the leaf groups setups read) and tickers.py, the ticker -> id lookup and close panel they share (the relative-strength groups use it too)"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/market/edges"
+purpose = "market facts setups read: the triggers of ADR 0075 and the market conditions setups gate on; one leaf feature group per module (its documented FEATURES, a pure compute and its GROUP declaration) that no headline-regime group reads, so a version bump here never reaches regime@v3"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

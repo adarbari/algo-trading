@@ -67,3 +67,15 @@ def test_the_sample_s_symbols_count_against_bars_history(tmp_path: Path) -> None
         run.record_item("hist:EQ:NEW", "OK: w")
         run.record_item("split:EQ:NEW", "SPLIT_MISMATCH: 1")  # not a symbol
         assert len(month_symbols(run)) == len(picks) + 1
+
+
+def test_an_actions_only_item_is_the_same_symbol_as_its_bars_item() -> None:
+    """``bars-history --actions-only`` asks Tiingo for the same symbol as a bars run: its
+    ``acts:`` items count once with the ``hist:`` ones (a refetch in the month is free)."""
+    writer = StoreWriter(MemoryBackend())
+    spent(writer, "bars_history", "hist:EQ:X", 3)  # hist:EQ:X0 .. X2
+    ctx = task_ctx(writer, clock=lambda: datetime(2026, 10, 9, tzinfo=UTC))
+    with IngestRun(ctx, "bars_history", date(2026, 10, 9)) as run:
+        run.record_item("acts:EQ:X0", "OK: w")  # already spent as hist:EQ:X0
+        run.record_item("acts:EQ:Y", "OK: w")
+        assert month_symbols(run) == {"hist:EQ:X0", "hist:EQ:X1", "hist:EQ:X2", "hist:EQ:Y"}

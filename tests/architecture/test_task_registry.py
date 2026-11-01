@@ -25,7 +25,7 @@ from algotrade_ingestion.workflows.nightly.nightly import (
     NIGHTLY,
     SCREENS,
 )
-from algotrade_sources.framework.registry import FIXTURES, SESSION_SOURCES, SOURCES
+from algotrade_sources.framework.registry import FILE_SOURCES, FIXTURES, SESSION_SOURCES, SOURCES
 from tests.conftest import REPO_ROOT
 
 TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
@@ -91,7 +91,7 @@ def test_every_task_is_reachable_from_the_cli(name: str) -> None:
 
 def test_every_declared_source_can_be_built() -> None:
     names = {s for t in TASKS.values() for s in (*t.sources, *t.optional_sources)}
-    known = {*SOURCES, *SESSION_SOURCES, *FIXTURES}
+    known = {*SOURCES, *SESSION_SOURCES, *FIXTURES, *FILE_SOURCES}
     assert names <= known, sorted(names - known)
 
 

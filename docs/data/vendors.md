@@ -45,6 +45,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | IV history / IV rank (enrichment) | **IBKR** (ADR 0028): IB's daily 30-day IV and HV per underlying, years of history; personal-use licence | our IV30 history (from the Cboe chains), the fallback | Implemented: `ibkr_iv@v1`, `iv_rank` with `iv_rank_source` |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
+| End-of-day option chains, history 2002 on (survivorship-free) | **HistoricalOptionData Level 2** (DeltaNeutral LLC; $1,495 once, daily or monthly zips of CSVs, the owner downloads them; `sources/vendors/historicaloptiondata`, `hod_files`, a folder source, no HTTP): raw 16:00 bid / ask / last / volume / open interest for about 4,300 underlyings incl. delisted names, plus stock quotes, option statistics, dividends and splits; personal licence | ORATS ($599, 2007 on) | Implemented (ADR 0084): `option-history-import` into its own store, `docs/data/option-history.md` |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
 | Analyst estimates, price targets, ratings (free tier) | **Yahoo** (unofficial, owner-only licence, ADR 0080: read per name when FMP has none: `analyst_*@v2`), **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v2`, `analyst_targets@v2`, `analyst_ratings@v2`, `analyst_revisions@v2` are built (docs/data/layers.md) |
@@ -94,13 +95,18 @@ Free static files on Cboe's CDN, no key; personal non-commercial use only (https
 never redistributed, so no vendor data is committed (the fixtures are made up in the real format).
 Verified 2026-10-17.
 
-- **Indices** `https://cdn.cboe.com/api/global/us_indices/daily_prices/<VIX9D|VIX6M|VVIX>_History.csv`
+- **Indices** `https://cdn.cboe.com/api/global/us_indices/daily_prices/<VIX9D|VIX6M|VVIX|SKEW|COR1M|COR3M|DSPX>_History.csv`
   (a 307 to `cdn-api.cboe.com`, followed): `DATE,OPEN,HIGH,LOW,CLOSE` (VVIX: `DATE,VVIX`, the close
   only), `MM/DD/YYYY`, VIX9D from 2011, VIX6M from 2008, VVIX from 2006. They are
-  `[[series]]` of `config/site/macro.toml` (`published` source, `csv` parser, `IDX:<KEY>` in
+  `[[series]]` of `config/site/series/cboe.toml` (read with `macro.toml`; `published` source, `csv` parser, `IDX:<KEY>` in
   `macro/series`): no code. **VIX and VIX3M stay FRED's** (`VIXCLS`, `VXVCLS`, the same closes). The
   index files' `Last-Modified` was Friday 21:31 UTC (17:31 New York) for Friday's close, so
   `release_lag_days = 1` errs late (vintage = observation + 1 day, ADR 0048).
+  **EB D4 (2026-11-01):** SKEW (close only, from 1990-01-02), COR1M and COR3M (OHLC, from 2006-01-03),
+  DSPX (close only, from 2014-06-19), measured the same day; same personal-use licence as the rest
+  of the Cboe files (no different terms found). Stored although no setup reads them yet (owner tenet).
+  **Strategy benchmarks, the rest (2026-11-01):** BFLY (from 1986-06-20), CMBO (1986-06-30), CLL (2008-08-26),
+  PPUT (1986-06-30), close only, same files and terms, beside PUT / WPUT / BXM / BXMD / CNDR (ADR 0084).
 - **VX futures** `https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv`,
   one file per contract holding its whole life: `Trade Date,Futures,Open,High,Low,Close,Settle,Change,
   Total Volume,EFP,Open Interest`. History starts with the 2013 contracts (403 for earlier ones). The
@@ -149,6 +155,26 @@ days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KI
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
 
+### Massive delisted tickers (stored first; ADR 0087)
+
+`GET /v3/reference/tickers?market=stocks&active=false&limit=1000`, cursor-paged through
+`next_url` (key in the Authorization header only), is the free survivorship-free list of what
+the active universe lacks: 23,557 records in 24 pages on 2026-10-24. The `delisted-tickers`
+task (in no workflow) writes it as a full snapshot per session to `instruments/delisted_tickers`
+(`ticker`, `name`, `exchange` = the MIC, `vendor_type`, `security_type`, `cik`, `figi`,
+`share_class_figi`, `end_date`); `end_date` is Massive's `delisted_utc` day, the vendor's last
+trading day: identity (the id merge and the data-quality report), never a feature. Gaps, all
+measured on that pull: `type` is null before 2017 (28% of the rows; `security_type` is also null
+for the unmapped `INDEX`); FIGI covers 3-18% of the names delisted 2010-2018 and 37-78% from
+2019; CIK 79-97%; 505 rows (2%) carry no `delisted_utc`; no OTC names and no ETFs before 2016;
+a renamed company's old ticker is absent. Tickers go through `act_symbol` like the active list
+(`KIMpL` -> `KIM$L`, a lowercase `w` / `r` mark upper-cased); no two records collapsed on it.
+Request budget: the shared `massive` limiter (`[massive] min_interval_s` = 12.5 s, the free
+tier's 5 a minute), so about 24 requests = 5 minutes; a pull under `[quality]
+min_delisted_tickers` (10,000) rows FAILS. Stored first, merged into `instruments/listing_history`
+in the next PR (ADR 0087). The repo holds a 60-record slice,
+`tests/fixtures/sources/massive/inactive_tickers_slice.json`.
+
 ## Tiingo daily prices from 2018 (implemented, ADR 0050)
 
 Host `https://api.tiingo.com`; the key (`ALGOTRADE_TIINGO_API_KEY` in `.env`, a free account) is
@@ -158,8 +184,12 @@ sent as an `Authorization: Token` header, never in URLs, raw files or logs. Lice
 written `BRK-B`; an unknown ticker answers 404). The payload's `open` / `high` / `low` /
 `close` / `volume` are **unadjusted**; they are stored as `bars/1d` rows with `source =
 "tiingo"` by the `bars-history` task (the `adj*` fields are ignored: corporate actions apply at
-read time, ADR 0016). `splitFactor` and `divCash` stay in the parsed payload for the task's
-split check against `events/split`.
+read time, ADR 0016). `splitFactor` and `divCash` stay in the parsed payload: the task checks
+the splits against `events/split` and writes the splits and dividends Massive's shallow history
+lacks (`events/split`, and `events/dividend` for ex-dates before Massive's first one, 2024-09;
+`divCash` is unadjusted, in the ex-date's share terms, untyped; `known_from` = the ex-date, as
+Tiingo gives no declaration date). `bars-history --actions-only --from-listings --since
+2002-01-01` stores that history back to 2002 without the bars.
 
 Free tier: 500 unique symbols a month, 50 requests an hour, 1,000 a day, so requests are spaced
 72 s apart (`[tiingo] min_interval_s`) and the ~140 scoped names take about 3 hours. The Power

@@ -1,0 +1,30 @@
+# L3 site setting: the Guide's screener for the site preset earnings_move_cheap (ADR 0051; docs/ui/guide.md
+# "The screener page"). Keys and tests as in screeners/income/vrp_scanner.toml.
+id = "earnings_move_cheap"
+version = 1  # the preset version this prose was written for
+summary = "Finds S&P 500 stocks whose options price the next earnings report well below what the stock has moved on its last eight reports: the setting a buyer of the report looks for.[^1]"
+hit = "An S&P 500 common stock with listed options, closing above $5 on at least $50M of 20-day dollar volume, with a tradeable option execution tier of A or B. The straddle for the report is at most 0.8 times its mean report move. The cheapest comes first."
+not_checked = "It does not check whether the past moves were driven by one outlier, the spreads at the strikes you would trade, or what the report will bring. A cheap straddle is not a profitable one."
+before_acting = [
+  "One outlier report in the last eight lifts the average and makes the straddle look cheap: compare rollup.earnings_reaction@v2.abs_move_median_8 and rollup.earnings_reaction@v2.abs_move_max_8.",
+  "A straddle bought before the report loses value as implied volatility falls after it: read rollup.implied_move@v1.move_dte and how many days remain.",
+  "Check rollup.earnings_reaction@v2.abs_moves_counted: the ratio needs at least four past reports.",
+]
+related = [
+  { id = "earnings_move_rich", reason = "the other side: a straddle priced above the name's past report moves" },
+]
+
+[[sources]]
+title = "Site convention: implied against realised earnings moves"
+url = "https://www.tastylive.com/concepts-strategies/expected-move"
+note = "Practitioner description of the expected move; the site's ratio against past moves is its own and unproven until the harness tests it."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+sp500 = "In the S&P 500"
+optionable = "Has listed options"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+execution = "A tradeable option execution tier, A or B"
+earnings_move_cheap = "Options price the report at 0.8 times its past moves or less"

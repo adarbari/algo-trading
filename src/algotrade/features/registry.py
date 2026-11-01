@@ -29,6 +29,7 @@ from algotrade.features.rollups.activity import (
     max_return,
     session_returns,
     signed_volume,
+    vol_long,
     vol_stats,
     volume_profile,
 )
@@ -52,6 +53,7 @@ from algotrade.features.rollups.corporate import (
     earnings,
     earnings_expected,
     earnings_reaction,
+    earnings_reaction_session,
     earnings_schedule,
     financials,
     fundamentals,
@@ -77,8 +79,8 @@ from algotrade.features.rollups.market import (
     macro_asof,
     regime,
     trend,
-    triggers,
 )
+from algotrade.features.rollups.market.edges import triggers
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,
@@ -143,6 +145,7 @@ GROUPS: dict[str, FeatureGroup] = {
             price_history.GROUP,
             earnings.GROUP,
             earnings_reaction.GROUP,
+            earnings_reaction_session.GROUP,
             earnings_schedule.GROUP,
             earnings_expected.GROUP,
             earnings_surprise.GROUP,
@@ -191,6 +194,7 @@ GROUPS: dict[str, FeatureGroup] = {
             trend_stats.GROUP,
             candle.GROUP,
             vol_stats.GROUP,
+            vol_long.GROUP,
             volume_profile.GROUP,
             swing_levels.GROUP,
             pivot_strength.GROUP,
@@ -253,6 +257,9 @@ SUPERSEDED: dict[str, Superseded] = {
     "fundamentals@v4": Superseded("fundamentals@v5"),
     # v2 adds the year-ago EPS TTM and the latest quarter's revenue and EPS (with the quarter a
     # year earlier); every v1 column is unchanged
+    # v2 adds the past earnings moves (abs_move_mean_8, abs_move_median_8, abs_moves_counted);
+    # every v1 column is unchanged, and the history is longer so a stale name's last report counts
+    "earnings_reaction@v1": Superseded("earnings_reaction@v2"),
     "financials@v1": Superseded("financials@v3"),
     # v3 reads the facts by SEC acceptance session (same fix); every v2 column is unchanged
     "financials@v2": Superseded("financials@v3"),

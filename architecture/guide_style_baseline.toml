@@ -146,11 +146,11 @@
 "field:rollup.dividend_schedule@v1.next_pay_date:caveats" = 1
 "field:rollup.earnings@v1.days_to_earnings:caveats" = 1
 "field:rollup.earnings_expected@v1.expected_basis:reads" = 1
-"field:rollup.earnings_reaction@v1.earnings_volume_ratio:caveats" = 1
-"field:rollup.earnings_reaction@v1.pre_event_adv_usd_20d:reads" = 1
-"field:rollup.earnings_reaction@v1.reaction_excess_return:caveats" = 3
-"field:rollup.earnings_reaction@v1.reaction_excess_return:reads" = 1
-"field:rollup.earnings_reaction@v1.reaction_status:reads" = 1
+"field:rollup.earnings_reaction@v2.earnings_volume_ratio:caveats" = 1
+"field:rollup.earnings_reaction@v2.pre_event_adv_usd_20d:reads" = 1
+"field:rollup.earnings_reaction@v2.reaction_excess_return:caveats" = 3
+"field:rollup.earnings_reaction@v2.reaction_excess_return:reads" = 1
+"field:rollup.earnings_reaction@v2.reaction_status:reads" = 1
 "field:rollup.episode_behaviour@v1.beta_252d:reads" = 1
 "field:rollup.episode_behaviour@v1.corr_252d:reads" = 1
 "field:rollup.episode_behaviour@v1.dd_covid_2020:reads" = 1

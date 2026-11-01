@@ -403,7 +403,9 @@ def test_a_failed_session_holds_back_the_later_ones(fake: Callable[..., Calls]) 
     assert summary["status"] == "FAILED"
     assert summary["sessions"] == [D1.isoformat()]
     assert summary["catch_up"]["held"] == [D.isoformat()]
-    assert calls.sessions("bars")[1:] == [D1] and writer.runs_for("nightly", D) == []
+    assert calls.sessions("bars")[1:] == [D1]
+    [snapshot_only] = writer.runs_for("nightly", D)  # the held session took its snapshots only
+    assert snapshot_only.stats["steps"]["bars"]["status"] == "NOT_RUN"
     assert calls.sessions("purge-raw") == [D1]
     assert last_done(writer) == date(2026, 9, 30)
     # Next run: the failed session comes first again.
@@ -711,7 +713,7 @@ def test_a_snapshot_step_past_its_day_fails_until_waived(fake: Callable[..., Cal
     assert chains["status"] == "FAILED" and chains["reason"].startswith("expired:")
     assert "--date 2026-10-02 --waive chains" in chains["reason"]  # the session filled in
     assert summary["catch_up"]["held"] == [later.isoformat()]
-    assert calls.sessions("chains") == [D]  # never refetched for an older session
+    assert calls.sessions("chains") == [D, later]  # D not refetched; later's snapshot taken
     waived = run_nightly(task_ctx(writer), Plan([D]), waive={"chains": "Cboe outage"})
     assert waived["status"] == "SUCCEEDED"
     chains = steps_of(waived)["chains"]
