@@ -2,7 +2,7 @@ import { Button, Text } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SiteFooter } from './SiteFooter';
+import SiteFooter from './SiteFooter';
 
 vi.mock('./DataStatusPill', () => ({ DataStatusPill: () => <Text>Data: complete</Text> }));
 vi.mock('@/features/guide-help', () => ({

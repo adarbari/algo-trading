@@ -96,8 +96,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
               }
               end={
                 viewer && (
-                  <Stack direction="row" gap={2} align="center">
-                    <GuideSearchButton bar />
+                  <>
                     <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
                     <AccountMenu
                       name={viewer.name}
@@ -115,9 +114,10 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
                           />
                         </Stack>
                       ) : null}
+                      <GuideSearchButton label="Search" />
                       <ThemeChoice />
                     </AccountMenu>
-                  </Stack>
+                  </>
                 )
               }
               nav={
