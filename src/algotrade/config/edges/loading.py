@@ -36,6 +36,7 @@ from algotrade.config.edges.document import Edge, expand_baselines, parse_edge
 from algotrade.config.edges.follow import AUDIT, is_legacy, legacy_own, parse_audit, parse_follow
 from algotrade.config.edges.follow import KEY as FOLLOW
 from algotrade.config.edges.positions.spec import check_edge as check_positions
+from algotrade.config.edges.positions.spec import check_rules
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import site_document
@@ -139,6 +140,8 @@ def _load(
                 edge, baselines=expand_baselines(edge.baselines, standard, edge.screeners)
             )
             _check_presets(edge, where, screeners, selections)
+            if catalog is not None:
+                check_rules(edge, where, catalog, templates)
             check_positions(edge, where, templates)
             if catalog is not None and not isinstance(edge.universe, str):
                 catalog.check(edge.universe.where, f"{where} universe")
