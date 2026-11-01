@@ -333,10 +333,8 @@ class SourcesSettings:
                 "max_verify_failures",
                 "max_ibkr_vol_rejected",
                 *("max_macro_stale_share", "min_calendar_future_dates", "max_filings_failed"),
-                "filings_backfill_per_night",
-                "min_delisted_tickers",
-                "max_analyst_failed",
-                "max_analyst_backlog",
+                *("filings_backfill_per_night", "min_delisted_tickers"),
+                *("max_analyst_failed", "max_analyst_backlog"),
                 "coverage",
             ],
         )
