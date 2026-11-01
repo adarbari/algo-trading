@@ -698,13 +698,13 @@ note = "the edge harness's per-session series (ADR 0064): one row per (main edge
 name = "results/edge_legs"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the edge harness's stored legs (ADR 0063): per decision session, each screener's statistic, the partitions the session read and the outcome partition it joined; session_date = the decision session, runs merge per key; framed, written and read only by services/evaluation/cross_section/legs/ (a fitness test)"
+note = "the edge harness's stored legs (ADR 0063): per decision session, each screener's statistic, the partitions the session read and the outcome partition it joined; session_date = the decision session, runs merge per key; framed, written and read only by services/evaluation/cross_section/legs/ (a fitness test) ; leg version 5 (ADR 0088, E6a): each pick's trade-contract fields as aligned pick_exit .. pick_adverse lists, null in older rows"
 
 [[table]]
 name = "results/edge_trades"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the edge trade ledger (ADR 0064): one row per pick of the main edge variant's implementation screeners at every horizon, excluded picks with a public reason; partition = the run's range end, runs merge per key, read by run_id; framed only by services/evaluation/cross_section/detail/ from the run's v2 legs and written in the run's one publish, read only by services/read/evaluation/runs.py; kept 45 days but for the canonical, latest and cited runs (the purge-raw task, runs.ledger_keep)"
+note = "the edge trade ledger (ADR 0064): one row per pick of the main edge variant's implementation screeners at every horizon, excluded picks with a public reason; partition = the run's range end, runs merge per key, read by run_id; framed only by services/evaluation/cross_section/detail/ from the run's v2 legs and written in the run's one publish, read only by services/read/evaluation/runs.py; kept 45 days but for the canonical, latest and cited runs (the purge-raw task, runs.ledger_keep) ; the trade contract's columns (ADR 0088, 2.5a): exit_kind, capital_basis, return_on_capital (at the document's cost), max_adverse, price_source, null in rows written before them, and value_licence per row (the strictest of the trial's and the outcome row's)"
 
 [[table]]
 name = "results/edge_verdict"
@@ -722,7 +722,7 @@ note = "what each site edge took at a session (ADR 0081): one row per (user, edg
 name = "results/edge_paper"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the forward paper record (ADR 0053 amendment 2026-10-10): one row per (record owner, edge, signal session, name) the nightly edge-signals job made for an edge open for recording (a site edge from candidate to live, a user's own from live: ADR 0064 amendment 2026-10-24, loading.records_paper), user_id being the RECORD owner (site for a site edge, else the user whose edge it is; a follower never writes one), settled by rewriting its own row (runs merge per key), with excess_return and the name's raw return (return, the stored fwd_return; null for an option P&L and before the column) and the licence recorded at the signal (a reader hides a name by it); framed and written by services/evaluation/forward/results.py, read through data/paper"
+note = "the forward paper record (ADR 0053 amendment 2026-10-10): one row per (record owner, edge, signal session, name) the nightly edge-signals job made for an edge open for recording (a site edge from candidate to live, a user's own from live: ADR 0064 amendment 2026-10-24, loading.records_paper), user_id being the RECORD owner (site for a site edge, else the user whose edge it is; a follower never writes one), settled by rewriting its own row (runs merge per key), with excess_return and the name's raw return (return, the stored fwd_return; null for an option P&L and before the column) and the licence recorded at the signal (a reader hides a name by it); framed and written by services/evaluation/forward/results.py, read through data/paper ; a settled trade's exit_kind, return_on_capital and price_source (ADR 0088, 2.5a), null while open and in older rows"
 
 [[table]]
 name = "results/winners_study"
