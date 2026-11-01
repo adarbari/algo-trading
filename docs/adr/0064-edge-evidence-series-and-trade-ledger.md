@@ -1,5 +1,7 @@
 # ADR 0064: Edge evidence detail: a per-session series and a trade ledger
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): the trade contract's ledger and paper columns, including the per-row `licence`.
+
 **Status:** accepted (2026-10-10; owner decisions on the Edge page redesign, ED9: the
 architecture plan's recommendations Q1-Q8 and D10-D12). Amends
 [0063](0063-incremental-edge-evaluation.md) (leg v2), [0053](0053-edges-hypotheses-outcomes-and-one-harness.md)
