@@ -86,10 +86,6 @@ An empty cell does not mean nobody asked for it. It means no backlog item is tie
 see_also = ["formula_duplicate", "feature_request_status"]
 
 [[term]]
-# each: id, term, short (one sentence), body, see_also. Typed by
-# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
-
-[[term]]
 id = "user_person"
 term = "Person"
 short = "One user the site declares in reviewed config, shown by id and name, never by email."
