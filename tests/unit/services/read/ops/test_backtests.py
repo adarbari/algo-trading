@@ -70,3 +70,20 @@ def test_another_users_run_is_not_theirs(api_golden: tuple[ReadStore, dict[str, 
     bob = open_stores(store.reader, store.configs, UserContext("bob"))
     assert load_backtests(bob) == ()  # "local" ran it; bob sees only his and the site's
     assert load_backtest(bob, api_golden[1]["backtest"]) is None
+
+
+def test_the_list_never_resolves_a_config(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The list's cost must not grow with the screener presets (~90): it lists the
+    ``strategies`` folder and resolves no config at all (the page's one-second budget)."""
+    resolved: list[str] = []
+
+    def counting(*args: object, **kwargs: object) -> object:
+        resolved.append(str(args[1:2]))
+        raise AssertionError("load_backtests resolved a config")
+
+    monkeypatch.setattr("algotrade.services.read.ops.configs.resolve_config", counting)
+    monkeypatch.setattr("algotrade.services.configs.resolve_config", counting)
+    assert load_backtests(ctx)
+    assert resolved == []
