@@ -328,7 +328,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/positioning"
-purpose = "options positioning and chain-shape feature groups (ADR 0031): flow, implied move, skew and term structure, from the same chain inputs options/ reads; one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus chain_inputs.py, the chain readings they share"
+purpose = "options positioning and chain-shape feature groups (ADR 0031): flow, implied move, skew and term structure, from the same chain inputs options/ reads, and earnings_moves.py (the realised moves of the last twelve reports against the stored implied moves before them); one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus chain_inputs.py, the chain readings they share"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
