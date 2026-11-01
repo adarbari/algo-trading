@@ -4,9 +4,23 @@
  * anyone out: the page opens and the question comes at the next visit.
  */
 import type { QueryClient } from '@tanstack/react-query';
-import { redirect } from '@tanstack/react-router';
+import { redirect, useNavigate } from '@tanstack/react-router';
+
+import { OnboardingPage } from '@/pages/onboarding';
 
 export const ONBOARDING_PATH = '/onboarding';
+
+/** The question's route component: the page, then Ideas once it is answered. */
+export function OnboardingScreen() {
+  const navigate = useNavigate();
+  return (
+    <OnboardingPage
+      onDone={() => {
+        void navigate({ to: '/ideas' });
+      }}
+    />
+  );
+}
 
 /** `beforeLoad` step of the trader layout, run after the workspace guard. */
 export async function onboardingGuard({

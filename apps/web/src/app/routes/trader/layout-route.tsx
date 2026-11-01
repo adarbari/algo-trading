@@ -5,7 +5,7 @@
  * two routes around the product, not sections of it: `/settings` (from the account menu) and
  * `/onboarding` (the one sign-up question).
  */
-import { createRoute, useNavigate } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
 
 import { lazyPage } from '@/shared/lib/lazy';
 
@@ -29,7 +29,7 @@ export const traderRoute = createRoute({
 });
 
 const SettingsPage = lazyPage(() => import('@/pages/settings'), 'SettingsPage');
-const OnboardingPage = lazyPage(() => import('@/pages/onboarding'), 'OnboardingPage');
+const OnboardingPage = lazyPage(() => import('../../workspaces/onboarding'), 'OnboardingScreen');
 
 export const settingsRoute = createRoute({
   getParentRoute: () => traderRoute,
@@ -38,20 +38,9 @@ export const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
-function Onboarding() {
-  const navigate = useNavigate();
-  return (
-    <OnboardingPage
-      onDone={() => {
-        void navigate({ to: '/ideas' });
-      }}
-    />
-  );
-}
-
 export const onboardingRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'onboarding',
   ...pageRoute(OnboardingPage),
-  component: Onboarding,
+  component: OnboardingPage,
 });
