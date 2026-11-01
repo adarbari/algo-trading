@@ -16,7 +16,7 @@ ON_EVENT = "on_event:"
 # harness skips an event that is not, never reads it early (``cross_section/events.py`` names
 # the stored field each class is read from).
 EVENT_CLASSES: Mapping[str, str] = {
-    "earnings_reaction": "a reported result's two-session reaction (earnings_reaction@v1); "
+    "earnings_reaction": "a reported result's two-session reaction (earnings_reaction@v2); "
     "anchor: the reaction's last session, E+1 (E: the report date)",
     "earnings_expected": "a next report expected, scheduled or from the year-ago report "
     "(earnings_expected@v1); anchor: the expected report date's session",

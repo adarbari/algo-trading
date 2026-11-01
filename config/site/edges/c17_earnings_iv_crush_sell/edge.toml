@@ -29,7 +29,7 @@ placeholder that keeps the document valid and is not the thesis. Unblock with a 
 volatility field (an iv7-style name with history); iv_next of iv_term@v1 is stored from 2026-10-02
 only and carries no tenor in its name. A second gap: the page's own first step, the implied move
 (implied_move@v1, chain-based, from 2026-10-02) against the realised reaction by size bucket, has no
-history either; earnings_reaction@v1 has the realised half."""
+history either; earnings_reaction@v2 has the realised half."""
 notes = """The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): the short at-the-money
 straddle priced by Black-Scholes (r = q = 0) from an implied volatility at D; no skew, no spread
 beyond cost_bps, no margin; no historical chains are stored (owner decision O3) and the real-chain P&L
@@ -72,7 +72,7 @@ with a published return exists, so no figure is filed. No screener is written un
 priced."""
 expected_size = """No published return. The page's own test is the implied move against the realised
 reaction by size bucket, which can settle the sign quickly once chain history exists; today the
-reaction half is stored (earnings_reaction@v1) and the implied half is not."""
+reaction half is stored (earnings_reaction@v2) and the implied half is not."""
 capacity_costs = """Undefined-risk short straddles need margin; a defined-risk fly cuts the tail and most of the
 edge. Large caps with $200M a day have tight option spreads, which the 50 bps cost approximates, and
 an individual's size is far below the open interest."""
