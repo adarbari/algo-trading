@@ -80,9 +80,8 @@ def test_a_case_table_is_typed_fail_closed(value: dict[str, Any], match: str) ->
 
 def test_a_case_needs_a_position() -> None:
     o = {"kind": "option_pnl", "horizon_sessions": [21], "benchmark": "none",
-         "start_offset_sessions": 1, "tenor_days": tenor_cases(), "structure": "put_short",
-         "strike_delta": 0.2}  # fmt: skip
-    with pytest.raises(ConfigurationError, match="cases: needs a position"):
+         "start_offset_sessions": 1, "tenor_days": tenor_cases(), "strike_delta": 0.2}  # fmt: skip
+    with pytest.raises(ConfigurationError, match="position: required for an option_pnl"):
         parse_edge(document(schedule="every_session", outcome=o), "drift", WHERE)
 
 

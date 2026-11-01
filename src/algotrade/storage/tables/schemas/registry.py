@@ -48,8 +48,8 @@ from algotrade.storage.tables.schemas.market import (
 )
 from algotrade.storage.tables.schemas.option_history import OPTION_HISTORY_TABLES
 from algotrade.storage.tables.schemas.outcomes import (
-    OPTION_PNL_SPEC,
     OUTCOMES_PREFIX,
+    STRUCTURE_PNL_SPEC,
     outcomes_spec,
 )
 from algotrade.storage.tables.schemas.reference import (
@@ -134,7 +134,7 @@ KNOWN: dict[str, TableSpec] = {
         SHORT_VOLUME_EVENTS,
         FUND_NAV_EVENTS,
         INSIDER_EVENTS,
-        OPTION_PNL_SPEC,
+        STRUCTURE_PNL_SPEC,
         *OPTION_HISTORY_TABLES,
     )
 }
