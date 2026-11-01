@@ -28,6 +28,9 @@ LIVE_OPTION_QUOTES = "live/option_quotes"
 # failed or missing fetch is a source problem; a stale chain is the feed serving an older session.
 # A chain stale for more than ``max_chain_stale_sessions`` is labelled CHRONIC (never stored): the
 # feed is not late for the name, it has stopped serving it, which is a fetch failure.
+FIRST_CBOE_CHAIN_SESSION = date(
+    2026, 10, 2
+)  # chains are stored from here; before it, bought history
 OK_LABEL = "OK"  # a fetched, current chain
 STALE = "STALE_DATA"
 CHRONIC = "STALE_CHRONIC"
