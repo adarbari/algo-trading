@@ -74,7 +74,7 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
    `gate_closed`, read as `paused`. A setup that wants both judged declares the gated and ungated pair as
    a variant; the harness reports open, closed and unknown slices (closed = the inverse decoy).
    `market_conditions@v1`, one leaf market group beside the unchanged `regime@v3`, stores the inputs and
-   `_on` states as catalogue features a gate may name; nothing in it is shared by default. Its stored state columns (`_on`, `short_premium_allowed`) are declared **open** as our own aggregate, through the per-field licence of ADR 0069 decision 4, while raw VIX-family values stay personal (the reviewer's recommendation; owner to confirm, see "Needs the owner"). A gate's fields
+   `_on` states as catalogue features a gate may name; nothing in it is shared by default. Its stored state columns (`_on`, `short_premium_allowed`) are declared **open** as our own thresholded booleans, the `regime@v3.label` precedent of ADR 0069 decision 4, while raw VIX-family values stay personal; a reason names the condition, never a VIX figure. Reversible by flipping `Feature.licence` with no recompute (0069 decision 3 re-gates at read). Decided by Fable for the owner, pending owner confirmation (decision A below). A gate's fields
    count toward the setup's licence under decision 20 (this replaces the review finding H1's rule that a
    gate may only read open stored verdict columns).
 8. **Base `delta_equivalent`** for named option sleeves on the time-series harness (decision 14), with
@@ -120,21 +120,20 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
     - *Declared per item:* each research-chosen gate or threshold declares a `holdout_from` and the
       research source it came from; a fitness test checks `holdout_from` is after that source's data
       cut-off. Thresholds from the October 2026 AI study (data through 2026-10-23) start no earlier than
-      2026-11-02.
+      2026-11-02. The dates are in decision D below.
     - *The holdout* is the sessions after both the research source's data cut-off and the commit that fixes the rule (a threshold tuned later restarts it), counted over trades whose window has closed. *The minimum* of 3 months is measured across the joined history and Cboe stretch. This decision has no basis unless #967 is accepted.
     - *The joint is disclosed:* the history's prices are HistoricalOptionData's 16:00 New York snapshot,
       the Cboe stretch's the Cboe close (the fixed cutover of decision 5, 2026-10-02); an evidence page
       over the joined holdout says so, and the price source is a column of every trade.
-    - *Cut-off dates* come from the research files. Only the AI study states one; the three option-setup
-      catalogue files (dated 2026-10-25) do not, so a `holdout_from` for a gate or threshold taken from
-      them cannot be set until the cut-off is read from them (open item in the PR, not guessed).
+    - *Cut-off dates:* decision D below. For the research-file items the bought history adds no
+      holdout time, and the 3-month minimum stands.
 16. **Ideas stays as ADR 0083 says (a); the setup state is a chip.** No 0083 amendment for Ideas by state.
 17. **A1 (the first option setup) is published gated** by the research gate R-A; the ungated version is a
     variant.
 18. **The `tails` profile is opt-in per setup by a new version (a)**; stored share verdicts stay.
 19. **A setup publishes its own evaluated exit rule (d)**: the 80th-percentile stop of ADR 0083 decision 3
     only for a setup that declares no stop; no ATR fallback for option setups.
-20. **A rule's licence is its strictest field (a)**, at the gate, entry, case and exit sites; the screener and universe stay under 0064 decision 10 and 0069 decision 3, so no existing setup disappears (reviewer's recommendation, owner to confirm); the trial is personal if any rule read a personal
+20. **A rule's licence is its strictest field (a)**, at the gate, entry, case and exit sites; the screener and universe stay under 0064 decision 10 and 0069 decision 3, so no existing setup disappears and 0064 decision 10 is not amended (decided by Fable for the owner, pending owner confirmation, decision B below); the gate is a rule, so its fields are recorded in the trial licence (decision C below); the trial is personal if any rule read a personal
     field; such a setup is hidden from, and adds no Ideas picks for, a viewer without that licence. The
     gate is a rule, so its fields count too (reading recorded for owner confirmation: it is the proposer's,
     not stated by the owner).
@@ -161,10 +160,11 @@ now (it is empty); retire c18; single-name earnings setups from 2018 with PRIOR_
 one-day VIX lag; history chain features on the external drive. FOMC dates carry the schedule's
 announcement date as `known_from` per year (decision 3 of 0050 exception).
 
-### Needs the owner (not answered on 2026-11-01; written as the reviewer's recommendation)
-- **A.** The stored `market_conditions@v1` states are open (decision 7); the alternative is personal, which makes every VIX-gated setup, A1 included, owner-only.
-- **B.** Decision 20 applies to gate, entry, case and exit rules only; the alternative applies it to the screener and universe too, amends 0064 decision 10 and hides existing setups such as `vrp_short_premium` and `c18` from viewers without the licence.
-- **C.** The reading that a gate's fields count toward the setup's licence (decision 20).
+### Decided by Fable for the owner, pending owner confirmation (2026-11-01, owner asleep; all reversible)
+- **A. The stored `market_conditions@v1` states are open.** The `_on` states and `short_premium_allowed` are thresholded booleans we compute, the `regime@v3.label` precedent (0069 decision 4); reasons name the condition; reversible by flipping `Feature.licence`.
+- **B. Decision 20 covers the gate, entry, case and exit sites only.** Screener and universe fields keep 0064 decision 10's per-column redaction; `vrp_short_premium` and `c18` are unchanged; 0064 decision 10 is not amended.
+- **C. Confirmed, with a flag.** A gate is a rule, so the strictest-field rule applies to it; with A open, a gate over the `_on` states stays open. H1's fitness test becomes "a gate's fields are recorded in the trial licence". Flag: question 9's text said the gate stays open-only either way, so it is answer 2 that revokes H1, not answer 9.
+- **D. `holdout_from`** is the first session after the latest data the item's cited sources read: the stated data end where a source gives one, else its publication month; for an item set by the researcher's judgement, the file's date. Default for the three option-setups research files: **2026-10-26**, so the earliest verdict is 2027-01-26. Exceptions, only where every source has an explicit end: Spintwig 2007-2024 (A4 variants) 2025-01-02; Lambda 2010-2025 2026-01-02; ORATS-only earnings items 2026-03-02. The regimes file has no exceptions (its thresholds were set on the full record to April 2025). The October 2026 AI study: 2026-11-02. The owner may reverse any of A-D; `needs-owner` stays on.
 
 ## Amendments (each ADR gets a pointer to this one)
 - **0053:** outcome kinds, the trade contract, measures and the verdict profile; rules over features as a
