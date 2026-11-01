@@ -189,7 +189,7 @@ purpose = "reads of events/insider_transaction (Form 4, EB D6): the lines a sess
 
 [[dir]]
 path = "src/algotrade/data/listings"
-purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
+purpose = "reads of instruments/listing_history, instruments/index_membership and instruments/delisted_tickers (ADR 0018 amendment, ADR 0087): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names; Massive's delisted tickers (read_delisted_tickers, identity only)"
 
 [[dir]]
 path = "src/algotrade/data/macro"
