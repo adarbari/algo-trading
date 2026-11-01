@@ -105,6 +105,8 @@ Verified 2026-10-17.
   **EB D4 (2026-11-01):** SKEW (close only, from 1990-01-02), COR1M and COR3M (OHLC, from 2006-01-03),
   DSPX (close only, from 2014-06-19), measured the same day; same personal-use licence as the rest
   of the Cboe files (no different terms found). Stored although no setup reads them yet (owner tenet).
+  **Strategy benchmarks, the rest (2026-11-01):** BFLY (from 1986-06-20), CMBO (1986-06-30), CLL (2008-08-26),
+  PPUT (1986-06-30), close only, same files and terms, beside PUT / WPUT / BXM / BXMD / CNDR (ADR 0084).
 - **VX futures** `https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv`,
   one file per contract holding its whole life: `Trade Date,Futures,Open,High,Low,Close,Settle,Change,
   Total Volume,EFP,Open Interest`. History starts with the 2013 contracts (403 for earlier ones). The
