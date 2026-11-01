@@ -824,3 +824,27 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's words in chat, 2026-11-01: `every_session` opens overlapping puts daily, so a fixed monthly entry matching the PUT index is the honest baseline; exits and entries are values or rules alike; share setups should get rule exits now. Recorded in `docs/options/backend-build.md` and `backend-concepts-1.md` (2.4a).
+
+## 2026-11-01 | ADR 0083 amendment (Evening Desk site) | Ideas tabs, idea page, watchlist, sign-up answer, derived option figures
+- Question: how do Ideas, the idea detail, a watchlist, the sign-up answer and option quotes work on the Evening Desk site?
+- Options: as the mockups show / as amended below.
+- Decision: (a) Ideas has Stocks | Premium tabs; the default comes from one sign-up answer; the cap of 15 and the Unproven fallback apply per tab. (b) A per-pick idea page, its sections filled from the setup: why it is here, the plan (the setup's historical exit rule), evidence, what could go wrong, learn this setup. (c) A watchlist: a per-user ticker list stored as user config (ADR 0029), filtering Ideas; tickers only, no quantities, basis or positions. (d) The sign-up answer is stored as a preference. Option quote display B: option screens show only our own derived figures (yield %, delta bands, return on collateral), never raw bid / ask, because the Cboe feed is unlicensed for display.
+- decided by: owner
+- status: final
+- Reasoning: the owner's decisions of 2026-11-01 on the Evening Desk mockups, relayed by the orchestrating session. Recorded as the ADR 0083 amendment 2026-11-01; build plan `docs/ui/evening-desk-plan.md`.
+
+## 2026-11-01 | Evening Desk plan | Product questions the mockups raised
+- Question: (1) which option figures count as derived; (2) the raw-quote Options tab and `GET /chains/{underlying_id}/live`; (3) watchlist filter before or after the cap, and its size; (4) a "Yours" Ideas tab; (5) Past lists now; (6) what "Both" defaults to, and a start-page choice; (7) Settings scope; (8) the buying-power inputs; (9) typed sold-at price and cost basis; (10) the idea page's wording; (11) a Sunday premium edition; (12) premium strategy tests for traders; (13) the tab of an Unproven screener that implements no setup.
+- Options: per question, the mockup / the plainest default within the fixed rules.
+- Decision: (1) our computed mid premium, spread as % of mid, open interest and volume, a straddle from mids, IV, IV rank, delta, yield %, return on collateral, breakeven and probability below the strike are shown; never a vendor bid, ask, last or size. (2) Both stay, admin-only (role gate and REST `redact`); the plan's V6 removes the raw columns from trader screens. (3) After the cap (it only narrows tonight's list); at most 50 instruments. (4) No: Ideas is Stocks | Premium; the watchlist lives in Settings and the ticker Watch toggle, followed and own setups on Setups. (5) Deferred to its own ADR (ADR 0083 decision 2). (6) Both -> Stocks; one preference (the default Ideas tab), no start-page choice. (7) In: theme, default tab, country shown read-only (US), sign out; out: nightly brief toggle, plan / trial, data download, account deletion. (8) A typed contract count (component state only), Reg-T only, no named broker rules. (9) Never stored: not in the URL, `localStorage`, user config or logs. (10) "The setup's rule holds Monday at a premium of $0.55 or more"; "Copy exit rule as text"; "The plan" shown as the historical exit rule. (11) No: the same nightly list. (12) Owner-only now (ADR 0088 decision 12). (13) Stocks.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: each keeps the fixed rules (publisher only, no sizing or stored positions, one nightly batch, labelled statistics, decision B) with the plainest default; a mid, a spread ratio and a straddle are our computations and OI / volume are exchange statistics, not quotes; billing, brief delivery and the scorecard have their own ADRs; HOD-derived evidence stays owner-only until its terms are read.
+
+## 2026-11-01 | Evening Desk plan | Vertical slices, no new components, the option grid's grain open
+- Question: how is the Evening Desk build cut, and how are the architect's and the simplicity review's findings folded in?
+- Options: slices by layer (design system, pages, reads) / vertical slices that each ship one screen end to end.
+- Decision: vertical slices V1-V12 on data that exists today, then O1-O4 following the options backend (E4, E6, E9-E12b); every mockup element mapped to an existing component or a variant (no `Stepper` or `Breadcrumb`); the Ideas setup-picks read gets its own owner (`ideas-setup-picks`, `services/read/ideas/`) with `ideas-list` narrowed to Unproven, the inverse pick reads outside `pick_edges.py`; Reg-T stays in `services/preview/options/`, not `quant/`; the option grid's grain (a read over the stored chain plus a small catalogue group, or a catalogue group only) is the architect's first call in V6; `put_wing@v1` / `call_wing@v1` unchanged.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the owner's instruction of 2026-11-01 ("new screens are available and work end to end, incrementally"); the architect review (file-disjointness, ownership, licence, cache key) and the simplicity review (cut two components, merge slices).
