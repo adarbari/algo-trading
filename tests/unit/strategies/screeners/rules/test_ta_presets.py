@@ -167,12 +167,12 @@ def test_pead_small_cap_needs_a_reaction_of_five_percent_and_ranks_the_largest_f
         "security_type", "status", "exchange", "market_cap", "price", "pre_event_adv",
         "reaction_status", "reaction",
     ]  # fmt: skip
-    reaction = "rollup.earnings_reaction@v1.reaction_excess_return"
+    reaction = "rollup.earnings_reaction@v2.reaction_excess_return"
     assert spec.tie_break == reaction and spec.tie_break_descending
     base = {c.rule.field: _passing(c) for c in spec.criteria}
     assert base["feature.market_cap"] < 2e9 and base[reaction] >= 0.05
-    adv = "rollup.earnings_reaction@v1.pre_event_adv_usd_20d"
-    status = "rollup.earnings_reaction@v1.reaction_status"
+    adv = "rollup.earnings_reaction@v2.pre_event_adv_usd_20d"
+    status = "rollup.earnings_reaction@v2.reaction_status"
     view = FeatureView(
         DAY,
         {
@@ -202,7 +202,7 @@ def test_eap_presets_take_an_expected_date_never_unknown_and_eap_volume_ranks_by
     with a SCHEDULED or PRIOR_YEAR expected report (UNKNOWN never passes); eap_volume also needs
     the earnings volume ratio and ranks by it, largest first."""
     basis = "rollup.earnings_expected@v1.expected_basis"
-    ratio = "rollup.earnings_reaction@v1.earnings_volume_ratio"
+    ratio = "rollup.earnings_reaction@v2.earnings_volume_ratio"
     for preset, signal in (("eap_all", None), ("eap_volume", ratio)):
         spec = resolve_config(STORE, preset, UserContext("site")).screen_spec
         assert tuple(c.id for c in spec.criteria)[:4] == BASE

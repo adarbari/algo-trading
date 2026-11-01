@@ -2,7 +2,7 @@
 before it (the field the ``earnings_gap_volume`` screener confirms a reaction with, edge
 ``earnings_gap_volume_drift``, EB E3).
 
-The window and the counted report are ``earnings_reaction@v1``'s own (``read_reactions``: a
+The window and the counted report are ``earnings_reaction@v2``'s own (``read_reactions``: a
 report counts once ``known_from <= session`` and its window E-1 .. E+1 has closed), so the ratio
 describes the same report as ``reaction_excess_return`` and ``sessions_since_reaction``:
 
@@ -10,7 +10,7 @@ describes the same report as ``reaction_excess_return`` and ``sessions_since_rea
                             mean dollar volume of the 20 sessions ending at E-1 inclusive (the
                             report day and after are left out), for the last counted report
 
-``earnings_reaction@v1.earnings_volume_ratio`` is the mean of four reports' ratios, a habit of the
+``earnings_reaction@v2.earnings_volume_ratio`` is the mean of four reports' ratios, a habit of the
 name; this is the last report's, the event itself. One row per instrument traded on the session;
 null when no report is counted, a bar of the window or of the 20 sessions before is missing, or
 the history is shorter (UNKNOWN, never zero).

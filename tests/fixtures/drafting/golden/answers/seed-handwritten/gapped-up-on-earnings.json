@@ -29,7 +29,7 @@
     },
     {
       "id": "earn",
-      "field": "rollup.earnings_reaction@v1.sessions_since_reaction",
+      "field": "rollup.earnings_reaction@v2.sessions_since_reaction",
       "op": "lte",
       "value": 1,
       "mode": "hard",

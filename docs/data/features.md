@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-751 stored features in 92 groups, in dependency order; 161 expression features.
+758 stored features in 92 groups, in dependency order; 164 expression features.
 
 ## `option_liquidity@v1`
 
@@ -109,9 +109,9 @@ Next and last earnings dates, report time and sessions to the next report. Store
 | `date_confirmed` | window | bool | flag | open |  | Whether the source confirmed the next report date | the source does not say (the Nasdaq calendar never does), or no report date on or after the session in the calendars stored by then | `events/earnings.date_confirmed` |
 | `last_earnings_date` | window | date | date | open |  | The latest report date before the session | no earlier report date known by the session (the calendars start with the first stored snapshot, the earnings backfill from its first day) | `events/earnings.ts` |
 
-## `earnings_reaction@v1`
+## `earnings_reaction@v2`
 
-How the last earnings report moved the price against SPY, and the volume it drew. Stored as `rollups/instrument/earnings_reaction@v1`; reads `events/earnings`, `bars/1d`, `instruments/symbol_ids` (optional).
+How the last earnings report moved the price against SPY and the volume it drew, and how far the name moved on its last eight reports. Stored as `rollups/instrument/earnings_reaction@v2`; reads `events/earnings`, `bars/1d`, `instruments/symbol_ids` (optional).
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -121,6 +121,13 @@ How the last earnings report moved the price against SPY, and the volume it drew
 | `sessions_since_reaction` | window | int | sessions | open | >= 0 | Exchange sessions from the end of the last report's reaction window up to the session (0: the session is that day) | no report known by the session has a closed reaction window (E+1 <= the session) | `events/earnings.ts` |
 | `pre_event_adv_usd_20d` | window | float32 | usd | open | >= 0 | Mean close x volume over the 20 sessions ending before the last report (the volume of the event itself excluded) | no report known by the session has a closed reaction window (E+1 <= the session), or a session among those 20 has no bar, or the history is shorter | `bars/1d.close`, `bars/1d.volume`, `events/earnings.ts` |
 | `earnings_volume_ratio` | window | float32 | ratio | open | >= 0 | Mean over the last 4 reports of the reaction window's mean dollar volume divided by that report's pre-event 20-session dollar volume | fewer than 4 reports with a closed window known by the session, or a bar of any of them is missing, or the history is shorter | `bars/1d.close`, `bars/1d.volume`, `events/earnings.ts` |
+| `abs_move_mean_8` | window | float32 | decimal | open | >= 0 | Mean absolute move (close before the report to close after it, E-1 to E+1, the raw move, not the excess over SPY) of the last 8 reports with a closed window; 0.05 is 5% | no report known by the session has a closed window with both bars (abs_moves_counted is 0) | `bars/1d.close`, `events/earnings.ts` |
+| `abs_move_median_8` | window | float32 | decimal | open | >= 0 | Median absolute move (E-1 to E+1, raw) of the last 8 reports with a closed window: the typical move, one outlier report does not shift it | no report known by the session has a closed window with both bars (abs_moves_counted is 0) | `bars/1d.close`, `events/earnings.ts` |
+| `abs_moves_counted` | window | int | count | open | 0 .. 8 | How many of the last 8 reports with a closed window had both bars of the window: the number of moves behind abs_move_mean_8 (0: none) | never (0 when no report has a closed window on the history) | `bars/1d.close`, `events/earnings.ts` |
+| `abs_move_mean_4` | window | float32 | decimal | open | >= 0 | Mean absolute move (E-1 to E+1, raw) of the newest 4 of the reports behind abs_move_mean_8: the recent habit, against the two-year one | no report known by the session has a closed window with both bars (abs_moves_counted is 0) | `bars/1d.close`, `events/earnings.ts` |
+| `abs_move_max_8` | window | float32 | decimal | open | >= 0 | Largest absolute move (E-1 to E+1, raw) of the last 8 reports with a closed window: the worst surprise the name has had | no report known by the session has a closed window with both bars (abs_moves_counted is 0) | `bars/1d.close`, `events/earnings.ts` |
+| `signed_move_mean_8` | window | float32 | decimal | open | >= -1 | Mean signed move (E-1 to E+1, raw, a fall is negative) of the last 8 reports with a closed window: whether the name has tended to rise or fall on reports | no report known by the session has a closed window with both bars (abs_moves_counted is 0) | `bars/1d.close`, `events/earnings.ts` |
+| `up_moves_8` | window | int | count | open | 0 .. 8 | How many of the last 8 reports with a closed window moved the price up (E+1 close above E-1 close); abs_moves_counted minus this is the falls and flat ones | never (0 when no report has a closed window on the history) | `bars/1d.close`, `events/earnings.ts` |
 
 ## `earnings_schedule@v1`
 
@@ -1470,6 +1477,9 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `ex_div_before_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the target expiry (put_wing.target_expiry, the 30-60 day expiry the put and call wings use): a short call held to it risks early assignment, and a short put misses the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED: the source lists a date only about 30 days ahead, so null is 'none known yet', not 'none'), or no target expiry (put_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= put_wing.target_expiry` | virtual |
 | `ex_div_before_nearest_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option expiring then carries the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no stored chain with an expiry on or after the session | `dividend_schedule.next_ex_date <= nearest_expiry.expiry_date` | virtual |
 | `ex_div_before_call_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date falls on or before the covered-call wing's target expiry (call_wing.target_expiry): the early-assignment risk of the short call, and the dividend the shares collect if it is not assigned | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no call target expiry (call_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= call_wing.target_expiry` | virtual |
+| `earnings_move_ratio` | expression | float | ratio | open | >= 0 | The move the options price for the next earnings report (implied_move.implied_move, the at-the-money straddle as a share of the spot) over the name's mean absolute move on its last eight reports (earnings_reaction.abs_move_mean_8): 1 is a straddle priced at the name's usual earnings move, above 1 the options price a bigger move than it has delivered, below 1 a smaller one | the move expiry does not cover the next report (implied_move.move_basis is not EARNINGS, or implied_move is null), fewer than 4 past reports have a closed window with both bars (earnings_reaction.abs_moves_counted, params.min_moves), or the mean past move is 0 | `if(implied_move.move_basis == "EARNINGS" and earnings_reaction.abs_moves_counted >= min_moves and earnings_reaction.abs_move_mean_8 > 0, implied_move.implied_move / earnings_reaction.abs_move_mean_8, null)` (min_moves = 4) | virtual |
+| `earnings_move_rich` | expression | bool | flag | open |  | Whether the options price the next earnings report at 1.3 times or more the name's mean absolute move on its last eight reports (earnings_move_ratio >= 1.3, params.rich_ratio): the straddle is expensive against what the name has done, the setting a seller of the report looks for | earnings_move_ratio is null (the move expiry does not cover the next report, or fewer than 4 past reports had a closed window) | `earnings_move_ratio >= rich_ratio` (rich_ratio = 1.3) | virtual |
+| `earnings_move_cheap` | expression | bool | flag | open |  | Whether the options price the next earnings report at 0.8 times or less the name's mean absolute move on its last eight reports (earnings_move_ratio <= 0.8, params.cheap_ratio): the straddle is cheap against what the name has done, the setting a buyer of the report looks for, or a name to leave out of a sale | earnings_move_ratio is null (the move expiry does not cover the next report, or fewer than 4 past reports had a closed window) | `earnings_move_ratio <= cheap_ratio` (cheap_ratio = 0.8) | virtual |
 
 ### `filings.toml`
 
@@ -1688,6 +1698,7 @@ Readable until retired (`algotrade-ingest retire-features --group <key>`); their
 | `fundamentals@v1` | `fundamentals@v4` + expression features |
 | `fundamentals@v2` | `fundamentals@v4` + expression features |
 | `fundamentals@v3` | `fundamentals@v4` + expression features |
+| `earnings_reaction@v1` | `earnings_reaction@v2` + expression features |
 | `financials@v1` | `financials@v3` + expression features |
 | `financials@v2` | `financials@v3` + expression features |
 | `analyst_estimates@v1` | `analyst_estimates@v2` + expression features |

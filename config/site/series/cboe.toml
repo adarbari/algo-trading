@@ -1,0 +1,171 @@
+# L3 site setting: the Cboe index series stored in macro/series (ADR 0048), the same [[series]]
+# tables as macro.toml (read with it by load_macro; split out because macro.toml is at the 1000-line
+# cap). Static CSVs on Cboe's CDN, personal non-commercial use, no redistribution.
+
+# Cboe's own history files (EB D3): the term-structure indices FRED does not carry (VIX itself and
+# VIX3M stay FRED's above: both give the same close). One static CSV per index on Cboe's CDN,
+# fetched whole, `MM/DD/YYYY` dates. The file of a session is last modified about 17:30 New York
+# time that day (measured 2026-10-17), so a one-day lag errs late. The VX futures by expiry are
+# `volatility/vx_futures` (the `vx-futures` task), not series.
+[[series]]
+key = "VIX9D"                 # Cboe 9-day VIX close (2011-)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX9D_History.csv"
+date_column = "DATE"
+value_column = "CLOSE"
+
+[[series]]
+key = "VIX6M"                 # Cboe 6-month VIX close (2008-)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX6M_History.csv"
+date_column = "DATE"
+value_column = "CLOSE"
+
+[[series]]
+key = "VVIX"                  # Cboe VIX-of-VIX close (2006-; the file has the close only)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VVIX_History.csv"
+date_column = "DATE"
+value_column = "VVIX"
+
+# --- Cboe strategy benchmarks (ADR 0084): total-return strategy index levels (PUT write, weekly
+# WPUT, BXM buy-write, 30-delta BXMD, CNDR iron condor) the option-history replication is checked
+# against; static Cboe files like VIX9D. Defaults omitted: transform = "level", parser = "csv".
+
+[[series]]
+key = "PUT"                  # Cboe the PUT write index, monthly at-the-money SPX puts (file from 1991)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/PUT_History.csv"
+date_column = "DATE"
+value_column = "PUT"
+
+[[series]]
+key = "WPUT"                  # Cboe the weekly put write index (2006-)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/WPUT_History.csv"
+date_column = "DATE"
+value_column = "WPUT"
+
+[[series]]
+key = "BXM"                  # Cboe the BXM buy-write index, monthly at-the-money SPX calls (2002-)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/BXM_History.csv"
+date_column = "DATE"
+value_column = "BXM"
+
+[[series]]
+key = "BXMD"                  # Cboe the 30-delta BXM buy-write index (1986-)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/BXMD_History.csv"
+date_column = "DATE"
+value_column = "BXMD"
+
+[[series]]
+key = "CNDR"                  # Cboe the iron condor index (1986-)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/CNDR_History.csv"
+date_column = "DATE"
+value_column = "CNDR"
+
+# --- Cboe options-setup inputs (EB D4): skew, implied correlation and dispersion. Stored although
+# no setup reads them yet (owner tenet 2026-11-01); the market features read them later.
+
+[[series]]
+key = "SKEW"                  # Cboe SKEW index, the tail-risk skew of SPX returns (file from 1990-01-02; the file has the close only)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/SKEW_History.csv"
+date_column = "DATE"
+value_column = "SKEW"
+
+[[series]]
+key = "COR1M"                  # Cboe 1-month implied correlation of the S&P 500's top 50 names (2006-01-03)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/COR1M_History.csv"
+date_column = "DATE"
+value_column = "CLOSE"
+
+[[series]]
+key = "COR3M"                  # Cboe 3-month implied correlation index (2006-01-03)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/COR3M_History.csv"
+date_column = "DATE"
+value_column = "CLOSE"
+
+[[series]]
+key = "DSPX"                  # Cboe S&P 500 dispersion index (2014-06-19; the file has the close only)
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+licence = "personal"
+terms = "Cboe data (https://www.cboe.com/terms/): personal non-commercial use, no redistribution"
+url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/DSPX_History.csv"
+date_column = "DATE"
+value_column = "DSPX"

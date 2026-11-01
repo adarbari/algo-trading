@@ -18,6 +18,12 @@
 # - known_from: the trough date, the earliest session a feature about the episode may be
 #   non-null (no feature may know an episode's depth before it ended).
 # - notes: the warnings that were visible before or during the fall.
+# - source: optional, where the dates and drawdowns are read from. The twelve episodes of 19% or
+#   more carry none (the plan's reviewed dates); the three short vol shocks below (aug_2015,
+#   volmageddon_2018, yen_carry_2024; options-setups design D3, 8-12% falls kept for stress
+#   replays of options setups) cite their sources. For them peak and trough are the closing-basis
+#   S&P 500 sessions, nasdaq_drawdown is the Nasdaq Composite's worst peak-to-trough inside that
+#   window, and no feature may read their depth before the trough (known_from).
 
 [[episode]]
 key = "oil_1973"
@@ -142,6 +148,36 @@ known_from = 2011-10-03
 notes = "No recession signal; VIX term structure inverted and credit spreads widened around the downgrade; -22% intraday."
 
 [[episode]]
+key = "aug_2015"
+name = "China devaluation flash crash, August 2015"
+peak = 2015-05-21
+trough = 2015-08-25
+recovered = 2016-07-11
+spx_drawdown = -0.12
+nasdaq_drawdown = -0.14
+recession = false
+kind = "shock"
+cause = "China devalued the yuan on August 11 and its equities fell, and on August 24 the Dow opened 1,000 points lower while the VIX closed at 40.74."
+known_from = 2015-08-25
+notes = "A fall of 12% in three months with no recession; the VIX went from 14 to 41 in a week, so short-volatility positions took their worst loss in days, not months."
+source = "S&P 500 and Nasdaq Composite daily closes (Yahoo Finance ^GSPC, ^IXIC); VIX close from Cboe via Yahoo Finance ^VIX; Federal Reserve Board, Monetary Policy Report, September 2015, on the August market turmoil"
+
+[[episode]]
+key = "volmageddon_2018"
+name = "Short-volatility unwind, February 2018"
+peak = 2018-01-26
+trough = 2018-02-08
+recovered = 2018-08-24
+spx_drawdown = -0.10
+nasdaq_drawdown = -0.10
+recession = false
+kind = "shock"
+cause = "Short-volatility funds were forced to buy VIX futures after a jump in wage growth on February 2 lifted yields; on February 5 the VIX rose from 17 to 37 and XIV lost more than 90% of its value."
+known_from = 2018-02-08
+notes = "A fall of 10% in two weeks with no recession; the VIX gained 20 points in one session. Credit Suisse announced the XIV note's early redemption on February 5."
+source = "S&P 500 and Nasdaq Composite daily closes (Yahoo Finance ^GSPC, ^IXIC); VIX close from Cboe via Yahoo Finance ^VIX; Credit Suisse press release of 6 February 2018 on the XIV termination"
+
+[[episode]]
 key = "qt_2018"
 name = "Fed tightening scare, late 2018"
 peak = 2018-09-20
@@ -184,6 +220,21 @@ kind = "shock"
 cause = "CPI near 9%, Fed funds from 0 to 4.5% in a year, QT and the war in Ukraine re-rated long-duration growth stocks."
 known_from = 2022-10-12
 notes = "Inflation, a fast-hiking Fed and narrow breadth in late 2021; two negative GDP quarters but no NBER recession; the Nasdaq fell from Nov 2021 to Dec 2022."
+
+[[episode]]
+key = "yen_carry_2024"
+name = "Yen carry-trade unwind, August 2024"
+peak = 2024-07-16
+trough = 2024-08-05
+recovered = 2024-09-19
+spx_drawdown = -0.08
+nasdaq_drawdown = -0.12
+recession = false
+kind = "shock"
+cause = "The Bank of Japan raised its rate on July 31 and a weak US jobs report followed on August 2; yen carry trades were closed and on August 5 the VIX closed at 38.57."
+known_from = 2024-08-05
+notes = "A fall of 8% in three weeks with no recession; the Nikkei fell 12% on August 5 and the VIX opened above 60 before closing lower, so intraday marks were far worse than closes."
+source = "S&P 500 and Nasdaq Composite daily closes (Yahoo Finance ^GSPC, ^IXIC); VIX close from Cboe via Yahoo Finance ^VIX; Bank of Japan, Statement on Monetary Policy, 31 July 2024"
 
 [[episode]]
 key = "tariffs_2025"
