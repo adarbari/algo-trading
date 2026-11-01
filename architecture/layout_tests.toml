@@ -59,6 +59,10 @@ path = "tests/architecture/ingestion"
 purpose = "fitness tests over the ingestion workflows: which steps stay in the nightly and which run in the post-session workflow (ADR 0070)"
 
 [[test_dir]]
+path = "tests/architecture/options"
+purpose = "fitness tests of the option figures a trader sees (the plan's decision B: derived figures only, no raw vendor quote on a trader screen)"
+
+[[test_dir]]
 path = "tests/architecture/pipeline"
 purpose = "fitness tests over the delivery pipeline: the CI workflow's shape, the flaky-spec quarantine list, the local gates that keep a measured speed-up (docs/ci.md Pipeline)"
 

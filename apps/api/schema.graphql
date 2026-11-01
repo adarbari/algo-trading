@@ -1493,6 +1493,35 @@ type FundReference {
 }
 
 """
+The short option at one delta band of one expiry: strike, our delta (signed as the right) and IV, the mid premium per share (the middle of the stored quote), the return on collateral (a put's premium over its strike, a call's over the share price), yield a year (simple, 365 days), breakeven, the model chance of ending below the strike (r = q = 0), the spread as a share of the mid and open interest
+"""
+type GridCell {
+  band: Float!
+  strike: Float!
+  delta: Float!
+  iv: Float!
+  mid: Float!
+  roc: Float!
+  yieldAnn: Float!
+  breakeven: Float!
+  pBelow: Float!
+  spreadPct: Float!
+  openInterest: Int
+}
+
+"""
+A row of the grid: the expiry that stands for `bucket` calendar days and its days, or `gap` (no listed expiry near it, or one a nearer bucket took). `reportInside` is true when the next report falls after the session and on or before the expiry; null with `reportInsideUnknown` when its date is not known (never false then)
+"""
+type GridExpiry {
+  bucket: Int!
+  expiry: Date
+  days: Int
+  reportInside: Boolean
+  reportInsideUnknown: Unknown
+  gap: Unknown
+}
+
+"""
 A screener row of a family page: its `id` and name, `line` (what it asks, in one line; empty without prose) and the site edges that use it, as rows
 """
 type GuideCategoryScreener {
@@ -2374,6 +2403,11 @@ type Instrument {
   chain: OptionChain
 
   """
+  The option grid for the session (ADR 0083 amendment 2026-11-01): puts and calls at our delta bands and expiry buckets, derived figures only (never a vendor bid, ask, last or size); or why there is none
+  """
+  optionGrid: OptionGridResult!
+
+  """
   An ETF's `top` largest holdings as of the issuer's date the session sees (null: not an ETF)
   """
   holdings(top: Int! = 10): Holdings
@@ -2680,6 +2714,26 @@ type OptionExpiry {
   date: Date!
   days: Int!
 }
+
+"""
+An underlying's option grid for the session. `puts[i][j]` and `calls[i][j]` are the cell of `columns[i]` at `bands[j]` (|delta|). `pricedAt` is the underlying's price the cells are priced at; `qKnown` false: the dividend yield was not stored and was priced as 0. The IV rank is a feature (`features`), not a grid field
+"""
+type OptionGrid {
+  underlyingId: String!
+  session: Date!
+  pricedAt: Float!
+  qKnown: Boolean!
+  bands: [Float!]!
+  columns: [GridExpiry!]!
+  puts: [[OptionGridCell!]!]!
+  calls: [[OptionGridCell!]!]!
+}
+
+"""A cell, or why there is none"""
+union OptionGridCell = GridCell | Unknown
+
+"""The grid, or why there is none"""
+union OptionGridResult = OptionGrid | Unknown
 
 """
 One contract's stored quote; IV (a decimal) and Greeks as the feed computes them
