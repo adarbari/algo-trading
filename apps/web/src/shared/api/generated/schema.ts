@@ -228,6 +228,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preferences/appearance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Appearance */
+        put: operations["save_appearance_preferences_appearance_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences/views/{scope}/view": {
         parameters: {
             query?: never;
@@ -434,6 +451,22 @@ export interface components {
             };
             /** Text */
             text: string;
+        };
+        /** Appearance */
+        Appearance: {
+            /**
+             * Theme
+             * @description the saved choice: light, dark or system
+             */
+            theme: string;
+        };
+        /** AppearanceBody */
+        AppearanceBody: {
+            /**
+             * Theme
+             * @description light, dark or system (the device decides)
+             */
+            theme: string;
         };
         /** Build */
         Build: {
@@ -2293,6 +2326,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_appearance_preferences_appearance_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppearanceBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appearance"];
                 };
             };
             /** @description Validation Error */

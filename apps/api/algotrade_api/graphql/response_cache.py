@@ -265,6 +265,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "InstrumentEventStudy",
         "InstrumentEventList",  # the chart's event list: events and study with source pages
         "TableView",
+        "Appearance",  # the user's theme: [appearance] of their preferences.toml (ADR 0085)
         "GuideField",
         "GuideHelpField",
         "GuideScreener",

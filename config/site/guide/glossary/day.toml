@@ -222,3 +222,52 @@ screener ran says nothing about whether its picks worked.
 """
 next = "Check the edge's own record for evidence on its picks."
 see_also = ["run_state", "not_run", "run"]
+
+[[term]]
+id = "theme"
+term = "Theme"
+short = "Whether the app is shown light, dark or as your device is set; your choice is saved to your account."
+body = """
+The theme is how the app looks: Light, Dark or System. Your choice is stored with your account, so
+it follows you to another device. It changes colours only: no figure, rule or result is affected.
+Until your first visit to a device loads your choice, that device may show its own setting for a
+moment.
+"""
+next = "Pick Light, Dark or System in the account menu."
+see_also = ["theme_light", "theme_dark", "theme_system"]
+
+[[term]]
+id = "theme_light"
+term = "Light theme"
+short = "Dark text on a light background, whatever your device is set to; saved with your account."
+body = """
+Light always shows the app with a light background, even when your device is set to dark. The
+choice is stored with your account, so every device you sign in on shows it. To follow the device
+instead, choose System.
+"""
+next = "Choose System if you want the device to decide."
+see_also = ["theme", "theme_dark", "theme_system"]
+
+[[term]]
+id = "theme_dark"
+term = "Dark theme"
+short = "Light text on a dark background, whatever your device is set to; saved with your account."
+body = """
+Dark always shows the app with a dark background, even when your device is set to light. The
+choice is stored with your account, so every device you sign in on shows it. To follow the device
+instead, choose System.
+"""
+next = "Choose System if you want the device to decide."
+see_also = ["theme", "theme_light", "theme_system"]
+
+[[term]]
+id = "theme_system"
+term = "System theme"
+short = "The app follows your device: light when it is set to light, dark when it is set to dark."
+body = """
+System is the default until you choose otherwise. The app takes the theme from your device and
+changes with it, for example when the device switches to dark in the evening. The choice is stored
+with your account, so each device you sign in on follows its own setting.
+"""
+next = "Choose Light or Dark to keep one look on every device."
+see_also = ["theme", "theme_light", "theme_dark"]

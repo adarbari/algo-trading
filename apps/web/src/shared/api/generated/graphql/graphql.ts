@@ -219,6 +219,11 @@ export type AcceptedFormulasQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type AcceptedFormulasQuery = { acceptedFormulas: { today: string, days: number, rows: Array<{ fingerprint: string, canonical: string, expression: string, unit: string, description: string, acceptedCount: number, users: number, firstAccepted: string, lastAccepted: string, duplicateOf: string, backlogKey: string }> } | null };
 
+export type AppearanceQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AppearanceQuery = { appearance: { theme: string } };
+
 export type OptionChainQueryVariables = Exact<{
   key: string;
   names: Array<string> | string;
@@ -881,6 +886,13 @@ export const AcceptedFormulasDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AcceptedFormulasQuery, AcceptedFormulasQueryVariables>;
+export const AppearanceDocument = new TypedDocumentString(`
+    query Appearance {
+  appearance {
+    theme
+  }
+}
+    `) as unknown as TypedDocumentString<AppearanceQuery, AppearanceQueryVariables>;
 export const OptionChainDocument = new TypedDocumentString(`
     query OptionChain($key: String!, $names: [FeatureName!]!) {
   instrument(key: $key) {

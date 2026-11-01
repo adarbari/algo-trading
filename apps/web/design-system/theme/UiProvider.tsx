@@ -19,12 +19,16 @@ import { useEffect, type ReactNode } from 'react';
 
 import type { DensityName } from '../tokens';
 
-/** `dark` is the default (dark-first); `system` follows `prefers-color-scheme`. */
+/** `system` follows `prefers-color-scheme`; the app chooses (ADR 0085), stories pass one. */
 export type Theme = 'dark' | 'light' | 'system';
 export type UpDownPalette = 'standard' | 'cvd';
 
 export interface UiProviderProps {
-  /** Colour theme; dark by default, `system` follows the OS. */
+  /**
+   * Colour theme. Absent: the attribute is left as it is (the page's inline script sets it from
+   * the stored choice before first paint, and with none the CSS follows the OS), so mounting never
+   * overwrites it.
+   */
   theme?: Theme;
   /** `compact` (default, data screens) or `comfortable`. */
   density?: DensityName;
@@ -34,14 +38,14 @@ export interface UiProviderProps {
 }
 
 export function UiProvider({
-  theme = 'dark',
+  theme,
   density = 'compact',
   upDown = 'standard',
   children,
 }: UiProviderProps) {
   useEffect(() => {
     const root = document.documentElement;
-    root.setAttribute('data-theme', theme);
+    if (theme !== undefined) root.setAttribute('data-theme', theme);
     root.setAttribute('data-density', density);
     root.setAttribute('data-updown', upDown);
   }, [theme, density, upDown]);
