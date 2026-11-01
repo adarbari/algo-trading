@@ -752,6 +752,21 @@ follow-up PR).
 - status: final
 - Reasoning: the owner's word in chat, 2026-10-24 ("Yes, i approve"), as relayed by the coordinator.
 
+## 2026-10-24 | Edge verdicts | A post-publication out-of-sample basis for research setups
+- Question: 63 of 66 setups read Not enough data because every out-of-sample period starts 2026-04-01 (5 or 6 independent decisions for a monthly setup against 40 needed); can a setup taken from published research be judged on the years after its paper's sample, without lowering `min_oos_trades = 40`?
+- Options: (1) forward-only, wait / (2) lower the 40 / (3) a second, separately labelled basis from the end of the paper's sample, for eligible research setups only.
+- Decision: (3). Split = end of the source paper's sample period, recorded in the site edge document; eligible only when our rule matches the paper's and the trial log shows no variant chosen after seeing results; our own setups stay forward-only; `min_oos_trades = 40` unchanged, no counting of overlapping windows or names; the two bases are never blended (UI: "backtested (hypothetical), after publication <years>" and "forward paper record since 2026-04-01"); verdicts on it need the survivorship-free universe, until then they carry the caveat and cannot be Works. Written as the ADR 0065 amendment 2026-10-25 (PR "ADR 0065 amendment: post-publication basis"); points left to the owner are listed in it and in the PR.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-10-24, as relayed by the coordinating session; the first credible verdicts should not wait a year for a monthly setup to collect 40 forward decisions, and the post-publication years are the agreed honest fast track.
+
+## 2026-10-25 | ADR 0065 amendment (PR 967) | The eight owner decisions
+- Question: the eight owner decisions listed at the end of the ADR 0065 amendment 2026-10-25: label wording, which `close` setups, the Edges list headline, deflation on the post-publication basis, one setup per paper, the attestation, the window, the short-side cap.
+- Options: the recommended answer to each / another answer to any.
+- Decision: the recommended answers. (1) "after publication <years>", or "after the paper's sample" where they differ; (2) accept the 12 `close` setups, each with its named difference recorded; (3) two labelled columns, forward first; (4) Works deflated by the site-wide trial count; (5) `lazy_prices_10k_change` only, not `risk_factor_change`; (6) the per-setup attestation that parameters came from the paper's text, given at registration; (7) a closed window that stops at `frozen_from`; (8) short-side setups on a survivors-only universe capped at Not enough data.
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in the orchestrating session, 2026-10-25: "Accept the recommended answers on #966, #967 and #968. Tell each session to record them and release its PR (#966 first, then #968's renumber, then #967)."
 ## 2026-10-24 | Workflow-first trader site (ADR 0083) | TRADER bar, verdict-backed Ideas, historical exit rule, product rules
 - Question: how does the paid trader product's site fit the workflow (find, check, test) and what are its list and legal rules?
 - Options: as proposed in the use-case brief and workflow design (research artifacts of the 2026-10-24 sessions).
@@ -761,3 +776,27 @@ follow-up PR).
 - Note: the owner accepted the recommended answers on the ADR's gaps (2026-10-25, relayed by the orchestrating session: "Accept the recommended answers on #966, #967 and #968."): evidence strength = verdict level, then `lift_pts`, then out-of-sample trades; Regime and Explore off the bar but routed; the brief carries the shared list only; Unproven keeps today's size rule.
 - Note: recorded in ADR 0083, which supersedes the 2026-10-22 "Ideas ranking rule, store and licence" index decision. The legal rules are research, not counsel's opinion.
 - Reasoning: the research found two open jobs at $20-100 (an evidence-backed shortlist, an honest test); the bar follows them and the list rests only on stored verdicts.
+
+## 2026-11-01 | Options-setups backend ADR 0088 | licence of market states, scope of the strictest-field rule, gate licence, holdout dates
+- Question: (A) are the stored `market_conditions@v1` states open or personal; (B) does the strictest-field licence rule reach screener and universe fields; (C) does it apply to a gate; (D) what `holdout_from` does each research source give?
+- Options: A open (recommended) or personal; B gate/entry/case/exit only (recommended) or every site; C confirm the reading or not; D per-source dates.
+- Decision: A open; B gate, entry, case and exit only (0064 decision 10 not amended); C confirmed, a gate's fields are recorded in the trial licence; D first session after each source's data end: 2026-10-26 default for the three option-setups research files (earliest verdict 2027-01-26), Spintwig 2025-01-02, Lambda 2026-01-02, ORATS-only earnings 2026-03-02, AI study 2026-11-02.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Note: reversible; decided while the owner was asleep.
+- Reasoning: A follows the `regime@v3.label` precedent and flips by `Feature.licence` with no recompute; B keeps existing setups visible; C follows from a gate being a rule; D never lets a gate be judged on data its research read. Recorded in ADR 0088 (PR #984).
+## 2026-11-01 | Survivorship-free listing history (ADR 0087) | Delisting return convention; pull the data now
+- Question: (1) which return to book for a bankruptcy or listing-standards delisting with no OTC print; (2) renew Tiingo Power, or pull the data now?
+- Options: (1) (a) CRSP-style replacement -30% NYSE / AMEX, -55% NASDAQ, zero figure shown beside / (b) unmeasured / (c) zero. (2) renew one month / do not renew and wait / rush PR2 and backfill before 2026-11-09 / renew longer.
+- Decision: (1) (a): a delisted name a setup would have bought is penalised, never flat. (2) pull the data now: the Massive delisted list was started on 2026-11-01; the Tiingo bars for the new ids follow PR2's ids; the renewal is raised again only if PR2 and that pull cannot both finish before 2026-11-09.
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in chat, 2026-11-01: "Ideally anything delisted if the setup suggests buying them it is a problem we should pick any options which penalizes picking a delisted stock is traded" and "let us pull the data. we still have enough time to do it. Let us start the backfill immediately." Decisions 3 to 5 of the ADR stay open.
+
+## 2026-11-01 | Survivorship-free listing history (ADR 0087) | Decisions 3 to 5
+- Question: (3) hold the 2010 `outcomes` backfill and `evaluate-edges` until the backfills (PR3) are done; (4) ETF closures before 2016 stay out of the universe, disclosed; (5) Norgate Platinum ($630 a year, Personal Use licence)?
+- Options: as recommended in the ADR / the alternatives named there.
+- Decision: (3) hold, as recommended. (4) stay out, disclosed, as recommended. (5) not now, as recommended; at most an owner-only cross-check.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-11-01: "3 to 5 aligned with your suggestion."

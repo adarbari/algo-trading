@@ -1,5 +1,7 @@
 # ADR 0073: Calendar schedules and the time-series base
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): base `delta_equivalent` for named option sleeves, lifting decision 1's limits for that base only.
+
 **Status:** accepted (2026-10-18; design from the EB harness plan, architect-reviewed). Extends [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (edges, outcomes,
 one harness) and [0064](0064-edge-evidence-series-and-trade-ledger.md) (what a run publishes).
 

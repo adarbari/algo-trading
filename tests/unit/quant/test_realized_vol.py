@@ -115,3 +115,24 @@ def test_nan_is_a_missing_observation() -> None:
     assert not np.isnan(out[2])
     with pytest.raises(ValueError, match="1-d or 2-d"):
         rv.close_to_close(np.ones((2, 2, 2)), 2)
+
+
+def test_downside_deviation_by_hand() -> None:
+    out = rv.downside_deviation(CLOSE, N)
+    returns = [math.log(CLOSE[i] / CLOSE[i - 1]) for i in range(1, len(CLOSE))]
+    losses = [min(r, 0.0) for r in returns]
+    expected = [
+        math.sqrt(sum(x * x for x in losses[i - N : i]) / N * 252)
+        for i in range(N, len(losses) + 1)
+    ]
+    assert np.isnan(out[:N]).all()
+    np.testing.assert_allclose(out[N:], expected, rtol=1e-12)
+
+
+def test_downside_deviation_is_zero_for_a_rising_series_and_nan_on_a_gap() -> None:
+    rising = np.array([100.0, 101.0, 102.5, 103.0, 105.0])
+    assert rv.downside_deviation(rising, 3)[-1] == 0.0
+    gap = np.array([100.0, 99.0, np.nan, 98.0, 97.0, 96.0])
+    assert np.isnan(rv.downside_deviation(gap, 3)[-1])  # the NaN return sits in the window
+    with pytest.raises(ValueError):
+        rv.downside_deviation(rising, 0)

@@ -1,4 +1,4 @@
-"""``config/site/regime/episodes.toml`` (ADR 0047): the twelve shipped episodes load in order with
+"""``config/site/regime/episodes.toml`` (ADR 0047): the shipped episodes load in order with
 their dates and drawdowns, and every ordering and shape rule names the episode."""
 
 from datetime import UTC, date, datetime
@@ -38,7 +38,7 @@ def changed(**kw: Any) -> dict[str, Any]:
 
 def test_the_shipped_episodes_load() -> None:
     found = load_episodes(FileConfigStore(REPO_ROOT / "config"))
-    assert len(found.episodes) == 12
+    assert len(found.episodes) == 15  # twelve drawdowns of 19% or more and three vol shocks
     gfc = found.by_key("gfc_2007")
     assert (gfc.peak, gfc.trough, gfc.spx_drawdown) == (date(2007, 10, 9), date(2009, 3, 9), -0.57)
     assert gfc.recession and gfc.nber_start == date(2007, 12, 1)
@@ -154,3 +154,20 @@ def test_the_shipped_timeline_window_and_gate_labels() -> None:
 def test_a_bad_timeline_fails(table: dict[str, Any], message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         Episodes.from_document({"timeline": table})
+
+
+def test_the_vol_shock_episodes_cite_their_source_and_are_known_from_the_trough() -> None:
+    """D3: the three short vol shocks the options setups replay (options-setups design)."""
+    found = load_episodes(FileConfigStore(REPO_ROOT / "config"))
+    shocks = {k: found.by_key(k) for k in ("aug_2015", "volmageddon_2018", "yen_carry_2024")}
+    assert {k: (e.peak, e.trough) for k, e in shocks.items()} == {
+        "aug_2015": (date(2015, 5, 21), date(2015, 8, 25)),
+        "volmageddon_2018": (date(2018, 1, 26), date(2018, 2, 8)),
+        "yen_carry_2024": (date(2024, 7, 16), date(2024, 8, 5)),
+    }
+    for e in shocks.values():
+        assert e.kind == "shock" and not e.recession and e.known_from == e.trough
+        assert e.source and -0.2 < e.spx_drawdown < -0.05
+    reference = [e for e in found.episodes if e.key not in shocks]
+    assert all(e.spx_drawdown <= -0.19 for e in reference)
+    assert all(e.source == "" for e in reference)
