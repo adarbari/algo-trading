@@ -9,11 +9,10 @@
 import { SearchDialog, type SearchDialogGroup } from '@algotrade/ui';
 import { useState } from 'react';
 
-import { useFeatureTable } from '@/entities/feature';
 import { GUIDE_KIND_TITLES, guideEntryPath } from '@/entities/guide';
 import { useDebounced } from '@/shared/lib';
 
-import { useGuideSearchResults } from '../api/hooks';
+import { useGuideSearchResults, useTickerGroups } from '../api/hooks';
 
 /** How long the box waits after the last keystroke before the server is asked. */
 export const SEARCH_DEBOUNCE_MS = 200;
@@ -34,37 +33,23 @@ export function GuideSearchDialog({ open, onOpenChange, onNavigate }: GuideSearc
   const [query, setQuery] = useState('');
   const asked = useDebounced(query.trim(), SEARCH_DEBOUNCE_MS);
   const results = useGuideSearchResults(asked);
-  const tickers = useFeatureTable({ columns: [], q: asked, size: TICKER_HITS }, asked !== '');
-  const guide = (asked ? (results.data ?? []) : []).map((group): SearchDialogGroup => ({
-    id: group.kind,
-    title: group.kind === SETUP_KIND ? 'Setups' : (GUIDE_KIND_TITLES[group.kind] ?? group.kind),
-    items: group.hits.map((hit) => ({
-      id: hit.id,
-      title: hit.title,
-      snippet: hit.snippet,
-      href:
-        group.kind === SETUP_KIND
+  const tickers = useTickerGroups(asked, TICKER_HITS);
+  const guide = (asked ? (results.data ?? []) : []).map((group): SearchDialogGroup => {
+    const setup = group.kind === SETUP_KIND;
+    return {
+      id: group.kind,
+      title: setup ? 'Setups' : (GUIDE_KIND_TITLES[group.kind] ?? group.kind),
+      items: group.hits.map((hit) => ({
+        id: hit.id,
+        title: hit.title,
+        snippet: hit.snippet,
+        href: setup
           ? `/edges?edge=${encodeURIComponent(hit.id)}`
           : guideEntryPath(hit.kind, hit.id),
-    })),
-  }));
-  const tickerGroup: SearchDialogGroup[] =
-    asked && (tickers.data?.rows.length ?? 0) > 0
-      ? [
-          {
-            id: 'ticker',
-            title: 'Tickers',
-            items: (tickers.data?.rows ?? []).map((row) => ({
-              id: row.symbol,
-              title: row.symbol,
-              snippet: row.name,
-              href: `/explore?sel=${encodeURIComponent(row.symbol)}&focus=${encodeURIComponent(row.symbol)}`,
-            })),
-          },
-        ]
-      : [];
-  const setups = guide.filter((g) => g.id === SETUP_KIND);
-  const groups = [...tickerGroup, ...setups, ...guide.filter((g) => g.id !== SETUP_KIND)];
+      })),
+    };
+  });
+  const groups = [...(asked ? (tickers.data ?? []) : []), ...guide];
   const change = (next: boolean) => {
     if (!next) setQuery('');
     onOpenChange(next);
@@ -74,8 +59,8 @@ export function GuideSearchDialog({ open, onOpenChange, onNavigate }: GuideSearc
       open={open}
       onOpenChange={change}
       title="Search"
-      placeholder="Search a ticker, a setup or the Guide"
-      hint="Type a ticker, a setup or a word the app uses."
+      placeholder="Tickers, setups, the Guide"
+      hint="Type a ticker, a setup or a term."
       query={query}
       onQueryChange={setQuery}
       groups={groups}

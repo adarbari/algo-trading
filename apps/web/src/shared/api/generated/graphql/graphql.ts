@@ -841,6 +841,14 @@ export type GuideSearchQueryVariables = Exact<{
 
 export type GuideSearchQuery = { guideSearch: { query: string, groups: Array<{ kind: string, hits: Array<{ kind: string, id: string, title: string, snippet: string }> }> } | null };
 
+export type TickerSearchQueryVariables = Exact<{
+  q: string;
+  size: number;
+}>;
+
+
+export type TickerSearchQuery = { table: { instruments: Array<{ instrumentId: string, symbol: string, name: string }> } | null };
+
 export type MyFeatureRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -4881,6 +4889,17 @@ export const GuideSearchDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideSearchQuery, GuideSearchQueryVariables>;
+export const TickerSearchDocument = new TypedDocumentString(`
+    query TickerSearch($q: String!, $size: Int!) {
+  table(columns: [], q: $q, size: $size) {
+    instruments {
+      instrumentId
+      symbol
+      name
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<TickerSearchQuery, TickerSearchQueryVariables>;
 export const MyFeatureRequestsDocument = new TypedDocumentString(`
     query MyFeatureRequests {
   myFeatureRequests {

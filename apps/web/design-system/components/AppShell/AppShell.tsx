@@ -43,9 +43,7 @@ export function AppShell({
       <main id={mainId} tabIndex={-1} className={styles.main} data-layout={layout}>
         {children}
       </main>
-      {footer !== undefined && footer !== null && (
-        <footer className={styles.footer}>{footer}</footer>
-      )}
+      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </div>
   );
 }

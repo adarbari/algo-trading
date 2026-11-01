@@ -29,7 +29,7 @@ import { useEffect } from 'react';
 
 import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
-import { BarSearchButton, GuideSearchProvider } from '@/features/guide-search';
+import { GuideSearchButton, GuideSearchProvider } from '@/features/guide-search';
 import { SiteFooter, SystemStatusStrip } from '@/widgets/status-strip';
 import { ThemeChoice } from '@/widgets/theme-choice';
 
@@ -97,7 +97,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
               end={
                 viewer && (
                   <Stack direction="row" gap={2} align="center">
-                    <BarSearchButton />
+                    <GuideSearchButton bar />
                     <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
                     <AccountMenu
                       name={viewer.name}
