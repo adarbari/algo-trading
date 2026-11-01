@@ -1,0 +1,94 @@
+# L3 site setting: the Guide glossary, the facts of an open position (ADR 0088, ADR 0051). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py
+# and tests/unit/config/edges/positions/test_fields.py (every POSITION_FIELDS entry names one of these).
+# These are the fields an exit rule may name, as position.<name>; they exist only while a trade is open.
+
+[[term]]
+id = "position_days_held"
+term = "position.days_held"
+short = "How many trading sessions the position has been open, counted from its entry session."
+body = """
+The count starts at the entry session and grows by one at each close. A rule such as
+position.days_held gte 10 closes a trade that has not worked after ten sessions. It counts
+exchange sessions, so a weekend adds nothing. It is known at every close and is never missing.
+It cannot tell a slow winner from a stalled loser: pair it with the profit or the move.
+"""
+see_also = ["position_move_since_entry"]
+
+[[term]]
+id = "position_move_since_entry"
+term = "position.move_since_entry_pct"
+short = "How far the underlying's close has moved since the entry session's close, as a fraction."
+body = """
+A value of 0.05 means the underlying closed 5% above its close on the entry session, and -0.05
+means 5% below. It applies to share and option positions. A rule such as
+position.move_since_entry_pct lt -0.08 closes a trade after an 8% fall. It measures the
+underlying, not the position's value: an option can lose more or less than the stock moved.
+Read the profit share for the option's own result.
+"""
+see_also = ["position_profit_share", "position_days_held"]
+
+[[term]]
+id = "position_profit_share"
+term = "position.profit_share_of_credit"
+short = "The profit or loss to date as a share of the credit received when the position was opened."
+body = """
+A value of 0.5 means half the credit has been kept; -2 means the loss has reached twice the
+credit. It applies to positions that receive a net credit, such as a short put or a put spread.
+The take profit and stop loss settings of an option setup compile to rules on this field. It
+is measured from the closing quotes of the day, so it can differ from what a trader could close
+at. It is missing when a leg has no usable quote that day.
+"""
+see_also = ["position_mark_loss_share", "position_dte"]
+
+[[term]]
+id = "position_mark_loss_share"
+term = "position.mark_loss_share_of_collateral"
+short = "The loss to date, valued at the closing quotes, as a share of the capital the position ties up."
+body = """
+The capital is the position's collateral: the strike times 100 for a cash-secured put, the width
+less the credit for a spread. A value of 0.1 means the position is down 10% of that capital. It is
+the running version of the worst loss the setup's statistics report. A rule such as
+position.mark_loss_share_of_collateral gte 0.15 closes a trade that has lost 15% of its capital.
+It uses the same quotes as the profit share, so it shares its gaps.
+"""
+see_also = ["position_profit_share"]
+
+[[term]]
+id = "position_delta"
+term = "position.position_delta"
+short = "The position's total sensitivity to the underlying: each leg's delta times its quantity, summed."
+body = """
+The delta of each option leg is computed by the app from the leg's own implied volatility at the
+close. A short put reads positive when the underlying rises in its favour and the sign follows the
+quantity of each leg. A value near zero means the position barely moves with the underlying today.
+A rule such as position.position_delta lt -30 closes a position that has become too short the
+underlying. It changes with the underlying, the time left and the volatility.
+"""
+see_also = ["position_distance_to_strike", "position_dte"]
+
+[[term]]
+id = "position_distance_to_strike"
+term = "position.distance_to_strike_pct"
+short = "How far the underlying is from the nearest short strike, as a fraction, positive when the strike is in the money."
+body = """
+The distance is the underlying's close less the nearest short strike, divided by the close. The
+sign is signed toward the money: a positive value means the short option is in the money and
+likely to be assigned or to cost the trader at expiry. A rule such as
+position.distance_to_strike_pct gt 0.02 closes a position whose short strike is 2% in the money.
+It looks only at the nearest short strike, so a spread's long protection is not counted.
+"""
+see_also = ["position_delta", "position_dte"]
+
+[[term]]
+id = "position_dte"
+term = "position.dte"
+short = "Calendar days left until the position's nearest option expires."
+body = """
+The count includes weekends, so a Friday close with the option expiring the next Friday reads 7. A
+rule such as position.dte lte 21 closes a trade three weeks before expiry. It applies to option
+positions only. The exit_dte setting compiles to a rule on this field. Near expiry the position
+reacts much more to small moves in the underlying, which is the usual reason to close early.
+"""
+see_also = ["position_delta", "position_profit_share"]

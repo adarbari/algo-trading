@@ -5,6 +5,8 @@
 - ``rollup.<name>@v<N>.<column>``  a rollup (``rollups/instrument/<name>@v<N>``)
 - ``market.<name>@v<N>.<column>``  a market-entity feature group (``rollups/market/<name>@v<N>``,
                                    one ``MKT:<market>`` row per session; ADR 0047)
+- ``position.<name>``              a position-level fact of an open trade (computed per close by the
+                                   option-structure engine, never stored; ADR 0088)
 - ``feature.<name>``               an expression feature (``config/site/features/*/*.toml``),
                                    computed on read from the stored features it names
 
@@ -24,6 +26,7 @@ MARKET_ROLLUP_PREFIX = "rollups/market/"  # market-entity feature groups (ADR 00
 GROUP_TABLE_PREFIXES = {"instrument": ROLLUP_TABLE_PREFIX, "market": MARKET_ROLLUP_PREFIX}
 GROUP_FIELD_HEADS = {"instrument": "rollup", "market": "market"}
 FEATURE_FIELD_PREFIX = "feature."
+POSITION_FIELD_HEAD = "position"  # ``position.<name>``: computed while a trade is open
 # The value types a field (an instrument column or a declared rollup column) may have.
 # ``float32``: a 32-bit float stored to halve the bytes (feature groups from ADR 0023 step 3).
 FIELD_TYPES = frozenset({"str", "float", "float32", "int", "bool", "date"})
@@ -91,6 +94,15 @@ def table_field(table: str, column: str) -> str:
     return group_field(*found, column)
 
 
+def position_field(name: str) -> str:
+    return f"{POSITION_FIELD_HEAD}.{name}"
+
+
+def is_position_field(field_name: str) -> bool:
+    """``position.<name>``: a fact of an open trade, computed per close (no table)."""
+    return field_name.startswith(f"{POSITION_FIELD_HEAD}.")
+
+
 def is_feature_field(field_name: str) -> bool:
     """``feature.<name>``: an expression feature, computed on read (no table of its own)."""
     return field_name.startswith(FEATURE_FIELD_PREFIX)
@@ -105,8 +117,9 @@ def field_source(field_name: str) -> tuple[str, str]:
     if head in entities and "." in rest:
         key, _, column = rest.rpartition(".")
         return rollup_table(entities[head], key), column
-    if head == "feature":
-        raise ConfigurationError(f"{field_name}: an expression feature is computed, not read")
+    if head in ("feature", POSITION_FIELD_HEAD):
+        raise ConfigurationError(f"{field_name}: a {head} field is computed, not read")
     raise ConfigurationError(
-        f"field {field_name!r} must start with 'instrument.', 'rollup.', 'market.' or 'feature.'"
+        f"field {field_name!r} must start with 'instrument.', 'rollup.', 'market.', 'position.' "
+        f"or 'feature.'"
     )
