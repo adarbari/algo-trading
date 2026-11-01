@@ -117,6 +117,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/price_moves@v1",
     "rollups/instrument/price_stats@v2",   # 280 MB
     "rollups/instrument/put_wing@v1",
+    "rollups/instrument/short_premium@v1",
     "rollups/instrument/qmj@v1",
     "rollups/instrument/cohort_pct_fundamental@v1",   # 3 float32 columns: measure before the first backfill
     "rollups/instrument/cohort_pct_options@v1",   # 3 float32 columns

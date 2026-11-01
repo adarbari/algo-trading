@@ -1,0 +1,132 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06). The keys are documented in
+# chart/momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+# The short premium summary (short_premium@v1): the put and the call to sell at about 0.20 delta
+# and 30 days, as the figures a list filters on. The option grid (ADR 0083 amendment of
+# 2026-11-01) is the full table over the same chain; its (0.20 delta, 30-day) cell is this row.
+
+[[field]]
+name = "rollup.short_premium@v1.premium_status"
+theme = "short premium"
+reads = "Whether both the put and the call at about 0.20 delta were found. OK means both. Otherwise it names the first failing step. NO_SPOT: no usable price for the underlying. NO_CHAIN: no option quotes. NO_EXPIRY: no listed expiry within 30% of 30 days. ILLIQUID: a side has no two-sided quote at the expiry, or none whose volatility we could solve. NO_STRIKE: no strike within 0.025 delta of 0.20 on a side."
+caveats = [
+  "A side that was found keeps its figures when the other side fails: the put columns can be filled while the status says ILLIQUID for the calls. Read the status before treating a null as 'no premium'.",
+  "NO_STRIKE on a liquid name usually means a wide strike ladder (a high-priced stock) that skips the 0.20 delta band, not a thin market.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "both sides found"
+op = "eq"
+value = "OK"
+mode = "hard"
+
+[[field]]
+name = "rollup.short_premium@v1.target_expiry"
+theme = "short premium"
+reads = "The expiry the summary uses: the listed expiry nearest 30 calendar days away, within 30% of it (21 to 39 days), ties to the earlier. It is the grid's 30-day column."
+caveats = [
+  "Weekly expiries count, so it can sit nearer 30 days than the standard monthly. Different from rollup.put_wing@v1.target_expiry (near 45 days among 30 to 60).",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "has a 30-day expiry"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.short_premium@v1.target_dte"
+theme = "short premium"
+reads = "Calendar days from the session to rollup.short_premium@v1.target_expiry: 21 to 39, nearest 30. The yield a year divides by it."
+caveats = [
+  "A name with few listed expiries can sit at either edge of the window; compare yields only when the days are close.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "close to 30 days"
+op = "between"
+value = [25, 35]
+mode = "soft"
+tolerance = 4
+
+[[field]]
+name = "rollup.short_premium@v1.put_strike"
+theme = "short premium"
+reads = "The strike of the put to sell: the two-sided put whose delta is nearest minus 0.20, within 0.025 of it. The delta is solved from the put's mid with the Treasury rate and the dividend yield. Its cash collateral is this strike times 100 per contract."
+caveats = [
+  "The delta is ours, not the feed's. The strike is a pick from the stored (end-of-day) quote: judge the trade on a live one.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "has a 0.20 delta put"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.short_premium@v1.put_breakeven"
+theme = "short premium"
+reads = "The price the underlying can fall to at the expiry before the sold put loses money: the strike minus the mid premium."
+caveats = [
+  "Ignores commissions, early assignment and any move in the price before the expiry; it is the expiry payoff, not a stop.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "has a put breakeven"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.short_premium@v1.put_yield_ann"
+theme = "short premium"
+reads = "The put's mid premium over its strike, scaled to a year by 365 over the days to the expiry. It is simple, not compounded: what the cash-secured put would pay a year if it repeated at this price. 0.15 is 15% a year."
+caveats = [
+  "It is a rate of premium, not a forecast of profit: a put that is assigned loses what the stock falls below the breakeven. A high yield is usually a high implied volatility paying for a real risk.",
+  "Short expiries and wide spreads inflate it: read rollup.short_premium@v1.target_dte and the spread on the grid before comparing.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "a put yielding at least 10% a year"
+op = "gte"
+value = 0.10
+mode = "soft"
+tolerance = 0.02
+
+[[field]]
+name = "rollup.short_premium@v1.call_strike"
+theme = "short premium"
+reads = "The strike of the call to sell against shares held: the two-sided call whose delta (ours) is nearest 0.20, within 0.025 of it."
+caveats = [
+  "The call is priced as European: an ex-dividend date before the expiry can bring early assignment this does not model.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "has a 0.20 delta call"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.short_premium@v1.call_breakeven"
+theme = "short premium"
+reads = "The price the shares can fall to at the expiry before the covered call loses on the stock: the price now minus the mid premium."
+caveats = [
+  "Shares called away above the strike give up the move beyond it; the breakeven says nothing about that cost.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "has a call breakeven"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.short_premium@v1.call_yield_ann"
+theme = "short premium"
+reads = "The call's mid premium over the price of the shares held, scaled to a year by 365 over the days to the expiry. It is simple, not compounded: the income a covered call would add a year if it repeated at this price."
+caveats = [
+  "It excludes the stock's own move and the dividend. A high yield pays for the risk of the shares being called away on a rally, or of an event before the expiry.",
+]
+sources = ["docs/options/backend-concepts-2.md"]
+[[field.use]]
+for = "a call yielding at least 8% a year"
+op = "gte"
+value = 0.08
+mode = "soft"
+tolerance = 0.02

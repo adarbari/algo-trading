@@ -118,7 +118,8 @@ def test_text_added_to_the_prompt_shrinks_the_slice_not_the_margin(site) -> None
         for n in range(25)
     ]
     tight = slice_for([*infos, *heavy], case.sentence, book, guide)
-    assert len(tight.fields) + len(roomy.brief) < len(roomy.fields) + len(tight.brief)
+    assert len(tight.fields) < len(roomy.fields)  # the slice shrank
+    assert len(tight.brief) <= len(roomy.brief)  # and the brief did not grow to make room
     prompt = sliced_system_prompt([*infos, *heavy], case.sentence, book, guide)
     assert len(prompt) // 4 <= BUDGET_TOKENS + sum(len(h.description) for h in heavy) // 4 + 400
     core = {f for f in CORE_FIELDS if f in {i.name for i in infos}}
