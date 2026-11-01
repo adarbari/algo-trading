@@ -56,6 +56,10 @@ vi.mock('@/widgets/compare-panel', async () => {
     },
   };
 });
+vi.mock('@/widgets/ticker-stands', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { TickerStands: ({ symbol }: { symbol: string }) => <Text>{`stands ${symbol}`}</Text> };
+});
 vi.mock('@/widgets/overview-panel', async () => {
   const { Text } = await import('@algotrade/ui');
   return {

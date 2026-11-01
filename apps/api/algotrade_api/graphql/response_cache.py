@@ -284,6 +284,7 @@ TODAY_OPERATIONS: frozenset[str] = frozenset({"LlmUsage"})
 RUN_OPERATIONS: frozenset[str] = frozenset(
     {
         "IdeasPage",
+        "InstrumentPickedBy",  # the inverse of Ideas: setup verdicts and the picks they read
         "StatusStrip",
         "DataStatus",
         "ScreenerConfigs",

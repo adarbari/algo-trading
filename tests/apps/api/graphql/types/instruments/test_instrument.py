@@ -172,3 +172,16 @@ def test_feature_series_refuses_unknown_and_instrument_names(graph: Graph) -> No
     assert bad["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
     fact = graph(SERIES, {"key": "AAA", "names": ["instrument.sector"], "start": "2022-11-01"})
     assert fact["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
+
+
+def test_picked_by_is_the_inverse_of_ideas_and_empty_when_no_setup_qualifies(
+    graph: Graph,
+) -> None:
+    """`Instrument.pickedBy` reads through `services/read/ideas/inverse.py`: on the golden store
+    no setup has a stored verdict, so it is an empty list, never an error."""
+    found = graph(
+        "query($key: String!) { instrument(key: $key) { pickedBy { edgeId place level tab } } }",
+        {"key": "AAA"},
+    )
+    assert "errors" not in found
+    assert found["data"]["instrument"]["pickedBy"] == []

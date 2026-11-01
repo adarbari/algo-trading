@@ -199,6 +199,22 @@ test('Ideas: a phone row keeps the ticker, who picked it, decision and score', a
   await expect(headers.filter({ hasText: /Price|Watch out/ })).toHaveCount(0);
 });
 
+test('Explore: where a ticker stands fits a phone and links to the setup that picked it', async ({
+  page,
+}) => {
+  await page.goto('/explore?focus=AAPL&tab=chart');
+  await expect(page.getByRole('heading', { level: 2, name: 'Where AAPL stands' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Momentum 12-1' })).toHaveAttribute(
+    'href',
+    '/edges?edge=momentum_12_1',
+  );
+  await expect(page.getByRole('region', { name: 'Avoid-list checks' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await expectAccessible(page);
+});
+
 test('Explore chart: the zoom buttons are there', async ({ page }) => {
   await page.goto('/explore?focus=AAPL&tab=chart');
   await expect(page.getByRole('button', { name: 'Zoom in' })).toBeVisible();
