@@ -18,7 +18,7 @@ from algotrade.config.edges.positions.cases import (
     canonical,
     when_of,
 )
-from algotrade.config.edges.positions.fields import fields_for
+from algotrade.config.edges.positions.fields import fields_for, is_credit
 from algotrade.config.edges.positions.templates import (
     RETURN_KINDS,
     SIDE_TEMPLATES,
@@ -127,6 +127,19 @@ def _exit(o: Table) -> ExitSettings | None:
     return settings
 
 
+def candidates(outcome: "Outcome") -> tuple["Outcome", ...]:
+    """The outcome once per template it may hold: its own, and each template a ``position`` case
+    can choose, so every check of a position holds for every branch."""
+    spec = outcome.position
+    if spec is None:
+        return (outcome,)
+    names = [spec.template]
+    for case_value in spec.cases:
+        if case_value.name == "position":
+            names += [str(c.value) for c in case_value.cases if str(c.value) not in names]
+    return tuple(replace(outcome, position=replace(spec, template=n)) for n in names)
+
+
 def check_outcome(outcome: "Outcome", where: str, templates: Templates) -> None:
     """The template exists and fits the outcome's kind: an ``option_pnl`` position has an option
     leg, a return outcome's is shares of its own side; exits and option parameters are for an
@@ -146,6 +159,12 @@ def check_outcome(outcome: "Outcome", where: str, templates: Templates) -> None:
         raise ConfigurationError(
             f"{where} strike_delta: {spec.template!r} has no leg chosen by delta"
         )
+    credit_exits = spec.exit is not None and (spec.exit.take_profit or spec.exit.stop_loss)
+    if credit_exits and not is_credit(template):
+        raise ConfigurationError(
+            f"{where} position: take_profit and stop_loss are measured against a credit, and "
+            f"{spec.template!r} is not a net-credit position"
+        )
     if template.share_only:
         if spec.exit is not None or spec.book or spec.skip_report_in_life:
             raise ConfigurationError(
@@ -162,7 +181,15 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
     template, the ``position:<id>`` baselines, and a grid only over an option position (its ids
     never clash with the edge's variants or ``main``)."""
     for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
-        check_outcome(outcome, where, templates)
+        for candidate in candidates(outcome):
+            check_outcome(candidate, where, templates)
+        case_names = {c.name for c in outcome.position.cases} if outcome.position else set()
+        axes = {name for g in edge.variant_grid for name, _ in g.axes}
+        if case_names & axes:
+            raise ConfigurationError(
+                f"{where} variant_grid: {sorted(case_names & axes)} is also case-valued, so "
+                f"the case would override the grid point"
+            )
     check_known(where, "baselines", edge.position_baselines, templates)
     for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
         pending = [
@@ -252,9 +279,15 @@ def check_rules(edge: Any, where: str, catalog: FieldCatalog, templates: Templat
             for case in case_value.cases:
                 catalog.check(case.when, f"{where} outcome.{case_value.name}.cases", CASE)
         _check_position_cases(spec, where, templates)
-        if spec.exit is not None and spec.exit.when is not None and spec.template in templates:
-            own = {**catalog.levels, "position": fields_for(templates[spec.template])}
-            replace(catalog, levels=own).check(spec.exit.when, f"{where} outcome.exit.when", EXIT)
+        if spec.exit is not None and spec.exit.when is not None:
+            for candidate in candidates(outcome):
+                template = templates.get(candidate.position.template if candidate.position else "")
+                if template is None:
+                    continue
+                own = {**catalog.levels, "position": fields_for(template)}
+                replace(catalog, levels=own).check(
+                    spec.exit.when, f"{where} outcome.exit.when", EXIT
+                )
 
 
 def _check_position_cases(spec: PositionSpec, where: str, templates: Templates) -> None:

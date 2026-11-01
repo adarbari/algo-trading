@@ -6,7 +6,7 @@ instrument and market fields of the name at the decision session). Called by the
 decision session and by the picks task at the served session, never by the option engine, which
 receives the resolved point."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from algotrade.config.edges.positions.cases import CaseValue, Scalar
@@ -29,9 +29,19 @@ class CaseResolution:
         return self.reason is None
 
 
-def resolve_case(case_value: CaseValue, row: Mapping[str, FieldValue]) -> CaseResolution:
+def resolve_case(
+    case_value: CaseValue,
+    row: Mapping[str, FieldValue],
+    domains: Mapping[str, Sequence[str]] | None = None,
+) -> CaseResolution:
+    """``domains``: a string field's declared values (``FieldCatalog.domains``); a value outside
+    it is read as missing, so ``ne`` / ``not_in`` on a label we never saw is UNKNOWN, never TRUE.
+    The caller passes the catalogue's domains; the function applies them itself."""
+    read = {
+        k: None if domains and k in domains and v not in domains[k] else v for k, v in row.items()
+    }
     for i, case in enumerate(case_value.cases):
-        truth = evaluate_group(case.when, row)
+        truth = evaluate_group(case.when, read)
         if truth is None:
             return CaseResolution(None, CASE_UNKNOWN, i)
         if truth:
