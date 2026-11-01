@@ -1,3 +1,4 @@
+import { Text } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,7 +7,10 @@ import { fakeQuery } from '@/shared/lib/testing';
 
 import { EarningsWeek } from './EarningsWeek';
 
-const hooks = vi.hoisted(() => ({ useEventCalendar: vi.fn(), table: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  useEventCalendar: vi.fn(),
+  table: vi.fn<(props: { columns: string[] }) => void>(),
+}));
 
 vi.mock('@/entities/event', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -29,7 +33,7 @@ vi.mock('@/features/calendar-source', () => ({
 vi.mock('@/widgets/feature-table', () => ({
   FeatureTable: (props: { label: string; keys: string[]; columns: string[] }) => {
     hooks.table(props);
-    return <p>{`${props.label} | ${props.keys.join(',')}`}</p>;
+    return <Text>{`${props.label} | ${props.keys.join(',')}`}</Text>;
   },
 }));
 
@@ -41,7 +45,7 @@ describe('EarningsWeek', () => {
   it('asks the feature table for the reporters, with the priced and the usual move', () => {
     render(<EarningsWeek />);
     expect(screen.getByText(/Earnings · .* to .* \| AAPL/)).toBeInTheDocument();
-    const columns = hooks.table.mock.calls[0]?.[0].columns as string[];
+    const columns = hooks.table.mock.calls[0]?.[0].columns ?? [];
     expect(columns).toContain('rollup.implied_move@v1.implied_move');
     expect(columns).toContain('rollup.earnings_moves@v1.abs_move_mean_12');
   });
