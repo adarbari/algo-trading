@@ -43,6 +43,7 @@ LEGACY = {
     "BLOCKED": StepStatus.NOT_RUN,
 }
 SATISFIED = (StepStatus.SUCCEEDED, StepStatus.WAIVED, StepStatus.SKIPPED)
+HELD_PREFIX = "held: session "  # a step held behind an older session's failure (ADR 0086)
 BAD = (StepStatus.FAILED, StepStatus.NOT_RUN, StepStatus.WAITING)
 
 

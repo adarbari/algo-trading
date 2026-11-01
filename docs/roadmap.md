@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Now / Next
-The pickup list a fresh session reads first. A PR that opens or closes an item updates it. **Running** (check `make status`; verified 2026-10-05 05:40): nothing long-running. IBKR IV history backfill finished 2026-10-05 05:30 (all 4,200 names: 4,197 OK, 3 genuine NO_DATA; `ibkr_iv@v1` rollups over 502 sessions, rank FULL for 4,789 of 5,415 names on 2026-10-02).
+The pickup list a fresh session reads first. A PR that opens or closes an item updates it. **Running** (check `make status`; verified 2026-10-05 05:40): nothing long-running. IBKR IV history backfill finished 2026-10-05 05:30 (all 4,200 names: 4,197 OK, 3 genuine NO_DATA; `ibkr_iv@v1` rollups over 502 sessions, rank FULL for 4,789 of 5,415 names on 2026-10-02). **Incident 2026-10-26 to 10-31:** rollups failed on a None `known_from` (PR 982) and rule 6 held 10-27 to 10-30, so the 10-27 chains snapshot was lost (owner `--waive chains` needed for the 10-27 to 10-29 option screeners); ADR 0086 now lets snapshot steps run for the latest session behind a failed one.
 
 **Next**
 - **Workflow-first trader site (ADR 0083, 2026-10-24):** the F1 ADR (this line's PR) fixes the TRADER bar (Ideas, Setups, Test, Calendar), Ideas from the picks of setups with a `works` / `promising` stored verdict ("Unproven" until one exists), the setup's historical exit rule and the product rules; next the build slices in order: the bar and ⌘K, Ideas, Test, then exit rule and methodology pages; Describe it loses `suggestions`. **Forward record (ADR 0064 amendment 2026-10-24):** every open site setup is paper traded from the first nightly after the deploy (no backfill possible); the owner checks the first `edge-signals` night's time.
