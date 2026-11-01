@@ -34,6 +34,10 @@ def test_the_recorded_slice_parses_to_identity_columns_with_nulls_kept() -> None
     assert (twtr["vendor_type"], twtr["security_type"]) == ("CS", "COMMON_STOCK")
     assert (twtr["figi"], twtr["cik"], twtr["exchange"]) == ("BBG000H6HNW3", "0001418091", "XNYS")
     assert twtr["share_class_figi"] == "BBG001T35PT7" and twtr["end_date"] == date(2022, 10, 31)
+    # The record's other fields are kept as received (owner tenet 2026-11-01), the stamp as text.
+    assert (twtr["market"], twtr["locale"], twtr["currency_name"]) == ("stocks", "us", "usd")
+    assert twtr["last_updated_utc"] == "2024-12-03T22:29:45.588279Z"
+    assert frame["market"].notna().all() and frame["last_updated_utc"].notna().all()
     # A name Massive types and identifies only in part: nulls stay null, never "".
     old = row(frame, "AAB.WS")
     assert old[["vendor_type", "security_type", "cik", "figi"]].isna().all()

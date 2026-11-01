@@ -40,11 +40,12 @@ target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_impo
 [[table]]
 name = "instruments/listing_history"
 owner = "apps/ingestion/algotrade_ingestion/tasks/listings/listing_history.py"
+note = "ADR 0018 amendment 2026-10-08, ADR 0087 (merged with Massive's delisted records): a full snapshot per pull session, key (source, ticker, exchange, asset_type, start_date, end_date), source tiingo or massive per row (IngestRun.write takes a per-row source); nothing a free vendor sent is dropped (owner tenet 2026-11-01): a row outside the universe's scope carries scope_reason (other_exchange, not_usd, other_asset_type, odd_ticker, no_start_date, duplicate_start) and is never read, a Massive-only record whose start no Tiingo row gives has a null start_date and a reason in no_id_reason; instrument_id null until a trusted id exists, no_id_reason says why (out_of_scope, no_start, overlaps_listing, pair_ambiguous, perma_ambiguous, perma_held, figi_shared, figi_held, perma_no_meta, no_perma), id_source (symbol_history | perma | figi) which step gave it, an id once given is carried from the previous snapshot and never upgraded; the columns added by ADR 0087 (name, vendor_type, security_type, cik, figi, share_class_figi, vendor_exchange, vendor_end_date, is_adr, data_provider_perma_ticker, id_source, no_id_reason, scope_reason) are absent in an older partition and read as null through data.listings.universe.listing_frame; end_date is the vendor's last trading day (identity, never a feature)"
 
 [[table]]
 name = "instruments/delisted_tickers"
 owner = "apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"
-note = "ADR 0087: Massive's inactive (delisted) tickers, a full snapshot per pull session, key (source, ticker, end_date); Massive's free key; end_date is the vendor's last trading day (identity, never a feature; null for ~2% of rows); vendor_type and security_type are null before 2017; no OTC names, no ETFs before 2016, a renamed company's old ticker is absent; FIGI and CIK are partial; no instrument_id until the listing-history merge"
+note = "ADR 0087: Massive's inactive (delisted) tickers, a full snapshot per pull session, key (source, ticker, end_date); Massive's free key; end_date is the vendor's last trading day (identity, never a feature; null for ~2% of rows); vendor_type and security_type are null before 2017; market, locale, currency_name and last_updated_utc (a string, as received) are kept; no OTC names, no ETFs before 2016, a renamed company's old ticker is absent; FIGI and CIK are partial; no instrument_id: the merged instruments/listing_history gives the ids"
 
 [[table]]
 name = "analyst/vendor_access"

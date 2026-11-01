@@ -10,6 +10,8 @@ the inactive list takes about five minutes). A ticker goes through ``act_symbol`
 same symbol space as the universe and ``symbol_history`` (``KIMpL`` -> ``KIM$L``); no two
 delisted records collapsed on it at the first pull. ``delisted_utc`` is Massive's last trading
 day at midnight New York time; its date part is the ``end_date`` (null where Massive has none).
+``market``, ``locale``, ``currency_name`` and ``last_updated_utc`` are kept as received (owner
+tenet 2026-11-01: nothing a free source sends is discarded).
 """
 
 import json
@@ -34,6 +36,10 @@ DELISTED_COLUMNS = [
     "cik",
     "figi",
     "share_class_figi",
+    "market",
+    "locale",
+    "currency_name",
+    "last_updated_utc",
     "end_date",
 ]
 
@@ -102,6 +108,10 @@ def parse_inactive(results: list[dict[str, Any]]) -> tuple[pd.DataFrame, dict[st
             "cik": r.get("cik") or None,
             "figi": r.get("composite_figi") or None,
             "share_class_figi": r.get("share_class_figi") or None,
+            "market": r.get("market") or None,
+            "locale": r.get("locale") or None,
+            "currency_name": r.get("currency_name") or None,
+            "last_updated_utc": r.get("last_updated_utc") or None,
             "end_date": _day(r.get("delisted_utc")),
         }
         for r in results
