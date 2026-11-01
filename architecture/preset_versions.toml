@@ -108,3 +108,5 @@
 "lazy_prices_similar/v1.toml" = "b1a92057a7b20683241d7fca5f25cfb64b17d89643dda53594f5cafcb985eb12"
 "risk_factor_unchanged/v1.toml" = "1b7e48a29557520701bbabd5d50661826e6437f7997a9d31be060362f85f07d3"
 "etf_launch_recent/v1.toml" = "a38fb7006722a293d082b3153bf046e24baed0ee08616c7c948580e529dfba31"
+"earnings_move_rich/v1.toml" = "0134e3b288d0aa2a628f0831688bc7992f82edc7293dad9935bfc1f79b08a268"
+"earnings_move_cheap/v1.toml" = "a493afcb48ff37e0dbbc1626a4556ce78cae8fae853338217da70867b3712cdf"
