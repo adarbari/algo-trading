@@ -30,7 +30,8 @@ columns it added (a single-partition read does not add absent columns), which re
 absent ``scope_reason`` means every row is in scope. A row with no ``start_date`` (a Massive-only
 record whose start no Tiingo row gives) is never in a window: it is counted in
 ``Universe.undated`` when it may be alive on S, so the run stamp can say how much is missing.
-``Universe.null_type`` counts the Stock names returned with no ``security_type``.
+``Universe.null_type`` counts the Stock names returned with no ``security_type``;
+``Universe.duplicate_id`` the listings of an id already returned (alive on S together), dropped.
 """
 
 from collections.abc import Collection
@@ -73,6 +74,7 @@ class Universe:
     membership_snapshot: date | None = None  # the S&P 500 membership snapshot used
     undated: int = 0
     null_type: int = 0
+    duplicate_id: int = 0  # listings of an id already returned, alive on the session (dropped)
 
 
 def conform_listings(frame: pd.DataFrame) -> pd.DataFrame:
@@ -105,11 +107,14 @@ def listed_asof(listings: pd.DataFrame, session: date, sp500_tickers: Collection
     member = usable["ticker"].astype(str).isin(set(sp500_tickers))
     kept = usable[is_etf | nasdaq | member]
     out = kept[COLUMNS].sort_values(["ticker", "start_date"], kind="stable")
-    out = out.reset_index(drop=True)
+    # One row per instrument: two listings of one id alive on S would count a name twice (the
+    # first by ticker stays; the merge keeps it from happening, this keeps a read honest).
+    twice = out["instrument_id"].duplicated()
+    out = out[~twice].reset_index(drop=True)
     stock = out["asset_type"].astype(str).eq(STOCK)
     return Universe(
-        session, session, out, int((~has_id).sum()),
-        undated=undated, null_type=int((stock & out["security_type"].isna()).sum()),
+        session, session, out, int((~has_id).sum()), undated=undated,
+        null_type=int((stock & out["security_type"].isna()).sum()), duplicate_id=int(twice.sum()),
     )  # fmt: skip
 
 
@@ -121,7 +126,7 @@ def universe_asof(reader: StoreReader, session: date) -> Universe:
     found = listed_asof(frame, session, members.tickers)
     return Universe(
         session, snap.snapshot_date, found.instruments, found.without_id, members.snapshot,
-        found.undated, found.null_type,
+        found.undated, found.null_type, found.duplicate_id,
     )  # fmt: skip
 
 
@@ -191,8 +196,10 @@ def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
     the outcomes task (a window ending at ``session`` marks a name with no bar at its end
     DELISTED)."""
     frame, _ = listing_frame(reader)
-    end = pd.to_datetime(frame["end_date"])
     has_id = frame["instrument_id"].notna() & (frame["instrument_id"].astype(str) != "")
-    gone = frame[has_id & end.notna() & (end <= pd.Timestamp(session))]
-    last = pd.to_datetime(gone["end_date"]).dt.date
-    return dict(zip(gone["instrument_id"].astype(str), last, strict=True))
+    rows = frame[has_id]
+    # An id several listings share (a ticker change) is delisted only once every one has ended.
+    ends = pd.to_datetime(rows["end_date"]).groupby(rows["instrument_id"].astype(str))
+    stats = ends.agg(["count", "size", "max"])
+    gone = stats[(stats["count"] == stats["size"]) & (stats["max"] <= pd.Timestamp(session))]
+    return {str(i): last.date() for i, last in gone["max"].items()}

@@ -312,3 +312,53 @@ def test_the_winners_sample_reads_only_tiingo_rows() -> None:
 
     frame, _ = read_listings(_merged_store())
     assert set(frame["source"]) == {"tiingo"} and list(frame["ticker"]) == ["AAA"]
+
+
+def _shared_id_store(rows: list[tuple[str, str, date, date | None]]) -> StoreReader:
+    """Listings (id, ticker, start, end), all NASDAQ stocks of one snapshot."""
+    now, day = pd.Timestamp("2026-10-05", tz="UTC"), date(2026, 10, 5)
+    frame = pd.DataFrame(rows, columns=["instrument_id", "ticker", "start_date", "end_date"])
+    frame = frame.assign(exchange="NASDAQ", asset_type="Stock", price_currency="USD",
+                         perma_ticker="", source="tiingo", ts=now, session_date=day,
+                         knowledge_ts=now, run_id="r")  # fmt: skip
+    frame["end_date"] = frame["end_date"].astype(object).where(frame["end_date"].notna(), None)
+    members = pd.DataFrame(
+        {"index_name": ["SP500"], "ticker": ["NONE"], "start_date": [date(2000, 1, 3)],
+         "end_date": [None], "ts": [now], "session_date": [day], "knowledge_ts": [now],
+         "source": ["x"], "run_id": ["m"]}
+    )  # fmt: skip
+    writer = StoreWriter(MemoryBackend())
+    writer.write_table("instruments/listing_history", day, "r", frame)
+    writer.write_table("instruments/index_membership", day, "m", members)
+    return StoreReader(writer._backend)
+
+
+def test_two_listings_of_one_id_alive_together_are_one_name_and_counted() -> None:
+    reader = _shared_id_store(
+        [
+            ("EQ:X", "XYZ", date(2000, 1, 3), date(2025, 3, 1)),
+            ("EQ:X", "XYZQ", date(2000, 1, 3), date(2025, 6, 2)),  # the same id, alive together
+            ("EQ:Y", "YYY", date(2000, 1, 3), None),
+        ]
+    )
+    got = universe_asof(reader, date(2024, 6, 3))
+    assert list(got.instruments["ticker"]) == ["XYZ", "YYY"] and got.duplicate_id == 1
+    later = universe_asof(reader, date(2025, 4, 1))  # only the second is still listed
+    assert list(later.instruments["ticker"]) == ["XYZQ", "YYY"] and later.duplicate_id == 0
+
+
+def test_a_shared_id_is_delisted_only_once_every_one_of_its_listings_has_ended() -> None:
+    reader = _shared_id_store(
+        [
+            ("EQ:FB", "FB", date(2012, 5, 18), date(2022, 6, 8)),  # a ticker change: one instrument
+            ("EQ:FB", "META", date(2022, 6, 9), None),
+            ("EQ:Z", "ZZZ", date(2000, 1, 3), date(2010, 1, 4)),
+            ("EQ:W", "WA", date(2000, 1, 3), date(2005, 1, 4)),
+            ("EQ:W", "WB", date(2006, 1, 3), date(2012, 1, 4)),
+        ]
+    )
+    assert delisted_by(reader, date(2030, 1, 1)) == {
+        "EQ:Z": date(2010, 1, 4),
+        "EQ:W": date(2012, 1, 4),
+    }  # FB: META is still listed
+    assert delisted_by(reader, date(2011, 1, 1)) == {"EQ:Z": date(2010, 1, 4)}  # WB still listed

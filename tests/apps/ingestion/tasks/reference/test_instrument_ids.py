@@ -334,19 +334,23 @@ def test_the_figi_step_runs_only_after_symbol_history_and_the_perma_ticker_fail(
     assert stats["ids_by_figi"] == 1 and stats["no_id_figi_shared"] == 2
 
 
-def test_a_perma_id_another_listing_holds_is_not_given_twice() -> None:
+def test_listings_of_one_perma_ticker_share_its_id_in_turn_never_at_once() -> None:
     listings = _listing_rows(
-        {"ticker": "FIRST", "perma_ticker": "US7"},
-        {
-            "ticker": "SECOND",
-            "perma_ticker": "US7",
-            "start_date": date(2016, 1, 4),
-            "end_date": None,
-        },
+        {"ticker": "FIRST", "perma_ticker": "US7"},  # 2005 to 2015
+        {"ticker": "SECOND", "perma_ticker": "US7", "start_date": date(2016, 1, 4),
+         "end_date": None},  # the ticker change: the same instrument, listed after
+        {"ticker": "THIRD", "perma_ticker": "US7", "start_date": date(2010, 1, 4),
+         "end_date": None},  # alive with FIRST: another company under the same permaTicker
+    )  # fmt: skip
+    out, stats = assign_listing_ids_counted(listings, None)
+    by = out.set_index("ticker")
+    assert by.loc["FIRST", "instrument_id"] == "EQ:TIINGO:US7"
+    assert by.loc["SECOND", "instrument_id"] == "EQ:TIINGO:US7"  # shared, not alphabetical luck
+    assert (
+        pd.isna(by.loc["THIRD", "instrument_id"])
+        and by.loc["THIRD", "no_id_reason"] == "perma_held"
     )
-    out = assign_listing_ids(listings, None).set_index("ticker")
-    assert out.loc["FIRST", "instrument_id"] == "EQ:TIINGO:US7"  # the first in order keeps it
-    assert out.loc["SECOND", "no_id_reason"] == "perma_held"
+    assert stats["no_id_perma_held"] == 1
 
 
 def test_a_carried_id_is_never_upgraded_even_when_the_rules_now_give_another() -> None:
@@ -357,7 +361,8 @@ def test_a_carried_id_is_never_upgraded_even_when_the_rules_now_give_another() -
          "instrument_id": "EQ:BBG000GONE", "id_source": "figi", "end_date": date(2020, 5, 1)},
     )  # fmt: skip
     listings = _listing_rows(
-        {"ticker": "KEEP", "figi": "BBG000KEEP"},  # the rule would now give the symbol_history id
+        # it delisted since (a new end date): the id stays; the rule would now give another
+        {"ticker": "KEEP", "figi": "BBG000KEEP", "end_date": date(2016, 1, 4)},
         {"ticker": "OLDSTYLE", "perma_ticker": "US6"},
         {"ticker": "GONE", "source": "massive", "exchange": "NYSE", "end_date": date(2020, 5, 1),
          "figi": "BBG000GONE"},

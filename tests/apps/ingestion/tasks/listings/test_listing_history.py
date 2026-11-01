@@ -253,7 +253,7 @@ def test_bbby_with_the_recorded_meta_stays_undated_and_gets_no_id_even_with_a_fi
 def test_bbby_takes_its_successors_start_and_a_perma_id_when_meta_names_one_company() -> None:
     ctx = context(BBBY, history=False)
     one = payloads.meta_rows(
-        ("US000000000258", "bbby", None, True), ("US000000000258", "bbbyq", "Bed Bath", True)
+        ("US000000000258", "bbby", None, False), ("US000000000258", "bbbyq", "Bed Bath", True)
     )  # built by hand in the recorded shape: what the recorded answer would be for one company
     record = ingest_listing_history(ctx, source(FILE), DAY, bbby_meta(one))
     assert record.status is RunStatus.COMPLETE

@@ -25,18 +25,21 @@ universe: ``data.listings`` counts them as undated). In this order:
 1. ``pair_ambiguous``: it had several candidates to pair with.
 2. ``no_start``: it has no end date to look a successor up by.
 3. ``overlaps_listing``: an in-scope Tiingo row of its own ticker covers its last day (the
-   ticker was reused: that row's life is not this record's).
+   ticker was reused: that row's life is not this record's); checked again once a start is
+   found: no in-scope Tiingo row of the ticker may overlap the whole life ``start..end``, or the
+   one name would be listed twice (a Tiingo row that ended days before the record's end).
 4. ``no_start``: no candidate. Candidates are the out-of-scope ``other_exchange`` Tiingo rows
    (the OTC successor a bankrupt name moves to: ``BBBY`` -> ``BBBYQ``) whose ticker starts with
    the record's and is at most ``SUFFIX`` characters longer, that started on or before the
    record's last day and have no end or ended no more than ``PAIR_DAYS`` days before it.
 5. One Tiingo meta request, for the record's ticker and its candidates' (one request per record
    that has candidates). The record takes the permaTicker ``P`` only when exactly one
-   permaTicker sits on the meta rows of those tickers and those rows name exactly one candidate
-   (or only the record's own ticker, with one candidate); then its start is that candidate's.
-   Otherwise ``perma_ambiguous`` (or ``no_meta`` when Tiingo answered nothing). Recorded
-   2026-11-01: ``bbby`` answers a reused ticker's permaTicker and ``bbbyq`` Bed Bath & Beyond's,
-   two permaTickers: BBBY stays undated, the safe outcome.
+   permaTicker sits on both a meta row of the record's own ticker, inactive there, and the meta
+   rows of exactly one candidate; then its start is that candidate's. Otherwise
+   ``perma_ambiguous``, or ``no_meta`` when the record's own ticker has no meta row (an unrelated
+   OTC name proves nothing). Recorded 2026-11-01: ``bbby`` answers a reused ticker's permaTicker
+   (active) and ``bbbyq`` Bed Bath & Beyond's: no common permaTicker, BBBY stays undated, the
+   safe outcome.
 
 The end date is read here (identity: pairing and the id), never as a feature or label.
 """
@@ -178,42 +181,41 @@ class _Successors:
         ]  # fmt: skip
 
 
-def _covers(rows: list[Row], last: date) -> bool:
-    """Whether one of the Tiingo rows was listed on ``last``."""
+def _covers(rows: list[Row], first: date | None, last: date) -> bool:
+    """Whether one of the Tiingo rows was listed on a day of ``first..last`` (``first`` None:
+    on ``last``)."""
     return any(
-        r["start_date"] <= last and (r["end_date"] is None or r["end_date"] >= last) for r in rows
+        r["start_date"] <= last and (r["end_date"] is None or r["end_date"] >= (first or last))
+        for r in rows
     )
-
-
-def _named_start(key: str, candidates: list[Row], rows: pd.DataFrame) -> list[Row]:
-    """The candidates whose start the record may take: the one candidate the meta rows of one
-    permaTicker name, or the only candidate when they name the record's own ticker alone."""
-    named = {compare_key(t) for t in rows["ticker"]}
-    cands = {compare_key(c["ticker"]) for c in candidates}
-    if len(named & cands) == 1:
-        (only,) = named & cands
-        return [c for c in candidates if compare_key(c["ticker"]) == only]
-    if not named & cands and named == {key} and len(candidates) == 1:
-        return candidates
-    return []
 
 
 def _by_perma(
     key: str, candidates: list[Row], meta: pd.DataFrame | None
 ) -> tuple[Row | None, pd.Series | None, str]:
     """-> (the candidate whose start the record takes, the meta row naming the permaTicker, the
-    reason when there is none): the module docstring's step 5."""
+    reason when there is none): the module docstring's step 5. One permaTicker must sit on the
+    meta rows of both the record's own ticker (inactive there: the old company no longer trades
+    under it) and of exactly one candidate."""
     if meta is None or meta.empty:
         return None, None, NO_META
-    names = {key} | {compare_key(c["ticker"]) for c in candidates}
-    rows = meta[meta["ticker"].map(compare_key).isin(names)]
-    if rows.empty:
+    tickers = meta["ticker"].map(compare_key)
+    own = meta[tickers == key]
+    if own.empty:  # nothing says what the record's ticker was: an OTC name nearby proves nothing
         return None, None, NO_META
-    starts = _named_start(key, candidates, rows) if rows["perma_ticker"].nunique() == 1 else []
+    theirs = meta[tickers.isin({compare_key(c["ticker"]) for c in candidates})]
+    common = set(own["perma_ticker"]) & set(theirs["perma_ticker"])
+    if len(common) != 1:
+        return None, None, PERMA_AMBIGUOUS
+    (perma,) = common
+    if own.loc[own["perma_ticker"] == perma, "is_active"].any():  # a reused ticker's new company
+        return None, None, PERMA_AMBIGUOUS
+    named = theirs[theirs["perma_ticker"] == perma]
+    keys = {compare_key(t) for t in named["ticker"]}
+    starts = [c for c in candidates if compare_key(c["ticker"]) in keys]
     if len(starts) != 1:
         return None, None, PERMA_AMBIGUOUS
-    own = rows[rows["ticker"].map(compare_key) == compare_key(starts[0]["ticker"])]
-    return starts[0], (own if not own.empty else rows).iloc[0], ""
+    return starts[0], named.iloc[0], ""
 
 
 def _date_record(
@@ -225,7 +227,7 @@ def _date_record(
     if key is None or last is None:
         row["no_id_reason"] = NO_START
         return
-    if _covers(covering.get(key, []), last):
+    if _covers(covering.get(key, []), None, last):
         row["no_id_reason"] = OVERLAPS
         return
     candidates = successors.of(key, last)
@@ -237,6 +239,9 @@ def _date_record(
     start, meta_row, reason = _by_perma(key, candidates, ask_meta(asked))
     if start is None or meta_row is None:
         row["no_id_reason"] = reason
+        return
+    if _covers(covering.get(key, []), start["start_date"], last):  # the dated life meets another
+        row["no_id_reason"] = OVERLAPS
         return
     row.update(
         start_date=start["start_date"], perma_ticker=str(meta_row["perma_ticker"]),

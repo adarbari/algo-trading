@@ -186,10 +186,11 @@ def test_bbby_takes_the_start_of_its_otc_successor_only_when_meta_names_one_comp
     assert meta.asked == [["BBBY", "BBBYQ"]] and stats["meta_record_requests"] == 1
     assert pd.isna(record["start_date"]) and record["no_id_reason"] == "perma_ambiguous"
     assert record["perma_ticker"] == "" and stats["massive_perma_ambiguous"] == 1
-    # Were both tickers one company (one permaTicker on both rows), the record takes BBBYQ's start.
+    # Were both tickers one company (one permaTicker on both rows, inactive on the old ticker),
+    # the record takes BBBYQ's start.
     same = Meta(
         tfx.meta_rows(
-            ("US000000000258", "bbby", None, True),
+            ("US000000000258", "bbby", None, False),
             ("US000000000258", "bbbyq", "Bed Bath & Beyond Inc", True),
         )
     )
@@ -198,9 +199,45 @@ def test_bbby_takes_the_start_of_its_otc_successor_only_when_meta_names_one_comp
     assert record["perma_ticker"] == "US000000000258"
     assert record["data_provider_perma_ticker"] == "000258" and not record["is_adr"]
     assert record["end_date"] == date(2023, 5, 2) and record["source"] == "massive"
-    # One candidate and meta naming only the record's own ticker: still that candidate's start.
-    own = Meta(tfx.meta_rows(("US000000000258", "bbby", None, True)))
-    assert only(merged(t, m, own)[0], "massive", "BBBY")["start_date"] == date(1992, 6, 4)
+    # Meta naming only the record's own ticker proves nothing about the candidate: undated.
+    own = Meta(tfx.meta_rows(("US000000000258", "bbby", None, False)))
+    assert pd.isna(only(merged(t, m, own)[0], "massive", "BBBY")["start_date"])
+    # The one permaTicker is active on the record's ticker: that company still trades under it.
+    live = Meta(tfx.meta_rows(("US1", "bbby", None, True), ("US1", "bbbyq", "Bed Bath", True)))
+    out, _ = merged(t, m, live)
+    assert only(out, "massive", "BBBY")["no_id_reason"] == "perma_ambiguous"
+
+
+def test_an_unrelated_otc_name_with_a_longer_ticker_never_dates_a_record() -> None:
+    """B1: AB ended in 2015; ABCD is some other company on the OTC market whose meta answers a
+    permaTicker, while AB itself has no meta row. Taking ABCD's start would date AB from 2001 and
+    give it an id, and the bars of ABCD would be fetched as AB's."""
+    t = tiingo("ABCD,PINK,Stock,USD,2001-03-01,2016-01-04")
+    m = massive(mfx.inactive_record("AB", "2015-06-01", "XNAS", "CS"))
+    meta = Meta(tfx.meta_rows(("US999", "abcd", "Abcd Corp", False)))
+    out, _ = merged(t, m, meta)
+    record = only(out, "massive", "AB")
+    assert meta.asked == [["AB", "ABCD"]]
+    assert pd.isna(record["start_date"]) and record["no_id_reason"] == "no_meta"
+    assert record["perma_ticker"] == ""
+    # The same when AB answers a permaTicker of its own that ABCD does not share.
+    other = Meta(tfx.meta_rows(("US1", "ab", "Ab Inc", False), ("US999", "abcd", "Abcd", False)))
+    record = only(merged(t, m, other)[0], "massive", "AB")
+    assert pd.isna(record["start_date"]) and record["no_id_reason"] == "perma_ambiguous"
+
+
+def test_a_dated_life_that_meets_an_in_scope_row_of_the_ticker_is_overlaps_listing() -> None:
+    """B2: XYZ's Tiingo row ended 13 days before Massive's end (no pair) and the OTC successor's
+    meta confirms one company: dating the record from 2000 would list XYZ twice."""
+    t = tiingo(
+        "XYZ,NASDAQ,Stock,USD,2000-01-03,2025-03-01", "XYZQ,PINK,Stock,USD,2000-01-03,2025-06-02"
+    )
+    m = massive(mfx.inactive_record("XYZ", "2025-03-14", "XNAS", "CS"))
+    meta = Meta(tfx.meta_rows(("US5", "xyz", "Xyz", False), ("US5", "xyzq", "Xyz", True)))
+    out, stats = merged(t, m, meta)
+    record = only(out, "massive", "XYZ")
+    assert pd.isna(record["start_date"]) and record["no_id_reason"] == "overlaps_listing"
+    assert record["perma_ticker"] == "" and stats["paired"] == 0
 
 
 def test_with_no_successor_the_record_is_still_written_undated_and_nothing_is_asked() -> None:
@@ -245,6 +282,6 @@ def test_two_candidates_naming_one_company_are_ambiguous_too() -> None:
     t = tiingo(
         "BBBYQ,PINK,Stock,USD,1992-06-04,2023-09-29", "BBBYQ,OTC,Stock,USD,2010-02-03,2023-09-29"
     )
-    both = Meta(tfx.meta_rows(("US1", "bbby", None, True), ("US1", "bbbyq", "Bed Bath", True)))
+    both = Meta(tfx.meta_rows(("US1", "bbby", None, False), ("US1", "bbbyq", "Bed Bath", True)))
     out, _ = merged(t, massive(mfx.inactive_record("BBBY", "2023-05-02")), both)
     assert only(out, "massive", "BBBY")["no_id_reason"] == "perma_ambiguous"  # which start?

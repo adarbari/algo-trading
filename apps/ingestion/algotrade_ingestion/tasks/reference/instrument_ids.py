@@ -20,8 +20,9 @@
   earlier ones gave no id and only for a listing with a start date (a null start is a null id): (1)
   the previous snapshot's id on the same key, never upgraded (``ids_held`` counts those the
   rules would now give another id); (2) the overlapping ``symbol_history`` row's id; (3)
-  ``EQ:TIINGO:<permaTicker>`` through ``equity_id``, unless another listing already holds it
-  (``perma_held``); (4) the composite FIGI through ``equity_id``, only when it is on one listing
+  ``EQ:TIINGO:<permaTicker>`` through ``equity_id``, shared by the listings of one permaTicker (a
+  ticker change) unless one holding it was listed at the same time (``perma_held``); (4) the
+  composite FIGI through ``equity_id``, only when it is on one listing
   of the frame and its id is held in ``symbol_history``, ``id_map`` or the frame by none
   (``figi_shared``, ``figi_held``: a ticker change of an instrument that has an id, never a new
   listing); (5) none, with the reason in ``no_id_reason``. ``equity_id`` is never called without
@@ -397,18 +398,12 @@ def _label(value: Any) -> str | None:
     return str(value).strip()
 
 
-def _carry_key(
-    source: object,
-    ticker: object,
-    exchange: object,
-    asset: object,
-    start: date | None,
-    end: date | None,
-) -> CarryKey:
-    """What a listing row is on from one snapshot to the next: a Tiingo row by its table key, a
-    Massive-only row (its start may be null) by (ticker, last trading day)."""
+def _carry_key(source: object, ticker: object, start: date | None, end: date | None) -> CarryKey:
+    """What a listing row is on from one snapshot to the next: a Tiingo row by (ticker, start),
+    which is unique among the rows in scope (its end moves when it delists: the id must not),
+    a Massive-only row by (ticker, last trading day)."""
     if source == TIINGO:
-        return (TIINGO, ticker, _label(exchange), _label(asset), start, end)
+        return (TIINGO, ticker, start)
     return (source, ticker, end)
 
 
@@ -420,16 +415,15 @@ def _previous_listing_ids(previous: pd.DataFrame | None) -> dict[CarryKey, tuple
     if previous is None or previous.empty:
         return out
     cells = zip(
-        _column(previous, "source", TIINGO), previous["ticker"], _column(previous, "exchange"),
-        _column(previous, "asset_type"), previous["start_date"], previous["end_date"],
-        _column(previous, "instrument_id"), _column(previous, "id_source"),
+        _column(previous, "source", TIINGO), previous["ticker"], previous["start_date"],
+        previous["end_date"], _column(previous, "instrument_id"), _column(previous, "id_source"),
         _column(previous, "scope_reason"), strict=True,
     )  # fmt: skip
-    for source, ticker, exchange, asset, start, end, iid, how, scope in cells:
+    for source, ticker, start, end, iid, how, scope in cells:
         if _label(iid) is None or not pd.isna(scope):
             continue
         by = _label(how) or (BY_PERMA if is_perma_id(str(iid)) else BY_HISTORY)
-        key = _carry_key(source, ticker, exchange, asset, _date(start), _date(end))
+        key = _carry_key(source, ticker, _date(start), _date(end))
         out.setdefault(key, (str(iid), by))
     return out
 
@@ -447,8 +441,6 @@ class _ListingIds:
     ) -> None:
         self.n = len(listings)
         self.ticker = _column(listings, "ticker")
-        self.exchange = _column(listings, "exchange")
-        self.asset = _column(listings, "asset_type")
         self.start = [_date(v) for v in listings["start_date"]]
         self.end = [_date(v) for v in listings["end_date"]]
         self.source = _column(listings, "source", TIINGO)
@@ -463,6 +455,7 @@ class _ListingIds:
         self.held |= set(mapped)
         self.before = _previous_listing_ids(previous)
         self.taken: set[str] = set()  # the ids the frame holds so far
+        self.lives: dict[str, list[tuple[date | None, date | None]]] = {}  # ... and when held
         self.carried: list[int] = []
         self.shared = Counter(f for f in self.figi if f is not None)
         self._mark_unplaceable()
@@ -487,14 +480,21 @@ class _ListingIds:
     def _give(self, i: int, wanted: str, how: str) -> None:
         self.ids[i], self.via[i] = wanted, how
         self.taken.add(wanted)
+        self.lives.setdefault(wanted, []).append((self.start[i], self.end[i]))
+
+    def _held_over(self, wanted: str, i: int) -> bool:
+        """Whether a listing already holding ``wanted`` was listed while row ``i`` was (one
+        company's ticker changes share an id, in turn; two at once do not)."""
+        start, end = self.start[i], self.end[i]
+        return any(
+            (s is None or end is None or s <= end) and (e is None or start is None or e >= start)
+            for s, e in self.lives.get(wanted, [])
+        )
 
     def carry(self) -> None:
         """1. The previous snapshot's id on the same key: an id once given is never upgraded."""
         for i in self.order:
-            key = _carry_key(
-                self.source[i], self.ticker[i], self.exchange[i], self.asset[i],
-                self.start[i], self.end[i],
-            )  # fmt: skip
+            key = _carry_key(self.source[i], self.ticker[i], self.start[i], self.end[i])
             if key in self.before:
                 self._give(i, *self.before[key])
                 self.carried.append(i)
@@ -507,13 +507,15 @@ class _ListingIds:
                 self._give(i, found, BY_HISTORY)
 
     def perma_ids(self) -> None:
-        """3. ``EQ:TIINGO:<permaTicker>``, unless another listing already holds the id."""
+        """3. ``EQ:TIINGO:<permaTicker>``: the listings of one permaTicker share its id (a ticker
+        change is one instrument, listed in turn); not while another listing holding it was
+        listed at the same time."""
         for i in self.order:
             perma = self.perma[i]
             if self.ids[i] is not None or perma is None:
                 continue
             wanted = equity_id(str(self.ticker[i]), perma_ticker=perma)
-            if wanted in self.taken:
+            if self._held_over(wanted, i):
                 self.reason[i] = PERMA_HELD
             else:
                 self._give(i, wanted, BY_PERMA)
