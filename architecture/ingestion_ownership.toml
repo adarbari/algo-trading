@@ -73,12 +73,12 @@ detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
 id = "delisted-tickers-ingestion"
-description = "Store Massive's inactive (delisted) tickers in instruments/delisted_tickers (ADR 0086): one full snapshot per session from MassiveTickers' inactive list (cursor-paged, 12.5 s a request on the free tier), a pull under [quality] min_delisted_tickers rows FAILED before any write, the vendor's last trading day as end_date (identity, never a feature), in no workflow until the listing-history merge"
+description = "Store Massive's inactive (delisted) tickers in instruments/delisted_tickers (ADR 0087): one full snapshot per session from MassiveTickers' inactive list (cursor-paged, 12.5 s a request on the free tier), a pull under [quality] min_delisted_tickers rows FAILED before any write, the vendor's last trading day as end_date (identity, never a feature), in no workflow until the listing-history merge"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/entries_reference.py",  # the registry entry's runner calls the task
 ]
-section = "docs/adr/0086-survivorship-free-listing-history.md#decision"
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
 detect = [{ call = "ingest_delisted_tickers" }]
 
 [[responsibility]]

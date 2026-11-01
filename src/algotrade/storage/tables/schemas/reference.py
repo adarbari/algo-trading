@@ -89,7 +89,7 @@ LISTING_HISTORY = fixed(
 )
 
 # L1: every US ticker Massive lists as INACTIVE (delisted), one row per (ticker, last trading
-# day) from ``/v3/reference/tickers?active=false`` (ADR 0086): the names the active universe
+# day) from ``/v3/reference/tickers?active=false`` (ADR 0087): the names the active universe
 # lacks, with the vendor's CIK and FIGIs where it has them. A full copy per pull session
 # (snapshot). Identity only: ``end_date`` is the vendor's last trading day (null
 # for ~2% of the rows, where Massive gives none), ``vendor_type`` is null before 2017 and

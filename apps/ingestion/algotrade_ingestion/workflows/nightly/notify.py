@@ -32,6 +32,7 @@ from algotrade.config.site.settings import NightlySettings
 from algotrade.data import StoreReader
 from algotrade_ingestion.workflows.nightly.records import chain_drift, load_report
 from algotrade_ingestion.workflows.nightly.render import render_html, render_text
+from algotrade_ingestion.workflows.nightly.steps import HELD_PREFIX
 
 TITLE = "algotrade nightly"
 SMTP_TIMEOUT_S = 30
@@ -194,17 +195,25 @@ def message(summary: Mapping[str, Any]) -> str:
     """One line: status, sessions, the critical steps that did not succeed (optional ones
     are warnings in the report), and the sessions held back behind a failed one."""
     steps = [(name, step) for run in summary.get("runs", []) for name, step in run["steps"].items()]
-    bad = sorted(
-        {
-            f"{name} {step['status'].lower()}"
-            for name, step in steps
-            if step["status"] in BAD and step.get("critical", True)
-        }
-    )
+    bad = {
+        f"{name} {step['status'].lower()}"
+        for name, step in steps
+        if step["status"] in BAD and step.get("critical", True)
+    }
+    for run in summary.get("snapshot_runs", []):  # only its own snapshot steps count (ADR 0086)
+        for name, step in run["steps"].items():
+            held = str(step.get("reason", "")).startswith(HELD_PREFIX)
+            if step["status"] in BAD and step.get("critical", True) and not held:
+                bad.add(f"{name} {step['status'].lower()} (snapshot pass {run['session']})")
+    bad_steps = sorted(bad)
     sessions = ", ".join(summary.get("sessions", [])) or "no session"
     held = (summary.get("catch_up") or {}).get("held", [])
     tail = f"; held back: {', '.join(held)}" if held else ""
-    return f"{summary['status']} ({sessions})" + (f": {'; '.join(bad)}" if bad else "") + tail
+    return (
+        f"{summary['status']} ({sessions})"
+        + (f": {'; '.join(bad_steps)}" if bad_steps else "")
+        + tail
+    )
 
 
 def notice(

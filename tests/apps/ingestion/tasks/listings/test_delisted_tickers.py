@@ -1,5 +1,5 @@
 """The delisted-tickers task on the RECORDED Massive inactive slice: one snapshot per session,
-stamps, an idempotent rerun, and the ``[quality] min_delisted_tickers`` floor (ADR 0086)."""
+stamps, an idempotent rerun, and the ``[quality] min_delisted_tickers`` floor (ADR 0087)."""
 
 import json
 from datetime import UTC, date, datetime

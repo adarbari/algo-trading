@@ -1,5 +1,5 @@
 """Massive's inactive (delisted) ticker list on a RECORDED slice of the 2026-10-24 pull: the
-parse, the ``next_url`` paging and the request URLs (ADR 0086)."""
+parse, the ``next_url`` paging and the request URLs (ADR 0087)."""
 
 import json
 from datetime import date

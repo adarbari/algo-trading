@@ -10,7 +10,7 @@ from tests.conftest import REPO_ROOT
 
 SCANNED = ("src/algotrade", "apps/api", "apps/backtest", "apps/ingestion", "libs")
 ALLOWED = (
-    # universe_asof, delisted_by, read_listings, S&P 500; delisted.py (ADR 0086: Massive's
+    # universe_asof, delisted_by, read_listings, S&P 500; delisted.py (ADR 0087: Massive's
     # delisted tickers, for the id merge and the quality report only)
     "src/algotrade/data/listings/",
     "src/algotrade/data/resolver.py",  # is this listing alive on S
