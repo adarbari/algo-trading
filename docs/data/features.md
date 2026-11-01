@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-771 stored features in 94 groups, in dependency order; 164 expression features.
+780 stored features in 95 groups, in dependency order; 164 expression features.
 
 ## `option_liquidity@v1`
 
@@ -1099,6 +1099,22 @@ The covered call at the expiry nearest 45 days: the one nearest 15-30 delta (our
 | `best_call_volume` | chain | int | count | open | >= 0 | The best call's volume | no call at the target expiry with our \|delta\| in 0.05..0.50 (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.volume` |
 | `best_call_spread_pct` | chain | float32 | decimal | open | 0 .. 2 | The best call's (ask - bid) / mid on the stored quote (judge the trade on a live one) | no call at the target expiry with our \|delta\| in 0.05..0.50 (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask` |
 | `best_call_yield` | chain | float32 | decimal | open | 0 .. 1 | The best call's premium yield for the period: mid / the underlying's price (the covered call's income per dollar of stock held) | no call at the target expiry with our \|delta\| in 0.05..0.50 (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+
+## `short_premium@v1`
+
+The short put and call at 0.20 delta about 30 days out: strike, breakeven and yield a year (the option grid's cell). Stored as `rollups/instrument/short_premium@v1`; reads `chains/option_quotes`, `rates/treasury`, `chains/underlying_quotes` (optional), `rollups/instrument/div_yield@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `premium_status` | label | str | category | open | OK, NO_SPOT, NO_CHAIN, NO_EXPIRY, ILLIQUID, NO_STRIKE | OK (both the 0.20-delta put and call were found), or the first failing step: NO_SPOT, NO_CHAIN, NO_EXPIRY (none within 30% of 30 days), ILLIQUID (a side has no two-sided quote or no vol of ours), NO_STRIKE (no strike within 0.025 of 0.20 delta) | never | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `target_expiry` | chain | date | date | open |  | The listed expiry nearest 30 calendar days within 30% of it (ties: the earlier) | no listed expiry within 30% of 30 days (premium_status NO_EXPIRY), or no spot or chain | `chains/option_quotes.expiry` |
+| `target_dte` | chain | int | days | open | 21 .. 39 | Calendar days from the session to the target expiry | no listed expiry within 30% of 30 days (premium_status NO_EXPIRY), or no spot or chain | `chains/option_quotes.expiry` |
+| `put_strike` | chain | float32 | usd_per_share | open | >= 0 | The short put's strike: our \|delta\| nearest 0.20 | no two-sided strike within 0.025 of 0.20 \|delta\| at the expiry (see premium_status): the put side | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `put_breakeven` | chain | float32 | usd_per_share | open | >= 0 | The put's breakeven: strike - mid | no two-sided strike within 0.025 of 0.20 \|delta\| at the expiry (see premium_status): the put side | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `put_yield_ann` | chain | float32 | decimal | open | >= 0 | The put's yield a year on its collateral: mid / strike x 365 / days to the expiry (simple, not compounded) | no two-sided strike within 0.025 of 0.20 \|delta\| at the expiry (see premium_status): the put side | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `call_strike` | chain | float32 | usd_per_share | open | >= 0 | The short call's strike: our \|delta\| nearest 0.20 | no two-sided strike within 0.025 of 0.20 \|delta\| at the expiry (see premium_status): the call side | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `call_breakeven` | chain | float32 | usd_per_share | open | >= 0 | The call's breakeven: spot - mid | no two-sided strike within 0.025 of 0.20 \|delta\| at the expiry (see premium_status): the call side | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `call_yield_ann` | chain | float32 | decimal | open | >= 0 | The call's yield a year on its collateral: mid / spot x 365 / days to the expiry (simple, not compounded) | no two-sided strike within 0.025 of 0.20 \|delta\| at the expiry (see premium_status): the call side | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
 
 ## `skew@v1`
 
