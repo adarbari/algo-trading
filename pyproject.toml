@@ -139,7 +139,14 @@ modules = [
     "algotrade.engines.backtest",
     "algotrade.engines.screening",
     "algotrade.engines.selection",
+    "algotrade.engines.structures",
 ]
+
+[[tool.importlinter.contracts]]
+name = "The option-structure engine is pure: features, config, quant and core only (no data, storage or services; ADR 0088)"
+type = "forbidden"
+source_modules = ["algotrade.engines.structures"]
+forbidden_modules = ["algotrade.data", "algotrade.storage", "algotrade.services"]
 
 [[tool.importlinter.contracts]]
 name = "Backtest engine parts keep single responsibilities (risk, execution, accounting)"

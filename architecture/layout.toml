@@ -244,6 +244,11 @@ path = "src/algotrade/engines/selection"
 purpose = "the selection engine: evaluate a Selection with a per-rule audit"
 
 [[dir]]
+path = "src/algotrade/engines/structures"
+purpose = "the option-structure engine (ADR 0088, design 2.4): marks a position of option legs (and a share leg held with them) through its window from the chains the caller loads, the quoted and intrinsic exit value, the exit fallback for a thin quote, the daily hedge's net delta and the reasons a name is unmeasured (marking.py, chain.py); pure: features, config and quant only"
+contracts = ["The option-structure engine is pure: features, config, quant and core only (no data, storage or services; ADR 0088)"]
+
+[[dir]]
 path = "src/algotrade/features"
 purpose = "the feature store: the framework, the feature groups, expression features, the registry (registry.py), the site feature set (site.py) and the generated catalogue (catalogue.py)"
 contracts = [

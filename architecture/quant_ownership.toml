@@ -24,9 +24,13 @@ detect = [{ import = "scipy.stats" }, { call = "erfc" }, { call = "erf" }]
 
 [[responsibility]]
 id = "quant-chain-pnl"
-description = "The maths of a chain P&L (ADR 0053 amendment, EB H13): the two-sided mid of a quote (never of a one-sided or crossed one), a long position's P&L mid to mid and bought at the ask and sold at the bid, intrinsic value at expiry, our own delta of a leg from its mid (the implied vol of the mid, r = q = 0) and the daily delta-hedged P&L of a position over the closes of a window; pure numpy"
+description = "The maths of a chain P&L (ADR 0053 amendment, EB H13): the two-sided mid of a quote (never of a one-sided or crossed one), a long position's P&L mid to mid and bought at the ask and sold at the bid, intrinsic value at expiry, our own delta of a leg from its mid (the implied vol of the mid, r = q = 0) and the daily delta-hedged P&L of a position over the closes of a window, per-leg Greeks and the quantity-weighted sum of a multi-leg position (ADR 0088); pure numpy"
 owner = ["src/algotrade/quant/edges/chain_pnl.py"]
-allowed = ["apps/ingestion/algotrade_ingestion/tasks/derived/option_paths.py"]  # the chain P&L writer calls them
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/derived/option_paths.py",  # the chain P&L writer calls them
+    "src/algotrade/engines/structures/marking.py",  # the option-structure engine marks legs with them (ADR 0088)
+    "src/algotrade/features/rollups/options/wing_search.py",  # select_legs picks a leg by our own delta
+]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-18-optionpnl-the-chain-pl-grain-eb-h13"
 detect = [{ call = "leg_delta" }, { call = "hedged_pnl" }, { call = "long_pnl" }]
 
