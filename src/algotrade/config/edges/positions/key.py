@@ -12,6 +12,7 @@ points that differ only in ``take_profit`` are two keys. ``parse_position_key`` 
 
 import json
 from dataclasses import dataclass, replace
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 from algotrade.config.edges.positions.spec import ExitRule, ExitSettings, exit_rules
@@ -62,9 +63,25 @@ def _leg_json(leg: Leg) -> dict[str, Any]:
     }  # fmt: skip
 
 
+def _scalar(value: Any) -> Any:
+    """A rule value as JSON, one spelling per value: numbers as floats (1 and 1.0 are one key),
+    dates as ISO text."""
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
 def _node_json(node: Rule | Group) -> dict[str, Any]:
     if isinstance(node, Rule):
-        value = list(node.value) if isinstance(node.value, tuple) else node.value
+        value = (
+            [_scalar(v) for v in node.value]
+            if isinstance(node.value, tuple)
+            else _scalar(node.value)
+        )
         return {"f": node.field, "o": node.op, "v": value}
     return {"k": node.kind, "c": [_node_json(c) for c in node.children]}
 
@@ -168,7 +185,7 @@ def _apply(outcome: "Outcome", name: str, value: Any, templates: Templates) -> "
         spec = replace(spec, template=str(value))
     else:  # take_profit, stop_loss, exit_dte
         settings = spec.exit or ExitSettings()
-        spec = replace(spec, exit=replace(settings, **{name: value or None}))
+        spec = replace(spec, exit=replace(settings, **{name: value}))
     return _outcome_with_legs(replace(outcome, position=spec), templates)
 
 

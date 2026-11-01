@@ -17,15 +17,14 @@ def identity_dict(value: Any) -> Any:
     """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome,
     an unset ``hold_rank`` or ``tenor_days``, the default weighting, an empty ensemble, no canary,
     an unset position, entry condition, gate, verdict profile, variant grid or position
-    baselines (ADR 0088), the legs and collateral the loader fills on a position, and the volatility
-    target's keys when there is none: a document that
-    named none of them hashes as it did before them, so no stored leg or run is recomputed by
-    their arrival (ADR 0053 amendments, ADR 0074)."""
+    baselines (ADR 0088) and the volatility target's keys when there is none (a position's resolved
+    legs and collateral, filled by the loader, stay: a template edit keeping its id changes what
+    the edge measures): a document that named none of them hashes as it did before them, so no
+    stored leg or run is recomputed by their arrival (ADR 0053 amendments, ADR 0074)."""
     if isinstance(value, dict):
         long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
         plain = value.get("weighting") == "equal" and value.get("vol_field") is None
         untargeted = "vol_target" in value and value["vol_target"] is None
-        spec = "template" in value  # a PositionSpec: its legs and collateral are the loader's
         return {
             k: identity_dict(v)
             for k, v in value.items()
@@ -37,7 +36,6 @@ def identity_dict(value: Any) -> Any:
             and not (k in ("position", "gate", "verdict_profile", "entry") and v is None)
             and not (k in ("variant_grid", "position_baselines", "cases") and not v)
             and not (k == "when" and v is None)
-            and not (spec and k in ("legs", "collateral"))
             and not (untargeted and k in ("vol_target", "vol_window", "vol_return_field"))
         }
     if isinstance(value, (list, tuple)):

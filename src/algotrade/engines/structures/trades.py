@@ -199,7 +199,8 @@ def collateral_of(
     the shares' value, ``cash_secured`` the strike times the short puts, ``max_loss`` the worst
     loss at expiry; ``regt`` is not computed in this slice (NaN, stored null)."""
     if kind == "notional":
-        return abs(_share_qty(legs)) * spot
+        shares = abs(_share_qty(legs))
+        return shares * spot if shares else NAN  # no share leg: no notional capital (never 0)
     chosen = [(c.leg.qty, c.leg.right == "C", c.strike) for c in pick.legs]
     if kind == "cash_secured":
         puts = [abs(q) * k for q, call, k in chosen if q < 0 and not call]
@@ -381,8 +382,9 @@ def _settle(
     marked = [
         marks.mids[t][j] + share * spots[t] - (entry_mid + share * spots[0]) for t in range(1, k)
     ]
-    trade.path_min = float(np.nanmin([*marked, option + stock]))
-    if fields:
+    # an interior close with no mark leaves the lowest P&L unknown: null, never the min of the rest
+    trade.path_min = float(np.min([*marked, option + stock])) if np.isfinite(marked).all() else NAN
+    if fields and not share:  # a stock leg's loss is not in the option marks (E4b): null
         worst = fields[k - 1][position_field("mark_loss_share_of_collateral")]
         trade.max_adverse = NAN if worst is None else float(worst)
     trade.realised_vol = _realised_vol(spots)

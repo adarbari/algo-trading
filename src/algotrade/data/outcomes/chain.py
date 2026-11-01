@@ -20,11 +20,11 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
+from algotrade.data.chains import FIRST_CBOE_CHAIN_SESSION
 from algotrade.data.outcomes.reading import OUTCOME_FIELDS
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import FORWARD_RETURNS, STRUCTURE_PNL, spec_for
 
-FIRST_CBOE_CHAIN_SESSION = date(2026, 10, 2)  # chains are stored from here; before it, history
 CBOE = "cboe"
 CHAIN_FIELDS = (
     "position_key", "entry_spot", "entry_half_spread", "exit_half_spread", "pnl_mid",

@@ -168,3 +168,19 @@ def test_collateral_is_cash_secured_max_loss_or_not_computed() -> None:
     assert np.isnan(collateral_of("max_loss", [CALL], naked_call, 100.0, -1.0))  # unbounded
     assert np.isnan(collateral_of("regt", legs, put_spread, 100.0, -1.2))  # not in this slice
     assert np.isnan(collateral_of("cash_secured", [CALL], naked_call, 100.0, -1.0))  # no short put
+    assert np.isnan(collateral_of("notional", [SHORT_PUT], put_spread, 100.0, -1.2))  # no stock leg
+
+
+def test_a_missing_interior_mark_leaves_the_lowest_pnl_unknown_not_the_min_of_the_rest() -> None:
+    days = window([100.0, 101.0, 102.0, 103.0, 104.0], names=(A, B), missing={2: {A}})
+    trade = {t.name: t for t in run(days, [SHORT_PUT])}[A]
+    assert trade.reason is None and np.isfinite(trade.pnl_mid)  # the trade itself is measured
+    assert np.isnan(trade.path_min)
+
+
+def test_a_position_with_a_stock_leg_stores_no_max_adverse_until_the_stock_is_in_it() -> None:
+    days = window([100.0, 101.0, 102.0, 103.0, 104.0])
+    (trade,) = run(days, [STOCK, CALL], collateral="notional")
+    assert np.isnan(trade.max_adverse)
+    (plain,) = run(days, [SHORT_PUT])
+    assert np.isfinite(plain.max_adverse)

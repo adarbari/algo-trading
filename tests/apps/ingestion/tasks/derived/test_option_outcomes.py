@@ -318,3 +318,16 @@ def test_the_acceptance_check_passes_and_fails_on_a_name_with_a_chain_but_no_row
     (failed,) = check_option_outcomes(reader, END, ctx.settings)
     assert failed.status == "FAIL" and "OK chains" in failed.detail
     assert check_option_outcomes(reader, date(2026, 10, 15), ctx.settings)[0].status == "FAIL"
+
+
+def test_the_writer_never_starts_before_the_first_cboe_session_whatever_else_is_stored() -> None:
+    """A status partition from before 2026-10-02 (bought history's days) must not lower the first
+    stored session below the cutover: a window that would start there is not computed."""
+    writer, _ = _chains()
+    day = date(2026, 10, 1)
+    rows = [{"instrument_id": A, "symbol": "A", "status": "OK", "tier": "core"}]
+    writer.write_table("chains/status", day, "old", stamped(rows, day, "old", _known(day), "test"))
+    configs = _configs(horizon_sessions=[9])  # S = 2026-10-01 for the window ending END
+    record = compute_option_outcomes(_ctx(writer, configs), END)
+    (key,) = (w.key for w in _wanted(configs))
+    assert record.items[key] == "BEFORE_HISTORY"

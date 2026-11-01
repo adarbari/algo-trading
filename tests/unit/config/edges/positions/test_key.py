@@ -3,13 +3,16 @@ template's id; round-trips to its spec; two exit rules (or a different hold) are
 template edit changes the key a trade is stored under."""
 
 from dataclasses import asdict, replace
+from datetime import date
 from typing import Any
 
 import pytest
 
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.positions.cases import Case, CaseValue
 from algotrade.config.edges.positions.key import (
+    case_points,
     key_of,
     parse_position_key,
     parsed_key,
@@ -17,8 +20,11 @@ from algotrade.config.edges.positions.key import (
     resolve_legs,
     with_legs,
 )
+from algotrade.config.edges.positions.spec import ExitRule
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.predicates import Group, Rule
+from algotrade.services.evaluation.forward.settle import outcome_hash
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import WHERE, document
@@ -77,9 +83,44 @@ def test_the_key_never_names_the_template_and_a_template_edit_changes_it() -> No
     assert position_key(edited, 21) != position_key(o, 21)
 
 
-def test_the_legs_the_loader_fills_are_not_part_of_an_edges_identity() -> None:
+def test_a_template_edit_keeping_its_id_changes_the_edges_identity_and_outcome_hash() -> None:
     body = {k: v for k, v in PUT.items() if v is not None}
-    parsed = parse_edge(document(schedule="every_session", outcome=body), "drift", WHERE)
-    loaded = with_legs(parsed, TEMPLATES)
-    assert loaded.outcome.position.legs and not parsed.outcome.position.legs  # type: ignore[union-attr]
-    assert identity_dict(asdict(loaded.outcome)) == identity_dict(asdict(parsed.outcome))
+    edge = with_legs(
+        parse_edge(document(schedule="every_session", outcome=body), "drift", WHERE), TEMPLATES
+    )
+    wing = TEMPLATES["put_spread"].legs[1]
+    edited = {
+        **TEMPLATES,
+        "put_spread": replace(
+            TEMPLATES["put_spread"],
+            legs=(TEMPLATES["put_spread"].legs[0], replace(wing, delta=0.05)),
+            collateral="cash_secured",
+        ),
+    }
+    again = with_legs(
+        parse_edge(document(schedule="every_session", outcome=body), "drift", WHERE), edited
+    )
+    assert identity_dict(asdict(again.outcome)) != identity_dict(asdict(edge.outcome))
+    assert outcome_hash(again) != outcome_hash(edge)
+
+
+def test_a_case_value_of_zero_is_a_rule_not_the_absence_of_one() -> None:
+    o = outcome()
+    spec = replace(
+        o.position,
+        cases=(CaseValue("exit_dte", (Case(Group("all", (Rule("a", "gt", 1),)), 5),), 0),),
+    )
+    points = case_points(replace(o, position=spec), TEMPLATES)
+    dte = [x for p in points for x in parsed_key(p, 21).exits if x.kind == "EXIT_DTE"]
+    assert sorted(x.rule.children[0].value for x in dte) == [0, 5]  # type: ignore[union-attr]
+
+
+def test_one_spelling_per_value_numbers_as_floats_and_dates_as_text() -> None:
+    base = parsed_key(outcome(), 21)
+
+    def keyed(value: object) -> str:
+        rule = ExitRule("CONDITION", Group("all", (Rule("market.x", "lt", value),)))  # type: ignore[arg-type]
+        return key_of(replace(base, exits=(rule,)))
+
+    assert keyed(1) == keyed(1.0)
+    assert keyed(date(2026, 1, 1)) == keyed("2026-01-01")  # a date does not crash the dump

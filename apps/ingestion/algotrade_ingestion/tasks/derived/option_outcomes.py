@@ -47,6 +47,7 @@ from algotrade.core.time.calendar import close_time, sessions_between, sessions_
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
     CHAIN_STATUS,
+    FIRST_CBOE_CHAIN_SESSION,
     OK_LABEL,
     chain_labels,
     chain_status,
@@ -192,7 +193,8 @@ def compute_option_outcomes(
     configs = ctx.configs or SITE
     wanted = positions_wanted(load_edges(configs), load_templates(configs))
     stored = ctx.reader.dates(CHAIN_STATUS)
-    first = stored[0] if stored else ends[-1]
+    # one source per S (H6): never before the first Cboe session, whatever else is stored
+    first = max(stored[0], FIRST_CBOE_CHAIN_SESSION) if stored else ends[-1]
     loader = ChainLoader(ctx.reader, ctx.settings)
     fields = FieldLoader(ctx.reader)
     features = site_features(configs) if any(w.fields for w in wanted) else None
