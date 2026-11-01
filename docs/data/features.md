@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-758 stored features in 92 groups, in dependency order; 164 expression features.
+760 stored features in 92 groups, in dependency order; 164 expression features.
 
 ## `option_liquidity@v1`
 
@@ -1331,15 +1331,17 @@ When each macro series the regime cards rest on became known: its latest observa
 | `vix3m_vintage_kind` | label | str | category | personal | alfred, lagged | VIX3M: alfred (a real vintage) or lagged (observation date plus the release lag) | the series has no observation known by the session (no FRED key, or before it starts) | `series:VIX3M` |
 | `vix3m_first_vintage` | window | date | date | personal |  | VIX3M: the earliest ALFRED vintage known by the session: before it the stored history is the figures as first vintaged, not as known then | the series is unrevised (lagged), or its first ALFRED vintage is after the session | `series:VIX3M` |
 
-### `market_triggers@v1`
+### `market_triggers@v2`
 
-Market-level triggers for the time-series edges: the latest VIX spike (VIX at least 30 in backwardation after 21 quiet sessions), known from the session after its close. Stored as `rollups/market/market_triggers@v1`; reads `macro/series` (optional).
+Market-level triggers for the time-series edges: the latest VIX spike (VIX at least 30 in backwardation after 21 quiet sessions) and the latest post-spike contango (VIX 25% off its high with the curve back in contango), known from the session after the close. Stored as `rollups/market/market_triggers@v2`; reads `macro/series` (optional).
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
 | `vix_spike_date` | window | date | date | personal |  | The session the latest VIX spike was first known: the first day with VIX at least 30 and VIX / VIX3M above 1 after 21 sessions without one (known from the session after its close) | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike'); or no spike in the last 300 sessions of observations | `series:VIX`, `series:VIX3M` |
 | `sessions_since_vix_spike` | window | int | sessions | personal | 0 .. 301 | Exchange sessions from the latest VIX spike's session up to the session (0: the session is that day); 301 when the readings are fresh and no spike is in the last 300 sessions | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike') | `series:VIX`, `series:VIX3M` |
 | `vix_spike_level` | window | float32 | pct_points | personal | 30 .. 150 | The VIX close of the latest spike (20 = 20% implied vol) | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike'); or no spike in the last 300 sessions of observations | `series:VIX`, `series:VIX3M` |
+| `post_spike_contango_date` | window | date | date | personal |  | The session the latest post-spike contango trigger was first known: the first day VIX is 25% or more below its 20-observation high, VIX / VIX3M is below 1 and VIX is above its 252-observation median, after 21 sessions without that state (known from the session after its close) | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike'); or no post-spike contango trigger in the last 300 sessions of observations | `series:VIX`, `series:VIX3M` |
+| `sessions_since_post_spike_contango` | window | int | sessions | personal | 0 .. 301 | Exchange sessions from the latest post-spike contango trigger's session up to the session (0: the session is that day); 301 when the readings are fresh and none is in the last 300 sessions | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike') | `series:VIX`, `series:VIX3M` |
 
 ### `regime_indicators@v1`
 

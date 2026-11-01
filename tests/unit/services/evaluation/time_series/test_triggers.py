@@ -20,7 +20,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.time_series.conftest import build_world, timed_edge
 
-TABLE = "rollups/market/market_triggers@v1"
+TABLE = "rollups/market/market_triggers@v2"
 H = 5
 FIRST, LAST = date(2024, 1, 2), date(2024, 12, 27)
 AS_OF = datetime(2026, 10, 20, tzinfo=UTC)

@@ -264,3 +264,13 @@ The trigger is the first session where the VIX closed at 30 or more. The three-m
 """
 next = "Open the edge's result and read how many spikes lie behind it."
 see_also = ["schedule_on_market", "base_out_of_window"]
+
+[[term]]
+id = "market_trigger_post_spike_contango"
+term = "Post-spike contango"
+short = "The market-wide trigger for the first calm day after a fear spike, once the curve slopes up again."
+body = """
+The trigger is the first session where three things hold. The VIX is at least 25% below its highest close of the last 20. The three-month VIX is above it, so the curve slopes up again. The VIX is still above its median of the last year. It comes only after 21 sessions without that state, so a long recovery is one trigger. The date is the session the reading was first known, one session after the close. The levels are fixed, and a change makes a new version of the field. A stale VIX reading makes the day unknown, never a day without a trigger. The state needs a full year of closes, so the first year of the history cannot hold one. The VIX comes from Cboe via FRED, for personal use only. Example: the VIX peaks at 40, falls to 28 while the three-month VIX is 32, and the trigger is dated the next session.
+"""
+next = "Open the edge's result and read how many recoveries lie behind it."
+see_also = ["market_trigger_vix_spike", "schedule_on_market"]
