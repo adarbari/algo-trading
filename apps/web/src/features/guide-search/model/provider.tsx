@@ -4,9 +4,21 @@
  * gives `useOpenGuideSearch` to whatever else opens it (the Guide rail's button). A feature
  * cannot import the router, so the app passes its navigation.
  */
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 
-import { GuideSearchDialog } from '../ui/GuideSearchDialog';
+/** The dialog loads on first use: it brings the ticker read with it, which no page needs before. */
+const GuideSearchDialog = lazy(() =>
+  import('../ui/GuideSearchDialog').then((m) => ({ default: m.GuideSearchDialog })),
+);
 
 const OpenContext = createContext<() => void>(() => undefined);
 
@@ -23,7 +35,9 @@ export interface GuideSearchProviderProps {
 
 export function GuideSearchProvider({ navigate, children }: GuideSearchProviderProps) {
   const [open, setOpen] = useState(false);
+  const [used, setUsed] = useState(false);
   const show = useCallback(() => {
+    setUsed(true);
     setOpen(true);
   }, []);
   useEffect(() => {
@@ -32,6 +46,7 @@ export function GuideSearchProvider({ navigate, children }: GuideSearchProviderP
         return;
       }
       event.preventDefault();
+      setUsed(true);
       setOpen((was) => !was);
     };
     document.addEventListener('keydown', onKeyDown);
@@ -42,7 +57,11 @@ export function GuideSearchProvider({ navigate, children }: GuideSearchProviderP
   return (
     <OpenContext value={show}>
       {children}
-      <GuideSearchDialog open={open} onOpenChange={setOpen} onNavigate={navigate} />
+      {used && (
+        <Suspense fallback={null}>
+          <GuideSearchDialog open={open} onOpenChange={setOpen} onNavigate={navigate} />
+        </Suspense>
+      )}
     </OpenContext>
   );
 }
