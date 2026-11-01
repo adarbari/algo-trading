@@ -1,4 +1,4 @@
-# ADR 0087: Fama-French daily factors as published series; residual returns v2
+# ADR 0089: Fama-French daily factors as published series; residual returns v2
 
 **Status:** proposed (2026-11-01; architect design, owner chose "add French factors"; decisions
 3-5 decided by Fable for the owner, pending owner confirmation, `docs/decisions/log.md`). Extends [0048](0048-macro-series-with-vintages.md) (a new

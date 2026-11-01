@@ -130,7 +130,7 @@ def record_fetch(reader: StoreReader, keys: list[str], session: date = D) -> Non
 
 
 def test_a_french_file_a_month_behind_is_not_stale() -> None:
-    """ADR 0087: French's daily files end about a month before the session and each day is known
+    """ADR 0089: French's daily files end about a month before the session and each day is known
     from observation + 70 days (``lagged``), so the newest value a session knows is 70 days old,
     and the pull every 28 days lets that drift to about 90: inside the monthly 103-day window.
     A ``daily`` series (stale after 74 days) would flag the 95-day case."""

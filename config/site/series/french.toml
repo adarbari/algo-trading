@@ -1,4 +1,4 @@
-# Kenneth French's daily data library (ADR 0087): the factor and industry files as published
+# Kenneth French's daily data library (ADR 0089): the factor and industry files as published
 # macro series. One [[file]] per zip (a file used by two blocks, the industry zips, is still one
 # request per run: the adapter reads a URL once); each listed column expands into a series
 # keyed <prefix>_<COLUMN> (src/algotrade/config/site/macro.py), values in PERCENT as published.

@@ -571,7 +571,7 @@ Paced by `[published] min_interval_s` (1 s); one request per file, refetched by 
 | OFR Financial Stress Index (financialresearch.gov) | `csv`: `Date,OFR FSI,Credit,Equity valuation,...`, daily | market stress | OFR public data: `open` |
 | Stooq daily history (`stooq.com/q/d/l/?s=<symbol>&i=d`) | `csv`: `Date,Open,High,Low,Close,Volume`, `value_column = "Close"` | not used: it now answers a JavaScript browser-verification page (HTML), so `SPX` comes from FRED `SP500` | free for personal use, no redistribution: **`personal`** |
 | Barclays Shiller CAPE, `cape.csv` (`indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv`) | `cape_csv`: `Date` (`dd/mm/yyyy` month-ends) + 26 country columns, 1981-12-, `0` and `#VALUE!` = no value | country CAPE, `MACRO:CAPE_<COUNTRY>` (EB D7) | terms not retrievable (decision log 2026-10-17): **`personal`**, one pull per 28 days, never redistributed |
-| Kenneth French data library, 7 daily US zips (`mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/`: 3 and 5 factors, momentum, short- and long-term reversal, 12 and 49 industries) | `french_zip`: a zip of one CSV (CRLF, a preamble, then sections that start at a header line with an empty first cell, `YYYYMMDD` dates, percent returns), `section` 1 (value weighted) or 2 (equal weighted, the industry files), `-99.99` / `-999` = no value | factors and industry returns, `MACRO:FF3_*`, `FF5_*`, `FF_MOM`, `FF_ST_REV`, `FF_LT_REV`, `IND12_*`, `IND12EW_*`, `IND49_*`, `IND49EW_*` (ADR 0087) | no terms of use stated; files carry only "Copyright <year> Eugene F. Fama and Kenneth R. French", built from CRSP: **`personal`** pending the owner, one pull per 28 days, never redistributed, cite Fama and French |
+| Kenneth French data library, 7 daily US zips (`mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/`: 3 and 5 factors, momentum, short- and long-term reversal, 12 and 49 industries) | `french_zip`: a zip of one CSV (CRLF, a preamble, then sections that start at a header line with an empty first cell, `YYYYMMDD` dates, percent returns), `section` 1 (value weighted) or 2 (equal weighted, the industry files), `-99.99` / `-999` = no value | factors and industry returns, `MACRO:FF3_*`, `FF5_*`, `FF_MOM`, `FF_ST_REV`, `FF_LT_REV`, `IND12_*`, `IND12EW_*`, `IND49_*`, `IND49EW_*` (ADR 0089) | no terms of use stated; files carry only "Copyright <year> Eugene F. Fama and Kenneth R. French", built from CRSP: **`personal`** pending the owner, one pull per 28 days, never redistributed, cite Fama and French |
 | Shiller `ie_data.xls` (Yale) | `shiller_xls`: a legacy `.xls` workbook | CAPE, long-run earnings | academic data, credit the author: `open` |
 
 **Country CAPE point in time:** the file has no vintages and is re-estimated. A month first
@@ -582,7 +582,7 @@ run (the adapter reads a URL once) and `refetch_days = 28` keeps it to one pull 
 `tests/fixtures/sources/published/cape.csv` is hand-built in the file's format, not vendor
 data.
 
-**Kenneth French files (ADR 0087):** declared in `config/site/series/french.toml` (a `[[file]]`
+**Kenneth French files (ADR 0089):** declared in `config/site/series/french.toml` (a `[[file]]`
 per zip, the columns listed; each column is a series `<prefix>_<COLUMN>`, values in percent as
 published), because `macro.toml` is at its length cap and one block beats 135 entries. Point in
 time as the CAPE file: a day first seen is known from observation + 70 days; a changed value on

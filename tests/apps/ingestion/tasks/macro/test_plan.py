@@ -149,7 +149,7 @@ def test_a_null_never_replaces_a_stored_number() -> None:
 
 
 def test_a_revised_series_dates_a_late_first_seen_observation_from_the_run_session() -> None:
-    """ADR 0087: the 2026-10-05 run first sees 2026-07-01 (obs + 2 days is long past); a session
+    """ADR 0089: the 2026-10-05 run first sees 2026-07-01 (obs + 2 days is long past); a session
     before the run must not know it. The backfill keeps obs + lag; a non-revised series and an
     observation already stored are unchanged."""
     target = vintage_rows(

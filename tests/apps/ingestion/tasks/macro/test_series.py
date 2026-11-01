@@ -322,7 +322,7 @@ def test_the_budget_is_a_typed_macro_setting() -> None:
 def test_a_night_reads_the_stored_vintages_of_the_series_due_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ADR 0087: a published file pulled once a month is NOT_DUE on the other nights, and its
+    """ADR 0089: a published file pulled once a month is NOT_DUE on the other nights, and its
     (very long) stored history is not read just to be skipped."""
     ctx = context(Feeds())
     ingest_macro(ctx, REGISTRY, D1)
@@ -370,7 +370,7 @@ def french_context(zipped: bytes) -> TaskContext:
 
 
 def test_the_equal_weighted_section_is_what_ind12ew_stores_not_the_value_weighted_one() -> None:
-    """Finding 1 of the ADR 0087 review: the task's request carried no ``section``, so IND12EW_*
+    """Finding 1 of the ADR 0089 review: the task's request carried no ``section``, so IND12EW_*
     stored the value-weighted returns."""
     ctx = french_context((RECORDED / "french_ind12_daily.zip").read_bytes())
     record = ingest_macro(ctx, MacroSettings.from_documents({}, [FRENCH]), D1)

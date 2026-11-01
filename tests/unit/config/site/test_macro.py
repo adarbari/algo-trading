@@ -71,7 +71,7 @@ def test_the_shipped_registry() -> None:
         *CBOE_SETUP_INPUTS,
     }  # Cboe's files: personal use, no redistribution
     cape = {k for k in macro.keys if k.startswith("CAPE_")}  # Barclays' file: personal use
-    french = {s.key for s in macro.series if s.research}  # French's library: personal, ADR 0087
+    french = {s.key for s in macro.series if s.research}  # French's library: personal, ADR 0089
     assert len(cape) == 26 and len(french) == 135
     assert personal == third_party | cape | french
     unrevised = {  # FRED's daily market series: never revised, so one plain request each
@@ -138,7 +138,7 @@ def test_the_document_shape_is_checked() -> None:
         MacroSettings.from_document({"series": {"key": "X"}})
 
 
-# --- config/site/series/<family>.toml: a file expanded into a series per column (ADR 0087)
+# --- config/site/series/<family>.toml: a file expanded into a series per column (ADR 0089)
 
 BLOCK = {
     "defaults": {

@@ -1,4 +1,4 @@
-"""``french_zip`` (Kenneth French's data library, ADR 0087) against the seven daily US files
+"""``french_zip`` (Kenneth French's data library, ADR 0089) against the seven daily US files
 recorded 2026-11-01 (vintage 202609 CRSP; trimmed to the preamble, the first and last ten rows of
 each section and the footer) and every series of ``config/site/macro/french.toml`` against its
 file; plus the parser's rules on small synthetic zips. CI never calls the network."""
