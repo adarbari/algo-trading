@@ -1,5 +1,7 @@
 # ADR 0050: Event sensitivity: what moves a name, what is coming, and who found out
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): decision 3: FOMC `known_from` is the schedule's announcement date per year.
+
 **Status:** accepted (2026-10-06; owner decisions in
 [event-sensitivity-plan.md](../event-sensitivity-plan.md) section 8; decision 3 reviewed by
 `architect`, reviewed again with the groups before EV2 ships). Extends

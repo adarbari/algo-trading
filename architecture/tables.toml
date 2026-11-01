@@ -42,6 +42,11 @@ name = "instruments/listing_history"
 owner = "apps/ingestion/algotrade_ingestion/tasks/listings/listing_history.py"
 
 [[table]]
+name = "instruments/delisted_tickers"
+owner = "apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"
+note = "ADR 0087: Massive's inactive (delisted) tickers, a full snapshot per pull session, key (source, ticker, end_date); Massive's free key; end_date is the vendor's last trading day (identity, never a feature; null for ~2% of rows); vendor_type and security_type are null before 2017; no OTC names, no ETFs before 2016, a renamed company's old ticker is absent; FIGI and CIK are partial; no instrument_id until the listing-history merge"
+
+[[table]]
 name = "analyst/vendor_access"
 owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/probe.py"
 note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Finnhub), one row per (vendor, endpoint), from the by-hand analyst-probe"
@@ -237,6 +242,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 [[table]]
 name = "rollups/instrument/earnings_reaction@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/earnings_reaction_session@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "F10: the session a report's reaction lands on, from the calendar row's time of day (pre_market: the report's session, after_hours: the next, else unknown); read by the on_event:earnings_reaction_session schedule"
 
 [[table]]
 name = "rollups/instrument/analyst_estimates@v2"
@@ -511,6 +521,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 [[table]]
 name = "rollups/instrument/vol_stats@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/vol_long@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the long realised-volatility windows (hv126, hv252, downside deviation over 252) beside vol_stats@v1, a leaf so vol_stats is never bumped (ADR 0088, design F6); backfill with rollups --only vol_long@v1"
 
 [[table]]
 name = "rollups/instrument/volume_profile@v1"
