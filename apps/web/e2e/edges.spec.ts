@@ -31,7 +31,7 @@ test('the Edges tab lists the edges and the chosen edge shows its verdict and fi
 }) => {
   const errors = collectErrors(page);
   await page.goto('/ideas');
-  await page.getByRole('navigation', { name: 'Trader sections' }).getByText('Edges').click();
+  await page.getByRole('navigation', { name: 'Trader sections' }).getByText('Setups').click();
   await expect(page).toHaveURL(/\/edges$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Edges' })).toBeVisible();
   const list = page.getByRole('grid', { name: 'Edges' });
