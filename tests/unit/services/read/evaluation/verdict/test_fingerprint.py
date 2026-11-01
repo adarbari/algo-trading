@@ -64,6 +64,7 @@ NOT_HEADLINE = {
 NOT_JUDGED = {
     "algotrade.config.site.settings:load_users": "gate on who sees a setup",
     "algotrade.services.licences:held_by": "gate on who sees a setup",
+    "algotrade.services.read.evaluation.runs:load_edge_runs": "gate on who sees a setup",
     "algotrade.config.edges.document:MODEL_KIND": "feeds counts_wins, so the call",
     "algotrade.config.edges.document:PAIR_KIND": "feeds counts_wins, so the call",
     "algotrade.config.edges.portfolio:PORTFOLIO_KIND": "feeds the call's portfolio flag",

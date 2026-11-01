@@ -16,11 +16,12 @@ from algotrade.config.edges.document import Edge
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import strictest
+from algotrade.features.framework.feature import LICENCES, strictest
 from algotrade.services.evaluation.cross_section.reads.session import ADV_FIELD
 from algotrade.services.selection import selection_fields
 
 OPEN = "open"
+STRICTEST = LICENCES[-1]
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,9 @@ def outcome_licence(rows: pd.DataFrame) -> str:
     history is personal (ADR 0084 decision 1)."""
     if "licence" not in rows.columns:
         return OPEN
-    return strictest(str(x) for x in rows["licence"].dropna().unique())
+    return strictest(  # a value that is no known licence is the strictest: fail closed
+        str(x) if str(x) in LICENCES else STRICTEST for x in rows["licence"].dropna().unique()
+    )
 
 
 def _of(features: FeatureSet, fields: Iterable[str]) -> str:

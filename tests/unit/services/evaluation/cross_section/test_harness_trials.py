@@ -12,6 +12,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from algotrade.config.user import UserContext
@@ -444,24 +445,26 @@ def test_outcome_rows_recording_a_personal_licence_make_the_trial_personal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """ADR 0084 decision 1: the trial's licence includes the strictest licence of the outcome
-    rows it joined (the screen and universe are open here), recorded as ``evidence_licence``.
-    No stored outcome table has a ``licence`` column yet (``structure_pnl@v2``, E4, is the first),
-    so the read is wrapped to add the column the history-priced rows will carry."""
-    real = measuring.read_stored
+    rows of every entry session, recorded as ``evidence_licence``. No stored outcome table has a
+    ``licence`` column yet (``structure_pnl@v2``, E4, is the first), so the column read is
+    stood in for; it is made for every entry session, never only the ones a chunk reads, so a
+    run that reuses its stored legs keeps the licence."""
+    asked: list[set[Any]] = []
 
-    def tagged(*args: Any, **kwargs: Any) -> Any:
-        frame = real(*args, **kwargs)
-        return None if frame is None else frame.assign(licence="personal")
+    def tagged(reader: Any, chain: bool, sessions: Any, as_of: Any = None) -> list[Any]:
+        asked.append(set(sessions))
+        return [pd.DataFrame({"licence": ["open", "personal"]})]
 
     w = build_world()
     plain = evaluate_edge(
         w.reader, w.results, w.configs, UserContext("site"), edge(), DAYS[0], DAYS[-1], AS_OF
     )
     assert {r.licence for r in plain.results} == {"open"}
-    monkeypatch.setattr(measuring, "read_stored", tagged)
+    monkeypatch.setattr(measuring, "licence_frames", tagged)
     personal = evaluate_edge(
         w.reader, w.results, w.configs, UserContext("site"), edge(), DAYS[0], DAYS[-1], AS_OF
     )
+    assert asked and len(asked[0]) > 1  # every entry session of the plans
     assert {(r.licence, r.licences.outcome) for r in personal.results if r.licences} == {
         ("personal", "personal")
     }

@@ -2,6 +2,7 @@
 outcome rows is absent for a viewer without the licence and present for one who holds it; the
 screen's own personal fields never hide a setup (ADR 0088 decision B)."""
 
+from datetime import date
 from typing import Any
 
 import pandas as pd
@@ -10,7 +11,7 @@ import pytest
 from algotrade.services.evaluation.cross_section.detail.licences import outcome_licence
 from algotrade.services.evaluation.edge_picks.frame import RESULT, edge_picks_frame
 from algotrade.services.evaluation.edge_picks.night import EdgePicks
-from algotrade.services.read.evaluation import edges
+from algotrade.services.read.evaluation import edges, runs
 from algotrade.services.read.evaluation.pick_edges import COUNTS, load_pick_edges
 from algotrade.services.read.evaluation.verdict.evidence_licence import evidence_visible
 from algotrade.services.read.screens.runs import ScreenerRun
@@ -18,6 +19,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.result_writer import ResultWriter
 from tests.unit.services.read.evaluation.conftest import (
     DOCS,
+    EDGE,
     END,
     FROZEN,
     T,
@@ -55,11 +57,32 @@ def test_an_open_or_unrecorded_evidence_setup_is_listed_for_everyone() -> None:
         assert ids(backend, "trader") == ["drift"]
 
 
-def test_only_the_canonical_run_decides_not_an_older_history_run() -> None:
+def test_any_personal_run_hides_the_setup_not_only_the_canonical_one() -> None:
+    """``edge_runs`` serves every committed run, so the strictest decides: an older history run,
+    or an exploratory one, hides the setup from a trader."""
     backend = MemoryBackend()
     write_run(backend, "older", FROZEN, 0.6, evidence_licence="personal")
     write_run(backend, "newer", FROZEN, 0.6, minutes=5, evidence_licence="open")
-    assert ids(backend, "trader") == ["drift"]
+    assert ids(backend, "trader") == []
+    other = MemoryBackend()
+    write_run(other, "exploring", date(2026, 7, 1), 0.6, evidence_licence="personal")
+    assert ids(other, "trader") == []
+    assert ids(other, "owner") == ["drift"]
+
+
+def test_a_traders_own_edge_over_personal_outcomes_is_hidden_from_them() -> None:
+    backend = MemoryBackend()
+    mine = {**docs(), ("trader", "edges", "drift"): {**EDGE, "id": "mine", "frozen_from": FROZEN}}
+    write_run(backend, "own", FROZEN, 0.6, owner="trader", edge="mine", evidence_licence="personal")
+    found = [e.id for e in edges.load_edges(stores(backend, "trader", mine))]
+    assert "mine" not in found
+
+
+def test_the_site_trial_count_does_not_depend_on_the_viewer() -> None:
+    backend = MemoryBackend()
+    write_run(backend, "official", FROZEN, 0.6, evidence_licence="personal", trials_counted=7)
+    counts = {runs.load_site_trials(stores(backend, u, docs())) for u in ("trader", "owner")}
+    assert counts == {7}
 
 
 def test_a_setup_with_no_run_has_no_evidence_to_hide() -> None:
@@ -70,7 +93,12 @@ def test_a_setup_with_no_run_has_no_evidence_to_hide() -> None:
 
 @pytest.mark.parametrize(
     ("column", "expected"),
-    [(None, "open"), ([None, None], "open"), (["open", "personal"], "personal")],
+    [
+        (None, "open"),
+        ([None, None], "open"),
+        (["open", "personal"], "personal"),
+        (["open", "Personal"], "yahoo"),
+    ],
 )
 def test_the_outcome_licence_is_the_strictest_row(column: Any, expected: str) -> None:
     frame = pd.DataFrame({"x": [1, 2]})

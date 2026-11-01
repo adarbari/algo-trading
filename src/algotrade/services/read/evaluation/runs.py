@@ -379,7 +379,7 @@ def _site_trials(ctx: Stores) -> int:
     )
 
     def count() -> int:
-        edges = [e for e in load_edges(ctx) if not e.mine and e.id in site]
+        edges = [e for e in load_edges(ctx, gated=False) if not e.mine and e.id in site]
         found = (load_canonical_run(ctx, e).run for e in edges)
         return sum(r.trials_counted or 0 for r in found if r is not None)
 
