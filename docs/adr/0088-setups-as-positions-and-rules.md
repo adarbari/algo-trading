@@ -8,7 +8,7 @@ build slices: [options/backend-plan.md](../options/backend-plan.md). Extends
 criteria language), [0081](0081-stored-edge-picks.md) (picks), [0083](0083-workflow-first-trader-site.md)
 (Ideas, the historical exit rule) and [0084](0084-bought-option-history.md) (the bought history).
 **Amends** 0053, 0049, 0047, 0069 decision 4, 0073, 0081, 0064, 0074, 0075, 0050 decision 3, 0083
-decision 3, 0084 and, once PR #967 merges, 0065 (list under Amendments). Takes number 0088: 0087 is
+decision 3, 0084 and, 0065 (#967, merged) (list under Amendments). Takes number 0088: 0087 is
 PR #968's, 0086 is on main.
 
 ## Context
@@ -188,7 +188,7 @@ announcement date as `known_from` per year (decision 3 of 0050 exception).
 - **0084:** derivations from the bought history (decision 11); decision 3's import allowance extended to
   the outcome derivation and the splice; the licence gate it requires (slice E1) is this ADR's reading of
   decisions 12 and 20.
-- **0065, on top of PR #967 (effective when it merges):** decision 15.
+- **0065, on top of the post-publication basis from #967 (merged):** decision 15.
 
 ## Consequences
 - Option setups reuse the edge document, harness, verdict, picks and Ideas; share setups gain the
