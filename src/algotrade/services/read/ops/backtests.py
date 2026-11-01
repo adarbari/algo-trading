@@ -13,14 +13,13 @@ from typing import Any
 
 from algotrade.config.user import SITE_USER
 from algotrade.services.backtests.run import EQUITY, FILLS, run_job_name
+from algotrade.services.configs import strategy_ids
 from algotrade.services.read.context import Stores, run_partition
-from algotrade.services.read.ops.configs import configs_of
 from algotrade.services.read.values import to_scalar
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import result_table
 
 JOB_PREFIX = "backtest-"
-STRATEGY = "strategy"
 DATA_KEYS = ("as_of", "data_versions", "reference_snapshot", "survivorship_bias")
 
 
@@ -92,9 +91,8 @@ def _backtest(run: RunRecord) -> Backtest:
 def load_backtests(ctx: Stores) -> tuple[Backtest, ...]:
     """Every saved run of every strategy config ``ctx.user`` sees, newest first."""
     owners = _owners(ctx)
-    ids = sorted(
-        {c.config_id for c in configs_of(ctx.configs, ctx.user) if c.kind in (STRATEGY, None)}
-    )
+    scopes = dict.fromkeys(["site", ctx.user.user_id])  # the site's presets, then the user's
+    ids = sorted({i for s in scopes for i in strategy_ids(ctx.configs, s)})
     runs = [r for i in ids for o in owners for r in ctx.reader.runs(run_job_name(i, o))]
     return tuple(_backtest(r) for r in sorted(runs, key=lambda r: r.started_at, reverse=True))
 
