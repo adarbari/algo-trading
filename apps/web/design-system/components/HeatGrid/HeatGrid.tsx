@@ -238,7 +238,9 @@ export function HeatGrid({
                       if (!isActive) setFocus({ r, c });
                     }}
                   >
-                    {loading ? null : (
+                    {loading ? null : cell.level === undefined ? (
+                      cell.text
+                    ) : (
                       <>
                         <span className={styles.figure}>
                           {cell.text}
