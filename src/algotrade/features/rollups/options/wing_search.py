@@ -223,29 +223,47 @@ def target_expiries(contracts: pd.DataFrame, p: WingParams) -> pd.Series:
     return best.set_index("underlying_id")["expiry"]
 
 
+def priced(
+    mid: np.ndarray, spot: object, strike: object, t: object, r: object, q: object, is_call: bool
+) -> tuple[np.ndarray, np.ndarray]:
+    """Our implied vol and BSM delta of each mid (the one convention of ``our_deltas`` and of
+    the option grid): ``spot``, ``strike``, ``t`` (years), ``r`` and ``q`` broadcast against
+    ``mid``; NaN where the mid is NaN or the inversion fails."""
+    n = len(mid)
+    spot, strike, t, r, q = (
+        np.broadcast_to(np.asarray(a, dtype=float), (n,)) for a in (spot, strike, t, r, q)
+    )
+    iv = np.full(n, np.nan)
+    quoted = np.isfinite(mid)
+    if quoted.any():
+        solved = implied_vol(
+            mid[quoted], spot[quoted], strike[quoted], t[quoted], r[quoted], q[quoted], is_call
+        )
+        iv[quoted] = np.where(solved.status == IVStatus.OK, solved.iv, np.nan)
+    ok = np.isfinite(iv)
+    delta = np.full(n, np.nan)
+    if ok.any():
+        g = greeks(spot[ok], strike[ok], t[ok], r[ok], q[ok], iv[ok], is_call)
+        delta[ok] = g.delta
+    return iv, delta
+
+
 def our_deltas(contracts: pd.DataFrame, curve: YieldCurve, is_call: bool) -> pd.DataFrame:
     """``contracts`` (with ``spot``, ``q``, ``dte``) plus ``mid``, ``iv`` and ``delta``: NaN
     for a contract without a two-sided quote or whose inversion fails."""
     bid = contracts["bid"].fillna(0).to_numpy(dtype=float)
     ask = contracts["ask"].fillna(0).to_numpy(dtype=float)
-    two_sided = (bid > 0) & (ask > bid)
-    mid = np.where(two_sided, (bid + ask) / 2, np.nan)
+    mid = np.where((bid > 0) & (ask > bid), (bid + ask) / 2, np.nan)
     t = contracts["dte"].to_numpy(dtype=float) / DAYS_PER_YEAR
-    spot = contracts["spot"].to_numpy(dtype=float)
-    strike = contracts["strike"].to_numpy(dtype=float)
-    r, q = curve.rate(t), contracts["q"].to_numpy(dtype=float)
-    iv = np.full(len(contracts), np.nan)
-    if two_sided.any():
-        k = two_sided
-        solved = implied_vol(mid[k], spot[k], strike[k], t[k], r[k], q[k], is_call)
-        iv[k] = np.where(solved.status == IVStatus.OK, solved.iv, np.nan)
-    priced = np.isfinite(iv)
-    delta = np.full(len(contracts), np.nan)
-    if priced.any():
-        g = greeks(
-            spot[priced], strike[priced], t[priced], r[priced], q[priced], iv[priced], is_call
-        )
-        delta[priced] = g.delta
+    iv, delta = priced(
+        mid,
+        contracts["spot"].to_numpy(dtype=float),
+        contracts["strike"].to_numpy(dtype=float),
+        t,
+        curve.rate(t),
+        contracts["q"].to_numpy(dtype=float),
+        is_call,
+    )
     return contracts.assign(mid=mid, iv=iv, delta=delta)
 
 
@@ -299,7 +317,7 @@ def wing_row(contracts: pd.DataFrame, p: WingParams, side: Side) -> dict[str, ob
     }
 
 
-def _div_yields(rows: pd.DataFrame | None, session: date) -> pd.Series:
+def div_yields(rows: pd.DataFrame | None, session: date) -> pd.Series:
     if rows is None:
         return pd.Series(dtype=float)
     today = rows[rows["session_date"] == session]
@@ -326,7 +344,7 @@ def compute(
     chosen = contracts[
         contracts["expiry"].to_numpy() == targets.reindex(contracts["underlying_id"]).to_numpy()
     ]
-    yields = _div_yields(inputs.get(DIVIDENDS), session)
+    yields = div_yields(inputs.get(DIVIDENDS), session)
     chosen = chosen.assign(
         spot=spots.reindex(chosen["underlying_id"]).to_numpy(),
         q=yields.reindex(chosen["underlying_id"]).fillna(0.0).to_numpy(),

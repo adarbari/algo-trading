@@ -172,6 +172,7 @@ def test_the_shipped_guide_is_complete() -> None:
         "momentum-2",
         "options-chain",
         "options-chain-2",
+        "options-premium",
         "options-wing",
         "options-wing-2",
         "statements",

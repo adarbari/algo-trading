@@ -74,6 +74,9 @@ EXEMPT = {
     "carry the series' licence, but this read ignores it (owner decision pending, PR)",
     "services/read/events/instrument_events.py": STORED_OPEN,
     "services/read/instruments/chains.py": STORED_OPEN,
+    "services/read/options/grid.py": "stored open data (Cboe chain, spot, Treasury curve); the "
+    "per-name facts (report date, dividend yield, the open iv_history@v2 rank, never the IBKR "
+    "one) go through load_feature_values, the gated loader",
     "services/read/ops/ingestion.py": STORED_OPEN,
     "services/read/screens/runs.py": "run rows: names and decisions; values are gated in results",
     "services/read/screens/views.py": "saved views: configs, no values",

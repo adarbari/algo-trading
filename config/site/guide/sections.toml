@@ -63,7 +63,7 @@ themes = ["momentum and trend", "price levels", "volume and liquidity", "volatil
 [[theme_group]]
 id = "options"
 title = "Options"
-themes = ["implied volatility", "option chain and short strikes", "put wing, walls and expiries"]
+themes = ["implied volatility", "option chain and short strikes", "put wing, walls and expiries", "short premium"]
 
 [[theme_group]]
 id = "company"
