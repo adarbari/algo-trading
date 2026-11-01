@@ -1,4 +1,4 @@
 /** Widget: the status strip under the top bar of every page (open system issues, snooze, the session notice). */
 export { SystemStatusStrip, type SystemStatusStripProps } from './ui/SystemStatusStrip';
 /** Widget: the footer of every page (data-status pill and the risk statement). */
-export { SiteFooter, type SiteFooterProps } from './ui/SiteFooter';
+export { SiteFooter, type SiteFooterProps } from './ui/SiteFooterLazy';

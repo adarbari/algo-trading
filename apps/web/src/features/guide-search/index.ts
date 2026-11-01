@@ -4,5 +4,5 @@
  * navigation) or by the Guide rail's `GuideSearchButton`. The server ranks; the browser neither
  * searches nor filters (ADR 0038).
  */
-export { BarSearchButton, GuideSearchButton } from './ui/GuideSearchButton';
+export { GuideSearchButton } from './ui/GuideSearchButton';
 export { GuideSearchProvider, useOpenGuideSearch } from './model/provider';

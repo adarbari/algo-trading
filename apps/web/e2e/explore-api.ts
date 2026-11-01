@@ -574,6 +574,12 @@ function graphqlAnswer(operation: Operation): Json | null {
     return UNIVERSE_FILTERS;
   }
   if (name === 'FeatureTable') return featureTable(operation.variables ?? {});
+  if (name === 'TickerSearch') {
+    const { data } = featureTable({ ...operation.variables, columns: [] }) as {
+      data: { table: { instruments: unknown } };
+    };
+    return { data: { table: { instruments: data.table.instruments } } };
+  }
   if (name === 'ComparePrices') return comparePrices(operation.variables ?? {});
   if (operation.variables?.['key'] !== 'AAPL') return null;
   const instrumentId = VALUES.instrumentId;

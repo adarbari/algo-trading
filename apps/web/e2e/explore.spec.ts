@@ -145,7 +145,8 @@ test('one ticker opens on its overview', async ({ page }) => {
 
 test('the bar search opens a ticker in Explore: type, arrows, Enter', async ({ page }) => {
   await page.goto('/explore?sel=AAPL');
-  await page.getByRole('button', { name: 'Search' }).click();
+  await page.getByRole('button', { name: 'Abhi Admin' }).click();
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   const box = page.getByRole('searchbox', { name: 'Search' });
   await box.fill('nvda');
   const tickers = page.getByRole('region', { name: 'Tickers' });

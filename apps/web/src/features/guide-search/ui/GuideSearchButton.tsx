@@ -1,26 +1,17 @@
 /**
- * The button that opens the Guide's search dialog (the Guide rail's search box): a full-width
- * secondary button with the search icon, so a touch user has the search without the keyboard.
+ * The button that opens the app's search dialog (⌘K does too): the Guide rail's search box and the
+ * account menu's first item, full width with the search icon, so a touch user has the search
+ * without the keyboard and the phone's top bar keeps its room.
  */
 import { Button } from '@algotrade/ui';
 
 import { useOpenGuideSearch } from '../model/provider';
 
-export function GuideSearchButton() {
+export function GuideSearchButton({ label = 'Search the Guide' }: { label?: string }) {
   const open = useOpenGuideSearch();
   return (
     <Button icon="search" fullWidth onClick={open}>
-      Search the Guide
-    </Button>
-  );
-}
-
-/** The search box of the top bar: a compact button that opens the dialog (⌘K does too). */
-export function BarSearchButton() {
-  const open = useOpenGuideSearch();
-  return (
-    <Button icon="search" size="sm" onClick={open} aria-keyshortcuts="Control+K Meta+K">
-      Search
+      {label}
     </Button>
   );
 }

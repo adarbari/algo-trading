@@ -28,6 +28,19 @@ const GuideSearchQuery = graphql(`
   }
 `);
 
+/** The Tickers group for `q` (the server matches the whole universe); its code loads with the
+ * first ticker search, not with the app. */
+export function useTickerGroups(q: string, size: number) {
+  const variables = { q, size };
+  return useQuery({
+    queryKey: queryKeys.gql('TickerSearch', variables),
+    queryFn: async ({ queryKey }) =>
+      (await import('./ticker-query')).tickerGroups(variables, queryKey),
+    enabled: q !== '',
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** The result groups for `q`, the previous ones kept on screen while the next are read. */
 export function useGuideSearchResults(q: string) {
   const variables = { q, limit: SEARCH_LIMIT_PER_KIND };

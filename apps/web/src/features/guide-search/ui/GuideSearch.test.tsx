@@ -57,24 +57,7 @@ function serve(guide: unknown, rows: { symbol: string; name: string }[] = []) {
     Promise.resolve('limit' in variables ? guide : tableOf(rows))) as never);
 }
 const tableOf = (rows: { symbol: string; name: string }[]) => ({
-  table: {
-    session: { date: '2026-10-30', unavailable: [] },
-    universeSnapshot: null,
-    preSnapshot: null,
-    sort: null,
-    total: rows.length,
-    page: 1,
-    size: rows.length,
-    unavailable: [],
-    columns: [],
-    instruments: rows.map((r) => ({ instrumentId: `EQ:${r.symbol}`, ...r })),
-    rows: rows.map(() => []),
-    unknown: rows.map(() => []),
-    reasons: rows.map(() => []),
-    kinds: rows.map(() => []),
-    facets: [],
-    kindTexts: [],
-  },
+  table: { instruments: rows.map((r) => ({ instrumentId: `EQ:${r.symbol}`, ...r })) },
 });
 const guideCalls = () => GQL.mock.calls.filter(([, v]) => 'limit' in (v as object));
 
