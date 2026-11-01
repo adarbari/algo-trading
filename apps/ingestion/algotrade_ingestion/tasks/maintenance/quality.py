@@ -371,8 +371,9 @@ def macro_checks(
     vintages than an earlier ``macro`` run recorded (a stored vintage is never removed: ADR
     0048). Fetchable: its source is enabled in ``sources.toml`` and the latest macro run did
     not skip it (no credential); the skipped ones are named in the detail, and when every
-    enabled series was skipped the check WARNs instead of failing. The research series of
-    ``config/site/macro/`` (ADR 0087) are left out of both and graded by ``_macro_research``."""
+    enabled series was skipped the check WARNs instead of failing. The research series (the
+    ``[[file]]`` blocks of ``config/site/series/*.toml``, ADR 0087) are left out of both and
+    graded by ``_macro_research``."""
     enabled = [x for x in macro.series if s.vendor(x.source).enabled]
     if not enabled:
         return []
@@ -412,11 +413,12 @@ def _research_due(
 def _macro_research(
     keys: pd.DataFrame, session: date, research: list[MacroSeries], due: list[MacroSeries]
 ) -> list[Check]:
-    """The series expanded from ``config/site/macro/*.toml`` (ADR 0087): each against its own
-    ``stale_after_days`` and WARN only (they sit outside ``max_macro_stale_share``), graded on a
-    night a ``macro`` run of the session fetched them (about once a month, ``refetch_days``);
-    other nights say so and read nothing (their vintage counts are checked on those nights too,
-    by ``macro_checks``). ``keys``: their stored key columns."""
+    """The series expanded from the ``[[file]]`` blocks of ``config/site/series/*.toml`` (ADR
+    0087): each against its own ``stale_after_days`` and WARN only (they sit outside
+    ``max_macro_stale_share``), graded on a night a ``macro`` run of the session fetched them
+    (about once a month, ``refetch_days``); other nights say so and read nothing (their vintage
+    counts are checked on those nights too, by ``macro_checks``). ``keys``: their stored key
+    columns."""
     if not research:
         return []
     name = "macro_research_fresh"
