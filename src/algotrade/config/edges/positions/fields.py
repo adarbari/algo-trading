@@ -42,22 +42,29 @@ BY_NAME: Mapping[str, PositionField] = {f.name: f for f in POSITION_FIELDS}
 
 
 def _closeness(leg_strike: str, delta: float | None, otm_pct: float | None) -> float:
-    """How near the money a leg's strike rule puts it (higher: nearer; ``atm`` is 0.5, a delta
-    is itself, ``otm_pct`` p is 0.5 - p): an ordering of declared rules, not a price."""
+    """How near the money a leg's strike rule puts it (higher: nearer): ``atm`` is 0.5, a delta is
+    itself, and an ``otm_pct`` leg is farther out than every delta leg (a wing is declared by its
+    distance, a short by its delta). An ordering of declared rules, not a price."""
     if leg_strike == "atm":
         return 0.5
-    return delta if delta is not None else 0.5 - (otm_pct or 0.0)
+    if delta is not None:
+        return delta
+    return -(otm_pct or 0.0)
 
 
 def is_credit(template: Template) -> bool:
-    """A net-credit position: its leg nearest the money is short (a short put, a put spread, a
-    short straddle, an iron fly, a covered call's call). The engine reads the realised credit;
-    this decides only whether ``profit_share_of_credit`` may be named."""
+    """A net-credit position: the legs nearest the money, taken together, are net short (a short
+    put, a put spread, a short straddle, an iron fly or condor, a covered call's call). A tie that
+    nets to zero (a calendar) is not credit. The engine reads the realised credit; this decides
+    only whether ``profit_share_of_credit`` and the credit exits may be named."""
     options = [leg for leg in template.legs if leg.kind != SHARES]
     if not options:
         return False
-    nearest = max(options, key=lambda leg: _closeness(leg.strike or "", leg.delta, leg.otm_pct))
-    return nearest.qty < 0
+    near = max(_closeness(leg.strike or "", leg.delta, leg.otm_pct) for leg in options)
+    nearest = [
+        leg for leg in options if _closeness(leg.strike or "", leg.delta, leg.otm_pct) == near
+    ]
+    return sum(leg.qty for leg in nearest) < 0
 
 
 def applies_to(field: PositionField, template: Template) -> bool:

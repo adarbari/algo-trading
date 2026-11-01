@@ -39,3 +39,12 @@ def test_an_unknown_case_before_a_true_one_is_unknown_and_a_true_one_before_it_w
 def test_resolution_is_deterministic() -> None:
     row = {"x": 0.7}
     assert [resolve_case(TENOR, row) for _ in range(3)] == [resolve_case(TENOR, row)] * 3
+
+
+def test_a_label_outside_the_declared_domain_is_unknown_not_a_branch() -> None:
+    ne = parse_group({"all": [{"field": "label", "op": "ne", "value": "contango"}]}, "case")
+    cv = CaseValue("tenor_days", (Case(ne, 30),), 45)
+    domains = {"label": ("contango", "backwardation")}
+    assert resolve_case(cv, {"label": "FOO"}, domains).reason == CASE_UNKNOWN
+    assert resolve_case(cv, {"label": "backwardation"}, domains).value == 30
+    assert resolve_case(cv, {"label": "contango"}, domains).value == 45

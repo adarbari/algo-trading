@@ -33,7 +33,8 @@ def identity_dict(value: Any) -> Any:
             and not (k == "ensemble" and not v)
             and not (k == "canary" and v is None)
             and not (k in ("position", "gate", "verdict_profile", "entry") and v is None)
-            and not (k in ("variant_grid", "position_baselines") and not v)
+            and not (k in ("variant_grid", "position_baselines", "cases") and not v)
+            and not (k == "when" and v is None)
             and not (untargeted and k in ("vol_target", "vol_window", "vol_return_field"))
         }
     if isinstance(value, (list, tuple)):

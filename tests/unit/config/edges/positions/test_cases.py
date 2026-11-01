@@ -10,13 +10,14 @@ import pytest
 
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.positions.fields import is_credit
 from algotrade.config.edges.positions.spec import (
     check_edge,
     check_rules,
     exit_delay,
     exit_rules,
 )
-from algotrade.config.edges.positions.templates import load_templates
+from algotrade.config.edges.positions.templates import Leg, Template, load_templates
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import field_catalog
 from algotrade.storage.configs.files import FileConfigStore
@@ -195,3 +196,37 @@ def test_a_position_field_that_does_not_apply_to_the_templates_legs_is_refused()
     edge = parse_edge(document(outcome=shares), "drift", WHERE)
     with pytest.raises(ConfigurationError, match=r"unknown field 'position\.dte'"):
         check_rules(edge, WHERE, CATALOG, TEMPLATES)
+
+
+def test_every_branch_of_a_position_case_is_checked_like_the_default() -> None:
+    to_straddle = {"cases": [{"when": HIGH_IV, "value": "short_straddle"}], "default": "short_put"}
+    with pytest.raises(ConfigurationError, match="has no leg chosen by delta"):
+        check_edge(parse(position=to_straddle), WHERE, TEMPLATES)
+    cases_on_shares = {"cases": [{"when": HIGH_IV, "value": "short_shares"}],
+                       "default": "long_shares"}  # fmt: skip
+    shares = {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+              "start_offset_sessions": 1, "position": cases_on_shares}  # fmt: skip
+    with pytest.raises(ConfigurationError, match="not the position of side"):
+        check_edge(parse_edge(document(outcome=shares), "drift", WHERE), WHERE, TEMPLATES)
+    lacking = {"cases": [{"when": HIGH_IV, "value": "put_spread"}], "default": "short_put"}
+    doc = put(position=lacking, exit={"when": {"all": [DTE]}}, strike_delta=None)
+    check_rules(parse_edge(doc, "drift", WHERE), WHERE, CATALOG, TEMPLATES)  # both have dte
+
+
+def test_which_templates_are_credit_and_a_case_axis_is_not_a_grid_axis() -> None:
+    debit = Template("long_put", (Leg("option", 1, "P", "atm"),), "max_loss")
+    assert not is_credit(debit)
+    shorts = Leg("option", -1, "P", "delta", 0.16)
+    wing = Leg("option", 1, "P", "otm_pct", None, 0.05)
+    assert is_credit(Template("condor", (shorts, wing), "max_loss"))
+    near = (Leg("option", -1, "C", "atm"), Leg("option", 1, "C", "atm"))
+    assert not is_credit(Template("calendar", near, "max_loss"))
+    grid = [{"prefix": "g", "tenor_days": [7, 30]}]
+    doc = {**put(tenor_days=tenor_cases()), "variant_grid": grid}
+    with pytest.raises(ConfigurationError, match="also case-valued"):
+        check_edge(parse_edge(doc, "drift", WHERE), WHERE, TEMPLATES)
+
+
+def test_a_position_outcomes_identity_drops_absent_cases_and_exit_condition() -> None:
+    o = identity_dict(asdict(parse().outcome))
+    assert "cases" not in o["position"] and "when" not in o["position"]["exit"]
