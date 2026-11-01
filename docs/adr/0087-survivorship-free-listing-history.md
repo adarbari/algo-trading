@@ -95,6 +95,12 @@ and types (architect review). PR3 the owner's runs (below). PR4 the `filings` ta
 Form 25 follow-up). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3`, the harness
 disclosure and the `universe_basis` stamp (architect review). PR7 S&P 500 renames through Massive ticker events (probe first) and the 2024-26
 `EQ:<symbol>` bars migration (800 listings with no id have bars stored under `EQ:<symbol>` on 2025-06-02).
+PR3b (not in PR2): Massive ticker details `/v3/reference/tickers/{T}?date=D` are point in time (`list_date`,
+`figi`; probed 2026-11-01: BBBY on 2023-05-02 answers the old Bed Bath & Beyond, its `list_date` 1992-06-04) and
+fill the start a Massive-only record still lacks (`no_start`, `perma_ambiguous`: Tiingo's meta for `bbby` answers a
+reused ticker's permaTicker, so PR2 leaves BBBY undated). PR2 keeps every Tiingo row and every Massive record (owner
+tenet 2026-11-01): a record whose start no Tiingo row gives is written with a null start and its reason in
+`no_id_reason`, never dropped (Decision 2's "dropped and counted" is superseded).
 
 **Backfill** (detached, README "Long runs"): Massive inactive list ~6 minutes; Tiingo meta ~35 batches; Tiingo bars
 for the new ids plus the tails ~9,000 to 11,000 requests, 1 to 1.3 hours at 0.4 s, which holds only on the Power

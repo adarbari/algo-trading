@@ -71,21 +71,35 @@ ID_MAP = fixed(
 )
 
 # L1: every US-listed stock / ETF a vendor ever listed, with its listing dates (ADR 0018
-# amendment, 2026-10-08; edges ED6): the universe as it was, for the winners study. One full
-# copy per pull session (snapshot). ``instrument_id`` is null until a trusted id exists (a
-# symbol_history match or a permaTicker); ``end_date`` is the vendor's last trading day and is
-# read only by ``data.listings.universe_asof``. knowledge_ts is the pull time (2026 for a
-# 2010 listing), so only the identity reads (resolver, universe_asof) may use it for an old S.
+# amendment, 2026-10-08; edges ED6; merged with Massive's delisted names, ADR 0087): the
+# universe as it was. One full copy per pull session (snapshot). Nothing a vendor sent is
+# discarded (owner tenet 2026-11-01): every Tiingo file row is a row, the ones outside the
+# universe's scope carry ``scope_reason`` (null = in scope; ``data.listings`` never reads the
+# others), and every Massive inactive record is a row too (``source = massive`` when no Tiingo
+# row pairs with it). ``instrument_id`` is null until a trusted id exists, and then
+# ``no_id_reason`` says why (``out_of_scope``, ``no_start``, ``overlaps_listing``,
+# ``perma_ambiguous``, ``figi_held``...) and ``id_source`` (symbol_history | perma | figi) which
+# step of the id order gave it. ``start_date`` is null for a Massive-only record whose start no
+# Tiingo row gives (never guessed). ``end_date`` is the vendor's last trading day and is read only
+# by ``data.listings`` (identity); ``vendor_end_date`` is Massive's, for a paired row.
+# knowledge_ts is the pull time (2026 for a 2010 listing), so only the identity reads
+# (resolver, universe_asof) may use it for an old S. The columns after ``perma_ticker`` were added
+# by ADR 0087: an older partition reads them as absent (``data.listings.universe.listing_frame``).
 LISTING_HISTORY = fixed(
     "instruments/listing_history",
     "reference",
-    ("ticker", "start_date", "ts"),
+    ("ticker", "ts"),
     "instrument_id string",
     "ts timestamp_utc!",
     *strings("ticker", "exchange", "asset_type", "price_currency", "perma_ticker"),
-    "start_date date!",
+    "start_date date",
     "end_date date",
-    key=("source", "ticker", "start_date"),
+    *strings("name", "vendor_type", "security_type", "cik", "figi", "share_class_figi"),
+    *strings("vendor_exchange", "data_provider_perma_ticker"),
+    *strings("id_source", "no_id_reason", "scope_reason"),
+    "vendor_end_date date",
+    "is_adr bool",
+    key=("source", "ticker", "exchange", "asset_type", "start_date", "end_date"),
 )
 
 # L1: every US ticker Massive lists as INACTIVE (delisted), one row per (ticker, last trading
@@ -93,8 +107,10 @@ LISTING_HISTORY = fixed(
 # lacks, with the vendor's CIK and FIGIs where it has them. A full copy per pull session
 # (snapshot). Identity only: ``end_date`` is the vendor's last trading day (null
 # for ~2% of the rows, where Massive gives none), ``vendor_type`` is null before 2017 and
-# ``security_type`` is ``MASSIVE_TYPES`` of it. No ``instrument_id`` yet: the merge into
-# ``instruments/listing_history`` is a later PR. knowledge_ts is the pull time.
+# ``security_type`` is ``MASSIVE_TYPES`` of it; ``market``, ``locale``, ``currency_name`` and
+# ``last_updated_utc`` (a string, as received) are the record's other fields, kept. No
+# ``instrument_id``: the merge into ``instruments/listing_history`` (ADR 0087) gives the ids.
+# knowledge_ts is the pull time.
 DELISTED_TICKERS = fixed(
     "instruments/delisted_tickers",
     "reference",
@@ -102,6 +118,7 @@ DELISTED_TICKERS = fixed(
     "ts timestamp_utc!",
     *strings("ticker", "name", "exchange", "vendor_type", "security_type"),
     *strings("cik", "figi", "share_class_figi"),
+    *strings("market", "locale", "currency_name", "last_updated_utc"),
     "end_date date",
     key=("source", "ticker", "end_date"),
 )

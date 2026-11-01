@@ -215,7 +215,7 @@ export const Series: Story = {
   ),
 };
 
-/** IBM Plex Sans scale and weights; IBM Plex Mono. */
+/** Figtree scale and weights; Sora headings; DM Mono. */
 export const Typography: Story = {
   render: () => (
     <Stack gap={3}>

@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>algotrade</title>
+    <script id="theme-boot">
+      // The device's copy of the user's theme (key: entities/appearance THEME_KEY), set before the
+      // first paint; with none the CSS follows the OS. UiProvider never overwrites it on mount.
+      (function () {
+        try {
+          var theme = localStorage.getItem('algotrade.theme');
+          if (theme === 'light' || theme === 'dark' || theme === 'system') {
+            document.documentElement.setAttribute('data-theme', theme);
+          }
+        } catch (e) {
+          // storage blocked: the OS decides
+        }
+      })();
+    </script>
     <script id="chunk-reload">
       // A redeploy removes the old hashed chunks: reload once (not again within 60 s).
       (function () {

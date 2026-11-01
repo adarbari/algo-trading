@@ -32,6 +32,17 @@ def test_one_row_per_listing_a_recycled_ticker_answers_with_several() -> None:
     assert len(meta[meta["ticker"] == "AAC"]) == 3 and "ZZZZ" not in set(meta["ticker"])
 
 
+def test_the_free_fields_are_all_kept_including_isadr_and_the_data_provider_id() -> None:
+    meta = parse_meta(payloads.meta_bbby_payload())  # RECORDED 2026-11-01
+    assert list(meta.columns) == COLUMNS and "is_adr" in COLUMNS
+    assert not meta["is_adr"].any() and meta["is_adr"].dtype == bool
+    bbby = meta[meta["ticker"] == "BBBY"].iloc[0]  # a reused ticker: no name, active
+    assert bbby["perma_ticker"] == "US000000143626" and bbby["name"] == ""
+    assert bbby["data_provider_perma_ticker"] == "195902" and bool(bbby["is_active"])
+    adr = parse_meta(b'[{"permaTicker": "US1", "ticker": "x", "isADR": true, "isActive": false}]')
+    assert bool(adr["is_adr"].iloc[0]) and not bool(adr["is_active"].iloc[0])
+
+
 def test_rows_without_a_perma_ticker_are_dropped_and_repeats_kept_once() -> None:
     raw = (
         b'[{"permaTicker": "", "ticker": "x", "isActive": true},'

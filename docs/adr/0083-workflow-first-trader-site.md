@@ -1,5 +1,7 @@
 # ADR 0083: The workflow-first trader site: Ideas, Setups, Test, Calendar; what Ideas is; the historical exit rule; the product rules
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): decision 3: the exit rule over the contract's `max_adverse` for both kinds, an option setup publishes its own exits, short and book picks shown.
+
 **Status:** accepted (2026-10-24; owner decisions, taken after the use-case research and the
 workflow design; an architect reviewed the build slices). Amends
 [0025](0025-frontend-architecture.md) (the TRADER sections), [0069](0069-data-licence-gate.md) (for Ideas a withheld pick is dropped, not shown by name), [0053](0053-edges-hypotheses-outcomes-and-one-harness.md)

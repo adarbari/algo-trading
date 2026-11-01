@@ -136,6 +136,47 @@ def meta_payload() -> bytes:
     return json.dumps(rows).encode()
 
 
+def meta_rows(*rows: tuple[str, str, str | None, bool]) -> bytes:
+    """A fundamentals-meta answer BUILT BY HAND in the recorded shape (``meta_bbby_payload``):
+    rows are (permaTicker, ticker, name, isActive); the gated fields are left out (the adapter
+    ignores them)."""
+    return json.dumps(
+        [
+            {
+                "permaTicker": perma, "ticker": ticker, "name": name, "isActive": active,
+                "isADR": False, "dataProviderPermaTicker": perma[-6:],
+            }
+            for perma, ticker, name, active in rows
+        ]
+    ).encode()  # fmt: skip
+
+
+def meta_bbby_payload() -> bytes:
+    """RECORDED 2026-11-01 (``/tiingo/fundamentals/meta?tickers=bbby,bbbyq,shld,shldq,sivb,sivbq,
+    abc,cor``, the owner's key; the gated fields trimmed): ``bbby`` answers a REUSED ticker's
+    permaTicker (no name, active; not the bankrupt Bed Bath & Beyond) and ``bbbyq`` the bankrupt
+    company's: two permaTickers for the one candidate set of the old BBBY, so the merge must call
+    it ``perma_ambiguous`` and give no start. ``shld``, ``sivb`` and ``abc`` answer nothing;
+    ``cor`` answers two companies (Cencora, active, and CoreSite, inactive)."""
+    recorded = [
+        ("US000000143626", "bbby", None, True, "195902"),
+        ("US000000000258", "bbbyq", "Bed Bath & Beyond Inc", True, "197799"),
+        ("US000000000054", "cor", "Cencora Inc", True, "195812"),
+        ("US000000008678", "cor", "CoreSite Realty Corporation", False, "192908"),
+        ("US000000086368", "shldq", "Sears Holdings Corp", False, "194967"),
+        ("US000000002604", "sivbq", "SVB Financial Group", True, "198834"),
+    ]
+    return json.dumps(
+        [
+            {
+                "permaTicker": perma, "ticker": ticker, "name": name, "isActive": active,
+                "isADR": False, "dataProviderPermaTicker": provider,
+            }
+            for perma, ticker, name, active, provider in recorded
+        ]
+    ).encode()  # fmt: skip
+
+
 NAV_TICKERS_SLICE = (
     REPO_ROOT / "tests" / "fixtures" / "sources" / "tiingo" / "nav_tickers_slice.csv"
 )

@@ -43,16 +43,17 @@ def load(*releases: dict[str, Any]) -> MacroReleases:
     return MacroReleases.from_document({"release": list(releases)})
 
 
-def test_the_shipped_registry_loads_the_nine_releases() -> None:
+def test_the_shipped_registry_loads_the_ten_releases() -> None:
     found = load_macro_releases(FileConfigStore(REPO_ROOT / "config"))
     assert found.keys == (
         "CPI", "EMPLOYMENT", "PCE", "GDP", "PPI", "RETAIL_SALES", "ISM_MFG", "ISM_SERVICES", "FOMC",
+        "FOMC_UNSCHEDULED",
     )  # fmt: skip
     ids = {r.key: r.release_id for r in found.fred}
     assert ids == {"CPI": 10, "EMPLOYMENT": 50, "PCE": 54, "GDP": 53, "PPI": 46, "RETAIL_SALES": 9}
-    fomc = found.releases[-1]
-    assert fomc.source == "dates" and fomc.release_id is None and len(fomc.dates) == 32
-    assert fomc.dates[0] == date(2024, 1, 31) and fomc.dates[-1] == date(2027, 12, 8)
+    fomc = next(r for r in found.releases if r.key == "FOMC")
+    assert fomc.source == "dates" and fomc.release_id is None and len(fomc.dates) == 26 * 8 - 1
+    assert fomc.dates[0] == date(2002, 1, 30) and fomc.dates[-1] == date(2027, 12, 8)
     rules = {r.key: (r.nth_business_day, r.time_et) for r in found.releases if r.source == "rule"}
     assert rules == {"ISM_MFG": (1, "10:00"), "ISM_SERVICES": (3, "10:00")}
     assert fomc.time_et == "14:00"
@@ -132,3 +133,65 @@ def without(base: dict[str, Any], key: str) -> dict[str, Any]:
 def test_every_rule_names_the_entry(doc: dict[str, Any], message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         MacroReleases.from_document(doc)
+
+
+def shipped(key: str) -> Any:
+    found = load_macro_releases(FileConfigStore(REPO_ROOT / "config"))
+    return next(r for r in found.releases if r.key == key)
+
+
+def test_fomc_has_eight_scheduled_meetings_a_year_and_a_known_from_before_the_first() -> None:
+    """ADR 0088 (D2): scheduled meetings only (2020 lost the cancelled 03-18), and each
+    year's declared ``known_from`` is on or before its first meeting, with a source URL."""
+    fomc = shipped("FOMC")
+    per_year = {y: [d for d in fomc.dates if d.year == y] for y in range(2002, 2028)}
+    assert {y: len(ds) for y, ds in per_year.items() if len(ds) != 8} == {2020: 7}
+    assert [p.year for p in fomc.publications] == list(range(2002, 2028))
+    for p in fomc.publications:
+        assert p.known_from <= per_year[p.year][0], p.year
+        assert p.source.startswith("https://www.federalreserve.gov/"), p.year
+
+
+def test_the_unscheduled_fomc_dates_are_kept_apart_from_the_scheduled_ones() -> None:
+    fomc, unscheduled = shipped("FOMC"), shipped("FOMC_UNSCHEDULED")
+    assert not set(fomc.dates) & set(unscheduled.dates)
+    for day in (date(2008, 1, 22), date(2020, 3, 3), date(2020, 3, 15)):
+        assert day in unscheduled.dates and day not in fomc.dates
+    assert not unscheduled.publications
+
+
+def year(**kw: Any) -> dict[str, Any]:
+    return {
+        "year": 2026,
+        "known_from": date(2025, 12, 31),
+        "source": "https://x",
+        "inferred": True,
+        **kw,
+    }
+
+
+@pytest.mark.parametrize(
+    ("years", "message"),
+    [
+        (
+            [year(known_from=date(2026, 2, 1))],
+            r"year 2026: known_from 2026-02-01 is after the first",
+        ),
+        ([year(year=2025)], r"declared \[2025\] but dates cover \[2026\]"),
+        ([year(), year()], r"years must be unique and ascending"),
+        ([year(source=" ")], r"source: expected a non-empty string"),
+        ([year(inferred="yes")], r"inferred: expected true or false"),
+        ([year(known_from="2025-12-31")], r"known_from: expected a date"),
+        ([{k: v for k, v in year().items() if k != "source"}], r"source: required"),
+    ],
+)
+def test_a_bad_declared_year_names_the_release(years: list[dict[str, Any]], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        load({**FOMC, "dates": [date(2026, 1, 28)], "year": years})
+
+
+def test_a_declared_year_loads_and_only_a_dates_release_may_declare_one() -> None:
+    found = load({**FOMC, "dates": [date(2026, 1, 28)], "year": [year()]}).releases[0]
+    assert found.known_from_by_year == {2026: date(2025, 12, 31)}
+    with pytest.raises(ConfigurationError, match=r"year: not used by source = 'rule'"):
+        load({**ISM, "year": [year()]})

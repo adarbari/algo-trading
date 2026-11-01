@@ -71,6 +71,11 @@ purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/e
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
+path = "src/algotrade/config/edges/positions"
+purpose = "positions of an edge document (ADR 0088), split from config/edges (at its module cap): the site's position templates and position_of (templates.py), the position key, option parameters and [outcome.exit] of an outcome (spec.py), the variant grids (grid.py), the published exit rule's settings (exit_rule.py) and the option_pnl outcome's structures, tenor rule and checks (chain.py, moved here)"
+contracts = ["Configs are pure: no storage I/O"]
+
+[[dir]]
 path = "src/algotrade/config/edges/schedules"
 purpose = "schedule vocabularies of an edge document, split from config/edges/document.py (at its line cap, config/edges at its module cap): the event classes and subtypes an on_event: schedule may name, their anchor sessions and the fail-closed parsing (events.py; ADR 0053 amendment 2026-10-08: ED4 item 7, ADR 0075); the market-trigger names land beside it (calendar windows stay in core/time/windows.py, ADR 0073)"
 contracts = ["Configs are pure: no storage I/O"]

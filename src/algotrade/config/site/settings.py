@@ -953,7 +953,7 @@ def load_field_guide(configs: SiteDocuments) -> FieldGuideSettings:
 
 
 def load_macro(configs: SiteDocuments) -> MacroSettings:
-    """``macro.toml`` and the ``site/series/*.toml`` family files, one registry (ADR 0048)."""
+    """``macro.toml`` and the ``site/series/*.toml`` family files, one registry (ADR 0048, 0089)."""
     families = [configs.load("site", "series", n) for n in configs.names("site", "series")]
     return MacroSettings.from_documents(site_document(configs.load, "macro"), families)
 

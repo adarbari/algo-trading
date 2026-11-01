@@ -3,11 +3,12 @@
 
 ``https://api.tiingo.com/tiingo/fundamentals/meta?tickers=a,b,...`` answers a JSON list with
 ONE object per listing that ever used each requested ticker: ``permaTicker`` (``US000000041372``,
-stable across ticker changes), ``ticker`` (lowercase), ``name``, ``isActive`` and
-``dataProviderPermaTicker``; the sector, industry and similar fields are gated (a string
-"Field not available for free/evaluation") and ignored. A recycled ticker therefore answers with
-several rows: ``prm`` -> PRIMEDIA (inactive) and Perimeter (active). ``permaTicker`` is also the
-key of ``/tiingo/daily/<permaTicker>/prices``, which serves that listing's own bars.
+stable across ticker changes), ``ticker`` (lowercase), ``name``, ``isActive``, ``isADR`` and
+``dataProviderPermaTicker`` (the free fields, all kept); the sector, industry and similar fields
+are gated (a string "Field not available for free/evaluation") and ignored. A recycled ticker
+therefore answers with several rows: ``prm`` -> PRIMEDIA (inactive) and Perimeter (active).
+``permaTicker`` is also the key of ``/tiingo/daily/<permaTicker>/prices``, which serves that
+listing's own bars.
 
 The request key is the tickers, comma-separated (the task batches them, 100 at a time); the key
 travels in an ``Authorization: Token`` header set on the transport. Tickers Tiingo does not know
@@ -28,7 +29,7 @@ DATASET = "fundamentals_meta"
 TABLE = "perma_meta"  # a key of ``Normalized.parsed``: nothing is stored from here
 HOST = "https://api.tiingo.com"
 URL = HOST + "/tiingo/fundamentals/meta?tickers={tickers}"
-COLUMNS = ["ticker", "perma_ticker", "name", "is_active", "data_provider_perma_ticker"]
+COLUMNS = ["ticker", "perma_ticker", "name", "is_active", "data_provider_perma_ticker", "is_adr"]
 
 
 def vendor_symbol(ticker: str) -> str:
@@ -44,13 +45,14 @@ def parse_meta(payload: bytes) -> pd.DataFrame:
         raise ValueError(f"expected a JSON list of listings, got {str(rows)[:120]!r}")
     frame = pd.DataFrame(
         rows,
-        columns=["ticker", "permaTicker", "name", "isActive", "dataProviderPermaTicker"],
+        columns=["ticker", "permaTicker", "name", "isActive", "dataProviderPermaTicker", "isADR"],
     )
     frame.columns = pd.Index(COLUMNS)
     for column in ("ticker", "perma_ticker", "name", "data_provider_perma_ticker"):
         frame[column] = frame[column].fillna("").astype(str).str.strip()
     frame["ticker"] = frame["ticker"].str.upper()
-    frame["is_active"] = frame["is_active"].map(lambda v: v is True or str(v).lower() == "true")
+    for flag in ("is_active", "is_adr"):
+        frame[flag] = frame[flag].map(lambda v: v is True or str(v).lower() == "true")
     kept = frame[(frame["ticker"] != "") & (frame["perma_ticker"] != "")]
     return kept.drop_duplicates(["ticker", "perma_ticker"]).reset_index(drop=True)
 

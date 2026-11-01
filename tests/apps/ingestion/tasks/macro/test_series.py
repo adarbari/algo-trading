@@ -1,8 +1,11 @@
 """The ``macro`` task over recorded payloads: rows and vintages, the lagged rule, idempotent
 reruns, a changed lagged value as a new vintage, and series skipped for a missing credential."""
 
+import io
+import zipfile
 from datetime import date, timedelta
 from itertools import count
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -314,3 +317,87 @@ def test_the_budget_is_a_typed_macro_setting() -> None:
     assert tight.run_budget_s == 60
     with pytest.raises(Exception, match="run_budget_s"):
         MacroSettings.from_document({"macro": {"run_budget_s": 0}})
+
+
+def test_a_night_reads_the_stored_vintages_of_the_series_due_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0089: a published file pulled once a month is NOT_DUE on the other nights, and its
+    (very long) stored history is not read just to be skipped."""
+    ctx = context(Feeds())
+    ingest_macro(ctx, REGISTRY, D1)
+    asked: list[list[str]] = []
+    original = StoreReader.table_range
+
+    def spy(self: StoreReader, table: str, *args: Any, **kw: Any) -> Any:
+        if table == TABLE:
+            instruments = kw.get("instruments", args[3] if len(args) > 3 else None)
+            asked.append(list(instruments or []))
+        return original(self, table, *args, **kw)
+
+    monkeypatch.setattr(StoreReader, "table_range", spy)
+    same_day = ingest_macro(ctx, REGISTRY, D1)
+    assert same_day.items["SPX"] == "NOT_DUE" and asked == [["MACRO:GDP_REAL", "MACRO:T10Y3M"]]
+    asked.clear()
+    ingest_macro(ctx, REGISTRY, D2)  # the file is due again: its ids are read
+    assert asked and "IDX:SPX" in asked[0]
+    asked.clear()
+    quiet = MacroSettings.from_document({"series": [SPX]})
+    assert ingest_macro(ctx, quiet, D2).items == {"SPX": "NOT_DUE"} and asked == []
+
+
+FRENCH = {
+    "defaults": {
+        "source": "published", "kind": "macro", "cadence": "monthly", "pit": "lag",
+        "release_lag_days": 70, "revised": True, "licence": "personal", "terms": "t",
+        "parser": "french_zip", "date_column": "date",
+    },
+    "file": [
+        {"prefix": "IND12", "url": "https://french.test/12.zip", "columns": ["NoDur"]},
+        {"prefix": "IND12EW", "url": "https://french.test/12.zip", "section": 2,
+         "columns": ["NoDur"]},
+    ],
+}  # fmt: skip
+
+
+RECORDED = Path(__file__).resolve().parents[4] / "fixtures" / "sources" / "published"
+
+
+def french_context(zipped: bytes) -> TaskContext:
+    feeds = Feeds()
+    feeds.transport = lambda url: zipped  # type: ignore[method-assign]
+    return context(feeds)
+
+
+def test_the_equal_weighted_section_is_what_ind12ew_stores_not_the_value_weighted_one() -> None:
+    """Finding 1 of the ADR 0089 review: the task's request carried no ``section``, so IND12EW_*
+    stored the value-weighted returns."""
+    ctx = french_context((RECORDED / "french_ind12_daily.zip").read_bytes())
+    record = ingest_macro(ctx, MacroSettings.from_documents({}, [FRENCH]), D1)
+    assert record.items == {"IND12_NODUR": "OK: 20 rows", "IND12EW_NODUR": "OK: 20 rows"}
+    value, equal = rows(table(ctx), "IND12_NODUR"), rows(table(ctx), "IND12EW_NODUR")
+    assert value[0][3] == pytest.approx(0.02) and equal[0][3] == pytest.approx(0.37)
+    assert [r[3] for r in value] != [r[3] for r in equal]
+
+
+def test_a_french_day_added_by_a_later_pull_is_stored_beside_the_backfill() -> None:
+    """Finding 2, through the task: the file gains 2026-10-01 on a pull of 2026-10-06 and the
+    series already has vintages, so it is added at ``max(obs + 70, session)`` (here obs + 70,
+    still ahead; the clipping case is ``test_plan``'s)."""
+    original = (RECORDED / "french_ind12_daily.zip").read_bytes()
+    one = MacroSettings.from_documents({}, [{**FRENCH, "file": FRENCH["file"][:1]}])
+    ctx = french_context(original)
+    ingest_macro(ctx, one, D1)  # the backfill keeps obs + 70
+    assert rows(table(ctx), "IND12_NODUR")[-1][:2] == (date(2026, 9, 30), date(2026, 12, 9))
+    with zipfile.ZipFile(io.BytesIO(original)) as archive:
+        name = archive.namelist()[0]
+        lines = archive.read(name).decode().split("\r\n")
+    at = next(i for i, line in enumerate(lines) if line.startswith("20260930"))
+    lines.insert(at + 1, "20261001," + ",".join(["   0.10"] * 12))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(name, "\r\n".join(lines))
+    ctx.sources["published"] = PublishedSeries(http_for(lambda url: buffer.getvalue()))
+    ingest_macro(ctx, one, D3, only=["IND12_NODUR"])
+    added = [r for r in rows(table(ctx), "IND12_NODUR") if r[0] == date(2026, 10, 1)]
+    assert added == [(date(2026, 10, 1), date(2026, 12, 10), "lagged", pytest.approx(0.10))]

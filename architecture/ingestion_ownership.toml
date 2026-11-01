@@ -73,7 +73,7 @@ detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
 id = "delisted-tickers-ingestion"
-description = "Store Massive's inactive (delisted) tickers in instruments/delisted_tickers (ADR 0087): one full snapshot per session from MassiveTickers' inactive list (cursor-paged, 12.5 s a request on the free tier), a pull under [quality] min_delisted_tickers rows FAILED before any write, the vendor's last trading day as end_date (identity, never a feature), in no workflow until the listing-history merge"
+description = "Store Massive's inactive (delisted) tickers in instruments/delisted_tickers (ADR 0087): one full snapshot per session from MassiveTickers' inactive list (cursor-paged, 12.5 s a request on the free tier), a pull under [quality] min_delisted_tickers rows FAILED before any write, the vendor's last trading day as end_date (identity, never a feature) and every other field of the record kept (market, locale, currency_name, last_updated_utc), in no workflow; the listing-history task merges it"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/entries_reference.py",  # the registry entry's runner calls the task
@@ -328,6 +328,16 @@ section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
 detect = [{ import = "plistlib" }]
 
 [[responsibility]]
+id = "listing-history-merge"
+description = "Merge Tiingo's supported-tickers rows and Massive's delisted records into the rows of instruments/listing_history before ids (ADR 0087, decision 2): the compare key (upper case, a dot read as a hyphen, a $ preferred never pairs); an ended in-scope Tiingo row pairing with a Massive record of the same key whose last trading day is within 7 days when each is the other's only neighbour (several: pair_ambiguous, none pairs), a paired row taking every Massive attribute; a Massive-only record always written as a source = massive row (exchange from its MIC, an unmapped MIC out of scope) whose start date comes only from an out-of-scope OTC successor row of its company that one Tiingo meta request confirms by a single permaTicker, otherwise a null start and the reason (no_start, overlaps_listing, pair_ambiguous, perma_ambiguous, no_meta), never a guess and never dropped; pure, the meta question comes in as a callable; the ids themselves are instrument_ids.assign_listing_ids's"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/listing_merge.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/listings/listing_history.py",  # the task runs the merge between the two pulls and the ids
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "merge_listings" }]
+
+[[responsibility]]
 id = "live-verification"
 description = "Compare a session's stored values with an independent live source (IBKR): the sample, the checks and their tolerances (verification.toml), the verification/ibkr table; the quality check `verification` grades it and the nightly email reports it"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/verification/*"]
@@ -348,6 +358,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the calendar (macro_calendar_future)
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
+    "src/algotrade/features/rollups/market/edges/conditions.py",  # names the feature input of the stored calendar (known_from <= session) for the FOMC distances (ADR 0088); reads only, the table's one writer stays macro/calendar.py
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
@@ -428,7 +439,7 @@ detect = [{ call = "priority_order" }]
 
 [[responsibility]]
 id = "vendor-listing-perma-ticker"
-description = "Which vendor listing a Tiingo permaTicker belongs to (edges ED6): TiingoListingMeta fetches the fundamentals meta rows (one per listing that ever used a ticker) and match_perma assigns a permaTicker to a listing only by a unique ticker + active / inactive match (one listing and one row; the one open listing and the one active row; the one delisted listing and the one inactive row), otherwise it gets none (ambiguous / no_meta); the id then follows from equity_id, never from a guess"
+description = "Which vendor listing a Tiingo permaTicker belongs to (edges ED6): TiingoListingMeta fetches the fundamentals meta rows (one per listing that ever used a ticker) and match_perma assigns a permaTicker to a listing only by a unique ticker + active / inactive match (one listing and one row; the one open listing and the one active row; the one delisted listing and the one inactive row), otherwise it gets none (ambiguous / no_meta; match_perma_reasons says which, per listing); the adapter keeps every free field (name, isActive, isADR, dataProviderPermaTicker); the id then follows from equity_id, never from a guess"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",
     "libs/sources/algotrade_sources/vendors/tiingo/meta.py",
@@ -438,7 +449,7 @@ allowed = [
     "libs/sources/algotrade_sources/framework/registry.py",  # registers the adapter
 ]
 section = "docs/adr/0018-figi-instrument-ids.md#decision"
-detect = [{ call = "match_perma" }, { call = "parse_meta" }]
+detect = [{ call = "match_perma" }, { call = "match_perma_reasons" }, { call = "parse_meta" }]
 
 [[responsibility]]
 id = "vx-futures-ingestion"

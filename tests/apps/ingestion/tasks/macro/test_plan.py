@@ -146,3 +146,23 @@ def test_a_null_never_replaces_a_stored_number() -> None:
     nulls = held((date(2026, 10, 1), date(2026, 10, 3), "lagged", None))
     number = vintage_rows(spec(pit="lag"), fetched(("2026-10-01", None, 2.0)))
     assert triples(rows_to_write(number, nulls, D)) == [(date(2026, 10, 1), D, "lagged", 2.0)]
+
+
+def test_a_revised_series_dates_a_late_first_seen_observation_from_the_run_session() -> None:
+    """ADR 0089: the 2026-10-05 run first sees 2026-07-01 (obs + 2 days is long past); a session
+    before the run must not know it. The backfill keeps obs + lag; a non-revised series and an
+    observation already stored are unchanged."""
+    target = vintage_rows(
+        spec(revised=True), fetched(("2026-07-01", None, 1.0), ("2026-10-04", None, 2.0))
+    )
+    stored = held((date(2026, 6, 30), date(2026, 7, 2), "lagged", 0.5))
+    live = rows_to_write(target, stored, D, live=True)
+    assert triples(live) == [
+        (date(2026, 7, 1), D, "lagged", 1.0),  # max(07-03, session)
+        (date(2026, 10, 4), date(2026, 10, 6), "lagged", 2.0),  # obs + lag is still ahead
+    ]
+    backfill = rows_to_write(target, stored.iloc[0:0], D, live=False)
+    assert triples(backfill)[0] == (date(2026, 7, 1), date(2026, 7, 3), "lagged", 1.0)
+    assert triples(rows_to_write(target, stored, D))[0][1] == date(2026, 7, 3)  # not revised
+    again = rows_to_write(target, live.assign(vintage_kind="lagged"), D, live=True)
+    assert again.empty  # stored under its session date: nothing new on the next pull

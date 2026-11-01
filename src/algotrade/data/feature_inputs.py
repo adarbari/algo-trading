@@ -147,6 +147,14 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        would show company facts not known then)
 - ``rates/treasury``   ``rates.curve_as_rows``: the curve the session sees (latest on or before;
                        ``curve_date`` and ``pre_snapshot`` added); ``None`` when none is stored
+- ``rates/treasury_10y``
+                       ``rates.tenor_history``: the 10-year par yield of each stored curve dated
+                       in the ``lookback`` sessions up to the session (``session_date``,
+                       ``rate_par``): a change over sessions, which ``rates/treasury`` (the one
+                       curve a session sees) cannot give
+- ``events/macro_release``
+                       every stored version of the release calendar known on or before the
+                       session (``known_from``; the reader keeps the latest version of a date)
 - ``volatility/ibkr_iv30``
                        ``volatility.ibkr_iv30``: IBKR's vols for the session plus ``lookback``
                        earlier sessions; ``None`` when the session has no rows (no IBKR run)
@@ -207,7 +215,7 @@ from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.macro.series import first_alfred_vintages, known_window, stored_vintages
 from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
 from algotrade.data.rates import TABLE as TREASURY
-from algotrade.data.rates import curve_as_rows
+from algotrade.data.rates import curve_as_rows, tenor_history
 from algotrade.data.reference import (
     UNIVERSE_TABLE,
     company_sectors,
@@ -224,7 +232,7 @@ from algotrade.data.statements.reading import TABLE as STATEMENTS
 from algotrade.data.statements.reading import statement_facts
 from algotrade.data.volatility import IBKR_IV30, VX_FUTURES, ibkr_iv30, known_vx, vx_futures
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import KNOWN_FROM
+from algotrade.storage.tables.schemas import KNOWN_FROM, MACRO_RELEASE_EVENTS
 
 
 class Loaded(Protocol):
@@ -598,6 +606,11 @@ class _Window:
         return self.frame.iloc[lo:hi]
 
 
+def _treasury_10y(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    frame = tenor_history(reader, "10Y", sessions_before(sessions[0], lookback), sessions[-1])
+    return _Window(frame, _days(frame["session_date"]), need_session=False)
+
+
 def _events_by_date(table: str) -> Loader:
     def load(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
         first = sessions_before(sessions[0], lookback)
@@ -722,6 +735,8 @@ INPUTS: Mapping[str, Loader] = {
     FILING_TEXT: _rolling_filing_text,
     "events/short_interest": _short_interest,
     TREASURY: _partition(curve_as_rows),
+    "rates/treasury_10y": _treasury_10y,
+    MACRO_RELEASE_EVENTS.name: _event_snapshots(MACRO_RELEASE_EVENTS.name),
     SHARES: _share_facts,
     SHARES_ACCEPTED: _share_facts_accepted,
     STATEMENTS: _statement_facts,

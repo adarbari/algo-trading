@@ -15,8 +15,9 @@ SIDES = (LONG, SHORT, LONG_SHORT)  # which names an outcome holds and in which d
 
 def identity_dict(value: Any) -> Any:
     """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome,
-    an unset ``hold_rank`` or ``tenor_days``, the default weighting, an empty ensemble, no canary
-    and the volatility target's keys when there is none: a document that named none of them hashes
+    an unset ``hold_rank`` or ``tenor_days``, the default weighting, an empty ensemble, no canary,
+    an unset position, gate, verdict profile, variant grid or position baselines (ADR 0088) and
+    the volatility target's keys when there is none: a document that named none of them hashes
     as it did before them, so no stored leg or run is recomputed by their arrival (ADR 0053
     amendments, ADR 0074)."""
     if isinstance(value, dict):
@@ -31,6 +32,8 @@ def identity_dict(value: Any) -> Any:
             and not (plain and k in ("weighting", "vol_field"))
             and not (k == "ensemble" and not v)
             and not (k == "canary" and v is None)
+            and not (k in ("position", "gate", "verdict_profile") and v is None)
+            and not (k in ("variant_grid", "position_baselines") and not v)
             and not (untargeted and k in ("vol_target", "vol_window", "vol_return_field"))
         }
     if isinstance(value, (list, tuple)):

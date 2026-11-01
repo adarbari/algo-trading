@@ -12,7 +12,7 @@ scope = ["src/algotrade/core/", "src/algotrade/config/"]
 [[responsibility]]
 id = "edge-documents"
 description = "Load and validate edge documents (ADR 0053 decision 1): config/site/edges/<id>/edge.toml with a user's config/users/<id>/edges/ over it (ADR 0015; a user document is a copy that `extends` an edge under its own id, a new edge, or only the `[follow]` bookmark (`since`, labels) of a site edge: never a shadow of a site edge, ADR 0053 amendments 2026-10-09 and 2026-10-10; an edge has one status of `STATUSES`, a user's own edge sets it (`USER_STATUSES`) with the server-written `[audit]`, and `follow.py` types the bookmark and the audit and reads the old `[follow]` states tolerantly (`LEGACY`); the Edge carries `site_frozen_from`, the split a copy's run is exploratory against, and `owner`, `site` or the user, from where its document lives, never a key; `load_all_edges` is every owner's edges for the evaluation CLI; `LEGACY_SITE_OWNERS` the older owner whose run records the site's reads), typed into frozen Edge dataclasses fail closed (outcome, schedule and event class, universe, status, the nine quality-bar answers), screeners, baselines and a named universe checked against the presets that exist, the winners study's parameters (WinnersStudySettings, config/site/studies/winners.toml, ED6), and docs/edges.md rendered from them; consumers call load_edges, never read the kind themselves"
-owner = ["src/algotrade/config/edges/*", "src/algotrade/config/edges/schedules/*"]
+owner = ["src/algotrade/config/edges/*", "src/algotrade/config/edges/schedules/*", "src/algotrade/config/edges/positions/*"]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "load", arg = "edges" }, { call = "names", arg = "edges" }, { call = "parse_edge" }]
 
@@ -37,7 +37,7 @@ detect = [
 
 [[responsibility]]
 id = "id-resolution"
-description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule, and the non-tradable MKT: market ids only through core.model.instruments.market_id (ADR 0047)"
+description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule, and the non-tradable MKT: market ids only through core.model.instruments.market_id (ADR 0047); the id order of a vendor listing row (previous snapshot's id carried and never upgraded, symbol_history, permaTicker, a unique unheld Massive FIGI, else none with a reason) is instrument_ids.assign_listing_ids's (ADR 0087)"
 owner = [
     "src/algotrade/core/model/instruments.py",
     "src/algotrade/data/resolver.py",
@@ -46,6 +46,13 @@ owner = [
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }, { string_prefix = "MKT:" }, { string_prefix = "IDX:" }, { string_prefix = "MACRO:" }]
+
+[[responsibility]]
+id = "position-templates"
+description = "Position templates (ADR 0088, design 2.4): config/site/positions/templates.toml typed fail closed into frozen Templates (legs: shares of a signed quantity, or an option chosen by a delta / atm / otm_pct strike rule, never a target yield; the collateral rule), checked against an edge's `position` and `position:<id>` baselines where the edge loads, and `position_of(outcome)`, the one function that names the templates an outcome holds (the `position` key, else the template of a return outcome's side); the read model, the trade contract and the engine call it, never re-derive a side to a position"
+owner = ["src/algotrade/config/edges/positions/templates.py"]
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
+detect = [{ call = "position_of" }, { call = "parse_templates" }]
 
 [[responsibility]]
 id = "screen-spec"

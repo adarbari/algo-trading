@@ -8,7 +8,7 @@
   padding-block: var(--space-2-5);
   padding-inline: var(--space-5);
   border-bottom: var(--border-width-thin) solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-bar);
 }
 
 .brand {

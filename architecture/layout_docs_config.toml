@@ -69,12 +69,16 @@ path = "config/site/filters"
 purpose = "filter definitions, one <surface>.toml per table, list or feed (ADR 0082): the surface's [[column]]s and its [[filter]]s (id, label, group, kind, field, options, bins, window_unit, guide), typed by src/algotrade/config/filters/definitions.py; ideas.toml, screener_results.toml, universe.toml, screeners.toml, edges.toml and edge_trades.toml are the Ideas list's, a screener's results table's, the Explore table's, the Screeners list's, the Edges list's and an edge's trade ledger's"
 
 [[config_dir]]
+path = "config/site/positions"
+purpose = "position templates (ADR 0088): templates.toml, the [[template]]s (id, legs of shares or options with their strike rule, collateral) an edge outcome names by `position`, typed by src/algotrade/config/edges/positions/templates.py"
+
+[[config_dir]]
 path = "config/site/ranking"
 purpose = "ranking parameters, one <name>.toml per ranked list: ideas.toml, the Ideas ranking rule (site_top 5, user_top 20, user_weight 3; owner decision 2026-10-22), typed by src/algotrade/config/ranking/ideas.py, read by services/ideas/rule.py"
 
 [[config_dir]]
 path = "config/site/series"
-purpose = "macro series by source family, one <family>.toml of [[series]] tables per family: cboe.toml (Cboe's static index files); read together with macro.toml by load_macro (ADR 0048), split out because macro.toml is at the 1000-line cap"
+purpose = "macro series by source family, one <family>.toml per family, [[series]] tables and/or [defaults] with a [[file]] per published file whose columns each become a series keyed <prefix>_<COLUMN> (ADR 0089, src/algotrade/config/site/macro.py): cboe.toml (Cboe's static index files), french.toml (Kenneth French's daily factor and industry files); read together with macro.toml by load_macro (ADR 0048), split out because macro.toml is at the 1000-line cap"
 
 [[config_dir]]
 path = "config/site/studies"
@@ -240,6 +244,10 @@ purpose = "the web UI: frontend architecture (layers, rules) and the design syst
 path = "docs/decisions"
 purpose = "the decision log: product-direction and policy decisions, by the owner or by a Fable agent on their behalf, append-only, log.md plus dated archives log-*.md (.claude/skills/review-and-release)"
 kind = "log"
+
+[[docs_dir]]
+path = "docs/options"
+purpose = "the options-setups backend plan: the design behind ADR 0088 (share and option setups as positions and rules), its entities, stores and build slices E0 to E16"
 
 [[docs_dir]]
 path = "docs/edges"

@@ -31,7 +31,12 @@ export default defineConfig({
     ? { grep: quarantinePattern ?? /$^/ }
     : quarantinePattern && { grepInvert: quarantinePattern }),
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
-  use: { baseURL: `http://127.0.0.1:${String(previewPort)}`, trace: 'retain-on-failure' },
+  // The scheme is pinned: with System the default theme, the runner's own preference would decide it.
+  use: {
+    baseURL: `http://127.0.0.1:${String(previewPort)}`,
+    colorScheme: 'dark',
+    trace: 'retain-on-failure',
+  },
   projects: [
     // Desktop: every spec but the phone one.
     {

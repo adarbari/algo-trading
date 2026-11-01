@@ -1,5 +1,7 @@
 # ADR 0081: Stored edge picks: what each site edge took, written nightly, read by the screener page
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): `@named` picks, status `gate_closed`, `pick_sides` / `pick_weights`, short and book picks shown (decision 4).
+
 **Status:** accepted (2026-10-23; the owner chose "store each edge's picks nightly and read them"
 over re-running the selection on every page request). Extends
 [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (the edge harness's pick rule) and

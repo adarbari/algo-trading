@@ -1,0 +1,630 @@
+"""``market_conditions@v1``: the market a setup enters, one ``MKT:US`` row per session (ADR 0088,
+design section 2.1): the VIX-family statistics, the dimension states D1-D11 as open ``_on``
+verdicts, the stand-aside verdict ``short_premium_allowed``, the 10-year yield change, the
+share of the universe about to report and the calendar distances. A **leaf** group: nothing in
+the headline regime reads it, so ``regime@v3`` and its fingerprint are untouched. Which of these
+a setup gates or slices on is the setup's own choice (a rule over catalogue features); none is
+shared by default.
+
+Inputs: ``macro/series`` VIX, VIX3M, VIX9D, VIX6M and VVIX (Cboe closes, ``pit = "lag"``,
+``release_lag_days = 1``: personal use only), the stored ``market_trend@v2`` and
+``regime_indicators@v1`` rows, ``rates/treasury_10y``, ``events/macro_release`` (FOMC) and
+``earnings_expected@v1``.
+
+Point in time. A VIX-family value is the latest observation known by the session; the shared
+observation date ``vix_obs_date`` is the VIX's, and a series that has no observation on that
+exact date is null (a ratio of two series is never taken across dates, never filled); the
+S&P 500 trend and realised volatility are read from the ``market_trend@v2`` row dated
+``vix_obs_date``, never the session's own, so the VIX and the index describe the same close.
+Stale is null: when the newest VIX observation is more than ``MAX_AGE_SESSIONS`` old every
+VIX-derived column is null. The rate inputs (``y10_chg_63d``, the inverted-curve verdict) are
+read at the session itself and never combined with the VIX-dated inputs in one verdict.
+Rolling windows count observations known by the session and are complete or
+null (``WINDOW`` observations of the VIX for the percentile, so the statistics are null for the
+first year of each series). No hysteresis: a verdict flips as its inputs do.
+
+Licence (ADR 0088 decision A): the VIX-family values stay ``personal``; every ``_on`` verdict,
+``short_premium_allowed`` and the calendar columns are our own aggregate and ``open``. A
+reason names the condition ("the VIX curve is inverted"), never a value.
+
+A verdict is null (UNKNOWN) when an input it needs is null; the Kleene helpers of
+``indicators`` (``compare``, ``either``, ``both``) combine them. The thresholds are ``Params``
+(``config/site/rollups.toml ["market_conditions@v1"]``); changing one is
+``market_conditions@v2``.
+"""
+
+from dataclasses import dataclass
+from datetime import date, timedelta
+
+import numpy as np
+import pandas as pd
+
+from algotrade.core.model.instruments import index_id, market_id
+from algotrade.core.time.calendar import (
+    is_last_session_of_week,
+    session_weekday,
+    sessions_ending,
+    sessions_to,
+)
+from algotrade.core.time.windows import windows
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
+from algotrade.features.rollups.corporate import earnings_expected
+from algotrade.features.rollups.market import indicators, trend
+from algotrade.features.rollups.market.indicators import Verdict, both, compare, either
+from algotrade.features.rollups.market.macro import MACRO
+from algotrade.features.rollups.market.observations import Series, as_series, fresh
+
+NAME = "market_conditions"
+VERSION = 1
+TREASURY_10Y = "rates/treasury_10y"  # the 10-year par yield of each stored curve, by curve date
+RELEASES = "events/macro_release"
+MAX_AGE_SESSIONS = 3  # the newest VIX observation older than this is stale
+WINDOW = 252  # observations of the percentile and median windows
+HIGH_WINDOW = 20  # observations of the recent VIX high
+CHANGE_OBS = 5  # observations of vix_chg_5d
+YIELD_SESSIONS = 63  # sessions of y10_chg_63d
+YIELD_TOLERANCE_DAYS = 5  # a curve this far before a target date stands in for it (holidays)
+SEASON_SESSIONS = 10  # an expected report this many sessions ahead or less is "in season"
+LOOKBACK = WINDOW + 20  # sessions of macro observations read
+VIX, VIX3M, VIX9D, VIX6M, VVIX = (index_id(k) for k in ("VIX", "VIX3M", "VIX9D", "VIX6M", "VVIX"))
+SERIES_IDS = (VIX, VIX3M, VIX9D, VIX6M, VVIX)
+FOMC_KEY = "FOMC"
+
+
+@dataclass(frozen=True)
+class Params:
+    """The verdict thresholds (research-options-regimes.md section 1, dimensions D1-D11)."""
+
+    contango_below: float = 0.95  # D2: VIX / VIX3M below this is contango
+    backwardation_at: float = 1.0  # D2: VIX / VIX3M at or above this is backwardation
+    kink_at: float = 1.0  # D2: VIX9D / VIX at or above this is a front kink
+    vrp_rich_at: float = 4.0  # D3: VIX minus realised vol, points, at or above: rich
+    vrp_cheap_below: float = 0.0  # D3: ... below this: cheap
+    vix_low_pct: float = 20.0  # D1: VIX percentile of its last 252 observations below: low
+    vix_high_pct: float = 80.0  # D1: ... above: high
+    recovery_off_high: float = 0.25  # D7: VIX at least this far below its 20-observation high
+    rate_shock_at: float = (
+        0.005  # D8: the 10-year yield up this much (decimal: 50 bp) in 63 sessions
+    )
+    vvix_high_above: float = 110.0  # D11: VVIX above this is high
+    stress_at: float = 35.0  # R-A: VIX at or above this is the STRESS band (as ``vix_band``)
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.vix_low_pct < self.vix_high_pct <= 100:
+            raise ValueError("need 0 <= vix_low_pct < vix_high_pct <= 100")
+        if not 0 < self.recovery_off_high < 1:
+            raise ValueError("recovery_off_high must be in (0, 1)")
+
+
+D = Params()
+_UNKNOWN = (
+    f"no VIX observation known by the session, or its newest is more than {MAX_AGE_SESSIONS} "
+    "sessions old (stale: nothing is read)"
+)
+_SERIES = tuple(f"series:{k}" for k in ("VIX", "VIX3M", "VIX9D", "VIX6M", "VVIX"))
+_RV = trend.GROUP.feature("spx_realised_vol_20d").key
+_SMA = trend.GROUP.feature("spx_close_vs_sma200").key
+_CURVE_ON = indicators.GROUP.feature("curve_10y3m_on").key
+_OWN_VIX, _OWN_VIX3M, _OWN9D, _OWN_VVIX, _OWN_PCT = (  # the verdicts read the stored values
+    f"{NAME}.{c}@v{VERSION}" for c in ("vix", "vix3m", "vix9d", "vvix", "vix_pct_252")
+)
+_OWN_HIGH, _OWN_MEDIAN, _OWN_CHG = (
+    f"{NAME}.{c}@v{VERSION}" for c in ("vix_high_20", "vix_median_252", "vix_chg_5d")
+)
+_YIELD = f"{TREASURY_10Y}.rate_par"
+_FOMC = f"{RELEASES}.release_date"
+_SEASON = earnings_expected.GROUP.feature("sessions_to_expected_report").key
+
+
+def _personal(
+    name: str, dtype: str, unit: str, description: str, null: str, inputs: tuple[str, ...],
+    valid_range: tuple[float, float] | None = None,
+) -> Feature:  # fmt: skip
+    return Feature(name, dtype, unit, description, null, valid_range=valid_range, inputs=inputs,
+                   licence="personal")  # fmt: skip
+
+
+def _open(
+    name: str, dtype: str, unit: str, description: str, null: str, inputs: tuple[str, ...],
+    valid_range: tuple[float, float] | None = None,
+) -> Feature:  # fmt: skip
+    return Feature(name, dtype, unit, description, null, valid_range=valid_range, inputs=inputs)
+
+
+_V1 = _SERIES[0]
+FEATURES = (
+    _personal(
+        "vix",
+        "float32",
+        "pct_points",
+        "Cboe VIX close on the shared observation date (20 = 20% implied vol)",
+        _UNKNOWN,
+        (_SERIES[0],),
+        (0, 150),
+    ),
+    _personal(
+        "vix3m",
+        "float32",
+        "pct_points",
+        "Cboe 3-month VIX close on the shared observation date",
+        f"{_UNKNOWN}; or VIX3M has no close on that date",
+        (_SERIES[0], _SERIES[1]),
+        (0, 150),
+    ),
+    _personal(
+        "vix9d",
+        "float32",
+        "pct_points",
+        "Cboe 9-day VIX close on the shared observation date (20 = 20% implied vol)",
+        f"{_UNKNOWN}; or VIX9D has no close on that date (it starts in 2011)",
+        (_SERIES[0], _SERIES[2]),
+        (0, 150),
+    ),
+    _personal(
+        "vix6m",
+        "float32",
+        "pct_points",
+        "Cboe 6-month VIX close on the shared observation date",
+        f"{_UNKNOWN}; or VIX6M has no close on that date (it starts in 2008)",
+        (_SERIES[0], _SERIES[3]),
+        (0, 150),
+    ),
+    _personal(
+        "vvix",
+        "float32",
+        "pct_points",
+        "Cboe VIX-of-VIX close on the shared observation date",
+        f"{_UNKNOWN}; or VVIX has no close on that date (it starts in 2006)",
+        (_SERIES[0], _SERIES[4]),
+        (0, 400),
+    ),
+    _personal(
+        "vix_obs_date",
+        "date",
+        "date",
+        "The observation date of the VIX close the other "
+        "VIX-family columns share (known from the session after it)",
+        _UNKNOWN,
+        (_V1,),
+    ),
+    _personal(
+        "vix_pct_252",
+        "float32",
+        "pct_points",
+        "Share of the last 252 VIX observations "
+        "at or below the latest, in percent (0 is the lowest of a year, 100 the highest)",
+        f"{_UNKNOWN}; or fewer than {WINDOW} observations are known",
+        (_V1,),
+        (0, 100),
+    ),
+    _personal(
+        "vix_median_252",
+        "float32",
+        "pct_points",
+        "Median of the last 252 VIX observations",
+        f"{_UNKNOWN}; or fewer than {WINDOW} observations are known",
+        (_V1,),
+        (0, 150),
+    ),
+    _personal(
+        "vix_high_20",
+        "float32",
+        "pct_points",
+        "Highest of the last 20 VIX observations",
+        f"{_UNKNOWN}; or fewer than {HIGH_WINDOW} observations are known",
+        (_V1,),
+        (0, 150),
+    ),
+    _personal(
+        "vix_chg_5d",
+        "float32",
+        "decimal",
+        "VIX over its value 5 observations earlier, minus 1 (0.25 is up 25%)",
+        f"{_UNKNOWN}; or fewer than {CHANGE_OBS + 1} observations are known",
+        (_V1,),
+        (-1, 20),
+    ),
+    _personal(
+        "backwardation_run",
+        "int",
+        "count",
+        "Consecutive VIX observations up to the "
+        "shared date with VIX / VIX3M at or above 1 (0: the curve is not inverted)",
+        f"{_UNKNOWN}; or VIX3M has no close on the shared date",
+        (_SERIES[0], _SERIES[1]),
+        (0, 5000),
+    ),
+    _personal(
+        "vvix_pct_252",
+        "float32",
+        "pct_points",
+        "Share of the last 252 VVIX observations at or below the latest, in percent",
+        f"{_UNKNOWN}; or VVIX has no close on the shared date or fewer than {WINDOW} observations",
+        (_SERIES[0], _SERIES[4]),
+        (0, 100),
+    ),
+    _open(
+        "y10_chg_63d",
+        "float32",
+        "decimal",
+        "The 10-year par Treasury yield minus its value "
+        "63 sessions earlier (0.005 is up 50 basis points)",
+        "the session or the date 63 sessions back has no stored curve within 5 days",
+        (_YIELD,),
+        (-0.1, 0.1),
+    ),
+    _open(
+        "vix_contango_on",
+        "bool",
+        "flag",
+        "The VIX curve slopes up: VIX is below 95% of VIX3M",
+        _UNKNOWN + "; or VIX3M has no close on the shared date",
+        (_OWN_VIX, _OWN_VIX3M),
+    ),
+    _open(
+        "vix_front_kink_on",
+        "bool",
+        "flag",
+        "Front-end stress: the 9-day VIX is at or above the 30-day VIX",
+        _UNKNOWN + "; or VIX9D has no close on the shared date",
+        (_OWN_VIX, _OWN9D),
+    ),
+    _open(
+        "index_vrp_rich_on",
+        "bool",
+        "flag",
+        "Index options price in at least 4 points more "
+        "movement than the S&P 500 delivered (VIX minus 20-session realised volatility)",
+        _UNKNOWN + f"; or {_RV} is null",
+        (_OWN_VIX, _RV),
+    ),
+    _open(
+        "index_vrp_cheap_on",
+        "bool",
+        "flag",
+        "Index options price in less movement than the "
+        "S&P 500 delivered (VIX below 20-session realised volatility)",
+        _UNKNOWN + f"; or {_RV} is null",
+        (_OWN_VIX, _RV),
+    ),
+    _open(
+        "post_spike_recovery_on",
+        "bool",
+        "flag",
+        "Volatility is falling back after a spike: "
+        "VIX at least 25% below its 20-observation high, the curve back in contango and VIX "
+        "still above its one-year median",
+        _UNKNOWN + "; or a rolling window is incomplete",
+        (_OWN_VIX, _OWN_VIX3M, _OWN_HIGH, _OWN_MEDIAN),
+    ),
+    _open(
+        "rate_shock_on",
+        "bool",
+        "flag",
+        "Interest rates are rising fast: the 10-year yield is "
+        "up 50 basis points or more in 63 sessions, or the yield curve has been inverted for "
+        "about a month",
+        "the yield change or the curve verdict is unknown and the other is not on",
+        (_YIELD, _CURVE_ON),
+    ),
+    _open(
+        "vvix_high_on",
+        "bool",
+        "flag",
+        "The market's volatility of volatility is high: VVIX above 110",
+        f"{_UNKNOWN}; or VVIX has no close on the shared date",
+        (_OWN_VVIX,),
+    ),
+    _open(
+        "vix_low_on",
+        "bool",
+        "flag",
+        "VIX is low for its year: below its 20th percentile of the last 252 observations",
+        f"{_UNKNOWN}; or the year is incomplete",
+        (_OWN_PCT,),
+    ),
+    _open(
+        "vix_high_on",
+        "bool",
+        "flag",
+        "VIX is high for its year: above its 80th percentile of the last 252 observations",
+        f"{_UNKNOWN}; or the year is incomplete",
+        (_OWN_PCT,),
+    ),
+    _open(
+        "short_premium_allowed",
+        "bool",
+        "flag",
+        "No stand-aside signal for option sellers: "
+        "the VIX curve is not inverted, index options are not cheap against realised "
+        "volatility outside a post-spike recovery, and the S&P 500 is not below its 200-day "
+        "mean with VIX rising in the stress band",
+        "a condition it needs is unknown and none of the others is on",
+        (_OWN_VIX, _OWN_VIX3M, _OWN_HIGH, _OWN_MEDIAN, _OWN_CHG, _RV, _SMA),
+    ),
+    _open(
+        "earnings_season_share",
+        "float32",
+        "decimal",
+        "Share of the names with a known "
+        "expected report date whose report is expected in the next 10 sessions (0.15 is "
+        "peak season)",
+        "no name has an expected report date for the session",
+        (_SEASON,),
+        (0, 1),
+    ),
+    _open(
+        "sessions_to_fomc",
+        "int",
+        "sessions",
+        "Sessions from the session to the next FOMC decision known by it (0: a decision today)",
+        "no future FOMC decision is known by the session",
+        (_FOMC,),
+        (0, 400),
+    ),
+    _open(
+        "fomc_cycle_week",
+        "int",
+        "count",
+        "Whole 7-day periods since the latest FOMC decision on or "
+        "before the session (0: the first 6 days)",
+        "no FOMC decision is known before the session",
+        (_FOMC,),
+        (0, 60),
+    ),
+    _open(
+        "in_opex_week",
+        "bool",
+        "flag",
+        "The session is one of the 5 sessions ending on the month's option expiry",
+        "never",
+        (),
+    ),
+    _open(
+        "weekday",
+        "int",
+        "count",
+        "The session's weekday: 0 Monday to 4 Friday",
+        "never",
+        (),
+        (0, 4),
+    ),
+    _open(
+        "last_before_weekend",
+        "bool",
+        "flag",
+        "The session is the last of its week (the next session falls in a later week)",
+        "never",
+        (),
+    ),
+)
+COLUMNS = column_types(FEATURES)
+
+
+def _none(value: Verdict) -> Verdict:
+    """Kleene not."""
+    return None if value is None else not value
+
+
+def _at(s: Series | None, day: pd.Timestamp) -> float:
+    """The value observed exactly on ``day`` (NaN: none: never an older one)."""
+    if s is None or day not in s.index:
+        return np.nan
+    return float(s.loc[day])
+
+
+def _window(s: Series | None, day: pd.Timestamp, n: int) -> np.ndarray | None:
+    """The last ``n`` observations up to ``day`` (``None``: fewer are known)."""
+    if s is None:
+        return None
+    known = s[s.index <= day]
+    return known.to_numpy(float)[-n:] if len(known) >= n else None
+
+
+def _rank(window: np.ndarray | None) -> float:
+    """The share of ``window`` at or below its last value, in percent."""
+    return np.nan if window is None else float((window <= window[-1]).mean() * 100.0)
+
+
+def _run(vix: Series, vix3m: Series | None, day: pd.Timestamp, at: float) -> float:
+    """Consecutive shared observations up to ``day`` with VIX / VIX3M at or above ``at``."""
+    if vix3m is None or day not in vix3m.index:
+        return np.nan
+    both_ = pd.concat({"a": vix, "b": vix3m}, axis=1, join="inner").sort_index()
+    ratio = (both_["a"] / both_["b"])[both_.index <= day].to_numpy(float)
+    count = 0
+    for r in ratio[::-1]:
+        if not r >= at:
+            break
+        count += 1
+    return float(count)
+
+
+type Readings = dict[str, float]  # the VIX-family numbers of one session, NaN where unknown
+_NUMBERS = (
+    "vix", "vix3m", "vix9d", "vix6m", "vvix", "vix_pct_252", "vix_median_252", "vix_high_20",
+    "vix_chg_5d", "backwardation_run", "vvix_pct_252",
+)  # fmt: skip
+STORED_NUMBERS = _NUMBERS
+
+
+def vix_readings(
+    series: dict[str, Series], session: date, p: Params
+) -> tuple[Readings, date | None]:
+    """The VIX-family numbers for ``session`` and the shared observation date (``None`` with
+    every number NaN when the VIX is missing or stale)."""
+    out = dict.fromkeys(_NUMBERS, np.nan)
+    vix = series.get(VIX)
+    if vix is None or not fresh(vix, session, MAX_AGE_SESSIONS):
+        return out, None
+    day = pd.Timestamp(vix.index[-1])
+    now, vvix = float(vix.iloc[-1]), series.get(VVIX)
+    year, recent, change = _window(vix, day, WINDOW), _window(vix, day, HIGH_WINDOW), None
+    change = _window(vix, day, CHANGE_OBS + 1)
+    out.update(
+        vix=now,
+        vix3m=_at(series.get(VIX3M), day),
+        vix9d=_at(series.get(VIX9D), day),
+        vix6m=_at(series.get(VIX6M), day),
+        vvix=_at(vvix, day),
+        vix_pct_252=_rank(year),
+        vix_median_252=np.nan if year is None else float(np.median(year)),
+        vix_high_20=np.nan if recent is None else float(recent.max()),
+        vix_chg_5d=np.nan if change is None else now / float(change[0]) - 1.0,
+        backwardation_run=_run(vix, series.get(VIX3M), day, p.backwardation_at),
+    )  # fmt: skip
+    if not np.isnan(out["vvix"]):
+        out["vvix_pct_252"] = _rank(_window(vvix, day, WINDOW))
+    return out, day.date()
+
+
+def y10_change(frame: pd.DataFrame | None, session: date) -> float:
+    """The 10-year par yield on or before ``session`` minus the one on or before the session
+    ``YIELD_SESSIONS`` earlier (each within ``YIELD_TOLERANCE_DAYS``); NaN when either is
+    missing."""
+    if frame is None or frame.empty:
+        return np.nan
+    days = pd.to_datetime(frame["session_date"])
+    rate = pd.Series(frame["rate_par"].to_numpy(float), index=pd.DatetimeIndex(days)).sort_index()
+
+    def near(day: date) -> float:
+        ts = pd.Timestamp(day)
+        before = rate[rate.index <= ts]
+        if before.empty or (ts - before.index[-1]).days > YIELD_TOLERANCE_DAYS:
+            return np.nan
+        return float(before.iloc[-1])
+
+    return near(session) - near(sessions_ending(session, YIELD_SESSIONS + 1)[0])
+
+
+def fomc_dates(releases: pd.DataFrame | None, session: date) -> list[date]:
+    """The FOMC decision dates known by ``session`` (the latest version of each date known by
+    it, a ``moved`` one dropped), ascending."""
+    if releases is None or releases.empty:
+        return []
+    rows = releases[releases["release_key"] == FOMC_KEY]
+    rows = rows[pd.to_datetime(rows["known_from"]).dt.date <= session]
+    if rows.empty:
+        return []
+    rows = rows.sort_values(["known_from", "session_date"], kind="stable")
+    latest = rows.drop_duplicates("release_date", keep="last")
+    live = latest[latest["status"] != "moved"]
+    return sorted(pd.to_datetime(live["release_date"]).dt.date.tolist())
+
+
+def calendar_columns(releases: pd.DataFrame | None, session: date) -> dict[str, object]:
+    """The calendar columns: FOMC distances from the dates known by ``session``, the opex week
+    and the weekday from the exchange calendar."""
+    known = fomc_dates(releases, session)
+    ahead = [d for d in known if d >= session]
+    behind = [d for d in known if d <= session]
+    opex = any(session in w for w in windows("opex_week", session - timedelta(10),
+                                             session + timedelta(10)))  # fmt: skip
+    return {
+        "sessions_to_fomc": sessions_to(session, ahead[0]) if ahead else np.nan,
+        "fomc_cycle_week": (session - behind[-1]).days // 7 if behind else np.nan,
+        "in_opex_week": opex,
+        "weekday": session_weekday(session),
+        "last_before_weekend": is_last_session_of_week(session),
+    }
+
+
+def season_share(expected: pd.DataFrame | None) -> float:
+    """Of the names with an expected report date, the share expecting one within
+    ``SEASON_SESSIONS`` sessions (NaN: no name has a date)."""
+    if expected is None or expected.empty:
+        return np.nan
+    ahead = pd.to_numeric(expected["sessions_to_expected_report"], errors="coerce").dropna()
+    return float((ahead <= SEASON_SESSIONS).mean()) if len(ahead) else np.nan
+
+
+def verdicts(v: Readings, y10: float, rv: float, sma: float,
+             curve_on: Verdict, p: Params) -> dict[str, Verdict]:  # fmt: skip
+    """Every ``_on`` verdict and ``short_premium_allowed`` from the session's readings."""
+    vix, vix3m = v["vix"], v["vix3m"]
+    ratio = vix / vix3m if vix3m else np.nan
+    vrp = vix - rv * 100.0 if not np.isnan(rv) else np.nan
+    high20 = v["vix_high_20"]
+    off_high = vix / high20 if high20 else np.nan
+    contango = compare(ratio, "<", p.contango_below)
+    back = compare(ratio, ">=", p.backwardation_at)
+    cheap = compare(vrp, "<", p.vrp_cheap_below)
+    recovery = both(compare(off_high, "<=", 1.0 - p.recovery_off_high),
+                    compare(ratio, "<", p.backwardation_at),
+                    compare(vix - v["vix_median_252"], ">", 0.0))  # fmt: skip
+    stress_fall = both(compare(sma, "<", 0.0), compare(v["vix_chg_5d"], ">", 0.0),
+                       compare(vix, ">=", p.stress_at))  # fmt: skip
+    stand_aside = either(back, both(cheap, _none(recovery)), stress_fall)
+    return {
+        "vix_contango_on": contango,
+        "vix_front_kink_on": compare(v["vix9d"] / vix if vix else np.nan, ">=", p.kink_at),
+        "index_vrp_rich_on": compare(vrp, ">=", p.vrp_rich_at),
+        "index_vrp_cheap_on": cheap,
+        "post_spike_recovery_on": recovery,
+        "rate_shock_on": either(compare(y10, ">=", p.rate_shock_at), curve_on),
+        "vvix_high_on": compare(v["vvix"], ">", p.vvix_high_above),
+        "vix_low_on": compare(v["vix_pct_252"], "<", p.vix_low_pct),
+        "vix_high_on": compare(v["vix_pct_252"], ">", p.vix_high_pct),
+        "short_premium_allowed": _none(stand_aside),
+    }
+
+
+def _row_on(frame: pd.DataFrame | None, column: str, day: date | None) -> float:
+    """``column`` of the row dated ``day`` (NaN: no such row, never another date's)."""
+    if frame is None or frame.empty or day is None or "session_date" not in frame.columns:
+        return np.nan
+    rows = frame[pd.to_datetime(frame["session_date"]).dt.date == day]
+    return _row(rows, column)
+
+
+def _row(frame: pd.DataFrame | None, column: str) -> float:
+    if frame is None or frame.empty or column not in frame.columns:
+        return np.nan
+    value = frame.iloc[-1][column]
+    return float(value) if pd.notna(value) else np.nan
+
+
+def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
+    series = as_series(inputs[MACRO])
+    v, obs_date = vix_readings(series, session, params)
+    trend_rows = inputs.get(trend.GROUP.table)
+    ind_rows = inputs.get(indicators.GROUP.table)
+    curve_on = _row(ind_rows, "curve_10y3m_on")
+    y10 = y10_change(inputs.get(TREASURY_10Y), session)
+    states = verdicts(v, y10, _row_on(trend_rows, "spx_realised_vol_20d", obs_date),
+                      _row_on(trend_rows, "spx_close_vs_sma200", obs_date),
+                      None if np.isnan(curve_on) else bool(curve_on), params)  # fmt: skip
+    row: dict[str, object] = {"instrument_id": market_id("US")}
+    row.update({k: v[k] for k in STORED_NUMBERS})
+    row["vix_obs_date"] = obs_date
+    row["y10_chg_63d"] = y10
+    row.update(states)
+    row["earnings_season_share"] = season_share(inputs.get(earnings_expected.GROUP.table))
+    row.update(calendar_columns(inputs.get(RELEASES), session))
+    return pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
+
+
+def _lookback(p: Params) -> int:
+    return 0
+
+
+GROUP = FeatureGroup(
+    NAME,
+    VERSION,
+    "The market a setup enters: VIX-family statistics, the open verdicts of the volatility, "
+    "term-structure, rate, event and earnings dimensions, the stand-aside verdict for option "
+    "sellers and the calendar distances; a leaf nothing in the headline regime reads",
+    (
+        Input(MACRO, lookback=LOOKBACK, required=False, ids=SERIES_IDS),
+        Input(trend.GROUP.table, lookback=MAX_AGE_SESSIONS, required=False),
+        Input(indicators.GROUP.table, lookback=_lookback, required=False),
+        Input(TREASURY_10Y, lookback=YIELD_SESSIONS + 5, required=False),
+        Input(RELEASES, lookback=0, required=False),
+        Input(earnings_expected.GROUP.table, lookback=_lookback, required=False),
+    ),
+    FEATURES,
+    compute,
+    params=D,
+    entity="market",
+)

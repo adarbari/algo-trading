@@ -18,7 +18,7 @@ import pandas as pd
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data.outcomes.reading import OUTCOME_FIELDS
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import OPTION_PNL
+from algotrade.storage.tables.schemas import FORWARD_RETURNS, OPTION_PNL, spec_for
 
 CHAIN_FIELDS = (
     "structure", "tenor_days", "entry_spot", "entry_mid", "entry_ask", "exit_mid", "exit_bid",
@@ -123,3 +123,21 @@ def read_chain(
     if frame is None:
         raise missing_chain(wanted or [date.min])
     return select_chain(frame, horizon, wanted, as_of)
+
+
+def licence_frames(
+    reader: StoreReader, chain: bool, sessions: Iterable[date], as_of: datetime | None = None
+) -> list[pd.DataFrame]:
+    """The ``licence`` column of the outcome table's (the chain grain's when ``chain``)
+    partitions over the span of the start ``sessions`` (one column read; the span is stricter
+    than the sessions alone). Empty for an outcome table that declares no such
+    column (``forward_returns@v2``: its rows are open). The harness folds them into the
+    trial's licence for every entry session it covers, a stored leg it reuses included."""
+    table = OPTION_PNL if chain else FORWARD_RETURNS
+    if spec_for(table).column("licence") is None:
+        return []
+    days = sorted(set(sessions))
+    if not days:
+        return []
+    found = reader.table_range(table, days[0], days[-1], as_of, columns=("licence",))
+    return [] if found is None else [found]

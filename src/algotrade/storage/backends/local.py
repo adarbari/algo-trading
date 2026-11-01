@@ -55,7 +55,7 @@ from algotrade.storage.backends.arrow import (
     to_frame,
 )
 from algotrade.storage.backends.history import HISTORY, HistoryCopy
-from algotrade.storage.backends.partial_reads import read_run_file
+from algotrade.storage.backends.partial_reads import read_run_file, row_groups_passing
 from algotrade.storage.backends.runs.local_index import (
     INDEX,
     SWAP_GRACE_S,
@@ -725,11 +725,17 @@ def _read_file(
     ``instruments`` in file order. ``ParquetFile`` + an Arrow filter, not ``read_table``: a
     third of the cost on a small file (no dataset discovery), the same columns and types. The
     value set takes the id column's type: an empty ``instruments`` selects no rows (as the
-    memory backend does) instead of raising on a null-typed set."""
+    memory backend does). A file of several row groups (a clustered table) decodes only the
+    groups whose ``instrument_id`` statistics can hold a wanted id (``row_groups_passing``; a
+    group without statistics is kept), then the exact filter below."""
     with pq.ParquetFile(path) as parquet:
         keep = None if columns is None else keep_columns(columns)
         present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
-        data = parquet.read(columns=present)
+        if instruments is not None and parquet.metadata.num_row_groups > 1:
+            wanted = [RowFilter("instrument_id", frozenset(instruments))]
+            data = parquet.read_row_groups(row_groups_passing(parquet, wanted), columns=present)
+        else:
+            data = parquet.read(columns=present)
     if instruments is None:
         return data
     ids = data.column("instrument_id")

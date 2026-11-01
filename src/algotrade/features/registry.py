@@ -80,7 +80,7 @@ from algotrade.features.rollups.market import (
     regime,
     trend,
 )
-from algotrade.features.rollups.market.edges import triggers
+from algotrade.features.rollups.market.edges import conditions, triggers
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,
@@ -220,6 +220,7 @@ GROUPS: dict[str, FeatureGroup] = {
             indicators.GROUP,
             regime.GROUP,
             triggers.GROUP,
+            conditions.GROUP,
             fund_reference.GROUP,
             cef_nav.GROUP,
             etf_flows.GROUP,

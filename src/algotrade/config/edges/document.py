@@ -115,7 +115,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
-from algotrade.config.edges import chain, named
+from algotrade.config.edges import named
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
 from algotrade.config.edges.identity import (
     LONG,
@@ -139,6 +139,10 @@ from algotrade.config.edges.portfolio import (
     vol_target_of,
     weighting_of,
 )
+from algotrade.config.edges.positions import chain, grid
+from algotrade.config.edges.positions.spec import KEYS as POSITION_KEYS
+from algotrade.config.edges.positions.spec import PositionSpec, gate_of, spec_of
+from algotrade.config.edges.positions.templates import POSITION_PREFIX, baseline_template
 from algotrade.config.edges.schedules.events import (
     EVENT_CLASSES,
     EVENT_SUBTYPES,
@@ -156,7 +160,7 @@ from algotrade.config.edges.schedules.markets import (
 )
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
-from algotrade.config.strategy.schema import Selection, parse_selection
+from algotrade.config.strategy.schema import Group, Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.core.time.windows import (
@@ -206,6 +210,7 @@ QUALITY_BAR = (
 )
 PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
 PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source", "leg")
+PROFILES = ("return", "tails")  # ``verdict_profile``: the judge's criteria (ADR 0088, E6b)
 STANDARD = "@standard"  # in ``baselines``: the site's standard decoys (``expand_baselines``)
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
@@ -213,13 +218,13 @@ KEYS = (
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
     "extends", "follow", "audit", "published", "family", "ensemble", "oos_class", "mechanism_kind",
     "plain_reason",
-    "asset_class",
+    "asset_class", "gate", "variant_grid", "verdict_profile",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
     "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field", "pair_field",
-    "vol_target", "vol_window", "vol_return_field", "canary",
+    "vol_target", "vol_window", "vol_return_field", "canary", *POSITION_KEYS,
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -267,6 +272,7 @@ class Outcome:
     vol_window: int = 60
     vol_return_field: str = "rollup.trend_stats@v2.ret_1d"
     canary: Canary | None = None  # a risk-off gate on the book (ADR 0074 amendment)
+    position: PositionSpec | None = None  # a template of config/site/positions (ADR 0088)
 
     @property
     def result_side(self) -> str:
@@ -380,6 +386,12 @@ class Edge:
     # ADR 0074: the screeners a book averages into ONE variant; the class of its haircut
     ensemble: tuple[str, ...] = ()
     oos_class: str | None = None
+    # ADR 0088: the setup's gate (a rule over market features, parsed with the rules), its
+    # variant grids, the verdict profile (None: the kind's) and the ``position:<id>`` baselines.
+    gate: Group | None = None
+    variant_grid: tuple[grid.Grid, ...] = ()
+    verdict_profile: str | None = None
+    position_baselines: tuple[str, ...] = ()
     # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
     # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
     site_frozen_from: date | None = None
@@ -455,6 +467,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     screeners = _ids(t, "screeners")
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
+    baselines, position_baselines = _baselines(t)
     chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
         check_base(held.kind, held_base, where)
@@ -480,7 +493,13 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         universe=universe,
         top_k=top_k,
         screeners=screeners,
-        baselines=_ids(t, "baselines", (STANDARD,)),
+        baselines=baselines,
+        position_baselines=position_baselines,
+        gate=gate_of(t),
+        variant_grid=grid.parse_grids(t),
+        verdict_profile=t.choice("verdict_profile", "", PROFILES)
+        if "verdict_profile" in doc
+        else None,
         status=status,
         sources=sources,
         quality_bar=_quality_bar(t, closed),
@@ -783,6 +802,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         vol_window=vol_window,
         vol_return_field=vol_return_field,
         canary=canary_of(o, kind),
+        position=spec_of(o, kind, offset),
     )
 
 
@@ -932,6 +952,15 @@ def expand_baselines(
     for b in baselines:
         out += [d for d in standard if d not in listed and d not in out] if b == STANDARD else [b]
     return tuple(out)
+
+
+def _baselines(t: Table) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(screener baselines, ``position:<template>`` baselines): a position baseline values the
+    setup's own picks with another template, a paired base and not a screener (G19)."""
+    raw = t.strings("baselines", ())
+    owned = tuple(baseline_template(s) for s in raw if s.startswith(POSITION_PREFIX))
+    rest = Table({"baselines": [s for s in raw if not s.startswith(POSITION_PREFIX)]}, t.where)
+    return _ids(rest, "baselines", (STANDARD,)), owned
 
 
 def _ids(t: Table, key: str, tokens: tuple[str, ...] = ()) -> tuple[str, ...]:

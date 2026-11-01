@@ -135,14 +135,16 @@ class SeriesRequest(FetchRequest):
     """One series to fetch. ``key`` is the registry key.
 
     ``code``: the vendor's code (the FRED series id). ``url``, ``date_column``,
-    ``value_column`` and ``parser`` describe a published file (``vendors/published/
-    parsers.py``). ``start`` / ``end`` bound ``obs_date`` (inclusive; ``None``: unbounded)."""
+    ``value_column`` and ``parser`` (and ``section``) describe a published file (``vendors/
+    published/parsers.py``). ``start`` / ``end`` bound ``obs_date`` (inclusive; ``None``:
+    unbounded)."""
 
     code: str = ""
     url: str = ""
     date_column: str = "date"
     value_column: str = "value"
     parser: str = "csv"
+    section: int = 1  # a file of several tables: which one (``french_zip``), counted from 1
     vintages: bool = True  # FRED: every vintage (ALFRED); False: the current values only
     start: date | None = None
     end: date | None = None

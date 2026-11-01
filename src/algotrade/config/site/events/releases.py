@@ -7,6 +7,12 @@ Each ``[[release]]`` is a ``key`` (its instrument id is ``MACRO:<key>``), a ``na
 sorted list of release dates, FOMC's, typed from the Fed's calendar), the release time of
 day ``time_et`` (New York) and its ``terms``. The loader checks shape and uniqueness; the
 dates, and the UTC instant of ``time_et``, are the ``macro-calendar`` task's.
+
+A ``dates`` release may declare, per calendar year, when that year's schedule became public
+(``[[release.year]]``: ``year``, ``known_from``, ``source`` URL, ``inferred``): the row's
+``known_from`` is then that day, not the day the task first saw the date (ADR 0050 decision 3,
+the ADR 0088 exception for FOMC history). Declared years must cover the dates exactly and
+``known_from`` must not fall after the year's first date.
 """
 
 import re
@@ -31,6 +37,7 @@ KEYS = (
     "nth_business_day",
     "exceptions",
     "dates",
+    "year",
     "time_et",
     "terms",
 )
@@ -47,12 +54,25 @@ class Documents(Protocol):
 
 
 @dataclass(frozen=True)
+class Publication:
+    """When one year's ``dates`` became public: ``known_from`` (the day the schedule was
+    published, or a conservative day after it when ``inferred``), and the ``source`` it is
+    read from."""
+
+    year: int
+    known_from: date
+    source: str
+    inferred: bool
+
+
+@dataclass(frozen=True)
 class MacroRelease:
     """One ``[[release]]``. ``release_id`` is set for ``source = "fred"``, ``nth_business_day``
     for ``source = "rule"``; ``time_et`` is ``"HH:MM"`` in America/New_York. ``exceptions``
     (a rule release only): ``"YYYY-MM"`` -> the date the rule misses that month (the actual
     release date, in that month). ``dates`` (``source = "dates"``): the release dates, sorted
-    and unique."""
+    and unique. ``publications``: the declared ``known_from`` per year of ``dates`` (empty: the
+    task's default)."""
 
     key: str
     name: str
@@ -63,6 +83,12 @@ class MacroRelease:
     nth_business_day: int | None = None
     exceptions: Mapping[str, date] = field(default_factory=dict)
     dates: tuple[date, ...] = ()
+    publications: tuple[Publication, ...] = ()
+
+    @property
+    def known_from_by_year(self) -> dict[int, date]:
+        """The declared ``known_from`` of each year in ``publications``."""
+        return {p.year: p.known_from for p in self.publications}
 
     @property
     def instrument_id(self) -> str:
@@ -131,6 +157,7 @@ def _release(doc: Mapping[str, Any], file: str, index: int) -> MacroRelease:
     if not _TIME.match(time_et):
         raise ConfigurationError(f"{where} time_et: expected HH:MM (New York), got {time_et!r}")
     release_id, nth = _source_keys(t, source)
+    dates = _dates(t, source)
     return MacroRelease(
         key=key,
         name=" ".join(t.text("name", "").split()),
@@ -140,7 +167,8 @@ def _release(doc: Mapping[str, Any], file: str, index: int) -> MacroRelease:
         release_id=release_id,
         nth_business_day=nth,
         exceptions=_exceptions(t, source),
-        dates=_dates(t, source),
+        dates=dates,
+        publications=_publications(t, source, dates),
     )
 
 
@@ -199,3 +227,46 @@ def _exceptions(t: Table, source: str) -> dict[str, date]:
         if day.strftime("%Y-%m") != month:
             raise ConfigurationError(f"{t.where} exceptions {month}: {day} is not in that month")
     return dict(sorted(raw.items()))
+
+
+def _publications(t: Table, source: str, dates: tuple[date, ...]) -> tuple[Publication, ...]:
+    """``[[release.year]]``: one per calendar year of ``dates`` (none at all is allowed),
+    ascending, each ``known_from`` on or before the year's first date."""
+    raw = t.raw("year")
+    if raw is None:
+        return ()
+    if source != "dates":
+        raise ConfigurationError(f"{t.where} year: not used by source = {source!r}")
+    if not isinstance(raw, list) or not all(isinstance(r, Mapping) for r in raw):
+        raise ConfigurationError(f"{t.where} year: expected a list of tables ([[release.year]])")
+    found = tuple(_publication(Table(r, f"{t.where} [[year]][{i}]")) for i, r in enumerate(raw))
+    years = [p.year for p in found]
+    if years != sorted(set(years)):
+        raise ConfigurationError(f"{t.where} year: years must be unique and ascending")
+    first = {y: min(d for d in dates if d.year == y) for y in {d.year for d in dates}}
+    if set(years) != set(first):
+        raise ConfigurationError(
+            f"{t.where} year: declared {sorted(years)} but dates cover {sorted(first)}"
+        )
+    for p in found:
+        if p.known_from > first[p.year]:
+            raise ConfigurationError(
+                f"{t.where} year {p.year}: known_from {p.known_from} is after the first date "
+                f"{first[p.year]}"
+            )
+    return found
+
+
+def _publication(t: Table) -> Publication:
+    t.only(("year", "known_from", "source", "inferred"))
+    for key in ("year", "known_from", "source", "inferred"):
+        _required(t, key)
+    known_from, inferred = t.raw("known_from"), t.raw("inferred")
+    if not isinstance(known_from, date) or isinstance(known_from, datetime):
+        raise ConfigurationError(f"{t.where} known_from: expected a date, got {known_from!r}")
+    if not isinstance(inferred, bool):
+        raise ConfigurationError(f"{t.where} inferred: expected true or false, got {inferred!r}")
+    source = " ".join(t.text("source", "").split())
+    if not source:
+        raise ConfigurationError(f"{t.where} source: expected a non-empty string")
+    return Publication(t.integer("year", 0, 1990), known_from, source, inferred)

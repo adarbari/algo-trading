@@ -90,6 +90,7 @@ def write_run(
     trials_counted: int = 1,
     oos: dict[str, Any] | None = None,
     screener_hashes: dict[str, str] | None = None,
+    evidence_licence: str | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T; ``trades``: its ledger (``results/edge_trades``, its
@@ -123,6 +124,8 @@ def write_run(
         stats["ledger_rows"] = len(trades)
     if screener_hashes is not None:  # runs from before the hashes were recorded have none
         stats["screener_hashes"] = screener_hashes
+    if evidence_licence is not None:  # runs from before the column read as open
+        stats["evidence_licence"] = evidence_licence
     if trigger is not None:  # runs from before the trigger was recorded have none
         stats["trigger"] = trigger
     record = RunRecord(run_id, f"edge-eval:{edge}:{owner}", END, at)

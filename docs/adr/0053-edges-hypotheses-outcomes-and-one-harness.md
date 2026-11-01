@@ -1,6 +1,6 @@
 # ADR 0053: Edges: hypotheses with evidence, an outcomes grain and one point-in-time harness
 
-**Status:** accepted, amended by [0083](0083-workflow-first-trader-site.md) (`results/edge_verdict` gains `basis_screener` and `basis_horizon`), amended by [0065](0065-verdict-basis-fixed-before-the-frozen-period.md) (the verdict's basis; and, amendment 2026-10-25, a post-publication basis for research setups) (2026-10-07; owner decisions 2026-10-06 and 2026-10-07; the plan and items
+**Status:** accepted, amended by [0088](0088-setups-as-positions-and-rules.md) (proposed 2026-11-01: outcome kinds, the trade contract, measures, the verdict profile, rules over features, `on_event:earnings_reaction`), amended by [0083](0083-workflow-first-trader-site.md) (`results/edge_verdict` gains `basis_screener` and `basis_horizon`), amended by [0065](0065-verdict-basis-fixed-before-the-frozen-period.md) (the verdict's basis; and, amendment 2026-10-25, a post-publication basis for research setups) (2026-10-07; owner decisions 2026-10-06 and 2026-10-07; the plan and items
 are [edges-plan.md](../edges-plan.md), the long form is the owner's PRD "Winners-Derived Screener:
 Product Requirements"; the open decisions below are the owner's before the item that needs each); amended by [0064](0064-edge-evidence-series-and-trade-ledger.md) (the optional `[published]` table of an edge document); amended 2026-10-22 (the stored verdict headline, `results/edge_verdict`).
 Extends [0005](0005-ingestion-is-the-only-writer.md) (ingestion writes the outcomes),
@@ -870,7 +870,7 @@ It is a second outcomes grain and a second outcome kind; the first is unchanged.
    bid in, ask out (the stored quote is symmetric around the mid). `cost_bps` is charged once on
    top. Unit `pnl`, so the trial statistics read the picks' mean P&L, never the win rate
    (`counts_wins` is false), as for `option_model_pnl`.
-7. **Document.** `[outcome] kind = "option_pnl"` (`config/edges/chain.py`): `structure` in
+7. **Document.** `[outcome] kind = "option_pnl"` (`config/edges/positions/chain.py`): `structure` in
    `atm_straddle_long | atm_straddle_short | delta_hedged_atm | delta_hedged_atm_short |
    put_short`, `tenor_days` (required, calendar days), `strike_delta` for `put_short` only,
    `benchmark = "none"`, no implied-vol field. An edge and its `[[variants]]` are all

@@ -29,6 +29,29 @@ def page(results: list[dict[str, object]], next_url: str | None = None) -> bytes
     return json.dumps(doc).encode()
 
 
+def inactive_record(
+    ticker: str,
+    delisted: str | None,
+    mic: str | None = "XNAS",
+    kind: str | None = "CS",
+    **more: str,
+) -> dict[str, object]:
+    """One record of the inactive list, in the recorded shape (``tests/fixtures/sources/massive/
+    inactive_tickers_slice.json``): the day is ``delisted`` (ISO date, as the last trading day), a
+    null ``mic`` or ``kind`` leaves the field out as Massive does, ``more`` adds fields."""
+    record: dict[str, object] = {
+        "active": False, "currency_name": "usd", "locale": "us", "market": "stocks",
+        "name": f"{ticker} Inc", "ticker": ticker, "last_updated_utc": "2025-01-16T17:32:57Z",
+    }  # fmt: skip
+    if delisted:
+        record["delisted_utc"] = f"{delisted}T05:00:00Z"
+    if mic:
+        record["primary_exchange"] = mic
+    if kind:
+        record["type"] = kind
+    return {**record, **more}
+
+
 def overview(
     ticker: str,
     description: str | None = None,

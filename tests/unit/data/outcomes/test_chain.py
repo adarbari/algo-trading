@@ -127,3 +127,17 @@ def test_a_complete_row_with_a_hedge_reason_has_its_hedged_columns_null() -> Non
     )  # fmt: skip
     writer = StoreWriter(MemoryBackend())
     _write(writer, S1, "r1", EARLY, [row])  # accepted: the unhedged P&L stands
+
+
+def test_a_table_without_a_licence_column_has_no_licence_frames() -> None:
+    """``forward_returns@v2`` and the chain grain declare no ``licence`` column yet (E4 adds it
+    to ``structure_pnl@v2``): their rows are open and nothing is read."""
+    from datetime import date  # noqa: PLC0415
+
+    from algotrade.data.outcomes import licence_frames  # noqa: PLC0415
+    from algotrade.storage.backends.memory import MemoryBackend  # noqa: PLC0415
+    from algotrade.storage.tables.readers import StoreReader  # noqa: PLC0415
+
+    reader = StoreReader(MemoryBackend())
+    for chain in (False, True):
+        assert licence_frames(reader, chain, [date(2026, 1, 5)]) == []
