@@ -7,7 +7,7 @@ import { calendarRoute } from './calendar-route';
 import { edgesBuilderRoutes, edgesRoute } from './edges-route';
 import { exploreRoute } from './explore-route';
 import { ideasRoute } from './ideas-route';
-import { traderRoute } from './layout-route';
+import { onboardingRoute, settingsRoute, traderRoute } from './layout-route';
 import { regimeRoute } from './regime-route';
 import { screenersRoutes } from './screeners-route';
 
@@ -21,4 +21,6 @@ export const traderRoutes = traderRoute.addChildren([
   exploreRoute,
   regimeRoute,
   calendarRoute,
+  settingsRoute,
+  onboardingRoute,
 ]);

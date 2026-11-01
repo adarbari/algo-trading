@@ -271,3 +271,61 @@ with your account, so each device you sign in on follows its own setting.
 """
 next = "Choose Light or Dark to keep one look on every device."
 see_also = ["theme", "theme_light", "theme_dark"]
+
+[[term]]
+id = "start_tab"
+term = "Start tab"
+short = "Which Ideas tab opens first, Stocks or Premium; a display choice saved to your account."
+body = """
+Ideas has two tabs: Stocks, for setups that buy or sell shares, and Premium, for setups that sell
+option premium. The start tab is the one the page opens on. Your choice is stored with your
+account, so it follows you to another device. It changes nothing but which tab you see first:
+both tabs list the same nightly results either way.
+"""
+next = "Pick Stocks or Premium in Settings."
+see_also = ["trade_mix", "watchlist"]
+
+[[term]]
+id = "trade_mix"
+term = "Mostly shares or mostly options"
+short = "The one sign-up question: it sets which Ideas tab opens first."
+body = """
+Asked once, the first time you sign in. Mostly shares opens Ideas on the Stocks tab; mostly
+options opens it on the Premium tab. It is not a profile: the site stores no account size,
+holdings or risk settings, and the answer changes nothing but the start tab. You can change it any
+time in Settings.
+"""
+see_also = ["start_tab"]
+
+[[term]]
+id = "watchlist"
+term = "Watchlist"
+short = "A list of up to 50 tickers you keep; it only filters what the site shows you."
+body = """
+The watchlist is a list of tickers, nothing else: no quantity, price paid or account. Adding a
+name never changes a result, a ranking or a statistic; the Ideas list can be narrowed to the names
+on it. It is stored with your account, so it follows you to another device. A name the
+instrument list later drops stays on your watchlist until you remove it, shown without a ticker.
+"""
+next = "Add names in Settings, or use the Watch button on a name's page."
+see_also = ["start_tab", "watch_toggle"]
+
+[[term]]
+id = "watch_toggle"
+term = "Watch button"
+short = "Adds a name to your watchlist, or takes it off."
+body = """
+The Watch button on an idea or a ticker page adds that name to your watchlist, and takes it off
+again when pressed a second time. Watching a name stores only its identity. Nothing else about it
+is saved, and nothing else on the page changes.
+"""
+see_also = ["watchlist"]
+
+[[term]]
+id = "country"
+term = "Country"
+short = "Where you confirmed you live at sign-up; the service is offered in the United States only."
+body = """
+The service is offered to residents of the United States only, which you confirmed when you signed
+up. It is shown here for reference and cannot be changed in Settings.
+"""

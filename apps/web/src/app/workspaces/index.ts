@@ -1,5 +1,6 @@
 /** Workspaces (TRADER, ADMIN), their sections and the role-gating seam. */
 export { canEnter, viewerGuard, workspaceGuard } from './guard';
+export { onboardingGuard, ONBOARDING_PATH } from './onboarding';
 export { lastWorkspace, rememberWorkspace } from './last-workspace';
 export {
   ADMIN,

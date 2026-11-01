@@ -20,6 +20,8 @@ import { mockApi } from './mock-api';
 /** Every section, and the Guide (its own layout, outside the workspaces) with its regime pages. */
 const ROUTES = [
   ...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)),
+  '/settings',
+  '/onboarding',
   '/guide',
   '/guide/start/how_the_app_thinks',
   '/guide/glossary',

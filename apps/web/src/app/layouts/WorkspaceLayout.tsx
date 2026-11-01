@@ -114,6 +114,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
                         </Stack>
                       ) : null}
                       <ThemeChoice />
+                      <TextLink href="/settings">Settings</TextLink>
                     </AccountMenu>
                   </Stack>
                 )

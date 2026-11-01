@@ -53,6 +53,13 @@ export async function mockViewer(page: Page, options: ViewerMockOptions = {}): P
       await route.fulfill({ json: { data: { appearance: { theme: 'system' } } } });
       return;
     }
+    // The sign-up answer (entities/trader-preferences): given, so no page is sent to /onboarding.
+    if (/query\s+TraderPreferences\b/.test(body?.query ?? '')) {
+      await route.fulfill({
+        json: { data: { traderPreferences: { defaultTab: 'stocks', watchlist: [] } } },
+      });
+      return;
+    }
     if (!/query\s+Viewer\b/.test(body?.query ?? '')) {
       await route.fallback();
       return;
