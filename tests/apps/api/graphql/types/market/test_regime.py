@@ -138,7 +138,7 @@ def test_the_market_values_by_name_are_checked_against_the_market_catalogue(grap
 def test_the_episodes_and_recessions_are_those_the_session_knew(graph: Graph) -> None:
     regime = _data(graph(EPISODES, {"date": END.isoformat()}))["regime"]
     episodes = {e["key"]: e for e in regime["episodes"]}
-    assert len(episodes) == 11 and "tariffs_2025" not in episodes  # its trough is in 2025
+    assert len(episodes) == 13 and "tariffs_2025" not in episodes  # its trough is in 2025
     assert episodes["covid_2020"]["name"] == "Covid crash, early 2020"
     assert episodes["covid_2020"]["recovered"] == "2020-08-18"
     assert episodes["hikes_2022"]["recovered"] is None  # regained only in 2024
@@ -146,7 +146,7 @@ def test_the_episodes_and_recessions_are_those_the_session_knew(graph: Graph) ->
     assert [r["start"] for r in regime["recessions"]][-1] == "2020-02-01"
     assert regime["recessions"][-1]["announcedEnd"] == "2021-07-19"
     old = _data(graph(EPISODES, {"date": PREVIOUS.isoformat()}))["regime"]
-    assert len(old["episodes"]) == 11  # the same on the previous session
+    assert len(old["episodes"]) == 13  # the same on the previous session
 
 
 def test_an_episodes_signal_timing_is_unknown_where_nothing_is_stored(graph: Graph) -> None:

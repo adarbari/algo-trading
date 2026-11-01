@@ -1,7 +1,8 @@
 """The skew and term-structure expression features of
 ``config/site/features/options/positioning.toml``
 (``skew_rr25``, ``term_ratio_30_90``, ``term_ratio_next_30``,
-``option_stock_volume_ratio``): values, the sign conventions
+``option_stock_volume_ratio``) and the earnings-move expression features of
+``earnings.toml`` (``earnings_move_ratio`` and its rich / cheap flags): values, the sign conventions
 (backwardation above 1, contango below), and nulls (UNKNOWN, never zero or infinity)."""
 
 import numpy as np
@@ -89,3 +90,39 @@ def test_option_stock_volume_ratio_is_contracts_times_100_over_shares(fs: Featur
     assert pd.isna(out["EQ:ZERO"]) and pd.isna(out["EQ:DARK"])  # never infinity; no chain
     assert pd.isna(out["EQ:NOVOL"])  # a chain without volume is unknown, not 0
     assert fs.expressions["option_stock_volume_ratio"].feature.licence == "open"
+
+
+def test_earnings_move_ratio_compares_the_implied_move_with_the_past_moves(
+    fs: FeatureSet,
+) -> None:
+    ids = ["EQ:RICH", "EQ:FAIR", "EQ:CHEAP", "EQ:TERM", "EQ:FEW", "EQ:NONE"]
+    move = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "implied_move": [0.12, 0.06, 0.04, 0.12, 0.12, np.nan],
+            "move_basis": ["EARNINGS"] * 3 + ["TERM"] + ["EARNINGS"] * 2,
+        }
+    )
+    past = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "abs_move_mean_8": [0.06, 0.06, 0.06, 0.06, 0.06, 0.06],
+            "abs_moves_counted": [8, 8, 8, 8, 3, 8],
+        }
+    )
+    frames = {
+        "rollups/instrument/implied_move@v1": move,
+        "rollups/instrument/earnings_reaction@v2": past,
+    }
+    names = ["earnings_move_ratio", "earnings_move_rich", "earnings_move_cheap"]
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    assert out.loc["EQ:RICH", "earnings_move_ratio"] == pytest.approx(2.0)
+    assert bool(out.loc["EQ:RICH", "earnings_move_rich"])
+    assert not bool(out.loc["EQ:FAIR", "earnings_move_rich"])
+    assert not bool(out.loc["EQ:FAIR", "earnings_move_cheap"])
+    assert bool(out.loc["EQ:CHEAP", "earnings_move_cheap"])
+    for unknown in ("EQ:TERM", "EQ:FEW", "EQ:NONE"):  # a term straddle, 3 reports, no straddle
+        assert pd.isna(out.loc[unknown, "earnings_move_ratio"])
+        assert pd.isna(out.loc[unknown, "earnings_move_rich"])

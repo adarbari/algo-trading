@@ -57,7 +57,7 @@ reaction session), net of 20 bps a round trip (an assumption for names trading $
 drift is held for weeks."""
 trigger_timing = """The reaction is two sessions, close(E-1) to close(E+1) (E: the report date); the
 anchor is E+1 and the decision session D = E+1, so the entry session is S = E+2
-(start_offset_sessions = 1). The event names are read at D from earnings_reaction@v1
+(start_offset_sessions = 1). The event names are read at D from earnings_reaction@v2
 (sessions_since_reaction = 0) and the volume ratio from earnings_gap_volume@v1 for the same report,
 never from a report known after D."""
 replication = """No published rule with numbers exists: the practitioner description (Kullamagi's episodic

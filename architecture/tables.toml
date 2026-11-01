@@ -241,7 +241,7 @@ name = "rollups/instrument/earnings_expected@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
-name = "rollups/instrument/earnings_reaction@v1"
+name = "rollups/instrument/earnings_reaction@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
@@ -782,7 +782,7 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
 
 # Superseded group tables (price_stats@v1, dividends@v1, fundamentals@v1, fundamentals@v2,
 # fundamentals@v3, financials@v1, financials@v2, growth_history@v1, income_statement@v1,
-# cash_flow@v1, balance_sheet@v1, iv_history@v1, liquidity_class@v1; ADR 0023 step 3) have no producer: they stay readable until
+# cash_flow@v1, balance_sheet@v1, iv_history@v1, liquidity_class@v1, earnings_reaction@v1; ADR 0023 step 3) have no producer: they stay readable until
 # `algotrade-ingest retire-features` (tasks/maintenance/retire_features.py) deletes them.
 # Every table may additionally be rewritten by the one-off id migration (ADR 0018):
 # apps/ingestion/algotrade_ingestion/tasks/maintenance/migrate_ids.py (an admin command, not a producer).
