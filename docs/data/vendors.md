@@ -95,13 +95,18 @@ Free static files on Cboe's CDN, no key; personal non-commercial use only (https
 never redistributed, so no vendor data is committed (the fixtures are made up in the real format).
 Verified 2026-10-17.
 
-- **Indices** `https://cdn.cboe.com/api/global/us_indices/daily_prices/<VIX9D|VIX6M|VVIX>_History.csv`
+- **Indices** `https://cdn.cboe.com/api/global/us_indices/daily_prices/<VIX9D|VIX6M|VVIX|SKEW|COR1M|COR3M|DSPX>_History.csv`
   (a 307 to `cdn-api.cboe.com`, followed): `DATE,OPEN,HIGH,LOW,CLOSE` (VVIX: `DATE,VVIX`, the close
   only), `MM/DD/YYYY`, VIX9D from 2011, VIX6M from 2008, VVIX from 2006. They are
-  `[[series]]` of `config/site/macro.toml` (`published` source, `csv` parser, `IDX:<KEY>` in
+  `[[series]]` of `config/site/series/cboe.toml` (read with `macro.toml`; `published` source, `csv` parser, `IDX:<KEY>` in
   `macro/series`): no code. **VIX and VIX3M stay FRED's** (`VIXCLS`, `VXVCLS`, the same closes). The
   index files' `Last-Modified` was Friday 21:31 UTC (17:31 New York) for Friday's close, so
   `release_lag_days = 1` errs late (vintage = observation + 1 day, ADR 0048).
+  **EB D4 (2026-11-01):** SKEW (close only, from 1990-01-02), COR1M and COR3M (OHLC, from 2006-01-03),
+  DSPX (close only, from 2014-06-19), measured the same day; same personal-use licence as the rest
+  of the Cboe files (no different terms found). Stored although no setup reads them yet (owner tenet).
+  **Strategy benchmarks, the rest (2026-11-01):** BFLY (from 1986-06-20), CMBO (1986-06-30), CLL (2008-08-26),
+  PPUT (1986-06-30), close only, same files and terms, beside PUT / WPUT / BXM / BXMD / CNDR (ADR 0084).
 - **VX futures** `https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv`,
   one file per contract holding its whole life: `Trade Date,Futures,Open,High,Low,Close,Settle,Change,
   Total Volume,EFP,Open Interest`. History starts with the 2013 contracts (403 for earlier ones). The
@@ -149,6 +154,26 @@ where it stopped; nightly fetches the session's bars and a corporate-action wind
 days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KIMpL`) are mapped to the universe's ACT style (`KIM$L`).
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
+
+### Massive delisted tickers (stored first; ADR 0087)
+
+`GET /v3/reference/tickers?market=stocks&active=false&limit=1000`, cursor-paged through
+`next_url` (key in the Authorization header only), is the free survivorship-free list of what
+the active universe lacks: 23,557 records in 24 pages on 2026-10-24. The `delisted-tickers`
+task (in no workflow) writes it as a full snapshot per session to `instruments/delisted_tickers`
+(`ticker`, `name`, `exchange` = the MIC, `vendor_type`, `security_type`, `cik`, `figi`,
+`share_class_figi`, `end_date`); `end_date` is Massive's `delisted_utc` day, the vendor's last
+trading day: identity (the id merge and the data-quality report), never a feature. Gaps, all
+measured on that pull: `type` is null before 2017 (28% of the rows; `security_type` is also null
+for the unmapped `INDEX`); FIGI covers 3-18% of the names delisted 2010-2018 and 37-78% from
+2019; CIK 79-97%; 505 rows (2%) carry no `delisted_utc`; no OTC names and no ETFs before 2016;
+a renamed company's old ticker is absent. Tickers go through `act_symbol` like the active list
+(`KIMpL` -> `KIM$L`, a lowercase `w` / `r` mark upper-cased); no two records collapsed on it.
+Request budget: the shared `massive` limiter (`[massive] min_interval_s` = 12.5 s, the free
+tier's 5 a minute), so about 24 requests = 5 minutes; a pull under `[quality]
+min_delisted_tickers` (10,000) rows FAILS. Stored first, merged into `instruments/listing_history`
+in the next PR (ADR 0087). The repo holds a 60-record slice,
+`tests/fixtures/sources/massive/inactive_tickers_slice.json`.
 
 ## Tiingo daily prices from 2018 (implemented, ADR 0050)
 

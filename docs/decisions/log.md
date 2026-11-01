@@ -770,3 +770,18 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: reversible; decided while the owner was asleep.
 - Reasoning: A follows the `regime@v3.label` precedent and flips by `Feature.licence` with no recompute; B keeps existing setups visible; C follows from a gate being a rule; D never lets a gate be judged on data its research read. Recorded in ADR 0088 (PR #984).
+## 2026-11-01 | Survivorship-free listing history (ADR 0087) | Delisting return convention; pull the data now
+- Question: (1) which return to book for a bankruptcy or listing-standards delisting with no OTC print; (2) renew Tiingo Power, or pull the data now?
+- Options: (1) (a) CRSP-style replacement -30% NYSE / AMEX, -55% NASDAQ, zero figure shown beside / (b) unmeasured / (c) zero. (2) renew one month / do not renew and wait / rush PR2 and backfill before 2026-11-09 / renew longer.
+- Decision: (1) (a): a delisted name a setup would have bought is penalised, never flat. (2) pull the data now: the Massive delisted list was started on 2026-11-01; the Tiingo bars for the new ids follow PR2's ids; the renewal is raised again only if PR2 and that pull cannot both finish before 2026-11-09.
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in chat, 2026-11-01: "Ideally anything delisted if the setup suggests buying them it is a problem we should pick any options which penalizes picking a delisted stock is traded" and "let us pull the data. we still have enough time to do it. Let us start the backfill immediately." Decisions 3 to 5 of the ADR stay open.
+
+## 2026-11-01 | Survivorship-free listing history (ADR 0087) | Decisions 3 to 5
+- Question: (3) hold the 2010 `outcomes` backfill and `evaluate-edges` until the backfills (PR3) are done; (4) ETF closures before 2016 stay out of the universe, disclosed; (5) Norgate Platinum ($630 a year, Personal Use licence)?
+- Options: as recommended in the ADR / the alternatives named there.
+- Decision: (3) hold, as recommended. (4) stay out, disclosed, as recommended. (5) not now, as recommended; at most an owner-only cross-check.
+- decided by: owner
+- status: final
+- Reasoning: the owner's word in chat, 2026-11-01: "3 to 5 aligned with your suggestion."

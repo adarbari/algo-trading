@@ -157,7 +157,7 @@ Sources: Aboody, Lehavy and Trueman (2010), Limited attention and the earnings a
 
 ### `rollup.earnings_gap_volume@v1.reaction_volume_ratio`
 
-**How to read it.** How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio.
+**How to read it.** How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v2.earnings_volume_ratio.
 
 **The criterion per intent**
 
@@ -167,7 +167,247 @@ Sources: Aboody, Lehavy and Trueman (2010), Limited attention and the earnings a
 
 **When the reading lies**
 
-- A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v1.reaction_excess_return for what the price did.
+- A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v2.reaction_excess_return for what the price did.
 - Null when a bar of the window or of the 20 sessions before it is missing, or the history is short. A hard 'gte' drops those names.
 
 Sources: Bernard and Thomas (1989), Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research
+
+### `rollup.earnings_reaction@v2.abs_move_mean_8`
+
+**How to read it.** How far the stock usually moves on a report, as a decimal (0.06 is 6%). It is the mean of its last eight reports, each the absolute move from the close before the report to the close after it. It is the raw move, not the excess over SPY, because it is what an option straddle on the report prices. Read it next to the implied move of the report ahead (feature.earnings_move_ratio does the division).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that usually move at least 5% on a report | `gte 0.05` | hard | - | illustrative: pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4 so a name with one report in history is not read as typical |
+
+**When the reading lies**
+
+- Eight reports is two years. A company that changed (a merger, a new business) is averaged with its old self, and one extreme report moves a mean of eight a lot. Compare rollup.earnings_reaction@v2.abs_move_median_8, and check rollup.earnings_reaction@v2.abs_moves_counted.
+- The window is two sessions, so it holds the move whether the company reported before the open or after the close. It can include other news of those days (a deal, an offering). It is a bigger number than the one-day gap of a report made before the open.
+- A report counts only once the session after it has closed, so the report ahead is never in it. A report whose window lacks a bar is left out, and one older than the history (about eight quarters) is not counted.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2); the realised half of implied against realised earnings moves
+
+### `rollup.earnings_reaction@v2.abs_move_median_8`
+
+**How to read it.** The typical move on a report, as a decimal (0.04 is 4%). It is the median of the last eight reports, each the absolute move from the close before the report to the close after it. Half of those reports moved the stock less than this and half more, so one outlier does not shift it the way it shifts rollup.earnings_reaction@v2.abs_move_mean_8.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose typical report move is small | `lte 0.03` | soft | 0.01 | illustrative: a name that rarely moves much on a report; no published cut-off |
+
+**When the reading lies**
+
+- A median far below the mean says a few big reports drive the average. A median near the mean says the name moves about the same every time. The straddle can look expensive against the median and fair against the mean.
+- Same window and the same exclusions as the mean: two sessions around the report, the report ahead never in it, a report without both bars left out. With few reports counted it is a rough number: check rollup.earnings_reaction@v2.abs_moves_counted.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
+
+### `rollup.earnings_reaction@v2.abs_moves_counted`
+
+**How to read it.** How many of the name's last eight reports stand behind its past-move numbers: reports whose two-session window has closed with both bars. 8 is a full history, 0 means no past report could be measured (a new listing, an ETF, a name whose reports are not in the calendar). It is a count, so 0 is a fact, not a gap.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| enough past reports to read the average | `gte 4` | hard | - | - |
+
+**When the reading lies**
+
+- The history behind it is about eight quarters of sessions, so a name listed or first covered recently has fewer; a name with a gap in its bars has fewer. Fewer than 4 makes the mean a poor guide: feature.earnings_move_ratio is null below 4.
+- It counts reports, not quarters: a report the calendar listed twice for one quarter (a moved date) counts once.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
+
+### `feature.earnings_move_ratio`
+
+**How to read it.** Whether the options price the next report above or below what the name usually does. It is the straddle's implied move (rollup.implied_move@v1.implied_move, a share of the price) divided by the mean move on the last eight reports (rollup.earnings_reaction@v2.abs_move_mean_8). 1.0 is a straddle at the usual move; 1.5 is 50% above it; 0.7 is 30% below.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| options pricing the report above the name's history | `gte 1.3` | soft | 0.1 | feature.earnings_move_rich uses 1.3; a threshold chosen for the setup, not a published one |
+
+**When the reading lies**
+
+- Only an expiry that covers the report is read. When rollup.implied_move@v1.move_basis is TERM (no report within 60 days, or none an expiry covers) the ratio is null, because a 30-day straddle is not a report price.
+- The straddle also pays for the days between today and the report and for the expiry after it, so a farther expiry reads richer; read rollup.implied_move@v1.move_dte. Past moves are two sessions around the report, the straddle spans to the expiry.
+- A mean of past moves is a poor forecast for a name that changed, and one outlier report inflates it (so the ratio reads cheap); compare rollup.earnings_reaction@v2.abs_move_median_8. Null below 4 past reports.
+
+Sources: Site convention; the implied against realised earnings move comparison used by options traders
+
+### `feature.earnings_move_rich`
+
+**How to read it.** True when the options price the next report at 1.3 times or more the name's mean move on its last eight reports (feature.earnings_move_ratio). The straddle is expensive against what the name has done. It is the setting for selling the report; it says the price is high, not that the sale pays.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a straddle priced rich against the name's past reports | `eq true` | hard | - | - |
+
+**When the reading lies**
+
+- A true flag compares two averages. It is not an edge: the realised move of this report can be anything. A rich straddle on a name about to change (a deal, a new product) is rich for a reason. Read the setup's backtested verdict before the flag.
+- Null, not false, when the ratio is null (no report-covering expiry, fewer than 4 past reports): a hard criterion drops those names.
+
+Sources: Site convention (config/site/features/options/earnings.toml)
+
+### `feature.earnings_move_cheap`
+
+**How to read it.** True when the options price the next report at 0.8 times or less the name's mean move on its last eight reports (feature.earnings_move_ratio). The straddle is cheap against what the name has done. It is the setting for buying the report, and a reason to leave the name out of a sale; it says the price is low, not that the buy pays.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a straddle priced cheap against the name's past reports | `eq true` | hard | - | - |
+
+**When the reading lies**
+
+- One outlier report in the last eight inflates the mean and makes the ratio read cheap; compare rollup.earnings_reaction@v2.abs_move_median_8.
+- Null, not false, when the ratio is null (no report-covering expiry, fewer than 4 past reports): a hard criterion drops those names. A false flag is not a rich one: the ratio between 0.8 and 1.3 is neither.
+
+Sources: Site convention (config/site/features/options/earnings.toml)
+
+### `rollup.earnings_reaction@v2.abs_move_mean_4`
+
+**How to read it.** The mean absolute move of the name's newest four reports, as a decimal (0.06 is 6%). Set it against rollup.earnings_reaction@v2.abs_move_mean_8: a recent mean above the two-year one says the reports have been getting bigger.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose recent reports moved at least 5% | `gte 0.05` | soft | 0.01 | illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4 |
+
+**When the reading lies**
+
+- Four reports is one year and the mean of four moves a lot with one outlier. Read rollup.earnings_reaction@v2.abs_moves_counted: below four it covers fewer reports.
+- Same window as the others: two sessions around the report, raw move, the report ahead never in it.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
+
+### `rollup.earnings_reaction@v2.abs_move_max_8`
+
+**How to read it.** The biggest absolute move among the name's last eight reports, as a decimal (0.25 is 25%). It is the worst surprise in two years, the size a seller of the report has already lost once.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with no report move above 15% in two years | `lte 0.15` | hard | - | illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4 |
+
+**When the reading lies**
+
+- One report, so it says nothing about how often. Compare rollup.earnings_reaction@v2.abs_move_median_8.
+- It can hold other news of the two sessions (a deal, an offering). Check the date before reading it as an earnings surprise.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
+
+### `rollup.earnings_reaction@v2.signed_move_mean_8`
+
+**How to read it.** The mean signed move of the name's last eight reports, as a decimal. Positive: it has tended to rise on reports. Negative: it has tended to fall. A fall counts as negative, so rises and falls offset.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that tended to rise on reports | `gt 0` | soft | 0.005 | illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4 |
+
+**When the reading lies**
+
+- Eight reports are a small sample and one large move sets the sign. Read it with rollup.earnings_reaction@v2.up_moves_8.
+- It describes the past, not the next report. A name that rose on most reports can still fall on the next.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
+
+### `rollup.earnings_reaction@v2.up_moves_8`
+
+**How to read it.** How many of the name's last eight reports moved the price up, from the close before the report to the close after it. Out of rollup.earnings_reaction@v2.abs_moves_counted, it shows whether the rises were the habit or the exception.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that rose on at least six of eight reports | `gte 6` | soft | 0.5 | illustrative: no published cut-off; pair with rollup.earnings_reaction@v2.abs_moves_counted gte 4 |
+
+**When the reading lies**
+
+- A count out of at most eight is a small sample: 6 of 8 is not strong evidence of a pattern.
+- Flat reports count as not up, so abs_moves_counted minus this is the falls and the flat ones.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
+
+### `rollup.earnings_reaction_session@v1.reaction_session_status`
+
+**How to read it.** Whether the newest report's reaction day is known and has come. OK: the day is known and today is on or after it. PENDING: the day is still ahead, as with a report made after the close today. UNKNOWN_TIME: the calendar gave no before-open or after-close time.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| only names whose reaction day is known | `eq "OK"` | hard | - | - |
+
+**When the reading lies**
+
+- UNKNOWN_TIME names are left out of the reaction-day schedule, never guessed, so a screen that needs the reaction day drops them. Check rollup.earnings_reaction_session@v1.reaction_report_time.
+- It describes the newest report only: a name stays OK for months until its next report.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
+
+### `rollup.earnings_reaction_session@v1.reaction_report_time`
+
+**How to read it.** When in the day the newest report was made: pre_market (before the open), after_hours (after the close) or unknown. It is the time on the earnings calendar row known by the session, not the time of a filing seen later.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| reports made before the open | `eq "pre_market"` | hard | - | - |
+
+**When the reading lies**
+
+- A calendar time is a vendor's, and it can be missing for small names. A report with no time reads unknown and has no reaction day.
+- An 8-K filing time (intraday) is known only after the event and is never used here.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
+
+### `rollup.earnings_reaction_session@v1.reaction_session_date`
+
+**How to read it.** The session the newest report moves the price on: the report's own session if made before the open, the next session if made after the close. It differs from rollup.earnings_reaction@v2.reaction_end_date, which is always the session after the report.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a reaction day that has already come | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null while the reaction day is ahead (PENDING) or the report time is unknown.
+- It names the reaction day, not the best day to trade: the move may be over by the open of the next session.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
+
+### `rollup.earnings_reaction_session@v1.sessions_since_reaction_session`
+
+**How to read it.** Exchange sessions from the newest report's reaction day up to the session. 0 means the session is the reaction day, 1 the day after. It is the count the reaction-day schedule reads to enter at the right session.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a report whose reaction day was in the last five sessions | `lte 5` | hard | - | illustrative: one trading week; no published cut-off |
+
+**When the reading lies**
+
+- Null while the reaction day is ahead or the report time is unknown, so a hard criterion drops those names.
+- A name keeps counting up until its next report, so a large value is a stale report, not a fresh one.
+
+Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)

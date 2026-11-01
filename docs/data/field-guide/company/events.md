@@ -182,6 +182,7 @@ Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
 |---|---|---|---|---|
 | no earnings in the next N sessions (short options) | `gt 10` | soft | 2, EVENT_RISK | N is the holding period; 25 for a 30-day short option held to expiry; or feature.earnings_before_expiry eq false |
 | earnings this week (an event play) | `lte 5` | hard | - | suggest rollup.earnings@v1.date_confirmed eq true when the date must be right |
+| earnings more than 10 sessions away | `gt 10` | hard | - | the next report is not close: nothing to gap the price before a short-dated trade is closed |
 
 **When the reading lies**
 
@@ -415,7 +416,7 @@ Sources: Site convention (ADR 0050)
 
 Sources: Hull, Options, Futures and Other Derivatives: early exercise of American calls before an ex-dividend date
 
-### `rollup.earnings_reaction@v1.reaction_excess_return`
+### `rollup.earnings_reaction@v2.reaction_excess_return`
 
 **How to read it.** How far the last report moved the stock beyond SPY: the close after the report over the close before it, minus SPY's return over the same two sessions, as a decimal (0.05 is +5% against the market). It is the surprise measure of the post-earnings-drift literature: the price reaction stands in for the surprise, so it needs no analyst estimates. Large and positive means the market read the report as good news.
 
@@ -423,17 +424,18 @@ Sources: Hull, Options, Futures and Other Derivatives: early exercise of America
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a big positive earnings reaction (post-earnings drift) | `gte 0.05` | hard | - | the small-cap drift screen uses 0.05; combine with rollup.earnings_reaction@v1.reaction_status eq OK and a market cap ceiling |
+| a big positive earnings reaction (post-earnings drift) | `gte 0.05` | hard | - | the small-cap drift screen uses 0.05; combine with rollup.earnings_reaction@v2.reaction_status eq OK and a market cap ceiling |
+| a stock that gapped up on its earnings | `gt 0.03` | soft | 0.01 | illustrative: a rise of more than 3% beyond SPY over the report's two sessions; no published cut-off |
 
 **When the reading lies**
 
 - The window is two sessions around the report, so it holds the move whether the company reported before the open or after the close, and it can include other news of those days (a deal, an offering, a guidance change). Read the headline before treating a +20% as an earnings surprise.
-- Null while the window is open (the session after the report has not closed), when a bar of the stock or of SPY is missing, or for a name with no report known: a hard criterion rejects those names. Pair it with rollup.earnings_reaction@v1.reaction_status eq OK to say why a name was left out.
-- The reaction is already in the price when you can first buy: the drift studies measure what follows it, over weeks, and it has faded in larger stocks; check feature.market_cap and rollup.earnings_reaction@v1.pre_event_adv_usd_20d.
+- Null while the window is open (the session after the report has not closed), when a bar of the stock or of SPY is missing, or for a name with no report known: a hard criterion rejects those names. Pair it with rollup.earnings_reaction@v2.reaction_status eq OK to say why a name was left out.
+- The reaction is already in the price when you can first buy: the drift studies measure what follows it, over weeks, and it has faded in larger stocks; check feature.market_cap and rollup.earnings_reaction@v2.pre_event_adv_usd_20d.
 
 Sources: Brandt, Kishore, Santa-Clara and Venkatachalam, Earnings Announcements are Full of Surprises (2008); Martineau, Rest in Peace Post-Earnings Announcement Drift (2022)
 
-### `rollup.earnings_reaction@v1.reaction_status`
+### `rollup.earnings_reaction@v2.reaction_status`
 
 **How to read it.** Whether the name's last report has a measured reaction: OK when the report's two-session window has closed with every bar it needs; NO_REPORT when no report is known by the session (a name with none, such as an ETF); INCOMPLETE when a report is known but its window is still open or a stock or SPY bar is missing.
 
@@ -445,12 +447,12 @@ Sources: Brandt, Kishore, Santa-Clara and Venkatachalam, Earnings Announcements 
 
 **When the reading lies**
 
-- OK says the numbers exist, not that the report is recent: rollup.earnings_reaction@v1.sessions_since_reaction counts the sessions since it, and a name stays OK for months until its next report. Add sessions_since_reaction when only fresh reactions matter.
+- OK says the numbers exist, not that the report is recent: rollup.earnings_reaction@v2.sessions_since_reaction counts the sessions since it, and a name stays OK for months until its next report. Add sessions_since_reaction when only fresh reactions matter.
 - A report that only an 8-K dated (not the earnings calendar) is missed until the earnings feed adds its results rows, so a recent reporter can read NO_REPORT.
 
-Sources: Site convention (docs/data/features.md, earnings_reaction@v1)
+Sources: Site convention (docs/data/features.md, earnings_reaction@v2)
 
-### `rollup.earnings_reaction@v1.pre_event_adv_usd_20d`
+### `rollup.earnings_reaction@v2.pre_event_adv_usd_20d`
 
 **How to read it.** The average dollars traded a day (close times volume) over the 20 sessions before the last report, the report's own volume left out. It is the liquidity you could count on before the news; after a big reaction the current volume is inflated for days and says little about what a later exit can trade.
 
@@ -484,7 +486,7 @@ Sources: Chordia, Goyal, Sadka, Sadka and Shivakumar, Liquidity and the Post-Ear
 
 Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007): the year-ago date as the expected one
 
-### `rollup.earnings_reaction@v1.earnings_volume_ratio`
+### `rollup.earnings_reaction@v2.earnings_volume_ratio`
 
 **How to read it.** How much trading a report usually draws: over the last four reports, the mean dollars traded a day in the report's two-session window divided by the 20-session average before it. 2 means the window trades twice the normal volume; 5 is a name whose reports are events. Frazzini and Lamont found the earnings announcement premium concentrated in the names whose reports draw the most volume.
 
@@ -532,7 +534,7 @@ Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 
 **When the reading lies**
 
-- It is the date the calendar lists. For a report after the close the market reacts the next day: rollup.earnings_reaction@v1.reaction_end_date gives the last session of the reaction window.
+- It is the date the calendar lists. For a report after the close the market reacts the next day: rollup.earnings_reaction@v2.reaction_end_date gives the last session of the reaction window.
 - Reports the calendar never stored are missing, so the date can be older than the real last report. Compare it with rollup.earnings@v1.last_earnings_date.
 
 Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
@@ -602,7 +604,7 @@ Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 
 - A small forecast makes the percentage huge: a result of 0.30 against a forecast of 0.06 is +400. It is null below a forecast of five cents; there rollup.earnings_surprise@v1.last_surprise_eps gives the size. Bound a threshold, for example below 100.
 - Most reports beat: the middle name beats by about 6. Compare a surprise with rollup.earnings_surprise@v1.surprise_median_4q, not with zero.
-- The price reaction can disagree with the surprise: a beat on weak guidance falls. Check rollup.earnings_reaction@v1.reaction_excess_return.
+- The price reaction can disagree with the surprise: a beat on weak guidance falls. Check rollup.earnings_reaction@v2.reaction_excess_return.
 - Null when there is no forecast, the forecast is below five cents in size, or the report is a SIGN_CONFLICT. A hard criterion rejects those names, so pair it with rollup.earnings_surprise@v1.surprise_status eq OK.
 
 Sources: Bernard and Thomas, Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium? (1989); Livnat and Mendenhall, Comparing the Post-Earnings Announcement Drift for Surprises Calculated from Analyst and Time Series Forecasts (2006)
@@ -887,7 +889,7 @@ Sources: Bali, Cakici and Whitelaw (2011), Maxing out: stocks as lotteries and t
 **When the reading lies**
 
 - Null when a close is missing in the 21, the history is shorter, or no earnings report is known for the name at all. The calendar cannot say it did not report. A name the calendar missed is null, not neutral.
-- It removes the report's own two returns, not the days around it. Drift after the window (rollup.earnings_reaction@v1.sessions_since_reaction) is still in.
+- It removes the report's own two returns, not the days around it. Drift after the window (rollup.earnings_reaction@v2.sessions_since_reaction) is still in.
 - Other news is still in the return: a deal, a downgrade, guidance outside the report. rollup.filing_activity@v1.filing_count_5d shows the last week's 8-Ks only.
 - Only reports known on the session are removed, so a past session is read as it was.
 

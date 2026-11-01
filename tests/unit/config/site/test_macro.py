@@ -2,6 +2,7 @@
 levels, third-party and Stooq series personal), ids come from kind and key, and every rule
 names the entry."""
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -9,8 +10,9 @@ import pytest
 from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.settings import load_macro
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.storage.configs.files import MemoryConfigStore
-from tests.unit.config.site.test_settings import site
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
+
+REPO = Path(__file__).resolve().parents[4]
 
 FRED = {
     "key": "UNRATE",
@@ -35,7 +37,8 @@ FILE = {
 }
 
 
-CBOE_STRATEGY_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR")
+CBOE_STRATEGY_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR", "BFLY", "CMBO", "CLL", "PPUT")
+CBOE_SETUP_INPUTS = ("SKEW", "COR1M", "COR3M", "DSPX")  # EB D4: skew, correlation, dispersion
 
 
 def load(*series: dict[str, Any]) -> MacroSettings:
@@ -43,7 +46,7 @@ def load(*series: dict[str, Any]) -> MacroSettings:
 
 
 def test_the_shipped_registry() -> None:
-    macro = MacroSettings.from_document(site("macro"))
+    macro = load_macro(FileConfigStore(REPO / "config", local=False))  # macro.toml + series/
     assert {"T10Y3M", "BAMLH0A0HYM2", "UNRATE", "NFCI", "RRPONTSYD"} <= macro.keys
     indices = {s.instrument_id: s.vendor_code for s in macro.series if s.kind == "index"}
     assert indices == {
@@ -55,6 +58,7 @@ def test_the_shipped_registry() -> None:
         "IDX:VIX6M": "VIX6M",
         "IDX:VVIX": "VVIX",
         **{f"IDX:{k}": k for k in CBOE_STRATEGY_INDEXES},  # ADR 0084: the replication targets
+        **{f"IDX:{k}": k for k in CBOE_SETUP_INPUTS},
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
     third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}
@@ -63,6 +67,7 @@ def test_the_shipped_registry() -> None:
         "VIX6M",
         "VVIX",
         *CBOE_STRATEGY_INDEXES,
+        *CBOE_SETUP_INPUTS,
     }  # Cboe's files: personal use, no redistribution
     cape = {k for k in macro.keys if k.startswith("CAPE_")}  # Barclays' file: personal use
     assert len(cape) == 26 and personal == third_party | cape
@@ -128,3 +133,31 @@ def test_the_document_shape_is_checked() -> None:
         MacroSettings.from_document({"indices": []})
     with pytest.raises(ConfigurationError, match=r"\[\[series\]\]"):
         MacroSettings.from_document({"series": {"key": "X"}})
+
+
+def test_the_family_files_of_series_join_the_one_registry() -> None:
+    store = MemoryConfigStore(
+        {
+            ("site", "settings", "macro"): {"series": [FRED]},
+            ("site", "series", "cboe"): {"series": [FILE]},
+        }
+    )
+    assert [s.key for s in load_macro(store).series] == ["UNRATE", "SPX"]
+    twice = MemoryConfigStore(
+        {
+            ("site", "settings", "macro"): {"series": [FILE]},
+            ("site", "series", "cboe"): {"series": [FILE]},
+        }
+    )
+    with pytest.raises(ConfigurationError, match=r"more than once: \['SPX'\]"):
+        load_macro(twice)
+
+
+def test_a_family_file_holds_only_series() -> None:
+    for doc in ({"serie": [FILE]}, {"series": [FILE], "macro": {"run_budget_s": 5}}):
+        store = MemoryConfigStore({("site", "series", "cboe"): doc})
+        with pytest.raises(ConfigurationError):
+            load_macro(store)
+    odd = MemoryConfigStore({("site", "series", "cboe"): {"series": {"key": "X"}}})
+    with pytest.raises(ConfigurationError, match="list of tables"):
+        load_macro(odd)
