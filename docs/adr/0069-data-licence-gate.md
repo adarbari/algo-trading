@@ -1,5 +1,7 @@
 # ADR 0069: The data-licence gate: every path that serves per-name values
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): decision 4: a gate's fields count toward the setup's licence; no site-wide open verdict column required.
+
 **Status:** accepted, amended by [0083](0083-workflow-first-trader-site.md) (Ideas drops a withheld pick instead of showing its name) (2026-10-16; design: the architect's review of the enforcement PR; the two
 owner defaults below are recommended and stand unless the owner changes them). Enforces
 [0028](0028-ibkr-enrichment-source.md) (licence tags) and [0064](0064-edge-evidence-series-and-trade-ledger.md)

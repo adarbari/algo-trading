@@ -1,5 +1,7 @@
 # ADR 0047: Market-entity features and non-tradable id namespaces
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): market fields may be named in per-name rules at the gate, entry, case and exit sites; licence per feature, a gate's fields count toward the setup's licence.
+
 **Status:** accepted (2026-10-06; architect design for the market regime track,
 [market-regime-plan.md](../market-regime-plan.md)). Amends [0009](0009-generic-instrument-model.md)
 (non-tradable id namespaces) and [0023](0023-feature-store.md) (`FeatureGroup.entity`, market

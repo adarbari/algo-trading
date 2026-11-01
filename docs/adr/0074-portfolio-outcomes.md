@@ -1,5 +1,7 @@
 # ADR 0074: Portfolio outcomes: a weighted book against a blended benchmark
 
+**Amended by [0088](0088-setups-as-positions-and-rules.md)** (proposed, 2026-11-01): the one book entity with a `slots` weighting, its series in the trade contract.
+
 **Status:** accepted (2026-10-18; orchestrator design call, pending owner confirmation, see
 `docs/decisions/log.md`). Amends [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (the
 outcome kinds and the harness), [0063](0063-incremental-edge-evaluation.md) (a leg's contents,

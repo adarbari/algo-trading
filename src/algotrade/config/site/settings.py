@@ -283,6 +283,7 @@ class SourcesSettings:
     min_calendar_future_dates: int = 1  # macro-calendar: dates each FRED release must list ahead
     max_filings_failed: float = 0.05  # filings: share of CIKs whose SEC fetch failed
     filings_backfill_per_night: int = 50  # filings: CIKs new to the universe read in full a night
+    min_delisted_tickers: int = 10_000  # delisted-tickers: a pull of fewer rows FAILs
     max_analyst_failed: float = 0.20  # analyst-snapshot: share of the night's calls that failed
     max_analyst_backlog: float = 0.25  # analyst-snapshot: share of in-scope names FMP was not asked
     coverage: tuple[CoverageRule, ...] = DEFAULT_COVERAGE  # [quality.coverage.<group>.<column>]
@@ -332,9 +333,8 @@ class SourcesSettings:
                 "max_verify_failures",
                 "max_ibkr_vol_rejected",
                 *("max_macro_stale_share", "min_calendar_future_dates", "max_filings_failed"),
-                "filings_backfill_per_night",
-                "max_analyst_failed",
-                "max_analyst_backlog",
+                *("filings_backfill_per_night", "min_delisted_tickers"),
+                *("max_analyst_failed", "max_analyst_backlog"),
                 "coverage",
             ],
         )
@@ -466,6 +466,7 @@ class SourcesSettings:
             filings_backfill_per_night=quality.integer(
                 "filings_backfill_per_night", d.filings_backfill_per_night, 0
             ),
+            min_delisted_tickers=quality.integer("min_delisted_tickers", d.min_delisted_tickers, 0),
             coverage=load_coverage(quality, d.coverage),
             ibkr=load_ibkr(_extra(vendors, "ibkr")),
             etf=EtfHoldingsSettings.from_table(_extra(vendors, "etf_holdings")),
