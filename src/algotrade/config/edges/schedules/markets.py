@@ -14,12 +14,14 @@ ON_MARKET = "on_market:"
 # decision session D from the ``MKT:US`` row, ``time_series/triggers.py``; kept equal by a
 # fitness test). D is the session the trigger was first known (``<= D``, never earlier).
 MARKET_TRIGGERS: Mapping[str, str] = {
-    "vix_spike": "market.market_triggers@v1.vix_spike_date",
+    "vix_spike": "market.market_triggers@v2.vix_spike_date",
+    "post_spike_contango": "market.market_triggers@v2.post_spike_contango_date",
 }
 # The stored field that is null when the reading behind the trigger is stale (UNKNOWN): the
 # placement counts such a session as not known, never as "no trigger".
 MARKET_TRIGGER_AGE: Mapping[str, str] = {
-    "vix_spike": "market.market_triggers@v1.sessions_since_vix_spike",
+    "vix_spike": "market.market_triggers@v2.sessions_since_vix_spike",
+    "post_spike_contango": "market.market_triggers@v2.sessions_since_post_spike_contango",
 }
 
 

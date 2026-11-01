@@ -635,9 +635,9 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "per regime-card macro series, its latest known observation, that vintage's date and kind and its first ALFRED vintage (provenance, personal licence on the personal series); read by services/read/regime/sources.py instead of the 2.9 M stored vintages, which it recomputes for a session with no row"
 
 [[table]]
-name = "rollups/market/market_triggers@v1"
+name = "rollups/market/market_triggers@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
-note = "ADR 0075: the VIX spike trigger of the on_market time-series edges, from FRED VIXCLS and VXVCLS (personal licence)"
+note = "ADR 0075, ADR 0088: the VIX spike and post-spike contango triggers of the on_market time-series edges, from FRED VIXCLS and VXVCLS (personal licence); v2 added the post-spike columns, v1 rows on the owner's store are superseded and read by nothing (backfill v2 with market-rollups --only market_triggers@v2 before the edges run, then delete v1 by hand)"
 
 [[table]]
 name = "rollups/market/market_conditions@v1"
