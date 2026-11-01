@@ -63,7 +63,7 @@ Sources: Realised volatility estimators: ADR 0021; Sinclair (2013), Volatility T
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| implied vol cheap against the year | `lte 0.3` | soft | 0.05 | this is the realised side only: the comparison is feature.iv_hv_spread-style, implied minus hv252 |
+| a calm realised year | `lte 0.3` | soft | 0.05 | this is the realised side only: pair it with an implied-vol field before calling options cheap or rich |
 
 **When the reading lies**
 
@@ -75,7 +75,7 @@ Sources: Realised volatility estimators: ADR 0021; Goyal and Saretto (2009), Cro
 
 ### `rollup.vol_long@v1.downside_dev_252`
 
-**How to read it.** The root mean square of the year's negative daily returns (a gain counts as zero), annualised: the volatility of the losses alone. 0.15 means the typical bad day, scaled to a year, is a 15% pace. A name that mostly jumps up reads low here while hv252 reads high. A name that mostly bleeds reads about the same on both.
+**How to read it.** The root mean square of the year's negative daily returns (a gain counts as zero), annualised: the volatility of the losses alone. 0.15 means the typical bad day, scaled to a year, is a 15% pace. A name that mostly jumps up reads low here while hv252 reads high. A symmetric name reads about 0.7 times hv252, and a steady bleed reads high here while hv252 stays low.
 
 **The criterion per intent**
 

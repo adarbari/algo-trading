@@ -18,7 +18,6 @@ is null (UNKNOWN), never a shorter window.
 
 from datetime import date
 
-import numpy as np
 import pandas as pd
 
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
@@ -60,21 +59,13 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-def downside_deviation(close: Matrix, window: int) -> Matrix:
-    """Per column: sqrt(mean(min(r, 0)^2)) x sqrt(periods) over the last ``window`` log returns
-    of ``close`` (NaN: a gap in the window or too few rows)."""
-    if len(close) < window + 1:
-        return np.full(close.shape[1], np.nan)
-    returns = np.diff(np.log(close[-window - 1 :]), axis=0)
-    losses = np.minimum(returns, 0.0)
-    return np.sqrt((losses**2).mean(axis=0) * PERIODS_PER_YEAR)
-
-
 def stats(px: Panel) -> dict[str, Matrix]:
     out: dict[str, Matrix] = {}
     for n in HV_WINDOWS:
         out[f"hv{n}"] = realized_vol.close_to_close(px.close[-n - 1 :], n, PERIODS_PER_YEAR)[-1]
-    out[f"downside_dev_{DOWNSIDE_WINDOW}"] = downside_deviation(px.close, DOWNSIDE_WINDOW)
+    out[f"downside_dev_{DOWNSIDE_WINDOW}"] = realized_vol.downside_deviation(
+        px.close[-DOWNSIDE_WINDOW - 1 :], DOWNSIDE_WINDOW, PERIODS_PER_YEAR
+    )[-1]
     return out
 
 

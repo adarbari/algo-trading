@@ -520,17 +520,17 @@ sources = [
   "Goyal and Saretto (2009), Cross-section of option returns and volatility, JFE: implied against historical volatility",
 ]
 [[field.use]]
-for = "implied vol cheap against the year"
+for = "a calm realised year"
 op = "lte"
 value = 0.30
 mode = "soft"
 tolerance = 0.05
-note = "this is the realised side only: the comparison is feature.iv_hv_spread-style, implied minus hv252"
+note = "this is the realised side only: pair it with an implied-vol field before calling options cheap or rich"
 
 [[field]]
 name = "rollup.vol_long@v1.downside_dev_252"
 theme = "volatility"
-reads = "The root mean square of the year's negative daily returns (a gain counts as zero), annualised: the volatility of the losses alone. 0.15 means the typical bad day, scaled to a year, is a 15% pace. A name that mostly jumps up reads low here while hv252 reads high. A name that mostly bleeds reads about the same on both."
+reads = "The root mean square of the year's negative daily returns (a gain counts as zero), annualised: the volatility of the losses alone. 0.15 means the typical bad day, scaled to a year, is a 15% pace. A name that mostly jumps up reads low here while hv252 reads high. A symmetric name reads about 0.7 times hv252, and a steady bleed reads high here while hv252 stays low."
 caveats = [
   "A year with one crash day is dominated by that day; compare with rollup.vol_long@v1.hv252 before reading a high value as steady weakness.",
   "It treats every gain as zero, so it cannot tell a flat name from a rising one: pair it with rollup.trend_stats@v2.ret_252d for the direction.",
