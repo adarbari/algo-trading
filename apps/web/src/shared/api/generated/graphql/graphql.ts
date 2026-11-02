@@ -632,6 +632,13 @@ export type InstrumentHistoryQueryVariables = Exact<{
 
 export type InstrumentHistoryQuery = { instrument: { instrumentId: string, series: { names: Array<string>, points: Array<{ session: string, values: Array<unknown> }> } } | null };
 
+export type InstrumentPickedByQueryVariables = Exact<{
+  key: string;
+}>;
+
+
+export type InstrumentPickedByQuery = { instrument: { instrumentId: string, pickedBy: Array<{ edgeId: string, edgeName: string, tab: string, level: string, place: number }> } | null };
+
 export type LlmUsageQueryVariables = Exact<{
   recent: number;
 }>;
@@ -3694,6 +3701,20 @@ export const InstrumentHistoryDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<InstrumentHistoryQuery, InstrumentHistoryQueryVariables>;
+export const InstrumentPickedByDocument = new TypedDocumentString(`
+    query InstrumentPickedBy($key: String!) {
+  instrument(key: $key) {
+    instrumentId
+    pickedBy {
+      edgeId
+      edgeName
+      tab
+      level
+      place
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<InstrumentPickedByQuery, InstrumentPickedByQueryVariables>;
 export const LlmUsageDocument = new TypedDocumentString(`
     query LlmUsage($recent: Int!) {
   llmUsage(recent: $recent) {

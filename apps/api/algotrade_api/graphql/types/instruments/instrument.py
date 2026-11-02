@@ -12,6 +12,7 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS, DEFAULT_MONTHS
+from algotrade.services.read.ideas import inverse
 from algotrade.services.read.instruments import identity
 from algotrade.services.read.instruments.prices import Adjustment
 from algotrade.services.read.options.grid import load_option_grid
@@ -28,6 +29,25 @@ from algotrade_api.graphql.types.options.grid import OptionGridResult, result_of
 
 if TYPE_CHECKING:  # the screens' types name Instrument: resolved lazily (no import cycle)
     from algotrade_api.graphql.types.screens.hit import ScreenerHit
+
+
+@strawberry.type(
+    description="A qualifying setup that picked the instrument: its own `place` among that "
+    "setup's picks (not its rank in the tab's capped Ideas list) in the `tab`, and the `level` "
+    "(verdict) it qualifies at"
+)
+class PickingSetup:
+    edge_id: str
+    edge_name: str
+    tab: str
+    level: str
+    place: int
+
+    @classmethod
+    def of(cls, d: inverse.InstrumentSetup) -> Self:
+        return cls(
+            edge_id=d.edge_id, edge_name=d.edge_name, tab=d.tab, level=d.level, place=d.place
+        )
 
 
 @strawberry.type(
@@ -164,3 +184,12 @@ class Instrument:
 
         found = await self.ctx.loaders.screener_hits.load((self.instrument_id,))
         return [ScreenerHit.of(h, self.ctx) for h in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The setups with a stored verdict of Works or Promising that picked it in "
+        "the session (the picks Ideas is built from, same licence filter, each at the setup's "
+        "own place: the tab's cap of 15 is not applied), strongest first; empty: none did"
+    )
+    async def picked_by(self, info: Info) -> list[PickingSetup]:
+        found = await off_loop(inverse.load_setups_of_instrument, self.ctx, self.instrument_id)
+        return [PickingSetup.of(d) for d in found]

@@ -1,8 +1,4 @@
-# L3 site setting: the Guide glossary, reading a screen's result (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One [[term]]
-# each: id, term, short (one sentence), body, see_also. Typed by
-# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
-
-# ------------------------------------------------------------------------ reading a screen's result
+# L3 site setting: the Guide glossary, reading a screen's result (ADR 0051, docs/ui/guide.md section 3, "Glossary"). One # ------------------------------------------------------------------------ reading a screen's result
 
 [[term]]
 id = "near_miss"
@@ -504,3 +500,45 @@ The rank is the average position among the stocks that have a value. It is scale
 
 A percentile is null for an ETF, fund or trust, because only stocks count as the group. It is also null for a name with no sector or industry at that level, and for a group too small to rank (a site setting for each level). A name whose own value is missing is null too, and it is not counted in its group. On a partial trading day, when too few stocks have a price, every price percentile is null. A sector or industry percentile says how the name stands against its peers. That can differ a lot from its rank against the whole universe.
 """
+
+# ---------------------------------------------------------------------------- the ticker page (Evening Desk V5)
+
+[[term]]
+id = "ticker_where_it_stands"
+term = "Where a ticker stands"
+short = "What the site's stored data says about this ticker tonight: the setups that picked it, checks to make, and the next report."
+body = """
+This is a summary of stored facts, not a verdict and not advice. The first card lists the published setups that picked the ticker tonight. The second lists checks that can rule a name out. The third gives the next earnings report and the move the options market prices for it. Every value is for the session the page shows. A value the session does not have says so and gives the reason.
+"""
+next = "Open a setup to read its rules and how it has done before you rely on a pick."
+see_also = ["ticker_picked_by", "ticker_avoid_checks", "ticker_next_report"]
+
+[[term]]
+id = "ticker_picked_by"
+term = "Setups that picked it"
+short = "The published setups, with a stored verdict of Works or Promising, whose rules chose this ticker tonight."
+body = """
+Each line is one setup, its verdict and the place the ticker holds in that setup's list. The list is the same one Ideas is built from. A setup with no verdict of Works or Promising does not appear, so a ticker can match a setup's rules and still show none here. None tonight is a normal answer: it means no setup with evidence picked the name. The page does not then call it a bad stock.
+"""
+next = "Read the setup's page: the rules, how it has done and when it fails."
+see_also = ["verdict", "edge_definition", "ticker_where_it_stands"]
+
+[[term]]
+id = "ticker_avoid_checks"
+term = "Avoid-list checks"
+short = "Stored facts that make traders look twice before taking a name: a late filing, a lock-up expiry, new shares and short interest."
+body = """
+Each row is one stored fact with its value for the session. A late-filing notice means the company missed its report deadline. A lock-up expiry is the date early holders may sell after an IPO. A rising share count means existing holders own a smaller share of the company. Days to cover is the short position over the average daily volume, a measure of crowding. A row reads None when the site found nothing on file. It reads Unknown, with the reason, when the data for the session is missing. The rows are facts, not a verdict.
+"""
+next = "Open the filing or the report behind a row you care about before you rely on a pick."
+see_also = ["ticker_where_it_stands", "unknown"]
+
+[[term]]
+id = "ticker_next_report"
+term = "Report ahead and its priced move"
+short = "The next earnings report date and the move the options market prices for it."
+body = """
+The date is the next report the site knows of for the session. The priced move is the cost of a straddle at the expiry that covers the report, divided by the share price. It is the market's guess of the size of the move, in either direction. It is not a forecast of the direction, and it is not a stored result of past reports.
+"""
+next = "Compare the priced move with the size of the setup's stop before a report falls inside a hold."
+see_also = ["ticker_where_it_stands", "ticker_picked_by"]

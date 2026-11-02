@@ -12,6 +12,7 @@ export {
   useInstrumentPrices,
 } from './api/hooks';
 export { useInstrumentFacts } from './api/facts';
+export { usePickedBy, type PickingSetup } from './api/picked-by';
 export {
   chunks,
   historyOf,
