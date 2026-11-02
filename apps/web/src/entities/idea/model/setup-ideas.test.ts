@@ -24,6 +24,7 @@ const response: SetupIdeasResponse = {
         picked: 2,
         shown: 2,
         unknown,
+        setupState: null,
       },
     ],
     ideas: [

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from algotrade.services.ideas.setup_rule import setup_key
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.evaluation.positions import state
 from algotrade.services.read.ideas.of_setup import SetupPickSet, load_pick_set
 from algotrade.services.read.ideas.setups import load_session_setups
 
@@ -40,3 +41,13 @@ def load_setups_of_instrument(ctx: ReadContext, instrument_id: str) -> tuple[Ins
                     InstrumentSetup(setup.edge.id, setup.edge.name, setup.tab, verdict, p.place)
                 )
     return tuple(out)
+
+
+def load_state_of_setup(ctx: ReadContext, edge_id: str) -> state.SetupState | None:
+    """The state (ADR 0088 decision 16) of the qualifying setup ``edge_id`` at ``ctx.session``,
+    from the edge the tab's session setups already hold (read once per request, licence-filtered
+    like Ideas); None: the setup is not one the tab lists."""
+    found = next(
+        (s.edge for s in load_session_setups(ctx).qualifying if s.edge.id == edge_id), None
+    )
+    return None if found is None else state.setup_state_at(ctx, found)

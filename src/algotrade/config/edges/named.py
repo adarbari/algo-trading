@@ -20,6 +20,9 @@ from algotrade.core.time.windows import WINDOW_GAPS, window_length
 OUT_OF_WINDOW = "out_of_window"  # the ``base`` of a time-series edge
 DELTA_EQUIVALENT = "delta_equivalent"  # the ``base`` of a named option sleeve (ADR 0088)
 TIME_SERIES = (OUT_OF_WINDOW, DELTA_EQUIVALENT)  # the bases the time-series harness measures
+# A sleeve's every-session ladder: one entry every session, holds overlapping (X1's sibling; a
+# schedule, never a variant key, backend-plan G18); ``every_session`` stays spaced by the hold.
+LADDER = "every_session_ladder"
 SYMBOL_FIELD = "instrument.symbol"
 MAX_NAMED = 10
 
@@ -123,7 +126,13 @@ def check_time_series(
     """``base = "out_of_window"`` needs a ``calendar`` or ``on_market`` (``market``) schedule and
     a named universe; an ``on_market`` schedule needs that base (ADR 0075: a market trigger's
     base is not the cross-section). ``base = "delta_equivalent"`` needs a named universe and a
-    plain or calendar ``schedule`` (its entries come from the schedule, not from events)."""
+    plain or calendar ``schedule`` (its entries come from the schedule, not from events); only
+    it may ladder (``LADDER``: its slots book sizes overlapping holds; the cross-section's not)."""
+    if schedule == LADDER and base != DELTA_EQUIVALENT:
+        raise ConfigurationError(
+            f"{where} schedule: {LADDER!r} is a named option sleeve's (base "
+            f"{DELTA_EQUIVALENT!r}), got base {base!r}"
+        )
     if market and base != OUT_OF_WINDOW:
         raise ConfigurationError(
             f"{where} base: an on_market schedule is measured against the out-of-window "

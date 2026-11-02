@@ -11,6 +11,8 @@ import { Button, Chip, formatValue, Heading, Stack, StatusBadge, Text } from '@a
 
 import {
   EdgeLiveBadge,
+  SetupStateChip,
+  setupStateTerm,
   labelText,
   sideLabel,
   stateLabel,
@@ -56,6 +58,10 @@ export function EdgeHeader({ edge, onBack, onEdit }: EdgeHeaderProps) {
             <Stack direction="row" gap={2} align="center" wrap>
               <StatusBadge tone={verdictTone(v.verdict)}>{verdictLabel(v.verdict)}</StatusBadge>
               {termHelp('verdict')}
+              <SetupStateChip
+                state={edge.setupState}
+                help={edge.setupState ? termHelp(setupStateTerm(edge.setupState.state)) : null}
+              />
               <Text size="sm" tone="secondary">
                 {`${edge.mine ? `Your edge · extends ${edge.extends ?? 'nothing'}` : 'Site edge'} · ${statusLabel(edge.status)}`}
               </Text>
@@ -113,6 +119,11 @@ export function EdgeHeader({ edge, onBack, onEdit }: EdgeHeaderProps) {
             </Stack>
           </Stack>
         </Stack>
+        {edge.setupState?.reason && (
+          <Text size="sm" tone="secondary">
+            {edge.setupState.reason}
+          </Text>
+        )}
         <Text size="base">{edge.thesis}</Text>
         <Text size="sm" tone="secondary">
           {v.headline}

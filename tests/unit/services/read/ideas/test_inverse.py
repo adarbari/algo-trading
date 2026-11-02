@@ -45,3 +45,16 @@ def test_the_setups_of_an_instrument_come_strongest_first(wired: None) -> None:
     found = inverse.load_setups_of_instrument(CTX, "EQ:X")
     assert [(s.edge_id, s.place) for s in found] == [("strong", 4), ("weak", 2)]
     assert inverse.load_setups_of_instrument(CTX, "EQ:NONE") == ()
+
+
+def test_the_state_of_a_listed_setup_is_read_from_the_tabs_edge_and_none_for_another(
+    wired: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[object] = []
+    monkeypatch.setattr(
+        inverse.state, "setup_state_at", lambda ctx, edge: seen.append(edge.id) or "S"
+    )
+    assert inverse.load_state_of_setup(CTX, "weak") == "S"
+    assert seen == ["weak"]
+    assert inverse.load_state_of_setup(CTX, "nope") is None
+    assert seen == ["weak"]  # no state read for a setup the tab does not list

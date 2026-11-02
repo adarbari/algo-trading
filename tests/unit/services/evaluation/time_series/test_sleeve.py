@@ -347,3 +347,21 @@ def test_a_variant_s_case_rule_is_part_of_its_trial_identity() -> None:
 
     low, high = identities(edge_at(0.5)), identities(edge_at(0.7))
     assert low["main"] == high["main"] and low["by_rank"] != high["by_rank"]
+
+
+def test_a_ladder_enters_every_session_on_slots_of_its_depth_and_an_open_entry_is_lost() -> None:
+    """index_put_ladder: one entry every session, each held H, so H overlap (slots = names x H);
+    a trade whose window has not closed (no row yet) is lost, never filled, and the statistics
+    count the independent windows, not the overlapping entries."""
+    edge = sleeve_edge(schedule="every_session_ladder", variant_grid=None)
+    placed = entries(edge)
+    assert [d for d, _ in placed] == sessions_between(FIRST, LAST)  # every_session: every H-th
+    assert len(entries(sleeve_edge())) < len(placed)
+    *_, (_, last) = placed  # its window still open at as-of: the row is not known yet
+    late = {("known", last): {"at": AS_OF + timedelta(days=1)}}
+    (main,) = run(world(edge, changes=late), edge).results
+    assert main.lost == {"NO_OUTCOME": 1}
+    assert main.book["slots"] == H and main.book["cohorts"] == len(placed) - 1
+    m = main.measures[0]
+    assert m.picks == len(placed) - 1 and m.sessions < m.picks
+    assert main.identity.startswith(f"{edge.id}|every_session_ladder|SPY|")

@@ -19,7 +19,7 @@ import {
 } from '@algotrade/ui';
 import { useState, type ReactNode } from 'react';
 
-import { verdictLabel, verdictTone } from '@/entities/edge';
+import { SetupStateChip, setupStateTerm, verdictLabel, verdictTone } from '@/entities/edge';
 import { useSetupIdeas, type IdeaTab, type SetupGroup, type SetupIdea } from '@/entities/idea';
 import { termHelp } from '@/features/guide-help';
 import { WatchlistShowing } from '@/features/watchlist';
@@ -62,6 +62,10 @@ function GroupHeader({
           {group.name}
         </Button>
         <StatusBadge tone={verdictTone(group.level)}>{verdictLabel(group.level)}</StatusBadge>
+        <SetupStateChip
+          state={group.setupState}
+          help={group.setupState ? termHelp(setupStateTerm(group.setupState.state)) : null}
+        />
         {night && group.state !== 'picked' && (
           <Stack direction="row" gap={1} align="center">
             <Text size="sm" tone="muted">

@@ -145,6 +145,13 @@ export type RunStatus =
   | 'RUNNING'
   | 'WAITING';
 
+/** A setup's state at the served session */
+export type SetupStateCode =
+  | 'OFF'
+  | 'ON'
+  | 'PAUSED'
+  | 'UNKNOWN';
+
 /** A fast (market) or slow (macro) indicator, or the screener gate (GATE) */
 export type SignalKind =
   | 'FAST'
@@ -344,7 +351,7 @@ export type EdgesPageQueryVariables = Exact<{
 }>;
 
 
-export type EdgesPageQuery = { edgeList: { total: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> }, items: Array<{ id: string, name: string, thesis: string, status: string, state: string, mine: boolean, screeners: Array<string>, summary: { verdict: string, result: string, trades: number | null } }> } | null };
+export type EdgesPageQuery = { edgeList: { total: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> }, items: Array<{ id: string, name: string, thesis: string, status: string, state: string, mine: boolean, screeners: Array<string>, summary: { verdict: string, result: string, trades: number | null }, setupState: { state: SetupStateCode, reason: string } | null }> } | null };
 
 export type EdgeProblemsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -356,7 +363,7 @@ export type EdgeDetailQueryVariables = Exact<{
 }>;
 
 
-export type EdgeDetailQuery = { edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, basisWhy: string, side: string, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean, referenceRate: number | null, touchRate: number | null }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null, nextClose: string | null, projections: Array<{ criterion: string, oos: boolean, have: number, needed: number, remaining: number, state: string, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null }>, atTarget: { needed: number, level: string, reasons: Array<string>, sentence: string } | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, provenance: { state: string, line: string, runId: string | null } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
+export type EdgeDetailQuery = { edges: Array<{ id: string, name: string, status: string, state: string, labels: Array<string>, oosHidden: boolean, mine: boolean, extends: string | null, thesis: string, mechanism: string, persistence: string, horizons: Array<number>, screeners: Array<string>, baselines: Array<string>, rejectionReason: string, setupState: { state: SetupStateCode, reason: string } | null, sources: Array<{ title: string, url: string }>, definition: { picks: string, trade: string, compare: string, test: string }, verdict: { verdict: string, rationale: string, headline: string, result: string, basis: string | null, basisWhy: string, side: string, trades: number | null, oosTrades: number | null, winRate: number | null, baseRate: number | null, liftPts: number | null, lift: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, trials: number | null, deciles: Array<number | null>, robustness: { lift: number, draws: number, beats: number, summary: string, bins: Array<{ start: number, end: number, count: number }> } | null, criteria: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, years: Array<{ year: string, period: string, label: string, fromDate: string, toDate: string, partial: boolean, winRate: number | null, baseRate: number | null, liftPts: number | null, decileSpread: number | null, trades: number | null }>, columns: Array<{ period: string, winRate: number | null, baseRate: number | null, liftPts: number | null, trades: number | null, decileSpread: number | null, decileT: number | null, sharpe: number | null, deflatedSharpe: number | null, pbo: number | null, thin: boolean, referenceRate: number | null, touchRate: number | null }>, evidence: { oosTrades: number, needed: number, worksOosNeeded: number, wholeTrades: number, wholeNeeded: number, reached: boolean, checks: Array<{ id: string, label: string, value: string, threshold: string, status: string, level: string }>, outlook: { criterion: string, level: string, sentence: string, have: number | null, needed: number | null, remaining: number | null, projectionState: string | null, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null, nextClose: string | null, projections: Array<{ criterion: string, oos: boolean, have: number, needed: number, remaining: number, state: string, expectedBy: string | null, fillRatio: number | null, cadenceSessions: number | null }>, atTarget: { needed: number, level: string, reasons: Array<string>, sentence: string } | null } | null } | null, haircut: { sharpe: number, haircutSharpe: number, cut: number, trials: number, sessions: number, method: string, summary: string } | null, decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null }, canonicalRun: { runId: string, knowledgeTs: string } | null, provenance: { state: string, line: string, runId: string | null } | null, runs: Array<{ runId: string, owner: string, rangeFrom: string | null, rangeTo: string, splitFrom: string | null, exploratory: boolean, knowledgeTs: string, trialsCounted: number | null, lostInputs: Array<string> }> }> };
 
 export type EdgeDocumentQueryVariables = Exact<{
   ids: Array<string> | string;
@@ -591,7 +598,7 @@ export type SetupIdeasQueryVariables = Exact<{
 }>;
 
 
-export type SetupIdeasQuery = { setupIdeas: { session: string, state: string, ruleVersion: number, total: number, watchlist: number | null, leftOut: Array<{ kind: string, count: number }>, groups: Array<{ edgeId: string, name: string, level: string, liftPts: number | null, oosTrades: number | null, basisScreener: string, basisHorizon: number | null, state: string, picked: number, shown: number, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, ideas: Array<{ rank: number, instrumentId: string, setupId: string, place: number, watchOut: Array<string>, instrument: { symbol: string, name: string } | null, alsoIn: Array<{ edgeId: string, edgeName: string, place: number }>, metrics: Array<{ name: string, value: unknown }>, result: { decision: string, regime: string | null, sizeMultiplier: number | null } | null, option: { expiry: string | null, credit: number | null, collateral: number | null, returnOnCollateral: number | null, assignmentChance: number | null, legs: Array<{ right: string, strike: number, expiry: string, qty: number, mid: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, chanceUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, collateralUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null }> } | null };
+export type SetupIdeasQuery = { setupIdeas: { session: string, state: string, ruleVersion: number, total: number, watchlist: number | null, leftOut: Array<{ kind: string, count: number }>, groups: Array<{ edgeId: string, name: string, level: string, liftPts: number | null, oosTrades: number | null, basisScreener: string, basisHorizon: number | null, state: string, picked: number, shown: number, setupState: { state: SetupStateCode, reason: string } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, ideas: Array<{ rank: number, instrumentId: string, setupId: string, place: number, watchOut: Array<string>, instrument: { symbol: string, name: string } | null, alsoIn: Array<{ edgeId: string, edgeName: string, place: number }>, metrics: Array<{ name: string, value: unknown }>, result: { decision: string, regime: string | null, sizeMultiplier: number | null } | null, option: { expiry: string | null, credit: number | null, collateral: number | null, returnOnCollateral: number | null, assignmentChance: number | null, legs: Array<{ right: string, strike: number, expiry: string, qty: number, mid: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, chanceUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, collateralUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null }> } | null };
 
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
@@ -1470,6 +1477,10 @@ export const EdgesPageDocument = new TypedDocumentString(`
         result
         trades
       }
+      setupState {
+        state
+        reason
+      }
     }
   }
 }
@@ -1493,6 +1504,10 @@ export const EdgeDetailDocument = new TypedDocumentString(`
     oosHidden
     mine
     extends
+    setupState {
+      state
+      reason
+    }
     thesis
     mechanism
     persistence
@@ -3507,6 +3522,10 @@ export const SetupIdeasDocument = new TypedDocumentString(`
       state
       picked
       shown
+      setupState {
+        state
+        reason
+      }
       unknown {
         code
         kind

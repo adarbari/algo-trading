@@ -144,3 +144,13 @@ def sessions_after(start: date, n: int) -> date:
     for _ in range(n):
         start = next_session(start)
     return start
+
+
+def test_a_sleeve_ladder_decides_every_session_and_only_a_sleeve_may() -> None:
+    """index_put_ladder: every session is a decision (the holds overlap, the slots book sizes
+    them); every_session keeps its spacing, and a cross-section edge cannot ladder."""
+    days = sessions_between(date(2026, 1, 2), date(2026, 3, 31))
+    assert decision_sessions("every_session_ladder", days, 17, sleeve=True) == days
+    assert len(decision_sessions("every_session", days, 17, sleeve=True)) < len(days)
+    with pytest.raises(ConfigurationError, match="named option sleeve"):
+        decision_sessions("every_session_ladder", days, 17)

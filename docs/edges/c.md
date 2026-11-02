@@ -12,6 +12,7 @@ Back to the [index of every edge](../edges.md).
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
 | Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`) | candidate | every session | option pnl, over 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 45-day tenor, forward-only from 2026-10-02), costs 35 bps | none yet |
 | Covered calls on high idiosyncratic volatility (`high_vol_call_write`) | candidate | every session | option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02) | `ivol_high` |
+| Index put write, every-session ladder (`index_put_ladder`) | candidate | every session ladder | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
 | Index put write (`index_put_write`) | candidate | calendar:after monthly expiry | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
 | Short puts on low-volatility names (`low_vol_put_write`) | candidate | every session | option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02) | `low_volatility` |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
@@ -248,6 +249,37 @@ Back to the [index of every edge](../edges.md).
 - Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finance, 2014 <https://doi.org/10.1111/jofi.12152>
 - Garleanu, N., Pedersen, L. H. and Poteshman, A., Demand-Based Option Pricing, Review of Financial Studies, 2009 <https://doi.org/10.1093/rfs/hhp005>
 - Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006 <https://doi.org/10.1111/j.1540-6261.2006.00836.x>
+
+## Index put write, every-session ladder (`index_put_ladder`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Selling a cash-secured put on SPY, QQQ or IWM every session, each held 17 sessions so the puts overlap as a ladder, earns more on its collateral than holding the same share delta, because index puts are priced above the moves that follow.
+
+- **Outcome:** option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02)
+- **Schedule:** every session ladder
+- **Universe:** `instrument.symbol in ('SPY', 'QQQ', 'IWM')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** The same idea as index_put_write (X1), tested again with every-session entries: a second trial of the index put-write premium, read beside index_put_write, never as independent evidence. The two share the symbols, the 20-delta put, the 17-session hold, the gate and the PUT tracking; only the entry dates differ. Each named symbol is one trial of the deflated Sharpe ratio; no variants and no grid, so the idea's tries stay few (X1 holds the gate variant and the grid). The deflated Sharpe ratio counts this edge's trials only, not X1's (trial logs are kept per edge): counting the two together is a follow-up after the harness split, due before either can have a verdict (2027-02-03). Entry: every session S = D + 1, a 20-delta put on the first monthly expiry at least 21 days after S and not before the hold's last session, held 17 sessions, so 17 puts per symbol are open at once. The book (E8b) is 51 fixed slots (3 symbols x 17), each trade one slot's share of the collateral, an empty slot cash; never levered. Overlapping trades share most of their days, so the t-ratios and the deflated Sharpe ratio count the independent windows (one per 17 sessions), not the trades. A window still open at the run's as-of is lost under its reason, never filled. NO VERDICT before a 3-month unseen holdout (ADR 0088): the holdout starts at 2026-11-03, so the earliest verdict is on trades whose window closed after 2027-02-03, and the judge enforces it. Built on the Cboe-era store only (chains from 2026-10-02); the bought option history (build row E5) is not purchased, and evidence derived from it would be owner-only (personal). Not paper traded (the record refuses a setup with no screener). Tracking: each window's return on collateral beside the Cboe PUT index's (personal licence); the SPX index itself is not traded.
+
+**Quality bar**
+
+1. **Mechanism:** Investors pay for index protection (insurance mandates, portfolio overlays), and dealers who sell it charge for carrying the short-gamma risk; index implied volatility sits above the realised volatility that follows (Driessen, Maenhout and Vilkov: 24.7% against 20.8%, 1996-2003).
+2. **Persistence:** The demand for protection is structural and the seller is paid for a tail few hold through, but most of a put writer's return is its equity beta (Israelov and Nielsen), so the claim tested here is the part beyond the delta-equivalent stock, on the same collateral and cost. Entering every session spreads the entry date over the month, so the result does not rest on the roll day.
+3. **Outcome:** The option position's return on its cash-secured collateral (strike x 100) from the entry close to the close 17 sessions later (or its declared exit), net of the site's option cost levels, against the delta-equivalent stock held over the same sessions on the same collateral and cost (base delta_equivalent); the T-bill on the collateral is set beside it.
+4. **Trigger timing:** Every session is a decision session D and S the session after it; the gate reads market_conditions@v2 at D (the VIX curve, implied against realised volatility, trend), and the expiry is chosen from S's chain by the exchange calendar, so nothing beyond D is read to place an entry.
+5. **Faithful replication:** The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the first monthly expiry 21 or more days out, a new one every session, each held 17 sessions, a setup gate on top. index_put_write is the same position entered once a month after the roll.
+6. **Expected size and sample:** PUT has matched the S&P 500 total return over 1986-2024 with about two thirds of its volatility (Cboe-commissioned study; not a harness figure); against beta-matched equity the excess is about 1 to 2% a year before costs (practitioner estimates, not verified). Expect about index_put_write's excess with a smoother book, and losses in sharp sell-offs (2008, 2020, 2022).
+7. **Capacity and costs:** SPY, QQQ and IWM options are among the most liquid listed; a cash-secured put needs the strike x 100 in cash, split over 17 open puts per symbol. About 250 entries a year per symbol, so 17 times index_put_write's round trips; each pays the option cost levels and commission in verdict.toml [option_costs].
+8. **Failure modes and retirement:** A crash inside the hold hits every open put at once (the ladder spreads the entry date, not the market risk); a regime where implied volatility no longer exceeds realised; the gate keeping the sleeve out of the best-paid sessions; the extra round trips eating the premium. Retire if the frozen-period return on collateral over the delta-equivalent stock is not above zero after costs, or its tail (CVaR) is worse than the stock's on the same collateral.
+9. **Decoys:** Equity beta (the delta-equivalent stock on the same collateral is the base), the T-bill on the collateral, the Cboe PUT index's own return over each window (the tracking figure), and index_put_write, the same position entered monthly.
+
+**Sources**
+
+- Israelov, R. and Nielsen, L., Covered Calls Uncovered, Financial Analysts Journal, 2015 <https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered>
+- Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk, Journal of Finance, 2009
+- Cboe S&P 500 PutWrite Index (PUT) methodology <https://www.cboe.com/us/indices/dashboard/put/>
 
 ## Index put write (`index_put_write`)
 

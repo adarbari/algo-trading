@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from algotrade.core.time.calendar import next_session
-from algotrade.quant.edges.statistics import sharpe_t, welch_t
+from algotrade.quant.edges.statistics import deflated_sharpe, sharpe_t, welch_t
 from algotrade.services.evaluation.time_series.measures import (
     Obs,
     deflate_trial,
@@ -183,3 +183,21 @@ def test_a_split_year_and_regime_keep_their_in_sample_side() -> None:
     assert {("regime_part", "calm:in_sample"), ("regime_part", "calm:out_of_sample")} <= kinds
     none = {m.slice_kind for m in measures(BOTH, 4, None, False)}
     assert not {"year_part", "regime_part"} & none
+
+
+def test_a_ladder_deflates_over_its_independent_windows_not_its_overlapping_trades() -> None:
+    """A sleeve's every-session ladder (index_put_ladder): 40 entries one session apart, each held
+    4 sessions, stand for 10 independent windows; the deflated Sharpe ratio reads every 4th value
+    (as the t-ratios count them), never the 40 overlapping ones, and spaced windows keep all."""
+    values = [0.01 + 0.002 * math.sin(i) for i in range(40)]
+    ladder = obs(date(2025, 1, 2), values, True, step=1)
+    m = measure("all", "all", ladder, 4)
+    assert (m.picks, m.sessions) == (40, 10)
+    got = deflate_trial(m, values, 1, None)
+    thinned = values[::4]
+    assert got.deflated_sharpe == deflated_sharpe(thinned, 1, 1.0 / (len(thinned) - 1))
+    assert got.deflated_sharpe != deflated_sharpe(values, 1, 1.0 / (len(values) - 1))
+    spaced = measure("all", "all", obs(date(2025, 1, 2), values, True, step=4), 4)
+    assert deflate_trial(spaced, values, 1, None).deflated_sharpe == deflated_sharpe(
+        values, 1, 1.0 / (len(values) - 1)
+    )

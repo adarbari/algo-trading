@@ -6,11 +6,14 @@ import datetime as dt
 from typing import Self
 
 import strawberry
+from strawberry.types import Info
 
 from algotrade.services.read import values
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.ideas import picks, premium
+from algotrade.services.read.ideas import inverse, picks, premium
 from algotrade.services.read.ideas.setups import Tab
+from algotrade_api.graphql.offload import off_loop
+from algotrade_api.graphql.types.evaluation.verdict import SetupState
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.screens.ideas import IdeaMetric
@@ -149,9 +152,10 @@ class SetupGroup:
     unknown: Unknown | None
     picked: int
     shown: int
+    ctx: strawberry.Private[ReadContext]
 
     @classmethod
-    def of(cls, d: picks.SetupGroup) -> Self:
+    def of(cls, d: picks.SetupGroup, ctx: ReadContext) -> Self:
         return cls(
             edge_id=d.edge_id,
             name=d.name,
@@ -164,7 +168,18 @@ class SetupGroup:
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
             picked=d.picked,
             shown=d.shown,
+            ctx=ctx,
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The setup's state at the served session (ON, OFF, PAUSED or UNKNOWN with "
+        "its reason; ADR 0088 decision 16): a group is a setup with a good stored verdict, so "
+        "ON or PAUSED; null: no session is served or the setup is not readable"
+    )
+    async def setup_state(self, info: Info) -> SetupState | None:
+        # the request's own context: the date the groups were read for
+        found = await off_loop(inverse.load_state_of_setup, self.ctx, self.edge_id)
+        return SetupState.of(found) if found is not None else None
 
 
 @strawberry.type(
@@ -196,7 +211,7 @@ class SetupIdeas:
             tab=IdeaTab(d.tab),
             state=d.state,
             rule_version=d.rule_version,
-            groups=[SetupGroup.of(g) for g in d.groups],
+            groups=[SetupGroup.of(g, ctx) for g in d.groups],
             ideas=[SetupIdea.of(i, ctx) for i in d.ideas],
             total=d.total,
             left_out=[LeftOut.of(c) for c in d.left_out],
