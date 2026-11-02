@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -75,7 +75,12 @@ describe('an owner waiver of a shared budget', () => {
 });
 
 describe('every waiver in perf-budgets.json', () => {
-  const log = readFileSync(resolve(process.cwd(), '../../docs/decisions/log.md'), 'utf8');
+  // every decision log file: log.md is rotated into log-<from>-to-<to>.md (2026-11-02, #1095)
+  const dir = resolve(process.cwd(), '../../docs/decisions');
+  const log = readdirSync(dir)
+    .filter((f) => /^log.*\.md$/.test(f))
+    .map((f) => readFileSync(resolve(dir, f), 'utf8'))
+    .join('\n');
   const waivers =
     loadBudgets(pathToFileURL(resolve(process.cwd(), 'perf-budgets.json'))).waivers ?? {};
 
@@ -83,7 +88,7 @@ describe('every waiver in perf-budgets.json', () => {
     '%s has an owner-final entry in the decision log',
     (_path, w) => {
       const start = log.indexOf(`## ${w.log}\n`);
-      expect(start, `no "## ${w.log}" entry in docs/decisions/log.md`).toBeGreaterThanOrEqual(0);
+      expect(start, `no "## ${w.log}" entry in docs/decisions/log*.md`).toBeGreaterThanOrEqual(0);
       const next = log.indexOf('\n## ', start + 1);
       const entry = log.slice(start, next < 0 ? undefined : next);
       expect(entry).toContain('- decided by: owner\n');
