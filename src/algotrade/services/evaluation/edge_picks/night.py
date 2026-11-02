@@ -18,9 +18,11 @@ from algotrade.config.edges.document import Edge
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
+from algotrade.core.model.predicates import Group
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.services.configs import resolve_config
+from algotrade.engines.screening.gate import UNDECIDED, UNKNOWN
+from algotrade.services.configs import field_catalog, resolve_config
 from algotrade.services.evaluation.cross_section.events import EventDayMissingError
 from algotrade.services.evaluation.cross_section.harness import edge_universe
 from algotrade.services.evaluation.cross_section.measuring import MEASURED_COVERAGE, names_for
@@ -33,6 +35,7 @@ from algotrade.services.evaluation.cross_section.picks import (
 )
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.services.evaluation.forward.signals import legs_between
+from algotrade.services.screening.regime import edge_gate
 from algotrade.storage.configs.store import ConfigStore
 
 PICKED, NOT_DECISION_DAY, UNJUDGED, SKIPPED = "picked", "not_decision_day", "unjudged", "skipped"
@@ -133,6 +136,19 @@ def _decide(night: Night, edge: Edge, screener: str, names: frozenset[str] | Non
     return replace(made, status=PICKED, pick_ids=tuple(picks))
 
 
+def _gate_shut(night: Night, gate: Group) -> str | None:
+    """Why the setup gate holds the session's picks back (None: it is open), whatever
+    ``[regime].enabled`` says: closed or unknown never picks (fail closed). E9 stores the closed
+    case as its own status."""
+    domains = field_catalog(night.configs).domains
+    decision = edge_gate(night.reader, gate, night.session, domains)
+    if decision.open:
+        return None
+    if decision.state == UNDECIDED:
+        return UNKNOWN
+    return decision.reason or "gate closed"
+
+
 def edge_night(
     night: Night, edge: Edge, wanted: Callable[[str], bool] = lambda _: True
 ) -> list[EdgePicks]:
@@ -165,4 +181,6 @@ def edge_night(
         return [EdgePicks(edge.id, s, SKIPPED, reason=why, top_k=top_k) for s in screeners]
     if not fired:
         return [EdgePicks(edge.id, s, NOT_DECISION_DAY, top_k=top_k) for s in screeners]
+    if edge.gate is not None and (shut := _gate_shut(night, edge.gate)) is not None:
+        return [EdgePicks(edge.id, s, SKIPPED, reason=shut, top_k=top_k) for s in screeners]
     return [_decide(night, edge, s, names) for s in screeners]

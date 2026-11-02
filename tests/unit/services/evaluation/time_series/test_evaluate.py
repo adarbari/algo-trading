@@ -180,3 +180,33 @@ def test_the_windows_are_trade_contract_rows_equal_to_the_measured_values() -> N
     assert list(trades["value"]) == pytest.approx([v for _, v in spy.in_window])
     assert set(trades["capital_basis"]) == {"notional"} and set(trades["price_source"]) == {"bars"}
     assert (trades["return_on_capital"] == trades["value"]).all() and trades["hit"].all()
+
+
+def gated(w: World, state):  # type: ignore[no-untyped-def]
+    return evaluate_time_series(
+        w.reader, timed_edge(), FIRST, LAST, AS_OF, lambda d: "calm", None, False, 1000, state
+    )
+
+
+def slice_of(result, kind: str, value: str):  # type: ignore[no-untyped-def]
+    return next(m for m in result.measures if (m.slice_kind, m.slice_value) == (kind, value))
+
+
+def test_a_gate_keeps_the_open_periods_and_slices_closed_and_unknown_beside_them() -> None:
+    w = build_world()
+    odd = lambda d: ("open", "closed", "unknown")[d.toordinal() % 3]  # noqa: E731
+    inverse = lambda d: {"open": "closed", "closed": "open", "unknown": "unknown"}[odd(d)]  # noqa: E731
+    (plain,), (g,), (inv,) = (r.results for r in (run(w), gated(w, odd), gated(w, inverse)))
+    states = {"open", "closed", "unknown"}
+    assert {m.slice_value for m in g.measures if m.slice_kind == "gate"} == states
+    # the edge's result is its open rows; the slices partition the ungated one
+    assert (
+        g.measures[0].sessions == slice_of(g, "gate", "open").sessions < plain.measures[0].sessions
+    )
+    assert sum(slice_of(g, "gate", s).sessions for s in states) == plain.measures[0].sessions
+    # the closed slice is the inverse-gate edge (no extra run); unknown is excluded on both sides
+    assert slice_of(g, "gate", "closed").sessions == inv.measures[0].sessions
+    assert slice_of(g, "gate", "closed").mean_excess_picks == pytest.approx(
+        inv.measures[0].mean_excess_picks
+    )
+    assert slice_of(g, "gate", "unknown").sessions == slice_of(inv, "gate", "unknown").sessions
