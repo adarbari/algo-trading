@@ -901,3 +901,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's decision in chat (2026-11-02); the local hook exists to catch the common CI failures early (architecture and layout tests, bundle budgets, Guide coverage, lint and types), not to repeat CI.
+
+## 2026-11-01 | ADR 0088 S2 / S3 / F2 | B2 reuses the two existing presets; S3 already merged; F2 is a coverage test
+- Question: S2 says reuse `low_volatility` and `ivol_high` and add `total_vol_high` only if a run shows the sort differs. Build it now?
+- Options: add `total_vol_high` now / add nothing until a run of the two edges (X4) shows the sort differs.
+- Decision: add nothing. S2 is a reuse, so it has no PR; `total_vol_high` waits for the X4 run. S3 (`earnings_move_rich`, `earnings_move_cheap`) merged in #993, so it needs no slice. F2's 33 verdict-column terms were written with F1 and F3 (#992, #1008); this PR adds the test that keeps them in step with the columns and keeps their wording descriptive, and rewords the two sentences that told a reader what to do.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the build doc's own condition ("only if the run shows the sort differs") cannot be met before X4's run exists, and a third near-duplicate preset would add code the owner's less-code rule (2026-10-25) asks to avoid.
