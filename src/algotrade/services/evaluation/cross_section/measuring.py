@@ -51,6 +51,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     Pairs,
     apply_outcome,
     is_return,
+    level_rocs,
     level_values,
     needs_implied_vol,
     needs_pairs,
@@ -492,7 +493,8 @@ def _picks(
                 adverse=_finite(trades.at[i, "max_adverse"]),
                 price_source=str(trades.at[i, "price_source"]),
                 outcome_licence=str(trades.at[i, "outcome_licence"]),
-                values_at=level_values(levels, i) if counted else None,
+                values_at=(leveled := level_values(levels, i) if counted else None),
+                rocs_at=level_rocs(leveled, stored, i) if side == LONG else None,  # E11
                 entry_session=entry.get(i) if isinstance(entry, Mapping) else None,
                 **(figures.get(i, {}) if counted else {}),
             )

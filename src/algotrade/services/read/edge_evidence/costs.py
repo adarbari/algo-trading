@@ -8,12 +8,20 @@ The decile spread does not move with cost (both tenths pay it), so it is stated 
 read from the period's own row. A period is ``measured`` or has the state saying why not:
 ``not_stored`` (an older run, or the period does not exist: no split) or ``oos_hidden`` (a
 copy's out-of-sample result is withheld, so the whole-history and out-of-sample periods are too).
-An edge whose outcome is not a return has no cost rows: ``not_a_cost_outcome``."""
+An edge whose outcome is not a return has no cost rows: ``not_a_cost_outcome``.
+
+An option position's cost rows are its named levels (``<period>:<level>``, ADR 0088 2.6: ``mid``
+pays no spread or commission, ``effective`` a share of the spreads, ``full`` all of them; E11):
+each level is a ``CostLevel`` with its ``level`` and its mean return on the collateral
+(``mean_roc``), at the document's own ``bp`` (every level pays it), ``assumed`` on the level the
+verdict reads (``MAIN_OPTION_LEVEL``). Its cost is not linear in a basis-point charge, so a
+period has no ``break_even_bp``."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
+from algotrade.config.edges.verdict import MAIN_OPTION_LEVEL, OPTION_LEVELS
 from algotrade.quant.edges.statistics import break_even_cost
 from algotrade.services.read.context import Stores
 from algotrade.services.read.edge_evidence.basis import OfficialBasis, official_basis
@@ -56,6 +64,8 @@ class CostLevel:
     base_rate: float | None
     lift_pts: float | None
     mean_excess: float | None
+    level: str | None = None  # an option position's cost level (mid, effective, full); else None
+    mean_roc: float | None = None  # its picks' mean return on collateral at the level
 
 
 @dataclass(frozen=True)
@@ -91,6 +101,40 @@ def _split(value: str) -> tuple[str, float] | None:
         return (STORED_PERIOD[stored], float(bp)) if stored in STORED_PERIOD else None
     except ValueError:
         return None
+
+
+def _option_split(value: str) -> tuple[str, str] | None:
+    """``(period, level)`` of an option cost row's ``slice_value`` ``<period>:<level>``."""
+    stored, _, level = value.partition(":")
+    if stored not in STORED_PERIOD or level not in OPTION_LEVELS:
+        return None
+    return STORED_PERIOD[stored], level
+
+
+def _option_costs(basis: BasisRows, assumed: float) -> EdgeCosts | None:
+    """An option position's levels (None: ``basis`` has no option cost row)."""
+    found = [
+        (split, r)
+        for r in basis.rows
+        if r.slice_kind == runs.COST and (split := _option_split(r.slice_value)) is not None
+    ]
+    if not found:
+        return None
+    rank = {name: i for i, name in enumerate(OPTION_LEVELS)}
+    found.sort(key=lambda f: (PERIODS.index(f[0][0]), rank[f[0][1]]))
+    levels = tuple(
+        replace(_level(p, assumed, r, assumed), assumed=name == MAIN_OPTION_LEVEL, level=name,
+                mean_roc=r.mean_roc)
+        for (p, name), r in found
+    )  # fmt: skip
+    plain = [r for r in basis.rows if r.slice_kind != runs.COST]
+    periods = tuple(
+        CostPeriod(p, MEASURED, None, next(
+            (r.decile_spread for r in plain if STORED_PERIOD.get(r.slice_kind) == p), None
+        )) if any(lv.period == p for lv in levels) else _period(p, (), plain, basis.hidden, 1.0)
+        for p in PERIODS
+    )  # fmt: skip
+    return EdgeCosts(MEASURED, basis.variant, basis.horizon, assumed, levels, periods)
 
 
 def _level(period: str, bp: float, row: EdgeRow, assumed: float) -> CostLevel:
@@ -156,6 +200,9 @@ def costs_of(
     assumed = assumed_bp or 0.0
     if not cost_applies:
         return EdgeCosts(NOT_A_COST_OUTCOME, basis.variant, basis.horizon, assumed, (), ())
+    option = _option_costs(basis, assumed)
+    if option is not None:
+        return option
     plain = [r for r in basis.rows if r.slice_kind != runs.COST]
     cost_rows = [
         (split, r)

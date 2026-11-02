@@ -92,6 +92,8 @@ class Pick:
     # An option pick's oriented value at each cost level (``OPTION_LEVELS``: mid, effective, full),
     # from E6b-2; None for a share, an excluded pick and a leg stored before it.
     values_at: tuple[float, ...] | None = None
+    # E11: a long option pick's return on capital at each of those levels (``hit.level_rocs``)
+    rocs_at: tuple[float, ...] | None = None
     # An option pick's figures over its collateral, all at the mid level (E6b-3; see
     # ``evidence.values.option_figures``): ``hedged_roc`` after the daily delta hedge,
     # ``stock_roc`` the share leg's part of the P&L, ``wing_cost`` the bought wing's entry mids.
@@ -699,8 +701,9 @@ def _level_rows(
 ) -> list[SliceMeasure]:
     """The cost rows of an option position, one per level in ``names`` (``<period>:<level>``): the
     hits from each session's level counts and the mean of the counted picks' values at the level
-    (an option's value is not linear in the level, so it is stored per pick, never derived); a
-    level a session did not count, or a pick with no value at it, leaves its figure unset."""
+    (an option's value is not linear in the level, so it is stored per pick, never derived) and,
+    as the row's ``mean_roc`` (E11), the mean of their return on capital at it; a level a session
+    did not count, or a pick with no value at it, leaves its figure unset."""
     counted = [p for r in measured for p in r.picks if not p.reason]
     out = []
     for index, name in enumerate(names):
@@ -713,7 +716,10 @@ def _level_rows(
             if not counted or not all(have)
             else float(np.mean([p.values_at[index] for p in counted if p.values_at]))
         )
-        out.append(_cost_row(m, name, *found, mean, None))
+        rocs = [p.rocs_at[index] for p in counted if p.rocs_at and len(p.rocs_at) > index]
+        roc = float(np.mean(rocs)) if counted and len(rocs) == len(counted) else None
+        row = _cost_row(m, name, *found, mean, None)
+        out.append(replace(row, tail=TailMeasures(mean_roc=roc)) if roc is not None else row)
     return out
 
 

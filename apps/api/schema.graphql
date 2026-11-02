@@ -297,7 +297,7 @@ type Config {
 }
 
 """
-One period at one round-trip cost of `bp` basis points: the `winRate`, `baseRate`, `liftPts` (win rate less base rate, in points) and `meanExcess` (the picks' mean return over the benchmark, a fraction, net of `bp`) over `sessions` independent sessions and `picks` picks; `assumed`: this is the edge document's own cost, the one every other figure of the page is net of
+One period at one round-trip cost of `bp` basis points: the `winRate`, `baseRate`, `liftPts` (win rate less base rate, in points) and `meanExcess` (the picks' mean return over the benchmark, a fraction, net of `bp`) over `sessions` independent sessions and `picks` picks; `assumed`: this is the edge document's own cost, the one every other figure of the page is net of. An option setup's rows are its cost `level` (mid: no spread or commission; effective: a share of the spreads; full: all of them; null for a share setup) at the document's `bp`, with `meanRoc` the picks' mean return on the collateral at that level and `assumed` on the level its verdict reads
 """
 type CostLevel {
   period: String!
@@ -309,6 +309,8 @@ type CostLevel {
   baseRate: Float
   liftPts: Float
   meanExcess: Float
+  level: String
+  meanRoc: Float
 }
 
 """
