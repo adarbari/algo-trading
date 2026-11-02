@@ -41,7 +41,8 @@ export function rewriteDocuments(code: string, id: string): string | null {
       );
     }
     const literal = m[0].slice(0, m[0].lastIndexOf('`') + 1);
-    if (/\.\.\.\s*[A-Za-z_]|(^|[\s`])fragment\s+\w+\s+on\b/.test(literal)) {
+    // An inline fragment (`... on Type`) carries its own selection; only a named one is a gap.
+    if (/\.\.\.\s*(?!on\b)[A-Za-z_]|(^|[\s`])fragment\s+\w+\s+on\b/.test(literal)) {
       const name = /(query|mutation|subscription)\s+(\w+)/.exec(literal)?.[2] ?? 'anonymous';
       throw new Error(
         `${id}:${String(lineOf(code, start))}: operation ${name} uses a fragment; codegen appends its definition, which an inlined literal lacks`,

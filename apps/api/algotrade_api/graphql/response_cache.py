@@ -74,6 +74,7 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
         "GuideEdgeIndex",  # site edge documents and mechanism files: the same for every caller
         "InstrumentPrices",
         "OptionQuotes",
+        "OptionGrid",  # derived from the same Cboe chain as OptionQuotes: no viewer input
         "EtfHoldings",
         "InstrumentEvents",
         "SessionDate",

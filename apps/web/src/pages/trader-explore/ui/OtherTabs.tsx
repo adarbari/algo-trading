@@ -4,7 +4,8 @@
  * carries only the Overview and Chart widgets. A ticker named inside a panel opens in a tab of
  * its own.
  */
-import { Stack } from '@algotrade/ui';
+import { Skeleton, Stack } from '@algotrade/ui';
+import { lazy, Suspense } from 'react';
 
 import { ComparePanel } from '@/widgets/compare-panel';
 import { EventStudyPanel } from '@/widgets/event-study-panel';
@@ -15,11 +16,18 @@ import { OptionsPanel } from '@/widgets/options-panel';
 import { ScreenerHitsPanel, WhyIdeaPanel } from '@/widgets/screener-hits-panel';
 
 import { DEFAULT_DIMENSIONS, joinList } from '@/entities/explore';
+import { useViewer } from '@/entities/viewer';
 import { exploreState, openTicker } from '../model/state';
 import type { DetailTabsProps } from './DetailTabs';
 
+// The trader's option grid loads on its own: the Options tab is one of seven in this chunk.
+const OptionGrid = lazy(() =>
+  import('@/widgets/option-grid').then((m) => ({ default: m.OptionGrid })),
+);
+
 export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsProps) {
   const state = exploreState(search);
+  const admin = useViewer().data?.role === 'admin';
   const open = (other: string) => {
     onSearchChange(openTicker(state, other));
   };
@@ -56,6 +64,14 @@ export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: De
         <WhyIdeaPanel symbol={symbol} screenerId={state.via} onOpenScreener={onOpenScreener} />
       ) : null;
     case 'options':
+      // Traders read the derived grid; the raw chain stays an admin's tool (decision B, ADR 0083).
+      if (!admin) {
+        return (
+          <Suspense fallback={<Skeleton />}>
+            <OptionGrid symbol={symbol} />
+          </Suspense>
+        );
+      }
       return (
         <OptionsPanel
           symbol={symbol}
