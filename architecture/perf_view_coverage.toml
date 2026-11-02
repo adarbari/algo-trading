@@ -15,15 +15,11 @@
 
 [baseline]
 # The pins: the size of each list; a PR only lowers them (adding an entry fails the test).
-max_operation = 13
+max_operation = 11
 max_view = 0
 
 [[operation]]
 name = "ComparePrices"
-reason = "not yet captured"
-
-[[operation]]
-name = "EdgeBuilder"
 reason = "not yet captured"
 
 [[operation]]
@@ -60,10 +56,6 @@ reason = "not yet captured"
 
 [[operation]]
 name = "RunRecord"
-reason = "not yet captured"
-
-[[operation]]
-name = "ScreenVersions"
 reason = "not yet captured"
 
 [[operation]]

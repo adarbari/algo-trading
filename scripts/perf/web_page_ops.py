@@ -211,6 +211,9 @@ class Source:
         seen = seen | {key}
         m = self.module(path)
         local = m.local_exports.get(name, name)
+        if local in m.lazies:  # `export const X = lazyPage(...)` in a barrel: the page it loads
+            target, export = m.lazies[local]
+            return self.resolve_export(target, export, seen)
         if local in m.decls and local not in m.imports:
             return m.path, local
         if name in m.reexports:
