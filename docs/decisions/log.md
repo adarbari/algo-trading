@@ -902,3 +902,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: owner rule G14 (every screener is a rule) and the less-code rule; changing the engine for one preset adds a second vocabulary. What is lost: LIQUIDITY_RISK on tier C/D names, and a PARTIAL screen on stale chains (the chains gate already fails the night). The liquidity picks are identical: QUALIFIED iff the put or call tier is A / B on a current chain.
+
+## 2026-11-01 | ADR 0088 S5 | The liquidity screen on Ideas
+- Question: as a rule preset `short_premium_liquidity` is a listed site screener (the Python one was ignored by the read model); it implements no setup, so its first 5 picks (`site_top`) show under Ideas "Unproven" in Stocks. Keep it off Ideas?
+- Options: (a) accept it, ranked by `chain_oi` (deepest chain first) instead of instrument id / (b) a preset-level exclusion from Ideas (a schema addition).
+- Decision: (a). Every site screener without an edge is listed the same way; an exclusion flag is a new schema field for one preset. The page labels the picks Unproven.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the less-code rule and consistency with the other 90 presets; the owner may ask for (b) if a liquidity list on the home page is unwanted.

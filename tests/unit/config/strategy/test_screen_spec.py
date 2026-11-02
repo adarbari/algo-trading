@@ -337,9 +337,11 @@ def test_every_site_preset_has_the_canonical_form_it_had_before_groups() -> None
     store = FileConfigStore(REPO_ROOT / "config", local=False)
     names = store.names("site", "screeners")
     assert names
+    grouped = set()
     for name in names:
         resolved = resolve_config(store, name, UserContext(SITE_USER))
         if "groups" in resolved.config.rules:
+            grouped.add(name)
             continue
         canonical = resolved.canonical()
         c = resolved.config
@@ -358,6 +360,7 @@ def test_every_site_preset_has_the_canonical_form_it_had_before_groups() -> None
         assert "groups" not in c.rules, name
         assert canonical == before, name
         assert resolved.screen_spec.groups == (), name
+    assert grouped == {"short_premium_liquidity"}  # a new grouped preset is a decision, not a drift
 
 
 def test_groups_resolve_through_the_layers_and_join_the_hash() -> None:

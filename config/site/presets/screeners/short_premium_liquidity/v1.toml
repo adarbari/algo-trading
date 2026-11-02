@@ -67,3 +67,7 @@ underlying_price = "rollup.option_liquidity@v1.underlying_price"
 iv30 = "rollup.option_liquidity@v1.iv30"
 liq_status = "rollup.option_liquidity@v1.liq_status"
 chain_asof = "rollup.option_liquidity@v1.chain_asof"
+
+[rank]
+tie_break = "rollup.option_liquidity@v1.chain_oi"   # every pick scores the same: deepest chain first
+tie_break_order = "desc"
