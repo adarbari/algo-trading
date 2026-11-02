@@ -21,8 +21,8 @@ id = "portfolio_effective_bets"
 term = "portfolio.effective_bets"
 short = "How many independent bets the open trades amount to, counting a name held twice once."
 body = """
-Each open trade counts equally, and the figure is one divided by the sum of the squared shares of
-each name: four trades in four names are 4 bets, four trades in one name are 1. Use it to stop a
+Each open trade counts equally. The figure is one divided by the sum of each name's squared share.
+Four trades in four names are 4 bets; four trades in one name are 1. Use it to stop a
 setup piling into one name. It is only the count of names when the trades are equal in size; no
 size is stored. An empty book is 0.
 """
