@@ -550,6 +550,11 @@ type Edge {
   The setup's state at the served session (ON, OFF, PAUSED or UNKNOWN with its reason; ADR 0088 decision 16); null: no session is served
   """
   setupState: SetupState
+
+  """
+  The example position of each of `instrumentIds` under this share setup at the served session (its side from what the setup stored that night, else long); null: no session is served
+  """
+  examplePositions(instrumentIds: [String!]!): [ExamplePosition!]
 }
 
 """One quality-bar answer: `key` names the question, `text` the answer"""
@@ -1182,6 +1187,31 @@ type EvidenceProgress {
   reached: Boolean!
   checks: [VerdictCriterion!]!
   outlook: EdgeOutlook
+}
+
+"""
+What a share setup's rule would open on one pick at the served session, never a size: `referenceClose` (the session's close; the entry is `entrySession`'s close), `stopPrice` from `stop` (the setup's exit rule), `exitSession` (the hold counted from the entry, a book's next rebalance). Each null figure says why in its `...Unknown`; `borrowAssumed`: a short pick
+"""
+type ExamplePosition {
+  edgeId: String!
+  instrumentId: String!
+  shape: ExampleShape!
+  referenceClose: Float
+  stopPrice: Float
+  stop: Stop
+  entrySession: Date
+  exitSession: Date
+  borrowAssumed: Boolean!
+  closeUnknown: Unknown
+  stopUnknown: Unknown
+  exitUnknown: Unknown
+}
+
+"""The shape of a share pick"""
+enum ExampleShape {
+  LONG_SHARES
+  SHORT_SHARES
+  BOOK
 }
 
 """

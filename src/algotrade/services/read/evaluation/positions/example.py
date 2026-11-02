@@ -21,20 +21,27 @@ A part that cannot be computed (no close, no exit rule, no basis) is an ``Unknow
 reason, never filled. One read of the closes for every pick and the exit rule once per setup (asked
 for the first long pick, so a fallback stop carries its multiple); when it falls back to the ATR
 stop, one read of every long pick's ATR. Measured on the store for 15 picks: about 0.04 s beyond
-the exit rule's own read, so no table (the 0.2 s bar). The option shape is a later slice (E9 2c)."""
+the exit rule's own read, so no table (the 0.2 s bar). The option shape is a later slice (E9 2c).
+
+``load_setup_examples`` is what a page asks (``Edge.examplePositions``): the setup's own inputs
+from its document (the entry delay, an entry condition, a book outcome) and each name's side from
+what the setup stored for the session (``pick_edges.load_edge_night``; a name it did not pick, or a
+night not stored, reads ``long``)."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions.exit_rule import ExitRuleSettings
 from algotrade.config.site.settings import site_document
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import last_session_of_month, next_session
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.evaluation.edges import Edge
+from algotrade.services.read.evaluation import pick_edges
+from algotrade.services.read.evaluation.edges import Edge, parsed_edges
 from algotrade.services.read.evaluation.positions.exit_rule import (
     ATR,
     ExitRule,
@@ -243,3 +250,24 @@ def load_example_positions(
             )
         )  # fmt: skip
     return tuple(out)
+
+
+def load_setup_examples(
+    ctx: ReadContext | None, edge: Edge, instrument_ids: Sequence[str]
+) -> tuple[ExamplePosition, ...] | None:
+    """The example position of each of ``instrument_ids`` under ``edge`` at the served session,
+    with the setup's own inputs (None: no session is served; empty: the document is not
+    readable)."""
+    if ctx is None:
+        return None
+    doc = next((e for e in parsed_edges(ctx, ctx.user.user_id) if e.id == edge.id), None)
+    if doc is None:
+        return ()
+    outcome = doc.outcome
+    night = pick_edges.load_edge_night(ctx, edge.id)
+    sides = {} if night is None else night.sides
+    book = outcome.kind == PORTFOLIO_KIND
+    picks = [PickInput(i, sides.get(i, LONG), book) for i in instrument_ids]
+    return load_example_positions(
+        ctx, edge, picks, outcome.start_offset_sessions, entry_condition=outcome.entry is not None
+    )
