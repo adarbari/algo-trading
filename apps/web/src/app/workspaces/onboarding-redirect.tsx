@@ -4,19 +4,14 @@
  * answer rides on the shell's `Appearance` read. A failed read never locks anyone out, the
  * question comes at the next visit.
  */
-import { useNavigate } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { Navigate } from '@tanstack/react-router';
 
 import { useStartTabUnanswered } from '@/entities/appearance';
 
-/** Renders nothing: sends a viewer who has not answered the question to it. */
+/** Renders nothing, or sends a viewer who has not answered the question to it. */
 export function OnboardingRedirect() {
-  const navigate = useNavigate();
-  const unanswered = useStartTabUnanswered(true) === true;
-  useEffect(() => {
-    if (unanswered && window.location.pathname !== '/settings') {
-      void navigate({ to: '/settings', replace: true });
-    }
-  }, [unanswered, navigate]);
-  return null;
+  const unanswered = useStartTabUnanswered() === true;
+  return unanswered && window.location.pathname !== '/settings' ? (
+    <Navigate to="/settings" replace />
+  ) : null;
 }

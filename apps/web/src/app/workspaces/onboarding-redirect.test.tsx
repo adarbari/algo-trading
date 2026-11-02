@@ -6,7 +6,10 @@ import { OnboardingRedirect } from './onboarding-redirect';
 const hooks = vi.hoisted(() => ({ prefs: vi.fn(), navigate: vi.fn() }));
 vi.mock('@/entities/appearance', () => ({ useStartTabUnanswered: hooks.prefs }));
 vi.mock('@tanstack/react-router', () => ({
-  useNavigate: () => hooks.navigate,
+  Navigate: (props: unknown) => {
+    hooks.navigate(props);
+    return null;
+  },
 }));
 
 beforeEach(() => {

@@ -11,7 +11,7 @@ import { SettingsPage } from '@/pages/settings';
 
 export function SettingsScreen() {
   const navigate = useNavigate();
-  const unanswered = useStartTabUnanswered(true) === true;
+  const unanswered = useStartTabUnanswered() === true;
   return unanswered ? (
     <OnboardingPage
       onDone={() => {
