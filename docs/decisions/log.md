@@ -284,6 +284,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: G18 settled that a schedule is not a variant key after the owner's (c), so the ladder is a sibling naming X1; identical parameters isolate the entry-date axis; joint trial counting cannot affect a verdict before the holdout closes, so it is a dated follow-up, not a blocker.
 
+## 2026-11-02 | FilterBar's narrow form (ADR 0052 MU3, ADR 0082, ADR 0085) | The sheet form stays; the `scroll` form is deleted
+- Question: which phone form of `FilterBar` stays, the sheet ("Filters · N" button, a side sheet) or the sideways-scrolling chip row?
+- Options: sheet / scroll.
+- Decision: the sheet. ADR 0082's `groups`, `count` and "Show N results" footer exist only in it; Evening Desk wants one pattern per job (the sheet is the phone's detail surface in `MasterDetail`); MU3 already made it the default. The `scroll` branch, its prop, story, test and screenshots are removed.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: `scroll` has no home for groups, range editors or the count, so keeping it would be a second, lesser filter model on phones.
 ## 2026-11-02 | ADR 0088 X9 | A share setup re-filed with the tails verdict profile: skipped for now
 - Question: build X9 (a share setup as a new version with `verdict_profile = "tails"`, judged beside its `return` version, owner decision 7), and which setup?
 - Options: build now / build after E6b-1 on the fattest-tailed judged setup / skip until a share setup is `promising`.

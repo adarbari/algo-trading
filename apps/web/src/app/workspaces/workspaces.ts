@@ -9,8 +9,6 @@ export interface Section {
   /** URL path of the section's route. */
   readonly path: string;
   readonly label: string;
-  /** What the section is for: set only while it is a placeholder page; a built page has none. */
-  readonly summary?: string;
 }
 
 export interface Workspace {
@@ -66,12 +64,10 @@ export const ADMIN: Workspace = {
     {
       path: '/admin/screener-runs',
       label: 'Screener runs',
-      summary: 'Per-user scheduled screens, run history and publishing (sharing) results.',
     },
     {
       path: '/admin/users',
       label: 'Users & configs',
-      summary: 'Users and their configs (site presets, user layers).',
     },
   ],
 };

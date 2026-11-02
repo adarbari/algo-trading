@@ -54,6 +54,7 @@ export interface TableFrameProps {
   notes?: SessionNotes | null | undefined;
   /** Above the table: filters. */
   header?: ReactNode;
+  /** One line of counts; empty when the filter bar's count already says it. */
   summary: string;
   /** Server paging; null: one page. */
   pager?: Pager | null | undefined;
@@ -124,9 +125,11 @@ export function TableFrame({
           rowLines={2}
           toolbar={
             <Stack direction="row" gap={2} align="center" wrap>
-              <Text size="sm" tone="muted">
-                {summary}
-              </Text>
+              {summary ? (
+                <Text size="sm" tone="muted">
+                  {summary}
+                </Text>
+              ) : null}
               {pager && pager.pages > 1 ? (
                 <Stack direction="row" gap={1} align="center">
                   <IconButton
