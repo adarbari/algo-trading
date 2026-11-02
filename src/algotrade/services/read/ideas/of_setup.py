@@ -4,10 +4,11 @@ public read of ``results/edge_picks``; this module never names the table). The r
 candidates, the edge's own row says which counted and their place; a probe row says what the
 night was when nobody counted (not a decision day, nothing picked, or not stored / unjudged, which
 is UNKNOWN with its reason, never "no picks", ADR 0081 decision 6). Until the setup state and the
-pick's side reach the page (E10), a night the setup gate closed and a short or long-short setup are
-UNKNOWN with the reason too, never listed as long picks or as "nothing picked". A run whose rank
-follows values the viewer's licences do not cover (``run_withheld``) yields no picks for them: the
-pick is not listed and its rank never shown, only counted as dropped (ADR 0083 amendment (a))."""
+pick's side reach the page (E10), a night the setup gate closed and a short, long-short or book
+setup are UNKNOWN with the reason too, never listed as long picks or as "nothing picked". A run
+whose rank follows values the viewer's licences do not cover (``run_withheld``) yields no picks for
+them: the pick is not listed and its rank never shown, only counted as dropped (ADR 0083
+amendment (a))."""
 
 from dataclasses import dataclass
 
@@ -89,8 +90,8 @@ def _night(
     if probe.code == pick_edges.PAUSED:  # the setup gate was closed (a probe has no own pause)
         text = f"{setup.edge.id}'s gate was closed at {ctx.session.date}: {probe.reason}"
         return UNKNOWN, _unknown(setup, ctx, text)
-    if probe.by_score:  # a short or long-short list is ranked by score, not the run's rows
-        text = f"{setup.edge.id} ranks short picks by score at {ctx.session.date}, not shown yet"
+    if probe.by_score:  # a short, long-short or book list is not the run's long picks
+        text = f"{setup.edge.id}'s short or book picks at {ctx.session.date} are not shown yet"
         return UNKNOWN, _unknown(setup, ctx, text)
     return None
 

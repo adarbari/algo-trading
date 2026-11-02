@@ -5,9 +5,9 @@ from datetime import date
 
 import pytest
 
-from algotrade.core.time.calendar import next_session, previous_session
+from algotrade.core.time.calendar import next_session, previous_session, sessions_between
 from algotrade.core.time.windows import WINDOW_LENGTHS, WINDOW_NAMES, windows
-from algotrade.services.evaluation.time_series.periods import periods
+from algotrade.services.evaluation.time_series.periods import periods, window_decides
 
 
 @pytest.mark.parametrize("name", WINDOW_NAMES)
@@ -55,3 +55,13 @@ def _ends_by(first: date, span: int, last: date) -> bool:
 def test_the_tiling_is_deterministic() -> None:
     a = periods("opex_week", date(2020, 1, 1), date(2024, 12, 31))
     assert a == periods("opex_week", date(2020, 1, 1), date(2024, 12, 31))
+
+
+@pytest.mark.parametrize("name", WINDOW_NAMES)
+def test_window_decides_on_exactly_the_decision_sessions_of_the_windows(name: str) -> None:
+    """The stored picks' check (ADR 0088): a session decides when it is a window's D."""
+    first, last = date(2024, 1, 1), date(2024, 12, 31)
+    decisions = {p.decision for p in periods(name, first, last) if p.inside}
+    inner = {d for d in decisions if date(2024, 3, 1) <= d <= date(2024, 10, 31)}
+    days = sessions_between(date(2024, 3, 1), date(2024, 10, 31))
+    assert {d for d in days if window_decides(name, d)} == inner

@@ -89,7 +89,7 @@ from algotrade.services.evaluation.cross_section.picks import (
     long_picks,
     side_picks,
 )
-from algotrade.services.evaluation.cross_section.portfolio.overlays import apply_overlays
+from algotrade.services.evaluation.cross_section.portfolio.book import book_at, held_book
 from algotrade.services.evaluation.cross_section.portfolio.session import (
     cash_return,
     portfolio_stat,
@@ -100,7 +100,6 @@ from algotrade.services.evaluation.cross_section.portfolio.session import (
 from algotrade.services.evaluation.cross_section.portfolio.weights import (
     Weights,
     average_books,
-    book_weights,
 )
 from algotrade.services.evaluation.cross_section.random_picks import (
     RandomStat,
@@ -337,19 +336,6 @@ def _siblings_stored(
     return any(v is not None for v in siblings.values())
 
 
-def _book(
-    scope: _Scope, session: SessionReads, run: RankedRun, names: Names, day: date
-) -> tuple[Weights, str]:
-    """The book one screener's run gives at D: the qualified names among the pickable ones, best
-    first, ``top_k`` of them, weighted (``portfolio/weights.py``); ``()`` and the reason when it
-    cannot be formed. No picks is a cash book."""
-    o = scope.edge.outcome
-    chosen = [i for i in run.qualified if i in names.pickable]
-    picks = chosen if scope.edge.top_k is None else chosen[: scope.edge.top_k]
-    vols = session.numbers(o.vol_field, frozenset(picks), day) if o.vol_field and picks else {}
-    return book_weights(picks, o.weighting, run.scores, vols, scope.edge.top_k)
-
-
 def _valued(
     scope: _Scope,
     session: SessionReads,
@@ -369,7 +355,7 @@ def _valued(
     book_vol: float | None = None
     risk_off: float | None = None
     if not why:
-        weights, book_vol, risk_off, why = apply_overlays(o, session, day, weights)
+        weights, book_vol, risk_off, why = held_book(scope.edge, session, day, (weights,))
     if why:
         return portfolio_stat(day, regime, None, why, (), o.cost_bps)
     constituents = blend(o.benchmark)
@@ -397,7 +383,7 @@ def _portfolio_stat(
 ) -> SessionStat:
     """One ``portfolio_return`` session (ADR 0074): one screener's book, valued at S; the decile
     figures are its ranking of the eligible names, when enough were scored."""
-    weights, why = _book(scope, session, run, names, leg.decision)
+    weights, why = book_at(scope.edge, session, run, names.pickable, leg.decision)
     scored = {i: v for i, v in run.scores.items() if i in names.ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(names.ids)  # too few scores to rank
     deciles = (
@@ -434,7 +420,7 @@ def _ensemble_stat(
             if lost is not None:
                 session.lost[variant.id, day] = lost  # counted as the lost session it is
             return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
-        book, why = _book(scope, session, run, names, day)
+        book, why = book_at(scope.edge, session, run, names.pickable, day)
         if why:
             return _valued(scope, session, leg, horizon, rows, (), f"{why}:{member.id}")
         books.append(book)
