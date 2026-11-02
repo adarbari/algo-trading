@@ -38,7 +38,7 @@ from algotrade.services.preview.options.pool import (
 )
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.options.session_inputs import (
-    SessionInputs,
+    PricingInputs,
     gap,
     load_session_inputs,
     report_inside,
@@ -116,7 +116,7 @@ def _candidates(pool: pd.DataFrame, contract: Contract, delta: float, same: bool
 
 
 def _rolls(
-    inputs: SessionInputs,
+    inputs: PricingInputs,
     deltas: OurDeltas,
     session: date,
     contract: Contract,

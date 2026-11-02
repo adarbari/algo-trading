@@ -29,7 +29,7 @@ __all__ = [
     "DIV_YIELD",
     "NEXT_REPORT",
     "OPTIONABLE",
-    "SessionInputs",
+    "PricingInputs",
     "gap",
     "load_session_inputs",
     "report_inside",
@@ -42,7 +42,7 @@ _COLUMNS = ["underlying_id", "expiry", "right", "strike", "bid", "ask", "open_in
 
 
 @dataclass(frozen=True)
-class SessionInputs:
+class PricingInputs:
     """One underlying's chain (``expiry`` as a date, one row per contract), positive spot,
     the session's curve and dividend yield ``q`` (0 when none is stored: ``q_known`` False),
     and its stored next report date (``report``, by catalogue name)."""
@@ -123,7 +123,7 @@ def report_inside(session: date, expiry: date, report: FeatureValue) -> bool | U
 
 def load_session_inputs(
     ctx: ReadContext, underlying_id: str, extra: tuple[str, ...] = ()
-) -> tuple[SessionInputs, tuple[FeatureValue, ...]] | Unknown:
+) -> tuple[PricingInputs, tuple[FeatureValue, ...]] | Unknown:
     """``underlying_id``'s inputs for ``ctx.session`` and the values of the catalogue names
     ``extra`` (in order), or why the name cannot be priced."""
     asked = [OPTIONABLE, NEXT_REPORT, DIV_YIELD, *extra]
@@ -145,4 +145,4 @@ def load_session_inputs(
         return spot
     q_known = dividend.unknown is None and isinstance(dividend.value, int | float)
     q = float(dividend.value) if q_known and dividend.value is not None else 0.0
-    return SessionInputs(chain, spot, curve, q, q_known, report), tuple(more)
+    return PricingInputs(chain, spot, curve, q, q_known, report), tuple(more)

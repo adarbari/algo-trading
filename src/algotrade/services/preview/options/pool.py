@@ -16,7 +16,7 @@ from algotrade.features.rollups.premium.band_pick import OurDeltas
 from algotrade.quant.rates import DAYS_PER_YEAR
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.identity import resolve_id
-from algotrade.services.read.options.session_inputs import SessionInputs
+from algotrade.services.read.options.session_inputs import PricingInputs
 from algotrade.services.read.session import NotFoundError
 
 PUT, CALL = "put", "call"
@@ -32,7 +32,7 @@ def underlying(ctx: ReadContext, key: str) -> str:
     return found
 
 
-def listed_expiries(inputs: SessionInputs, right: str, session: date) -> list[date]:
+def listed_expiries(inputs: PricingInputs, right: str, session: date) -> list[date]:
     """The expiries after ``session`` with a ``right`` listed, in order."""
     chain = inputs.chain
     found = chain.loc[chain["right"] == RIGHT_CODE[right], "expiry"]
@@ -40,7 +40,7 @@ def listed_expiries(inputs: SessionInputs, right: str, session: date) -> list[da
 
 
 def priced_pool(
-    inputs: SessionInputs, deltas: OurDeltas, session: date, expiry: date, right: str
+    inputs: PricingInputs, deltas: OurDeltas, session: date, expiry: date, right: str
 ) -> pd.DataFrame:
     """``COLUMNS`` of the two-sided ``right`` contracts at ``expiry``, by strike (empty when
     none is two-sided)."""

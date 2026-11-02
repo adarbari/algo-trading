@@ -223,7 +223,7 @@ owner = [
     "src/algotrade/services/read/options/session_inputs.py",  # what the grid and the calculators price from
 ]
 section = "docs/api/read-model.md#graphql-conventions"
-detect = [{ call = "load_option_grid" }, { call = "load_session_inputs" }]
+detect = [{ call = "load_option_grid" }]
 
 [[responsibility]]
 id = "pick-positions"

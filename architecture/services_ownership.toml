@@ -273,6 +273,7 @@ detect = [{ call = "OnDemandScreens" }]
 id = "option-calculators"
 description = "The option calculators (services/preview/options/, plan V11; screens OptRoll, OptCalls): from figures a trader types (a sold contract and its price, shares held and their price), never stored or logged, the rolls of a sold option to later expiries (extra credit, new breakeven, credit per extra day, our delta), and the calls they could sell on shares (premium over their price, the return if called away, the ex-dividend date and early-exercise risk); priced from exactly the session's chain through session_inputs (an Unknown when it cannot be), derived figures only (the vendor quote stops in pool.py); the API serves them as body-only POSTs"
 owner = ["src/algotrade/services/preview/options/*"]
+allowed = ["apps/api/algotrade_api/routes/preview/options.py"]  # the REST routes: one call each
 section = "docs/ui/evening-desk-plan.md#5-vertical-slices"
 detect = [{ call = "preview_roll" }, { call = "preview_calls" }, { call = "priced_pool" }]
 
