@@ -147,7 +147,7 @@ short = "The setup's own pages: its Guide entry, and its rules and track record.
 body = """
 Every idea comes from one setup, and the setup is where the evidence lives. Its Guide entry explains the mechanism in plain words and where it fails. Its page shows the rules, the history by year and regime, and how it has done since it was frozen. Read it once before relying on any pick from it.
 """
-see_also = ["idea_evidence", "verdict"]
+see_also = ["idea_evidence", "verdict", "setup_how_done"]
 
 # The option grid (ADR 0083 amendment of 2026-11-01).
 [[term]]
