@@ -91,6 +91,7 @@ def write_run(
     oos: dict[str, Any] | None = None,
     screener_hashes: dict[str, str] | None = None,
     evidence_licence: str | None = None,
+    exits_digest: str | None = None,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T; ``trades``: its ledger (``results/edge_trades``, its
@@ -126,6 +127,8 @@ def write_run(
         stats["screener_hashes"] = screener_hashes
     if evidence_licence is not None:  # runs from before the column read as open
         stats["evidence_licence"] = evidence_licence
+    if exits_digest is not None:  # an option setup's declared exits (runs before it: none)
+        stats["exits_digest"] = exits_digest
     if trigger is not None:  # runs from before the trigger was recorded have none
         stats["trigger"] = trigger
     record = RunRecord(run_id, f"edge-eval:{edge}:{owner}", END, at)

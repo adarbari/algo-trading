@@ -120,6 +120,7 @@ const response: IdeasResponse = {
   ideas: {
     session: '2026-10-02',
     total: 4,
+    watchlist: null,
     hasMore: false,
     nextCursor: null,
     facets: null,
@@ -196,6 +197,7 @@ function setup(initial: TopIdeasSearch = {}) {
     onCompare: vi.fn(),
     onOpen: vi.fn(),
     onScreeners: vi.fn(),
+    onOpenSettings: vi.fn(),
   };
   const view = render(
     <TestQueryProvider>
@@ -314,6 +316,14 @@ describe('TopIdeas', () => {
     const { grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
     expect(aapl).toHaveTextContent(/VRP scanner.*Liquidity #2/);
+  });
+
+  it('says how many of the ranked ideas are on the watchlist, and opens Settings', async () => {
+    hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>({ ...data, total: 2, watchlist: 9 }));
+    const { onOpenSettings } = setup();
+    expect(screen.getByText('Showing 2 of 9 ideas: your watchlist')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit watchlist' }));
+    expect(onOpenSettings).toHaveBeenCalled();
   });
 
   it('names a withheld screener beside the table, with its help', () => {

@@ -12,7 +12,12 @@ from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.positions.chain import grain_name, reads_share_path
-from algotrade.config.edges.positions.spec import ExitSettings, PositionSpec, check_edge
+from algotrade.config.edges.positions.spec import (
+    ExitSettings,
+    PositionSpec,
+    check_edge,
+    exits_digest,
+)
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.evaluation.forward.settle import outcome_hash
@@ -261,3 +266,12 @@ def test_adding_an_exit_is_a_new_version_of_the_setup_not_of_its_profile() -> No
     assert len({outcome_hash(plain), outcome_hash(held), outcome_hash(tighter)}) == 3
     assert identity_dict(asdict(plain.outcome)) != identity_dict(asdict(held.outcome))
     assert plain.verdict_profile == held.verdict_profile
+
+
+def test_the_exits_digest_names_the_declared_exits_and_only_them() -> None:
+    """What the run records so the exit rule it publishes is the one it tested (ADR 0088 d19)."""
+    spec = parse_edge(put(), "drift", WHERE).outcome.position
+    assert spec is not None and exits_digest(spec) == exits_digest(spec)
+    assert exits_digest(replace(spec, exit=ExitSettings(0.5, 3.0, 21))) != exits_digest(spec)
+    assert exits_digest(replace(spec, book=False)) == exits_digest(spec)  # not an exit
+    assert exits_digest(None) is None

@@ -33,6 +33,7 @@ const listed: Data = {
   session: '2026-10-02',
   state: 'listed',
   total: 1,
+  watchlist: null,
   leftOut: [{ kind: 'no_verdict', count: 2 }],
   ideas: [a],
   groups: [
@@ -73,6 +74,7 @@ const props = {
   onOpen: vi.fn(),
   onOpenEdge: vi.fn(),
   onOpenIdea: vi.fn(),
+  onOpenSettings: vi.fn(),
 };
 
 stubElementSize();
@@ -112,6 +114,20 @@ describe('SetupIdeas', () => {
     render(<SetupIdeas {...props} />);
     expect(screen.getByText('Unproven')).toBeVisible();
     expect(screen.getByText('pool here')).toBeVisible();
+  });
+
+  it('says how many of the ideas under the cap are on the watchlist, and opens Settings', async () => {
+    hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>({ ...listed, watchlist: 15 }));
+    render(<SetupIdeas {...props} />);
+    expect(screen.getByText('Showing 1 of 15 ideas: your watchlist')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit watchlist' }));
+    expect(props.onOpenSettings).toHaveBeenCalled();
+  });
+
+  it('shows no watchlist line without a watchlist', () => {
+    hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>(listed));
+    render(<SetupIdeas {...props} />);
+    expect(screen.queryByText(/your watchlist/)).not.toBeInTheDocument();
   });
 
   it('says so when nothing is stored', () => {

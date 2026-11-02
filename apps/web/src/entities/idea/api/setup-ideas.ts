@@ -20,6 +20,7 @@ const SetupIdeasQuery = graphql(`
       state
       ruleVersion
       total
+      watchlist
       leftOut {
         kind
         count

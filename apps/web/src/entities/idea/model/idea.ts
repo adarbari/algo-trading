@@ -127,6 +127,8 @@ export interface IdeasData {
   screeners: ScreenerSummary[];
   /** The server's counts for the filters in force (null: none sent or nothing stored). */
   facets: FilterFacets | null;
+  /** The ideas ranked before the viewer's watchlist kept the watched ones (null: no watchlist). */
+  watchlist: number | null;
 }
 
 const FLAG_LABELS: Record<string, string> = {
@@ -218,6 +220,7 @@ export const NO_IDEAS: IdeasData = {
   paused: [],
   screeners: [],
   facets: null,
+  watchlist: null,
 };
 
 function toPaused(entry: ServedPaused, names: ReadonlyMap<string, string>): PausedIdea {
@@ -245,5 +248,6 @@ export function toIdeasData(response: IdeasResponse): IdeasData {
     paused: found.paused.map((entry) => toPaused(entry, names)),
     screeners: found.screeners.map(toScreener),
     facets: found.facets ?? null,
+    watchlist: found.watchlist ?? null,
   };
 }

@@ -375,6 +375,7 @@ def write_edge_eval(
         "job_id": job_id,
         "run_hash": evaluation.run_hash,
         "screener_hashes": dict(evaluation.screener_hashes),
+        "exits_digest": evaluation.exits_digest,  # the declared exits it tested (ADR 0088 d19)
         "split_from": evaluation.split_from.isoformat() if evaluation.split_from else None,
         "exploratory": evaluation.exploratory,
         "range": [evaluation.start.isoformat(), evaluation.end.isoformat()],

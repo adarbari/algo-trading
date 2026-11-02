@@ -53,6 +53,7 @@ from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.spec import exits_digest
 from algotrade.config.edges.positions.templates import POSITION_PREFIX, load_templates
 from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.site.settings import load_verdict
@@ -322,6 +323,8 @@ class EdgeEvaluation:
     # The bootstrap's draws, mean block and seed version, recorded in the run record's stats
     # (the evidence measures' audit, ADR 0088 2.6); empty: no tail measures (a time-series run).
     bootstrap: Mapping[str, Any] = field(default_factory=dict)
+    # The main outcome's declared exits (``spec.exits_digest``; None: no position), in the stats.
+    exits_digest: str | None = None
 
 
 def _random_sets(
@@ -705,6 +708,7 @@ def evaluate_edge(
         edge_id=edge.id,
         run_hash=hashed,
         screener_hashes={v.id: v.hash for v in variants if v.role != BASELINE},
+        exits_digest=exits_digest(edge.outcome.position),
         user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,
@@ -789,6 +793,7 @@ def _time_series(
     return EdgeEvaluation(
         edge_id=edge.id,
         run_hash=run_hash(edge, [], start, end, as_of, split_from=split, random_draws=random_draws),
+        exits_digest=exits_digest(edge.outcome.position),
         user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,
