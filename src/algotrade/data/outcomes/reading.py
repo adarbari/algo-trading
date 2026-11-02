@@ -35,7 +35,8 @@ def window_closed(window_end: pd.Series, as_of: datetime) -> pd.Series:
         end = close_time(day) if is_session(day) else datetime.combine(day, time.max, UTC)
         return pd.Timestamp(end) <= stamp
 
-    return pd.to_datetime(window_end).dt.date.map(closed).astype(bool)
+    days = pd.to_datetime(window_end).dt.date
+    return days.map({d: closed(d) for d in days.unique()}).astype(bool)  # once per window end
 
 
 def fold_stamps(

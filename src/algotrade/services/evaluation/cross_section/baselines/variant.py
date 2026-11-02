@@ -96,9 +96,12 @@ def run_keys(plans: Sequence[Any]) -> frozenset[tuple[str, str]]:
 
 
 def split_keys(plans: Sequence[Any]) -> bool:
-    """Whether plans of one horizon hold different position keys: a stored leg's reuse is judged
-    per horizon, so such a run recomputes (never one setup's rows closing another's window)."""
+    """Whether share path plans of one horizon hold different position keys: a stored leg's reuse
+    is judged per horizon, so such a run recomputes (never one setup's rows closing another's
+    window). Option trade runs keep main's reuse (E3c-2b review: no recompute cost there)."""
     held: dict[int, set[frozenset[tuple[str, str]]]] = {}
     for p in plans:
+        if grain_of(p.scope) != "share_path":
+            continue
         held.setdefault(p.horizon, set()).add(own_keys(p.scope.edge, p.horizon))
     return any(len(keys) > 1 for keys in held.values())
