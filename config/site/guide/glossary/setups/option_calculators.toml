@@ -279,7 +279,7 @@ body = """
 The exchange sets a minimum margin for selling an option you have not covered, and most US brokers start from it. Your broker may require more, and may change it with the market, so treat the margin figure as the least it could be. We do not show any broker's own rule. For a call, this is the minimum for an uncovered (naked) call, the riskiest way to sell one.
 """
 next = "Ask your broker what it requires before you rely on the figure."
-see_also = ["margin_account", "margin_held"]
+see_also = ["margin_account", "margin_held", "describe_not_covered"]
 
 [[term]]
 id = "margin_cash_secured"
@@ -307,16 +307,16 @@ short = "What this order sets aside in the account you chose, from the switch be
 body = """
 Cash-secured shows the full amount; Margin account shows the exchange minimum. The other account's figure sits underneath so you can see the gap between them. For a put, cash-secured is its strike times 100 times the contracts. For a call, cash-secured is the shares held at tonight's price, and margin is the naked-call minimum.
 """
-see_also = ["margin_cash_secured", "margin_account", "margin_premium_collected"]
+see_also = ["margin_cash_secured", "margin_account", "margin_premium_collected", "margin_reg_t"]
 
 [[term]]
 id = "margin_premium_collected"
 term = "Premium collected"
 short = "What you would be paid now for these contracts, at the middle of tonight's stored bid and ask."
 body = """
-The premium per share times 100 times the contracts. The line beneath it says what share that is of the amount held in the chosen account, over the days to expiry, so it changes when you switch between Cash-secured and Margin account. It is a return over that period, not a yearly rate, and real fills are worse than a middle price.
+The premium per share times 100 times the contracts. The line beneath it says what share that is of the amount held in the chosen account, over the days to expiry. It changes when you switch between Cash-secured and Margin account. It is a return over that period, not a yearly rate, and real fills are worse than a middle price.
 """
-see_also = ["margin_held", "grid_mid"]
+see_also = ["margin_held", "margin_account", "grid_mid"]
 
 [[term]]
 id = "margin_size"
@@ -332,6 +332,6 @@ id = "margin_stress"
 term = "Worst stored episode stress"
 short = "What a put would be worth in the money if the stock fell as far as in its worst stored market fall."
 body = """
-We take the stock's own fall in the worst of the market falls we store (the Covid crash of 2020, the rate-hike bear market of 2022, the tariff shock of 2025) and apply it to tonight's price. The sentence says how far in the money the put would be on your contracts, before the premium you were paid. It is the stock's past, not a forecast, and it is shown for puts only. Margin multiplies losses as well as returns.
+We take the stock's own fall in the worst market fall we store. The stored falls are the Covid crash of 2020, the rate-hike bear market of 2022 and the tariff shock of 2025. We apply that fall to tonight's price. The sentence says how far in the money the put would be on your contracts. That is before the premium you were paid. It is the stock's past, not a forecast, and it is shown for puts only. Margin multiplies losses as well as returns.
 """
 see_also = ["margin_account", "margin_held"]
