@@ -411,3 +411,50 @@ CONTRACT_COLUMNS = (
     "pick_exit", "pick_exit_kind", "pick_source", "pick_licence", "pick_capital",
     "pick_roc_gross", "pick_roc", "pick_adverse",
 )  # fmt: skip
+
+
+def test_an_option_legs_cost_levels_and_base_roc_round_trip_and_every_other_leg_stores_none() -> (
+    None
+):
+    """E6b-2: each option pick's values at (mid, effective, full) as a flat list, three per pick
+    (null for a pick with none), and the base return on capital as moments; both nullable columns
+    with no version bump, so a share leg and a leg written before them carry nothing new."""
+    levelled = replace(CONTRACT_PICK, values_at=(0.012, 0.010, 0.008))
+    bare = Pick("EQ:L", 2, "no_entry_bar")
+    held = leg(
+        stat=stat(
+            pick_values=(0.03,), pick_hits=1, picks=(levelled, bare), base_roc=(5, 0.011, 0.0004)
+        )
+    )
+    row = encode_leg(held, "site", "drift")
+    assert row["pick_values_at"] == [0.012, 0.010, 0.008, None, None, None]
+    assert (row["base_roc_n"], row["base_roc_mean"], row["base_roc_m2"]) == (5, 0.011, 0.0004)
+    assert decode_leg(row).stat == held.stat
+    plain = encode_leg(leg(), "site", "drift")
+    assert plain["pick_values_at"] is None and plain["base_roc_n"] is None
+    assert decode_leg(plain).stat.base_roc is None
+    assert all(p.values_at is None for p in decode_leg(plain).stat.picks)
+    legacy = {k: v for k, v in row.items() if k not in ("pick_values_at", "base_roc_n")}
+    old = decode_leg(legacy).stat
+    assert old.base_roc is None and all(p.values_at is None for p in old.picks)
+    assert {"pick_values_at", "base_roc_n", "base_roc_mean", "base_roc_m2"} <= {
+        c.name for c in EDGE_LEGS.columns
+    }
+
+
+def test_the_option_columns_survive_a_store(backend: Backend) -> None:
+    levelled = replace(CONTRACT_PICK, values_at=(0.012, 0.010, 0.008))
+    full = leg(
+        stat=stat(
+            pick_values=(0.03,),
+            pick_hits=1,
+            picks=(levelled, Pick("EQ:L", 2, "x")),
+            base_roc=(5, 0.011, 0.0004),
+        )
+    )
+    write = ResultWriter(backend)
+    with write.publishing("r1", NOW):
+        write_legs(write, "r1", legs_frame([encode_leg(full, "site", "drift")], "r1", NOW))
+    found = read_legs(StoreReader(backend), "site", "drift", D, D)
+    stored = found.legs[full.key, full.edge_variant, full.variant, full.horizon, D]
+    assert stored.stat.picks == full.stat.picks and stored.stat.base_roc == (5, 0.011, 0.0004)

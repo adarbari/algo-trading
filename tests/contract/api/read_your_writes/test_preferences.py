@@ -56,3 +56,34 @@ def test_appearance_put_shows_the_saved_theme(
     assert c.put("/preferences/appearance", json={"theme": "light"}).status_code == 200
     assert gate.fresh(c, APPEARANCE)["theme"] == "light"
     assert gate.warm(trader_client, APPEARANCE)["theme"] == "system"  # bob's own
+
+
+PREFS = "query TraderPreferences { traderPreferences { defaultTab watchlist { instrumentId } } }"
+
+
+def test_ideas_put_shows_the_saved_default_tab(
+    gate: Gate, writer_client: TestClient, trader_client: TestClient
+) -> None:
+    c = writer_client
+    assert gate.warm(c, PREFS)["defaultTab"] is None
+    assert gate.warm(trader_client, PREFS)["defaultTab"] is None
+    assert c.put("/preferences/ideas", json={"default_tab": "premium"}).status_code == 200
+    assert gate.fresh(c, PREFS)["defaultTab"] == "premium"
+    assert gate.warm(trader_client, PREFS)["defaultTab"] is None  # bob's own
+
+
+def test_watchlist_put_shows_the_saved_instruments(
+    gate: Gate,
+    writer_client: TestClient,
+    trader_client: TestClient,
+) -> None:
+    c = writer_client
+    one = "EQ:AAA"
+    assert gate.warm(c, PREFS)["watchlist"] == []
+    assert gate.warm(trader_client, PREFS)["watchlist"] == []
+    assert c.put("/preferences/watchlist", json={"instruments": [one]}).status_code == 200
+    assert gate.fresh(c, PREFS)["watchlist"] == [{"instrumentId": one}]
+    gate.warm(c, PREFS)
+    assert c.put("/preferences/watchlist", json={"instruments": []}).status_code == 200
+    assert gate.fresh(c, PREFS)["watchlist"] == []
+    assert gate.warm(trader_client, PREFS)["watchlist"] == []  # bob's own

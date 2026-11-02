@@ -82,6 +82,9 @@ class Pick:
     adverse: float | None = None
     price_source: str | None = None
     outcome_licence: str | None = None
+    # An option pick's oriented value at each cost level (``OPTION_LEVELS``: mid, effective, full),
+    # from E6b-2; None for a share, an excluded pick and a leg stored before it.
+    values_at: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +153,11 @@ class SessionStat:
     # by the canary (None: no canary). Stored with the leg (nullable columns, no version bump).
     book_vol: float | None = None
     risk_off: float | None = None
+    # An option position's base: the mean return on capital of every counted eligible name (the
+    # picks included), as ``(n, mean, m2)`` over the names with a return on capital; None for
+    # every other outcome (``session_rocs`` derives it from the values) and a leg stored before
+    # E6b-2. Stored with the leg (nullable columns, no version bump).
+    base_roc: Moments | None = None
 
     @property
     def net_values(self) -> tuple[float, ...]:
@@ -236,6 +244,9 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         base_hits_at=_sum_levels([leg.base_hits_at for leg in legs]),
         pick_hits_at=_sum_levels([leg.pick_hits_at for leg in legs]),
         short_values=_pooled_short(legs),
+        base_roc=None
+        if any(leg.base_roc is None for leg in legs)
+        else merge_moments([leg.base_roc for leg in legs if leg.base_roc is not None]),
     )
 
 
@@ -371,7 +382,8 @@ def session_rocs(
     base's on the same names. A pick with no return on capital is left out of its session's mean
     and a session with none is left out of the series; a banded run (the held names are not the
     picks) and an outcome with no money have no series (nothing is measured, never zero).
-    The base: the picks' return on capital less the picks' value minus the base's value mean. For
+    The base: an option position's is stored with the leg (``SessionStat.base_roc``); else the
+    picks' return on capital less the picks' value minus the base's value mean. For
     ``excess_return``, ``option_model_pnl`` and ``pair_spread`` the return on capital less the
     value is one constant per session (the benchmark's return and the cost), so this is the
     base's own return on capital; NaN when ``base`` is off, for a spread and for a book."""
@@ -396,7 +408,9 @@ def session_rocs(
         rocs.append(roc)
         simple = not r.weights and r.short_values is None and len(known) == len(counted)
         mean, eligible = r.pick_mean, r.eligible
-        if base and simple and mean is not None and eligible:
+        if base and r.base_roc is not None:  # an option position: stored with the leg
+            bases.append(r.base_roc[1] if r.base_roc[0] else float("nan"))
+        elif base and simple and mean is not None and eligible:
             everyone = (sum(r.pick_values) + r.rest[0] * r.rest[1]) / eligible
             bases.append(roc - (mean - everyone))
         else:
@@ -530,6 +544,9 @@ class CostGrid:
     document_bp: float | None
     levels: tuple[float, ...]
     sign: float = 1.0  # the outcome's orientation: the stored values are ``sign * (gross - cost)``
+    # An option position's levels (``OPTION_LEVELS``, in the order the legs count them) in place
+    # of the bp grid: set, ``levels`` is empty and ``_level_rows`` writes the rows.
+    names: tuple[str, ...] = ()
 
     @property
     def own(self) -> float:
@@ -552,47 +569,83 @@ def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) ->
     cost), so a cost row leaves it unset and the reader serves the period's own. Capacity is not
     a cost figure: unset here."""
     measured = [r for r in rows if not r.excluded_coverage]
+    if costs.names:
+        return _level_rows(m, measured, costs.names)
     share = _trip_share(measured)
     found: dict[float, tuple[int, int]] = {costs.own: (m.hits, m.base_hits)}
     for index, bp in enumerate(costs.levels):
         counted = _level_hits(measured, index)
         if counted is not None and bp != costs.own:
             found[bp] = counted
-    out = []
-    for bp in sorted(found):
-        hits, base_hits = found[bp]
-        hit_rate, base_rate = _mean(hits, m.picks), _mean(base_hits, m.eligible)
-        out.append(
-            replace(
-                m,
-                top_decile_mean=None,
-                decile_spread=None,  # cost-invariant: the period's own row says it
-                decile_t=None,
-                decile_sessions=0,
-                effect_size=None,
-                sharpe=None,
-                picks_t=None,
-                deflated_sharpe=None,
-                trials=None,
-                pbo=None,
-                decile_means=(),
-                reference_rate=None,
-                touch_rate=None,
-                pick_adv_median=None,
-                pick_adv_known=None,
-                pick_adv_low=None,
-                tail=TailMeasures(),  # a cost row is not a tail row
-                slice_kind=COST,
-                slice_value=f"{m.slice_kind}:{bp:g}",
-                hits=hits,
-                base_hits=base_hits,
-                hit_rate=hit_rate,
-                base_rate=base_rate,
-                lift=lift(hit_rate, base_rate),
-                mean_excess_picks=_net(m.mean_excess_picks, costs.own, bp, costs.sign, share),
-                bh_mean=_net(m.bh_mean, costs.own, bp, costs.sign),
-            )
+    return [
+        _cost_row(
+            m,
+            f"{bp:g}",
+            *found[bp],
+            _net(m.mean_excess_picks, costs.own, bp, costs.sign, share),
+            _net(m.bh_mean, costs.own, bp, costs.sign),
         )
+        for bp in sorted(found)
+    ]
+
+
+def _cost_row(
+    m: SliceMeasure, label: str, hits: int, base_hits: int, mean: float | None, bh: float | None
+) -> SliceMeasure:
+    """Period ``m`` as the cost row ``label``: the hit rate, base rate, lift and means at that
+    cost; every other figure is unset (a cost row is not a tail row)."""
+    hit_rate, base_rate = _mean(hits, m.picks), _mean(base_hits, m.eligible)
+    return replace(
+        m,
+        top_decile_mean=None,
+        decile_spread=None,  # cost-invariant: the period's own row says it
+        decile_t=None,
+        decile_sessions=0,
+        effect_size=None,
+        sharpe=None,
+        picks_t=None,
+        deflated_sharpe=None,
+        trials=None,
+        pbo=None,
+        decile_means=(),
+        reference_rate=None,
+        touch_rate=None,
+        pick_adv_median=None,
+        pick_adv_known=None,
+        pick_adv_low=None,
+        tail=TailMeasures(),  # a cost row is not a tail row
+        slice_kind=COST,
+        slice_value=f"{m.slice_kind}:{label}",
+        hits=hits,
+        base_hits=base_hits,
+        hit_rate=hit_rate,
+        base_rate=base_rate,
+        lift=lift(hit_rate, base_rate),
+        mean_excess_picks=mean,
+        bh_mean=bh,
+    )
+
+
+def _level_rows(
+    m: SliceMeasure, measured: Sequence[SessionStat], names: Sequence[str]
+) -> list[SliceMeasure]:
+    """The cost rows of an option position, one per level in ``names`` (``<period>:<level>``): the
+    hits from each session's level counts and the mean of the counted picks' values at the level
+    (an option's value is not linear in the level, so it is stored per pick, never derived); a
+    level a session did not count, or a pick with no value at it, leaves its figure unset."""
+    counted = [p for r in measured for p in r.picks if not p.reason]
+    out = []
+    for index, name in enumerate(names):
+        found = _level_hits(measured, index)
+        if found is None:
+            continue
+        have = [p.values_at is not None and len(p.values_at) > index for p in counted]
+        mean = (
+            None
+            if not counted or not all(have)
+            else float(np.mean([p.values_at[index] for p in counted if p.values_at]))
+        )
+        out.append(_cost_row(m, name, *found, mean, None))
     return out
 
 

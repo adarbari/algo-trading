@@ -849,6 +849,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner's instruction of 2026-11-01 ("new screens are available and work end to end, incrementally"); the architect review (file-disjointness, ownership, licence, cache key) and the simplicity review (cut two components, merge slices).
 
+## 2026-11-01 | V7 onboarding | The sign-up question has two answers and the skip button starts with shares
+- Question: the mockup offers Stocks / Options / Both plus an optional watchlist; the amendment stores one `[ideas] default_tab` of `stocks` or `premium`. What does the question offer, and what does the skip store?
+- Options: three answers with Both = stocks / two answers (mostly shares, mostly options), Skip stores shares / Skip stores nothing and asks again.
+- Decision: two answers, "Mostly shares" (`stocks`) and "Mostly options (selling premium)" (`premium`); Skip stores `stocks`, so the question is asked once; the watchlist is added in Settings or with the Watch button, not in the question.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the stored value has two states; asking again on every visit after a Skip would nag; the user can change it any time in Settings.
 ## 2026-11-01 | Evening Desk V1 | Wording of the conflicts statement and the bar's Test tab
 - Question: what may the Guide's "Conflicts" section claim, and where does the bar's Test tab point before V9?
 - Options: claim only what ADR 0083 fixes / also state owner holdings and data-vendor ties.
@@ -871,6 +878,14 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: a `calendar_week` surface built today would serve every meaningful filter as `withheld` (NOT_STORED): `earnings_moves@v1` and `implied_move@v1` have no rows until their first nightly after this PR merges, so the bar would be empty chrome on the Calendar's default view; reusing the `universe` surface (sector, market cap, liquidity) is less code but filters a week's reports by the wrong axes and would conflate saved views with Explore's. The rule's intent (every many-row table gets the bar) holds through the dated line; the owner may instead choose the `universe` reuse now, which costs a filter-bar shared-code raise on `/calendar` (pre-approved) on top of the raise above.
+
+## 2026-11-02 | Pre-push queue | A machine-wide queue for `make changed`, most dependants first
+- Question: eight sessions pushing at once ran five pre-push `make changed` together (load 42, 12+ min each); how is the load bounded?
+- Options: leave it / a per-worktree lock only / one machine-wide queue.
+- Decision: one machine-wide queue (`scripts/ops/push_queue.py`), 2 slots by default, ordered by priority = open PRs that depend on the pushed one (stacked on it, or naming it as `Stacked on` / `Depends on` / `waits on` / `needs #N`), then arrival; a later push with more dependants goes first.
+- decided by: owner
+- status: final
+- Reasoning: the owner's decision in chat; two concurrent runs is what the 10-core / 16 GB Mac carries, and the PR others wait on should clear first.
 ## 2026-11-01 | ADR 0088 E6b (the judge's inputs) | Merge timing of the fingerprint shift, the 2-PR split, the tails defaults
 - Question: (1) E6b-1 changes every stored verdict fingerprint once; Ideas reads only stored verdicts (ADR 0083 decision 2) and auto-deploy restarts the API within 5 minutes of a merge (`docs/hosting.md`), so Ideas is empty from the deploy until rows exist under the new fingerprint. Merge on green, or hold for the owner? (2) Approve the split into E6b-1 (fingerprint PR) and E6b-2 (option harness, no fingerprint change) and the `[tails_verdict]` defaults?
 - Options: (1) merge on green as soon as CI passes / hold `no-automerge` + `needs-owner` for the owner's moment / make Ideas fall back to the live judge like the edges list (`versions.load_summary`). (2) one PR / two PRs; the 2.6 defaults / tighter or looser.

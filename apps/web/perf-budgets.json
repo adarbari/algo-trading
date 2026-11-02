@@ -29,7 +29,9 @@
       "src/pages/trader-regime/index.ts": 61600,
       "src/pages/trader-edges/ui/EdgeSections.tsx": 97900,
       "src/pages/admin-screener-runs/index.ts": 40900,
-      "src/pages/trader-explore/ui/UniverseTable.tsx": 91750
+      "src/pages/trader-explore/ui/UniverseTable.tsx": 91750,
+      "src/pages/screener-results/index.ts": 92100,
+      "src/pages/trader-screeners/index.ts": 36900
     }
   },
   "e2e": {
@@ -166,6 +168,11 @@
       "round_trip_depth": 5,
       "wire_gzip_bytes": 374400,
       "settled_ms": 3200
+    },
+    "/screeners": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 348500,
+      "settled_ms": 3100
     }
   }
 }
