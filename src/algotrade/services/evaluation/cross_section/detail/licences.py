@@ -2,7 +2,8 @@
 0028): the most restrictive catalogue licence of what the trial reads. The trial's (on
 ``edge_eval`` and every ledger row) is that of its implied-vol field (when the outcome reads one),
 its screen's features, its universe's features, its entry and case rules' fields (E13) and its
-setup gate's fields (E1: a gate over the personal VIX statistics makes the trial personal); a ledger
+setup gate's fields (E1: a gate over the personal VIX statistics makes the trial personal) and a
+book's canary and volatility-target fields (ADR 0074); a ledger
 column's is that of what it is derived from: the outcome value (with its gross value, reference
 and touch) from the implied-vol field, the score from the screen's features, the ADV from its
 own field. A field the catalogue
@@ -84,6 +85,9 @@ def trial_licences(
     ruled = {r.field for r in entry.when.rules()} if entry else set()
     ruled |= set(case_fields(position.cases)) if position is not None else set()
     ruled |= {r.field for r in edge.gate.rules()} if edge.gate is not None else set()  # (E1)
+    book = edge.outcome  # a portfolio book's overlays read a field at D too (ADR 0074)
+    ruled |= {book.canary.field} if book.canary is not None else set()
+    ruled |= {book.vol_return_field} if book.vol_target is not None else set()
     entry_licence = _of(features, sorted(ruled))
     value = iv_licence or OPEN
     return TrialLicences(

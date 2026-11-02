@@ -3,6 +3,7 @@ catalogue licence of what each is derived from; a field the catalogue does not k
 
 from dataclasses import replace
 
+from algotrade.config.edges.portfolio import Canary
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.predicates import Group, Rule
@@ -110,3 +111,22 @@ def test_a_gate_reading_a_personal_field_makes_the_trial_personal_and_nothing_el
     assert found.trial == "personal"
     assert (found.value, found.score, found.adv, found.outcome) == ("open",) * 4
     assert gated(OPEN_GATE).trial == "open"
+
+
+def test_a_book_overlay_reading_a_personal_field_makes_the_trial_personal() -> None:
+    """The canary and the volatility target read a field at D (ADR 0074): a personal one makes
+    the trial personal, as a gate's does."""
+    store = configs(PRICE)
+    resolved = resolve_config(store, "momo", USER)
+    universe = parse_selection(ACTIVE, "active")
+    features = catalogue(store, "site")
+    base = edge()
+
+    def with_outcome(**kw: object):  # type: ignore[no-untyped-def]
+        moved = replace(base, outcome=replace(base.outcome, **kw))  # type: ignore[arg-type]
+        return trial_licences(features, moved, universe, [resolved], None).trial
+
+    canary = Canary(("SPY",), IBKR, 1, ("CASH",))
+    assert with_outcome(canary=canary) == "personal"
+    assert with_outcome(vol_target=0.1, vol_return_field=IBKR) == "personal"
+    assert with_outcome(vol_return_field=IBKR) == "open"  # read only with a target
