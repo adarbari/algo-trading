@@ -781,3 +781,25 @@ def test_a_stored_base_roc_is_the_sessions_base_and_it_pools_by_the_names_counte
     assert pooled.base_roc is not None and pooled.base_roc[:2] == (4, pytest.approx(0.02))
     assert pooled.base_roc[2] == pytest.approx(2 * 0.01**2 * 2)  # between-leg spread of the means
     assert pool_stats([a, replace(s, base_roc=None)]).base_roc is None
+
+
+def test_the_option_values_reach_the_slice_and_a_share_setups_columns_stay_null() -> None:
+    """E6b-3: the picks' figures aggregate into ``tail``'s option columns; the same sessions with
+    no figures (a share setup) leave them None and move no other tail figure."""
+    days = [date(2026, 1, 5) + timedelta(days=i) for i in range(4)]
+
+    def pick(i: int, **figures: float | None) -> Pick:
+        return replace(roc_pick("A", 0.01 * i, 0.01 * i), roc_gross=0.02 * i + 0.02, **figures)
+
+    figured = [
+        roc_stat(d, (pick(i, hedged_roc=0.01, stock_roc=0.005 * (i + 1), wing_cost=0.02),), (0.0,))
+        for i, d in enumerate(days)
+    ]
+    shares = [roc_stat(d, (pick(i),), (0.0,)) for i, d in enumerate(days)]
+    spec = TailSpec("trial", TailsVerdict(bootstrap_draws=50))
+    got = slice_measures(figured, [ALL], tail=spec)[0].tail
+    assert got.hedged_mean_roc == pytest.approx(0.01) and got.wing_cost == pytest.approx(0.02)
+    assert got.stock_share == pytest.approx(0.05 / 0.20)  # sum(0.005 (i+1)) / sum(0.02 i + 0.02)
+    plain = slice_measures(shares, [ALL], tail=spec)[0].tail
+    assert (plain.hedged_mean_roc, plain.stock_share, plain.wing_cost) == (None, None, None)
+    assert replace(got, hedged_mean_roc=None, stock_share=None, wing_cost=None) == plain

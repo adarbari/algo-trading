@@ -105,10 +105,9 @@ from algotrade.services.evaluation.cross_section.random_picks import (
 )
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.reporting.report_containment import window_end
-from algotrade.services.evaluation.cross_section.sessions import (
-    Leg,
-)
+from algotrade.services.evaluation.cross_section.sessions import Leg
 from algotrade.services.evaluation.evidence.shapes import roc_moments, trade_frame
+from algotrade.services.evaluation.evidence.values import figures_by_name
 
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
 
@@ -532,15 +531,14 @@ def _picks(
     ``trade_frame`` over the picks only; ``entry`` is S, ``exit_on`` S + h sessions;
     ``levels``: an option edge's outcomes at each cost level (``values_at``); ``option_costs``: the
     commission its return on capital pays, as the pick value and the base do."""
-    if side == SHORT:
-        res = short_view(res)
+    res = short_view(res) if side == SHORT else res
     rows = chain_rows(edge, rows[rows["instrument_id"].isin(set(picks))])
     stored = rows.set_index("instrument_id")
     named = res.loc[[i for i in picks if i in res.index]]
     trades = trade_frame(
         edge, rows, named, entry=entry, bars_exit=exit_on, side=side, option_costs=option_costs
-    )
-    trades = trades.set_index("instrument_id")
+    ).set_index("instrument_id")
+    figures = figures_by_name(stored)  # an option's hedged / stock / wing figures (E6b-3)
     gross = is_return(edge)
     out = []
     for rank, i in enumerate(picks, start=1):
@@ -573,6 +571,7 @@ def _picks(
                 price_source=str(trades.at[i, "price_source"]),
                 outcome_licence=str(trades.at[i, "outcome_licence"]),
                 values_at=level_values(levels, i) if counted else None,
+                **(figures.get(i, {}) if counted else {}),
             )
         )
     return tuple(out)

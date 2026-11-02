@@ -155,3 +155,74 @@ def test_a_pick_pays_the_commission_the_pick_value_and_the_base_pay() -> None:
     bare = _picks(*args)  # type: ignore[arg-type]
     assert paid[0].roc == pytest.approx((1.00 - 0.15 - 0.013) / 100)
     assert bare[0].roc == pytest.approx((1.00 - 0.15) / 100)
+
+
+# --- the option-only figures (ADR 0088, E6b-3), at the mid level --------------------------------
+
+
+def _spread(**changes: object) -> pd.DataFrame:
+    """A put credit spread: short 1 at mid 2.00, long 1 (the wing) at mid 0.50; collateral 400,
+    hedged mid P&L 1.20 and stock P&L 0.30 per unit."""
+    rows = _option_rows(
+        collateral=400.0, pnl_mid=1.5, pnl_hedged_mid=1.2, stock_pnl=0.3,
+    )  # fmt: skip
+    rows["leg_kinds"] = pd.Series([["option", "option"]] * len(rows), dtype=object)
+    rows["leg_qty"] = pd.Series([[-1.0, 1.0]] * len(rows), dtype=object)
+    rows["leg_entry_mid"] = pd.Series([[2.0, 0.5]] * len(rows), dtype=object)
+    for name, value in changes.items():
+        rows[name] = value
+    return rows
+
+
+def test_the_option_figures_by_hand() -> None:
+    found = values.option_figures(_spread())
+    assert found["hedged_roc"][0] == pytest.approx(1.2 / 400)
+    assert found["stock_roc"][0] == pytest.approx(0.3 / 400)
+    assert found["wing_cost"][0] == pytest.approx(0.5 / 400)  # the long leg only, over collateral
+
+
+def test_a_figure_that_cannot_be_known_is_nan_never_zero() -> None:
+    long_only = _spread()
+    long_only["leg_qty"] = pd.Series([[1.0, 1.0]] * 3, dtype=object)  # no short leg: no wing
+    no_stock = _spread(stock_pnl=np.nan, pnl_hedged_mid=np.nan)
+    none = _spread(collateral=np.nan)
+    assert np.isnan(values.option_figures(long_only)["wing_cost"]).all()
+    assert np.isnan(values.option_figures(no_stock)["stock_roc"]).all()
+    assert np.isnan(values.option_figures(no_stock)["hedged_roc"]).all()
+    assert all(np.isnan(v).all() for v in values.option_figures(none).values())
+    two_shorts = _spread()
+    two_shorts["leg_qty"] = pd.Series([[-1.0, -1.0]] * 3, dtype=object)
+    assert np.isnan(values.option_figures(two_shorts)["wing_cost"]).all()
+
+
+def test_a_wing_is_the_long_option_legs_of_a_position_with_a_short_one_and_shares_are_not() -> None:
+    rows = _spread()
+    rows["leg_kinds"] = pd.Series([["option", "option", "shares"]] * 3, dtype=object)
+    rows["leg_qty"] = pd.Series([[-1.0, 2.0, 1.0]] * 3, dtype=object)
+    rows["leg_entry_mid"] = pd.Series([[2.0, 0.5, np.nan]] * 3, dtype=object)
+    assert values.option_figures(rows)["wing_cost"][0] == pytest.approx(2 * 0.5 / 400)
+
+
+def test_the_figures_are_the_same_at_every_cost_level_and_a_share_table_has_none() -> None:
+    rows = _spread()
+    mid = values.option_figures(values.at_level(rows, "mid", COSTS))
+    full = values.option_figures(values.at_level(rows, "full", COSTS))
+    assert all(np.array_equal(mid[k], full[k], equal_nan=True) for k in mid)
+    assert values.figures_by_name(rows.set_index("instrument_id").iloc[:, :3]) == {}
+    named = values.figures_by_name(rows.set_index("instrument_id"))
+    assert named[rows["instrument_id"][0]]["wing_cost"] == pytest.approx(0.5 / 400)
+    nulled = values.figures_by_name(_spread(stock_pnl=np.nan).set_index("instrument_id"))
+    assert nulled[rows["instrument_id"][0]]["stock_roc"] is None
+
+
+def test_a_pick_carries_the_figures_at_the_mid_level_whatever_the_main_level() -> None:
+    e = edge(outcome=CHAIN)
+    rows = _spread()
+    ids = list(rows["instrument_id"])
+    res = apply_outcome(e, rows, option_costs=COSTS).set_index("instrument_id")
+    args = (e, ids, {}, res, rows, {}, "long", DAY, EXIT)
+    for costs in (COSTS, None):  # the commission changes the pick's roc, never these figures
+        pick = _picks(*args, option_costs=costs)[0]  # type: ignore[arg-type]
+        assert (pick.hedged_roc, pick.stock_roc) == (pytest.approx(0.003), pytest.approx(0.00075))
+        assert pick.wing_cost == pytest.approx(0.00125)
+    assert _picks(*args)[0].roc_gross == pytest.approx(1.5 / 400)  # type: ignore[arg-type]

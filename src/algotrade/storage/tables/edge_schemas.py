@@ -70,6 +70,8 @@ EDGE_EVAL = fixed(
         "reference_rate", "touch_rate", "pick_adv_median",
         "mean_roc", "mean_roc_lo", "mean_roc_hi", "excess_roc", "excess_roc_t", "cvar_5", "cvar_1",
         "base_cvar_5", "worst_window", "psr",
+        # E6b-3 (nullable, no version bump): the option-only values, null for a share setup.
+        "hedged_mean_roc", "stock_share", "wing_cost",
         *(f"decile_mean_{i:02d}" for i in range(1, 11)),
     ),
     runs="merge",
@@ -231,6 +233,9 @@ EDGE_LEGS = fixed(
     # E6b-2 (nullable, no version bump): an option pick's value at each cost level (``mid``,
     # ``effective``, ``full``), flat, three per pick, aligned to ``pick_ids``.
     "pick_values_at float64[]",
+    # E6b-3 (nullable, no version bump): an option pick's hedged return on capital, stock return
+    # on capital and wing cost, flat, three per pick, aligned to ``pick_ids`` (``pick_option``).
+    "pick_option float64[]",
     *(f"{n} int64[]" for n in ("pick_ranks", "pick_flags", "base_hits_at", "pick_hits_at")),
     *(f"{n} string[]" for n in ("pick_ids", "pick_reasons")),
     *(f"{n} int64" for n in (
