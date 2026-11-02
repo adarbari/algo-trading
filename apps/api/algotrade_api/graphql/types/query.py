@@ -60,7 +60,6 @@ from algotrade.services.read.ops.admin_runs import harness_runs, screener_runs
 from algotrade.services.read.ops.admin_runs.screener_runs import RunStatus
 from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, screeners, views
-from algotrade.services.read.users.appearance import load_appearance
 from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import selects
 from algotrade_api.graphql.limits import (
@@ -70,7 +69,7 @@ from algotrade_api.graphql.limits import (
     MAX_PAGE,
     MaxItems,
 )
-from algotrade_api.graphql.offload import INLINE, off_loop
+from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.coverage.known_values import KnownCoverage
@@ -122,9 +121,8 @@ from algotrade_api.graphql.types.screens.document import ScreenDetail, ScreenLis
 from algotrade_api.graphql.types.screens.screener import Screener
 from algotrade_api.graphql.types.screens.view import TableView
 from algotrade_api.graphql.types.session import Session
-from algotrade_api.graphql.types.users.appearance import Appearance
 from algotrade_api.graphql.types.users.feature_requests import MyFeatureRequest
-from algotrade_api.graphql.types.users.viewer import Viewer
+from algotrade_api.graphql.types.users.queries import UserQuery
 
 MAX_RUNS = 100  # nightlyRuns(limit)
 MAX_SESSIONS = 60  # completeness(sessions)
@@ -135,26 +133,7 @@ MAX_REFS = 100  # guideEntries(refs)
 
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
-class Query(IdeasQuery):
-    @strawberry.field(  # type: ignore[untyped-decorator]
-        description="Who this request is for: the signed-in registry user, their role and "
-        "workspaces (ADR 0040; not session data)",
-        metadata=INLINE,  # no I/O: never queues behind the page's reads
-    )
-    def viewer(self, info: Ctx) -> Viewer:
-        return Viewer.of(load_viewer(info.context.viewer))
-
-    @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The theme the user chose (`light`, `dark` or `system`; ADR 0085): "
-        "`system` when nothing valid is stored. Per user, not session data; not part of `viewer`, "
-        "which has no I/O"
-    )
-    def appearance(self, info: Ctx) -> Appearance:
-        ctx = info.context.stores()
-        return (
-            Appearance.of(load_appearance(ctx)) if ctx is not None else Appearance(theme="system")
-        )
-
+class Query(IdeasQuery, UserQuery):
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session `date` resolves to; null: nothing stored"
     )

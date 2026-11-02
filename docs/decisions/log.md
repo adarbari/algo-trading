@@ -849,6 +849,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner's instruction of 2026-11-01 ("new screens are available and work end to end, incrementally"); the architect review (file-disjointness, ownership, licence, cache key) and the simplicity review (cut two components, merge slices).
 
+## 2026-11-01 | V7 onboarding | The sign-up question has two answers and the skip button starts with shares
+- Question: the mockup offers Stocks / Options / Both plus an optional watchlist; the amendment stores one `[ideas] default_tab` of `stocks` or `premium`. What does the question offer, and what does the skip store?
+- Options: three answers with Both = stocks / two answers (mostly shares, mostly options), Skip stores shares / Skip stores nothing and asks again.
+- Decision: two answers, "Mostly shares" (`stocks`) and "Mostly options (selling premium)" (`premium`); Skip stores `stocks`, so the question is asked once; the watchlist is added in Settings or with the Watch button, not in the question.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the stored value has two states; asking again on every visit after a Skip would nag; the user can change it any time in Settings.
 ## 2026-11-01 | V8 Calendar PR (#1027) | /calendar distant-link budget raised by the Earnings week table
 - Question: the Earnings week table (FeatureTable, the column factories and the column picker now load on `/calendar`) puts the route at 357013 B gzip on the wire against the shrink-only `network` budget of 334800 B (+22 kB). Raise once, or make the week view lighter?
 - Options: raise the one route budget to measured + the 5 % headroom with a dated reason / a lighter week view (a lazy table chunk, the picker split out) / drop the table for a list.

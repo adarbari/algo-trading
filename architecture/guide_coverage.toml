@@ -31,7 +31,9 @@
 # fails until its line is removed. `enums` are sources, `sections` are paths, `panels` are the
 # uncovered titled containers per file.
 
-non_sections = []
+# /settings (reached from the account menu; the one sign-up question while it is unanswered):
+# a page around the product, not a section of it; every control on it has its Guide term.
+non_sections = ["/settings"]
 
 [panels]
 tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]

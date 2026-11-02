@@ -36,3 +36,20 @@ def test_a_stored_theme_is_read(theme: str) -> None:
 )
 def test_a_missing_or_malformed_choice_reads_as_system(document: Any) -> None:
     assert load_appearance(ctx_of(document)) == Appearance("system")
+
+
+@pytest.mark.parametrize(
+    ("document", "tab"),
+    [
+        ({"ideas": {"default_tab": "premium"}}, "premium"),
+        ({"ideas": {"default_tab": "stocks"}}, "stocks"),
+        ({"ideas": {"default_tab": "Stocks"}}, None),
+        ({"ideas": {"priority": ["vrp"]}}, None),
+        ({"ideas": "stocks"}, None),
+        ({}, None),
+    ],
+)
+def test_the_stored_start_tab_rides_on_the_read_and_is_none_until_answered(
+    document: Any, tab: str | None
+) -> None:
+    assert load_appearance(ctx_of(document)).start_tab == tab

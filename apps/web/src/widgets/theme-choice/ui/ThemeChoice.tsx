@@ -1,5 +1,5 @@
 /**
- * The account menu's Light / Dark / System choice (ADR 0085): a segmented control under a
+ * The Settings Light / Dark / System choice (ADR 0085): a segmented control under a
  * "Theme" label with its Guide help button. A change applies at once and saves in the
  * background; a failed save keeps the choice for this session and says so.
  */

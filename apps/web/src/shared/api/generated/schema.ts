@@ -245,6 +245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preferences/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Ideas */
+        put: operations["save_ideas_preferences_ideas_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences/views/{scope}/view": {
         parameters: {
             query?: never;
@@ -258,6 +275,23 @@ export interface paths {
         post?: never;
         /** Delete View */
         delete: operations["delete_view_preferences_views__scope__view_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/preferences/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Watchlist */
+        put: operations["save_watchlist_preferences_watchlist_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -987,6 +1021,22 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Ideas */
+        Ideas: {
+            /**
+             * Default Tab
+             * @description the saved choice: stocks or premium
+             */
+            default_tab: string;
+        };
+        /** IdeasBody */
+        IdeasBody: {
+            /**
+             * Default Tab
+             * @description stocks or premium: the Ideas tab to open on
+             */
+            default_tab: string;
         };
         /** JobStatus */
         JobStatus: {
@@ -1900,6 +1950,22 @@ export interface components {
              */
             names: string[];
         };
+        /** Watchlist */
+        Watchlist: {
+            /**
+             * Instruments
+             * @description the saved instrument ids, in order
+             */
+            instruments: string[];
+        };
+        /** WatchlistBody */
+        WatchlistBody: {
+            /**
+             * Instruments
+             * @description instrument ids (never tickers), each once, at most 50; replaces the list
+             */
+            instruments: string[];
+        };
     };
     responses: never;
     parameters: never;
@@ -2375,6 +2441,42 @@ export interface operations {
             };
         };
     };
+    save_ideas_preferences_ideas_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeasBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ideas"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_view_preferences_views__scope__view_put: {
         parameters: {
             query?: {
@@ -2440,6 +2542,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ViewNames"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_watchlist_preferences_watchlist_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Watchlist"];
                 };
             };
             /** @description Validation Error */

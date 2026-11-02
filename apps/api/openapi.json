@@ -1356,6 +1356,34 @@
         "title": "Health",
         "type": "object"
       },
+      "Ideas": {
+        "properties": {
+          "default_tab": {
+            "description": "the saved choice: stocks or premium",
+            "title": "Default Tab",
+            "type": "string"
+          }
+        },
+        "required": [
+          "default_tab"
+        ],
+        "title": "Ideas",
+        "type": "object"
+      },
+      "IdeasBody": {
+        "properties": {
+          "default_tab": {
+            "description": "stocks or premium: the Ideas tab to open on",
+            "title": "Default Tab",
+            "type": "string"
+          }
+        },
+        "required": [
+          "default_tab"
+        ],
+        "title": "IdeasBody",
+        "type": "object"
+      },
       "JobStatus": {
         "properties": {
           "error": {
@@ -3273,6 +3301,40 @@
         ],
         "title": "ViewNames",
         "type": "object"
+      },
+      "Watchlist": {
+        "properties": {
+          "instruments": {
+            "description": "the saved instrument ids, in order",
+            "items": {
+              "type": "string"
+            },
+            "title": "Instruments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instruments"
+        ],
+        "title": "Watchlist",
+        "type": "object"
+      },
+      "WatchlistBody": {
+        "properties": {
+          "instruments": {
+            "description": "instrument ids (never tickers), each once, at most 50; replaces the list",
+            "items": {
+              "type": "string"
+            },
+            "title": "Instruments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instruments"
+        ],
+        "title": "WatchlistBody",
+        "type": "object"
       }
     }
   },
@@ -4116,6 +4178,67 @@
         ]
       }
     },
+    "/preferences/ideas": {
+      "put": {
+        "operationId": "save_ideas_preferences_ideas_put",
+        "parameters": [
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdeasBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ideas"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Ideas",
+        "tags": [
+          "ideas"
+        ]
+      }
+    },
     "/preferences/views/{scope}/view": {
       "delete": {
         "operationId": "delete_view_preferences_views__scope__view_delete",
@@ -4268,6 +4391,67 @@
           }
         },
         "summary": "Save View",
+        "tags": [
+          "ideas"
+        ]
+      }
+    },
+    "/preferences/watchlist": {
+      "put": {
+        "operationId": "save_watchlist_preferences_watchlist_put",
+        "parameters": [
+          {
+            "description": "whose configs (default: the caller's; another user's: admins only)",
+            "in": "header",
+            "name": "X-Act-For",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (default: the caller's; another user's: admins only)",
+              "title": "X-Act-For"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Watchlist"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Watchlist",
         "tags": [
           "ideas"
         ]

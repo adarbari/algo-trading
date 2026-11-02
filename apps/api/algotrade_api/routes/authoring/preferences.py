@@ -1,7 +1,10 @@
 """``PUT`` / ``DELETE /preferences/views/{scope}/view``: save the user's views of a table
 (``scope``: ``screener:<id>`` for a screener's results), checked before saving. Reading a view is
 GraphQL (``Query.view``). ``PUT /preferences/appearance``: save the user's theme (light, dark or
-system; ADR 0085), read back by ``Query.appearance``. The Ideas screener priority is retired
+system; ADR 0085), read back by ``Query.appearance``. ``PUT /preferences/watchlist`` and
+``/preferences/ideas``: save the watchlist (instrument ids; 404 on an empty store, which has no
+reference to check them against) and the default Ideas tab (ADR 0083), read back by
+``Query.traderPreferences``. The Ideas screener priority is retired
 (owner decision 2026-10-22: the Ideas rule ranks by position and weight)."""
 
 from typing import Annotated
@@ -9,13 +12,17 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from algotrade.services.authoring import preferences
-from algotrade_api.deps import User, Writer
+from algotrade_api.deps import Context, User, Writer
 from algotrade_api.schemas.authoring.preferences import (
     Appearance,
     AppearanceBody,
+    Ideas,
+    IdeasBody,
     TableView,
     TableViewBody,
     ViewNames,
+    Watchlist,
+    WatchlistBody,
 )
 
 router = APIRouter(prefix="/preferences", tags=["ideas"])
@@ -67,3 +74,13 @@ def delete_view(
 @router.put("/appearance")
 def save_appearance(writer: Writer, user: User, body: AppearanceBody) -> Appearance:
     return Appearance(theme=preferences.save_appearance(writer, user, body.theme))
+
+
+@router.put("/watchlist")
+def save_watchlist(writer: Writer, user: User, ctx: Context, body: WatchlistBody) -> Watchlist:
+    return Watchlist(instruments=preferences.save_watchlist(writer, user, body.instruments, ctx))
+
+
+@router.put("/ideas")
+def save_ideas(writer: Writer, user: User, body: IdeasBody) -> Ideas:
+    return Ideas(default_tab=preferences.save_ideas_tab(writer, user, body.default_tab))

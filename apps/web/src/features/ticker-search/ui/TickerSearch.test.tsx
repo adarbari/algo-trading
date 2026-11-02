@@ -14,8 +14,8 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
 }));
 
 const rows = [
-  { symbol: 'NVDA', name: 'NVIDIA Corp' },
-  { symbol: 'NVO', name: 'Novo Nordisk' },
+  { symbol: 'NVDA', name: 'NVIDIA Corp', instrumentId: 'EQ:NVDA' },
+  { symbol: 'NVO', name: 'Novo Nordisk', instrumentId: 'EQ:NVO' },
 ];
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ describe('TickerSearch', () => {
     expect(screen.getByRole('option', { name: /NVO.*open.*Novo Nordisk/ })).toBeInTheDocument();
     await expectNoA11yViolations(container);
     await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
-    expect(onChoose).toHaveBeenCalledWith('NVO');
+    expect(onChoose).toHaveBeenCalledWith('NVO', 'EQ:NVO');
     expect(box).toHaveValue('');
   });
 

@@ -16,8 +16,8 @@ export const SEARCH_DEBOUNCE_MS = 200;
 export const SUGGESTIONS = 8;
 
 export interface TickerSearchProps {
-  /** A ticker was chosen. */
-  onChoose: (symbol: string) => void;
+  /** A ticker was chosen (and the instrument id the server gave it). */
+  onChoose: (symbol: string, instrumentId: string) => void;
   /** Tickers already chosen: their suggestion says so. */
   chosen?: readonly string[];
   /** The key that focuses the box from anywhere outside a text field. */
@@ -48,7 +48,8 @@ export function TickerSearch({ onChoose, chosen = [], focusKey }: TickerSearchPr
       emptyMessage={`No ticker matches “${asked}”`}
       onInputChange={setTyped}
       onValueChange={(symbol) => {
-        if (symbol) onChoose(symbol);
+        const row = (found.data?.rows ?? []).find((r) => r.symbol === symbol);
+        if (symbol && row) onChoose(symbol, row.instrumentId);
         setTyped('');
       }}
     />
