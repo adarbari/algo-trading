@@ -144,6 +144,25 @@ def test_positions_come_from_the_open_edge_documents_one_key_per_exit_rule_and_h
     assert _wanted(MemoryConfigStore({})) == []
 
 
+def test_each_grid_point_is_a_position_the_writer_stores() -> None:
+    configs = _configs()
+    doc = configs.load("site", "edges", "drift")
+    assert doc is not None
+    doc["variant_grid"] = [{"prefix": "g", "strike_delta": [0.2, 0.3]}]  # a sleeve's grid only
+    doc["base"] = "delta_equivalent"
+    doc["universe"] = {
+        "where": {"all": [{"field": "instrument.symbol", "op": "in", "value": ["A"]}]}
+    }
+    docs = {
+        **PRESETS,
+        ("site", "edges", "drift"): doc,
+        ("site", "positions", "templates"): TEMPLATES,
+    }
+    wanted = _wanted(MemoryConfigStore(docs))
+    deltas = sorted(parse_position_key(w.key).legs[0].delta for w in wanted)
+    assert deltas == [0.2, 0.25, 0.3]  # the edge's own position and one per grid point
+
+
 def test_a_window_is_written_to_its_start_partition_known_when_its_exit_chain_was() -> None:
     writer, reader = _chains()
     record = compute_option_outcomes(_ctx(writer, _configs()), END)

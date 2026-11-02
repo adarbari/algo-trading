@@ -4,5 +4,7 @@ same instrument's returns outside every window, not against a cross-section of n
 their tiled out-of-window stretches are ``periods.py``; the one module that reads outcomes (and the
 bill rate, and turns a symbol into an id) is ``harness.py``; ``measures.py`` turns the two series
 into the ``SliceMeasure`` rows the verdict already reads; ``random_windows.py`` draws the seeded
-random window sets; ``evaluate.py`` runs one edge. ``cross_section/harness.py`` calls it and
-wraps the result as an ``EdgeEvaluation``."""
+random window sets; ``evaluate.py`` runs one edge. ``sleeve.py`` runs a named option sleeve
+(``base = "delta_equivalent"``, ADR 0088 decision 14): its option trades against the
+delta-equivalent stock at the same entry session, per edge variant and grid point.
+``cross_section/harness.py`` calls them and wraps the result as an ``EdgeEvaluation``."""

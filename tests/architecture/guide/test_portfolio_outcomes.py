@@ -26,6 +26,7 @@ BASE_TERMS = {  # the other bases have terms of their own (event schedules, time
     "event": None,
     "universe": None,
     "out_of_window": None,
+    "delta_equivalent": None,  # its own term: base_delta_equivalent (edge_calendar.toml)
     BENCHMARK_BASE: "blended_benchmark",
 }
 OOS_TERMS = {"trend": "oos_haircut"}  # an ``oos_class`` and the term explaining its haircut

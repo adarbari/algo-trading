@@ -14,6 +14,7 @@ from algotrade.config.edges.positions.cases import Case, CaseValue
 from algotrade.config.edges.positions.key import (
     case_point,
     case_points,
+    grid_outcomes,
     key_of,
     parse_position_key,
     parsed_key,
@@ -142,6 +143,26 @@ def test_the_writer_stores_every_combination_a_name_can_resolve_to() -> None:
     assert position_key(case_point(case_valued, (30, 5), TEMPLATES), 21) in keys
 
 
+def test_each_grid_point_is_the_edges_outcome_with_its_values_and_legs_resolved_again() -> None:
+    edge = with_legs(
+        parse_edge(
+            document(
+                schedule="every_session", outcome=PUT,
+                variant_grid=[{"prefix": "g", "strike_delta": [0.15, 0.25], "take_profit": [0.5]}],
+            ),
+            "drift", WHERE,
+        ),
+        TEMPLATES,
+    )  # fmt: skip
+    points = grid_outcomes(edge, TEMPLATES)
+    assert [p for p, _ in points] == ["g_d15_tp50", "g_d25_tp50"]
+    assert [o.position.legs[0].delta for _, o in points] == [0.15, 0.25]  # the wing keeps 0.1
+    assert {o.position.exit.take_profit for _, o in points} == {0.5}
+    keys = {position_key(o, 21) for _, o in points} | {position_key(edge.outcome, 21)}
+    assert len(keys) == 3
+    assert grid_outcomes(replace(edge, variant_grid=()), TEMPLATES) == ()
+
+
 def test_a_share_key_holds_its_sides_exit_rules_and_no_option_parameters() -> None:
     share = {"kind": "excess_return", "horizon_sessions": [5], "benchmark": "SPY",
              "start_offset_sessions": 1, "position": "short_shares", "side": "short"}  # fmt: skip
@@ -156,3 +177,24 @@ def test_a_share_key_holds_its_sides_exit_rules_and_no_option_parameters() -> No
     assert rules == [("TAKE_PROFIT", "lte", -0.1), ("STOP_LOSS", "gte", 0.05)]
     with pytest.raises(ConfigurationError, match="share legs"):
         share_position_key(outcome(), 21)  # an option position has no share key
+
+
+def test_a_grid_point_of_a_case_valued_outcome_keys_its_own_case_points() -> None:
+    high = Group("all", (Rule("a", "gt", 1),))
+    body = {**PUT, "tenor_days": {"cases": [{"when": {"all": [{"field": "a", "op": "gt",
+                                                               "value": 1}]}, "value": 45}],
+                                  "default": 30}}  # fmt: skip
+    edge = with_legs(
+        parse_edge(
+            document(schedule="every_session", outcome=body,
+                     variant_grid=[{"prefix": "g", "strike_delta": [0.15]}]),
+            "drift", WHERE,
+        ),
+        TEMPLATES,
+    )  # fmt: skip
+    ((_, point),) = grid_outcomes(edge, TEMPLATES)
+    assert point.position is not None and point.position.cases[0].cases[0].when == high
+    own = {
+        position_key(p, h) for p in case_points(point, TEMPLATES) for h in point.horizon_sessions
+    }
+    assert {key for _, _, key in point.position.points} == own  # not the 0.25-delta base's

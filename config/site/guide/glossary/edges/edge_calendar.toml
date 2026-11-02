@@ -82,3 +82,13 @@ Some edges time one instrument, not a list of names: hold SPY over the turn of t
 """
 next = "Read the difference and the t-ratio together with the number of windows behind them."
 see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month", "sharpe_ratio"]
+
+[[term]]
+id = "base_delta_equivalent"
+term = "Compared with the same exposure in shares"
+short = "An option setup on a few named funds is judged against holding the shares its position behaves like."
+body = """
+Some setups sell or buy options on a short list of funds, such as a put sold on SPY each month. There is no crowd of names to compare with, so the comparison is the stock itself. At each entry, the position's delta says how many shares it moves like: a put sold at 30 delta behaves like 0.3 shares. The base buys that many shares at the same close and holds them to the position's last day. Both are read as a return on the cash the position sets aside, after costs. The difference is what the option adds over owning the shares: the premium collected, less the losses in sharp falls. The shares are held to the last day even when the option is closed early, so an early exit is compared with the full hold. Each grid point and variant is a separate try, and the trial count says how many were made.
+"""
+next = "Read the difference with the trial count and the number of entries behind it."
+see_also = ["base_out_of_window", "out_of_sample", "sharpe_ratio"]
