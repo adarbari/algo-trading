@@ -22,8 +22,9 @@ even when a trade's exit rule closed it earlier (the stock outcome is stored at 
 The one-session rule holds: the option and stock rows are read at their own S as of ``as_of``
 through ``harness.py`` (the package's one importer of ``data.outcomes``)."""
 
+import hashlib
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import date, datetime
 
@@ -39,7 +40,14 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
+from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, chain_rows
+from algotrade.services.evaluation.cross_section.reads.cases import (
+    case_keys,
+    cased_rows,
+    check_cases,
+    read_cases,
+)
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
 from algotrade.services.evaluation.evidence.contract import empty_trades
 from algotrade.services.evaluation.evidence.shapes import trade_frame
@@ -47,6 +55,7 @@ from algotrade.services.evaluation.time_series import harness
 from algotrade.services.evaluation.time_series.evaluate import InstrumentResult, TimeSeriesRun
 from algotrade.services.evaluation.time_series.measures import Obs, measures
 from algotrade.services.evaluation.time_series.periods import Period
+from algotrade.services.features import site_features
 
 NO_VALUE = "NO_VALUE"  # a measured trade the contract gives no return on capital (no collateral)
 
@@ -73,12 +82,21 @@ def evaluate_sleeve(
     exploratory: bool,
     gate: Callable[[date], str] | None = None,
     option_costs: OptionCosts | None = None,
+    domains: Mapping[str, Sequence[str]] | None = None,
+    features: FeatureSet | None = None,
 ) -> TimeSeriesRun:
     """``edge`` (``base = "delta_equivalent"``) for each of ``outcomes`` (``sleeve_outcomes``)
     over the decision sessions in ``start..end``; ``label``, ``split`` and ``gate`` as for
-    ``evaluate_time_series``; ``option_costs``: the commission a trade pays."""
+    ``evaluate_time_series``; ``option_costs``: the commission a trade pays. A trial with case
+    values (E13b) takes, at each D, the point the symbol's cases resolve to from D's partition
+    (``reads/cases.py``; ``domains``: the catalogue's string domains), never the default when a
+    case is UNKNOWN (``CASE_UNKNOWN``, lost); ``features``: the catalogue its case fields are
+    checked against at run start (G9-M4)."""
     if edge.base != DELTA_EQUIVALENT or not isinstance(edge.universe, Selection):
         raise ConfigurationError(f"edge {edge.id}: not a named option sleeve")
+    for _, outcome in outcomes:  # each trial's case values (a variant's or a grid point's)
+        check_cases(reader, replace(edge, outcome=outcome), features or site_features(), start,
+                    end, as_of)  # fmt: skip
     symbols = named_symbols(edge.universe, base=DELTA_EQUIVALENT)
     ids, unknown = harness.resolve_symbols(reader, symbols, end, as_of)
     days = sessions_between(start, end)
@@ -103,11 +121,11 @@ def evaluate_sleeve(
                 harness.read_returns(reader, found, entries, horizon, as_of),
             )
         ps, trades, stock = reads[at]
-        mine = chain_rows(held, trades)
+        mine, out = _cased(reader, held, trades, ps, list(ids.values()), domains)
         for symbol in symbols:
             results.append(
                 _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
-                       stock, label, gate, split, exploratory, option_costs)
+                       stock, label, gate, split, exploratory, option_costs, out)
             )  # fmt: skip
     main = reads[edge.outcome.horizon_sessions[0], edge.outcome.start_offset_sessions][0]
     measured = {e for r in results if r.edge_variant == MAIN for e, _ in r.in_window}
@@ -134,6 +152,7 @@ def _trial(
     split: date | None,
     exploratory: bool,
     option_costs: OptionCosts | None,
+    held_out: Mapping[tuple[str, date], str] | None = None,
 ) -> InstrumentResult:
     horizon = edge.outcome.horizon_sessions[0]
     mine = rows[rows["instrument_id"] == instrument] if instrument is not None else rows.iloc[:0]
@@ -145,6 +164,10 @@ def _trial(
         at = mine[(starts == p.entry).to_numpy()]
         if instrument is None:
             lost[unknown or harness.UNKNOWN_SYMBOL] += 1
+            continue
+        why = (held_out or {}).get((instrument, p.entry))
+        if why:  # its cases were UNKNOWN at D (or D's market row was missing): never the default
+            lost[why] += 1
             continue
         if at.empty:
             lost[harness.NO_OUTCOME] += 1
@@ -175,6 +198,9 @@ def _trial(
     inside = [o for o in obs if o.period.inside]
     kept = [frames[o.period.entry] for o in inside]
     key = position_key(edge.outcome, horizon)
+    spec = edge.outcome.position
+    if spec is not None and spec.points:  # a case-valued trial is the set of its points
+        key = hashlib.sha256("|".join(sorted(k for _, _, k in spec.points)).encode()).hexdigest()
     return InstrumentResult(
         symbol=symbol,
         horizon=horizon,
@@ -188,6 +214,33 @@ def _trial(
         edge_variant=variant,
         identity=f"{edge.id}|{edge.schedule}|{symbol}|{key}|{edge.outcome.cost_bps}",
     )
+
+
+def _cased(
+    reader: StoreReader,
+    edge: Edge,
+    trades: pd.DataFrame,
+    ps: Sequence[Period],
+    ids: Sequence[str],
+    domains: Mapping[str, Sequence[str]] | None,
+) -> tuple[pd.DataFrame, dict[tuple[str, date], str]]:
+    """``trades`` (every key) narrowed to ``edge``'s own rows (``chain_rows``) and, for a trial
+    with case values, each symbol's row at the point its cases resolve to at each period's D (from
+    D's partition only, relabelled to the default key: ``reads/cases.cased_rows``), with why each
+    (instrument, S) has none (``CASE_UNKNOWN``, or the market table of a gap at D)."""
+    keys = case_keys(edge.outcome)
+    if keys is None:
+        return chain_rows(edge, trades), {}
+    starts = pd.to_datetime(trades["session_date"]).dt.date
+    parts, out = [], {}
+    for p in ps:
+        resolved = read_cases(reader, keys.cases, ids, p.decision, domains)
+        why = dict.fromkeys(ids, resolved.gap) if resolved.gap else resolved.reasons
+        out.update({(i, p.entry): reason for i, reason in why.items()})
+        at = trades[(starts == p.entry).to_numpy()]
+        parts.append(at if resolved.gap else cased_rows(at, resolved, keys))
+    kept = pd.concat(parts, ignore_index=True) if parts else trades.iloc[:0]
+    return chain_rows(edge, kept), out
 
 
 def _base(row: pd.Series, stock_return: float | None, cost_bps: float | None) -> float | None:
