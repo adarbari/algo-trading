@@ -57,6 +57,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import GrainReads, stored_sessions
+from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.framework.feature import Feature
 from algotrade.services.evaluation.cross_section.baselines.variant import (
     Variant,
     _Scope,
@@ -73,6 +75,8 @@ from algotrade.services.evaluation.cross_section.detail.gating import (
     variant_gates,
 )
 from algotrade.services.evaluation.cross_section.detail.licences import (
+    edge_fields,
+    fitted_floor,
     trial_licences,
 )
 from algotrade.services.evaluation.cross_section.detail.windows import (
@@ -163,6 +167,7 @@ from algotrade.services.evaluation.cross_section.run.scopes import (
     edge_variants,
     event_schedules,
     iv_licence,
+    refuse_fitted_scores,
 )
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
@@ -175,6 +180,7 @@ from algotrade.services.evaluation.time_series.evaluate import (
     evaluate_time_series,
 )
 from algotrade.services.evaluation.time_series.sleeve import evaluate_sleeve, sleeve_outcomes
+from algotrade.services.evaluation.training.bound import first_judged_session, scored
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -233,6 +239,28 @@ def stored_outcome_sessions(reader: StoreReader) -> list[date]:
     return stored_sessions(reader)
 
 
+def _scores_read(
+    features: FeatureSet, scope: _Scope, universe: Selection, variant: Variant
+) -> tuple[Feature, ...]:
+    """The fitted scores ``variant``'s trial reads: its screens', the universe's and the rules'."""
+    members = [m.config for m in variant.members] or [variant.config]
+    return scored(features, edge_fields(scope.edge, universe, members))
+
+
+def _seen_until(
+    frozen_from: date | None, variant: Variant, reads: Sequence[Feature]
+) -> date | None:
+    """The first session a slice may keep and not be IN_SAMPLE: the later of a model screener's
+    ``frozen_from`` and the first session after every fitted score the rules read (E14,
+    ``training/bound.py``); None with neither (no slice is in-sample then: ``model`` is off)."""
+    if variant.config.config.impl != MODEL_IMPL:
+        return first_judged_session(reads)
+    if frozen_from is None:  # a model screener's own fit window is unknown: all in-sample
+        return None
+    own = frozen_from
+    return max(own, first_judged_session(reads) or own)
+
+
 def _turned_over(o: Outcome, stats: tuple[SessionStat, ...]) -> tuple[SessionStat, ...]:
     """``stats`` with the net series of an outcome whose cost is its turnover's: a buy/hold band
     (entries and exits) or a rebalanced portfolio book (the weight change); any other as given."""
@@ -275,8 +303,9 @@ def evaluate_edge(
         )
     variants = edge_variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
-    label = site_regime(configs.load).label  # the site's, not a user's
-    session = SessionReads(reader, label, screens, user.user_id, gate_domains(configs, edge))
+    session = SessionReads(  # the regime label is the site's, not a user's
+        reader, site_regime(configs.load).label, screens, user.user_id, gate_domains(configs, edge)
+    )
     days = sessions_between(start, end)
     verdict = load_verdict(configs)
     scopes = edge_scopes(configs, user, edge, iv_field, verdict.borrow_bps_annual)
@@ -389,12 +418,13 @@ def evaluate_edge(
             every, block_stats = turned(
                 every, block_stats, partial(_turned_over, vscope.edge.outcome)
             )
+            reads = _scores_read(features, vscope, scope.universe, variant)
             measures, costed = _slice_rows(
                 every,
                 split,
                 exploratory,
-                variant.config.config.impl == MODEL_IMPL,
-                edge.frozen_from,
+                variant.config.config.impl == MODEL_IMPL or bool(reads),
+                _seen_until(edge.frozen_from, variant, reads),
                 CostGrid(None, (), vscope.edge.outcome.sign, OPTION_LEVELS)
                 if vscope.edge.outcome.kind == CHAIN_KIND
                 else CostGrid(vscope.edge.outcome.cost_bps, spec.costs, vscope.edge.outcome.sign)
@@ -436,6 +466,7 @@ def evaluate_edge(
                         [m.config for m in variant.members] or [variant.config],
                         licences[scope.key],
                         stats.outcome_licence,
+                        fitted_floor(verdict.fitted_score_setups, reads),
                     ),
                     legs=_details(blocks_open, block_stats, found, vclosed)
                     if scope.key == MAIN
@@ -519,6 +550,7 @@ def _time_series(
     as the rows the verdict reads; no per-session series, legs or ledger (no screen to replay)."""
     if not isinstance(edge.universe, Selection):  # both measure named instruments only
         raise ConfigurationError(f"edge {edge.id}: a time-series edge names its instruments")
+    refuse_fitted_scores(configs, user, edge)  # no in-sample slice by decision session (E14)
     split, exploratory = effective_split(split_from, edge)
     domains, features = gate_domains(configs, edge), catalogue(configs, user.user_id)
     check_entry(reader, edge, features, start, end, as_of)  # G9-M3, G9-M4 (a sleeve: each trial)

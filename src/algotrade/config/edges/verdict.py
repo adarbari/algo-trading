@@ -39,6 +39,7 @@ KEYS = (
     "decoys",
     "capacity_adv_floor_usd",
     "capacity_position_usd",
+    "fitted_score_setups",
     "exit_rule",  # typed apart (positions/exit_rule.py); never a judge input
     "tails_verdict",  # TailsVerdict: the ``tails`` profile (ADR 0088, design 2.6)
     "option_costs",  # OptionCosts: the option cost levels (E6b-2 reads them)
@@ -215,6 +216,11 @@ class VerdictSettings:
     # pick's 20-day dollar volume ("a $100,000 position is 0.07% of the median pick's volume");
     # read when served, never stored, so changing it needs no run.
     capacity_position_usd: float = 100_000.0
+    # ``fitted_score_setups`` (E14, owner decision 10): who may see a setup whose rules read a
+    # fitted score. ``owner_only``: its trial is personal (the licence hide); ``forward_verdict``:
+    # published once its verdict (which reads only sessions after ``fitted_through`` plus the fit's
+    # horizon) is works / promising. Needs the ADR 0083 amendment for the label before it is set.
+    fitted_score_setups: str = "owner_only"
     # ``[published_haircut]``: the share of a published figure to expect lost by the time it is
     # traded, by the paper's leg (McLean and Pontiff: about a third after publication, a half for
     # a long-short spread that also has costs and short limits). Display only: never a verdict
@@ -284,6 +290,9 @@ class VerdictSettings:
             ),
             capacity_adv_floor_usd=t.number("capacity_adv_floor_usd", d.capacity_adv_floor_usd, 1),
             capacity_position_usd=t.number("capacity_position_usd", d.capacity_position_usd, 1),
+            fitted_score_setups=t.choice(
+                "fitted_score_setups", d.fitted_score_setups, ("owner_only", "forward_verdict")
+            ),
             haircut_long_short=cut.fraction("long_short", d.haircut_long_short),
             haircut_short=cut.fraction("short", d.haircut_short),
             haircut_long=cut.fraction("long", d.haircut_long),

@@ -24,6 +24,7 @@ from datetime import date
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.loading import SITE, records_paper
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.config.user import UserContext
@@ -36,7 +37,11 @@ from algotrade.core.time.calendar import (
 )
 from algotrade.data import StoreReader
 from algotrade.services.configs import resolve_config
-from algotrade.services.evaluation.cross_section.detail.licences import picks_licence
+from algotrade.services.evaluation.cross_section.detail.licences import (
+    edge_fields,
+    fitted_floor,
+    picks_licence,
+)
 from algotrade.services.evaluation.cross_section.events import (
     DEDUPE_SESSIONS,
     EventDayMissingError,
@@ -52,6 +57,7 @@ from algotrade.services.evaluation.cross_section.run.scopes import (
     iv_field_of,
 )
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
+from algotrade.services.evaluation.training.bound import scored
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 
@@ -173,8 +179,14 @@ def _licence(
     """The strictest licence of what ``edge``'s picks are read from (see ``EdgeSignals``)."""
     features = catalogue(configs, user.user_id)
     found = features.feature(iv_field_of(edge)) if needs_implied_vol(edge) else None
+    scores = scored(features, edge_fields(edge, universe, [config]))
     return picks_licence(
-        features, edge, universe, config, None if found is None else str(found.licence)
+        features,
+        edge,
+        universe,
+        config,
+        None if found is None else str(found.licence),
+        fitted_floor(load_verdict(configs).fitted_score_setups, scores),
     )
 
 
