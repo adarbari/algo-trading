@@ -106,3 +106,10 @@ def test_a_month_end_is_a_decision_day_whatever_the_horizon_and_the_month_before
         monthly = edge(schedule="month_end", outcome={**_outcome(), "horizon_sessions": [horizon]})
         assert fires(monthly, date(2026, 2, 27)) and fires(monthly, date(2026, 1, 30))
         assert not fires(monthly, date(2026, 2, 26))
+
+
+def test_a_gated_edge_with_no_market_row_is_skipped_unknown_never_picked(world: World) -> None:
+    gate = {"all": [{"field": "market.regime@v3.label", "op": "not_in", "value": ["STRESS"]}]}
+    (stored,) = edge_night(night(world), edge(top_k=3, gate=gate))
+    assert stored.status == "skipped" and stored.pick_ids == ()
+    assert stored.reason == "regime unknown"  # the gate applies with [regime] off, and fails closed

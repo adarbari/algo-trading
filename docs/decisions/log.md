@@ -924,3 +924,10 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's words in chat (2026-11-02): "things which often fail (in make changed locally or in CI previously) we do locally through a hook, but minimize the runtime on local load; the rest we push to GitHub CI." The table and timings are in `docs/ci.md` "Pre-push fast lane".
+## 2026-11-02 | Harness: shared-file conflict loop, push-queue order | Merge drivers and `Unblocks:`
+- Question: how do five UI PRs stop re-conflicting on `perf-budgets.json` and the two latency files at every merge to main, and how does the push queue favour the push that frees the most work?
+- Options: hand-merge each time / merge drivers (budgets union + max, views union) plus regeneration in `merge_main.sh` / generate the files only in CI. Queue: open dependants only / also an `Unblocks:` PR-body line.
+- Decision: merge drivers in `.gitattributes` (`scripts/ops/merge_budgets.py`), installed by `worktree.sh`, `merge_main.sh` and checked by `make doctor`; the view list regenerated after a merge that changed it; `Unblocks: V10, V11, #N` counted once per id in the queue priority. The route list is read as the budget keys themselves: a route one side removed (the other unchanged) is dropped with its e2e entry and reasons; there is no separate router list to consult.
+- decided by: owner
+- status: final
+- Reasoning: the owner's decision in chat (2026-11-02); the shared files are mechanical unions, so a conflict there carried no judgement, only a 5-15 minute re-run each time.
