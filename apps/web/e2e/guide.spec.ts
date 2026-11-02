@@ -326,7 +326,7 @@ test('search: Ctrl+K from any page, type, Enter lands on the entry; the rail but
   await page.goto('/ideas');
   await expect(page.getByRole('link', { name: /^Guide/ })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+k');
-  const dialog = page.getByRole('dialog', { name: 'Search the Guide' });
+  const dialog = page.getByRole('dialog', { name: 'Search' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('searchbox').fill('session');
   await expect(dialog.getByRole('region', { name: 'Glossary' })).toBeVisible();

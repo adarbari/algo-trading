@@ -4,6 +4,8 @@
  * The Builder and a new screener (`screener-builder-routes.tsx`, lazy) may carry
  * `returnTo=<edge id>` (opened from an edge's builder): they then return to it.
  * Tickers open in Explore.
+ * The bar's "Test" points here until V9 (Evening Desk plan) moves the flow to `/test`; the
+ * `/screeners` list then redirects there.
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
