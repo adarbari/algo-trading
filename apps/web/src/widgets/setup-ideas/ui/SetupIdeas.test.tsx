@@ -27,6 +27,7 @@ const idea = (instrumentId: string, symbol: string, rank: number): SetupIdea => 
   watchOut: ['liquidity_risk'],
   metrics: [{ name: 'hv30', value: 0.4 }],
   regime: null,
+  option: null,
 });
 const a = idea('EQ:A', 'AAA', 1);
 const listed: Data = {
@@ -128,6 +129,61 @@ describe('SetupIdeas', () => {
     hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>(listed));
     render(<SetupIdeas {...props} />);
     expect(screen.queryByText(/your watchlist/)).not.toBeInTheDocument();
+  });
+
+  it("adds the example position's columns on the Premium tab, and says why one has none", () => {
+    const put: SetupIdea = {
+      ...a,
+      option: {
+        legs: [{ right: 'P', strike: 95, expiry: '2026-12-04', qty: -1, mid: 1.2 }],
+        expiry: '2026-12-04',
+        credit: 120,
+        collateral: 9500,
+        returnOnCollateral: 0.0126,
+        assignmentChance: 0.22,
+        unknown: null,
+        chanceUnknown: null,
+        collateralUnknown: null,
+      },
+    };
+    const none: SetupIdea = {
+      ...idea('EQ:B', 'BBB', 2),
+      option: {
+        legs: [],
+        expiry: null,
+        credit: null,
+        collateral: null,
+        returnOnCollateral: null,
+        assignmentChance: null,
+        unknown: {
+          code: 'NO_ROW',
+          kind: 'NOT_STORED',
+          guideTerm: 'unavailable_not_stored',
+          kindText: 'Not stored',
+        },
+        chanceUnknown: null,
+        collateralUnknown: null,
+      },
+    };
+    const group = listed.groups[0];
+    if (!group) throw new Error('fixture');
+    const data: Data = {
+      ...listed,
+      ideas: [put, none],
+      groups: [{ ...group, ideas: [put, none] }],
+    };
+    hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>(data));
+    render(<SetupIdeas {...props} tab="premium" />);
+    expect(screen.getByRole('columnheader', { name: /Chance of assignment/ })).toBeVisible();
+    expect(screen.getByText('-1 P 95')).toBeVisible();
+    expect(screen.getByText('22%')).toBeVisible();
+    expect(screen.getByText('Not stored')).toBeVisible();
+  });
+
+  it('shows no option columns on the Stocks tab', () => {
+    hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>(listed));
+    render(<SetupIdeas {...props} />);
+    expect(screen.queryByRole('columnheader', { name: /Chance of assignment/ })).toBeNull();
   });
 
   it('says so when nothing is stored', () => {

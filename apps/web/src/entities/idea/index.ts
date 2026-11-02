@@ -27,5 +27,11 @@ export {
   type IdeasSearch,
   type IdeasSearchPatch,
 } from './model/search';
-export { type SetupGroup, type SetupIdea, type SetupIdeas } from './model/setup-ideas';
+export {
+  type PremiumLeg,
+  type PremiumOption,
+  type SetupGroup,
+  type SetupIdea,
+  type SetupIdeas,
+} from './model/setup-ideas';
 export { type IdeaDetail, type IdeaSetupRef } from './model/idea-detail';

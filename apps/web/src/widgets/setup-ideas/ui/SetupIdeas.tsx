@@ -24,7 +24,7 @@ import { useSetupIdeas, type IdeaTab, type SetupGroup, type SetupIdea } from '@/
 import { termHelp } from '@/features/guide-help';
 import { WatchlistShowing } from '@/features/watchlist';
 
-import { pickColumns } from '../model/columns';
+import { pickColumns, premiumColumns } from '../model/columns';
 import { LEFT_OUT_TERMS, STATE_TERMS } from '../model/terms';
 
 export interface SetupIdeasProps {
@@ -226,7 +226,11 @@ export function SetupIdeas({
                 {g.ideas.length > 0 && (
                   <DataTable<SetupIdea>
                     label={`${g.name} picks`}
-                    columns={pickColumns(names)}
+                    columns={
+                      tab === 'premium'
+                        ? [...pickColumns(names), ...premiumColumns()]
+                        : pickColumns(names)
+                    }
                     rows={g.ideas}
                     getRowId={(i) => i.instrumentId}
                     getRowLabel={(i) => i.symbol ?? i.instrumentId}
