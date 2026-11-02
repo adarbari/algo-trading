@@ -18,12 +18,14 @@ import pandas as pd
 import pytest
 
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.edges.positions.key import parse_position_key
+from algotrade.config.edges.positions.chain import reads_share_path
+from algotrade.config.edges.positions.key import parse_position_key, share_position_key
 from algotrade.config.edges.positions.spec import ExitSettings
 from algotrade.config.edges.positions.templates import SHARES, load_templates
 from algotrade.config.strategy.schema import Group, Rule
 from algotrade.core.time.calendar import close_time, sessions_ending
 from algotrade.features.site import site_features
+from algotrade.services.evaluation.cross_section.hit import own_keys
 from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
@@ -150,6 +152,34 @@ def test_only_share_positions_with_an_exit_are_wanted_one_key_per_hold() -> None
     assert wanted[0].fields == () and wanted[0].benchmark == "SPY"
     configs = MemoryConfigStore({**PRESETS, ("site", "positions", "templates"): TEMPLATES})
     assert positions_wanted(load_edges(configs), load_templates(configs), SHARES) == []
+
+
+def _loaded(**outcome: Any) -> Any:
+    """An edge loaded through the site loader (its checks included) with ``outcome`` over
+    ``OUTCOME``: no hand-built exit, so the document alone decides what is stored."""
+    docs = {
+        **PRESETS,
+        ("site", "edges", "drift"): document(
+            schedule="every_session", screeners=[], outcome={**OUTCOME, **outcome}
+        ),
+        ("site", "positions", "templates"): TEMPLATES,
+    }
+    configs = MemoryConfigStore(docs)
+    return next(e for e in load_edges(configs) if e.id == "drift"), load_templates(configs)
+
+
+def test_the_writer_stores_the_positions_the_harness_reads_by_the_same_predicate() -> None:
+    """E3c-2b: a share outcome declaring an ``[outcome.exit]`` loads, is read from the share path
+    grain (``reads_share_path``) and is exactly what the writer stores; one without an exit is
+    neither, so the two can never drift apart."""
+    held, templates = _loaded(exit={"take_profit": 0.05, "stop_loss": 0.05})
+    plain, _ = _loaded()
+    assert reads_share_path(held.outcome) and not reads_share_path(plain.outcome)
+    (wanted,) = positions_wanted([held], templates, SHARES)
+    assert (wanted.key, wanted.benchmark) == (share_position_key(held.outcome, 3), "SPY")
+    assert positions_wanted([plain], templates, SHARES) == []
+    # the key the reader holds the setup to is the key the writer stores it under
+    assert own_keys(held, 3) == {(wanted.key, "SPY")} and own_keys(plain, 3) == frozenset()
 
 
 def test_a_window_is_walked_to_each_exit_and_known_when_its_exit_close_was(

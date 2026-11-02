@@ -1,0 +1,252 @@
+# L3 site setting: the Guide glossary, the words of the option calculators on a ticker's Roll a put and
+# Calls on shares tabs (plan V11, ADR 0083 amendment, ADR 0051). One [[term]] each: id, term, short (one
+# sentence), body, next, see_also. Typed by src/algotrade/config/site/guide/glossary.py; fitness tests:
+# tests/unit/config/site/guide/test_glossary.py. Kept apart from ideas.toml, whose words are checked for
+# instruction wording (a calculator names the options a trader sells).
+
+# The option calculators: Roll a put and Calls on shares (plan V11, ADR 0083 amendment).
+[[term]]
+id = "roll_your_contract"
+term = "Your contract"
+short = "The put you sold: its strike and expiry, and optionally the price you sold it at."
+body = """
+Pick the expiry from the ones we list for this stock and type the strike. We look the contract up in tonight's stored chain, so a strike that was not listed, or had no two-sided quote, gets a plain answer instead of a figure. Nothing you type is saved or sent anywhere but to price it.
+"""
+next = "Add the price you sold it at to see a new breakeven."
+see_also = ["roll_sold_at", "roll_buy_back"]
+
+[[term]]
+id = "roll_sold_at"
+term = "Price you sold at"
+short = "The premium per share you collected when you sold the put, which the new breakeven needs."
+body = """
+Type the price per share, not per contract: a $1.40 premium is 1.40, not 140. Without it the roll table still shows the extra credit, and the new breakeven reads unknown. If you already rolled this position before, type the net premium: everything you have collected on it so far, less what you paid to buy back earlier contracts.
+"""
+see_also = ["roll_new_breakeven", "roll_buy_back", "roll_extra_credit"]
+
+[[term]]
+id = "roll_buy_back"
+term = "Buy-back cost"
+short = "What closing your put would cost now, at the middle of tonight's stored bid and ask, per share."
+body = """
+It is a calculation from the end-of-day quote, not a price you can be filled at. The sentence compares it with what you collected: a higher cost means the put has gained value against you. It also says how far the shares are from your strike and how many days are left to the expiry.
+"""
+next = "Check a live quote before you close or roll."
+see_also = ["grid_mid", "roll_sold_at", "grid_strike"]
+
+[[term]]
+id = "roll_rolls_for_credit"
+term = "Rolls for a credit"
+short = "Selling a later put after closing yours, where the new premium is larger than the cost of closing."
+body = """
+Each row is one put we list at a later expiry, at your strike or a lower one. We keep a row only when its premium is more than the buy-back cost, unless you ask for the ones that cost money. A later expiry gives you more time, and a lower strike gives you more room before the shares are assigned.
+"""
+see_also = ["roll_extra_credit", "roll_new_expiry", "roll_buy_back"]
+
+[[term]]
+id = "roll_new_expiry"
+term = "New expiry"
+short = "The date the rolled put would expire on, one of the later expiries we list for this stock."
+body = """
+A later date pays more in total and ties up your cash for longer. A chip on the row means the company's next earnings report falls inside that time, which can move the shares past the strike.
+"""
+see_also = ["report_inside_expiry", "roll_credit_per_day"]
+
+[[term]]
+id = "roll_new_strike"
+term = "New strike"
+short = "The strike of the put you would sell: your current strike, or a listed strike below it."
+body = """
+A lower strike is farther from the share price, so it pays less and is less likely to be reached. If it is reached you buy the shares at that price, so the strike is also the cash you set aside.
+"""
+see_also = ["grid_strike", "roll_extra_credit"]
+
+[[term]]
+id = "roll_extra_credit"
+term = "Extra credit"
+short = "The new put's premium less the cost of closing your put, per share, at middle prices."
+body = """
+A positive number is cash you receive for the roll. Multiply by 100 for one contract. The rows shown are credits only, unless you include rolls that cost money, which show a negative number.
+"""
+see_also = ["roll_buy_back", "roll_credit_per_day", "roll_include_debits"]
+
+[[term]]
+id = "roll_new_breakeven"
+term = "New breakeven"
+short = "The share price below which the rolled position loses money, counting what you collected so far."
+body = """
+It is the new strike less the price you sold at and the extra credit. It needs the price you sold at, so it reads unknown until you type one. It does not count commissions or any loss on the shares you already own.
+"""
+see_also = ["breakeven_price", "roll_sold_at", "roll_extra_credit", "roll_new_strike"]
+
+[[term]]
+id = "roll_credit_per_day"
+term = "Extra credit per extra day"
+short = "The extra credit divided by the days the roll adds to your expiry."
+body = """
+It lets you compare a roll of one week with a roll of two months on the same footing. A larger number pays more for each day you wait. Do not read it as a yearly return, because it ignores the cash you set aside.
+"""
+see_also = ["roll_extra_credit"]
+
+[[term]]
+id = "roll_new_delta"
+term = "New delta"
+short = "Our delta for the put you would sell, a rough guide to its odds of finishing in the money."
+body = """
+It is worked out by us from the middle premium, not copied from the feed. A put's delta is negative, and a number nearer zero means the put is less likely to be reached. Compare it with the delta of the put you sold to see whether the roll takes more or less risk.
+"""
+see_also = ["delta_band", "roll_same_delta"]
+
+[[term]]
+id = "roll_same_delta"
+term = "Roll to the same delta"
+short = "Keep, at each expiry, only the strike whose delta is nearest the delta of the put you sold."
+body = """
+Rolling out in time at a fixed strike usually leaves the put with a different delta. This choice holds the risk about the same instead, which can mean a lower strike at a later date. It asks the server again.
+"""
+see_also = ["roll_new_delta", "roll_new_strike"]
+
+[[term]]
+id = "roll_include_debits"
+term = "Include rolls that cost money"
+short = "Also list the rolls where the new premium is smaller than the cost of closing."
+body = """
+A roll that costs money can still make sense when you want more time or a lower strike and accept paying for it. These rows show a negative extra credit. It asks the server again.
+"""
+see_also = ["roll_extra_credit"]
+
+[[term]]
+id = "roll_rather_assigned"
+term = "Rather be assigned?"
+short = "If you would rather own the shares than keep rolling, the Calls on shares tab shows the calls you could sell on them."
+body = """
+Letting a put be assigned means buying the shares at the strike. After that you can sell calls on those shares to collect premium, and the other tab prices them from the price you paid.
+"""
+see_also = ["calls_could_sell", "roll_rolls_for_credit"]
+
+[[term]]
+id = "calls_shares_held"
+term = "Shares you hold"
+short = "How many shares you own; calls are sold in contracts of 100, so only whole hundreds are covered."
+body = """
+We round down to whole contracts: 250 shares cover two. The total premium column counts only the contracts your shares cover.
+"""
+see_also = ["calls_premium_total", "calls_could_sell"]
+
+[[term]]
+id = "calls_your_price"
+term = "Your price"
+short = "What the shares cost you per share, after the premiums you have already collected on them."
+body = """
+Take the price you paid for the shares and subtract the net premium per share from puts and calls you already sold on them. Net means everything collected, less what you paid to buy any back. The calls table measures every figure against this price, not today's.
+"""
+see_also = ["calls_premium_over_price", "calls_if_called", "calls_below_price"]
+
+[[term]]
+id = "calls_closed_at"
+term = "Close against your price"
+short = "The last stored price of the session, and how far it is from your price."
+body = """
+It is the end-of-day price we hold for the session, which is not a live quote. A price above yours means the shares have gained since you counted them in. A price below yours means a call struck at your price is out of the money tonight.
+"""
+see_also = ["calls_your_price"]
+
+[[term]]
+id = "calls_could_sell"
+term = "Calls you could sell"
+short = "Calls on your shares at three listed expiries, from a little below to above the price, at middle prices."
+body = """
+Each row is a call we list with a two-sided quote tonight. Selling one gives you the premium and an obligation to sell the shares at the strike if the buyer exercises. A higher strike pays less and leaves more room for the shares to rise.
+"""
+see_also = ["calls_expiry", "calls_premium", "calls_if_called", "calls_watch_for"]
+
+[[term]]
+id = "calls_expiry"
+term = "Expiry"
+short = "The date the call ends, one of the listed expiries nearest two, four and six weeks away."
+body = """
+A closer date pays less and leaves you free sooner. A later date pays more in total and keeps your shares committed for longer.
+"""
+see_also = ["calls_could_sell"]
+
+[[term]]
+id = "calls_premium"
+term = "Premium"
+short = "What you would receive per share for selling the call, at the middle of tonight's stored bid and ask."
+body = """
+Real fills are usually worse than the middle by about half the spread. Multiply by 100 for one contract. We never show the bid or the ask itself.
+"""
+see_also = ["grid_mid", "calls_premium_total"]
+
+[[term]]
+id = "calls_premium_over_price"
+term = "Premium ÷ your price"
+short = "The premium as a share of your price per share, for the whole time to the expiry."
+body = """
+It is a return for the period, not a year. A three-week call with 1% here is much more than a three-month call with 1%. It is measured against your price, so a price below today's raises it.
+"""
+see_also = ["calls_your_price", "return_on_collateral"]
+
+[[term]]
+id = "calls_if_called"
+term = "If called away"
+short = "Your return on the shares if they are sold at the strike, counting the premium and measured against your price."
+body = """
+It adds the premium to the gain from your price up to the strike, then divides by your price. It is negative when the strike is below your price and the premium does not cover the gap. It does not count dividends you receive before the expiry.
+"""
+see_also = ["calls_your_price", "calls_below_price"]
+
+[[term]]
+id = "calls_below_price"
+term = "Below your price"
+short = "A call whose strike is under your price: being called away would sell the shares for less than you count them at."
+body = """
+The row is shown muted because the premium may not make up for the loss on the shares. It stays in the table so you can see what the premium pays for that room.
+"""
+next = "Compare it with the return if called away before you choose."
+see_also = ["calls_your_price", "calls_if_called"]
+
+[[term]]
+id = "calls_premium_total"
+term = "Total premium"
+short = "The premium for all the contracts your shares cover, before commissions."
+body = """
+It is the premium per share times 100 times the number of whole contracts. Shares left over after the whole hundreds earn nothing from the call.
+"""
+see_also = ["calls_shares_held", "calls_premium"]
+
+[[term]]
+id = "calls_watch_for"
+term = "Watch for"
+short = "Things to check before selling this call: a report inside it, an ex-dividend date, a risk of early exercise."
+body = """
+A chip is a flag, not a verdict. A report inside the life of the call can move the shares past the strike. An ex-dividend date before the expiry can bring the call buyer to exercise early. Early exercise risk marks a call that is in the money with little time value left.
+"""
+see_also = ["report_inside_expiry", "calls_ex_dividend", "calls_early_exercise"]
+
+[[term]]
+id = "calls_ex_dividend"
+term = "Ex-dividend before expiry"
+short = "The stock goes ex-dividend on or before this call's expiry, so the dividend goes to the shares' owner on that date."
+body = """
+When the stock trades without its dividend its price usually falls by about that amount. A call buyer who wants the dividend may exercise the day before, which takes your shares. The ex-date comes from the stored schedule, and the source lists one about a month ahead.
+"""
+see_also = ["calls_dividend", "calls_early_exercise"]
+
+[[term]]
+id = "calls_early_exercise"
+term = "Early exercise risk"
+short = "The call is in the money and its remaining time value is smaller than the coming dividend."
+body = """
+A buyer who exercises early collects the dividend, so a call with little time value left is worth exercising before the ex-date. It is a flag from our calculation, not a forecast that it will happen. It is shown only when a dividend is known before the expiry.
+"""
+see_also = ["calls_dividend", "calls_ex_dividend"]
+
+[[term]]
+id = "calls_dividend"
+term = "Dividend and early exercise"
+short = "The next ex-dividend date, its amount, and the last day you must own the shares to receive it."
+body = """
+You must own the shares at the close before the ex-date to be paid. A short call is exercised early most often on that day. When no dividend is announced yet, the panel says so rather than showing none.
+"""
+see_also = ["calls_ex_dividend", "calls_early_exercise"]

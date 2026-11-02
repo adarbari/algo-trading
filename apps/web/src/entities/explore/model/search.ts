@@ -12,6 +12,8 @@ export const EXPLORE_TABS = [
   'compare',
   'chart',
   'options',
+  'roll',
+  'calls',
   'features',
   'financials',
   'events',

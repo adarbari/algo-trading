@@ -63,19 +63,13 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import (
-    chain_seqs,
-    chain_stamps,
-    outcome_seqs,
-    outcome_stamps,
-    stored_sessions,
-)
+from algotrade.data.outcomes import GrainReads, stored_sessions
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.baselines.variant import (
     Variant,
     _Scope,
-    crosses,
-    on_chain,
+    grain_of,
+    split_keys,
     variant_scope,
 )
 from algotrade.services.evaluation.cross_section.detail.gating import (
@@ -138,13 +132,14 @@ from algotrade.services.evaluation.cross_section.measures import (
     slice_measures,
 )
 from algotrade.services.evaluation.cross_section.measuring import (
-    _chain,
+    _beside,
     _drawn,
     _measure,
     _Measured,
     _needs,
     _Plan,
     _RandomSpec,
+    _reads,
     _trial_hash,
     both_seqs,
 )
@@ -563,12 +558,20 @@ def evaluate_edge(
             reader,
             as_of,
             _earnings_horizons(plans),
-            _chain(plans),
+            _reads(plans),
             residual_plans(plans),
-            crosses(plans, variants),  # a baseline the setup cannot be valued as fails here
+            _beside(plans, variants),  # a baseline the setup cannot be valued as fails here
         ),
         # an entry condition is refused here (G9-M3, G9-M4) or its legs are never reused
-        check_entries(reader, [c.edge for c in scopes], features, start, end, as_of, full),
+        check_entries(
+            reader,
+            [c.edge for c in scopes],
+            features,
+            start,
+            end,
+            as_of,
+            full or split_keys(plans),
+        ),
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
@@ -578,7 +581,7 @@ def evaluate_edge(
     for plan in plans:
         scope, horizon = plan.scope, plan.horizon
         needs_iv = needs_implied_vol(scope.edge)
-        closed = stats.closed[horizon]
+        closed = stats.plan_closed[plan.key]  # the sessions with a row of this setup's own key
         starts.setdefault(horizon, len(plan.blocks))  # the edge's own count, then its variants'
         unclosed.setdefault(
             horizon, sum(all(leg.entry not in closed for leg in b) for b in plan.blocks)
@@ -864,7 +867,7 @@ def _valued_as(
     grain) with the closed sessions, measured blocks and projected exits of that grain; ``own``
     are the plan's."""
     scope = variant_scope(plan.scope, variant)
-    if on_chain(scope) == on_chain(plan.scope):
+    if grain_of(scope) == grain_of(plan.scope):
         return scope, *own
     found = stats.legs.get((plan.key, variant.id), {})  # only the sessions it holds a leg for
     held = {leg.entry for block in plan.blocks for leg in block if leg.decision in found}
@@ -877,9 +880,9 @@ def _outcome_stamps(
     reader: StoreReader,
     as_of: datetime,
     names_for: Collection[int],
-    chain: bool,
+    reads: GrainReads,
     residuals: bool,
-    cross: bool,
+    cross: GrainReads | None,
     entries: Collection[date],
 ) -> tuple[
     dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
@@ -887,15 +890,9 @@ def _outcome_stamps(
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
     ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
     sequence (the harness is the one reader of outcomes)."""
-    if chain:  # an option_pnl edge reads the chain grain (EB H13)
-        known, names = chain_stamps(reader, entries, as_of, names_for)
-        seqs = chain_seqs(reader, entries)
-    else:
-        known, names = outcome_stamps(
-            reader, entries, as_of, names_for=names_for, residuals=residuals
-        )
-        seqs = outcome_seqs(reader, entries, residuals)
-    return known, names, both_seqs(reader, entries, chain, seqs, cross)
+    known, names = reads.stamps(reader, entries, as_of, names_for, residuals)  # the plans' grain
+    seqs = reads.seqs(reader, entries, residuals)
+    return known, names, both_seqs(reader, entries, seqs, cross)
 
 
 def residual_plans(plans: Sequence[_Plan]) -> bool:

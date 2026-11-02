@@ -46,7 +46,7 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.services.evaluation.cross_section.hit import apply_outcome, chain_rows
+from algotrade.services.evaluation.cross_section.hit import apply_outcome, own_rows
 from algotrade.services.evaluation.cross_section.portfolio.ladder import (
     book_figures,
     cohorts,
@@ -116,7 +116,7 @@ def evaluate_sleeve(
                 harness.read_returns(reader, found, entries, horizon, as_of),
             )
         ps, trades, stock = reads[at]
-        mine = chain_rows(held, trades)
+        mine = own_rows(held, trades)
         trials = [
             _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
                    stock, label, gate, split, exploratory, option_costs)

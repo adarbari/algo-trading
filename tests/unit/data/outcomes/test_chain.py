@@ -154,3 +154,14 @@ def test_a_set_of_rows_with_no_exit_still_has_the_exit_columns_as_null() -> None
     out = select_chain(bare, 5, [S1])
     assert set(CHAIN_COLUMNS) <= set(out.columns)
     assert out[["exit_session", "exit_kind", "collateral", "max_adverse"]].isna().all().all()
+
+
+def test_a_past_as_of_sees_only_windows_that_had_closed_not_just_the_early_exits() -> None:
+    backend = MemoryBackend()
+    known = datetime(2026, 10, 5, 22, tzinfo=UTC)
+    _write(StoreWriter(backend), S1, "r1", known, [_row("EQ:A")])  # window_end 2026-10-12
+    reader = StoreReader(backend)
+    before, after = datetime(2026, 10, 9, 23, tzinfo=UTC), datetime(2026, 10, 12, 21, tzinfo=UTC)
+    assert read_chain(reader, 5, [S1], as_of=before).empty
+    assert chain_stamps(reader, [S1], before) == ({}, {})
+    assert len(read_chain(reader, 5, [S1], as_of=after)) == 1
