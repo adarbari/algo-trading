@@ -89,7 +89,12 @@ at `-n 2`, whatever changed) and web (Prettier and Stylelint over the changed fi
 production build, `perf:bundle` and the DOM / request budgets `perf:e2e` on a free preview
 port). A push whose new commits are all clean merges of main runs the python lane alone. A
 fast test that stops failing leaves the list; one that starts failing often joins it, if it
-is seconds (`make perf` checks the python lane against the budget on an idle machine).
+is seconds (`make perf` checks the python lane against the budget on an idle machine). The
+table understates what the old hook already stopped (mirrored pytest, `tsc`, vitest, ESLint,
+ownership ran locally for part of the sample), so those checks are re-measured after about 50
+CI runs on the fast lane and join it if they start failing (architect review, 2026-11-02).
+Known gaps, CI's: a clean merge of main that pushes the combined bundle over budget (the web lane
+skips merge-only pushes); `import-linter`, `mypy`, ruff and file length run at commit.
 
 Measured over the last 100 failed CI runs (2026-10-24 to 2026-11-02), the failing step per job
 (a run can fail several), and its local cost on this Mac (load 10-45):
@@ -350,7 +355,7 @@ screenshot baselines, and a lazy page without a budget. What catches each before
 |---|---|---|
 | Route over budget | `make pre-push` (and `make changed`): the production build and `perf:bundle` for a change under `src/` or `design-system/` | the `pre-push` hook |
 | Lazy page without a budget (or a budget for a removed page) | the unit test `a budget for every lazy page` (`scripts/check-bundle-budgets.test.ts`, no build) | `npm run test`, CI `web-static` |
-| New story without light and dark baselines | `npm run visual:missing` makes only the missing PNGs in the CI Playwright image (Docker off Linux), then `ds:check` verifies them | `make changed`, only when a `*.stories.tsx` changed (nothing to do, nothing run, when no baseline is missing) |
+| New story without light and dark baselines | `npm run visual:missing` makes only the missing PNGs in the CI Playwright image (Docker off Linux), then `ds:check` verifies them | `make pre-push` and `make changed`, only when a `*.stories.tsx` changed (nothing to do, nothing run, when no baseline is missing) |
 | Anything the above skip | CI, the full gate | every PR |
 
 The hook is `pre-push-fast` in `.pre-commit-config.yaml` (`make pre-push`, below). Hooks live in the main checkout's

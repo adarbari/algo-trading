@@ -112,3 +112,20 @@ def test_the_python_lane_stays_under_the_budget() -> None:
     for _, cmd, _ in pre_push.python_lane():
         assert subprocess.run(cmd, cwd=REPO, check=False).returncode == 0, cmd
     assert time.monotonic() - started < pre_push.BUDGET_SECONDS
+
+
+def test_a_signal_kills_every_running_step_and_exits_128_plus_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # make passes only SIGTERM on: without this, pytest and `vite preview` outlived the queue slot
+    child = subprocess.Popen(["sleep", "30"], start_new_session=True)
+    pre_push.RUNNING.add(child)
+
+    def exit_(code: int) -> None:
+        raise SystemExit(code)
+
+    monkeypatch.setattr(pre_push.os, "_exit", exit_)
+    with pytest.raises(SystemExit) as stopped:
+        pre_push.stop_all(15)
+    pre_push.RUNNING.discard(child)
+    assert stopped.value.code == 143 and child.wait(timeout=5) != 0

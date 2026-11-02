@@ -20,7 +20,9 @@ changed` remains the full local check for anyone who wants it.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -73,7 +75,7 @@ def is_merge_only(remote: str | None, local: str, base: str = "origin/main") -> 
             # `--cc` prints a combined diff only where the merge resolved a conflict by hand
             if len(parents) < 2 or changed_tests._git("show", "--cc", "--format=", sha):
                 return False
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, IndexError):
         return False
     return True
 
@@ -130,6 +132,20 @@ def plan(files: list[str], merge_only: bool, root: Path | None = WEB) -> dict[st
     return lanes
 
 
+# Each step runs in its own process group: on a signal (push_queue forwards it to make, which
+# passes only SIGTERM on) the groups are killed, so no pytest, Playwright or `vite preview`
+# outlives the freed queue slot.
+RUNNING: set[subprocess.Popen[bytes]] = set()
+
+
+def stop_all(signum: int, _frame: object = None) -> None:
+    """Kill every running step's process group, then exit 128 + `signum`."""
+    for child in list(RUNNING):
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(child.pid, signal.SIGTERM)
+    os._exit(128 + signum)
+
+
 def _run_lane(name: str, steps: list[Step]) -> tuple[str, int, float]:
     started = time.monotonic()
     for what, cmd, extra in steps:
@@ -138,7 +154,13 @@ def _run_lane(name: str, steps: list[Step]) -> tuple[str, int, float]:
             env["ALGOTRADE_PORT_BASE"] = free_port_base()
         cwd = REPO if name == "python" else WEB
         print(f"pre-push {name}: {what}", flush=True)
-        if subprocess.run(cmd, cwd=cwd, env=env, check=False).returncode:
+        child = subprocess.Popen(cmd, cwd=cwd, env=env, start_new_session=True)
+        RUNNING.add(child)
+        try:
+            code = child.wait()
+        finally:
+            RUNNING.discard(child)
+        if code:
             return f"{name}: {what}", 1, time.monotonic() - started
     return name, 0, time.monotonic() - started
 
@@ -152,6 +174,8 @@ def main(argv: list[str]) -> int:
     if merge_only:
         print("pre-push: the push only merges main; the python lane alone", flush=True)
     lanes = plan(files, merge_only)
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, stop_all)
     started = time.monotonic()
     with ThreadPoolExecutor(max_workers=len(lanes)) as pool:
         results = list(pool.map(lambda kv: _run_lane(*kv), lanes.items()))
