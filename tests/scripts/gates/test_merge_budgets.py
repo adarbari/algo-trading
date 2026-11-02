@@ -3,6 +3,9 @@ files (owner decision 2026-11-02: five UI PRs re-conflicted on them at every mer
 
 import importlib.util
 import json
+import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -125,3 +128,42 @@ def test_captured_views_are_unioned_and_our_changed_entry_wins() -> None:
     # a view theirs dropped (ours unchanged) stays dropped
     gone = {"generated": "d2", "views": {"mine": view("B", True)}}
     assert "keep" not in mb.merge_views(base, base, gone)["views"]
+
+
+def test_the_generated_view_coverage_merges_as_ours_without_a_conflict(tmp_path: Path) -> None:
+    # 2026-11-02 #1033 / #1035: both sides regenerate it (a timestamp line), so every merge of
+    # main conflicted; `keepours` keeps the branch's copy and merge_main.sh regenerates it
+    repo = SCRIPT.parents[2]
+    doc = "docs/perf/view-coverage.md"
+    assert f"{doc} merge=keepours" in (repo / ".gitattributes").read_text().split("\n")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=tmp_path, env=env, capture_output=True, text=True, check=False,
+        )  # fmt: skip
+
+    git("init", "-q", "-b", "main")
+    (tmp_path / "scripts/ops").mkdir(parents=True)
+    shutil.copy(repo / "scripts/ops/install_merge_drivers.sh", tmp_path / "scripts/ops")
+    (tmp_path / ".gitattributes").write_text(f"{doc} merge=keepours\n")
+    (tmp_path / "docs/perf").mkdir(parents=True)
+    (tmp_path / doc).write_text("Generated (09:00 UTC)\n")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    installed = subprocess.run(
+        ["bash", "scripts/ops/install_merge_drivers.sh"], cwd=tmp_path, env=env, check=False
+    )
+    assert installed.returncode == 0
+    git("checkout", "-qb", "branch")
+    (tmp_path / doc).write_text("Generated (10:00 UTC)\n")
+    git("commit", "-qam", "ours")
+    git("checkout", "-q", "main")
+    (tmp_path / doc).write_text("Generated (11:00 UTC)\n")
+    git("commit", "-qam", "theirs")
+    git("checkout", "-q", "branch")
+    merged = git("merge", "--no-edit", "main")
+    assert merged.returncode == 0, merged.stdout + merged.stderr
+    assert (tmp_path / doc).read_text() == "Generated (10:00 UTC)\n"
