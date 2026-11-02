@@ -291,3 +291,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the fat left tails (stored `results/edge_trades`: `reverse_split_distress_filter` skew -12.5, `idiosyncratic_volatility_and_max`, `late_filer_nt_drift`) sit on short setups, which G20 leaves unjudged; the judged long setups with enough trades (`momentum_at_earnings` 27k trades, `momentum_12_1` 50k) have positive skew, so PSR and CVaR-ratio criteria would not change a `return` verdict; 63 of 66 edges read `not_enough_data`, and a new id is a new trial log and one more deflated-Sharpe trial with no verdict to deflate; nothing is lost by waiting (no new data).
+
+## 2026-11-02 | ADR 0088 S4 | Characteristic sorts: one new preset, vol-of-vol waits on F7
+- Question: S4 asks for sorts on profitability, cash and default as presets; which are new, and what shape?
+- Options: three new presets / reuse the two that exist and add the cash sort / one Python screener per sort.
+- Decision: profitability (`cash_op_profitability`) and default (`distress_ohlson`) already exist as rule presets of the same shape, so only the cash sort is new: `cash_to_assets_high` v1 over a new expression feature `cash_to_assets` (cash / total assets, null for a stale balance sheet). All three share the base gates, one `not_null` signal and a `tie_break` ranking, pinned by a test; no edge document names them yet, so there is no setup wiring. Vol-of-vol is not built: it needs option history (F7), and joins as one more preset of the shape.
+- decided by: Claude (Sonnet) in away mode
+- status: pending owner confirmation

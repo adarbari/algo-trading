@@ -1,0 +1,54 @@
+# Cash holdings sort, v1 (the B4 characteristic sort of the options-setups design, ADR 0088 build row S4;
+# Palazzo 2012 on cash and returns, and the stock characteristics of Zhan, Han, Cao and Tong 2022):
+# every stock with the measure, ranked by cash over total assets, highest first. The one criterion
+# only asks that the value exists (a missing value never passes, ADR 0030): the ranking is the
+# screen, so the edge harness (ADR 0053) takes its top K and compares the decile spread over all
+# eligible names. Same shape as cash_op_profitability and distress_ohlson (the base gates, one
+# not_null signal, a tie_break ranking): the vol-of-vol sort joins as one more such preset when F7 lands.
+# What it does not check: profitability, distress, size, banks (cash is null for them).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "cash_to_assets_high"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Cash holdings (cash to assets)"
+description = "Stocks ranked by cash held per dollar of assets, the most cash first."
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.cash_to_assets]
+field = "feature.cash_to_assets"
+op = "not_null"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+cash_to_assets = "feature.cash_to_assets"
+net_debt = "feature.net_debt"
+
+[rank]
+tie_break = "feature.cash_to_assets"
+tie_break_order = "desc"
