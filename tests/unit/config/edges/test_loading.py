@@ -438,9 +438,8 @@ def test_without_a_verdict_file_the_default_decoys_expand() -> None:
 
 # The share setups allowed the ``tails`` profile (a new edge version's id and why; X9 adds them).
 SHARE_TAILS_ALLOWED: frozenset[str] = frozenset()
-# vrp_short_premium was re-filed to option_pnl (X2, 2026-11-02), so it left this list.
 OLDER_OPTION_KINDS = {  # expires_otm / option_model_pnl: the older option kinds keep `return`
-    "c12_vrp_cross_section_iv_hv", "c13_iv_term_structure_straddles",
+    "vrp_short_premium", "c12_vrp_cross_section_iv_hv", "c13_iv_term_structure_straddles",
     "c14_delta_hedged_characteristics", "c16_pre_earnings_straddle_buy",
     "c17_earnings_iv_crush_sell", "c18_iv_rank_conditional_selling",
 }  # fmt: skip
@@ -449,7 +448,7 @@ OLDER_OPTION_KINDS = {  # expires_otm / option_model_pnl: the older option kinds
 def test_every_shipped_edge_judges_on_the_return_profile_unless_it_is_an_option_pnl() -> None:
     """ADR 0088 design 2.6, risk 16: a stock verdict never moves silently. The profile of every
     site edge resolves to ``return`` unless its outcome kind is ``option_pnl`` (``tails``); the
-    older option kinds are named, so a re-kind of one is seen here first."""
+    seven older option kinds are named, so a re-kind of one is seen here first."""
     edges = load_edges(SHIPPED)
     older = {e.id for e in edges if e.outcome.kind in ("expires_otm", "option_model_pnl")}
     assert older == OLDER_OPTION_KINDS
