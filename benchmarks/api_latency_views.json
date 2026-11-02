@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 01:55 UTC",
+ "generated": "2026-11-02 04:34 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -242,6 +242,60 @@
    ],
    "source": "static"
   },
+  "/admin/llm-usage > tab:AI and requests views:Calls": {
+   "route": "/admin/llm-usage",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "AI and requests views",
+     "name": "Calls"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/llm-usage",
+   "target": false
+  },
+  "/admin/llm-usage > tab:AI and requests views:Overview": {
+   "route": "/admin/llm-usage",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "AI and requests views",
+     "name": "Overview"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/llm-usage",
+   "target": false
+  },
+  "/admin/llm-usage > tab:AI and requests views:Requests": {
+   "route": "/admin/llm-usage",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "AI and requests views",
+     "name": "Requests"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/llm-usage",
+   "target": false
+  },
   "/admin/screener-runs": {
    "route": "/admin/screener-runs",
    "search": {},
@@ -254,6 +308,23 @@
    ],
    "uncertain": [
     "AdminScreenerRun",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/admin/users": {
+   "route": "/admin/users",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "GuideHelpField",
+    "UserRegistry"
+   ],
+   "uncertain": [
     "GuideHelpField"
    ],
    "interaction": [
@@ -1901,7 +1972,6 @@
     "TraderPreferences"
    ],
    "uncertain": [
-    "Appearance",
     "FeatureTable",
     "GuideHelpField",
     "TraderPreferences"

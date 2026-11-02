@@ -827,6 +827,11 @@ export type TraderPreferencesQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type TraderPreferencesQuery = { traderPreferences: { defaultTab: string | null, watchlist: Array<{ instrumentId: string, symbol: string | null }> } };
 
+export type UserRegistryQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type UserRegistryQuery = { userRegistry: { people: Array<{ id: string, name: string, role: string, licences: Array<string>, scheduled: boolean }> } | null };
+
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -4855,6 +4860,19 @@ export const TraderPreferencesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<TraderPreferencesQuery, TraderPreferencesQueryVariables>;
+export const UserRegistryDocument = new TypedDocumentString(`
+    query UserRegistry {
+  userRegistry {
+    people {
+      id
+      name
+      role
+      licences
+      scheduled
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<UserRegistryQuery, UserRegistryQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {
