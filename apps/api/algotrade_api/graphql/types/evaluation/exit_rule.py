@@ -1,6 +1,8 @@
-"""``ExitRule``: the historical exit rule a share setup publishes for a pick (ADR 0083 decision 3),
-from ``services/read/evaluation/positions/exit_rule.py``."""
+"""``ExitRule``: the exit rule a setup publishes for a pick (ADR 0083 decision 3; an option
+setup's declared exits, ADR 0088 decision 19), from
+``services/read/evaluation/positions/exit_rule.py``."""
 
+from datetime import date
 from typing import Self
 
 import strawberry
@@ -9,13 +11,15 @@ from algotrade.services.read.evaluation.positions import exit_rule
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
 strawberry.enum(exit_rule.StopKind, description="Where a published stop comes from")
+strawberry.enum(exit_rule.StopBasis, description="What a published stop's `fraction` is of")
 
 
 @strawberry.type(
-    description="A stop. `fraction`: how far below the entry reference close (HISTORY: the "
-    "drawdown that `1 - beyond` of the setup's winning trades never exceeded, on `winners` "
-    "trades; DECLARED: the setup's own rule); FALLBACK: `multiple` x `atr` (ATR(14), usd per "
-    "share), not from this setup's history"
+    description="A stop. `fraction` of its `basis`: below the entry reference close (ENTRY), a "
+    "multiple of the credit (CREDIT) or a share of the collateral (COLLATERAL); HISTORY: the "
+    "level that `1 - beyond` of the setup's winning trades never passed, on `winners` trades; "
+    "DECLARED: the setup's own rule; FALLBACK: `multiple` x `atr` (ATR(14), usd per share), "
+    "not from this setup's history"
 )
 class Stop:
     kind: exit_rule.StopKind
@@ -24,12 +28,13 @@ class Stop:
     multiple: float | None
     winners: int | None
     beyond: float | None
+    basis: exit_rule.StopBasis
 
     @classmethod
     def of(cls, d: exit_rule.Stop) -> Self:
         return cls(
             kind=d.kind, fraction=d.fraction, atr=d.atr, multiple=d.multiple,
-            winners=d.winners, beyond=d.beyond,
+            winners=d.winners, beyond=d.beyond, basis=d.basis,
         )  # fmt: skip
 
 
@@ -38,7 +43,10 @@ class Stop:
     "`holdSessions` (the verdict's basis horizon), each null only with `unknown` saying why "
     "(never filled from an older value; none of it is read from a run that ends after the "
     "served session). `winners`: the basis's winning long trades read; `inSampleOnly`: the "
-    "run hides its out-of-sample trades, so only in-sample winners were read"
+    "run hides its out-of-sample trades, so only in-sample winners were read. An option "
+    "setup's declared `takeProfit` (a share of the credit), `exitDte` (calendar days to "
+    "expiry) and the `conditionFields` of its exit condition; its hold is the earlier of the "
+    "basis horizon and the `expiry` when one was given"
 )
 class ExitRule:
     edge_id: str
@@ -47,6 +55,10 @@ class ExitRule:
     unknown: Unknown | None
     winners: int
     in_sample_only: bool
+    take_profit: float | None
+    exit_dte: int | None
+    condition_fields: list[str]
+    expiry: date | None
 
     @classmethod
     def of(cls, d: exit_rule.ExitRule) -> Self:
@@ -57,4 +69,8 @@ class ExitRule:
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
             winners=d.winners,
             in_sample_only=d.in_sample_only,
+            take_profit=d.take_profit,
+            exit_dte=d.exit_dte,
+            condition_fields=list(d.condition_fields),
+            expiry=d.expiry,
         )

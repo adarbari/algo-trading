@@ -5,6 +5,13 @@ setups picked is one idea at its best position, the others in ``also_in``), and 
 at ``CAP`` after the licence filter, which has already dropped what the viewer may not see. Each
 idea is served from its best pick's stored result (values, regime, watch-outs).
 
+The viewer's watchlist (``[watchlist] instruments``, ADR 0083 amendment (c)) filters the list
+after the cap: of the ideas under the cap only the watched ones are listed, their ``rank`` still
+their place in the whole list, and ``watchlist`` says how many were under the cap (None: no
+watchlist, no filter). The watchlist never changes the rule, the cap, ``total`` or a group's
+``picked`` (the whole list's counts); a group's ``shown`` counts the ideas listed, and the
+licence's left-out count only watched names, so no left-out count counts a name it hides.
+
 ``state`` is ``LISTED`` when any setup qualifies for the tab (a night that picks nothing is then
 an empty list with the reason on each group, never a fall back) and ``UNPROVEN`` when none does:
 the page then shows the tab's pool of screeners, ``Query.ideas(tab:)``, labelled Unproven, with
@@ -31,6 +38,7 @@ from algotrade.services.read.screens.ideas import (
     watch_out,
 )
 from algotrade.services.read.screens.results import ScreenResult, load_results
+from algotrade.services.read.users.trader import load_watchlist_ids
 from algotrade.services.read.values import Unknown
 
 CAP = 15
@@ -96,7 +104,9 @@ class SetupGroup:
 @dataclass(frozen=True)
 class SetupPicks:
     """The tab's list: ``groups`` (setups, strongest evidence first), ``ideas`` (best first, at
-    most ``CAP``), ``total``: ideas before the cap, ``left_out`` counts by kind."""
+    most ``CAP``, only watched ones under a watchlist), ``total``: ideas before the cap,
+    ``left_out`` counts by kind, ``watchlist``: the ideas under the cap before the watchlist
+    kept the watched ones (None: the viewer has no watchlist)."""
 
     session: date
     tab: str
@@ -106,6 +116,7 @@ class SetupPicks:
     ideas: tuple[SetupIdea, ...]
     total: int
     left_out: tuple[LeftOut, ...]
+    watchlist: int | None = None
 
 
 def _left_out(found: SessionSetups, tab: str, dropped: int) -> tuple[LeftOut, ...]:
@@ -136,12 +147,14 @@ def load_setup_picks(ctx: ReadContext, tab: str) -> SetupPicks:
     found = load_session_setups(ctx)
     setups = sorted(found.of_tab(tab), key=lambda s: s.edge.id)
     sets = [of_setup.load_pick_set(ctx, s) for s in setups]
-    dropped = sum(p.dropped for p in sets)
+    watched = frozenset(load_watchlist_ids(ctx))
+    dropped = sum(1 for p in sets for i in p.dropped if not watched or i in watched)
     left = _left_out(found, tab, dropped)
     if not setups:
         return SetupPicks(ctx.session.date, tab, UNPROVEN, RULE_VERSION, (), (), 0, left)
     ranked = rank_picks([p for ps in sets for p in ps.picks])
-    shown = ranked[:CAP]
+    capped = ranked[:CAP]
+    shown = [i for i in capped if i.instrument_id in watched] if watched else capped
     runs_of = {ps.setup.edge.id: ps.run for ps in sets}
     names = {s.edge.id: s.edge.name for s in setups}
     wanted: dict[str, list[str]] = {}
@@ -175,7 +188,15 @@ def load_setup_picks(ctx: ReadContext, tab: str) -> SetupPicks:
         key=lambda g: _group_key(g, setups),
     )
     return SetupPicks(
-        ctx.session.date, tab, LISTED, RULE_VERSION, tuple(groups), tuple(ideas), len(ranked), left
+        ctx.session.date,
+        tab,
+        LISTED,
+        RULE_VERSION,
+        tuple(groups),
+        tuple(ideas),
+        len(ranked),
+        left,
+        len(capped) if watched else None,
     )
 
 

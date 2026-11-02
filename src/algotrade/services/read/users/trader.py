@@ -3,9 +3,11 @@
 user answered, which is what shows the onboarding question) and ``[watchlist] instruments``
 (instrument ids only, never a position, size, basis or account). Per user, read through the
 ``ConfigStore``, never from ``Viewer``; session-free (a ``Stores``), and when the context has a
-session each id also carries its ticker. A malformed stored value reads as absent. Written by
+session each id also carries its ticker (``load_watchlist_ids``: the ids alone, what filters
+Ideas). A malformed stored value reads as absent. Written by
 ``services.authoring.preferences.save_watchlist`` / ``save_ideas_tab``."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from algotrade.data.reference import resolver
@@ -31,17 +33,32 @@ class TraderPreferences:
 
 def load_trader_preferences(ctx: Stores) -> TraderPreferences:
     """``ctx.user``'s default Ideas tab and watchlist (at most 50 ids, in saved order)."""
-    doc = ctx.configs.load(ctx.user.user_id, PREFERENCES, PREFERENCES) or {}
+    doc = _document(ctx)
     ideas = doc.get("ideas")
     tab = ideas.get("default_tab") if isinstance(ideas, dict) else None
-    table = doc.get(WATCHLIST)
-    raw = table.get("instruments") if isinstance(table, dict) else None
-    ids = [i for i in raw if isinstance(i, str)] if isinstance(raw, list) else []
     names = resolver(ctx.reader, ctx.session.date) if isinstance(ctx, ReadContext) else None
     return TraderPreferences(
         tab if isinstance(tab, str) and tab in IDEAS_TABS else None,
         tuple(
             WatchedInstrument(i, names.symbol_for(i) if names is not None else None)
-            for i in dict.fromkeys(ids)
-        )[:MAX_WATCHLIST],
+            for i in _watchlist(doc)
+        ),
     )
+
+
+def load_watchlist_ids(ctx: Stores) -> tuple[str, ...]:
+    """``ctx.user``'s watchlist as instrument ids only (empty: no watchlist), what filters Ideas
+    (``services.read.ideas.picks``); no reference read."""
+    return _watchlist(_document(ctx))
+
+
+def _document(ctx: Stores) -> dict[str, object]:
+    found = ctx.configs.load(ctx.user.user_id, PREFERENCES, PREFERENCES)
+    return dict(found) if isinstance(found, Mapping) else {}
+
+
+def _watchlist(doc: dict[str, object]) -> tuple[str, ...]:
+    table = doc.get(WATCHLIST)
+    raw = table.get("instruments") if isinstance(table, dict) else None
+    ids = [i for i in raw if isinstance(i, str)] if isinstance(raw, list) else []
+    return tuple(dict.fromkeys(ids))[:MAX_WATCHLIST]

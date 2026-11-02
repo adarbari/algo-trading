@@ -8,12 +8,15 @@ and catalogue fields), the case values and the three exit settings compiled to p
 (``exit_rules``; a share position's ``share_exit_rules``) are here too; the catalogue check of every
 rule is ``check_rules``."""
 
+import hashlib
+import json
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from algotrade.config.edges.positions import grid
 from algotrade.config.edges.positions.cases import (
+    EXIT_CASE_NAMES,
     EXPIRY_CYCLES,
     CaseValue,
     canonical,
@@ -331,3 +334,16 @@ def _check_position_cases(spec: PositionSpec, where: str, templates: Templates) 
                 f"{where} position: the cases choose among templates of one kind (all with an "
                 f"option leg, or all shares), so a setup's trades come from one grain"
             )
+
+
+def exits_digest(spec: PositionSpec | None) -> str | None:
+    """A digest of the declared exits of a position (``[outcome.exit]`` and its exit cases), None
+    without a position. The evaluation run records it, so the exit rule a setup publishes is the
+    one its run tested: a reader compares it with the document's now (ADR 0088 decision 19).
+    It hashes the ``asdict`` of ``ExitSettings``, ``CaseValue`` and ``Group``: a field added to
+    one of them changes every digest, so every option exit rule reads NOT_RUN until re-run."""
+    if spec is None:
+        return None
+    cases = [asdict(c) for c in spec.cases if c.name in EXIT_CASE_NAMES]
+    payload = {"exit": asdict(spec.exit) if spec.exit else None, "cases": cases}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()

@@ -88,8 +88,16 @@ export function useSaveIdeasTab() {
   });
 }
 
-/** Saves the whole watchlist: the instrument ids, in order (the server keeps at most 50). */
+/** The Ideas reads the watchlist filters (the tab's setup list and its Unproven pool). */
+const WATCHLIST_FILTERED = ['SetupIdeas', 'IdeasPage'];
+
+/** Saves the whole watchlist: the instrument ids, in order (the server keeps at most 50); the
+ * Ideas reads it filters are read again. */
 export function useSaveWatchlist() {
+  const client = useQueryClient();
+  const optimistic = useOptimistic<readonly WatchedName[]>((cached, names) => ({
+    traderPreferences: { ...cached.traderPreferences, watchlist: [...names] },
+  }));
   return useMutation({
     mutationFn: (names: readonly WatchedName[]) =>
       unwrap(
@@ -97,8 +105,13 @@ export function useSaveWatchlist() {
           body: { instruments: names.map((n) => n.instrumentId) },
         }),
       ),
-    ...useOptimistic<readonly WatchedName[]>((cached, names) => ({
-      traderPreferences: { ...cached.traderPreferences, watchlist: [...names] },
-    })),
+    ...optimistic,
+    onSettled: () =>
+      Promise.all([
+        optimistic.onSettled(),
+        ...WATCHLIST_FILTERED.map((name) =>
+          client.invalidateQueries({ queryKey: queryKeys.gqlAll(name) }),
+        ),
+      ]),
   });
 }

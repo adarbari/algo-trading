@@ -382,7 +382,12 @@ EDGE_VERDICT = fixed(
 # ``pick_ids`` (a ``long_short`` edge: its long leg, then its short leg ranked by its own score
 # ascending); null in rows written before the column, read as every pick ``long`` (only long picks
 # were stored then). ``pick_weights``: a book's weight of each pick, aligned with ``pick_ids``;
-# null when the edge is not a book and in rows written before the column.
+# null when the edge is not a book and in rows written before the column. A book's ``pick_ids`` are
+# the names it holds after its overlays (``CASH`` an id like them), its ``pick_weights`` theirs; an
+# ensemble's averaged book is one more row under the screener ``ensemble`` (no screener may take the
+# id). A named-symbol setup (ADR 0073: no screener) stores its one row under the sentinel screener
+# ``NAMED`` (``@named``; ``@`` is refused in every config id, so no screener can take it).
+NAMED = "@named"  # the screener key of a named-symbol setup's ``results/edge_picks`` row
 EDGE_PICKS = fixed(
     "results/edge_picks",
     "results",

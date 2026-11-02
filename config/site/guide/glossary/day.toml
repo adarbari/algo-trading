@@ -303,12 +303,12 @@ term = "Watchlist"
 short = "A list of up to 50 tickers you keep; it only filters what the site shows you."
 body = """
 The watchlist is a list of tickers, nothing else: no quantity, price paid or account. Adding a
-name never changes a result, a ranking or a statistic; the Ideas list can be narrowed to the names
-on it. It is stored with your account, so it follows you to another device. A name the
+name never changes a result, a ranking or a statistic; while it holds a name, Ideas shows only
+the names on it. It is stored with your account, so it follows you to another device. A name the
 instrument list later drops stays on your watchlist until you remove it, shown without a ticker.
 """
 next = "Add names in Settings, or use the Watch button on a name's page."
-see_also = ["start_tab", "watch_toggle"]
+see_also = ["start_tab", "watch_toggle", "ideas_watchlist"]
 
 [[term]]
 id = "watch_toggle"
