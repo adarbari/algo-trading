@@ -41,6 +41,7 @@
 "sector_reversal/v1.toml" = "1c2afdbb528f41a05607de4afaa0fa4859a6eeb10712cc671d111a96e686b3c7"
 "low_beta/v1.toml" = "4cbb0049fd5b18c1886c37fe5ccf0644240b8e22539b8bd9d84a196668fbcf21"
 "low_volatility/v1.toml" = "52a5bebf7586327e6dd27622f83c4bb077e849f98f8f2e3a853816b261ca0529"
+"total_vol_high/v1.toml" = "3cfa469886fd1e7d385e0fa1ec35cca276f617108daa50aee4e5f56f7828335b"
 "cp_iv_spread/v1.toml" = "f1ee8eaa6293f10c55ef390ab3ebdc8041fa869bceb1180b016a72fa85dcc31e"
 "cp_iv_spread_rise/v1.toml" = "c37c2dc937a026e6f81f00bf1dff6968af52e028c447c17978eab529948cfbc4"
 "iv_smirk/v1.toml" = "77d825243e47e52fd961c9ee496c9748bda0b9be505eb5b8f90143adc8937d50"
