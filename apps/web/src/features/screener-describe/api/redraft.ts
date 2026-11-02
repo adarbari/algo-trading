@@ -44,8 +44,6 @@ export function useRedraftPart(screenerId: string) {
             formulas_dropped: answer.formulas_dropped ?? [],
             missing: answer.missing ?? [],
             notes: answer.notes,
-            suggestions: answer.suggestions ?? [],
-            suggestions_dropped: answer.suggestions_dropped ?? [],
             unresolved: answer.unresolved ?? [],
             ...(answer.draft_session_id ? { draft_session_id: answer.draft_session_id } : {}),
           },

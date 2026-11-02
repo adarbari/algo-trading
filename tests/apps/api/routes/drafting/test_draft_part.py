@@ -247,16 +247,18 @@ def test_thirty_chained_re_drafts_each_feed_back_through_the_request_body(
     """What only grows (notes, dropped checks) is kept within what the body accepts, so the draft
     the browser holds can always be sent back (a 422 here would strand the trader's retype)."""
     rounds = 30
-    dropped = {
+    invented = {
         "field": "nope.x", "op": "gte", "value": 1, "mode": "score", "tolerance": None,
-        "on_miss": None, "why": "w", "source": None, "part": "p1",
+        "on_miss": None, "why": "w", "part": "p1",
     }  # fmt: skip
     answers = [
         PART_ANSWER
         | {
-            "criteria": [{**PART_ANSWER["criteria"][0], "value": n + 10}],
+            "criteria": [
+                {**PART_ANSWER["criteria"][0], "value": n + 10}, {**invented, "id": f"x{n}"},
+            ],
             "parts": [{"id": "p1", "words": f"over ${n + 10}", "reading": None}],
-            "notes": [f"note {n} a", f"note {n} b"], "suggestions": [dropped],
+            "notes": [f"note {n} a", f"note {n} b"],
         }
         for n in range(rounds)
     ]  # fmt: skip
@@ -269,7 +271,7 @@ def test_thirty_chained_re_drafts_each_feed_back_through_the_request_body(
         response = client.post(PATH, json=body)
         assert response.status_code == 200, (n, response.text)
         draft = response.json()["draft"]
-    assert len(draft["notes"]) == 40 and len(draft["suggestions_dropped"]) == rounds
+    assert len(draft["notes"]) == 40 and draft["dropped"] and "suggestions" not in draft
     assert draft["notes"][-1] == "note 29 b" and "note 0 a" not in draft["notes"]
     DraftPartBody.model_validate(retype(draft))
 

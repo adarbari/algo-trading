@@ -6,5 +6,6 @@ export const TEST_PATHS = {
   expert: '/test/expert',
   setup: '/test/setup',
   expertOf: (id: string) => `/test/expert/${encodeURIComponent(id)}`,
+  describeOf: (id: string) => `/test/describe/${encodeURIComponent(id)}`,
   resultOf: (id: string) => `/test/result/${encodeURIComponent(id)}`,
 } as const;

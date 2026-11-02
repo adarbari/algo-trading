@@ -3,15 +3,15 @@
 draft again, the browser swaps it in whole:
 
 - the part's own criteria (the ids it names) are replaced as a whole by the new ones, and so are
-  its dropped criteria, formulas, readings to choose, missing requests, suggestions and tie-break;
+  its dropped criteria, formulas, readings to choose, missing requests and tie-break;
 - the other parts win: a new criterion on the same field and operator as a criterion of another
-  part (or of the Builder's hand-added ones) is dropped with the reason ``OTHER_PART``; a
-  suggestion that repeats or rewrites one of them is not offered; a formula or term another part
-  already offers is not offered twice; the document's tie-break stays when another part owns it;
+  part (or of the Builder's hand-added ones) is dropped with the reason ``OTHER_PART``; a formula
+  or term another part already offers is not offered twice; the document's tie-break stays when
+  another part owns it;
 - what the Builder's document holds that no part names (the trader added it by hand) is the
   ``kept`` part, the other parts keep their ids, words and readings, and the offsets of the words
   after the replaced ones move with them (in UTF-16 units, as before);
-- ids stay unique (a new criterion, dropped criterion or suggestion that takes an id another
+- ids stay unique (a new criterion or dropped criterion that takes an id another
   part holds is renamed) and the document is validated as finalise does; a new criterion the
   validator refuses is dropped with its message, but one of the trader's own that it refuses is
   an error (the merge never drops what the trader has).
@@ -27,7 +27,6 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.drafting.contract.formulas import DroppedFormula
 from algotrade.services.drafting.contract.gaps import Unresolved
 from algotrade.services.drafting.contract.groups import group_parts, prune_groups
-from algotrade.services.drafting.contract.suggestions import rewrites
 from algotrade.services.drafting.parts.build import kind_of
 from algotrade.services.drafting.parts.model import KEPT_ID, UNPLACED_ID, Part
 from algotrade.services.drafting.parts.spans import utf16
@@ -103,15 +102,6 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
     missing += [m for m in sub.missing if missing_ref(m) not in have][: MAX_ITEMS - len(missing)]
     present = {missing_ref(m) for m in missing}
     mine.missing += [missing_ref(m) for m in sub.missing if missing_ref(m) in present]
-    # suggestions: ids stay unique, the other parts' thresholds are never rewritten
-    suggestions = [s for s in prior.suggestions if s.id not in old.suggestions]
-    shown = [c for c in criteria.values() if isinstance(c, Mapping)]
-    for suggestion in sub.suggestions:
-        if rewrites(suggestion.criterion, shown) or len(suggestions) >= MAX_ITEMS:
-            continue
-        fresh_id = _unique("s", {s.id for s in suggestions}, numbered=True)
-        suggestions.append(replace(suggestion, id=fresh_id, part=None))
-        mine.suggestions.append(fresh_id)
     notes += (n for n in sub.notes if n not in notes)
     parts = _parts(req, sub, document, mine, others)
     dropped, parts = _bounded(dropped, parts)
@@ -119,8 +109,7 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
         req.screener_id, _regrouped(ctx, req, document, parts, mine), tuple(dropped),
         _newest(dict.fromkeys(_clip(n) for n in [*notes, *mine.notes])),  # (after the groups)
         call_id=sub.call_id, formulas=tuple(formulas), formulas_dropped=_newest(formulas_dropped),
-        missing=tuple(missing), unresolved=tuple(unresolved), suggestions=tuple(suggestions),
-        suggestions_dropped=_newest([*prior.suggestions_dropped, *sub.suggestions_dropped]),
+        missing=tuple(missing), unresolved=tuple(unresolved),
         sentence=req.merged, parts=parts,
     )  # fmt: skip
 
@@ -165,7 +154,6 @@ class _Mine:
         self.formulas: list[str] = []
         self.unresolved: list[str] = []
         self.missing: list[str] = []
-        self.suggestions: list[str] = []
         self.rank = False
         self.notes: list[str] = []
         self.lost = False  # the merge dropped something the model said (its reading may lie)
@@ -179,13 +167,8 @@ def _default(term: Unresolved) -> Mapping[str, Any]:
     return term.alternatives[term.default_index].criterion
 
 
-def _unique(base: str, taken: Collection[str], numbered: bool = False) -> str:
-    """``base`` if free, else ``base_2``, ``base_3``...; ``numbered``: ``base1``, ``base2``..."""
-    if numbered:
-        n = 1
-        while f"{base}{n}" in taken:
-            n += 1
-        return f"{base}{n}"
+def _unique(base: str, taken: Collection[str]) -> str:
+    """``base`` if free, else ``base_2``, ``base_3``..."""
     name, k = base, 2
     while name in taken:
         name, k = f"{base}_{k}", k + 1
@@ -314,7 +297,7 @@ def _parts(
 def _groups(part: Part) -> dict[str, Sequence[str]]:
     refs: dict[str, Sequence[str]] = {
         "criteria": part.criteria, "dropped": part.dropped, "formulas": part.formulas,
-        "unresolved": part.unresolved, "missing": part.missing, "suggestions": part.suggestions,
+        "unresolved": part.unresolved, "missing": part.missing,
     }  # fmt: skip
     return {k: v for k, v in refs.items() if v} | ({"rank": ["rank"]} if part.rank else {})
 
@@ -344,7 +327,7 @@ def _retyped(req: PartRequest, sub: ScreenDraft, mine: _Mine, start: int) -> Par
     refs = Part(
         old.id, req.new_words, 0, 0, None, "server", "", old.origin,
         tuple(mine.criteria), tuple(d.id for d in mine.dropped), tuple(mine.formulas),
-        tuple(mine.unresolved), tuple(mine.missing), tuple(mine.suggestions), mine.rank,
+        tuple(mine.unresolved), tuple(mine.missing), mine.rank,
         old.join, old.join_words,
     )  # fmt: skip
     kind = kind_of(_groups(refs))

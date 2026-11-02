@@ -24,7 +24,7 @@ ASK = """\
 This is a RE-DRAFT of ONE part of a screen the trader already described. Answer with the same JSON
 object, for this part only.
 - "parts": exactly one part, {"id": "p1", "words": the part's words below, copied exactly,
-  "reading": one short line}; every criterion, formula, missing, unresolved, suggestion and the
+  "reading": one short line}; every criterion, formula, missing, unresolved and the
   tie_break carries "part": "p1".
 - "criteria" holds only what these words ask for. The criteria of the other parts are fixed: do not
   repeat, restate or contradict them (a criterion on the same field and operator as one of them is

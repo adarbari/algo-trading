@@ -1,6 +1,7 @@
 /**
- * The Builder's "Describe it" box: the describe form over the Builder's working document; the
- * draft the model proposes replaces it as an unsaved edit (save, preview and finalise as usual).
+ * The Test flow's "Describe it" box (`/test/describe/$id`): the describe form over the Builder's
+ * working document; the draft the model proposes replaces it as an unsaved edit (save, preview
+ * and finalise as usual).
  * What the model understood is the review panel under the input, loaded as one lazy chunk when an
  * answer arrives. A field the draft names that the catalogue has opens its Guide drawer. The
  * Builder owns what the trader decides on the answer's options (readings, formulas). Retyping one
@@ -10,7 +11,7 @@
  * it; saving goes through the formula feature's own save, then the Builder adds the pending
  * criterion as an active row. Shown once the screen is loaded.
  */
-import { Panel, Skeleton } from '@algotrade/ui';
+import { Skeleton, Surface } from '@algotrade/ui';
 import { lazy, Suspense } from 'react';
 
 import { useFeatureCatalogue } from '@/entities/feature';
@@ -33,7 +34,7 @@ export function DescribeScreen() {
   const reviewing = builder.reviewing;
   return (
     <>
-      <Panel title="Describe it" description="A sentence becomes draft criteria you review">
+      <Surface border="all" padding={4} radius="lg">
         <DescribeForm
           screenerId={builder.id}
           document={builder.document}
@@ -63,9 +64,6 @@ export function DescribeScreen() {
                   builder.setCriterion(criterion);
                   builder.recordChoice(choice);
                 }}
-                onAcceptSuggestion={(criterion) => {
-                  builder.addSuggested(criterion);
-                }}
                 onRedrafted={(next, prior, replaced) => {
                   // One part was retyped: the merged draft is the working document and the
                   // answer shown; the other parts' formula decisions and notes stay.
@@ -83,7 +81,7 @@ export function DescribeScreen() {
             </Suspense>
           )}
         />
-      </Panel>
+      </Surface>
       {reviewing && (
         <FormulaFeatureDialog
           key={reviewing.name}

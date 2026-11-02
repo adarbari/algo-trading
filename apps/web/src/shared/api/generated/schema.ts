@@ -890,10 +890,6 @@ export interface components {
              * @description the draft's `sentence`, as served
              */
             sentence: string;
-            /** Suggestions */
-            suggestions?: components["schemas"]["Suggestion"][];
-            /** Suggestions Dropped */
-            suggestions_dropped?: components["schemas"]["DroppedSuggestion"][];
             /** Unresolved */
             unresolved?: components["schemas"]["Unresolved"][];
         };
@@ -932,13 +928,6 @@ export interface components {
             existing: string | null;
             /** Name */
             name: string;
-            /** Reason */
-            reason: string;
-        };
-        /** DroppedSuggestion */
-        DroppedSuggestion: {
-            /** Field */
-            field: string;
             /** Reason */
             reason: string;
         };
@@ -1469,11 +1458,6 @@ export interface components {
              */
             start: number;
             /**
-             * Suggestions
-             * @description ids of suggestions
-             */
-            suggestions: string[];
-            /**
              * Unresolved
              * @description terms of the unresolved readings
              */
@@ -1922,13 +1906,6 @@ export interface components {
              */
             sentence?: string;
             /**
-             * Suggestions
-             * @description protective checks offered (soft or score), never in the document: the trader accepts or skips each
-             */
-            suggestions?: components["schemas"]["Suggestion"][];
-            /** Suggestions Dropped */
-            suggestions_dropped?: components["schemas"]["DroppedSuggestion"][];
-            /**
              * Unresolved
              * @description ambiguous terms; the document has each default
              */
@@ -2008,31 +1985,6 @@ export interface components {
              * @description the user's own edge: researching | candidate | live | retired | rejected; none keeps it
              */
             status?: string | null;
-        };
-        /** Suggestion */
-        Suggestion: {
-            /**
-             * Criterion
-             * @description a soft or score criterion, never in the document
-             */
-            criterion: {
-                [key: string]: unknown;
-            };
-            /**
-             * Id
-             * @description the server's id (s1, s2...), what a part's suggestions name
-             */
-            id: string;
-            /**
-             * Source
-             * @description the field guide entry or field that raised it
-             */
-            source: string | null;
-            /**
-             * Why
-             * @description the short reason, from the caveat or situation
-             */
-            why: string;
         };
         /** TableView */
         TableView: {

@@ -1,6 +1,6 @@
 """The items of a draft as the attribution sees them (ADR 0041, amended 2026-10-11): one ``Item``
 per criterion of the document (and per dropped one), pending formula, missing request, ambiguous
-term, suggestion and the rank, carrying the part id the model tagged it with, the words it
+term and the rank, carrying the part id the model tagged it with, the words it
 quoted, its field, whether the Builder's current document already had it, and the numbers a
 reading of its part may cite. Pure."""
 
@@ -9,7 +9,6 @@ from typing import Any
 
 from algotrade.services.drafting.contract.formulas import DraftFormula
 from algotrade.services.drafting.contract.gaps import MissingFeature, Unresolved
-from algotrade.services.drafting.contract.suggestions import Suggestion
 from algotrade.services.drafting.parts.consistency import names_numbers, stated, values_of
 from algotrade.services.drafting.parts.model import Item
 
@@ -43,7 +42,6 @@ def items_of(
     formulas: Sequence[DraftFormula],
     unresolved: Sequence[Unresolved],
     missing: Sequence[MissingFeature],
-    suggestions: Sequence[Suggestion],
     rank: tuple[str | None, str] | None,
     spans: Mapping[str, str] | None = None,
 ) -> list[Item]:
@@ -81,10 +79,6 @@ def items_of(
         out.append(Item("unresolved", u.term, u.part, u.span, options[u.default_index]["field"],
                         False, numbers))  # fmt: skip
     out += [Item("missing", m.key or str(m.new_key_slug), m.part, m.span) for m in missing]
-    out += [
-        Item("suggestions", s.id, s.part, None, s.criterion["field"], False, _numbers(s.criterion))
-        for s in suggestions
-    ]
     if rank is not None:
         out.append(Item("rank", "rank", rank[0], None, rank[1]))
     return out

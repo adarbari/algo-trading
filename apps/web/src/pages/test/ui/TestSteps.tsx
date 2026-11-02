@@ -19,7 +19,8 @@ export interface TestStepsProps {
 export function TestSteps({ at, id }: TestStepsProps) {
   const build = (() => {
     if (at === 'guided') return { href: TEST_PATHS.guided, label: 'Guided' };
-    if (at === 'describe') return { href: TEST_PATHS.describe, label: 'Describe it' };
+    if (at === 'describe')
+      return { href: id ? TEST_PATHS.describeOf(id) : TEST_PATHS.describe, label: 'Describe it' };
     if (at === 'start') return null;
     return {
       href: id ? TEST_PATHS.expertOf(id) : TEST_PATHS.expert,
@@ -29,7 +30,7 @@ export function TestSteps({ at, id }: TestStepsProps) {
   const items = [
     { href: TEST_PATHS.start, label: 'Start' },
     ...(build ? [build] : []),
-    ...(id && (at === 'expert' || at === 'result')
+    ...(id && at !== 'start' && at !== 'guided'
       ? [{ href: TEST_PATHS.resultOf(id), label: 'Result' }]
       : []),
   ];
