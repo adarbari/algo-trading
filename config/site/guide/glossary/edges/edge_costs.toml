@@ -17,7 +17,7 @@ tenths pay it. Small samples are noise: below about 40 trades, read the lines as
 Real costs rise with size and fall with liquidity, and the cost a trader pays can differ from every
 level shown. Don't pick the cost that makes the result look best; check capacity too.
 """
-see_also = ["break_even_cost", "hold_band", "capacity", "cost_state", "win_rate", "base_rate", "lift", "top_vs_bottom_decile", "trades"]
+see_also = ["break_even_cost", "hold_band", "capacity", "cost_state", "win_rate", "base_rate", "lift", "top_vs_bottom_decile", "trades", "option_cost_full"]
 
 [[term]]
 id = "break_even_cost"
@@ -88,3 +88,35 @@ result.
 """
 next = "Re-run the backtest to fill a not stored figure; show the out-of-sample result to fill a hidden one."
 see_also = ["cost_sensitivity", "capacity", "out_of_sample", "in_sample", "not_a_return"]
+
+# An option setup's cost levels (ADR 0088 design 2.6, E6b-2): the rows of its cost sensitivity.
+
+[[term]]
+id = "option_cost_mid"
+term = "Mid (option cost level)"
+short = "The option trades valued at the middle of each bid and ask, paying no spread and no commission."
+body = """
+Mid is the best a trade could have done: every option bought and sold at the middle of its quote. Nobody trades at the mid every time, so this is an upper bound. The gap between mid and full is what the spreads and commissions cost the setup. A setup that only works at mid does not work.
+"""
+next = "Compare the mid and full rows: a large gap means the setup's options are expensive to trade."
+see_also = ["option_cost_effective", "option_cost_full", "cost_sensitivity"]
+
+[[term]]
+id = "option_cost_effective"
+term = "Effective (option cost level)"
+short = "The option trades valued paying part of each half-spread, the share a trader working limit orders usually pays, plus commission."
+body = """
+A trader who places limit orders between the bid and the ask usually fills inside the spread, not at its far side. The share paid depends on how many option legs the position has: more legs are harder to fill well. The site sets the share per leg count. It sits between mid and full and is the closest to what a careful trader pays.
+"""
+next = "Read the effective row as the realistic case and the full row as the cautious one."
+see_also = ["option_cost_mid", "option_cost_full"]
+
+[[term]]
+id = "option_cost_full"
+term = "Full (option cost level)"
+short = "The option trades valued paying the whole half-spread on each side and the commission: the level the verdict reads."
+body = """
+Full assumes every option is bought at the ask and sold at the bid. Every contract pays its commission on the way in and, unless it expired, on the way out. It is the cautious case. The setup's verdict and every other figure on its page are read at this level, so a setup that passes here does not rely on good fills.
+"""
+next = "Check that the full row still earns on its collateral before relying on the setup."
+see_also = ["option_cost_mid", "option_cost_effective", "cost_sensitivity"]

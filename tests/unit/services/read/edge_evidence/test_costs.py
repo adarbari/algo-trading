@@ -245,3 +245,27 @@ def test_no_pick_with_a_stored_volume_is_not_stored_never_a_zero_median() -> Non
     found = capacity.load_edge_capacity(ctx, edge)
     assert found.state == capacity.NOT_STORED
     assert all(p.adv_median is None and p.adv_low is None for p in found.periods)
+
+
+def test_an_option_setups_costs_are_its_named_levels_on_its_collateral() -> None:
+    """E11: an option position's cost rows (``<period>:<level>``) are served as its levels in the
+    order mid, effective, full, each with its mean return on collateral, at the document's own
+    cost, ``assumed`` on the level the verdict reads; no break-even (not linear in a bp charge)."""
+    rows = [
+        row("momo", "cost", 0.7 - 0.05 * i, FROZEN, slice_value=f"{period}:{name}",
+            mean_excess_picks=0.004 - 0.001 * i, mean_roc=0.04 - 0.01 * i)
+        for period in ("all", "frozen")
+        for i, name in reversed(list(enumerate(("mid", "effective", "full"))))
+    ]  # fmt: skip
+    ctx, edge = site_world(rows)
+    found = costs.costs_of(load_basis_rows(ctx, official_basis(ctx, edge)), OWN_BP)
+    assert found.state == costs.MEASURED
+    assert [(lv.period, lv.level) for lv in found.levels] == [
+        (p, n) for p in ("all", "out_of_sample") for n in ("mid", "effective", "full")
+    ]
+    assert [lv.mean_roc for lv in found.levels[:3]] == pytest.approx([0.04, 0.03, 0.02])
+    assert {lv.bp for lv in found.levels} == {OWN_BP}
+    assert [lv.level for lv in found.levels if lv.assumed] == ["full", "full"]
+    by = {p.period: p for p in found.periods}
+    assert by["all"].state == costs.MEASURED and by["all"].break_even_bp is None
+    assert by["in_sample"].state == costs.NOT_STORED  # no row of that period
