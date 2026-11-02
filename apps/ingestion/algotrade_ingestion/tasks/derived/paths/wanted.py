@@ -4,10 +4,13 @@ parameter, for each hold of its ``horizon_sessions``), by stored key. ``OPTION``
 ``option_pnl`` positions (option-outcomes); ``SHARES``: the share positions of a return outcome
 that declare an ``[outcome.exit]`` (share-outcomes; one without keeps its fixed-horizon outcome).
 A new edge needs no code change; two setups that resolve to one key (and, for shares, one
-benchmark) share its rows."""
+benchmark) share its rows. ``window_ends`` are the window ends a run of either writer computes and
+``run_windows`` the position windows (and refusals) a run recorded, which its check holds it to."""
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
+from datetime import date, datetime
+from typing import Any
 
 from algotrade.config.edges.document import CLOSED, Edge, Outcome
 from algotrade.config.edges.positions.chain import CHAIN_KIND
@@ -21,6 +24,7 @@ from algotrade.config.edges.positions.templates import (
     Templates,
 )
 from algotrade.core.model.fields import is_position_field
+from algotrade.core.time.calendar import close_time, sessions_between, sessions_ending
 
 
 @dataclass(frozen=True)
@@ -78,4 +82,36 @@ def positions_wanted(
     return sorted(found.values(), key=lambda w: (w.hold, w.key, w.benchmark or ""))
 
 
-__all__ = ["OPTION", "SHARES", "Wanted", "positions_wanted"]
+def window_ends(
+    clock: Callable[[], datetime], session: date, recheck: int,
+    start: date | None = None, end: date | None = None,
+) -> list[date]:  # fmt: skip
+    """The window ends a run computes: ``session`` and the ``recheck`` sessions before it, or every
+    session in ``start..end``; none is refused, and a window not yet closed raises."""
+    ends = (
+        sessions_between(start, end or session) if start else sessions_ending(session, recheck + 1)
+    )
+    if not ends:
+        raise ValueError(f"no exchange session in {start}..{end or session}")
+    if close_time(ends[-1]) > clock():
+        raise ValueError(f"the window ending {ends[-1]} has not closed yet")
+    return ends
+
+
+def run_windows(
+    stats: Mapping[str, Any],
+) -> tuple[list[str], list[tuple[str, dict[str, Any], date]]]:
+    """A path writer run's stats -> (the refusals, one line per refused position; the computed
+    windows as (item, its stats, start session)), in item order."""
+    refused, windows = [], []
+    for key, value in sorted(stats.items()):
+        if not isinstance(value, dict):
+            continue
+        if "refused" in value:
+            refused.append(f"{key[:60]}: refused ({value['refused']})")
+        elif "start" in value:
+            windows.append((key, value, date.fromisoformat(value["start"])))
+    return refused, windows
+
+
+__all__ = ["OPTION", "SHARES", "Wanted", "positions_wanted", "run_windows", "window_ends"]

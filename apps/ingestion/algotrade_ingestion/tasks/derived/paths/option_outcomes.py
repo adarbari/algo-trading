@@ -37,7 +37,7 @@ from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
-from algotrade.core.time.calendar import close_time, sessions_between, sessions_ending
+from algotrade.core.time.calendar import close_time, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
     CHAIN_STATUS,
@@ -63,7 +63,12 @@ from algotrade_ingestion.tasks.derived.paths.close_fields import (
     rule_licence,
 )
 from algotrade_ingestion.tasks.derived.paths.option_rows import position_rows
-from algotrade_ingestion.tasks.derived.paths.wanted import Wanted, positions_wanted
+from algotrade_ingestion.tasks.derived.paths.wanted import (
+    Wanted,
+    positions_wanted,
+    run_windows,
+    window_ends,
+)
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.quality import Check
 
@@ -142,13 +147,7 @@ def compute_option_outcomes(
 ) -> RunRecord:
     """The windows ``session`` and the ``RECHECK`` sessions before it close, or those of every
     window-end session in ``start..end`` (one run each) -> the last run's record."""
-    ends = (
-        sessions_between(start, end or session) if start else sessions_ending(session, RECHECK + 1)
-    )
-    if not ends:
-        raise ValueError(f"no exchange session in {start}..{end or session}")
-    if close_time(ends[-1]) > ctx.clock():
-        raise ValueError(f"the window ending {ends[-1]} has not closed yet")
+    ends = window_ends(ctx.clock, session, RECHECK, start, end)
     configs = ctx.configs or SITE
     wanted = positions_wanted(load_edges(configs), load_templates(configs))
     stored = ctx.reader.dates(CHAIN_STATUS)
@@ -278,19 +277,9 @@ def check_option_outcomes(reader: StoreReader, session: date, s: SourcesSettings
     runs = [r for r in reader.runs(TASK, session) if r.status == RunStatus.COMPLETE]
     if not runs:
         return [Check("option_outcomes", "FAIL", f"no complete option-outcomes run for {session}")]
-    problems: list[str] = []
+    problems, windows = run_windows(runs[-1].stats)
     unmeasured = 0
-    windows = 0
-    for key, value in sorted(runs[-1].stats.items()):
-        if not isinstance(value, dict):
-            continue
-        if "refused" in value:
-            problems.append(f"{key[:60]}: refused ({value['refused']})")
-            continue
-        if "start" not in value:
-            continue
-        windows += 1
-        start = date.fromisoformat(value["start"])
+    for key, value, start in windows:
         status = chain_status(reader, start)
         ok = 0
         if status is not None and not status.empty:
@@ -315,7 +304,7 @@ def check_option_outcomes(reader: StoreReader, session: date, s: SourcesSettings
     return [
         Check(
             "option_outcomes", "PASS",
-            f"{windows} position windows closed by {session}, every OK chain has a row; "
+            f"{len(windows)} position windows closed by {session}, every OK chain has a row; "
             f"{unmeasured} UNMEASURED (a chain missing or stale)",
         )
     ]  # fmt: skip
