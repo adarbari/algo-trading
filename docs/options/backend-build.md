@@ -496,7 +496,7 @@ exit rule (E2 -> E12a) is off it.
 9. **(a)** A rule's licence is its strictest field; the trial is personal; such a setup is hidden from,
    and adds no Ideas picks for, a viewer without that licence.
 10. **As recommended:** (b) owner-only until one scored setup has a forward record, then (a) (decide
-    again at E14).
+    again at E14). **Decided at E14 (2026-11-02, Fable on the owner's behalf, pending owner confirmation):** one setting, `verdict.toml` `fitted_score_setups` = `owner_only` (default) or `forward_verdict`; see `docs/decisions/log.md`.
 11. **(a)** Short picks shown as "short" (borrow assumed, stop UNKNOWN in P1); books in rank order with
     the next rebalance date as the exit; no weights or sizes. Amends ADR 0083 d3 and ADR 0081 d4.
 

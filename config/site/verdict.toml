@@ -31,6 +31,10 @@ capacity_adv_floor_usd = 5000000 # a pick trading less than this (20-day average
                          # decision session) counts as low liquidity in an edge's capacity figures
 capacity_position_usd = 100000 # the position the capacity page sizes against a pick's volume
                          # (read when served, not stored: a change needs no run)
+fitted_score_setups = "owner_only" # a setup whose rules read a fitted score (edge_score_<edge>): "owner_only"
+                         # (its trial is personal) until one has a forward record, then "forward_verdict"
+                         # (published on a works / promising verdict, which never reads the in-sample
+                         # slice: sessions up to fitted_through plus the fit's horizon); owner decision 10
 
 [edge_costs]               # ADR 0064: the round-trip costs (bp) a return edge is also measured at,
 levels_bps = [0, 15, 30, 50] # beside its own cost_bps; in the leg key (a change recomputes every leg)
