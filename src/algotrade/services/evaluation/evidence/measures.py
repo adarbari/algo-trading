@@ -169,7 +169,10 @@ def _excess(
     return boot.mean, boot.t
 
 
-OptionFigures = tuple[float | None, float | None, float | None, float | None]  # one pick's
+OptionFigures = tuple[
+    float | None, float | None, float | None, float | None, float | None
+]  # one pick's (hedged_roc, stock_roc, roc_gross, wing_cost, capital)
+SHARE_FLOOR = 1e-6  # dollars per unit: a summed mid P&L smaller than this has no share to speak of
 
 
 def _mean_of_sessions(per_session: Sequence[Sequence[float]]) -> float | None:
@@ -180,19 +183,24 @@ def _mean_of_sessions(per_session: Sequence[Sequence[float]]) -> float | None:
 
 def option_measures(sessions: Sequence[Sequence[OptionFigures]]) -> dict[str, Any]:
     """The option-only columns of a slice: ``sessions[i]`` holds the counted picks of one session
-    as ``(hedged_roc, stock_roc, roc_gross, wing_cost)`` (None: not known). ``hedged_mean_roc`` and
-    ``wing_cost`` are means of the sessions' means over the picks that have the figure;
-    ``stock_share`` is the sum of the stock return over the sum of the mid return of the picks
-    that have both, None when the sum of the mid return is zero. A figure with no pick is None."""
+    as ``(hedged_roc, stock_roc, roc_gross, wing_cost, capital)`` (None: not known).
+    ``hedged_mean_roc`` and ``wing_cost`` are means of the sessions' means over the picks that
+    have the figure. ``stock_share`` is the sum of ``stock_pnl`` over the sum of ``pnl_mid`` in
+    dollars per unit (each return times its pick's capital, undoing the division by collateral),
+    over the picks that have both; None below ``SHARE_FLOOR`` in absolute value. A figure with no
+    pick is None."""
 
     def known(at: int) -> list[list[float]]:
         return [[p[at] for p in s if p[at] is not None] for s in sessions]  # type: ignore[misc]
 
-    both = [(p[1], p[2]) for s in sessions for p in s if p[1] is not None and p[2] is not None]
+    both = [
+        (p[1] * p[4], p[2] * p[4])  # type: ignore[operator]
+        for s in sessions
+        for p in s
+        if None not in (p[1], p[2], p[4])
+    ]
     total = sum(g for _, g in both)
-    share = None
-    if both and abs(total) > 1e-12:
-        share = float(sum(st for st, _ in both) / total)
+    share = float(sum(st for st, _ in both) / total) if both and abs(total) > SHARE_FLOOR else None
     return {
         "hedged_mean_roc": _mean_of_sessions(known(0)),
         "stock_share": share,

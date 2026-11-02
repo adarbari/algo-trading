@@ -438,7 +438,11 @@ def _tail_measures(
         spec.tails, spec.bootstrap and sl.kind in BOOTSTRAPPED,
     )  # fmt: skip
     figures = [
-        [(p.hedged_roc, p.stock_roc, p.roc_gross, p.wing_cost) for p in r.picks if not p.reason]
+        [
+            (p.hedged_roc, p.stock_roc, p.roc_gross, p.wing_cost, p.capital)
+            for p in r.picks
+            if not p.reason
+        ]
         for r in rows
     ]
     return replace(found, **option_measures(figures))

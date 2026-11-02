@@ -789,7 +789,9 @@ def test_the_option_values_reach_the_slice_and_a_share_setups_columns_stay_null(
     days = [date(2026, 1, 5) + timedelta(days=i) for i in range(4)]
 
     def pick(i: int, **figures: float | None) -> Pick:
-        return replace(roc_pick("A", 0.01 * i, 0.01 * i), roc_gross=0.02 * i + 0.02, **figures)
+        return replace(
+            roc_pick("A", 0.01 * i, 0.01 * i), roc_gross=0.02 * i + 0.02, capital=100.0, **figures
+        )
 
     figured = [
         roc_stat(d, (pick(i, hedged_roc=0.01, stock_roc=0.005 * (i + 1), wing_cost=0.02),), (0.0,))
