@@ -3,7 +3,7 @@
 Owner decision 2026-11-02: the hook runs locally only what failed often in CI or in `make changed`
 and is cheap on the shared Mac; everything else is GitHub CI's (the repo is public: hosted minutes
 are free, only concurrency is limited). Measured over the last 100 failed CI runs (2026-10-24 to
-2026-11-02, `docs/ci.md` "Pre-push fast lane"), on a warm worktree; target 90 s.
+2026-11-02, `docs/ci.md` "Pre-push fast lane"), on a warm worktree; target 90 s, hard budget 105 s.
 
 Two lanes run side by side:
   - python: `make numbering` (ADR numbers vs origin/main) and `FAST_TESTS`, the file- and
@@ -42,7 +42,8 @@ import changed_web
 
 REPO = changed_tests.REPO
 WEB = REPO / "apps" / "web"
-BUDGET_SECONDS = 90
+BUDGET_SECONDS = 105  # owner 2026-11-02: up to 105 s
+PRUNE_EVERY_SECONDS = 3600
 PY = ".venv/bin/python"
 # CI failures in the 100-run sample in brackets; each is seconds on a warm worktree.
 FAST_TESTS = (
@@ -61,6 +62,8 @@ FAST_TESTS = (
     # [2 + local reports] Guide coverage, wording, `see_also` links
     "tests/architecture/guide",
     "tests/unit/config/site/guide",
+    # [3, 2026-11-02] a resolver with logic in the GraphQL layer (4 s)
+    "tests/architecture/api/test_read_model.py",
     # [2 + local reports] folder caps
     "tests/architecture/test_layout.py",
     "tests/architecture/test_layout_web.py",
@@ -207,6 +210,40 @@ def _run_lane(name: str, steps: list[Step]) -> tuple[str, int, float]:
     return name, 0, time.monotonic() - started
 
 
+def prune_worktrees() -> None:
+    """Detached ``worktree.sh --prune-merged``, at most once an hour, after the timed lanes: the
+    disk hit 2.3 GB free on 2026-11-02 with 68 worktrees, 27 of them merged. The script removes
+    only clean, unlocked worktrees whose PR merged, so any push may run it safely."""
+    common = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    if not common:
+        return
+    main_checkout = Path(common).parent
+    stamp = main_checkout / "var" / "locks" / "worktree-prune.stamp"
+    try:
+        if time.time() - stamp.stat().st_mtime < PRUNE_EVERY_SECONDS:
+            return
+    except FileNotFoundError:
+        pass
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.touch()
+    log = main_checkout / "var" / "logs" / "worktree-prune.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("ab") as out:
+        subprocess.Popen(
+            ["bash", str(REPO / "scripts" / "worktree.sh"), "--prune-merged"],
+            cwd=main_checkout,
+            stdout=out,
+            stderr=out,
+            start_new_session=True,
+        )
+
+
 def main(argv: list[str]) -> int:
     base = next((a for a in argv[1:] if not a.startswith("--")), "origin/main")
     changed_tests.refresh(base)
@@ -226,6 +263,8 @@ def main(argv: list[str]) -> int:
         print(f"pre-push {'FAILED' if code else 'ok'}: {what} ({seconds:.0f} s)")
     if elapsed > BUDGET_SECONDS:
         print(f"pre-push: {elapsed:.0f} s, over the {BUDGET_SECONDS} s budget (docs/ci.md)")
+    with contextlib.suppress(OSError):
+        prune_worktrees()
     return max(code for _, code, _ in results)
 
 

@@ -286,3 +286,17 @@ def test_a_newer_push_cancels_the_branchs_running_ci() -> None:
     workflow = yaml.safe_load(WORKFLOW.read_text())
     concurrency = workflow["concurrency"]
     assert "github.ref" in concurrency["group"] and concurrency["cancel-in-progress"] is True
+
+
+def test_every_work_job_cancels_the_run_on_its_first_failure() -> None:
+    """The first red job stops the sibling jobs (owner 2026-11-02: a failed step must not keep
+    spending GitHub minutes). The aggregate gates (`changes`, `quality`, `tests`, `web`) only
+    read results."""
+    jobs = _jobs()
+    gates = {"changes", "quality", "tests", "web"}
+    for name, job in jobs.items():
+        if name in gates:
+            continue
+        cancels = [s for s in job["steps"] if "gh run cancel" in str(s.get("run", ""))]
+        assert cancels, f"ci.yml job {name} has no cancel-on-failure step"
+        assert cancels[-1] is job["steps"][-1] and cancels[-1]["if"] == "failure()"
