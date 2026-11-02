@@ -4,6 +4,8 @@ series starts and for an incomplete window, a stale VIX is all null, the stand-a
 follows its three conditions with Kleene unknowns, the licences (personal values, open
 verdicts) and the calendar columns from the FOMC rows known by the session."""
 
+import re
+import tomllib
 from datetime import date
 
 import numpy as np
@@ -14,6 +16,7 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.rollups.market import indicators, trend
 from algotrade.features.rollups.market.edges import conditions as c
 from algotrade.features.rollups.market.macro import MACRO
+from tests.conftest import REPO_ROOT
 
 END = date(2026, 10, 2)  # a Friday
 DAYS = sessions_ending(END, 300)[:-1]  # observations up to the session before END
@@ -334,3 +337,27 @@ def test_the_flags_and_the_label_columns_exist_with_their_licence() -> None:
 def test_the_label_bands_validate() -> None:
     with pytest.raises(ValueError, match="correction"):
         c.Params(correction_lo=-0.05, correction_hi=-0.15)
+
+
+GLOSSARY = "config/site/guide/glossary/market_conditions.toml"
+# ADR 0083: the Guide describes a market state, it never tells a trader what to do.
+INSTRUCTION = re.compile(r"\b(buy|sell(?!-)|should|recommend\w*|avoid)\b", re.IGNORECASE)
+
+
+def _terms() -> dict[str, str]:
+    raw = tomllib.loads((REPO_ROOT / GLOSSARY).read_text())["term"]
+    return {t["id"]: " ".join((t["term"], t["short"], t["body"])) for t in raw}
+
+
+def test_every_conditions_column_has_a_guide_term() -> None:
+    columns = {f.name for f in c.FEATURES}
+    terms = _terms()
+    assert not columns - terms.keys(), (
+        f"write a term in {GLOSSARY}: {sorted(columns - terms.keys())}"
+    )
+    assert not terms.keys() - columns, f"a term for no column: {sorted(terms.keys() - columns)}"
+
+
+def test_conditions_guide_terms_describe_and_never_instruct() -> None:
+    hits = {i: m.group() for i, text in _terms().items() if (m := INSTRUCTION.search(text))}
+    assert not hits, f"describe the state, give no instruction (ADR 0083): {hits}"
