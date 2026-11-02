@@ -90,9 +90,7 @@ export function MarginCalculator({ symbol }: MarginCalculatorProps) {
       <Panel
         title="Your contract"
         actions={termHelp('margin_buying_power')}
-        footer={
-          <Text size="sm">Nothing you enter is saved.</Text>
-        }
+        footer={<Text size="sm">Nothing you enter is saved.</Text>}
       >
         <Stack gap={3}>
           <Grid columns={4} gap={3} collapse="md" align="start">
