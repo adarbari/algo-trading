@@ -496,6 +496,22 @@ EXPECTED: dict[int, dict[str, tuple[Any, ...]]] = {
 # Version 2 (ADR 0083 d2) only adds ``basis_screener`` and ``basis_horizon``: every label, result,
 # basis and figure is the version 1 golden, so no verdict changes (the new keys are checked below).
 EXPECTED[2] = EXPECTED[1]
+# Version 3 (ADR 0088 decision 15): no option verdict before its unseen holdout. Only the option
+# case changes (its run reaches no session here); every share setup's headline is version 2's.
+EXPECTED[3] = {
+    **EXPECTED[2],
+    "out_of_window": (
+        "not_enough_data",
+        "No verdict on an option setup before its unseen holdout holds 92 days of closed "
+        "trades: it starts 2026-10-26, the trades of 20 sessions close on the exchange "
+        "calendar and the run reaches no session; the earliest verdict is 2027-02-25",
+        "scr, 20 trading days",
+        70,
+        60,
+        10.0,
+        1.2,
+    ),
+}
 
 
 def _headline(name: str) -> tuple[Any, ...]:

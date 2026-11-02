@@ -70,6 +70,8 @@ max_cvar_ratio = 1.25      # Promising: the setup's CVaR 5% may be at most this 
 min_tail_windows = 5       # the ratio is read only when the 5% tail holds at least this many windows
 bootstrap_draws = 2000     # stationary block bootstrap (Politis-Romano): draws per interval ...
 bootstrap_mean_block = 3   # ... and the mean block, in decision sessions (raised to the horizon's overlap)
+holdout_from = 2026-10-26  # ADR 0088 decision 15 (D): the first session after the option research's data; no option
+holdout_days = 92          # verdict until the run reaches holdout_from + this many days (3 months, unseen sessions)
 
 [option_costs]             # design 2.4: the option cost levels, `mid` (no spread), `effective`, `full` (all of it)
 levels = ["mid", "effective", "full"] # fixed names, in this order
