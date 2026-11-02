@@ -62,7 +62,11 @@ def priced_pool(
             "open_interest": pool["open_interest"].to_numpy()[keep],
         }
     )
-    return out.sort_values("strike").drop_duplicates("strike").reset_index(drop=True)
+    # Two contracts at one strike (an adjusted deliverable): the one with more open interest.
+    ranked = out.sort_values(
+        ["strike", "open_interest"], ascending=[True, False], kind="stable", na_position="last"
+    )
+    return ranked.drop_duplicates("strike").reset_index(drop=True)
 
 
 def figures(pool: pd.DataFrame) -> list[tuple[float, float, float]]:

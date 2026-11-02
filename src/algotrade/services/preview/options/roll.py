@@ -14,9 +14,12 @@ out of the money, each with its extra credit, new breakeven, credit per extra da
   None when the trader did not give the price sold at (the screen asks for it).
 
 Gaps are ``Unknown``: the name cannot be priced (``session_inputs``), or the sold contract is
-not listed tonight with a two-sided quote (NOT_APPLICABLE / ILLIQUID). Nothing is stored.
+not listed tonight with a two-sided quote (NOT_APPLICABLE / ILLIQUID), or the rolls at
+the same delta are asked for and the sold contract has no delta of ours
+(NOT_APPLICABLE). Nothing is stored.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import date
 
@@ -196,6 +199,9 @@ def preview_roll(
         why = f"{what}: {status.lower().replace('_', ' ')} on {session}"
         return gap(ctx, code, status, why, OPTION_QUOTES)
     buy_back, delta = float(sold["mid"].iloc[0]), float(sold["delta"].iloc[0])
+    if same_delta and not math.isfinite(delta):  # no vol inverts: no delta to match
+        why = f"{what}: no delta of ours on {session} to roll to"
+        return gap(ctx, UnknownCode.NOT_APPLICABLE, "NO_DELTA", why, OPTION_QUOTES)
     rolls = _rolls(
         inputs, deltas, session, contract, buy_back, delta, sold_at, include_debits, same_delta
     )

@@ -1,7 +1,7 @@
 """``POST /preview/options/{roll,calls}``: what a trader types stays out of request logs and
 caches (body only, no query parameter, ``Cache-Control: no-store``, no log record carries a
-typed figure), a gap is served in public words without its cause, an undefined figure is null
-(never NaN), and an unknown ticker is a 404."""
+typed figure), a gap is served in public words with its cause for an admin only, an undefined
+figure is null (never NaN), and an unknown ticker is a 404."""
 
 import logging
 from datetime import date, timedelta
@@ -9,10 +9,14 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.users import Role
 from algotrade.services.preview.options import calls, roll
-from algotrade.services.read.availability.cause import Cause
+from algotrade.services.read.availability.cause import Cause, table_cause
 from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade_api.deps import ApiSettings, ReadStore
+from algotrade_api.main import create_app
 from algotrade_api.routes.preview import options as route
+from tests.helpers.api_store import as_user
 
 PATHS = ("/preview/options/roll", "/preview/options/calls")
 EXPIRY = date(2022, 12, 23)
@@ -41,11 +45,21 @@ def test_nothing_typed_reaches_a_log_and_no_answer_is_cached(
     assert not any(figure in logged for figure in TYPED)
 
 
-def test_a_gap_is_public_words_without_a_cause(client: TestClient) -> None:
-    got = client.post(PATHS[0], json=ROLL).json()
-    if got["preview"] is None:  # the golden store has no curve: NO_PARTITION, never r = 0
-        assert set(got["gap"]) == {"code", "kind", "guide_term", "kind_text"}
-        assert "rates" not in got["gap"]["kind_text"]
+def test_a_gap_is_public_words_and_its_cause_is_an_admins_only(
+    api_golden: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def as_role(role: Role) -> TestClient:
+        settings = ApiSettings("memory://", "config")
+        return TestClient(create_app(settings, api_golden[0], authenticator=as_user(role=role)))
+
+    cause = table_cause("rates/treasury", "no curve on or before 2022-11-23")
+    found = Unknown(UnknownCode.NO_PARTITION, cause)
+    monkeypatch.setattr(route.roll, "preview_roll", lambda *a, **k: found)
+    trader = as_role(Role.TRADER).post(PATHS[0], json=ROLL).json()
+    assert trader["preview"] is None and trader["gap"]["cause"] is None
+    assert trader["gap"]["code"] == "NO_PARTITION" and "rates" not in trader["gap"]["kind_text"]
+    admin = as_role(Role.ADMIN).post(PATHS[0], json=ROLL).json()
+    assert admin["gap"]["cause"][0]["subject"] == "rates/treasury"
 
 
 def test_an_unknown_ticker_is_not_found(client: TestClient) -> None:

@@ -2146,6 +2146,21 @@
       "OptionGap": {
         "description": "Why a figure or a whole preview is not available, in public words (ADR 0056).",
         "properties": {
+          "cause": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CauseLink"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the chain behind it, root cause first (admins only: null for anyone else)",
+            "title": "Cause"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -2167,7 +2182,8 @@
           "code",
           "kind",
           "guide_term",
-          "kind_text"
+          "kind_text",
+          "cause"
         ],
         "title": "OptionGap",
         "type": "object"

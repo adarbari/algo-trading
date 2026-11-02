@@ -1,7 +1,8 @@
 """``POST /preview/options/{roll,calls}``: the option calculators (plan V11) over figures a
 trader types, priced on the request's session. Derived figures only: no bid, ask, last or size
 field anywhere (``tests/architecture/options/test_trader_option_figures.py``). A gap is served in
-public words only (its kind and Guide term), never its cause."""
+public words (its kind and Guide term); its cause chain is an admin's only (ADR 0056: marked
+``ADMIN_CAUSE``, the routes ``redact``)."""
 
 import math
 from datetime import date
@@ -10,7 +11,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from algotrade.services.preview.options import calls, roll
+from algotrade.services.read.availability.cause import ADMIN_CAUSE
 from algotrade.services.read.values import Unknown
+from algotrade_api.schemas.availability import CauseLink
 from algotrade_api.schemas.health import Schema
 
 Right = Literal["put", "call"]
@@ -23,10 +26,15 @@ class OptionGap(Schema):
     kind: str
     guide_term: str
     kind_text: str
+    cause: list[CauseLink] | None = Field(
+        description="the chain behind it, root cause first (admins only: null for anyone else)",
+        json_schema_extra={ADMIN_CAUSE: None},
+    )
 
 
 def gap_of(found: Unknown | None) -> OptionGap | None:
-    """``found`` as served, without its cause; None for None."""
+    """``found`` as served (``redact`` strips the cause for anyone but an admin); None for
+    None."""
     if found is None:
         return None
     return OptionGap(
@@ -34,6 +42,7 @@ def gap_of(found: Unknown | None) -> OptionGap | None:
         kind=found.kind.value,
         guide_term=found.guide_term,
         kind_text=found.public_reason,
+        cause=[CauseLink.model_validate(link) for link in found.cause.links],
     )
 
 

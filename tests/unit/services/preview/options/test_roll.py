@@ -6,8 +6,10 @@ vendor quote on any type) and every UNKNOWN case."""
 import dataclasses
 from datetime import date, timedelta
 
+import numpy as np
 import pytest
 
+from algotrade.features.rollups.premium.band_pick import OurDeltas
 from algotrade.services.preview.options.roll import (
     MAX_EXPIRIES,
     Contract,
@@ -136,6 +138,18 @@ def test_a_one_sided_sold_contract_is_illiquid() -> None:
 
     found = roll(one_sided)
     assert isinstance(found, Unknown) and found.code is UnknownCode.ILLIQUID
+
+
+def test_same_delta_without_a_delta_of_ours_is_not_applicable_never_an_empty_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def no_vol(self: object, mid: np.ndarray, *a: object) -> np.ndarray:
+        return np.full(len(mid), np.nan)
+
+    monkeypatch.setattr(OurDeltas, "__call__", no_vol)
+    found = roll(chain, same_delta=True)
+    assert isinstance(found, Unknown) and found.code is UnknownCode.NOT_APPLICABLE
+    assert good(roll(chain)).rolls  # without same_delta the rolls still show
 
 
 def test_only_the_sessions_chain_is_read_never_an_older_one() -> None:

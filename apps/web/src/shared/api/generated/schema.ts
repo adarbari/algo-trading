@@ -1383,6 +1383,11 @@ export interface components {
          * @description Why a figure or a whole preview is not available, in public words (ADR 0056).
          */
         OptionGap: {
+            /**
+             * Cause
+             * @description the chain behind it, root cause first (admins only: null for anyone else)
+             */
+            cause: components["schemas"]["CauseLink"][] | null;
             /** Code */
             code: string;
             /** Guide Term */
