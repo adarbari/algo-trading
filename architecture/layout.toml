@@ -434,7 +434,7 @@ purpose = "use case: evaluate every strategy on every golden dataset against the
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
-purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run planning its legs and assembling the evaluation (harness.py), the measuring of those legs over chunks of sessions, the one reader of outcomes with the harness (measuring.py), what it reads once per session (reads/), a portfolio_return book's weights and value (portfolio/), the key of a reusable leg (legs/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
+purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run planning its legs and assembling the evaluation (harness.py; its identity, scopes and typed result in run/), the measuring of those legs over chunks of sessions, the one reader of outcomes with the harness (measuring.py), what it reads once per session (reads/), a portfolio_return book's weights and value (portfolio/), the key of a reusable leg (legs/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/baselines"
@@ -459,6 +459,10 @@ purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reporting"
 purpose = "what an edge evaluation reports beyond its stored rows (ADR 0053): the text report of a run (report.py) and the report-containment diagnostic of an earnings_expected edge (report_containment.py, the one module that reads the real report dates)"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/cross_section/run"
+purpose = "what one edge evaluation is set up from and returns (ADR 0053): its identity, the Edge fields that make a run (RUN_INPUTS) and the bookkeeping ones, the run hash, the effective split and the trials earlier runs logged (identity.py); the variants and the scopes it evaluates, a scope's universe, its event schedules and an implied-vol field's licence (scopes.py); the typed result, EdgeEvaluation with each VariantResult, LegDetail and RandomPicks (evaluation.py); split from harness.py, which plans and assembles the run"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/discovery"

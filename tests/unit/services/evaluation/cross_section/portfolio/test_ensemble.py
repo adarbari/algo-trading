@@ -8,11 +8,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.services.evaluation.cross_section.harness import (
-    EdgeEvaluation,
-    _prior_trials,
-    evaluate_edge,
-)
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
 from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
@@ -20,6 +16,8 @@ from algotrade.services.evaluation.cross_section.results import (
     records,
     write_edge_eval,
 )
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
+from algotrade.services.evaluation.cross_section.run.identity import prior_trials
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.evaluation.cross_section.conftest import (
     ACTIVE,
@@ -104,7 +102,7 @@ def test_the_ensemble_is_one_trial_whatever_its_grid_and_members_are_none() -> N
     w = _world()
     ev = _run(w, ensemble={"variants": ["momo", "lowmo"]})
     write_edge_eval(w.results, ev, AS_OF)
-    assert {(t[0], t[1]) for t in _prior_trials(w.results, "drift", "site")} == {
+    assert {(t[0], t[1]) for t in prior_trials(w.results, "drift", "site")} == {
         ("main", "ensemble")
     }
 

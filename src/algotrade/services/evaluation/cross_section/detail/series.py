@@ -14,8 +14,8 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN
 from algotrade.services.evaluation.cross_section.detail.windows import BlockWindow
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, VariantResult
 from algotrade.services.evaluation.cross_section.measures import BUCKETS, SessionStat, session_rocs
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation, VariantResult
 
 RESULT = "edge_series"
 SOURCE = "edge-eval"
