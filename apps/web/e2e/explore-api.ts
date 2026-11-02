@@ -582,6 +582,23 @@ function graphqlAnswer(operation: Operation): Json | null {
       return withEpisodeFeatures(fixture('facts-aapl.json'));
     case 'InstrumentEvents':
       return fixture('gql-events-aapl.json');
+    case 'InstrumentPickedBy':
+      return {
+        data: {
+          instrument: {
+            instrumentId,
+            pickedBy: [
+              {
+                edgeId: 'momentum_12_1',
+                edgeName: 'Momentum 12-1',
+                tab: 'stocks',
+                level: 'promising',
+                place: 2,
+              },
+            ],
+          },
+        },
+      };
     case 'InstrumentScreenerHits':
       return {
         data: {

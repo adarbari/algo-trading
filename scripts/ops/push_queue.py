@@ -13,10 +13,13 @@ or slot whose pid is dead, or older than ``STALE_SECONDS``, is dropped at every 
 
 Priority = the open PRs that depend on this branch's PR: stacked on it (their head contains this
 branch's head commit, or their base is this branch) or naming it in the body (``Stacked on #N``,
-``Depends on #N``, ``waits on #N``, ``needs #N``). ``PUSH_PRIORITY`` overrides; any ``gh`` or git
-failure gives 0 with the reason printed, so a push is never blocked on GitHub. The wrapper then
-runs ``make changed WORKERS=${PUSH_QUEUE_WORKERS:-4}`` and frees its slot when that ends or is
-signalled. Run by the ``make-changed`` pre-push hook in ``.pre-commit-config.yaml``.
+``Depends on #N``, ``waits on #N``, ``needs #N``), plus the work it unblocks that has no PR yet: a
+line ``Unblocks: V10, V11, #123`` in its own body (slice ids or ``#N``, each counted once, a ``#N``
+that is already an open dependant not twice; owner decision 2026-11-02). ``PUSH_PRIORITY``
+overrides; any ``gh`` or git failure gives 0 with the reason printed, so a push is never blocked
+on GitHub. The wrapper then runs ``make changed WORKERS=${PUSH_QUEUE_WORKERS:-4}``
+and frees its slot when that ends or is signalled. Run by the ``make-changed`` pre-push hook
+in ``.pre-commit-config.yaml``.
 """
 
 from __future__ import annotations
@@ -41,13 +44,30 @@ GH_TIMEOUT = 15
 _DEPENDS = r"(?:stacked\s+on|depends\s+on|waits\s+on|needs)\s+#{n}(?!\d)"
 
 
+_UNBLOCKS_LINE = re.compile(r"^[ \t>*-]*unblocks\s*:[ \t]*(.*)$", re.IGNORECASE | re.MULTILINE)
+_SLICE_ID = re.compile(r"^(?:#\d+|[A-Za-z]{1,4}\d+[A-Za-z]?)$")
+
+
+def parse_unblocks(body: str | None) -> set[str]:
+    """The ids on the ``Unblocks:`` lines of a PR body: slice ids (``V10``) or ``#N``."""
+    ids: set[str] = set()
+    for line in _UNBLOCKS_LINE.findall(body or ""):
+        for raw in re.split(r"[,;\s]+", line.strip()):
+            token = raw.strip("`.()[]")
+            if _SLICE_ID.match(token):
+                ids.add(token.upper())
+    return ids
+
+
 def count_dependants(
     pr_number: int | None,
     prs: list[dict[str, Any]],
     descendant_refs: set[str] | frozenset[str] = frozenset(),
     own_ref: str = "",
+    own_body: str | None = None,
 ) -> int:
-    """Open PRs (from ``prs``: number, headRefName, baseRefName, body) that depend on this one.
+    """Open PRs (from ``prs``: number, headRefName, baseRefName, body) that depend on this one,
+    plus the distinct ids on ``own_body``'s ``Unblocks:`` line that are not already counted.
 
     A PR counts once, if its head is in ``descendant_refs`` (its branch contains our head
     commit), its base is our branch, or its body says it waits on ``#pr_number``.
@@ -64,7 +84,8 @@ def count_dependants(
         named = bool(pattern and pattern.search(pr.get("body") or ""))
         if stacked or named:
             counted.add(number if isinstance(number, int) else id(pr))
-    return len(counted)
+    unblocked = {i for i in parse_unblocks(own_body) if i != f"#{pr_number}"}
+    return len(counted) + len(unblocked - {f"#{n}" for n in counted})
 
 
 def order_tickets(tickets: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -116,9 +137,11 @@ def compute_priority() -> tuple[int, int | None, str]:
     branch = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()
     override = os.environ.get("PUSH_PRIORITY")
     pr: int | None = None
+    own_body = ""
     try:
         try:
-            pr = json.loads(_run(["gh", "pr", "view", branch, "--json", "number"]))["number"]
+            view = json.loads(_run(["gh", "pr", "view", branch, "--json", "number,body"]))
+            pr, own_body = view["number"], view.get("body") or ""
         except subprocess.CalledProcessError:
             pr = None  # no PR yet: only stacked branches can count
         if override is not None:
@@ -149,7 +172,7 @@ def compute_priority() -> tuple[int, int | None, str]:
             ).returncode
             == 0
         }
-        return count_dependants(pr, prs, descendants, branch), pr, "open dependants"
+        return count_dependants(pr, prs, descendants, branch, own_body), pr, "dependants"
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
         reason = f"priority 0, GitHub unavailable ({type(exc).__name__})"
         return (int(override) if override and override.lstrip("-").isdigit() else 0), pr, reason
