@@ -96,6 +96,12 @@ def _rows(ctx: ReadContext, underlying_ids: Sequence[str]) -> pd.DataFrame:
     return found
 
 
+def load_chain_quotes(ctx: ReadContext, underlying_ids: Sequence[str]) -> pd.DataFrame:
+    """The session's stored quotes of the chains of ``underlying_ids`` as one frame (empty: none
+    stored): what a position's legs are chosen from (the example position, ADR 0088 2.8)."""
+    return _rows(ctx, underlying_ids)
+
+
 def _by_id(ctx: ReadContext, table: str, ids: Sequence[str]) -> dict[str, Mapping[Any, Any]]:
     frame = partition(ctx, table)
     if not isinstance(frame, pd.DataFrame):
