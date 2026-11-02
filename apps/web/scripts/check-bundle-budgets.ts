@@ -10,7 +10,8 @@
  * values: an unset build tree-shakes ~22 kB of auth-js away, so a branch passed here and failed CI
  * by 17 B (2026-10-10). In CI (`CI` set) the workflow's own build is measured as it is.
  */
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
@@ -100,6 +101,42 @@ export function measure(
     routes,
     leaked: lazyOnly.filter((src) => closure.has(src)),
   };
+}
+
+/**
+ * The page modules the app imports lazily (`import('@/pages/x')`, or `import('./X')` inside
+ * src/pages), as paths from apps/web: each becomes a chunk the budgets must bound. Read from the
+ * source, so a page without a budget fails the unit tests, not only the build (`srcDir` is
+ * apps/web/src).
+ */
+export function lazyPageSources(srcDir: string): string[] {
+  const web = dirname(srcDir);
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walk(path) : [path];
+    });
+  const isFile = (path: string): boolean => existsSync(path) && statSync(path).isFile();
+  const found = new Set<string>();
+  for (const file of walk(srcDir)) {
+    if (!/\.tsx?$/.test(file) || /\.(test|stories)\./.test(file)) continue;
+    for (const match of readFileSync(file, 'utf8').matchAll(/import\(\s*'([^']+)'\s*\)/g)) {
+      const spec = match[1] as string;
+      const base = spec.startsWith('@/')
+        ? join(srcDir, spec.slice(2))
+        : spec.startsWith('.')
+          ? resolve(dirname(file), spec)
+          : undefined;
+      const source = [`${base ?? ''}.ts`, `${base ?? ''}.tsx`, join(base ?? '', 'index.ts')]
+        .concat(join(base ?? '', 'index.tsx'))
+        .find(isFile);
+      if (base !== undefined && source !== undefined) {
+        const rel = relative(web, source);
+        if (rel.startsWith('src/pages/')) found.add(rel);
+      }
+    }
+  }
+  return [...found].sort();
 }
 
 /** What is over budget, as one sentence each; empty when the build is within every budget. */
