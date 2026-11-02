@@ -194,12 +194,3 @@ def test_a_run_hiding_its_out_of_sample_trades_says_only_in_sample_winners_were_
     rule = at([*WINNERS, *late])
     assert rule.in_sample_only and rule.winners == 10  # the reader served in-sample rows only
     assert rule.stop is not None and rule.stop.fraction == 0.08
-
-
-def test_an_option_setups_exit_rule_is_unknown_until_it_is_published(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(module, "holds_options", lambda outcome, configs: True)
-    found = at(WINNERS)
-    assert (found.stop, found.hold_sessions) == (None, None)
-    assert found.unknown is not None and found.unknown.code == UnknownCode.NOT_APPLICABLE

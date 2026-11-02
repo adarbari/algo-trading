@@ -139,6 +139,11 @@ values = { ON = "term:setup_state_on", OFF = "term:setup_state_off", PAUSED = "t
 names = { ON = "On", OFF = "Off", PAUSED = "Paused", UNKNOWN = "Unknown" }
 
 [[enum]]
+source = "graphql:StopBasis"
+values = { ENTRY = "term:exit_basis_entry", CREDIT = "term:exit_basis_credit", COLLATERAL = "term:exit_basis_collateral" }
+names = { ENTRY = "Entry price", CREDIT = "Credit", COLLATERAL = "Collateral" }
+
+[[enum]]
 source = "graphql:UnavailableKind"
 exempt = "covered by GUIDE_TERMS (one glossary term per kind), kept complete by tests/unit/services/read/availability/test_cause.py"
 
