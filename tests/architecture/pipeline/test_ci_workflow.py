@@ -278,3 +278,11 @@ def test_a_red_test_shard_cancels_the_rest_and_app_only_changes_skip_the_scoreca
     assert "tests/* | apps/api/*) python=true ;;" in classify
     assert "apps/web/src/* | apps/web/e2e/* | apps/web/real/*) web=true ;;" in classify
     assert "evaluate=true visual=true; fi" in classify, "a push to main runs everything"
+
+
+def test_a_newer_push_cancels_the_branchs_running_ci() -> None:
+    # owner 2026-11-02: CI is the gate and its concurrency is the limit, so a superseded run of
+    # the same branch must not hold a runner
+    workflow = yaml.safe_load(WORKFLOW.read_text())
+    concurrency = workflow["concurrency"]
+    assert "github.ref" in concurrency["group"] and concurrency["cancel-in-progress"] is True

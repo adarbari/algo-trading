@@ -78,18 +78,21 @@ def test_a_bare_make_check_refuses_with_rule_9() -> None:
 
 def _pre_push_entry() -> str:
     config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
-    hooks = [h for repo in config["repos"] for h in repo["hooks"] if h["id"] == "make-changed"]
+    hooks = [h for repo in config["repos"] for h in repo["hooks"] if h["id"] == "pre-push-fast"]
     assert len(hooks) == 1 and hooks[0]["stages"] == ["pre-push"]
     return str(hooks[0]["entry"])
 
 
-def test_the_pre_push_hook_runs_make_changed_without_the_git_environment() -> None:
+def test_the_pre_push_hook_runs_the_fast_lane_without_the_git_environment() -> None:
     """Git exports GIT_DIR to a hook; the tests under `make changed` then ran `git init --bare`
     against the real repository and left core.bare=true in the shared config (2026-11-02)."""
     words = shlex.split(_pre_push_entry())
-    # the queue wrapper runs `make changed` once it has a slot (scripts/ops/push_queue.py)
+    # the queue wrapper runs `make pre-push` (the fast lane, owner 2026-11-02) once it has a slot
     assert words[-2:] == [".venv/bin/python", "scripts/ops/push_queue.py"] and words[0] == "env"
-    assert '["make", "changed"' in (ROOT / "scripts" / "ops" / "push_queue.py").read_text()
+    queue = (ROOT / "scripts" / "ops" / "push_queue.py").read_text()
+    assert 'HOOK_TARGET = "pre-push"' in queue and '["make", HOOK_TARGET' in queue
+    target = re.search(r"^pre-push:.*?(?=^\S)", (ROOT / "Makefile").read_text(), re.S | re.M)
+    assert target and "scripts/pre_push.py" in target.group(0)
     unset = {words[i + 1] for i, w in enumerate(words) if w == "-u"}
     assert {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"} <= unset
     probe = [*words[:-2], "sh", "-c", 'printf "%s" "${GIT_DIR-unset}"']

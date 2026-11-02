@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A machine-wide queue for the pre-push ``make changed``, ordered by how many PRs wait on the push.
+"""A machine-wide queue for the pre-push hook (`make pre-push`), the push most waited on first.
 
 2026-11-02: with about 8 sessions pushing at once, the pre-push hook (#1036) ran five
 ``make changed`` at a time on the 10-core / 16 GB Mac (load 42, 12+ min each); two at a time is
@@ -15,8 +15,9 @@ Priority = the open PRs that depend on this branch's PR: stacked on it (their he
 branch's head commit, or their base is this branch) or naming it in the body (``Stacked on #N``,
 ``Depends on #N``, ``waits on #N``, ``needs #N``). ``PUSH_PRIORITY`` overrides; any ``gh`` or git
 failure gives 0 with the reason printed, so a push is never blocked on GitHub. The wrapper then
-runs ``make changed WORKERS=${PUSH_QUEUE_WORKERS:-4}`` and frees its slot when that ends or is
-signalled. Run by the ``make-changed`` pre-push hook in ``.pre-commit-config.yaml``.
+runs ``make pre-push WORKERS=${PUSH_QUEUE_WORKERS:-4}`` (the fast lane, ``scripts/pre_push.py``;
+``make changed`` stays the full local check) and frees its slot when that ends or is
+signalled. Run by the ``pre-push-fast`` pre-push hook in ``.pre-commit-config.yaml``.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from typing import Any
 
 SLOTS = 2
 WORKERS = "4"
+HOOK_TARGET = "pre-push"
 POLL_SECONDS = 5.0
 STALE_SECONDS = 2 * 3600.0
 GH_TIMEOUT = 15
@@ -234,7 +236,7 @@ def main() -> int:
         shutil.rmtree(slot, ignore_errors=True)
 
     child = subprocess.Popen(
-        ["make", "changed", f"WORKERS={workers}"],
+        ["make", HOOK_TARGET, f"WORKERS={workers}"],
         env={**os.environ, "WEB_WORKERS": os.environ.get("WEB_WORKERS", workers)},
     )
 
