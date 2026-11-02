@@ -53,8 +53,8 @@ class Book:
 
     def lost(self, until: date) -> None:
         """The book is not known through ``until`` (a lost leg's trades): every row up to and
-        including that date is UNKNOWN, reason ``leg_lost``."""
-        self._lost_until = until
+        including that date is UNKNOWN, reason ``leg_lost``. Never shortens an earlier stretch."""
+        self._lost_until = until if self._lost_until is None else max(self._lost_until, until)
 
 
 def walk_in_order(

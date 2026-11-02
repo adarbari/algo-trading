@@ -15,7 +15,6 @@ ALLOWED = (
     "algotrade.config.edges.document",  # ``ordered.py`` reads an edge's rules, nothing stored
     "algotrade.config.strategy.levels",
     "algotrade.services.evaluation.cross_section.measures",  # ``trades.py``: a pick's shape
-    "algotrade.services.evaluation.cross_section.reporting.report_containment",  # window_end
     "algotrade.services.licences",
     "algotrade.services.evaluation.portfolio_level",
 )

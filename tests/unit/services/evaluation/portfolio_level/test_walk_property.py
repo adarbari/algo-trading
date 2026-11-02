@@ -78,3 +78,11 @@ def test_a_book_adds_trades_and_a_lost_leg_makes_every_row_unknown_until_its_dat
     lost = book.row_at(d1, _sectors)
     assert lost.reason == "leg_lost" and set(lost.values.values()) == {None}
     assert book.row_at(d2, _sectors).values["portfolio.open_positions"] == 1  # known again
+
+
+def test_a_later_lost_leg_never_shortens_an_earlier_unknown_stretch() -> None:
+    book = Book()
+    far, near = START + timedelta(days=5), START + timedelta(days=1)
+    book.lost(far)
+    book.lost(near)
+    assert book.row_at(START + timedelta(days=3), _sectors).reason == "leg_lost"

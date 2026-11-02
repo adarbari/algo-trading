@@ -21,7 +21,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.core.time.calendar import next_session
+from algotrade.core.time.calendar import window_end as window_end  # noqa: PLC0414  (re-export: measuring.py)
 from algotrade.data import StoreReader
 from algotrade.data.events import stored_events
 from algotrade.features.rollups.corporate.earnings import EVENTS, valid_events
@@ -58,14 +58,6 @@ def reports_after(reader: StoreReader, as_of: datetime) -> dict[str, list[tuple[
     ):
         out.setdefault(str(iid), []).append((_day(known), _day(report)))
     return out
-
-
-def window_end(entry: date, horizon: int) -> date:
-    """The session ``horizon`` sessions after the entry session S."""
-    day = entry
-    for _ in range(horizon):
-        day = next_session(day)
-    return day
 
 
 def containment(

@@ -7,8 +7,8 @@ window's end, so a trade whose exit is not known is still held until then."""
 from collections.abc import Iterable
 from datetime import date
 
+from algotrade.core.time.calendar import window_end
 from algotrade.services.evaluation.cross_section.measures import Pick
-from algotrade.services.evaluation.cross_section.reporting.report_containment import window_end
 from algotrade.services.evaluation.portfolio_level.book import OpenTrade
 from algotrade.services.licences import PERSONAL
 
