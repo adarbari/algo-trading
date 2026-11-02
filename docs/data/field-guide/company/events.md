@@ -181,7 +181,7 @@ Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
 | no earnings in the next N sessions (short options) | `gt 10` | soft | 2, EVENT_RISK | N is the holding period; 25 for a 30-day short option held to expiry; or feature.earnings_before_expiry eq false |
-| earnings this week (an event play) | `lte 5` | hard | - | suggest rollup.earnings@v1.date_confirmed eq true when the date must be right |
+| earnings this week (an event play) | `lte 5` | hard | - | rollup.earnings@v1.date_confirmed eq true applies when the sentence says the date must be confirmed |
 | earnings more than 10 sessions away | `gt 10` | hard | - | the next report is not close: nothing to gap the price before a short-dated trade is closed |
 
 **When the reading lies**

@@ -95,6 +95,7 @@ export const PART_TEXT = {
   editedHelp: { kind: 'term', id: 'describe_part_edited' } as TermRef,
   redrafting: 'Redrafting this part',
   list: 'Parts of your sentence',
+  sentence: 'Your sentence as read',
   rankedBy: 'Ranked by',
   rankHelp: { kind: 'term', id: 'describe_part_rank' } as TermRef,
   retype: 'Retype this part',
@@ -105,10 +106,4 @@ export const PART_TEXT = {
   confirmTitle: 'Replace this part?',
   confirmEdits: 'This replaces your edits to this part.',
   limitHelp: { kind: 'term', id: 'describe_part_limit' } as TermRef,
-  suggested: 'Suggested',
-  suggestedHelp: { kind: 'term', id: 'describe_suggested' } as TermRef,
-  add: 'Add',
-  skip: 'Skip',
-  added: 'Added',
-  skipped: 'Skipped',
 } as const;

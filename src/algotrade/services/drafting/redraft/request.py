@@ -17,7 +17,6 @@ from typing import Any, cast
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.drafting.contract.formulas import DraftFormula, DroppedFormula
 from algotrade.services.drafting.contract.gaps import Alternative, MissingFeature, Unresolved
-from algotrade.services.drafting.contract.suggestions import DroppedSuggestion, Suggestion
 from algotrade.services.drafting.parts.build import kind_of
 from algotrade.services.drafting.parts.model import (
     JOIN_KINDS,
@@ -117,7 +116,7 @@ def _part(raw: Mapping[str, Any]) -> Part:
     """A part as the browser sends it back; its ``kind`` is recomputed, never read."""
     refs = {
         key: tuple(str(i) for i in raw.get(key) or ())
-        for key in ("criteria", "dropped", "formulas", "unresolved", "missing", "suggestions")
+        for key in ("criteria", "dropped", "formulas", "unresolved", "missing")
     }
     reading = raw.get("reading")
     text = " ".join(reading.split())[:MAX_READING].rstrip() if isinstance(reading, str) else ""
@@ -130,7 +129,7 @@ def _part(raw: Mapping[str, Any]) -> Part:
         str(raw.get("id")), str(raw.get("words") or ""), int(raw.get("start") or 0),
         int(raw.get("end") or 0), text or None, source, kind_of(_groups(refs, rank)), origin,
         refs["criteria"], refs["dropped"], refs["formulas"], refs["unresolved"],
-        refs["missing"], refs["suggestions"], rank, join, join_words,
+        refs["missing"], rank, join, join_words,
     )  # fmt: skip
 
 
@@ -204,14 +203,6 @@ def _prior(
         ),
         missing=tuple(_missing(m) for m in body.get("missing") or ()),
         unresolved=tuple(_unresolved(u) for u in body.get("unresolved") or ()),
-        suggestions=tuple(
-            Suggestion(dict(s["criterion"]), str(s["why"]), s.get("source"), str(s["id"]))
-            for s in body.get("suggestions") or ()
-        ),
-        suggestions_dropped=tuple(
-            DroppedSuggestion(str(d["field"]), str(d["reason"]))
-            for d in body.get("suggestions_dropped") or ()
-        ),
         sentence=sentence,
         parts=tuple(parts),
     )
@@ -264,7 +255,6 @@ def _refs(screener_id: str, prior: ScreenDraft) -> None:
         "formulas": [f.name for f in prior.formulas],
         "unresolved": [u.term for u in prior.unresolved],
         "missing": [missing_ref(m) for m in prior.missing],
-        "suggestions": [s.id for s in prior.suggestions],
     }
     for group in ("criteria", *held):
         seen: set[str] = set()

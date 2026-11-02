@@ -139,7 +139,7 @@ def test_a_part_names_only_items_the_draft_holds(ctx: ReadContext) -> None:  # n
     prior = held_draft(ctx)
     for group, ref in (
         ("formulas", "draft_nope"), ("unresolved", "nope"), ("missing", "nope"),
-        ("suggestions", "s9"), ("dropped", "nope"),
+        ("dropped", "nope"),
     ):  # fmt: skip
         sent = body_of(prior, "p2", "over $9")
         sent["parts"] = [
