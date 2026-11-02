@@ -129,6 +129,12 @@ def test_type_checking_stays_incremental_between_runs() -> None:
         assert '"tsBuildInfoFile": "./node_modules/.tmp/' in text, name
 
 
+def test_a_design_system_change_makes_the_missing_screenshot_baselines_first() -> None:
+    got = cmds("apps/web/design-system/components/Banner/Banner.stories.tsx")
+    assert got.index("npm run visual:missing") < got.index("npm run ds:check")
+    assert "npm run visual:missing" not in cmds("apps/web/src/entities/feature/columns.tsx")
+
+
 def test_app_and_design_system_code_adds_the_bundle_budgets_but_a_config_file_does_not() -> None:
     assert "npm run perf:bundle" in cmds("apps/web/design-system/components/Banner/Banner.tsx")
     assert "npm run perf:bundle" not in cmds("apps/web/package.json")
@@ -140,3 +146,13 @@ def test_eslint_does_not_fail_on_a_changed_file_the_config_ignores() -> None:
     # argument it warns "File ignored", and --max-warnings=0 turned that into a failed push
     got = cmds("apps/web/src/shared/api/generated/graphql/gql.ts")
     assert any(c.startswith("npx eslint") and "--no-warn-ignored" in c for c in got)
+
+
+def test_only_a_changed_story_file_can_need_new_baselines() -> None:
+    for name in ("Banner.tsx", "Banner.module.css", "Banner.test.tsx", "index.ts"):
+        assert "npm run visual:missing" not in cmds(
+            f"apps/web/design-system/components/Banner/{name}"
+        )
+    assert "npm run visual:missing" in cmds(
+        "apps/web/design-system/components/Banner/Banner.stories.tsx"
+    )

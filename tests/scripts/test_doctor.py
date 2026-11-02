@@ -558,3 +558,13 @@ def test_serving_releases_are_not_checked_without_a_store(tmp_path: Path) -> Non
         raise FileNotFoundError
 
     assert doctor.check_serving(probes(tmp_path, {}, serving=boom)).level == doctor.INFO
+
+
+def test_a_missing_pre_push_hook_fails_with_the_install_command(tmp_path: Path) -> None:
+    probe = probes(tmp_path, {}, main=lambda: tmp_path)
+    bad = doctor.check_pre_push_hook(probe)
+    assert bad.level == doctor.FAIL and "pre-commit install --hook-type pre-push" in bad.fix
+    hooks = tmp_path / ".git" / "hooks"
+    hooks.mkdir(parents=True)
+    (hooks / "pre-push").write_text("#!/usr/bin/env bash\n# pre-commit hook\n")
+    assert doctor.check_pre_push_hook(probe).level == doctor.OK

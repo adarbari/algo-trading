@@ -138,6 +138,21 @@ def check_docker(p: Probes) -> Result:
     )
 
 
+def check_pre_push_hook(p: Probes) -> Result:
+    """The pre-push hook runs `make changed` (the checks CI fails on most) before a push. Hooks
+    live in the main checkout's .git, shared by every worktree: install them once there."""
+    main = p.main()
+    hook = main / ".git" / "hooks" / "pre-push"
+    if hook.is_file() and "pre-commit" in hook.read_text(errors="replace"):
+        return Result(OK, "pre-push hook", "installed (make changed runs before a push)")
+    return Result(
+        FAIL,
+        "pre-push hook",
+        "not installed: pushes skip make changed, and CI finds the red checks instead",
+        f"cd {main} && .venv/bin/pre-commit install --hook-type pre-push",
+    )
+
+
 def check_gh(p: Probes) -> Result:
     if not p.which("gh"):
         return Result(FAIL, "gh", "not on PATH", "brew install gh && gh auth login")
@@ -730,6 +745,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_node(p),
         check_docker(p),
         check_gh(p),
+        check_pre_push_hook(p),
         *check_venv(p),
         check_venv_paths(p),
         check_node_modules(p),
