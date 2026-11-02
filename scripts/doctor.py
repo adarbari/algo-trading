@@ -153,6 +153,16 @@ def check_pre_push_hook(p: Probes) -> Result:
     )
 
 
+def check_merge_drivers(p: Probes) -> Result:
+    """The merge drivers of .gitattributes (perf budgets, latency views) are local git config:
+    without them every UI PR conflicts on those files whenever main moves (2026-11-02)."""
+    script = p.repo / "scripts" / "ops" / "install_merge_drivers.sh"
+    rc, out = p.run(["bash", str(script), "--check"])
+    if rc == 0:
+        return Result(OK, "merge drivers", "installed (perf budgets and latency views merge alone)")
+    return Result(FAIL, "merge drivers", out or "not installed", f"bash {script}")
+
+
 def check_gh(p: Probes) -> Result:
     if not p.which("gh"):
         return Result(FAIL, "gh", "not on PATH", "brew install gh && gh auth login")
@@ -746,6 +756,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_docker(p),
         check_gh(p),
         check_pre_push_hook(p),
+        check_merge_drivers(p),
         *check_venv(p),
         check_venv_paths(p),
         check_node_modules(p),

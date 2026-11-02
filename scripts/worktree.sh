@@ -133,6 +133,8 @@ if [ "$here" = 1 ]; then
   [ "$wt" != "$main" ] || { echo "refusing: this is the main checkout" >&2; exit 1; }
   [ -e "$wt/.venv" ] || run ln -s "$main/.venv" "$wt/.venv"
   run git -C "$wt" config rerere.enabled false
+  # the merge drivers for the shared perf/latency JSON (common config: covers every worktree)
+  run bash "$wt/scripts/ops/install_merge_drivers.sh"
   pp="$wt/src:$wt/libs/sources:$wt/apps/ingestion:$wt/apps/api:$wt/apps/backtest"
   port_base=$((10000 + $(printf %s "$wt" | cksum | cut -d' ' -f1) % 500 * 10))
   if [ "$dry" = 1 ]; then
@@ -171,6 +173,8 @@ run git -C "$main" fetch -q origin "$base"
 run git -C "$main" worktree add -b "$branch" "$wt" "origin/$base"
 # a reused stale resolution dropped two changes on 2026-10-07: never replay recorded conflicts
 run git -C "$wt" config rerere.enabled false
+# the merge drivers for the shared perf/latency JSON (common config: covers every worktree)
+run bash "$wt/scripts/ops/install_merge_drivers.sh"
 run ln -s "$main/.venv" "$wt/.venv"
 # the pre-push hook (make changed) lives in the shared .git/hooks: install it once, from main
 [ -e "$main/.git/hooks/pre-push" ] || run bash -c "cd '$main' && .venv/bin/pre-commit install --hook-type pre-push"

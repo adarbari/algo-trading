@@ -568,3 +568,12 @@ def test_a_missing_pre_push_hook_fails_with_the_install_command(tmp_path: Path) 
     hooks.mkdir(parents=True)
     (hooks / "pre-push").write_text("#!/usr/bin/env bash\n# pre-commit hook\n")
     assert doctor.check_pre_push_hook(probe).level == doctor.OK
+
+
+def test_missing_merge_drivers_fail_with_the_install_command(tmp_path: Path) -> None:
+    missing = doctor.check_merge_drivers(
+        probes(tmp_path, {}, run=lambda *_a, **_k: (1, "merge driver 'perfbudgets' not installed"))
+    )
+    assert missing.level == doctor.FAIL and "install_merge_drivers.sh" in missing.fix
+    ok = doctor.check_merge_drivers(probes(tmp_path, {}, run=lambda *_a, **_k: (0, "")))
+    assert ok.level == doctor.OK
