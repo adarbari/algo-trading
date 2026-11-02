@@ -64,7 +64,7 @@ def test_rows_are_the_bucket_expiries_with_strikes_around_the_price() -> None:
         strikes = [r.strike for r in p.rows if r.days == days]
         assert strikes == sorted(strikes) and len(strikes) == STRIKES_EACH
         assert all(0.95 * 98.0 <= k <= 110.0 for k in strikes)
-    assert (p.contracts, p.shares, p.price) == (2, 250, 98.0)
+    assert p.contracts == 2
     assert p.above_price == pytest.approx(100 / 98 - 1)
 
 

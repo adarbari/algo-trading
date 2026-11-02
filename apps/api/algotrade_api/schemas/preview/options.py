@@ -121,8 +121,6 @@ class CallsPreview(Schema):
     underlying_id: str
     session: date
     priced_at: float
-    shares: int
-    price: float
     contracts: int
     above_price: float
     rows: list[CallRow]
@@ -201,8 +199,6 @@ def calls_result(found: calls.CallsPreview | Unknown) -> CallsResult:
         underlying_id=found.underlying_id,
         session=found.session,
         priced_at=found.priced_at,
-        shares=found.shares,
-        price=found.price,
         contracts=found.contracts,
         above_price=found.above_price,
         rows=rows,

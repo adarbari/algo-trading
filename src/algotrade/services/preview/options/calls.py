@@ -83,15 +83,14 @@ class CallRow:
 
 @dataclass(frozen=True)
 class CallsPreview:
-    """The calls on ``shares`` held at ``price`` (``above_price``: the underlying's close over
-    it less one); ``contracts`` whole hundreds, ``rows`` by expiry then strike, ``premium_total``
-    of each row for every contract (None when under 100 shares) in the rows' order."""
+    """The calls on the shares typed (``above_price``: the underlying's close over the price
+    typed, less one; the typed figures are the caller's, not echoed); ``contracts`` whole
+    hundreds, ``rows`` by expiry then strike, ``premium_total`` of each row for every contract
+    (None when under 100 shares) in the rows' order."""
 
     underlying_id: str
     session: date
     priced_at: float
-    shares: int
-    price: float
     contracts: int
     above_price: float
     rows: tuple[CallRow, ...]
@@ -172,8 +171,6 @@ def preview_calls(ctx: ReadContext, key: str, shares: int, price: float) -> Call
         underlying_id=underlying_id,
         session=session,
         priced_at=spot,
-        shares=shares,
-        price=price,
         contracts=contracts,
         above_price=spot / price - 1,
         rows=tuple(rows),

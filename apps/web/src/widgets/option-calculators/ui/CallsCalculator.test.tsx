@@ -38,8 +38,6 @@ const PREVIEW = {
   underlying_id: 'EQ:X',
   session: '2026-10-23',
   priced_at: 84.2,
-  shares: 300,
-  price: 78.5,
   contracts: 3,
   above_price: 0.073,
   rows: [

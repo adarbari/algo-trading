@@ -610,8 +610,6 @@ export interface components {
             contracts: number;
             dividend: components["schemas"]["Dividend"] | null;
             dividend_unknown: components["schemas"]["OptionGap"] | null;
-            /** Price */
-            price: number;
             /** Priced At */
             priced_at: number;
             /** Rows */
@@ -621,8 +619,6 @@ export interface components {
              * Format: date
              */
             session: string;
-            /** Shares */
-            shares: number;
             /** Underlying Id */
             underlying_id: string;
         };
