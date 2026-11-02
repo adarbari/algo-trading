@@ -50,10 +50,10 @@ def time_series(personal: bool) -> EdgeEvaluation:
                          series.AS_OF)  # fmt: skip
 
 
-def sleeve(personal: bool) -> EdgeEvaluation:
+def sleeve(personal: bool, **changes: Any) -> EdgeEvaluation:
     """The sleeve's trades priced from the bought history (personal rows) or from the Cboe
     chains (open rows): the option chain source's licence, recorded per row."""
-    e = sleeves.sleeve_edge()
+    e = sleeves.sleeve_edge(**changes)
     cboe = {"price_source": "cboe", "licence": "open"}
     changes = {} if personal else {(v, s): cboe for v in sleeves.PNL for _, s in sleeves.entries(e)}
     reader = sleeves.world(e, changes=changes)
@@ -63,10 +63,22 @@ def sleeve(personal: bool) -> EdgeEvaluation:
                          sleeves.LAST, sleeves.AS_OF)  # fmt: skip
 
 
+def sleeve_baselines(personal: bool) -> EdgeEvaluation:
+    """A sleeve's ``position:long_shares`` baseline rows (a comparison, never a trial) too."""
+    return sleeve(personal, baselines=["position:long_shares"])
+
+
+def ladder(personal: bool) -> EdgeEvaluation:
+    """``index_put_ladder``'s shape: a sleeve entering every session (#1101)."""
+    return sleeve(personal, schedule="every_session_ladder", variant_grid=None)
+
+
 KINDS: dict[str, Callable[[bool], EdgeEvaluation]] = {
     "cross_section": cross_section,
     "time_series": time_series,
     "sleeve": sleeve,
+    "sleeve_baselines": sleeve_baselines,
+    "ladder": ladder,
 }
 
 
