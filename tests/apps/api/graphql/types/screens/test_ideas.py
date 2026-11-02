@@ -13,7 +13,10 @@ from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import Graph
+from tests.conftest import REPO_ROOT
 from tests.helpers.api_store import as_user, store_over
+
+SITE_PRESETS = len(list((REPO_ROOT / "config/site/presets/screeners").iterdir()))
 
 IDEAS = """query Ideas($first: Int!, $after: String, $names: [FeatureName!]!, $date: Date) {
   ideas(first: $first, after: $after, date: $date) {
@@ -49,7 +52,7 @@ def test_ideas_rank_the_runs_of_the_session_and_serve_the_best_pick(graph: Graph
     ideas = body["data"]["ideas"]
     assert (ideas["session"], ideas["total"]) == ("2022-11-23", 2)
     [screener] = [s for s in ideas["screeners"] if s["screener"]["id"] == "vrp_scanner"]
-    assert len(ideas["screeners"]) == 97  # the other ninety-six site presets: NOT_RUN
+    assert len(ideas["screeners"]) == SITE_PRESETS  # the rest: NOT_RUN
     assert screener["screener"] == {
         "id": "vrp_scanner", "owner": "site", "scope": "site", "name": "VRP", "version": 4,
         "latestRun": {"runId": screener["run"]["runId"]}, "notRun": None,
@@ -133,7 +136,7 @@ def test_screeners_and_a_view(graph: Graph) -> None:
         ' missing: view(scope: "screener:nope") { scope } }'
     )
     screeners = {s["id"]: s for s in body["data"]["screeners"]}
-    assert len(screeners) == 97  # vrp_scanner and ninety-six other presets
+    assert len(screeners) == SITE_PRESETS  # vrp_scanner and every other preset
     assert screeners["vrp_scanner"] == {
         "id": "vrp_scanner", "name": "VRP", "latestRun": {"picked": 2}, "notRun": None
     }  # fmt: skip
