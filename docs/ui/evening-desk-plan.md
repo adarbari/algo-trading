@@ -1,6 +1,6 @@
 # Evening Desk: build plan for the trader site's new screens
 
-Status: plan (2026-11-01). Basis: [ADR 0083](../adr/0083-workflow-first-trader-site.md) and its
+Status: done (2026-11-02): V1-V12 and O1-O4 merged; closing audit in section 7. Basis: [ADR 0083](../adr/0083-workflow-first-trader-site.md) and its
 amendment of 2026-11-01 (Ideas tabs, idea page, watchlist, sign-up answer, derived option
 figures), [ADR 0085](../adr/0085-evening-desk-theme.md) (tokens, live), [0051](../adr/0051-guide-explain-once-show-in-place.md)
 (the Guide), [0052](../adr/0052-one-ui-for-phones-and-desktops.md) (one tree),
@@ -175,3 +175,12 @@ Every trader screen of the canvas (bar Pricing, Past lists, the "Yours" tab and 
 tests) is live on the new skeleton, the old page each replaced deleted in its slice, `make web-check`
 and the phone e2e project green, each new word in the Guide with coverage baselines shrunk, and no
 raw vendor quote on a trader screen (a fitness test in V6 over the trader GraphQL operations).
+
+**Closing audit (2026-11-02).** Every slice is merged. Deleted in the closing PR: the orphaned
+`widgets/regime-sizing`, `pages/placeholder` and the `placeholderRoute` builder (no section is
+unbuilt). `widgets/options-panel` is admin-only (the trader's Options tab is `widgets/option-grid`).
+`top-ideas`, `paused-ideas`, `ideas-heading`, `pick-detail` and `event-calendar-panel` are still
+composed by the new Ideas, Test result and Calendar pages, so they stay until regrouped. Main's CI
+(web static, performance budgets, e2e) is green, so no route budget is over. The raw-quote
+fitness test (`test_trader_option_figures.py`) reads every named web operation. `/admin/users`
+keeps a Guide exemption (no start page yet).
