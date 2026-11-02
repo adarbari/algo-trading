@@ -24,11 +24,7 @@ from algotrade.engines.screening.runner import RunCoverage
 from algotrade.features.site import site_features
 from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config, resolve_screen_version
-from algotrade.services.evaluation.cross_section.harness import (
-    EdgeEvaluation,
-    edge_universe,
-    evaluate_edge,
-)
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.legs.audit import (
     LegDifference,
     differing_legs,
@@ -49,6 +45,8 @@ from algotrade.services.evaluation.cross_section.results import (
     survivorship,
     write_edge_eval,
 )
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
+from algotrade.services.evaluation.cross_section.run.scopes import edge_universe
 from algotrade.services.evaluation.discovery.persist import write_winners_study
 from algotrade.services.evaluation.discovery.tells import discover
 from algotrade.services.evaluation.forward.results import run_night

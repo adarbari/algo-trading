@@ -228,6 +228,7 @@ forbidden_modules = [
     "algotrade.storage",
     "algotrade.services.evaluation.cross_section.measuring",
     "algotrade.services.evaluation.cross_section.harness",
+    "algotrade.services.evaluation.cross_section.run",
     "algotrade.services.evaluation.cross_section.legs",
     "algotrade.services.evaluation.cross_section.detail",
     "algotrade.services.evaluation.forward",

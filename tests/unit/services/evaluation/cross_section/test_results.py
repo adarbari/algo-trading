@@ -13,7 +13,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import DataValidationError
 from algotrade.data import dates_digest
 from algotrade.quant.edges.statistics import break_even_cost
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.legs.rows import (
     _stored,
     decode_leg,
@@ -29,6 +29,7 @@ from algotrade.services.evaluation.cross_section.results import (
     survivorship,
     write_edge_eval,
 )
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.storage.backends.runs.run_selection import merge_rows
 from algotrade.storage.tables.edge_schemas import EDGE_EVAL
 from tests.helpers.stored_frames import stamped
