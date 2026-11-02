@@ -251,3 +251,13 @@ def test_every_other_workflow_running_the_architecture_tests_checks_out_full_his
             assert checkouts and all(
                 str(c.get("with", {}).get("fetch-depth")) == "0" for c in checkouts
             ), f"{path.name}:{name} runs the architecture tests: checkout needs fetch-depth: 0"
+
+
+def test_a_workflow_that_pushes_to_a_pr_branch_dispatches_ci() -> None:
+    """A push with GITHUB_TOKEN starts no run, so the PR head would have none of the protected
+    checks (2026-11-01: #1012, #1015). Any workflow that `git push`es must dispatch ci.yml."""
+    for path in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+        text = path.read_text()
+        if "git push" in text and path.name != "ci.yml":
+            assert "gh workflow run ci.yml" in text, f"{path.name} pushes but never dispatches CI"
+            assert "actions: write" in text, f"{path.name} needs actions: write to dispatch"

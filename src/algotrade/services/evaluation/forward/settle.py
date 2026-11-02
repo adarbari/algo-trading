@@ -15,7 +15,9 @@ is missing or invalid there is skipped with that reason, never a loss. ``excess_
 settled trade is set only when the outcome's value is a return (not an ``expires_otm`` cushion);
 ``raw_return`` is the name's own ``fwd_return`` over the window (``forward_returns@v2``: the
 close-to-close price return, no benchmark, no cost), set for a settled trade whose stored row has
-one (not for an option P&L, whose ``fwd_return`` is the option's); the Past lists read it."""
+one (not for an option P&L, whose ``fwd_return`` is the option's); the Past lists read it. It
+comes from the trade contract (``evidence.shapes.trade_frame``, ADR 0088 2.5a), which also gives a
+settled trade its ``exit_kind``, ``return_on_capital`` and ``price_source``."""
 
 import hashlib
 import json
@@ -51,6 +53,7 @@ from algotrade.services.evaluation.cross_section.hit import (
 )
 from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.reads.session import implied_at
+from algotrade.services.evaluation.evidence.shapes import trade_frame
 from algotrade.services.evaluation.forward.signals import advance
 
 GRACE_SESSIONS = 5  # sessions after a window's close an outcome may still be stored
@@ -75,6 +78,10 @@ class Settled:
     excess_return: float | None
     delisted: bool
     raw_return: float | None = None
+    exit_kind: str | None = None  # the trade contract's (ADR 0088, 2.5a), for a settled trade
+    return_on_capital: float | None = None
+    price_source: str | None = None
+    outcome_licence: str | None = None  # the outcome row's licence (bought history is personal)
 
 
 def outcome_hash(edge: Edge) -> str:
@@ -86,6 +93,10 @@ def outcome_hash(edge: Edge) -> str:
 def _finite(value: Any) -> float | None:
     number = pd.to_numeric(value, errors="coerce")
     return float(number) if pd.notna(number) and abs(number) != float("inf") else None
+
+
+def _finite_text(value: Any) -> str | None:
+    return None if pd.isna(value) else str(value)
 
 
 def _skipped(instrument: str, why: str) -> Settled:
@@ -127,12 +138,6 @@ def settle_group(
             [_skipped(i, "no outcome stored for its window") for i in names] if late else []
         )
     mine = stored[stored["instrument_id"].isin(names)]
-    raw = (  # the name's own price return, before any residual attaches; an option P&L has none
-        pd.Series(dtype=float)
-        if edge.outcome.kind == CHAIN_KIND
-        else pd.to_numeric(mine.set_index("instrument_id")["fwd_return"], errors="coerce")
-    )
-    raw = raw[~raw.index.duplicated()]
     if needs_residual(edge):  # a factor-neutral edge settles on the residual rows (EB H11)
         mine = attach_residuals(mine, read_residuals(reader, [buy], now), horizon)
         waiting = set(mine.loc[mine["residual_reason"] == NO_RESIDUAL_ROW, "instrument_id"])
@@ -150,7 +155,15 @@ def settle_group(
         )
     except MissingDataError:
         return out + [_skipped(i, "no implied vol stored at the signal session") for i in names]
-    result = apply_outcome(edge, mine, implied).set_index("instrument_id") if len(mine) else None
+    scored = apply_outcome(edge, mine, implied) if len(mine) else None
+    result = None if scored is None else scored.set_index("instrument_id")
+    contract = (  # the trade contract's columns of each scored name (ADR 0088, 2.5a); paper is long
+        None
+        if scored is None
+        else trade_frame(
+            edge, mine, scored, entry=buy, bars_exit=first["sell_session"], side="long"
+        ).set_index("instrument_id")
+    )
     for name in names:
         if result is None or name not in result.index:
             out.append(_skipped(name, "no entry bar at the buy session"))
@@ -159,6 +172,8 @@ def settle_group(
         if row["excluded"]:
             out.append(_skipped(name, REASONS.get(str(row["excluded"]), str(row["excluded"]))))
             continue
+        assert contract is not None
+        trade = contract.loc[name]
         out.append(
             Settled(
                 name,
@@ -166,7 +181,11 @@ def settle_group(
                 "",
                 float(str(row["value"])) if is_return(edge) else None,
                 bool(row["delisted"]),
-                _finite(raw.get(name)),
+                _finite(trade["underlying_return"]),
+                _finite_text(trade["exit_kind"]),
+                _finite(trade["return_on_capital"]),
+                _finite_text(trade["price_source"]),
+                _finite_text(trade["outcome_licence"]),
             )
         )
     return out
