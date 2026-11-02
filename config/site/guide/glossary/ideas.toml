@@ -180,7 +180,7 @@ see_also = ["option_grid"]
 [[term]]
 id = "grid_strike"
 term = "Strike"
-short = "The price at which the sold option is struck: the price you would buy the shares at (a put) or sell them at (a call)."
+short = "The price the shares change hands at if the sold option is assigned."
 body = """
 The grid shows, for each delta band and expiry, the listed strike whose delta of ours is nearest the band. A strike farther below the share price (for a put) pays less and is less likely to be reached. Strikes come from the stored chain, so a strike that was not listed that day cannot appear.
 """
