@@ -33,6 +33,9 @@ READER_MODULES = ("stored.py",)
 # and requires it here or in its own ``NOT_JUDGED`` with a reason.
 JUDGED_CODE: tuple[str, ...] = (
     "algotrade.config.edges.named:OUT_OF_WINDOW",
+    "algotrade.config.edges.verdict:MAIN_OPTION_LEVEL",
+    "algotrade.config.edges.verdict:OptionCosts",  # reached through the settings (E6b)
+    "algotrade.config.edges.verdict:TailsVerdict",
     "algotrade.config.edges.verdict:VerdictSettings",
     "algotrade.quant.edges.statistics:_finite",
     "algotrade.quant.edges.statistics:percentile_of",

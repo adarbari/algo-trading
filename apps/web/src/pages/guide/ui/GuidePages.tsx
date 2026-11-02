@@ -24,7 +24,7 @@ import { GuideScreenersIndex } from '@/widgets/guide-screeners';
 import { GuideRail } from '@/widgets/guide-rail';
 import { GuideEpisode, GuideIndicator, GuideRegimeIndex } from '@/widgets/guide-regime';
 import { GuideSituation, GuideSituationsIndex } from '@/widgets/guide-situations';
-import { GuideStart, GuideStartIndex } from '@/widgets/guide-start';
+import { GuideStart, GuideStartIndex, StartOutline } from '@/widgets/guide-start';
 
 export function GuideHomePage() {
   return (
@@ -180,7 +180,10 @@ export function GuideStartIndexPage() {
 
 export function GuideStartPage({ id }: { id: string }) {
   return (
-    <DocLayout rail={<GuideRail page="start_page" startPage={id} />}>
+    <DocLayout
+      rail={<GuideRail page="start_page" startPage={id} />}
+      aside={<StartOutline id={id} />}
+    >
       <GuideStart id={id} />
     </DocLayout>
   );

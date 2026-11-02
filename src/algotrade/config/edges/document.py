@@ -159,7 +159,7 @@ from algotrade.config.edges.schedules.markets import (
     market_schedule_ok,
     market_trigger,
 )
-from algotrade.config.edges.verdict import LEGS
+from algotrade.config.edges.verdict import LEGS, PROFILES
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Group, Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
@@ -211,7 +211,6 @@ QUALITY_BAR = (
 )
 PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
 PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source", "leg")
-PROFILES = ("return", "tails")  # ``verdict_profile``: the judge's criteria (ADR 0088, E6b)
 STANDARD = "@standard"  # in ``baselines``: the site's standard decoys (``expand_baselines``)
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
