@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 09:03 UTC",
+ "generated": "2026-11-02 09:23 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -577,6 +577,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -594,6 +595,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -626,6 +628,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -643,6 +646,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -672,6 +676,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -689,6 +694,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -718,6 +724,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -735,6 +742,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -764,6 +772,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -781,6 +790,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -810,6 +820,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -827,6 +838,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -856,6 +868,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -873,6 +886,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -902,6 +916,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -919,6 +934,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1047,18 +1063,12 @@
     }
    ],
    "params": {},
-   "ops": [
-    "OptionChain",
-    "OptionQuotes"
-   ],
-   "uncertain": [
-    "OptionChain",
-    "OptionQuotes"
-   ],
+   "ops": [],
+   "uncertain": [],
    "interaction": [],
    "source": "static",
    "parent": "/explore?sel={instrument}",
-   "target": true
+   "target": false
   },
   "/explore?sel={instrument} > tab:View:Overview": {
    "route": "/explore",
@@ -1149,6 +1159,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1166,6 +1177,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1195,6 +1207,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1212,6 +1225,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1241,6 +1255,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1258,6 +1273,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],

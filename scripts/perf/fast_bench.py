@@ -407,6 +407,13 @@ VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object
             lambda d: [r["name"] for r in d["catalogue"][:3]],
         )
     },
+    "OptionGrid": {
+        "key": (
+            "FeatureTable",
+            {"columns": [], "size": 1},
+            lambda d: d["table"]["instruments"][0]["symbol"],
+        )
+    },
     "HarnessRun": {"runId": ("HarnessRuns", {"limit": 1}, lambda d: d["harnessRuns"][0]["runId"])},
     "AdminScreenerRun": {
         "runId": ("AdminScreenerRuns", {"limit": 1}, lambda d: d["screenerRuns"][0]["runId"])
