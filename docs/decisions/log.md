@@ -849,6 +849,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner's instruction of 2026-11-01 ("new screens are available and work end to end, incrementally"); the architect review (file-disjointness, ownership, licence, cache key) and the simplicity review (cut two components, merge slices).
 
+## 2026-11-01 | V7 onboarding | The sign-up question has two answers and the skip button starts with shares
+- Question: the mockup offers Stocks / Options / Both plus an optional watchlist; the amendment stores one `[ideas] default_tab` of `stocks` or `premium`. What does the question offer, and what does the skip store?
+- Options: three answers with Both = stocks / two answers (mostly shares, mostly options), Skip stores shares / Skip stores nothing and asks again.
+- Decision: two answers, "Mostly shares" (`stocks`) and "Mostly options (selling premium)" (`premium`); Skip stores `stocks`, so the question is asked once; the watchlist is added in Settings or with the Watch button, not in the question.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the stored value has two states; asking again on every visit after a Skip would nag; the user can change it any time in Settings.
 ## 2026-11-01 | Evening Desk V1 | Wording of the conflicts statement and the bar's Test tab
 - Question: what may the Guide's "Conflicts" section claim, and where does the bar's Test tab point before V9?
 - Options: claim only what ADR 0083 fixes / also state owner holdings and data-vendor ties.
@@ -895,3 +902,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the plan's "paired base, not a trial" (G19, 2.7) fixes the role; the raw return is the only stock figure comparable with an option's return on spot (a covered call earns the stock's move plus the premium); refusing the opposite side keeps "own picks" true (a short leg is ranked from the bottom, so it would silently hold other names); reading both grains is what A3 against `position:long_shares` needs, and the summed sequence is the existing staleness rule (ADR 0063) extended, not a new one. Option-template baselines are limited to option_pnl setups (they take the setup's entry, tenor and cycle) and fail with a named error otherwise.
+## 2026-11-01 | ADR 0088 S2 / S3 / F2 | B2 reuses the two existing presets; S3 already merged; F2 is a coverage test
+- Question: S2 says reuse `low_volatility` and `ivol_high` and add `total_vol_high` only if a run shows the sort differs. Build it now?
+- Options: add `total_vol_high` now / add nothing until a run of the two edges (X4) shows the sort differs.
+- Decision: add nothing. S2 is a reuse, so it has no PR; `total_vol_high` waits for the X4 run. S3 (`earnings_move_rich`, `earnings_move_cheap`) merged in #993, so it needs no slice. F2's 33 verdict-column terms were written with F1 and F3 (#992, #1008); this PR adds the test that keeps them in step with the columns and keeps their wording descriptive, and rewords the two sentences that told a reader what to do.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the build doc's own condition ("only if the run shows the sort differs") cannot be met before X4's run exists, and a third near-duplicate preset would add code the owner's less-code rule (2026-10-25) asks to avoid.

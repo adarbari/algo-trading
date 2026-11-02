@@ -144,8 +144,8 @@ def test_a_nested_sync_resolver_calls_no_read_loader() -> None:
     # and a sync ``def`` calling a ``load_*`` of the read model would read on the loop
     found = []
     for path in _types_modules():
-        if path.name == "query.py":  # top level: ``OffLoop`` runs these in the pool
-            continue
+        if path.name in ("query.py", "queries.py"):  # top level (``UserQuery`` is a base of
+            continue  # ``Query``): ``OffLoop`` runs these in the pool
         for node in ast.walk(ast.parse(path.read_text())):
             if not isinstance(node, ast.FunctionDef):
                 continue

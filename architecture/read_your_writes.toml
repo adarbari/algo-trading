@@ -55,6 +55,16 @@ path = "/preferences/appearance"
 test = "tests/contract/api/read_your_writes/test_preferences.py::test_appearance_put_shows_the_saved_theme"
 
 [[route]]
+method = "PUT"
+path = "/preferences/watchlist"
+test = "tests/contract/api/read_your_writes/test_preferences.py::test_watchlist_put_shows_the_saved_instruments"
+
+[[route]]
+method = "PUT"
+path = "/preferences/ideas"
+test = "tests/contract/api/read_your_writes/test_preferences.py::test_ideas_put_shows_the_saved_default_tab"
+
+[[route]]
 method = "DELETE"
 path = "/preferences/views/{scope}/view"
 test = "tests/contract/api/read_your_writes/test_preferences.py::test_view_delete_forgets_a_named_view"

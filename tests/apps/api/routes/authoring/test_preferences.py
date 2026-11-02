@@ -221,3 +221,36 @@ def test_a_theme_is_checked_before_it_is_saved(writer_client: TestClient, root: 
         assert writer_client.put(APPEARANCE, json=body).status_code == 400, body
     assert writer_client.put(APPEARANCE, json={}).status_code == 422
     assert not (root / "users" / "local" / "preferences.toml").exists()
+
+
+WATCHLIST = "/preferences/watchlist"
+IDEAS = "/preferences/ideas"
+READ_PREFS = "query P { traderPreferences { defaultTab watchlist { instrumentId symbol } } }"
+
+
+def read_prefs(client: TestClient) -> dict[str, Any]:
+    return client.post("/graphql", json={"query": READ_PREFS}).json()["data"]["traderPreferences"]  # type: ignore[no-any-return]
+
+
+def test_the_tab_and_watchlist_are_saved_read_back_with_tickers_and_checked(
+    writer_client: TestClient, root: Path
+) -> None:
+    one = "EQ:AAA"
+    assert read_prefs(writer_client) == {"defaultTab": None, "watchlist": []}
+    assert writer_client.put(IDEAS, json={"default_tab": "premium"}).json() == {
+        "default_tab": "premium"
+    }
+    assert writer_client.put(WATCHLIST, json={"instruments": [one, one]}).json() == {
+        "instruments": [one]
+    }
+    got = read_prefs(writer_client)
+    assert got["defaultTab"] == "premium"
+    assert [w["instrumentId"] for w in got["watchlist"]] == [one]
+    assert got["watchlist"][0]["symbol"]  # the session's snapshot names it
+    assert writer_client.put(WATCHLIST, json={"instruments": ["AAPL"]}).status_code == 400
+    assert writer_client.put(WATCHLIST, json={"instruments": ["EQ:NOPE"]}).status_code == 400
+    assert writer_client.put(IDEAS, json={"default_tab": "yours"}).status_code == 400
+    assert writer_client.put(IDEAS, json={}).status_code == 422
+    assert [w["instrumentId"] for w in read_prefs(writer_client)["watchlist"]] == [one]
+    text = (root / "users" / "local" / "preferences.toml").read_text()
+    assert "[watchlist]" in text and "default_tab" in text
