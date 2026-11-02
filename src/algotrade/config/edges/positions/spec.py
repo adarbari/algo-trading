@@ -45,6 +45,7 @@ if TYPE_CHECKING:
 KEYS = ("position", "expiry_cycle", "skip_report_in_life", "book", "exit")
 EXIT_KEYS = ("take_profit", "stop_loss", "exit_dte", "when")
 OPTION_KIND = "option_pnl"
+SLEEVE_BASE = "delta_equivalent"  # named.DELTA_EQUIVALENT (named imports positions: no cycle)
 MAX_EXIT_DTE = 400
 
 
@@ -217,6 +218,11 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
         return
     if edge.outcome.kind != OPTION_KIND or edge.outcome.position is None:
         raise ConfigurationError(f"{where} variant_grid: only an option_pnl position has a grid")
+    if edge.base != SLEEVE_BASE:  # the cross-section harness does not read grid points yet
+        raise ConfigurationError(
+            f"{where} variant_grid: only a named option sleeve (base = {SLEEVE_BASE!r}) is "
+            f"evaluated per grid point yet"
+        )
     taken = {"main", *(v.id for v in edge.variants)}
     clash = sorted(taken & set(grid.grid_ids(edge.variant_grid)))
     if clash:

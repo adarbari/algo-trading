@@ -50,7 +50,7 @@ from algotrade.config.edges.document import (
     job_name,
 )
 from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
-from algotrade.config.edges.named import OUT_OF_WINDOW
+from algotrade.config.edges.named import DELTA_EQUIVALENT, TIME_SERIES
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.positions.spec import exits_digest
@@ -177,6 +177,7 @@ from algotrade.services.evaluation.evidence.contract import capital_basis_of
 from algotrade.services.evaluation.evidence.measures import BOOTSTRAP_SEED_VERSION
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from algotrade.services.evaluation.time_series.measures import deflate_trial, pbo_among
+from algotrade.services.evaluation.time_series.sleeve import evaluate_sleeve, sleeve_outcomes
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -414,7 +415,7 @@ def screen_uses(configs: ConfigStore, edges: Sequence[Edge]) -> list[tuple[str, 
     per use: what ``shared_screens`` counts to choose the screens worth caching for a run."""
     uses: list[tuple[str, str]] = []
     for edge in edges:
-        if edge.base == OUT_OF_WINDOW:
+        if edge.base in TIME_SERIES:
             continue  # measured by time_series/, no screener runs
         try:
             found = _variants(configs, UserContext(edge.owner), edge)
@@ -510,8 +511,9 @@ def evaluate_edge(
     ``screens``: the screens other edges of the run computed (``reads/screens.py``). Raises
     ``ConfigurationError`` for an event class with no declared field and
     ``MissingDataError`` when no outcome is stored for a horizon. An edge with ``base =
-    "out_of_window"`` is a time-series edge, measured by ``time_series/`` (``_time_series``)."""
-    if edge.base == OUT_OF_WINDOW:
+    "out_of_window"`` or ``"delta_equivalent"`` is measured by ``time_series/``
+    (``_time_series``)."""
+    if edge.base in TIME_SERIES:
         return _time_series(
             reader, writer, configs, user, edge, start, end, as_of, split_from, random_draws
         )
@@ -747,8 +749,9 @@ def _time_series(
     split_from: date | None,
     random_draws: int,
 ) -> EdgeEvaluation:
-    """A time-series edge (ADR 0073) as an ``EdgeEvaluation``: one trial per named instrument
-    (``variant`` its symbol, ``horizon`` the window's length), its slices and random window sets
+    """A time-series edge (ADR 0073) or named option sleeve (ADR 0088) as an ``EdgeEvaluation``:
+    one trial per named instrument (``variant`` its symbol, ``horizon`` the window's length or
+    the hold; a sleeve's per edge variant and grid point too), its slices and random window sets
     stored as the rows the verdict reads; no per-session series, legs or ledger (there is no
     screen to replay)."""
     split, exploratory = effective_split(split_from, edge)
@@ -756,34 +759,38 @@ def _time_series(
     check_entry(reader, edge, catalogue(configs, user.user_id), start, end, as_of)
     session = SessionReads(reader, site_regime(configs.load).label, domains=domains)
     gate = None if edge.gate is None else partial(session.gate, edge.gate)
-    run = evaluate_time_series(
-        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,
-        domains,
+    run = (
+        evaluate_sleeve(reader, edge, sleeve_outcomes(edge, load_templates(configs)), start, end,
+                        as_of, session.label, split, exploratory, gate,
+                        load_verdict(configs).option_costs)  # check_entry refused an entry
+        if edge.base == DELTA_EQUIVALENT
+        else evaluate_time_series(
+            reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,
+            domains,
+        )
     )  # fmt: skip
     keys = {
-        r.symbol: hashlib.sha256(
-            f"{edge.id}|{run.window}|{r.symbol}|{HARNESS_VERSION}".encode()
-        ).hexdigest()
+        r.identity: hashlib.sha256(f"{r.identity}|{HARNESS_VERSION}".encode()).hexdigest()
         for r in run.results
     }
-    tried = {(MAIN, r.symbol, keys[r.symbol], run.horizon) for r in run.results}
+    tried = {(r.edge_variant, r.symbol, keys[r.identity], r.horizon) for r in run.results}
     trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
-    pbo = pbo_among({r.symbol: dict(r.paired) for r in run.results if r.paired})
+    pbo = pbo_among({r.identity: dict(r.paired) for r in run.results if r.paired})
     sharpes = [r.measures[0].sharpe for r in run.results if r.measures[0].sharpe is not None]
     spread = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None  # as ``deflate`` reads it
     results = [
         VariantResult(
-            r.symbol, SCREENER, keys[r.symbol], run.horizon, (),
+            r.symbol, SCREENER, keys[r.identity], r.horizon, (),
             (
                 deflate_trial(r.measures[0], [v for _, v in r.paired], trials, pbo, spread),
                 *r.measures[1:],
             ),
-            lost_sessions=r.lost, timing=r.timing,
+            edge_variant=r.edge_variant, lost_sessions=r.lost, timing=r.timing or None,
         )
         for r in run.results
     ]  # fmt: skip
     randoms = tuple(
-        RandomPicks(MAIN, run.horizon, r.symbol, keys[r.symbol], r.randoms)
+        RandomPicks(MAIN, run.horizon, r.symbol, keys[r.identity], r.randoms)
         for r in run.results
         if r.randoms
     )
