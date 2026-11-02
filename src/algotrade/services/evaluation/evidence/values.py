@@ -102,3 +102,63 @@ def commission_of(rows: pd.DataFrame, costs: OptionCosts | None) -> np.ndarray:
     if costs is None:
         return np.zeros(len(rows))
     return commission_per_unit(rows, costs)
+
+
+def _wing_cost(rows: pd.DataFrame) -> np.ndarray:
+    """The wing cost per unit of each row: the entry mids paid for the long option legs
+    (``leg_qty`` > 0, times ``leg_entry_mid``) of a position that also has a short option leg (the
+    bought protection of a spread or condor). NaN where there is no such wing (a long-only or
+    share-only position, no short leg) or a leg's quantity or mid is unknown: never 0."""
+    out = np.full(len(rows), np.nan)
+    needed = ("leg_kinds", "leg_qty", "leg_entry_mid")
+    if any(c not in rows.columns for c in needed):
+        return out
+    for at, (kinds, qty, mids) in enumerate(zip(*(rows[c] for c in needed), strict=True)):
+        if kinds is None or qty is None or mids is None or not len(kinds) == len(qty) == len(mids):
+            continue
+        legs = [
+            (float(q), float(m)) for k, q, m in zip(kinds, qty, mids, strict=True) if k == OPTION
+        ]
+        longs = [q * m for q, m in legs if q > 0]
+        if longs and any(q < 0 for q, _ in legs) and all(np.isfinite(longs)):
+            out[at] = sum(longs)
+    return out
+
+
+def option_figures(rows: pd.DataFrame) -> dict[str, np.ndarray]:
+    """The option-only figures of each row of the option trade grain, each over its collateral
+    (a row with none has none): ``hedged_roc`` the mid P&L after the daily delta hedge
+    (``pnl_hedged_mid``), ``stock_roc`` the share leg's part of the mid P&L (``stock_pnl``) and
+    ``wing_cost`` the wing's entry mids. All at the mid level: they carry no spread and no
+    commission (a hedge or a leg price has no cost level of its own), whatever the main value's
+    level. NaN where not known, never 0."""
+    collateral = pd.to_numeric(rows["collateral"], errors="coerce").to_numpy(dtype=np.float64)
+    has = np.isfinite(collateral) & (collateral > 0)
+
+    def over(values: np.ndarray) -> np.ndarray:
+        with np.errstate(invalid="ignore", divide="ignore"):
+            return np.where(has, values / collateral, np.nan)
+
+    def column(name: str) -> np.ndarray:
+        if name not in rows.columns:
+            return np.full(len(rows), np.nan)
+        return pd.to_numeric(rows[name], errors="coerce").to_numpy(dtype=np.float64)
+
+    return {
+        "hedged_roc": over(column("pnl_hedged_mid")),
+        "stock_roc": over(column("stock_pnl")),
+        "wing_cost": over(_wing_cost(rows)),
+    }
+
+
+def figures_by_name(stored: pd.DataFrame) -> dict[str, dict[str, float | None]]:
+    """``option_figures`` per instrument of ``stored`` (indexed by instrument, one row each), as
+    ``Pick`` keywords with None for what is not known; {} for rows that are not the option trade
+    grain's (a share setup's outcomes have no collateral or hedge column)."""
+    if "pnl_hedged_mid" not in stored.columns or "collateral" not in stored.columns:
+        return {}
+    found = option_figures(stored)
+    return {
+        name: {k: (float(v[at]) if np.isfinite(v[at]) else None) for k, v in found.items()}
+        for at, name in enumerate(stored.index)
+    }

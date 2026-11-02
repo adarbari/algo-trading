@@ -15,6 +15,7 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -45,6 +46,14 @@ class TailMeasures:
     base_cvar_5: float | None = None
     worst_window: float | None = None
     psr: float | None = None
+    # The option-only values (E6b-3), all at the mid level; None for a share setup and where no
+    # counted pick has the figure: ``hedged_mean_roc`` the mean per-session return on capital
+    # after the daily delta hedge, ``stock_share`` the share leg's part of the mid return, the sum
+    # of ``stock_pnl`` over the sum of ``pnl_mid`` of the picks that have both, ``wing_cost`` the
+    # mean per-session cost of the bought wing as a share of collateral.
+    hedged_mean_roc: float | None = None
+    stock_share: float | None = None
+    wing_cost: float | None = None
 
 
 def bootstrap_seed(seed_key: str, label: str) -> int:
@@ -158,3 +167,42 @@ def _excess(
         bootstrap_seed(seed_key, f"{label}:{EXCESS}"),
     )
     return boot.mean, boot.t
+
+
+OptionFigures = tuple[
+    float | None, float | None, float | None, float | None, float | None
+]  # one pick's (hedged_roc, stock_roc, roc_gross, wing_cost, capital)
+SHARE_FLOOR = 1e-6  # dollars per unit: a summed mid P&L smaller than this has no share to speak of
+
+
+def _mean_of_sessions(per_session: Sequence[Sequence[float]]) -> float | None:
+    """The mean of the sessions' means, over the sessions that have a value; None with none."""
+    means = [float(np.mean(v)) for v in per_session if len(v)]
+    return float(np.mean(means)) if means else None
+
+
+def option_measures(sessions: Sequence[Sequence[OptionFigures]]) -> dict[str, Any]:
+    """The option-only columns of a slice: ``sessions[i]`` holds the counted picks of one session
+    as ``(hedged_roc, stock_roc, roc_gross, wing_cost, capital)`` (None: not known).
+    ``hedged_mean_roc`` and ``wing_cost`` are means of the sessions' means over the picks that
+    have the figure. ``stock_share`` is the sum of ``stock_pnl`` over the sum of ``pnl_mid`` in
+    dollars per unit (each return times its pick's capital, undoing the division by collateral),
+    over the picks that have both; None below ``SHARE_FLOOR`` in absolute value. A figure with no
+    pick is None."""
+
+    def known(at: int) -> list[list[float]]:
+        return [[p[at] for p in s if p[at] is not None] for s in sessions]  # type: ignore[misc]
+
+    both = [
+        (p[1] * p[4], p[2] * p[4])  # type: ignore[operator]
+        for s in sessions
+        for p in s
+        if None not in (p[1], p[2], p[4])
+    ]
+    total = sum(g for _, g in both)
+    share = float(sum(st for st, _ in both) / total) if both and abs(total) > SHARE_FLOOR else None
+    return {
+        "hedged_mean_roc": _mean_of_sessions(known(0)),
+        "stock_share": share,
+        "wing_cost": _mean_of_sessions(known(3)),
+    }
