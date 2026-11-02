@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ScreenerBuilderPage } from './ScreenerBuilderPage';
+import { TestExpertPage } from './TestExpertPage';
 
 const probe = vi.hoisted(() => ({ id: '' }));
 
@@ -42,12 +42,12 @@ vi.mock('@/widgets/feature-table', async () => {
   };
 });
 
-describe('ScreenerBuilderPage', () => {
+describe('TestExpertPage', () => {
   it('lays the Builder out around one provider and passes navigation through', async () => {
     const onOpenTicker = vi.fn();
     const onOpenRegime = vi.fn();
     render(
-      <ScreenerBuilderPage
+      <TestExpertPage
         id="my-vrp"
         onOpenTicker={onOpenTicker}
         onDeleted={vi.fn()}

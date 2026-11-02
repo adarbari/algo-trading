@@ -30,7 +30,7 @@ function ExploreRoute() {
     <ExplorePage
       search={search}
       onSearchChange={onSearchChange}
-      onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
+      onOpenScreener={(id) => void navigate({ to: '/test/result/$id', params: { id } })}
     />
   );
 }

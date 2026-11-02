@@ -1,5 +1,5 @@
 /**
- * Trader > Screeners > one screener (Builder): the draft bar, who an unsaved edit would add or
+ * Test > Expert: one screener's rules (the Builder): the Test steps, the draft bar, who an unsaved edit would add or
  * drop against the saved run, the regime gate in one line, the "Describe it" box (a sentence
  * to a draft, ADR 0041), the criteria beside the run summary and funnel, and the live preview's
  * top rows. The widgets share the Builder's state
@@ -17,12 +17,14 @@ import { RegimeGateLine } from '@/widgets/regime-gate';
 import { ScreenFunnel } from '@/widgets/screen-funnel';
 import { ScreenSummary } from '@/widgets/screen-summary';
 
-export interface ScreenerBuilderPageProps {
+import { TestSteps } from './TestSteps';
+
+export interface TestExpertPageProps {
   /** The screener being built. */
   id: string;
   /** Open a ticker in Explore. */
   onOpenTicker: (symbol: string) => void;
-  /** The screener was deleted: back to the list. */
+  /** The screener was deleted: back to the start. */
   onDeleted: () => void;
   /** Open the Regime page (the gate line's link). */
   onOpenRegime: () => void;
@@ -30,16 +32,17 @@ export interface ScreenerBuilderPageProps {
   onReturn?: (() => void) | undefined;
 }
 
-export function ScreenerBuilderPage({
+export function TestExpertPage({
   id,
   onOpenTicker,
   onDeleted,
   onOpenRegime,
   onReturn,
-}: ScreenerBuilderPageProps) {
+}: TestExpertPageProps) {
   return (
     <ScreenerBuilderProvider id={id} key={id}>
       <Stack gap={3}>
+        <TestSteps at="expert" id={id} />
         <DraftBar onDeleted={onDeleted} onReturn={onReturn} />
         <PreviewDiff />
         <RegimeGateLine screenerId={id} onOpenRegime={onOpenRegime} />

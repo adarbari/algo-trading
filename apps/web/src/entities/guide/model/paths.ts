@@ -82,12 +82,12 @@ export function situationPath(slug: string): string {
 
 /** A screener's results (what "See today's hits" opens). */
 export function screenerResultsPath(id: string): string {
-  return `/screeners/${encodeURIComponent(id)}`;
+  return `/test/result/${encodeURIComponent(id)}`;
 }
 
 /** A screener in the Builder. */
 export function screenerBuilderPath(id: string): string {
-  return `/screeners/${encodeURIComponent(id)}/edit`;
+  return `/test/expert/${encodeURIComponent(id)}`;
 }
 
 /**

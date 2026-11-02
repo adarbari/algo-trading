@@ -33,7 +33,7 @@
 
 # /settings (reached from the account menu; the one sign-up question while it is unanswered):
 # a page around the product, not a section of it; every control on it has its Guide term.
-non_sections = ["/explore", "/regime", "/settings"]  # off the bar (ADR 0083 amendment 2026-11-01): reached by search, the regime chip and links
+non_sections = ["/explore", "/regime", "/screeners", "/settings"]  # off the bar (ADR 0083 amendment 2026-11-01): reached by search, the regime chip and links; /screeners only redirects to /test (V9)
 
 [panels]
 tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]
@@ -441,7 +441,7 @@ path = "/ideas"
 start = "start:read_a_result"
 
 [[section]]
-path = "/screeners"
+path = "/test"
 start = "start:test_a_setup"
 
 [[section]]
@@ -524,8 +524,8 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/features/formula-feature/ui/FormulaFeatureDialog.tsx" = 1
 "src/features/screener-describe/ui/DescribeForm.tsx" = 1
 "src/features/screener-finalise/ui/RebaseBanner.tsx" = 1
-"src/pages/edge-builder/ui/EdgeBuilderPage.tsx" = 1
-"src/pages/screener-builder/ui/NewScreenerPage.tsx" = 1
+"src/pages/test/ui/TestNewPage.tsx" = 1
+"src/pages/test/ui/TestSetupPage.tsx" = 1
 "src/widgets/compare-panel/ui/ComparePanel.tsx" = 1
 "src/widgets/completeness-panel/ui/CompletenessPanel.tsx" = 1
 "src/widgets/criteria-table/ui/CriteriaTable.tsx" = 2

@@ -423,6 +423,14 @@ VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object
         )
     },
     "GuideField": {"name": _FEATURE},
+    "FeatureDistribution": {"name": _FEATURE},
+    "EdgeDocument": {
+        "ids": (
+            "EdgesPage",
+            {"filters": None, "q": None},
+            lambda d: [d["edgeList"]["items"][0]["id"]],
+        )
+    },
     "GuideHelpField": {"name": _FEATURE},
     "GuideSituation": {
         "slug": ("GuideIndex", {}, lambda d: d["guideIndex"]["situations"][0]["slug"])

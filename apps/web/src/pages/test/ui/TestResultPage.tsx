@@ -1,7 +1,7 @@
 /**
- * Trader > Screeners > one screener (Results, `/screeners/$id`): the latest run as a review
+ * Test > Result (`/test/result/$id`): the latest run as a review
  * table with the row under review beside it (its decision, criteria and price chart), and
- * "Edit criteria" for the Builder. Reviewing comes first, editing is one click away. The
+ * "Edit criteria" for Expert and "Test it as a setup" for the setup builder. Reviewing comes first, editing is one click away. The
  * review is keyboard-first: j / k move, c adds the ticker to the compare set, x hides it for
  * now, Enter opens it in Explore. "Edit criteria" goes straight to the Builder page. Under the
  * header an edge line says which edge this screener implements and its record, so a pick's
@@ -17,14 +17,18 @@ import { ScreenerResults } from '@/widgets/feature-table';
 import { PickDetail } from '@/widgets/pick-detail';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 
-export interface ScreenerResultsPageProps {
+import { TestSteps } from './TestSteps';
+
+export interface TestResultPageProps {
   /** The screener shown. */
   id: string;
   /** The filter bar's `f` search param and its writer (the route's). */
   f: string | undefined;
   onFilterChange: (f: string | undefined) => void;
-  /** Open the full Builder page for this screener. */
+  /** Open the rules of this screener (Expert). */
   onEdit: () => void;
+  /** Test the screener as a setup (the setup builder). */
+  onBuildSetup: () => void;
   /** Open a ticker in Explore. */
   onOpenTicker: (symbol: string) => void;
   /** Open the tickers added to the compare set in Explore. */
@@ -33,15 +37,16 @@ export interface ScreenerResultsPageProps {
   onOpenEdge: (edgeId: string) => void;
 }
 
-export function ScreenerResultsPage({
+export function TestResultPage({
   id,
   f,
   onFilterChange,
   onEdit,
+  onBuildSetup,
   onOpenTicker,
   onCompare,
   onOpenEdge,
-}: ScreenerResultsPageProps) {
+}: TestResultPageProps) {
   const description = useScreenerRuns().data?.byId.get(id)?.description ?? null;
   const own = (useMyScreeners().data ?? []).some((s) => s.screenerId === id);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -58,6 +63,7 @@ export function ScreenerResultsPage({
   };
   return (
     <Stack gap={3}>
+      <TestSteps at="result" id={id} />
       <Stack direction="row" gap={3} align="center" justify="between" wrap>
         <Stack gap={1}>
           <Heading level={1}>{id}</Heading>
@@ -87,6 +93,9 @@ export function ScreenerResultsPage({
           ) : null}
           <Button variant="secondary" onClick={onEdit}>
             Edit criteria
+          </Button>
+          <Button variant="primary" onClick={onBuildSetup}>
+            Test it as a setup
           </Button>
         </Stack>
       </Stack>

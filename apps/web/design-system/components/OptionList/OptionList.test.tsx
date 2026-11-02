@@ -83,6 +83,20 @@ describe('OptionList', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('lays the choices out as cards on request', () => {
+    render(
+      <OptionList
+        variant="card"
+        items={[{ id: 'a', title: 'Alpha', description: 'First' }]}
+        value="a"
+        onSelect={() => undefined}
+        label="Ways"
+      />,
+    );
+    expect(screen.getByRole('list', { name: 'Ways' })).toHaveAttribute('data-variant', 'card');
+    expect(screen.getByRole('button', { name: /Alpha/ })).toHaveAttribute('aria-current', 'true');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <OptionList items={items} value="a" onSelect={vi.fn()} label="Fields" mono />,
