@@ -7,8 +7,10 @@ from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
+import pandas as pd
 import pytest
 
+from algotrade.services.read.evaluation import pick_edges
 from algotrade.services.read.evaluation.positions import example as module
 from algotrade.services.read.evaluation.positions.example import (
     PickInput,
@@ -142,3 +144,57 @@ def test_a_setup_with_an_entry_condition_has_no_entry_or_exit_from_s(
 def test_no_picks_read_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     asked = _wire(monkeypatch, {}, ExitRule("drift", None, None))
     assert load_example_positions(CTX, EDGE, []) == () and asked == []
+
+
+def _setup(
+    monkeypatch: pytest.MonkeyPatch, rows: list[dict[str, Any]], kind: str = "excess_return",
+    entry: object = None,
+) -> list[Any]:  # fmt: skip
+    """Stub the document, the stored night and ``load_example_positions``; returns its calls."""
+    outcome = SimpleNamespace(kind=kind, start_offset_sessions=2, entry=entry)
+    calls: list[Any] = []
+    monkeypatch.setattr(
+        module, "parsed_edges", lambda ctx, user: [SimpleNamespace(id="drift", outcome=outcome)]
+    )
+    monkeypatch.setattr(pick_edges, "partition", lambda ctx, table: pd.DataFrame(rows))
+
+    def examples(ctx: Any, edge: Any, picks: Any, offset: int, entry_condition: bool) -> tuple[()]:
+        calls.append((list(picks), offset, entry_condition))
+        return ()
+
+    monkeypatch.setattr(module, "load_example_positions", examples)
+    return calls
+
+
+ROW = {"user_id": "site", "edge_id": "drift", "screener": "s", "status": "picked", "reason": None}
+CTX_ME: Any = SimpleNamespace(session=SimpleNamespace(date=S), user=SimpleNamespace(user_id="me"))
+
+
+def test_a_setups_examples_take_each_names_stored_side_and_the_documents_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = {**ROW, "pick_ids": ["EQ:A", "EQ:B"], "pick_sides": ["long", "short"]}
+    calls = _setup(monkeypatch, [row])
+    module.load_setup_examples(CTX_ME, EDGE, ["EQ:A", "EQ:B", "EQ:C"])
+    ((picks, offset, entry),) = calls
+    assert [(p.instrument_id, p.side, p.book) for p in picks] == [
+        ("EQ:A", "long", False), ("EQ:B", "short", False), ("EQ:C", "long", False),
+    ]  # fmt: skip
+    assert (offset, entry) == (2, False)
+
+
+def test_a_book_outcome_and_an_entry_condition_reach_the_example(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _setup(monkeypatch, [{**ROW, "pick_ids": ["EQ:A"]}], "portfolio_return", object())
+    module.load_setup_examples(CTX_ME, EDGE, ["EQ:A"])
+    ((picks, _, entry),) = calls
+    assert picks[0].book and entry
+
+
+def test_no_session_is_none_and_an_unreadable_document_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert module.load_setup_examples(None, EDGE, ["EQ:A"]) is None
+    monkeypatch.setattr(module, "parsed_edges", lambda ctx, user: [])
+    assert module.load_setup_examples(CTX_ME, EDGE, ["EQ:A"]) == ()

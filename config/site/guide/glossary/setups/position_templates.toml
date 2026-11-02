@@ -20,7 +20,7 @@ short = "A named shape of legs a setup can hold, such as long shares, a short pu
 body = """
 The site keeps a short list of templates. Long shares and short shares hold 100 shares. Short put sells one put near 0.30 delta. Put spread also buys a 0.10-delta put below it. Covered call holds 100 shares and sells one 0.30-delta call. Short straddle sells an at-the-money put and call. Iron fly adds two wings 5% out of the money. A setup names one template and may change its numbers, such as the delta. The shape decides the tab: any option leg puts a setup's picks on Premium.
 """
-see_also = ["position", "setup_collateral", "exit_take_profit"]
+see_also = ["position", "setup_collateral", "exit_take_profit", "example_long_shares", "example_short_shares"]
 
 [[term]]
 id = "setup_collateral"
@@ -66,3 +66,33 @@ body = """
 The tails profile measures the worst 5% of outcomes and how stable the average is. It does so by resampling stretches of the stored trades thousands of times. Resampling keeps runs of bad days together, but it only reuses what happened. A history without a crash like 1987 cannot produce one. A short-premium setup can lose more in one crash than in its whole tested history. Read the worst stored episode as a floor for the loss, not a ceiling.
 """
 see_also = ["verdict_profile", "margin_stress", "verdict"]
+
+[[term]]
+id = "example_long_shares"
+term = "Long shares (example)"
+short = "A share pick the setup would buy: the reference close, the stop price below it and the session it would exit."
+body = """
+The reference close is the session's close; the tested entry is the close the setup's delay later, so the price can differ. The stop price is the reference close less the setup's historical stop distance, or its declared stop. The exit is the hold counted in trading sessions from the entry. No size is given: the setup publishes the rule, not an order.
+"""
+next = "Read the stop's source in the setup's exit rule before relying on the distance."
+see_also = ["exit_stop_history", "exit_stop_declared", "exit_hold", "setup_template"]
+
+[[term]]
+id = "example_short_shares"
+term = "Short shares (example)"
+short = "A share pick the setup would sell short: the reference close and the exit session, with borrow assumed and no stop yet."
+body = """
+A short pick sells shares the trader does not own, so it assumes they can be borrowed at the session; a hard-to-borrow name may not be. The setup's historical stop is published for long picks only, so the stop reads not applicable here. The exit is the hold counted from the entry. A short loses when the price rises, and that loss has no ceiling.
+"""
+next = "Check that the name can be borrowed and what the borrow costs before acting on a short."
+see_also = ["exit_hold", "exit_stop_history", "setup_template"]
+
+[[term]]
+id = "example_book"
+term = "Book name (example)"
+short = "A name held as part of a setup's book: it has no stop and leaves at the book's next rebalance."
+body = """
+A book setup holds a list of names together and rebalances on its schedule, such as each month end. A name in it exits when the next rebalance drops it, so its exit is the entry after the next rebalance session. It carries no weight or size here, and no stop of its own: the book is judged as a whole. Don't read one name's move as the book's result.
+"""
+next = "Open the setup to see the book's rebalance schedule and its evidence."
+see_also = ["setup_template", "exit_hold"]

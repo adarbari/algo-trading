@@ -12,12 +12,13 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, provenance, runs, versions
-from algotrade.services.read.evaluation.positions import exit_rule, state
+from algotrade.services.read.evaluation.positions import example, exit_rule, state
 from algotrade.services.read.evaluation.verdict import model as verdict_model
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.types.evaluation.compare import EdgeCompare
 from algotrade_api.graphql.types.evaluation.exit_rule import ExitRule
+from algotrade_api.graphql.types.evaluation.positions.example import ExamplePosition
 from algotrade_api.graphql.types.evaluation.verdict import (
     EdgeDefinition,
     EdgeSettings,
@@ -402,3 +403,15 @@ class Edge:
         read = await info.context.aread(None)
         found = await off_loop(state.load_setup_state, read, self.edge)
         return SetupState.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The example position of each of `instrumentIds` under this share setup at "
+        "the served session (its side from what the setup stored that night, else long); null: "
+        "no session is served"
+    )
+    async def example_positions(
+        self, info: Info, instrument_ids: list[str]
+    ) -> list[ExamplePosition] | None:
+        read = await info.context.aread(None)
+        found = await off_loop(example.load_setup_examples, read, self.edge, instrument_ids)
+        return [ExamplePosition.of(p) for p in found] if found is not None else None

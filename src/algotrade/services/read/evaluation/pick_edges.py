@@ -22,7 +22,7 @@ the same table's answer for a whole edge at the served session (the stored statu
 by the setup state (``positions/state.py``, ADR 0088 decision 16)."""
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
@@ -107,10 +107,12 @@ class EdgeNight:
     """What a site edge stored at the served session: the stored ``status`` (``picked``,
     ``gate_closed``, ``not_decision_day``, ``unjudged`` or ``skipped``) and its ``reason``. The
     setup gate is decided once per edge and night, so every screener row says the same; a
-    ``gate_closed`` row wins over any other."""
+    ``gate_closed`` row wins over any other. ``sides``: each picked name's side over the rows
+    (``long`` for a row stored before sides)."""
 
     status: str
     reason: str
+    sides: Mapping[str, str] = field(default_factory=dict)  # every screener row's pick -> side
 
 
 def load_edge_night(ctx: ReadContext, edge_id: str) -> EdgeNight | None:
@@ -121,10 +123,17 @@ def load_edge_night(ctx: ReadContext, edge_id: str) -> EdgeNight | None:
     rows = found[(found["user_id"] == SITE_USER) & (found["edge_id"] == edge_id)]
     if rows.empty:
         return None
-    nights = [
-        EdgeNight(str(r.status), _reason(getattr(r, "reason", None))) for r in rows.itertuples()
-    ]
-    return next((n for n in nights if n.status == GATE_CLOSED), nights[0])
+    nights: list[EdgeNight] = []
+    sides: dict[str, str] = {}
+    for r in rows.itertuples():
+        nights.append(EdgeNight(str(r.status), _reason(getattr(r, "reason", None))))
+        picks = _ids(getattr(r, "pick_ids", None))
+        stored = _ids(getattr(r, "pick_sides", None))
+        sides.update(
+            zip(picks, stored if len(stored) == len(picks) else [LONG] * len(picks), strict=True)
+        )
+    night = next((n for n in nights if n.status == GATE_CLOSED), nights[0])
+    return EdgeNight(night.status, night.reason, sides)
 
 
 def _reason(why: Any) -> str:
