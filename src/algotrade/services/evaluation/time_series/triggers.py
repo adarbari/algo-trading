@@ -135,8 +135,9 @@ def trigger_decides(
     were counted depends on where the chain starts (``trigger_periods`` starts it at its range's
     first session), so it is walked back to the last reset: ``horizon`` sessions in a row with no
     trigger, after which the next trigger is counted whatever came before. Reads only sessions up
-    to D; a session before D whose row is not stored is no trigger, at D it is an error, as
-    ``trigger_periods`` says, and no reset within ``RESET_CAP`` sessions is an error too."""
+    to D. A session whose row is not stored, at D or on the way back to the reset, is an error
+    (fail closed: a gap could hide a trigger and pass for a reset), and so is no reset within
+    ``RESET_CAP`` sessions."""
     got = reading(reader, trigger, day, as_of)
     if got is None:
         raise ConfigurationError(
@@ -150,7 +151,11 @@ def trigger_decides(
     quiet, start = 0, None
     for earlier in reversed(before):
         seen = reading(reader, trigger, earlier, as_of)
-        fired[earlier] = seen is not None and seen[0]
+        if seen is None:
+            raise ConfigurationError(
+                f"market trigger {trigger}: no stored market row for {earlier}, before {day}"
+            )
+        fired[earlier] = seen[0]
         quiet = 0 if fired[earlier] else quiet + 1
         if quiet >= horizon:
             start = earlier
