@@ -163,6 +163,16 @@ def position_of(outcome: Any) -> tuple[str, ...] | None:
     return None
 
 
+def holds_options(outcome: Any, configs: Documents) -> bool:
+    """Whether an outcome's position has an option leg (an older option kind: its ``structure``);
+    the one test of a share setup against an option setup."""
+    named = position_of(outcome)
+    if named is None:
+        return getattr(outcome, "structure", None) is not None
+    templates = load_templates(configs)
+    return any(t in templates and templates[t].has_option for t in named)
+
+
 def baseline_template(entry: str) -> str:
     """The template id of a ``position:<id>`` baselines entry."""
     return validate_id("position", entry.removeprefix(POSITION_PREFIX))

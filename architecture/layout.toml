@@ -586,7 +586,7 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/evaluation/positions"
-purpose = "the position a setup publishes for a pick (ADR 0083, 0088), split from evaluation (at its module cap): the historical exit rule (exit_rule.py: the percentile stop of the basis's winners, the ATR fallback, a declared stop as it is, the hold)"
+purpose = "the position a setup publishes for a pick (ADR 0083, 0088), split from evaluation (at its module cap): the historical exit rule (exit_rule.py: the percentile stop of the basis's winners, the ATR fallback, a declared stop as it is, the hold) and the setup state (state.py: ON / OFF / PAUSED / UNKNOWN from the stored headline and the night's gate row; outside verdict/ so the verdict fingerprint is unchanged)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

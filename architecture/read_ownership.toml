@@ -77,6 +77,7 @@ owner = [
     "src/algotrade/services/read/evaluation/verdict/model.py",
     "src/algotrade/services/read/evaluation/verdict/fingerprint.py",  # the digest of everything the judge reads (the judge call, settings, source, JUDGE_VERSION): the guard of a stored headline
     "src/algotrade/services/read/evaluation/verdict/stored.py",  # the stored headline read only on a fingerprint match, else the live judge (own edges and copies always live)
+    "src/algotrade/services/read/evaluation/positions/state.py",  # the setup state (ADR 0088 decision 16): ON / OFF / PAUSED / UNKNOWN on read from the stored headline and the night's gate row, never stored
     "src/algotrade/services/read/evaluation/versions.py",  # the same rule over a user's own edge's latest run (in-sample only while its out-of-sample is hidden)
     "src/algotrade/config/edges/verdict.py",
     "src/algotrade/config/edges/positions/quotes.py",  # [option_quotes]: typed apart, sets outcome rows, never a judge input

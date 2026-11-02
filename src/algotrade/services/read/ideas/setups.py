@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from algotrade.config.edges.positions.templates import load_templates, position_of
+from algotrade.config.edges.positions.templates import holds_options
 from algotrade.config.user import SITE_USER
 from algotrade.services.ideas.setup_rule import LEVEL_ORDER, SetupStanding
 from algotrade.services.read.context import ReadContext, once_per_request
@@ -73,12 +73,7 @@ class SessionSetups:
 
 def tab_of(ctx: ReadContext, outcome: object) -> str:
     """The tab of a setup with this ``outcome``: Premium when its position has an option leg."""
-    named = position_of(outcome)
-    if named is None:
-        return PREMIUM if getattr(outcome, "structure", None) is not None else STOCKS
-    templates = load_templates(ctx.configs)
-    option = any(t in templates and templates[t].has_option for t in named)
-    return PREMIUM if option else STOCKS
+    return PREMIUM if holds_options(outcome, ctx.configs) else STOCKS
 
 
 def in_tab(ctx: ReadContext, tab: str) -> Callable[[str], bool]:

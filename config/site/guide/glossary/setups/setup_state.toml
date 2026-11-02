@@ -1,0 +1,65 @@
+# L3 site setting: the Guide glossary, a setup's state at the session and how a setup differs from a screener
+# (ADR 0088 decision 16, design 2.3; ADR 0051). One [[term]] each: id, term, short (one sentence), body, next,
+# see_also. Typed by src/algotrade/config/site/guide/glossary.py; fitness tests:
+# tests/unit/config/site/guide/test_glossary.py. The four values of the state chip
+# (services/read/evaluation/positions/state.py, `SetupStateCode`).
+
+[[term]]
+id = "setup_state"
+term = "Setup state"
+short = "Whether a setup is on, off, paused or unknown at the session, from its stored verdict and its gate."
+body = """
+Every setup shows one state for the session the page serves. It reads two stored facts. The first is the setup's verdict on its tested history. The second is what its gate said that night. Works or promising with an open gate is on. Any other judged verdict is off. A good verdict with a closed gate is paused. A missing fact is unknown, never a guess. The state is computed when the page asks; it is not stored and never uses an older night. Don't read it as a forecast: it says whether the setup's own rule would trade tonight.
+"""
+next = "Open the setup's evidence to see the verdict the state rests on."
+see_also = ["setup_state_on", "setup_state_off", "setup_state_paused", "setup_state_unknown", "verdict"]
+
+[[term]]
+id = "setup_state_on"
+term = "On (setup state)"
+short = "The setup's verdict is works or promising and its gate is open, or it has no gate."
+body = """
+On is shown when the setup's stored verdict for the session is works or promising and nothing holds it back. A gated setup is on when its gate was open that night. On a session that is not one of its decision days the gate is not asked, and the state follows the verdict. On does not mean the setup picked a name tonight: a decision day can still pick nothing. Its picks appear on Ideas.
+"""
+next = "Open Ideas to see what the setup picked at the session."
+see_also = ["setup_state", "setup_state_paused", "verdict_works"]
+
+[[term]]
+id = "setup_state_off"
+term = "Off (setup state)"
+short = "The setup's stored verdict is not working, not enough data or a diagnostic, so it publishes no picks."
+body = """
+Off is shown whenever the setup's verdict was judged and is neither works nor promising. Not working means its picks did no better than the other names. Not enough data means too few trades to tell. A diagnostic is a long-short spread, which no verdict rests on. An off setup adds nothing to Ideas, whatever its gate says. A setup can turn on again after a new evaluation run.
+"""
+next = "Read the verdict's reason to see which test the setup did not pass."
+see_also = ["setup_state", "verdict", "verdict_basis"]
+
+[[term]]
+id = "setup_state_paused"
+term = "Paused (setup state)"
+short = "The setup's verdict is good but its gate is closed tonight, so it stands aside and picks nothing."
+body = """
+A gate is a rule over the market, such as "the VIX curve is in contango". A paused setup has a good verdict, but its gate failed at the session. The reason names the rule that did not pass, never a value. Example: an option-selling setup pauses while the VIX curve is inverted, because its tested trades lost most then. Paused is not a loss of trust: the verdict is unchanged.
+"""
+next = "The setup trades again on the first decision day its gate is open."
+see_also = ["setup_state", "setup_state_on", "screener_vs_setup"]
+
+[[term]]
+id = "setup_state_unknown"
+term = "Unknown (setup state)"
+short = "A fact the state needs is not stored for the session, so the page says so instead of guessing."
+body = """
+Unknown is shown when the setup has no usable stored verdict for the session, or its gate's answer was not stored that night. The nightly step may have skipped it for missing data, or not run yet. Your own setups are always unknown here, because only site setups store nightly picks. Unknown never means off: it means the page cannot tell.
+"""
+next = "Check again after the nightly run completes; an admin sees the cause on the page."
+see_also = ["setup_state", "not_run"]
+
+[[term]]
+id = "screener_vs_setup"
+term = "Screener and setup"
+short = "A screener filters names by rules on one night; a setup adds a tested trade around a screener and a verdict."
+body = """
+A screener is a list of rules over stored fields. It says which names pass at a session and nothing about what happened after. A setup is a written idea with a position, an entry, an exit and a holding period. It names one or more screeners as the way it finds names, and adds a gate over the market. The setup is what gets tested over past sessions and receives a verdict. A screener's hits are candidates; only a setup's picks reach Ideas. Don't treat a screener hit as an idea: it has no tested exit and no verdict.
+"""
+next = "Open the setup page to see which screener it rests on and its verdict."
+see_also = ["screener", "edge", "setup_state", "setup_template"]
