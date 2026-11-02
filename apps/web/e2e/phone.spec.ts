@@ -15,6 +15,7 @@ import { mockAdminApi } from './admin-api';
 import { mockViewer } from './auth-api';
 import FORMULAS from './fixtures/accepted-formulas.json' with { type: 'json' };
 import REQUESTS from './fixtures/feature-requests.json' with { type: 'json' };
+import { mockEdgesApi } from './edges-api';
 import { mockBuilderApi, mockDescribeApi } from './builder-api';
 import { mockApi } from './mock-api';
 
@@ -872,4 +873,21 @@ test('Explore: Roll a put, Calls on shares and Buying power fit a phone', async 
     innerWidth: window.innerWidth,
   }));
   expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+});
+
+test("An option setup's page stacks its position, history and years inside the screen", async ({
+  page,
+}) => {
+  const mock = await mockEdgesApi(page);
+  mock.optionEdges.push('momentum_12_1');
+  await page.goto('/edges?edge=momentum_12_1');
+  await page.locator('#setup-rules').scrollIntoViewIfNeeded();
+  await expect(page.getByRole('heading', { level: 3, name: 'The position' })).toBeVisible();
+  await page.locator('#setup-record').scrollIntoViewIfNeeded();
+  await expect(page.getByText('72 of 100 trades')).toBeVisible();
+  await expect(page.getByText('2024')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await expectAccessible(page);
 });

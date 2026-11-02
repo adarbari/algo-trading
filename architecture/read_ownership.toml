@@ -227,6 +227,19 @@ section = "docs/api/read-model.md#graphql-conventions"
 detect = [{ call = "load_option_grid" }]
 
 [[responsibility]]
+id = "option-setup-read"
+description = "The option setup page's read object (services/read/evaluation/positions/option_setup.py, ADR 0088, plan O1): the setup's declared option position as structured rules (template legs with their strike rule, tenor, expiry cycle, collateral, declared exits, skip-report flag; none, NOT_APPLICABLE, for a share setup) and, beside it, its evidence on the cash set aside (option_evidence.py) read only from the canonical run's stored ledger of the verdict basis, bounded to the served session: the typical trade (median return on capital, its quartiles), the bad trade (the mean of the worst 5% of trades and how many), the trades that kept the premium (return on capital above zero at the document's cost), the stored cost levels reused as they are, each year's typical trade and kept count, and the worst trade open in each reference stress episode; fail closed, one UNKNOWN with its reason for the whole section, never a zero or a subset; it makes no verdict"
+owner = [
+    "src/algotrade/services/read/evaluation/positions/option_setup.py",
+    "src/algotrade/services/read/evaluation/positions/option_evidence.py",
+]
+allowed = [
+    "apps/api/algotrade_api/graphql/*",  # Query.edgeOptionSetup serves it: one loader call
+]
+section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
+detect = [{ call = "load_option_setup" }, { call = "load_option_evidence" }]
+
+[[responsibility]]
 id = "pick-positions"
 description = "The position a setup publishes for a pick (services/read/evaluation/positions/, ADR 0083 decision 3, ADR 0088): its historical exit rule, the 80th percentile of the max_drawdown of the verdict basis's winning long trades in the canonical run (read through runs.load_run_trades only, canonical run ending by the session, trades that exited by it), the 2 x ATR(14) fallback below [exit_rule] min_winners, a setup's declared stop published as it is, the hold the verdict's basis_horizon; an option setup's (ADR 0088 decision 19) declared [outcome.exit] published as declared (stop_loss a multiple of the credit, take_profit, exit_dte, the exit condition's fields; a case-valued exit only as resolved for the pick), only without a declared stop the percentile of the winners' max_adverse (a share of collateral) under the same bounds, UNKNOWN below min_winners (no ATR fallback), the hold the earlier of the basis horizon and the given expiry; UNKNOWN with its reason, never filled; the example position joins in E9; and the example position of each share pick on read (positions/example.py: the served session's price_stats.close as the reference, the stop price from that exit rule, the exit session counted in exchange sessions from the entry; a short pick borrow assumed with no stop, a book name with no weight, size or stop, exiting at its next rebalance; a setup with an entry condition has no entry or exit from the session; a missing part UNKNOWN with its reason); and the example position of an option pick on read (positions/option_example.py: the legs wing_search.select_legs chooses on the served session's stored chain, the expiry no earlier than the hold's end, the net credit and collateral per share, the exit rule given the selected expiry as dollar marks, the exit session the earlier of expiry and the hold cap; no chain, price or legs, or case values not applied by a run, UNKNOWN with the reason)"
 owner = [

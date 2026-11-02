@@ -153,7 +153,7 @@ def _fallback(
     return Stop(StopKind.FALLBACK, atr=float(cell.value), multiple=multiple, winners=winners), None
 
 
-def _ledger(
+def basis_trades(
     ctx: ReadContext, edge: Edge, run: runs.EdgeRun, summary: EdgeSummary
 ) -> tuple[list[runs.TradeRow], Unknown | None]:
     """The basis's trades in the canonical run that exited by the session, or why they cannot be
@@ -175,7 +175,7 @@ def _from_history(
     """The percentile stop of the basis's winners, else the ATR fallback (the rules of the module
     docstring: a ledger the viewer's licences do not cover, or that is long-only, is UNKNOWN)."""
     horizon = summary.basis_horizon or 0
-    known, unknown = _ledger(ctx, edge, run, summary)
+    known, unknown = basis_trades(ctx, edge, run, summary)
     if unknown is None and any(t.side != "long" for t in known):
         why = "the exit rule is published for long picks only"
         unknown = _unknown(edge, UnknownCode.NOT_APPLICABLE, why)
@@ -254,7 +254,7 @@ def _percentile(
     """The percentile stop of the basis's winners' ``max_adverse`` (a share of collateral), the
     reason there is none, and the winners read. A winner's loss the viewer may not read, or one
     not stored, makes it UNKNOWN: never a percentile over a subset."""
-    known, unknown = _ledger(ctx, edge, run, summary)
+    known, unknown = basis_trades(ctx, edge, run, summary)
     winners = [t.max_adverse for t in known if t.hit is True]
     losses = [float(c.value) for c in winners if c.value is not None]
     hidden = next((c.unknown for c in winners if c.unknown is not None), None)

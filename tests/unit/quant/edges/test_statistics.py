@@ -315,3 +315,15 @@ def test_welch_t_hand_computed_and_undefined_cases() -> None:
     assert es.welch_t([1.0, 1.0], [2.0, 2.0]) == (pytest.approx(-1.0), None)
     assert es.welch_t([], [1.0]) == (None, None)
     assert es.welch_t([1.0, 2.0, float("nan")], [0.0, 1.0])[0] == pytest.approx(1.0)
+
+
+def test_quartiles_by_hand_and_undefined_without_values() -> None:
+    # sorted 1..5: p25 at index 1, the median at 2, p75 at index 3; the nan is no value
+    assert es.quartiles([5, 1, float("nan"), 3, 2, 4]) == (2.0, 3.0, 4.0, 5)
+    assert es.quartiles([1, 2, 3, 4]) == (1.75, 2.5, 3.25, 4)  # linear between order statistics
+    assert es.quartiles([]) == (None, None, None, 0)
+
+
+def test_count_above_is_strict_and_ignores_missing_values() -> None:
+    assert es.count_above([0.1, 0.0, -0.1, float("nan"), 0.2]) == (2, 4)  # a tie at 0 is not above
+    assert es.count_above([]) == (0, 0)

@@ -2850,6 +2850,27 @@ type OptionCount {
   count: Int!
 }
 
+"""
+What the setup's own history says on the cash it sets aside, from its stored trades at the verdict's basis (`basisScreener`, `basisHorizon`) as the session knew them; returns are fractions of the collateral at the document's cost. `typical` the median trade with its quartiles `typicalLo` / `typicalHi`; `badMean` the mean of the worst `badTrades` of `trades` (the worst 5%); `kept`: trades of `trades` that returned above zero; `costs` the stored cost levels (middle price, worse side, full spread: `level`, `meanRoc`); `byYear` and `stress` (the worst trade open in each reference episode; `stressUnknown` says why it is empty). `unknown`: why there is no section at all (every figure null); `inSampleOnly`: only in-sample trades are read. No verdict is made here
+"""
+type OptionEvidence {
+  unknown: Unknown
+  basisScreener: String
+  basisHorizon: Int
+  trades: Int!
+  typical: Float
+  typicalLo: Float
+  typicalHi: Float
+  badMean: Float
+  badTrades: Int!
+  kept: Int!
+  costs: EdgeCosts
+  byYear: [OptionYear!]!
+  stress: [OptionStressWindow!]!
+  stressUnknown: Unknown
+  inSampleOnly: Boolean!
+}
+
 """A listed expiry and its calendar days from the session"""
 type OptionExpiry {
   date: Date!
@@ -2875,6 +2896,19 @@ union OptionGridCell = GridCell | Unknown
 
 """The grid, or why there is none"""
 union OptionGridResult = OptionGrid | Unknown
+
+"""
+One leg of the setup's position: `kind` (shares | option), `qty` signed (negative: sold); for an option its `right` (P | C), `strike` rule (delta | atm | otm_pct) with its `delta` or `otmPct` (a fraction) and its own `tenorDays` (null: the setup's)
+"""
+type OptionLegRule {
+  kind: String!
+  qty: Int!
+  right: String
+  strike: String
+  delta: Float
+  otmPct: Float
+  tenorDays: Int
+}
 
 """
 One leg of the example position: `qty` signed (negative: sold), `mid` and our `delta` per share, `pItm` the quoted chance it finishes in the money (not backtested)
@@ -2908,6 +2942,58 @@ type OptionQuote {
   theta: Float
   vega: Float
   rho: Float
+}
+
+"""
+The option position the setup's document declares: its `template` and `legs`, the `collateral` rule (cash_secured | max_loss | regt), `schedule` (when it decides), `startOffsetSessions` (entry that many sessions after the decision), `tenorDays` sought, `expiryCycle`, `skipReportInLife`, the declared exits (`takeProfit` a share of the credit, `stopLoss` a multiple of it, `exitDte` calendar days to expiry, `exitConditionFields` the catalogue fields of its exit condition; null: not declared), the parameters chosen by case for each pick (`caseValued`, never given a value here)
+"""
+type OptionRules {
+  template: String!
+  legs: [OptionLegRule!]!
+  collateral: String!
+  schedule: String!
+  startOffsetSessions: Int!
+  tenorDays: Int
+  expiryCycle: String!
+  skipReportInLife: Boolean!
+  takeProfit: Float
+  stopLoss: Float
+  exitDte: Int
+  exitConditionFields: [String!]!
+  caseValued: [String!]!
+}
+
+"""
+The option setup page of an edge (ADR 0088): `positionKind` (shares | options); for an option setup its declared `rules` and its `evidence`; a share setup has neither (`rulesUnknown` says so, `evidence` is null)
+"""
+type OptionSetup {
+  edgeId: String!
+  positionKind: String!
+  rules: OptionRules
+  rulesUnknown: Unknown
+  evidence: OptionEvidence
+}
+
+"""
+One reference stress episode the session knows, from its `start` (the peak) to its `end` (the trough): how many of the setup's `trades` were open in it and the `worst` return on the cash set aside among them (null with 0 trades: none was open)
+"""
+type OptionStressWindow {
+  key: String!
+  name: String!
+  start: Date!
+  end: Date!
+  trades: Int!
+  worst: Float
+}
+
+"""
+One year of decision sessions of the setup's own history: its `trades`, the `typical` return on the cash set aside (the median, a fraction) and how many trades `kept` the premium
+"""
+type OptionYear {
+  year: Int!
+  trades: Int!
+  typical: Float
+  kept: Int!
 }
 
 """
@@ -3101,6 +3187,18 @@ type Query {
     """
     date: Date = null
   ): IdeaDetail
+
+  """
+  The option setup page of the edge `id` for the session: its declared option position as rules and its evidence on the cash set aside, from the canonical run's stored trades as the session knew them (ADR 0088). A share setup has `positionKind` shares and no sections. Null: no such edge for the viewer (or its evidence is under a licence they lack), or nothing stored
+  """
+  edgeOptionSetup(
+    id: String!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): OptionSetup
 
   """
   The people the site declares (id, name, role, held data licences; never an email), in declaration order, for the Admin Users page

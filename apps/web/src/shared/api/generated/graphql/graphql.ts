@@ -377,6 +377,13 @@ export type EdgeTradesQueryVariables = Exact<{
 
 export type EdgeTradesQuery = { edgeTrades: { period: TradePeriod, page: number, pageSize: number, total: number, basis: string | null, licence: string | null, oosHidden: boolean, symbolsSnapshot: string | null, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ variant: string, horizonSessions: number, decisionSession: string, entrySession: string | null, exitSession: string | null, instrumentId: string, symbolAsOf: string | null, rank: number | null, status: string, excludedReason: string | null, hit: boolean | null, delisted: boolean, beforeSplit: boolean, source: string, maxDrawdown: number | null, symbol: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, company: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, score: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, value: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, grossValue: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, advUsd: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, reference: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, touch: { value: boolean | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }> } | null };
 
+export type OptionSetupQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type OptionSetupQuery = { edgeOptionSetup: { edgeId: string, positionKind: string, rulesUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rules: { template: string, collateral: string, schedule: string, startOffsetSessions: number, tenorDays: number | null, expiryCycle: string, skipReportInLife: boolean, takeProfit: number | null, stopLoss: number | null, exitDte: number | null, exitConditionFields: Array<string>, caseValued: Array<string>, legs: Array<{ kind: string, qty: number, right: string | null, strike: string | null, delta: number | null, otmPct: number | null, tenorDays: number | null }> } | null, evidence: { basisScreener: string | null, trades: number, typical: number | null, typicalLo: number | null, typicalHi: number | null, badMean: number | null, badTrades: number, kept: number, inSampleOnly: boolean, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, costs: { state: string, assumedBp: number, levels: Array<{ period: string, bp: number, assumed: boolean, level: string | null, meanRoc: number | null, winRate: number | null }> } | null, byYear: Array<{ year: number, trades: number, typical: number | null, kept: number }>, stress: Array<{ key: string, name: string, start: string, end: string, trades: number, worst: number | null }>, stressUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null } | null };
+
 export type ScreenerEdgesQueryVariables = Exact<{
   id: string;
 }>;
@@ -1834,6 +1841,92 @@ export const EdgeTradesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgeTradesQuery, EdgeTradesQueryVariables>;
+export const OptionSetupDocument = new TypedDocumentString(`
+    query OptionSetup($id: String!) {
+  edgeOptionSetup(id: $id) {
+    edgeId
+    positionKind
+    rulesUnknown {
+      code
+      kind
+      guideTerm
+      kindText
+    }
+    rules {
+      template
+      collateral
+      schedule
+      startOffsetSessions
+      tenorDays
+      expiryCycle
+      skipReportInLife
+      takeProfit
+      stopLoss
+      exitDte
+      exitConditionFields
+      caseValued
+      legs {
+        kind
+        qty
+        right
+        strike
+        delta
+        otmPct
+        tenorDays
+      }
+    }
+    evidence {
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+      basisScreener
+      trades
+      typical
+      typicalLo
+      typicalHi
+      badMean
+      badTrades
+      kept
+      inSampleOnly
+      costs {
+        state
+        assumedBp
+        levels {
+          period
+          bp
+          assumed
+          level
+          meanRoc
+          winRate
+        }
+      }
+      byYear {
+        year
+        trades
+        typical
+        kept
+      }
+      stress {
+        key
+        name
+        start
+        end
+        trades
+        worst
+      }
+      stressUnknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<OptionSetupQuery, OptionSetupQueryVariables>;
 export const ScreenerEdgesDocument = new TypedDocumentString(`
     query ScreenerEdges($id: String!) {
   edges {

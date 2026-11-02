@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 13:59 UTC",
+ "generated": "2026-11-02 15:34 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -452,6 +452,7 @@
     "EdgeVariantGrid",
     "EdgesPage",
     "GuideHelpField",
+    "OptionSetup",
     "TableView"
    ],
    "uncertain": [
@@ -490,6 +491,7 @@
     "EdgeVariantGrid",
     "EdgesPage",
     "GuideHelpField",
+    "OptionSetup",
     "TableView"
    ],
    "uncertain": [
@@ -1843,6 +1845,48 @@
    ],
    "source": "static"
   },
+  "/test/describe/:id": {
+   "route": "/test/describe/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
+   },
+   "ops": [
+    "GuideHelpField",
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "interaction": [
+    "FeatureDistribution",
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/describe/:id > expand:Distribution": {
+   "route": "/test/describe/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Distribution"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/describe/:id"
+  },
   "/test/expert": {
    "route": "/test/expert",
    "search": {},
@@ -2059,48 +2103,6 @@
    "interaction": [],
    "source": "static",
    "parent": "/test/setup/:id"
-  },
-  "/test/describe/:id": {
-   "route": "/test/describe/:id",
-   "search": {},
-   "clicks": [],
-   "params": {
-    "id": "link"
-   },
-   "ops": [
-    "GuideHelpField",
-    "ScreenDetail",
-    "ScreenVersions"
-   ],
-   "uncertain": [
-    "GuideHelpField",
-    "ScreenDetail",
-    "ScreenVersions"
-   ],
-   "interaction": [
-    "FeatureDistribution",
-    "GuideEntries"
-   ],
-   "source": "static"
-  },
-  "/test/describe/:id > expand:Distribution": {
-   "route": "/test/describe/:id",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Distribution"
-    }
-   ],
-   "params": {
-    "id": "link"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/test/describe/:id"
   }
  }
 }

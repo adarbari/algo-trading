@@ -13,6 +13,8 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
     random_pick_sums     per draw, the sum of values and of hits over ``k`` names drawn
                          uniformly without replacement (the random-pick backtests)
     percentile_of        the share of a sample a value beats (ties half)
+    quartiles            (p25, median, p75, n) of a setup's trade returns (the typical trade)
+    count_above          how many values are strictly above a floor (trades that kept the premium)
     welch_t              mean of one sample minus another's and its Welch t-ratio (unequal
                          variances), the in-window against out-of-window comparison of a
                          time-series edge (ADR 0073)
@@ -193,6 +195,22 @@ def spread_summary(x: ArrayLike) -> tuple[float | None, float | None, float | No
     if sd <= 0.0:
         return mean, sd, None, n
     return mean, sd, mean / (sd / math.sqrt(n)), n
+
+
+def quartiles(x: ArrayLike) -> tuple[float | None, float | None, float | None, int]:
+    """``(p25, median, p75, n)`` of the finite values (linear interpolation between order
+    statistics, numpy's default); the three None with no value."""
+    v = _finite(x)
+    if v.size == 0:
+        return None, None, None, 0
+    lo, mid, hi = np.percentile(v, [25.0, 50.0, 75.0])
+    return float(lo), float(mid), float(hi), int(v.size)
+
+
+def count_above(x: ArrayLike, floor: float = 0.0) -> tuple[int, int]:
+    """``(values strictly above floor, finite values)``: a tie at the floor is not above it."""
+    v = _finite(x)
+    return int((v > floor).sum()), int(v.size)
 
 
 def welch_t(a: ArrayLike, b: ArrayLike) -> tuple[float | None, float | None]:
