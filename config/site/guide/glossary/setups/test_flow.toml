@@ -1,0 +1,49 @@
+# L3 site setting: the Guide glossary, the Test flow (ADR 0083 decision 4, ADR 0051). One [[term]]
+# each: id, term, short (one sentence), body, next, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+# The three steps (Start, Build, Result) and the four ways in of apps/web/src/pages/test.
+
+[[term]]
+id = "test_flow"
+term = "The Test flow"
+short = "Three steps to test an idea on past data: choose a way in, build the rules, read the result."
+body = """
+Start offers four ways in. Build is where the rules of your screener are set. Result shows what the screener picked on the latest session and the setups that use it. Nothing here places an order or sends an alert. Every figure is backtested (hypothetical): it says what the rules would have picked on past sessions, not what a pick will do. The steps at the top of the page show where you are and take you back to an earlier one.
+"""
+see_also = ["test_guided", "test_expert", "test_describe", "test_yours", "criterion"]
+
+[[term]]
+id = "test_guided"
+term = "Guided"
+short = "Start from a template: a site screener you open, change and keep as your own copy."
+body = """
+A template is a screener the site publishes. Pick one and it opens with its rules and a live preview of the names it would pick. Change any rule and a copy becomes yours, pinned to the version you started from. The template itself changes only by a site update. Example: opening a volatility template and tightening its threshold gives you a draft of your own, with the original untouched. A template built for another market mood can look good for a reason that has gone, so read its rules before you trust its picks.
+"""
+see_also = ["test_flow", "preset", "draft"]
+
+[[term]]
+id = "test_expert"
+term = "Expert"
+short = "Write the rules yourself: name a draft, then add each criterion from the field catalogue."
+body = """
+Expert starts from a blank draft with the base gates only. You add criteria one field at a time, set a threshold and a mode for each, and watch the preview change. It suits someone who knows which fields they want. Each field has its own Guide entry saying how to read it and when it misleads. A draft is saved under the name you give it, in 1 to 64 characters of a to z, 0 to 9, underscore and hyphen.
+"""
+see_also = ["test_flow", "criterion", "mode", "draft"]
+
+[[term]]
+id = "test_describe"
+term = "Describe it as a way in"
+short = "Say the idea in a sentence; the app drafts rules you review before anything is saved."
+body = """
+You type what you want to find, in your own words. The app turns the sentence into draft criteria and shows which words it understood as stored fields. It never saves or runs anything for you: you review the draft, change it and finalise it yourself. A word it cannot match to a stored field is left out with a reason, not guessed. Read the draft against your sentence before you accept it.
+"""
+see_also = ["test_flow", "test_expert", "draft"]
+
+[[term]]
+id = "test_yours"
+term = "Yours and the site's"
+short = "The screeners you already have, drafts included, and the site's templates, in one list."
+body = """
+Open a screener from the list to read its result, or choose Edit to change its rules. A draft that was never finalised is listed too, marked as a draft. A site template shows its run on the latest session and the setups that use it. Counts are for the latest session with a finished nightly run, so a screener with no run for it says so instead of showing an older day.
+"""
+see_also = ["test_flow", "draft", "not_run"]

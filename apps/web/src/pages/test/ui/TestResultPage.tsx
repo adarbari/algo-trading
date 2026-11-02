@@ -1,0 +1,146 @@
+/**
+ * Test > Result (`/test/result/$id`): the latest run as a review
+ * table with the row under review beside it (its decision, criteria and price chart), and
+ * "Edit criteria" for Expert and "Test it as a setup" for the setup builder. Reviewing comes first, editing is one click away. The
+ * review is keyboard-first: j / k move, c adds the ticker to the compare set, x hides it for
+ * now, Enter opens it in Explore. "Edit criteria" goes straight to the Builder page. Under the
+ * header an edge line says which edge this screener implements and its record, so a pick's
+ * evidence is on the page it is reviewed on.
+ */
+import { Button, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
+import { useState } from 'react';
+
+import { ScreenerDescription, useMyScreeners, useScreenerRuns } from '@/entities/screen';
+import { ScreenerEdgeLine } from '@/widgets/screener-edge-line';
+import { ScreenerRunLine } from '@/widgets/screener-run-line';
+import { ScreenerResults } from '@/widgets/feature-table';
+import { PickDetail } from '@/widgets/pick-detail';
+import { PriceChartPanel } from '@/widgets/price-chart-panel';
+
+import { TestSteps } from './TestSteps';
+
+export interface TestResultPageProps {
+  /** The screener shown. */
+  id: string;
+  /** The filter bar's `f` search param and its writer (the route's). */
+  f: string | undefined;
+  onFilterChange: (f: string | undefined) => void;
+  /** Open the rules of this screener (Expert). */
+  onEdit: () => void;
+  /** Test the screener as a setup (the setup builder). */
+  onBuildSetup: () => void;
+  /** Open a ticker in Explore. */
+  onOpenTicker: (symbol: string) => void;
+  /** Open the tickers added to the compare set in Explore. */
+  onCompare: (symbols: readonly string[]) => void;
+  /** Open an edge's page (its evidence). */
+  onOpenEdge: (edgeId: string) => void;
+}
+
+export function TestResultPage({
+  id,
+  f,
+  onFilterChange,
+  onEdit,
+  onBuildSetup,
+  onOpenTicker,
+  onCompare,
+  onOpenEdge,
+}: TestResultPageProps) {
+  const description = useScreenerRuns().data?.byId.get(id)?.description ?? null;
+  const own = (useMyScreeners().data ?? []).some((s) => s.screenerId === id);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [compared, setCompared] = useState<readonly string[]>([]);
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
+  const [range, setRange] = useState<ChartRange>('1Y');
+  const toggle = (symbol: string) => {
+    setCompared((now) =>
+      now.includes(symbol) ? now.filter((s) => s !== symbol) : [...now, symbol],
+    );
+  };
+  const hide = (instrumentId: string) => {
+    setDismissed((now) => new Set(now).add(instrumentId));
+  };
+  return (
+    <Stack gap={3}>
+      <TestSteps at="result" id={id} />
+      <Stack direction="row" gap={3} align="center" justify="between" wrap>
+        <Stack gap={1}>
+          <Heading level={1}>{id}</Heading>
+          {description ? (
+            <ScreenerDescription description={description} />
+          ) : own ? (
+            <Stack direction="row">
+              <Button size="sm" variant="ghost" onClick={onEdit}>
+                Add a description
+              </Button>
+            </Stack>
+          ) : null}
+          <Text size="sm" tone="secondary">
+            What this screener found in its latest run. Add any catalogue feature as a column; your
+            columns and filters are saved as your view of it.
+          </Text>
+        </Stack>
+        <Stack direction="row" gap={2} align="center">
+          {compared.length >= 2 ? (
+            <Button
+              onClick={() => {
+                onCompare(compared);
+              }}
+            >
+              {`Compare ${String(compared.length)} in Explore`}
+            </Button>
+          ) : null}
+          <Button variant="secondary" onClick={onEdit}>
+            Edit criteria
+          </Button>
+          <Button variant="primary" onClick={onBuildSetup}>
+            Test it as a setup
+          </Button>
+        </Stack>
+      </Stack>
+      <ScreenerEdgeLine screenerId={id} onOpenEdge={onOpenEdge} />
+      <ScreenerResults
+        id={id}
+        f={f}
+        onFilterChange={onFilterChange}
+        onOpen={onOpenTicker}
+        focusId={focusId}
+        onFocusChange={(row) => {
+          setFocusId(row ? row.instrumentId : null);
+        }}
+        onToggleCompare={(row) => {
+          toggle(row.symbol);
+        }}
+        onDismiss={(row) => {
+          hide(row.instrumentId);
+        }}
+        dismissed={dismissed}
+        compared={compared}
+        renderRunLine={(runs, gaps) => <ScreenerRunLine id={id} runs={runs} gaps={gaps} />}
+        onShowDismissed={() => {
+          setDismissed(new Set());
+        }}
+        renderDetail={({ row, criteria, inSheet }) => (
+          <Stack gap={3}>
+            <PickDetail
+              row={row}
+              screenerId={id}
+              criteria={criteria}
+              compared={compared.includes(row.symbol)}
+              showActions={!inSheet}
+              onOpen={onOpenTicker}
+              onToggleCompare={() => {
+                toggle(row.symbol);
+              }}
+              onDismiss={() => {
+                hide(row.instrumentId);
+              }}
+            />
+            <PriceChartPanel symbol={row.symbol} range={range} onRangeChange={setRange} />
+          </Stack>
+        )}
+      />
+    </Stack>
+  );
+}

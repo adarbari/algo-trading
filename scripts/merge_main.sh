@@ -78,7 +78,7 @@ regen_latency() {
 
 if git merge --no-edit origin/main; then
   # the driver merged the shared files without a conflict: the view list may still be stale
-  if ! git diff --quiet "$(git merge-base ORIG_HEAD origin/main)" origin/main -- benchmarks/api_latency_views.json; then
+  if ! git diff --quiet "$(git merge-base ORIG_HEAD origin/main)" origin/main -- benchmarks/api_latency_views.json docs/perf/view-coverage.md; then
     regen_latency
   else
     echo "merged cleanly: nothing to regenerate"

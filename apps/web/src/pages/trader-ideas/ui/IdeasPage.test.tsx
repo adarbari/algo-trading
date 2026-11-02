@@ -122,6 +122,7 @@ describe('IdeasPage', () => {
         onOpenScreener={onOpenScreener}
         onOpenRegime={onOpenRegime}
         onOpenEdge={onOpenEdge}
+        onOpenIdea={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();

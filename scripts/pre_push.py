@@ -14,7 +14,10 @@ Two lanes run side by side:
     raise reasons) and the DOM / request budgets, the two web CI failures seen most.
 A push that only merges main (every commit since the remote head is a clean merge) runs the
 python lane alone: a merge brings ADR-number, layout-cap and view-coverage collisions, not new
-web code. ESLint, `tsc`, vitest, the mirrored pytest, e2e and screenshots stay CI's; `make
+web code. One web check runs on every push, merges included, when the branch touches
+`src/` or `perf-budgets.json`: the budget for every lazy page (one vitest file, seconds), since
+the budgets merge driver keeps a budget main raised for a page the branch removed (2026-11-02,
+#1035). ESLint, `tsc`, vitest, the mirrored pytest, e2e and screenshots stay CI's; `make
 changed` remains the full local check for anyone who wants it.
 """
 
@@ -60,6 +63,19 @@ FAST_TESTS = (
     "tests/architecture/test_layout_web.py",
 )
 Step = tuple[str, list[str], dict[str, str]]
+# [1, 2026-11-02 #1035] a budget for a removed page, or a lazy page without one
+BUDGET_PAGES: Step = (
+    "budget for every lazy page",
+    [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/check-bundle-budgets.test.ts",
+        "-t",
+        "a budget for every lazy page",
+    ],
+    {},
+)
 
 
 def is_merge_only(remote: str | None, local: str, base: str = "origin/main") -> bool:
@@ -124,11 +140,23 @@ def _present(files: list[str], root: Path | None) -> list[str]:
     return [r for r in rels if root is None or (root / r).is_file()]
 
 
+def touches_budget_pages(files: list[str]) -> bool:
+    """The branch changes a page import or the budgets: `BUDGET_PAGES` can fail."""
+    return any(
+        f == f"{changed_web.WEB}perf-budgets.json" or f.startswith(f"{changed_web.WEB}src/")
+        for f in files
+    )
+
+
 def plan(files: list[str], merge_only: bool, root: Path | None = WEB) -> dict[str, list[Step]]:
-    """The lanes to run: `python` always, `web` unless the push only merges main."""
+    """The lanes to run: `python` always; `web` unless the push only merges main, which still
+    runs `BUDGET_PAGES` when the branch touches the pages or the budgets."""
     lanes = {"python": python_lane()}
-    if not merge_only:
-        lanes["web"] = web_lane(files, root)
+    web = [] if merge_only else web_lane(files, root)
+    if touches_budget_pages(files):
+        web.append(BUDGET_PAGES)
+    if web:
+        lanes["web"] = web
     return lanes
 
 

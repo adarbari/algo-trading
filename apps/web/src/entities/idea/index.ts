@@ -1,5 +1,6 @@
 /** Entity: ideas (one row per ticker with the screeners that picked it) and the screeners. */
 export { IDEAS_OPERATION, IDEAS_PAGE, prefetchIdeas, useIdeas } from './api/hooks';
+export { IDEA_DETAIL_OPERATION, prefetchIdeaDetail, useIdeaDetail } from './api/idea-detail';
 export { prefetchSetupIdeas, SETUP_IDEAS_OPERATION, useSetupIdeas } from './api/setup-ideas';
 export { IDEA_FACTS, IDEA_FEATURES } from './model/facts';
 export {
@@ -27,3 +28,4 @@ export {
   type IdeasSearchPatch,
 } from './model/search';
 export { type SetupGroup, type SetupIdea, type SetupIdeas } from './model/setup-ideas';
+export { type IdeaDetail, type IdeaSetupRef } from './model/idea-detail';
