@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.positions.cases import EntrySpec
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.verdict import OPTION_LEVELS, OptionCosts
 from algotrade.config.strategy.schema import Selection
@@ -40,6 +41,11 @@ from algotrade.services.evaluation.cross_section.picks import (
     SelectionReads,
     screen_variant,
 )
+from algotrade.services.evaluation.cross_section.reads.entry import (
+    Entered,
+    entered_rows,
+    read_entries,
+)
 from algotrade.services.evaluation.cross_section.reads.screens import CachedScreen, ScreenCache
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.regime import edge_gate, session_market
@@ -47,6 +53,7 @@ from algotrade.services.selection import fields_view
 
 if TYPE_CHECKING:
     from algotrade.services.evaluation.cross_section.baselines.variant import Variant
+    from algotrade.services.evaluation.cross_section.sessions import Leg
 
 UNKNOWN = "UNKNOWN"
 SECTOR_FIELD = "instrument.sector"  # the stratum of a pick's sector-matched random draws (ADR 0053)
@@ -81,13 +88,14 @@ class SessionReads:
         domains: Mapping[str, Sequence[str]] | None = None,
     ):
         self._reader, self._label_field = reader.recording(), label_field
-        self._domains = domains  # the catalogue's string domains, for a setup gate
+        self._domains = domains  # the catalogue's string domains, for a gate or entry rule
         self._screens, self._owner = screens, owner
         self._selections = SelectionReads(self._reader)
         self._runs: dict[tuple[str, date], RankedRun | None] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}  # (universe repr, D)
         self._labels: dict[date, str] = {}
         self._gates: dict[tuple[Group, date], str] = {}
+        self._entries: dict[tuple[EntrySpec, int, frozenset[str], date], Entered] = {}
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
         self._siblings: dict[tuple[str, frozenset[str], date], dict[str, str | None]] = {}
@@ -186,6 +194,7 @@ class SessionReads:
         self._eligible.clear()
         self._labels.clear()
         self._gates.clear()
+        self._entries.clear()
         self._implied.clear()
         self._adv.clear()
         self._siblings.clear()
@@ -210,6 +219,45 @@ class SessionReads:
         if (group, day) not in self._gates:
             self._gates[group, day] = edge_gate(self._reader, group, day, self._domains).state
         return self._gates[group, day]
+
+    def entries(self, spec: EntrySpec, offset: int, ids: frozenset[str], decision: date) -> Entered:
+        """The entry session of each of ``ids`` under an entry condition decided at D
+        (``reads/entry.py``). Cached per decision session only, never across them: a later D
+        whose wait shares a close would log no read for it and keep a stale leg after a
+        restatement (as ``history``)."""
+        key = (spec, offset, ids, decision)
+        if key not in self._entries:
+            self._entries[key] = read_entries(
+                self._reader, spec, offset, ids, decision, self._domains
+            )
+        return self._entries[key]
+
+    def entered(
+        self,
+        edge: Edge,
+        universe: Selection,
+        variant_id: str,
+        leg: "Leg",
+        by_entry: Mapping[date, pd.DataFrame],
+        rows: pd.DataFrame,
+    ) -> tuple[Entered | None, pd.DataFrame | None, date | None]:
+        """``(None, rows, None)`` for an edge without an entry condition. With one: its entries
+        at ``leg`` over the eligible names and the entered names' rows at their own S
+        (``reads/entry.py``), read inside the leg's attribution, so a restated partition of any
+        close of the wait invalidates the leg. A market gap at a
+        reached close loses the leg to the market table (``lost``; the rows are None); an S some
+        name entered at with no partition is returned last, for the caller to lose the leg to
+        the outcome table (rows None)."""
+        spec = edge.outcome.entry
+        if spec is None:
+            return None, rows, None
+        eligible = self.eligible(universe, leg.decision)
+        found = self.entries(spec, edge.outcome.start_offset_sessions, eligible, leg.decision)
+        if found.gap is not None:
+            self.lost[variant_id, leg.decision] = found.gap
+            return found, None, None
+        kept, missing = entered_rows(by_entry, found, leg.entry)
+        return found, kept, missing
 
     def implied(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
         key = (field_name, ids, day)

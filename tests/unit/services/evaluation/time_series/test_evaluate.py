@@ -7,15 +7,18 @@ import pytest
 
 from algotrade.config.edges.document import MAIN, QUALITY_BAR
 from algotrade.config.user import UserContext
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.engines.selection.entry import NOT_TRIGGERED
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
 from algotrade.services.evaluation.evidence.contract import trade_problems as trades_problems
 from algotrade.services.evaluation.time_series import harness
-from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
+from algotrade.services.evaluation.time_series.evaluate import _entries, evaluate_time_series
 from algotrade.services.read.context import open_stores
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.services.read.evaluation.verdict import load_edge_verdict
 from algotrade.storage.configs.files import MemoryConfigStore
+from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.time_series.conftest import (
     AS_OF,
     FIRST,
@@ -210,3 +213,46 @@ def test_a_gate_keeps_the_open_periods_and_slices_closed_and_unknown_beside_them
         inv.measures[0].mean_excess_picks
     )
     assert slice_of(g, "gate", "unknown").sessions == slice_of(inv, "gate", "unknown").sessions
+
+
+SIGNAL_TABLE = "rollups/instrument/price_stats@v2"
+SIGNAL = "rollup.price_stats@v2.adv_usd_20d"
+UNTIL = date(2024, 3, 31)  # a quarter: the entry tests read a few periods, not two years
+ENTRY = {
+    "kind": "excess_return", "horizon_sessions": [H], "benchmark": "none",
+    "start_offset_sessions": 1,
+    "entry": {"when": {"all": [{"field": SIGNAL, "op": "gt", "value": 0}]}, "within_sessions": 1},
+}  # fmt: skip
+
+
+def with_signal(w: World, value) -> World:  # type: ignore[no-untyped-def]
+    """SPY's signal ``value(day)`` at each close a period's wait reads (its D)."""
+    for p in w.periods:
+        for day in (p.decision,):
+            rows = [{"instrument_id": "EQ:SPY", "adv_usd_20d": value(day)}]
+            w.writer.write_table(SIGNAL_TABLE, day, f"s-{day}", stamped(rows, day, f"s-{day}"))
+    return w
+
+
+def quarter(w: World, edge):  # type: ignore[no-untyped-def]
+    return evaluate_time_series(w.reader, edge, FIRST, UNTIL, AS_OF, lambda d: "calm", None, False)
+
+
+def test_an_entry_condition_true_at_d_measures_the_periods_as_without_one() -> None:
+    w = with_signal(build_world(), lambda day: 1.0)
+    assert quarter(w, timed_edge(outcome=ENTRY)).results == quarter(w, timed_edge()).results
+
+
+def test_a_period_whose_entry_condition_never_held_is_lost_with_its_reason() -> None:
+    w = with_signal(build_world(), lambda day: -1.0)
+    (spy,) = quarter(w, timed_edge(outcome=ENTRY)).results
+    (plain,) = quarter(w, timed_edge()).results
+    assert spy.lost == {NOT_TRIGGERED: plain.measures[0].sessions + plain.measures[0].eligible}
+    assert not spy.in_window
+
+
+def test_a_time_series_entry_condition_waits_one_close_only() -> None:
+    w = build_world()
+    waits = timed_edge(outcome={**ENTRY, "entry": {**ENTRY["entry"], "within_sessions": 2}})
+    with pytest.raises(ConfigurationError, match=r"within_sessions = 1"):
+        _entries(w.reader, waits, ["EQ:SPY"], w.periods[:1], None)

@@ -55,14 +55,25 @@ def test_the_slow_rarely_failing_checks_stay_in_ci() -> None:
         "generated:check",
     ):
         assert not any(slow in c for c in every), slow
-    # the python lane is the fixed fast list, whatever changed: no mirrored or whole-folder runs
-    assert cmds(["src/algotrade/x.py"])["python"] == cmds([])["python"]
+    # the python lane is the fixed fast list plus the scoped ownership check: no mirrored or
+    # whole-folder runs
+    assert cmds(["src/algotrade/x.py"])["python"][:-1] == cmds([])["python"]
     assert not any(c.endswith(" tests/architecture") for c in every)
 
 
 def test_a_config_only_web_change_gets_no_build() -> None:
     web = cmds(["apps/web/package.json"])["web"]
     assert not any("vite build" in c or "perf:" in c for c in web)
+
+
+def test_changed_python_files_get_the_scoped_ownership_check() -> None:
+    # 2026-11-02 #1064 / #1065: a new ownership violation reached CI only
+    changed = ["src/algotrade/b.py", "apps/api/a.py", "docs/x.md", "tests/unit/t.py"]
+    assert cmds(changed)["python"][-1] == (
+        ".venv/bin/python scripts/check_ownership.py --files apps/api/a.py src/algotrade/b.py"
+    )
+    assert not any("check_ownership" in c for c in cmds(["docs/x.md"])["python"])
+    assert "check_ownership" in cmds(["src/algotrade/b.py"], merge_only=True)["python"][-1]
 
 
 def test_a_merge_only_push_skips_the_web_lane() -> None:

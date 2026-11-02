@@ -206,6 +206,13 @@ def _with_expressions(
     return joined, tuple(sorted({*missing, *computed.missing}))
 
 
+def has_rows(reader: StoreReader, table: str, start: date, end: date, as_of: datetime) -> bool:
+    """Whether feature table ``table`` has any row in ``start..end`` known at ``as_of``: what a
+    rule over its fields can be decided from (the harness refuses a rule over a field whose table
+    has none over its range, G9-M4)."""
+    return _sessions(reader, table, start, end, as_of) != frozenset()
+
+
 def _sessions(
     reader: StoreReader,
     table: str,
