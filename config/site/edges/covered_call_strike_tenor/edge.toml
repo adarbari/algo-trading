@@ -18,6 +18,7 @@ practitioner doctrine with no peer-reviewed evidence (not verified)."""
 schedule = "every_session"
 base = "delta_equivalent"
 top_k = "all"
+baselines = ["position:long_shares"]
 screeners = []
 status = "candidate"
 mechanism_kind = "paid_for_risk"
@@ -31,9 +32,9 @@ The variant's 30-day call is the first monthly expiry at least 30 days out (up t
 and on about half the sessions it is the same expiry as the main edge's 45-day one. Decisions
 every 21 sessions, so no two trades of a symbol overlap.
 Each trade's return on its collateral is read against the delta-equivalent stock at the same S
-(base delta_equivalent: the sleeve's reading of "against the stock"; a position:long_shares
-baseline is not valued for a sleeve, so it is not declared). The main edge sells the
-45-day call; the variant tenor_by_iv_rank sells the 30-day call when the ETF's own IV rank (ours,
+(base delta_equivalent: the sleeve's reading of "against the stock"; the position:long_shares
+baseline, declared in `baselines`, values the same trades as the whole ETF held, per symbol).
+The main edge sells the 45-day call; the variant tenor_by_iv_rank sells the 30-day call when the ETF's own IV rank (ours,
 iv_history@v2, open licence) is at least 0.5 at D and the 45-day one otherwise; a name whose rank is
 unknown at D is not traded (CASE_UNKNOWN), never the default. skip_report_in_life skips an expiry
 with an earnings report inside it: a no-op on these ETFs, kept for the single-name follow-up on

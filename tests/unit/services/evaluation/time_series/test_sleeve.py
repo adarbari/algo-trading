@@ -150,6 +150,41 @@ def test_a_named_spy_sleeve_with_a_two_point_grid_evaluates_by_hand() -> None:
     assert len({r.identity for r in out.results}) == 3  # each trial its own position key
 
 
+def test_a_share_baseline_values_the_trades_periods_as_shares_and_is_never_a_trial() -> None:
+    edge = sleeve_edge()
+    n = len(entries(edge))
+    out = run(world(edge), edge, shares=("long_shares",))
+    plain = run(world(edge), edge)
+    baseline = [r for r in out.results if r.role == "baseline"]
+    assert [(r.edge_variant, r.symbol) for r in baseline] == [("main", "position:long_shares:SPY")]
+    trials = [r for r in out.results if r.role == "screener"]
+    assert [(r.edge_variant, r.symbol) for r in trials] == [
+        (r.edge_variant, r.symbol) for r in plain.results
+    ]  # the trials and their measures are unchanged by it
+    assert (out.scheduled, out.unclosed) == (plain.scheduled, plain.unclosed)
+    (b,) = baseline
+    main = trials[0]
+    assert [e for e, _ in b.in_window] == [e for e, _ in main.in_window]  # the same periods
+    assert [v for _, v in b.in_window] == pytest.approx([STOCK] * n)  # shares, no cost set
+    base = PNL["main"][1] * 100.0 * STOCK / COLLATERAL  # the same delta-equivalent stock
+    assert b.measures[0].bh_mean == pytest.approx(base) == pytest.approx(main.measures[0].bh_mean)
+    assert [v for _, v in b.paired] == pytest.approx([STOCK - base] * n)
+    assert b.identity not in {r.identity for r in trials} and len(b.trades) == 0
+    assert b.book == {} and main.book  # a baseline is no part of a book
+
+
+def test_a_share_baseline_is_valued_only_where_the_trade_has_a_value_and_less_the_cost() -> None:
+    edge = sleeve_edge(outcome={**SLEEVE["outcome"], "cost_bps": 10})  # type: ignore[dict-item]
+    (_, s0), *_ = entries(edge)
+    reader = world(edge, skip=frozenset({("main", s0)}))
+    out = run(reader, edge, shares=("long_shares",))
+    b = next(r for r in out.results if r.role == "baseline")
+    assert s0 not in {e for e, _ in b.in_window} and b.lost == {"NO_OUTCOME": 1}
+    assert [v for _, v in b.in_window] == pytest.approx(
+        [STOCK - 10 / 1e4] * (len(entries(edge)) - 1)
+    )
+
+
 def test_a_missing_or_unmeasured_trade_is_lost_with_its_reason_and_no_stock_leaves_it_unpaired(
 ) -> None:  # fmt: skip
     edge = sleeve_edge()
@@ -225,6 +260,24 @@ def test_evaluate_edge_gives_one_trial_per_grid_point_and_variant_of_the_sleeve(
         (1.0 - SPREAD - 0.013) / COLLATERAL
     )  # the site's commission: 0.65 a contract at entry and exit, per unit
     assert main.trials == 4  # every grid point and variant counts in the deflated Sharpe ratio
+
+
+def test_a_share_baseline_is_not_a_trial_nor_deflated_in_the_harness() -> None:
+    edge = sleeve_edge(
+        variants=[{"id": "wide", "outcome": {"strike_delta": 0.15}}],
+        baselines=["position:long_shares"],
+    )
+    configs = MemoryConfigStore({("site", KIND, NAME): SITE.load("site", KIND, NAME)})
+    ev = evaluate_edge(
+        world_ev := world(edge), ResultWriter(MemoryBackend()), configs, UserContext("site"),
+        edge, FIRST, LAST, AS_OF,
+    )  # fmt: skip
+    assert world_ev is not None
+    baseline = [r for r in ev.results if r.role == "baseline"]
+    assert [(r.edge_variant, r.variant) for r in baseline] == [("main", "position:long_shares:SPY")]
+    assert ev.trials == 4  # the baseline is not one of the trials
+    assert all(m.trials is None and m.deflated_sharpe is None for m in baseline[0].measures)
+    assert all(r.measures[0].trials == 4 for r in ev.results if r.role == "screener")
 
 
 def test_a_variant_that_moves_the_entry_reads_its_own_sessions_and_keys() -> None:

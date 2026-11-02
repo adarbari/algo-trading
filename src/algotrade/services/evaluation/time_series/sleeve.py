@@ -43,7 +43,11 @@ from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.named import DELTA_EQUIVALENT, named_symbols
 from algotrade.config.edges.portfolio import TRACKED_LICENCE
 from algotrade.config.edges.positions.key import grid_outcomes, position_key
-from algotrade.config.edges.positions.templates import Templates
+from algotrade.config.edges.positions.templates import (
+    POSITION_PREFIX,
+    Templates,
+    sleeve_baseline_id,
+)
 from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
@@ -51,6 +55,7 @@ from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, own_rows
+from algotrade.services.evaluation.cross_section.measures import BASELINE, SCREENER
 from algotrade.services.evaluation.cross_section.portfolio.ladder import (
     book_figures,
     cohorts,
@@ -101,6 +106,7 @@ def evaluate_sleeve(
     gate_keys: Mapping[str, str] | None = None,
     domains: Mapping[str, Sequence[str]] | None = None,
     features: FeatureSet | None = None,
+    shares: Sequence[str] = (),
 ) -> TimeSeriesRun:
     """``edge`` (``base = "delta_equivalent"``) for each of ``outcomes`` (``sleeve_outcomes``)
     over the decision sessions in ``start..end``; ``label``, ``split`` and ``gate`` as for
@@ -111,7 +117,10 @@ def evaluate_sleeve(
     A trial with case values (E13b) takes, at each D, the point the symbol's cases resolve to
     from D's partition (``reads/cases.py``; ``domains``: the catalogue's string domains), never
     the default when a case is UNKNOWN (``CASE_UNKNOWN``, lost); ``features``: the catalogue its
-    case fields are checked against at run start (G9-M4)."""
+    case fields are checked against at run start (G9-M4); ``shares``: the share templates
+    declared as ``position:<template>`` baselines (ADR 0088 G19): beside each symbol's trial of
+    the main edge variant, one baseline row valuing the same periods as that template's shares
+    (``_trial`` with ``shares``), never a trial, nor in a book."""
     if edge.base != DELTA_EQUIVALENT or not isinstance(edge.universe, Selection):
         raise ConfigurationError(f"edge {edge.id}: not a named option sleeve")
     for _, outcome in outcomes:  # each trial's case values (a variant's or a grid point's)
@@ -150,8 +159,19 @@ def evaluate_sleeve(
         ]  # fmt: skip
         book = _book(reader, held, trials, ps, days, len(symbols), start, end, as_of)
         results += [replace(r, book=book) for r in trials]
+        if variant == MAIN:  # the setup's own trade periods, valued as shares: comparisons only
+            results += [
+                _trial(held, MAIN, sleeve_baseline_id(t, symbol), ids.get(symbol),
+                       unknown.get(symbol), ps, mine, stock, label,
+                       (gates or {}).get(variant, gate), split, exploratory, option_costs,
+                       (gate_keys or {}).get(variant, ""), out, shares=t)
+                for t in shares
+                for symbol in symbols
+            ]  # fmt: skip
     main = reads[edge.outcome.horizon_sessions[0], edge.outcome.start_offset_sessions][0]
-    measured = {e for r in results if r.edge_variant == MAIN for e, _ in r.in_window}
+    measured = {
+        e for r in results if r.edge_variant == MAIN and r.role == SCREENER for e, _ in r.in_window
+    }
     return TimeSeriesRun(
         edge.schedule,
         edge.outcome.horizon_sessions[0],
@@ -177,7 +197,13 @@ def _trial(
     option_costs: OptionCosts | None,
     gate_key: str = "",
     held_out: Mapping[tuple[str, date], str] | None = None,
+    shares: str | None = None,
 ) -> InstrumentResult:
+    """One (edge variant, symbol) trial. With ``shares`` (a share template id) it is that
+    template's baseline of the same symbol's trial (its ``symbol`` the baseline's id,
+    ``sleeve_baseline_id``): only the periods where the setup's trade has
+    a value, each valued as the stock return less ``cost_bps`` (the base's own cost), the base
+    unchanged (the same delta-equivalent stock), and an identity of its own."""
     horizon = edge.outcome.horizon_sessions[0]
     mine = rows[rows["instrument_id"] == instrument] if instrument is not None else rows.iloc[:0]
     starts = pd.to_datetime(mine["session_date"]).dt.date
@@ -209,6 +235,12 @@ def _trial(
             lost[why or NO_VALUE] += 1
             continue
         base = _base(row, stock.values.get((instrument, p.entry)), edge.outcome.cost_bps)
+        if shares is not None:  # the template's shares over the periods the trade has a value for
+            held = _shares_value(stock.values.get((instrument, p.entry)), edge.outcome.cost_bps)
+            if held is None:
+                lost[harness.NO_OUTCOME] += 1
+                continue
+            value = held
         state = "" if gate is None else gate(p.decision)
         regime = label(p.decision)
         paired = value - base if base is not None else None
@@ -221,12 +253,7 @@ def _trial(
         obs = [o for o in obs if o.gate == "open"]
     inside = [o for o in obs if o.period.inside]
     kept = [frames[o.period.entry] for o in inside]
-    key = position_key(edge.outcome, horizon)
-    spec = edge.outcome.position
-    if spec is not None and spec.points:  # a case-valued trial: its rules and its points
-        rules = json.dumps(identity_dict(asdict(spec)["cases"]), sort_keys=True, default=str)
-        points = "|".join(sorted(k for _, _, k in spec.points))
-        key = hashlib.sha256(f"{rules}|{points}".encode()).hexdigest()
+    key = _trial_key(edge, horizon)
     return InstrumentResult(
         symbol=symbol,
         horizon=horizon,
@@ -236,9 +263,11 @@ def _trial(
         paired=tuple((o.period.entry, o.paired) for o in inside if o.paired is not None),
         timing={},
         lost=dict(lost),
-        trades=pd.concat(kept, ignore_index=True) if kept else empty_trades(),
+        trades=pd.concat(kept, ignore_index=True) if kept and shares is None else empty_trades(),
         edge_variant=variant,
+        role=BASELINE if shares is not None else SCREENER,
         identity=f"{edge.id}|{edge.schedule}|{symbol}|{key}|{edge.outcome.cost_bps}"
+        + (f"|{POSITION_PREFIX}{shares}" if shares is not None else "")
         + (f"|gate:{gate_key}" if gate_key else ""),  # a variant's own gate: another trial
     )
 
@@ -268,6 +297,25 @@ def _cased(
         parts.append(at if resolved.gap else cased_rows(at, resolved, keys))
     kept = pd.concat(parts, ignore_index=True) if parts else trades.iloc[:0]
     return own_rows(edge, kept), out
+
+
+def _trial_key(edge: Edge, horizon: int) -> str:
+    """The trial's position key; a case-valued trial's is a digest of its rules and points."""
+    key = position_key(edge.outcome, horizon)
+    spec = edge.outcome.position
+    if spec is not None and spec.points:
+        rules = json.dumps(identity_dict(asdict(spec)["cases"]), sort_keys=True, default=str)
+        points = "|".join(sorted(k for _, _, k in spec.points))
+        key = hashlib.sha256(f"{rules}|{points}".encode()).hexdigest()
+    return key
+
+
+def _shares_value(stock_return: float | None, cost_bps: float | None) -> float | None:
+    """A long-shares baseline's value over a period: the stock's return less ``cost_bps`` (the
+    cost ``_base`` charges the delta-equivalent stock); None without a finite stock return."""
+    if stock_return is None or not np.isfinite(stock_return):
+        return None
+    return float(stock_return) - (cost_bps or 0.0) / 1e4
 
 
 def _base(row: pd.Series, stock_return: float | None, cost_bps: float | None) -> float | None:
