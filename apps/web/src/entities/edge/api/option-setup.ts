@@ -33,7 +33,6 @@ const OptionSetup = graphql(`
         exitDte
         exitConditionFields
         caseValued
-        horizons
         legs {
           kind
           qty
@@ -52,7 +51,6 @@ const OptionSetup = graphql(`
           kindText
         }
         basisScreener
-        basisHorizon
         trades
         typical
         typicalLo

@@ -382,7 +382,7 @@ export type OptionSetupQueryVariables = Exact<{
 }>;
 
 
-export type OptionSetupQuery = { edgeOptionSetup: { edgeId: string, positionKind: string, rulesUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rules: { template: string, collateral: string, schedule: string, startOffsetSessions: number, tenorDays: number | null, expiryCycle: string, skipReportInLife: boolean, takeProfit: number | null, stopLoss: number | null, exitDte: number | null, exitConditionFields: Array<string>, caseValued: Array<string>, horizons: Array<number>, legs: Array<{ kind: string, qty: number, right: string | null, strike: string | null, delta: number | null, otmPct: number | null, tenorDays: number | null }> } | null, evidence: { basisScreener: string | null, basisHorizon: number | null, trades: number, typical: number | null, typicalLo: number | null, typicalHi: number | null, badMean: number | null, badTrades: number, kept: number, inSampleOnly: boolean, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, costs: { state: string, assumedBp: number, levels: Array<{ period: string, bp: number, assumed: boolean, level: string | null, meanRoc: number | null, winRate: number | null }> } | null, byYear: Array<{ year: number, trades: number, typical: number | null, kept: number }>, stress: Array<{ key: string, name: string, start: string, end: string, trades: number, worst: number | null }>, stressUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null } | null };
+export type OptionSetupQuery = { edgeOptionSetup: { edgeId: string, positionKind: string, rulesUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rules: { template: string, collateral: string, schedule: string, startOffsetSessions: number, tenorDays: number | null, expiryCycle: string, skipReportInLife: boolean, takeProfit: number | null, stopLoss: number | null, exitDte: number | null, exitConditionFields: Array<string>, caseValued: Array<string>, legs: Array<{ kind: string, qty: number, right: string | null, strike: string | null, delta: number | null, otmPct: number | null, tenorDays: number | null }> } | null, evidence: { basisScreener: string | null, trades: number, typical: number | null, typicalLo: number | null, typicalHi: number | null, badMean: number | null, badTrades: number, kept: number, inSampleOnly: boolean, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, costs: { state: string, assumedBp: number, levels: Array<{ period: string, bp: number, assumed: boolean, level: string | null, meanRoc: number | null, winRate: number | null }> } | null, byYear: Array<{ year: number, trades: number, typical: number | null, kept: number }>, stress: Array<{ key: string, name: string, start: string, end: string, trades: number, worst: number | null }>, stressUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null } | null };
 
 export type ScreenerEdgesQueryVariables = Exact<{
   id: string;
@@ -1865,7 +1865,6 @@ export const OptionSetupDocument = new TypedDocumentString(`
       exitDte
       exitConditionFields
       caseValued
-      horizons
       legs {
         kind
         qty
@@ -1884,7 +1883,6 @@ export const OptionSetupDocument = new TypedDocumentString(`
         kindText
       }
       basisScreener
-      basisHorizon
       trades
       typical
       typicalLo

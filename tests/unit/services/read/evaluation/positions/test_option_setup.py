@@ -3,6 +3,7 @@ values, the evidence on collateral by hand (typical trade and quartiles, bad tra
 premium, by year, stress), a share setup with no option section, and every UNKNOWN case: no
 trade, no verdict basis, a licensed or unstored return, a run ending after the session."""
 
+from dataclasses import replace
 from datetime import date, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -201,3 +202,31 @@ def test_a_setup_with_no_run_has_no_basis_and_no_invented_verdict() -> None:
     assert found.evidence is not None and found.evidence.unknown is not None
     assert found.evidence.unknown.code is UnknownCode.NOT_RUN
     assert (found.evidence.trades, found.evidence.typical, found.evidence.costs) == (0, None, None)
+
+
+def test_a_live_verdict_on_a_newer_run_than_the_bounded_one_is_not_used(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The live judge reads the unbounded canonical run: its basis is no basis of the (older)
+    run the ledger is read from, so the section is UNKNOWN, never a mixed read."""
+    real = evidence_module.runs
+
+    def load(ctx: Any, edge: Any, bounded: bool = False) -> Any:
+        found = real.load_canonical_run(ctx, edge, bounded)
+        if bounded or found.run is None:
+            return found
+        return replace(found, run=replace(found.run, run_id="newer"))
+
+    monkeypatch.setattr(
+        evidence_module, "runs",
+        SimpleNamespace(load_canonical_run=load, load_run_trades=real.load_run_trades),
+    )  # fmt: skip
+    ev = setup().evidence
+    assert ev is not None and ev.unknown is not None and ev.unknown.code is UnknownCode.NOT_RUN
+    assert ev.trades == 0 and ev.typical is None
+
+
+def test_a_non_finite_return_on_capital_is_not_stored_never_dropped() -> None:
+    ev = setup([*LEDGER, option_trade(30, float("nan"))]).evidence
+    assert ev is not None and ev.unknown is not None
+    assert ev.unknown.code is UnknownCode.NOT_STORED and ev.trades == 0

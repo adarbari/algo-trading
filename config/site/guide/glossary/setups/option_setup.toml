@@ -104,15 +104,6 @@ next = "Compare it with the typical trade."
 see_also = ["option_typical", "option_stress", "idea_cash_set_aside"]
 
 [[term]]
-id = "option_trades"
-term = "Trades (option setup)"
-short = "How many past trades of the setup the figures on this page rest on."
-body = """
-They are the setup's stored trades at its tested horizon, from its own history. With few trades a median or a range is noise.
-"""
-see_also = ["option_typical"]
-
-[[term]]
 id = "option_how_sure"
 term = "How sure, costs and stress"
 short = "How often the premium was kept, what the return is after trading costs, and the worst trade in each past market stress."
@@ -125,11 +116,11 @@ see_also = ["option_kept", "option_cost_mid", "option_stress"]
 [[term]]
 id = "option_kept"
 term = "Kept the premium"
-short = "How many of the setup's past trades returned more than zero on the cash set aside."
+short = "How many past trades the figures rest on, and how many returned more than zero on the cash set aside."
 body = """
-A count of trades out of all trades, not a probability for the next one. A trade that returned less than zero lost part of the cash set aside, even when it kept some premium.
+The trades are the setup's stored trades at its tested horizon; with few of them a median or a range is noise. Kept is a count out of all trades, not a probability for the next one. A trade that returned less than zero lost part of the cash set aside, even when it kept some premium.
 """
-see_also = ["option_trades", "option_bad_trade", "idea_cash_set_aside"]
+see_also = ["option_bad_trade", "idea_cash_set_aside"]
 
 [[term]]
 id = "option_stress"
@@ -158,4 +149,4 @@ short = "The setup's past trades grouped by the year they were decided: how many
 body = """
 A year with few trades says little. Look for years that differ from the rest: a setup that earned in only one year relied on that year.
 """
-see_also = ["option_trades", "option_typical", "option_kept"]
+see_also = ["option_typical", "option_kept"]

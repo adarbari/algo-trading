@@ -54,7 +54,7 @@ function strip(e: OptionEvidence): StatItem[] {
     },
     {
       id: 'trades',
-      label: <Labelled text="Trades" help="option_trades" />,
+      label: <Labelled text="Trades" help="option_kept" />,
       value: e.trades,
       format: { kind: 'number' },
     },

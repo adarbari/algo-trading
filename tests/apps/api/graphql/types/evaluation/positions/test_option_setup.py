@@ -14,7 +14,7 @@ def test_a_setup_is_served_with_its_rules_and_evidence_as_the_read_model_has_the
     leg = option_setup.LegRule("option", -1, "P", "delta", 0.25, None, None)
     rules = option_setup.OptionRules(
         "short_put", (leg,), "cash_secured", "every_session", 1, 30, "monthly", True,
-        0.5, 2.0, 21, ("rollup.x",), (), (20,),
+        0.5, 2.0, 21, ("rollup.x",), (),
     )  # fmt: skip
     year = option_evidence.OptionYear(2025, 2, -0.15, 0)
     stress = option_evidence.StressWindow(

@@ -75,7 +75,6 @@ class OptionRules:
     exit_dte: int | None
     exit_condition_fields: tuple[str, ...]
     case_valued: tuple[str, ...]
-    horizons: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -119,7 +118,6 @@ def _rules(edge: Edge, doc: document.Edge) -> OptionRules | Unknown:
             tuple(sorted({r.field for r in exits.when.rules()})) if exits and exits.when else ()
         ),
         case_valued=tuple(sorted(c.name for c in spec.cases)),
-        horizons=outcome.horizon_sessions,
     )
 
 

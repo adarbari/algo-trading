@@ -11,7 +11,6 @@ const unknownNote = {
 const EVIDENCE: OptionEvidence = {
   unknown: null,
   basisScreener: 'iv_rich_puts',
-  basisHorizon: 21,
   trades: 100,
   typical: 0.012,
   typicalLo: -0.004,
@@ -71,7 +70,6 @@ export const OPTION_SETUP_FIXTURE: OptionSetup = {
     exitDte: 21,
     exitConditionFields: ['iv_rank'],
     caseValued: ['strike'],
-    horizons: [10, 21],
     legs: [
       {
         kind: 'option',

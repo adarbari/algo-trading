@@ -44,8 +44,7 @@ class OptionLegRule:
     "`expiryCycle`, `skipReportInLife`, the declared exits (`takeProfit` a share of the credit, "
     "`stopLoss` a multiple of it, `exitDte` calendar days to expiry, `exitConditionFields` the "
     "catalogue fields of its exit condition; null: not declared), the parameters chosen by case "
-    "for each pick (`caseValued`, never given a value here) and the holding `horizons` in "
-    "sessions"
+    "for each pick (`caseValued`, never given a value here)"
 )
 class OptionRules:
     template: str
@@ -61,7 +60,6 @@ class OptionRules:
     exit_dte: int | None
     exit_condition_fields: list[str]
     case_valued: list[str]
-    horizons: list[int]
 
     @classmethod
     def of(cls, d: option_setup.OptionRules) -> Self:
@@ -72,7 +70,7 @@ class OptionRules:
             expiry_cycle=d.expiry_cycle, skip_report_in_life=d.skip_report_in_life,
             take_profit=d.take_profit, stop_loss=d.stop_loss, exit_dte=d.exit_dte,
             exit_condition_fields=list(d.exit_condition_fields),
-            case_valued=list(d.case_valued), horizons=list(d.horizons),
+            case_valued=list(d.case_valued),
         )  # fmt: skip
 
 

@@ -30,6 +30,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from math import isfinite
 
 from algotrade.quant.edges.statistics import count_above, quartiles
 from algotrade.quant.edges.tails import cvar, worst
@@ -147,7 +148,7 @@ def _returns(
         cell = t.return_on_capital
         if cell.unknown is not None:
             return cell.unknown
-        if cell.value is None or t.capital_basis not in COLLATERAL:
+        if cell.value is None or not isfinite(cell.value) or t.capital_basis not in COLLATERAL:
             why = f"run {run.run_id} stores no return on capital for a trade: re-run the backtest"
             return _unknown(edge, UnknownCode.NOT_STORED, why)
         returns.append(float(cell.value))
@@ -166,7 +167,13 @@ def load_option_evidence(ctx: ReadContext, edge: Edge) -> OptionEvidence:
     if run.range_to > day:  # its verdict, basis and ledger are not known then
         why = f"the canonical run ends {run.range_to}, after the session {day}"
         return OptionEvidence(unknown=_unknown(edge, UnknownCode.NOT_RUN, why))
-    summary = load_stored_summary(ctx, edge, bounded=True) or load_edge_summary(ctx, edge)
+    summary = load_stored_summary(ctx, edge, bounded=True)
+    if summary is None:  # the live judge reads the unbounded canonical run: only if it is ours
+        latest = runs.load_canonical_run(ctx, edge).run
+        if latest is None or latest.run_id != run.run_id:
+            why = f"the live verdict rests on a newer run than {run.run_id} (not bounded)"
+            return OptionEvidence(unknown=_unknown(edge, UnknownCode.NOT_RUN, why))
+        summary = load_edge_summary(ctx, edge)
     if summary.basis_screener is None or summary.basis_horizon is None:
         why = f"{edge.id} has no verdict basis ({summary.result})"
         return OptionEvidence(unknown=_unknown(edge, UnknownCode.NOT_RUN, why))

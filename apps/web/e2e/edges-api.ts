@@ -395,7 +395,6 @@ function optionSetup(id: string) {
       exitDte: 21,
       exitConditionFields: [],
       caseValued: ['strike'],
-      horizons: [21],
       legs: [
         {
           kind: 'option',
@@ -411,7 +410,6 @@ function optionSetup(id: string) {
     evidence: {
       unknown: NO_UNKNOWN,
       basisScreener: 'iv_rich_puts',
-      basisHorizon: 21,
       trades: 100,
       typical: 0.012,
       typicalLo: -0.004,

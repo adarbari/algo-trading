@@ -2945,7 +2945,7 @@ type OptionQuote {
 }
 
 """
-The option position the setup's document declares: its `template` and `legs`, the `collateral` rule (cash_secured | max_loss | regt), `schedule` (when it decides), `startOffsetSessions` (entry that many sessions after the decision), `tenorDays` sought, `expiryCycle`, `skipReportInLife`, the declared exits (`takeProfit` a share of the credit, `stopLoss` a multiple of it, `exitDte` calendar days to expiry, `exitConditionFields` the catalogue fields of its exit condition; null: not declared), the parameters chosen by case for each pick (`caseValued`, never given a value here) and the holding `horizons` in sessions
+The option position the setup's document declares: its `template` and `legs`, the `collateral` rule (cash_secured | max_loss | regt), `schedule` (when it decides), `startOffsetSessions` (entry that many sessions after the decision), `tenorDays` sought, `expiryCycle`, `skipReportInLife`, the declared exits (`takeProfit` a share of the credit, `stopLoss` a multiple of it, `exitDte` calendar days to expiry, `exitConditionFields` the catalogue fields of its exit condition; null: not declared), the parameters chosen by case for each pick (`caseValued`, never given a value here)
 """
 type OptionRules {
   template: String!
@@ -2961,7 +2961,6 @@ type OptionRules {
   exitDte: Int
   exitConditionFields: [String!]!
   caseValued: [String!]!
-  horizons: [Int!]!
 }
 
 """

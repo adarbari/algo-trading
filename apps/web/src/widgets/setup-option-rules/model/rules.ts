@@ -20,8 +20,8 @@ const SCHEDULES: Record<string, string> = {
   month_end: 'Each month end',
 };
 const COLLATERALS: Record<string, string> = {
-  cash_secured: 'Cash secured: the cash to buy the shares if assigned',
-  max_loss: 'The most the position can lose',
+  cash_secured: 'Cash secured',
+  max_loss: 'Maximum loss',
   regt: 'Reg T margin',
 };
 const CYCLES: Record<string, string> = { monthly: 'monthly', weekly: 'weekly', any: 'any' };
@@ -122,7 +122,7 @@ export function ruleRows(rules: OptionRules): RuleRow[] {
     rows.push({
       id: 'reports',
       label: 'Reports',
-      value: 'Skips a name that reports before expiry',
+      value: 'Skips names that report',
       help: 'option_rule_reports',
     });
   }
