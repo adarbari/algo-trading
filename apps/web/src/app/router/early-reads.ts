@@ -13,7 +13,7 @@ import { active } from '@/shared/api';
 import { router } from './router';
 
 /** The trader pages whose loader may run before the guard. */
-export const EARLY_PATHS = ['/ideas', '/screeners', '/edges', '/regime', '/calendar', '/explore'];
+export const EARLY_PATHS = ['/ideas', '/test', '/edges', '/regime', '/calendar', '/explore'];
 
 export function startEarlyReads(queryClient: QueryClient): void {
   const [matched] = router.getMatchedRoutes(router.latestLocation.pathname);

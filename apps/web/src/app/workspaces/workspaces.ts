@@ -32,8 +32,8 @@ export const TRADER: Workspace = {
       label: 'Setups',
     },
     {
-      // The Test flow (V9 moves it to /test and redirects /screeners there).
-      path: '/screeners',
+      // The Test flow (V9): /screeners and the old builder URLs redirect here.
+      path: '/test',
       label: 'Test',
     },
     {

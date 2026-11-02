@@ -41,3 +41,40 @@
     min-height: var(--density-control-height);
   }
 }
+
+/* steps: the links numbered by a counter, a quiet rule between them. */
+.nav[data-variant='steps'] {
+  counter-reset: step;
+  gap: var(--space-3);
+}
+
+.nav[data-variant='steps'] .link {
+  counter-increment: step;
+  gap: var(--space-1-5);
+  padding-inline: var(--space-1);
+  border-radius: 0;
+  border-block-end: var(--border-width-thick) solid transparent;
+}
+
+.nav[data-variant='steps'] .link::before {
+  content: counter(step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-5);
+  min-height: var(--space-5);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.nav[data-variant='steps'] .link[aria-current='page'] {
+  background: transparent;
+  border-block-end-color: var(--color-accent);
+}
+
+.nav[data-variant='steps'] .link[aria-current='page']::before {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}

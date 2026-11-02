@@ -97,7 +97,7 @@ function FieldRoute() {
   const { name } = fieldRoute.useParams();
   const navigate = useNavigate();
   return (
-    <GuideFieldPage name={name} onAddToBuilder={() => void navigate({ to: '/screeners/new' })} />
+    <GuideFieldPage name={name} onAddToBuilder={() => void navigate({ to: '/test/expert' })} />
   );
 }
 
@@ -133,8 +133,8 @@ function ScreenerRoute() {
   return (
     <GuideScreenerPage
       id={id}
-      onSeeHits={() => void navigate({ to: '/screeners/$id', params: { id } })}
-      onOpenBuilder={() => void navigate({ to: '/screeners/$id/edit', params: { id } })}
+      onSeeHits={() => void navigate({ to: '/test/result/$id', params: { id } })}
+      onOpenBuilder={() => void navigate({ to: '/test/expert/$id', params: { id } })}
     />
   );
 }

@@ -19,6 +19,9 @@ pre_push = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pre_push)
 
 
+BUDGET_PAGES = " ".join(pre_push.BUDGET_PAGES[1])
+
+
 def cmds(files: list[str], merge_only: bool = False) -> dict[str, list[str]]:
     lanes = pre_push.plan(files, merge_only, root=None)
     return {lane: [" ".join(c) for _, c, _ in steps] for lane, steps in lanes.items()}
@@ -27,18 +30,22 @@ def cmds(files: list[str], merge_only: bool = False) -> dict[str, list[str]]:
 def test_a_web_source_change_runs_the_static_gates_and_the_budgets() -> None:
     web = cmds(["apps/web/src/pages/trader-ideas/IdeasPage.tsx"])["web"]
     assert web[0].startswith("npx prettier --check") and "npm run ds:check" in web
-    assert web[-3:] == [
+    assert web[-4:] == [
         "env VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key"
         " npx vite build",
         "npm run perf:bundle",
         "npm run perf:e2e",
+        BUDGET_PAGES,
     ]
 
 
 def test_the_slow_rarely_failing_checks_stay_in_ci() -> None:
     # measured 2026-11-02: ESLint 4 failures in 100 red runs for 25-55 s, tsc 0, vitest 1
     every = [
-        c for lane in cmds(["apps/web/src/a/b/C.tsx", "src/algotrade/x.py"]).values() for c in lane
+        c
+        for lane in cmds(["apps/web/src/a/b/C.tsx", "src/algotrade/x.py"]).values()
+        for c in lane
+        if c != BUDGET_PAGES  # one vitest file, seconds: the one vitest the hook runs
     ]
     for slow in (
         "eslint",
@@ -59,9 +66,18 @@ def test_a_config_only_web_change_gets_no_build() -> None:
 
 
 def test_a_merge_only_push_skips_the_web_lane() -> None:
-    lanes = cmds(["apps/web/src/a/b/C.tsx"], merge_only=True)
+    lanes = cmds(["apps/web/design-system/a/B.tsx"], merge_only=True)
     assert set(lanes) == {"python"}
     assert lanes["python"][0] == "make --no-print-directory numbering"
+
+
+def test_a_merge_only_push_still_checks_a_budget_for_every_lazy_page() -> None:
+    # 2026-11-02 #1035: the budgets merge driver kept main's raised budget for two pages the
+    # branch had removed; only CI's vitest caught it
+    for touched in ("apps/web/src/pages/a/index.ts", "apps/web/perf-budgets.json"):
+        assert cmds([touched], merge_only=True)["web"] == [BUDGET_PAGES]
+    assert BUDGET_PAGES in cmds(["apps/web/perf-budgets.json"])["web"]
+    assert "web" not in cmds(["src/algotrade/x.py"], merge_only=True)
 
 
 def test_every_fast_test_exists() -> None:

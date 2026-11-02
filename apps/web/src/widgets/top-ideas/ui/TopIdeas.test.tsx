@@ -370,10 +370,10 @@ describe('TopIdeas', () => {
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
     expect(within(aapl).getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
       'href',
-      '/screeners/vrp',
+      '/test/result/vrp',
     );
     const liquidity = within(aapl).getByRole('link', { name: /^Liquidity/ });
-    expect(liquidity).toHaveAttribute('href', '/screeners/liq');
+    expect(liquidity).toHaveAttribute('href', '/test/result/liq');
     await userEvent.click(liquidity);
     expect(onOpen).not.toHaveBeenCalled();
   });
