@@ -453,13 +453,19 @@ type DecisionCount {
 }
 
 """
-One drop of the curve: from the high at `peak` down `depth` (positive) to `trough` and back to `recovered` (null: not yet)
+One drop of the curve: from the high at `peak` down `depth` (positive) to `trough` and back to `recovered` (null: not yet). An option setup's only (empty / null for any other): `market` the market episodes (Guide `episode:<key>`) the drop overlaps that the session already knows; `indexChange` the move of the Cboe strategy `index` it tracks over the same dates (null: `indexUnknown` says why, LICENCE to a viewer without the index's licence); `regtExceeded` whether the positions' Reg-T margin exceeded their collateral (null: `regtUnknown` says why)
 """
 type DrawdownEpisode {
   peak: Date!
   trough: Date!
   recovered: Date
   depth: Float!
+  market: [String!]!
+  index: String
+  indexChange: Float
+  indexUnknown: Unknown
+  regtExceeded: Boolean
+  regtUnknown: Unknown
 }
 
 """
