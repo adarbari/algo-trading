@@ -239,6 +239,9 @@ EDGE_LEGS = fixed(
     # E6b-2 (nullable, no version bump): an option pick's value at each cost level (``mid``,
     # ``effective``, ``full``), flat, three per pick, aligned to ``pick_ids``.
     "pick_values_at float64[]",
+    # E11 (nullable, no version bump): a long option pick's return on capital at each level,
+    # flat like ``pick_values_at`` (``hit.level_rocs``); null for a share and in older legs.
+    "pick_rocs_at float64[]",
     # E6b-3 (nullable, no version bump): an option pick's hedged return on capital, stock return
     # on capital and wing cost, flat, three per pick, aligned to ``pick_ids`` (``pick_option``).
     "pick_option float64[]",

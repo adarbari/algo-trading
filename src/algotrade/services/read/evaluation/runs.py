@@ -158,6 +158,8 @@ class EdgeRow:
     # E6b, an outcome with no money, too few sessions, no base), never 0.
     excess_roc_t: float | None = None
     psr: float | None = None
+    # E11: the mean return on capital; on an option position's cost row, at that row's level
+    mean_roc: float | None = None
     cvar_5: float | None = None
     cvar_5_n: int | None = None
     base_cvar_5: float | None = None
@@ -473,6 +475,7 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         licence=_text(row.get("licence")),
         excess_roc_t=_float(row.get("excess_roc_t")),
         psr=_float(row.get("psr")),
+        mean_roc=_float(row.get("mean_roc")),
         cvar_5=_float(row.get("cvar_5")),
         cvar_5_n=_int(row.get("cvar_5_n")),
         base_cvar_5=_float(row.get("base_cvar_5")),

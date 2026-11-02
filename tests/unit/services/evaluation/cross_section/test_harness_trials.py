@@ -466,6 +466,11 @@ def test_an_option_pnl_edge_has_a_cost_row_per_level_a_stored_base_and_picks_at_
     assert first.base_roc is not None and first.base_roc[0] == 20
     assert first.base_roc[1] == pytest.approx(-0.413 / 95)  # every name, at the full level
     assert r.measures[0].tail.excess_roc is not None  # the paired excess now has its base
+    # E11: each level's return on the collateral, the value times spot 100 over collateral 95
+    assert top.rocs_at == pytest.approx(tuple(v * 100 / 95 for v in top.values_at))
+    assert [levels[k].tail.mean_roc for k in levels] == pytest.approx(
+        [m.mean_excess_picks * 100 / 95 for m in levels.values()]
+    )
 
 
 def test_an_option_pnl_edge_with_no_chain_outcome_stored_is_missing_data() -> None:

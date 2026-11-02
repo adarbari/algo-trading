@@ -454,6 +454,23 @@ def level_values(levels: Sequence[pd.DataFrame], name: str) -> tuple[float, ...]
     return tuple(found) if found and all(math.isfinite(v) for v in found) else None
 
 
+def level_rocs(
+    values: tuple[float, ...] | None, stored: pd.DataFrame, name: str
+) -> tuple[float, ...] | None:
+    """A long option position's return on capital at each cost level (E11): each level's value
+    (P&L over the entry spot, net of the document's cost) times the trade's own entry spot over
+    its collateral, exact (``shapes.trade_frame`` nets the same cost of the same spot); None
+    without ``values`` or a positive collateral and spot in its stored row (``stored``, indexed by
+    instrument)."""
+    if values is None or name not in stored.index:
+        return None
+    spot = _numbers(stored.loc[[name]], "entry_spot")[0] if "entry_spot" in stored else math.nan
+    capital = _numbers(stored.loc[[name]], "collateral")[0] if "collateral" in stored else math.nan
+    if not (math.isfinite(spot) and math.isfinite(capital) and spot > 0 and capital > 0):
+        return None
+    return tuple(v * spot / capital for v in values)
+
+
 def _refuse_book(edge: Edge) -> None:
     """A ``portfolio_return`` is valued as a book (``cross_section/portfolio``), never by name."""
     if edge.outcome.kind == "portfolio_return":
