@@ -1,13 +1,15 @@
-"""The catalogue fields an option trade's exit rules name, read one close at a time (ADR 0088,
-design 2.4a, 2.13): ``FieldLoader`` reads each field of a close from that close's own partition
-only (``data.rollups.group_view``; a rule observed at close t acts at t + 1, so t's partition is
-the latest a decision may use), once per session and field set a run, and returns the latest
-``knowledge_ts`` of the partitions it read so a row's ``knowledge_ts`` stops at its own exit.
-``refuse_unstored`` names the fields a window cannot read at all (an expression feature, an
-instrument fact, or a feature group with no partition anywhere in S..T): the writer refuses
-that position (recorded, the others still write) rather than run a rule as one that never fires.
-A close whose partition lacks a name's row (or holds NaN) gives it a None: the rule is UNKNOWN
-there, never filled from another session."""
+"""The catalogue fields a path trade's exit rules name (an option or a share position), read one
+close at a time (ADR 0088, design 2.4a, 2.13): ``FieldLoader`` reads each field of a close from that
+close's own partition only (``data.rollups.group_view``; a rule observed at close t acts at t + 1,
+so t's partition is the latest a decision may use), once per session and field set a run, and
+returns the latest ``knowledge_ts`` of the partitions it read so a row's ``knowledge_ts`` stops at
+its own exit. ``refuse_unstored`` names the fields a window cannot read at all (an expression
+feature, an instrument fact, or a feature group with no partition anywhere in S..T): the writer
+refuses that position (recorded, the others still write) rather than run a rule as one that never
+fires. A close whose partition lacks a name's row (or holds NaN) gives it a None: the rule is
+UNKNOWN there, never filled from another session. ``rule_licence`` is a row's licence: the strictest
+of
+its price source's and the rule's fields'."""
 
 import math
 from collections.abc import Sequence
@@ -20,6 +22,9 @@ from algotrade.core.model.fields import field_source, group_of_table
 from algotrade.core.model.predicates import FieldValue
 from algotrade.data import StoreReader
 from algotrade.data.rollups import group_stamp, group_view
+from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.framework.feature import strictest
+from algotrade.services.licences import licence_of
 
 type Closes = dict[str, dict[str, FieldValue]]  # name -> field -> value at one close
 
@@ -89,3 +94,9 @@ def refuse_unstored(
         if not stored[table] & set(closes):
             problems.append(f"{name}: no stored partition of {table} in {closes[0]}..{closes[-1]}")
     return problems
+
+
+def rule_licence(features: FeatureSet | None, fields: Sequence[str], price: str = "open") -> str:
+    """The strictest licence of the ``price`` source and the exit rule's catalogue ``fields``."""
+    held = [] if features is None else [licence_of(features, f) for f in fields]
+    return strictest([price, *held])

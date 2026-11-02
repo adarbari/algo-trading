@@ -8,13 +8,21 @@ from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import (
     market_rollups,
-    option_outcomes,
     outcomes,
     residual_returns,
     rollups,
 )
+from algotrade_ingestion.tasks.derived.paths import option_outcomes, share_outcomes
 from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
-from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
+from algotrade_ingestion.tasks.framework.params import (
+    FROM,
+    SESSION,
+    TO,
+    Params,
+    Task,
+    session_of,
+    symbols,
+)
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
 from algotrade_ingestion.tasks.macro import series as macro_series
@@ -223,6 +231,34 @@ def run_outcomes(ctx: TaskContext, p: Params) -> RunRecord:
 
 def run_option_outcomes(ctx: TaskContext, p: Params) -> RunRecord:
     return option_outcomes.compute_option_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
+
+
+def run_share_outcomes(ctx: TaskContext, p: Params) -> RunRecord:
+    return share_outcomes.compute_share_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
+
+
+# The path outcome writers (ADR 0088), declared here, not in ``registry.py`` (at the file-length
+# cap); the registry adds ``PATH_TASKS`` to ``TASKS`` in their place.
+PATH_TASKS = (
+    Task(
+        "option-outcomes",
+        "chain P&L of the option windows a session closes (ADR 0053 amendment); forward-only",
+        option_outcomes,
+        option_outcomes.TABLES,
+        run_option_outcomes,
+        settings="edges/*.toml (option_pnl structures, tenors, horizons)",
+        params=(SESSION, FROM, TO),
+    ),
+    Task(
+        "share-outcomes",
+        "share path trades of the windows a session closes, for share setups with an exit",
+        share_outcomes,
+        share_outcomes.TABLES,
+        run_share_outcomes,
+        settings="edges/*.toml (share positions with [outcome.exit], horizons)",
+        params=(SESSION, FROM, TO),
+    ),
+)
 
 
 def run_residual_returns(ctx: TaskContext, p: Params) -> RunRecord:

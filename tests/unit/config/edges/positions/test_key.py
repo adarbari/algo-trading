@@ -18,9 +18,10 @@ from algotrade.config.edges.positions.key import (
     parsed_key,
     position_key,
     resolve_legs,
+    share_position_key,
     with_legs,
 )
-from algotrade.config.edges.positions.spec import ExitRule
+from algotrade.config.edges.positions.spec import ExitRule, ExitSettings
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import Group, Rule
@@ -124,3 +125,19 @@ def test_one_spelling_per_value_numbers_as_floats_and_dates_as_text() -> None:
 
     assert keyed(1) == keyed(1.0)
     assert keyed(date(2026, 1, 1)) == keyed("2026-01-01")  # a date does not crash the dump
+
+
+def test_a_share_key_holds_its_sides_exit_rules_and_no_option_parameters() -> None:
+    share = {"kind": "excess_return", "horizon_sessions": [5], "benchmark": "SPY",
+             "start_offset_sessions": 1, "position": "short_shares", "side": "short"}  # fmt: skip
+    edge = parse_edge(document(schedule="every_session", outcome=share, top_k=10), "drift", WHERE)
+    o = with_legs(edge, TEMPLATES).outcome
+    spec = replace(o.position, exit=ExitSettings(take_profit=0.1, stop_loss=0.05))
+    parsed = parse_position_key(share_position_key(replace(o, position=spec), 5))
+    assert (parsed.hold, parsed.offset, parsed.tenor_days, parsed.expiry_cycle) == (5, 1, None, "")
+    assert [leg.kind for leg in parsed.legs] == ["shares"]
+    # a short's take profit is a fall of the entry price, its stop a rise
+    rules = [(x.kind, x.rule.rules()[0].op, x.rule.rules()[0].value) for x in parsed.exits]
+    assert rules == [("TAKE_PROFIT", "lte", -0.1), ("STOP_LOSS", "gte", 0.05)]
+    with pytest.raises(ConfigurationError, match="share legs"):
+        share_position_key(outcome(), 21)  # an option position has no share key
