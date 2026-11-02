@@ -143,9 +143,11 @@ def not_possible(edge: Edge) -> str | None:
     """Why the paper record cannot trade ``edge`` (None: it can)."""
     if needs_implied_vol(edge) and iv_field_of(edge) in MIXED_SOURCE_IV:
         return "its implied vol field mixes sources: name one vendor's field"
-    if edge.gate is not None:  # the record would trade the sessions the gate closes (E9)
+    if edge.gate is not None or edge.outcome.entry is not None:  # not applied to it yet (E9)
         return (
             "its setup gate is not applied to the paper record yet: it would trade closed sessions"
+            if edge.gate is not None
+            else "its entry condition is not applied to the paper record yet: it would enter early"
         )
     if edge.outcome.result_side != "long":
         return (

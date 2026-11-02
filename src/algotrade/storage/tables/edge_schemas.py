@@ -105,6 +105,7 @@ EDGE_SERIES = fixed(
         "block_days", "picks", "pick_hits", "eligible", "base_hits", "excluded_missing",
         "excluded_unmeasured", "excluded_score_coverage", "no_entry_bar", "no_implied_vol",
         "outside_universe", "delisted", "unscored",
+        "not_triggered", "entry_unknown",  # E13: an entry condition's (nullable in older rows)
     )),
     *floats("pick_mean", "base_mean", *(f"decile_mean_{i:02d}" for i in range(1, 11))),
     runs="merge",
@@ -236,6 +237,13 @@ EDGE_LEGS = fixed(
     # E6b-3 (nullable, no version bump): an option pick's hedged return on capital, stock return
     # on capital and wing cost, flat, three per pick, aligned to ``pick_ids`` (``pick_option``).
     "pick_option float64[]",
+    # E13 (nullable, no version bump): with an entry condition, each pick's own entry session S
+    # (``pick_entry``, aligned to ``pick_ids``) and, over the base names, those whose rule never
+    # held in the wait (``not_triggered``) or was UNKNOWN first (``entry_unknown``); null for an
+    # edge without one and in older legs.
+    "pick_entry date[]",
+    "not_triggered int64",
+    "entry_unknown int64",
     *(f"{n} int64[]" for n in ("pick_ranks", "pick_flags", "base_hits_at", "pick_hits_at")),
     *(f"{n} string[]" for n in ("pick_ids", "pick_reasons")),
     *(f"{n} int64" for n in (

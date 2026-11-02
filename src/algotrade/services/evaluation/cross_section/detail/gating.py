@@ -64,9 +64,11 @@ def open_only(
 
 
 def gate_domains(configs: ConfigStore, edge: Edge) -> dict[str, tuple[str, ...]] | None:
-    """The catalogue's string domains, read only for a gated edge: a label the gate never saw is
-    read as missing (UNKNOWN), never open."""
-    return None if edge.gate is None else dict(field_catalog(configs).domains)
+    """The catalogue's string domains, read only for an edge with a gate or an entry condition (a
+    strict site): a label the rule never saw is read as missing (UNKNOWN), never open."""
+    outcomes = (edge.outcome, *(v.outcome for v in edge.variants))
+    strict = edge.gate is not None or any(o.entry is not None for o in outcomes)
+    return dict(field_catalog(configs).domains) if strict else None
 
 
 type Series = tuple[SessionStat, ...]

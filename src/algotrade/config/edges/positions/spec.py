@@ -200,8 +200,7 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
         pending = [
             (what, slice_)
             for what, slice_, used in (
-                ("entry", "E13", outcome.entry is not None),
-                ("case values", "E13", outcome.position is not None and outcome.position.cases),
+                ("case values", "E13b", outcome.position is not None and outcome.position.cases),
             )
             if used
         ]
