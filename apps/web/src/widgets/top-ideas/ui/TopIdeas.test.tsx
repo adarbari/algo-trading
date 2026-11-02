@@ -25,7 +25,7 @@ vi.mock('@/shared/api', async (importOriginal) => ({
 const hooks = vi.hoisted(() => ({ useIdeas: vi.fn() }));
 vi.mock('@/entities/idea', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useIdeas: hooks.useIdeas,
+  useIdeas: (applied: unknown): unknown => hooks.useIdeas(applied), // the tab is not under test here
 }));
 
 type Served = NonNullable<IdeasResponse['ideas']>;

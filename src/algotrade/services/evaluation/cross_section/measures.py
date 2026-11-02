@@ -51,8 +51,11 @@ class Pick:
     ``gross``: the stored excess return before cost (a return outcome, counted); ``drawdown``:
     the window's ``fwd_max_drawdown``; ``adv``: ``adv_usd_20d`` at D; ``reference`` / ``touch``:
     an ``expires_otm`` pick's; ``side``: ``short`` for a name the leg is short (its ``value`` and
-    ``hit`` are those of the short: ``hit.apply_outcome``'s ``short_value``). A value not known
-    is None, never 0."""
+    ``hit`` are those of the short: ``hit.apply_outcome``'s ``short_value``). The contract's fields
+    (leg v5, ADR 0088 2.5a; ``evidence.shapes.trade_frame``): ``exit_session`` / ``exit_kind``,
+    ``capital`` (an option's collateral), ``roc_gross`` / ``roc`` (return on capital before cost
+    and at the document's cost), ``adverse``, ``price_source`` and ``outcome_licence``; None in a
+    pick of an older leg and for a pick with no outcome row. A value not known is None, never 0."""
 
     instrument_id: str
     rank: int
@@ -67,6 +70,14 @@ class Pick:
     reference: float | None = None
     touch: bool | None = None
     side: str = "long"
+    exit_session: date | None = None
+    exit_kind: str | None = None
+    capital: float | None = None
+    roc_gross: float | None = None
+    roc: float | None = None
+    adverse: float | None = None
+    price_source: str | None = None
+    outcome_licence: str | None = None
 
 
 @dataclass(frozen=True)

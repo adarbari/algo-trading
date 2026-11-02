@@ -1,16 +1,19 @@
 /**
- * "Ideas for Fri 2 Oct": the session the stored screens ran on; plain "Ideas" while loading or
- * when the ideas are unavailable. Under it, one chip per screener with its state for the session.
+ * "Ideas for Fri 2 Oct": the session the stored lists are for; plain "Ideas" while loading or
+ * when nothing is stored. Under it, the Stocks | Premium tabs (the page's `tab` search param).
  */
-import { formatValue, Heading, Stack } from '@algotrade/ui';
+import { formatValue, Heading, SegmentedControl, Stack } from '@algotrade/ui';
 
-import { useIdeas } from '@/entities/idea';
+import { IDEA_TABS, useSetupIdeas, type IdeaTab } from '@/entities/idea';
+import { termHelp } from '@/features/guide-help';
 
-import { ScreenerChips } from './ScreenerChips';
+export interface IdeasHeadingProps {
+  tab: IdeaTab;
+  onTabChange: (tab: IdeaTab) => void;
+}
 
-export function IdeasHeading() {
-  const ideas = useIdeas();
-  const session = ideas.data?.session;
+export function IdeasHeading({ tab, onTabChange }: IdeasHeadingProps) {
+  const session = useSetupIdeas(tab).data?.session;
   return (
     <Stack gap={2}>
       <Heading level={1}>
@@ -18,7 +21,15 @@ export function IdeasHeading() {
           ? `Ideas for ${formatValue(session, { kind: 'date', style: 'weekday' }).text}`
           : 'Ideas'}
       </Heading>
-      <ScreenerChips screeners={ideas.data?.screeners ?? []} />
+      <Stack direction="row" gap={2} align="center">
+        <SegmentedControl
+          aria-label="Ideas tab"
+          options={IDEA_TABS.map((t) => ({ value: t.id, label: t.label }))}
+          value={tab}
+          onValueChange={onTabChange}
+        />
+        {termHelp('idea_tab')}
+      </Stack>
     </Stack>
   );
 }

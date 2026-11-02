@@ -9,6 +9,7 @@ from algotrade.config.edges.document import MAIN, QUALITY_BAR
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
+from algotrade.services.evaluation.evidence.contract import trade_problems as trades_problems
 from algotrade.services.evaluation.time_series import harness
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from algotrade.services.read.context import open_stores
@@ -166,3 +167,16 @@ def test_the_stored_rows_reach_the_verdict_and_the_t_ratio_is_the_edges_t() -> N
     labels = {c.id: c.label for c in verdict.criteria}
     assert "Welch" in labels["decile_t"] and "Welch" in labels["works_t"]
     assert verdict.verdict == "not_enough_data", verdict.rationale
+
+
+def test_the_windows_are_trade_contract_rows_equal_to_the_measured_values() -> None:
+    """E6a (ADR 0088, 2.5a): the in-window rows of an instrument as contract rows; their values
+    are ``in_window``'s, in step, and no measure changed."""
+    w = build_world()
+    (spy,) = run(w).results
+    trades = spy.trades
+    assert trades is not None and trades_problems(trades) == []
+    assert list(trades["entry_session"]) == [d for d, _ in spy.in_window]
+    assert list(trades["value"]) == pytest.approx([v for _, v in spy.in_window])
+    assert set(trades["capital_basis"]) == {"notional"} and set(trades["price_source"]) == {"bars"}
+    assert (trades["return_on_capital"] == trades["value"]).all() and trades["hit"].all()

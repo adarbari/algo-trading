@@ -37,7 +37,6 @@ function setup() {
           onOpenScreener={vi.fn()}
           onOpenRegime={vi.fn()}
           onOpenEdge={vi.fn()}
-          onOpenEdges={vi.fn()}
         />
       </QueryClientProvider>
     </ToastProvider>,
@@ -49,13 +48,11 @@ beforeEach(() => {
 });
 
 describe('the Ideas page with the real query client', () => {
-  it('says no screener has run yet, with a link to Screeners, when nothing is stored', async () => {
-    GQL.mockResolvedValue({ ideas: null });
+  it('says nothing is stored yet when the API has no ideas for the session', async () => {
+    GQL.mockResolvedValue({ ideas: null, setupIdeas: null });
     setup();
-    expect(await screen.findByText(/No screener has run yet, so there/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Go to Screeners' })).toBeInTheDocument();
+    expect(await screen.findByText('Nothing is stored for this session yet.')).toBeInTheDocument();
     expect(screen.queryByText('Loading ideas…')).not.toBeInTheDocument();
-    expect(screen.queryByText('Loading screeners…')).not.toBeInTheDocument();
   });
 
   it('settles on the error state at once for a request error, without waiting on a retry', async () => {
@@ -66,9 +63,9 @@ describe('the Ideas page with the real query client', () => {
     expect(
       await screen.findByText('The ideas failed to load.', {}, { timeout: 500 }),
     ).toBeVisible();
-    // The regime strip reads too; the Ideas read itself is asked once (no retry).
+    // The regime strip reads too; the setup-ideas read itself is asked once (no retry).
     const asked = GQL.mock.calls.filter(([document]) =>
-      String(document).includes('query IdeasPage'),
+      String(document).includes('query SetupIdeas'),
     );
     expect(asked).toHaveLength(1);
   });

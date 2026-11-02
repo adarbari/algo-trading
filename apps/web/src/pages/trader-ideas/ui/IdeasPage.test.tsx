@@ -42,38 +42,25 @@ vi.mock('@/widgets/paused-ideas', async () => {
     ),
   };
 });
-vi.mock('@/widgets/edge-signals', async () => {
-  const { Button } = await import('@algotrade/ui');
+vi.mock('@/widgets/ideas-heading', async () => {
+  const { Heading, Button } = await import('@algotrade/ui');
   return {
-    EdgeSignals: (props: {
-      onOpen: (s: string, via: string) => void;
-      onOpenEdge: (id: string) => void;
-      onOpenEdges: () => void;
-    }) => (
+    IdeasHeading: (props: { tab: string; onTabChange: (tab: 'premium') => void }) => (
       <>
+        <Heading level={1}>Ideas for Fri 2 Oct</Heading>
         <Button
           onClick={() => {
-            props.onOpen('MSFT', 'drift');
+            props.onTabChange('premium');
           }}
-        >
-          signal
-        </Button>
-        <Button
-          onClick={() => {
-            props.onOpenEdge('drift');
-          }}
-        >
-          signal edge
-        </Button>
-        <Button onClick={props.onOpenEdges}>edges</Button>
+        >{`tab ${props.tab}`}</Button>
       </>
     ),
   };
 });
-vi.mock('@/widgets/ideas-heading', async () => {
-  const { Heading } = await import('@algotrade/ui');
-  return { IdeasHeading: () => <Heading level={1}>Ideas for Fri 2 Oct</Heading> };
-});
+vi.mock('@/widgets/setup-ideas', () => ({
+  // the tab's Unproven section is what the page composes into the widget
+  SetupIdeas: (props: { tab: string; unproven: React.ReactNode }) => <>{props.unproven}</>,
+}));
 vi.mock('@/widgets/top-ideas', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
@@ -125,7 +112,6 @@ describe('IdeasPage', () => {
     const onOpenRegime = vi.fn();
     const onOpenScreener = vi.fn();
     const onOpenEdge = vi.fn();
-    const onOpenEdges = vi.fn();
     const { container } = render(
       <IdeasPage
         search={{ f: 'earnings:..5s' }}
@@ -136,13 +122,14 @@ describe('IdeasPage', () => {
         onOpenScreener={onOpenScreener}
         onOpenRegime={onOpenRegime}
         onOpenEdge={onOpenEdge}
-        onOpenEdges={onOpenEdges}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
     expect(widgets.top).toHaveBeenCalledWith(
       expect.objectContaining({ search: { f: 'earnings:..5s' } }),
     );
+    await user.click(screen.getByRole('button', { name: 'tab stocks' }));
+    expect(onSearchChange).toHaveBeenCalledWith({ tab: 'premium' });
     await user.click(screen.getByRole('button', { name: 'regime strip' }));
     expect(onOpenRegime).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'conviction' }));
@@ -157,12 +144,6 @@ describe('IdeasPage', () => {
     expect(onOpenScreener).toHaveBeenLastCalledWith('liq');
     await user.click(screen.getByRole('button', { name: 'screeners' }));
     expect(onScreeners).toHaveBeenCalledOnce();
-    await user.click(await screen.findByRole('button', { name: 'signal' }));
-    expect(onOpen).toHaveBeenLastCalledWith('MSFT', 'drift');
-    await user.click(screen.getByRole('button', { name: 'signal edge' }));
-    expect(onOpenEdge).toHaveBeenCalledWith('drift');
-    await user.click(screen.getByRole('button', { name: 'edges' }));
-    expect(onOpenEdges).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
   });
 });

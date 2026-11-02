@@ -26,6 +26,7 @@ import {
   type Idea,
   type IdeasSearch,
   type IdeasSearchPatch,
+  type IdeaTab,
 } from '@/entities/idea';
 import { decisionLabel } from '@/entities/screen';
 
@@ -48,6 +49,8 @@ export type TopIdeasSearch = IdeasSearch & FilterSearch;
 export type TopIdeasSearchPatch = IdeasSearchPatch & { f?: string | undefined };
 
 export interface TopIdeasProps {
+  /** The tab whose screeners make the list (its Unproven section, ADR 0083). */
+  tab?: IdeaTab;
   /** The page's search params: the column set and the filters in force. */
   search: TopIdeasSearch;
   onSearchChange: (patch: TopIdeasSearchPatch) => void;
@@ -59,6 +62,7 @@ export interface TopIdeasProps {
 }
 
 export function TopIdeas({
+  tab,
   search,
   onSearchChange,
   onCompare,
@@ -68,7 +72,7 @@ export function TopIdeas({
   const filters = useFilterState(search.f, (f) => {
     onSearchChange({ f });
   });
-  const ideas = useIdeas(filters.filters);
+  const ideas = useIdeas(filters.filters, tab);
   const facets = ideas.data?.facets;
   const labelOf = useMemo(() => labelsOf(ideas.data?.screeners ?? []), [ideas.data?.screeners]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -126,7 +130,7 @@ export function TopIdeas({
         }
       />
       <Panel
-        title="Top ideas · across all your screeners"
+        title="Tonight's matches · across the screeners of this tab"
         description={ideas.data?.session ? `Session ${ideas.data.session}` : undefined}
         flush
         state={state}
