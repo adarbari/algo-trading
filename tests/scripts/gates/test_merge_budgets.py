@@ -53,10 +53,26 @@ def test_a_route_removed_on_one_side_goes_with_its_e2e_entry_and_reasons() -> No
     out = mb.merge_budgets(BASE, ours, theirs)
     assert "/gone" not in out["e2e"] and "e2e./gone.requests" not in out["reasons"]
     assert out["bundle"]["routes"]["a.ts"] == 11
-    # a side that changed what the other removed keeps it
-    ours2 = doc()
-    ours2["e2e"]["/gone"]["requests"] = 12
-    assert mb.merge_budgets(BASE, ours2, theirs)["e2e"]["/gone"]["requests"] == 12
+
+
+def test_a_removal_wins_over_a_raise_on_the_other_side() -> None:
+    # 2026-11-02 #1035: the branch removed two pages and their e2e routes while main raised
+    # their budgets; keeping the raises left page budgets without pages and half e2e entries
+    base = json.loads(json.dumps(BASE))
+    base["e2e"]["/gone"].update({"dom_nodes": 200, "first_load_js_gzip_bytes": 1000})
+    removed = json.loads(json.dumps(base))
+    del removed["e2e"]["/gone"], removed["bundle"]["routes"]["old.ts"]
+    for key in ("e2e./gone.requests", "bundle.routes.old.ts"):
+        del removed["reasons"][key]
+    raised = json.loads(json.dumps(base))
+    raised["e2e"]["/gone"]["requests"] = 12
+    raised["bundle"]["routes"]["old.ts"] = 6
+    raised["reasons"]["e2e./gone.requests"] = "main raised it"
+    for ours, theirs in ((removed, raised), (raised, removed)):
+        out = mb.merge_budgets(base, ours, theirs)
+        assert "/gone" not in out["e2e"] and "old.ts" not in out["bundle"]["routes"]
+        assert "e2e./gone.requests" not in out["reasons"]
+        assert "bundle.routes.old.ts" not in out["reasons"]
 
 
 def test_an_orphan_reason_is_dropped() -> None:

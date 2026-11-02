@@ -13,10 +13,13 @@ run each). Declared in ``.gitattributes``; registered per clone by
 ``%A`` (ours) is overwritten with the result; exit 0 = merged, 1 = conflict (a normal conflict
 file, with markers, is left in ``%A``). ``budgets``: a three-way merge per leaf, keys unioned,
 the larger number where both sides changed it, the ``reasons`` text of the winning number, and a
-key one side removed (the other leaving it unchanged) stays removed; a reason whose budget no
-longer exists is dropped. ``views``: views unioned by key, the entry of the side that changed it
-(ours when both did), so a captured document is never lost to a regeneration. Unparsable JSON
-falls back to a normal conflict.
+key one side removed stays removed, even where the other side raised it: the side that removed
+a page or route removed what the budget measures, and a kept raise left a budget for a page that
+is gone, or half an e2e entry (2026-11-02, #1035: twice; a removed budget the code still needs
+fails `check-bundle-budgets` "a budget for every lazy page" instead, at the pre-push hook). A
+reason whose budget no longer exists is dropped. ``views``: views unioned by key, the entry of
+the side that changed it (ours when both did), so a captured document is never lost to a
+regeneration. Unparsable JSON falls back to a normal conflict.
 """
 
 from __future__ import annotations
@@ -82,8 +85,8 @@ def merge_budgets(  # noqa: PLR0912 - one pass per leaf, then one per reason
                 merged[path], winner[path] = a, o
         else:
             side = o if in_o else t
-            if path in b and b[path] == side[path]:
-                continue  # the other side removed it and this side left it alone
+            if path in b:
+                continue  # the other side removed it: removed, whatever this side changed
             merged[path], winner[path] = side[path], side
     by_key = {".".join(p): p for p in merged}
     reasons: dict[str, Any] = {}
