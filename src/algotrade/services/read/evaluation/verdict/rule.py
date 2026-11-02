@@ -12,6 +12,7 @@ from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.portfolio import benchmark_words as benchword
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
+from algotrade.core.time.calendar import next_session
 from algotrade.services.read.context import Stores, once_per_request
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.decay import decay_of
@@ -54,6 +55,7 @@ from algotrade.services.read.evaluation.verdict.model import (
     EN_DASH,
     FAIL,
     IN_SAMPLE,
+    NOT_ENOUGH,
     NOT_WORKING,
     OUT_OF_SAMPLE,
     PROMISING,
@@ -402,11 +404,37 @@ def judge(
     judged = _judge_candidate(
         replace(c, chain=facts.chain), t, draws, decoys, lost_inputs, facts, headline
     )
+    judged = _held_back(judged, facts, t, range_to, choice.key[1])
     years = () if headline else _years(c, split, range_to)
     return replace(
         judged, edge_id=edge_id, years=years, basis_why=choice.why,
         basis_screener=choice.key[0], basis_horizon=choice.key[1],
     )  # fmt: skip
+
+
+def _held_back(
+    v: EdgeVerdict, facts: EdgeFacts, t: VerdictSettings, range_to: date | None, horizon: int
+) -> EdgeVerdict:
+    """No option verdict before its unseen holdout (ADR 0088 decision 15): the holdout counts over
+    trades whose window has closed, so an option setup's run must reach ``holdout_from`` +
+    ``holdout_days`` + the basis's holding period (``horizon`` sessions, as calendar days, rounded
+    up) before it is judged; until then it is Not enough data with the reason (a run with no end
+    is held back too), whatever its figures say. The figures stay."""
+    if not facts.chain or v.verdict not in (WORKS, PROMISING, NOT_WORKING):
+        return v
+    start, days = t.tails.holdout_from, t.tails.holdout_days
+    earliest = start + timedelta(days=days)  # the last decision session of the holdout ...
+    for _ in range(horizon + 1):  # ... and its entry and window on the exchange calendar
+        earliest = next_session(earliest)
+    if range_to is not None and range_to >= earliest:
+        return v
+    reason = (
+        f"No verdict on an option setup before its unseen holdout holds {days} days of closed "
+        f"trades: it starts {start}, the trades of {horizon} sessions close on the exchange "
+        f"calendar and the run reaches {range_to or 'no session'}; "
+        f"the earliest verdict is {earliest}"
+    )
+    return replace(v, verdict=NOT_ENOUGH, rationale=reason, headline=reason, result=reason)
 
 
 def _inputs(ctx: Stores, run: runs.EdgeRun) -> tuple[tuple[EdgeRow, ...], Draws]:

@@ -4,6 +4,8 @@ import dataclasses
 from dataclasses import fields, replace
 from datetime import date, timedelta
 
+import pytest
+
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.services.read.evaluation.runs import Draw, EdgeRow, _lost
@@ -666,13 +668,43 @@ def test_a_chain_edge_can_be_promising_but_never_works_without_an_in_sample_basi
     )
     rows = [r for r in strong if r.slice_kind != "in_sample"]  # nothing in-sample exists
     chain = EdgeFacts(chain=True)
-    v = verdict(rows, draws=draws(100), facts=chain)
+    v = verdict(rows, draws=draws(100), facts=chain, range_to=AFTER_HOLDOUT)
     assert v.verdict == PROMISING and "Basis fixed on an in-sample period" in v.rationale
     by = {c.id: c for c in v.criteria}
     assert by["oos_lift"].status == "not_applicable" and by["basis_in_sample"].status == "fail"
     # an ordinary edge with the same rows still waits on its in-sample figures instead
     plain = verdict(rows, draws=draws(100))
     assert plain.verdict == NOT_ENOUGH and "basis_in_sample" not in {c.id for c in plain.criteria}
+
+
+AFTER_HOLDOUT = date(2027, 2, 25)  # 2026-10-26 + 92 days, then 21 sessions (entry and window)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        result(
+            oos={"decile_t": 3.0, "decile_spread": 0.9},
+            whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
+        ),
+        result(),
+        result(oos={"hit_rate": 0.3, "lift": 0.6, "decile_t": -1.0}),
+    ],
+    ids=["strong", "promising", "not working"],
+)
+def test_no_option_verdict_is_given_before_its_unseen_holdout_has_run(rows: list[EdgeRow]) -> None:
+    """Fitness (ADR 0088 decision 15): whatever the figures, an option setup's label is Not enough
+    data, with the reason, until the run reaches ``holdout_from`` + ``holdout_days``; the one
+    judge is the only place a label is decided (the stored row and the reader both call it)."""
+    chain = EdgeFacts(chain=True)
+    for end in (None, date(2026, 12, 1), AFTER_HOLDOUT - timedelta(days=1)):
+        v = verdict(rows, draws=draws(100), facts=chain, range_to=end)
+        assert v.verdict == NOT_ENOUGH and "unseen holdout" in v.result
+        assert "2027-02-25" in v.rationale  # the earliest verdict, in words
+    after = verdict(rows, draws=draws(100), facts=chain, range_to=AFTER_HOLDOUT)
+    assert after.verdict != NOT_ENOUGH or "unseen holdout" not in after.result
+    plain = verdict(rows, draws=draws(100), range_to=None)  # a share setup is never held back
+    assert "unseen holdout" not in plain.result
 
 
 # portfolio_return (ADR 0074): a book beats a blended benchmark, with no base rate over names
@@ -798,3 +830,40 @@ def test_a_member_does_not_count_as_a_peer_trial_of_the_ensemble() -> None:
     ]
     crit = {c.id: c for c in verdict(rows, facts=BOOK).criteria}
     assert crit["pbo"].status == "not_applicable" and crit["works_pbo"].status == "not_applicable"
+
+
+def test_a_trade_window_that_has_not_closed_does_not_count_toward_the_holdout() -> None:
+    """The holdout counts closed trades (ADR 0088 d15): a run ending on holdout_from + 92 days has
+    decisions whose 20-session windows are still open, so it is not yet a verdict."""
+    rows = result()
+    chain = EdgeFacts(chain=True)
+    early = verdict(rows, draws=draws(100), facts=chain, range_to=date(2027, 1, 26))
+    assert early.verdict == NOT_ENOUGH and "unseen holdout" in early.result
+    after = verdict(rows, draws=draws(100), facts=chain, range_to=AFTER_HOLDOUT)
+    assert after.verdict != NOT_ENOUGH
+
+
+def test_the_closing_of_a_window_follows_the_exchange_calendar_across_holidays() -> None:
+    """A 20-session window across Christmas and New Year closes 32 calendar days on, past any
+    fixed allowance: holdout_from 2026-12-04 + 1 day, then 21 sessions, is 2027-01-06."""
+    holiday = replace(T, tails=replace(T.tails, holdout_from=date(2026, 12, 4), holdout_days=1))
+    held = judge(
+        "e",
+        result(),
+        SPLIT,
+        holiday,
+        draws=draws(100),
+        facts=EdgeFacts(chain=True),
+        range_to=date(2027, 1, 5),
+    )
+    assert held.verdict == NOT_ENOUGH and "2027-01-06" in held.rationale
+    free = judge(
+        "e",
+        result(),
+        SPLIT,
+        holiday,
+        draws=draws(100),
+        facts=EdgeFacts(chain=True),
+        range_to=date(2027, 1, 6),
+    )
+    assert free.verdict != NOT_ENOUGH

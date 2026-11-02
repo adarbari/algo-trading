@@ -160,6 +160,7 @@ def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.Edg
             profile=verdict.profile_of(edge),
             base=edge.base,
         ),
+        range_to=run.range_to,  # the option holdout counts to the run's end (ADR 0088 d15)
         headline=headline,
     )
     if not hidden or found.verdict in (verdict.WAITING, verdict.DIAGNOSTIC):

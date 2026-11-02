@@ -21,7 +21,7 @@ from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.runs import EdgeRun
 from algotrade.services.read.evaluation.verdict.rule import JudgeCall
 
-JUDGE_VERSION = 2  # bump on a semantic change of the judge outside JUDGED_CODE (a parse, a column)
+JUDGE_VERSION = 3  # bump on a semantic change of the judge outside JUDGED_CODE (a parse, a column)
 
 # Modules of the package that read a stored headline and never judge (``stored.py``): they are
 # no part of the judge, so editing one neither changes the digest nor needs a re-judge.
@@ -36,6 +36,17 @@ JUDGED_CODE: tuple[str, ...] = (
     "algotrade.config.edges.named:OUT_OF_WINDOW",
     "algotrade.config.edges.named:TIME_SERIES",
     "algotrade.config.edges.verdict:MAIN_OPTION_LEVEL",
+    "algotrade.core.time.calendar:_MLK_FROM_YEAR",
+    "algotrade.core.time.calendar:_SPECIAL_BY_YEAR",
+    "algotrade.core.time.calendar:_observed",
+    "algotrade.core.time.calendar:easter",
+    "algotrade.core.time.calendar:nth_weekday",
+    "algotrade.core.time.calendar:SPECIAL_CLOSURES",
+    "algotrade.core.time.calendar:holidays",
+    "algotrade.core.time.calendar:is_session",
+    "algotrade.core.time.calendar:is_weekend",
+    "algotrade.core.time.calendar:next_session",  # the option holdout window
+    "algotrade.config.edges.verdict:_day",  # the holdout date of TailsVerdict
     "algotrade.config.edges.verdict:OptionCosts",  # reached through the settings (E6b)
     "algotrade.config.edges.verdict:TailsVerdict",
     "algotrade.config.edges.verdict:VerdictSettings",
