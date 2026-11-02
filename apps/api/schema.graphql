@@ -990,7 +990,7 @@ type EdgeTradePage {
 }
 
 """
-One trade of the ledger (a pick of the verdict's basis; excluded picks stay with their public `excludedReason`): `status` won, lost, excluded, or open (a paper trade not settled yet); `symbol` and `company` are the ticker and company name in the reference snapshot in force at the DECISION session (`symbolAsOf`; a delisted pick shows its last known); `beforeSplit`: the decision session is in-sample; `source`: backtest or live; `score` is the score at the decision session; `value` is oriented and net of cost (null: not stored)
+One trade of the ledger (a pick of the verdict's basis; excluded picks stay with their public `excludedReason`): `status` won, lost, excluded, or open (a paper trade not settled yet); `symbol` and `company` are the ticker and company name in the reference snapshot in force at the DECISION session (`symbolAsOf`; a delisted pick shows its last known); `beforeSplit`: the decision session is in-sample; `source`: backtest or live; `score` is the score at the decision session; `value` is oriented and net of cost (null: not stored). The trade contract's columns (ADR 0088): `exitKind` how it closed, `capitalBasis` what its return is on (notional for a share, the collateral for an option), `returnOnCapital` at the document's cost and `returnOnCapitalGross` before it, `capital` per unit, `maxAdverse` its worst loss as a share of capital, and an option's `hedgedRoc`, `stockRoc` and `wingCost` over its collateral (null: not stored, or a share)
 """
 type EdgeTradeRow {
   variant: String!
@@ -1016,6 +1016,15 @@ type EdgeTradeRow {
   advUsd: TradeNumber!
   reference: TradeNumber!
   touch: TradeFlag!
+  exitKind: String
+  capitalBasis: String
+  returnOnCapital: TradeNumber!
+  returnOnCapitalGross: TradeNumber!
+  capital: TradeNumber!
+  maxAdverse: TradeNumber!
+  hedgedRoc: TradeNumber!
+  stockRoc: TradeNumber!
+  wingCost: TradeNumber!
 }
 
 """
