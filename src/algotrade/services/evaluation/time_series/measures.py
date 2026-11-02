@@ -53,6 +53,7 @@ class Obs:
     period: Period
     value: float
     regime: str
+    gate: str = ""  # the setup gate's state at the decision session; "" with no gate
     paired: float | None = None  # a window: its return minus the next stretch's (``with_pairs``)
 
 
@@ -145,6 +146,29 @@ def _regime_side(label: str, split: date, before: bool, o: Obs) -> bool:
 
 
 def _slices(
+    obs: Sequence[Obs], split: date | None, exploratory: bool
+) -> list[tuple[str, str, Callable[[Obs], bool]]]:
+    """The slices of ``obs``; with a setup gate (the observations carry its state) each keeps the
+    open periods only and the ``gate`` slices open / closed / unknown come beside them."""
+    out = _plain_slices(obs, split, exploratory)
+    if not any(o.gate for o in obs):
+        return out
+    gated: list[tuple[str, str, Callable[[Obs], bool]]] = [
+        (k, v, partial(_when_open, keep)) for k, v, keep in out
+    ]
+    gated += [("gate", g, partial(_in_gate, g)) for g in sorted({o.gate for o in obs})]
+    return gated
+
+
+def _when_open(keep: Callable[[Obs], bool], o: Obs) -> bool:
+    return o.gate == "open" and keep(o)
+
+
+def _in_gate(state: str, o: Obs) -> bool:
+    return o.gate == state
+
+
+def _plain_slices(
     obs: Sequence[Obs], split: date | None, exploratory: bool
 ) -> list[tuple[str, str, Callable[[Obs], bool]]]:
     out: list[tuple[str, str, Callable[[Obs], bool]]] = [("all", "all", lambda o: True)]

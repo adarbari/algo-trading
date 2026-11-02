@@ -72,9 +72,13 @@ def evaluate_time_series(
     split: date | None,
     exploratory: bool,
     draws: int = DEFAULT_DRAWS,
+    gate: Callable[[date], str] | None = None,
 ) -> TimeSeriesRun:
     """``edge`` (``base = "out_of_window"``) over the periods of ``start..end``. ``label``: the
-    site's regime label at a session (the regime slices); ``split``: the run's split date."""
+    site's regime label at a session (the regime slices); ``split``: the run's split date;
+    ``gate``: the setup gate's state (open / closed / unknown) at a decision session, ``None`` for
+    an ungated edge. A gated edge's result is its open periods; the closed and unknown ones are
+    kept as the ``gate`` slices (ADR 0088)."""
     trigger = edge.market_trigger
     name = trigger or window_name(edge.schedule)
     if name is None or not isinstance(edge.universe, Selection):
@@ -88,7 +92,7 @@ def evaluate_time_series(
     bills = harness.bill_returns(reader, [p.decision for p in ps], horizon, as_of)
     results = [
         _instrument(s, ids.get(s), ps, read, bills, label, edge, split, exploratory, draws,
-                    horizon, unknown.get(s))
+                    horizon, unknown.get(s), gate)
         for s in symbols
     ]  # fmt: skip
     if placed and placed.dropped:  # base stretches left out for a stale trigger reading
@@ -113,6 +117,7 @@ def _instrument(
     draws: int,
     horizon: int,
     unknown: str | None,
+    gate: Callable[[date], str] | None = None,
 ) -> InstrumentResult:
     lost: Counter[str] = Counter()
     obs: list[Obs] = []
@@ -120,10 +125,14 @@ def _instrument(
         if instrument is None:
             lost[unknown or harness.UNKNOWN_SYMBOL] += 1
         elif (instrument, p.entry) in read.values:
-            obs.append(Obs(p, read.values[instrument, p.entry], label(p.decision)))
+            state = "" if gate is None else gate(p.decision)
+            obs.append(Obs(p, read.values[instrument, p.entry], label(p.decision), state))
         else:
             lost[read.reasons.get((instrument, p.entry), harness.NO_OUTCOME)] += 1
     obs = with_pairs(obs, horizon)
+    every = obs
+    if gate is not None:  # the edge's own series: the open periods (the slices hold the rest)
+        obs = [o for o in obs if o.gate == "open"]
     window = edge.market_trigger or window_name(edge.schedule)
     entries = {o.period.entry for o in obs if o.period.inside}
     kept = (
@@ -138,7 +147,7 @@ def _instrument(
     return InstrumentResult(
         symbol=symbol,
         horizon=horizon,
-        measures=measures(obs, horizon, split, exploratory),
+        measures=measures(every, horizon, split, exploratory),
         randoms=random_windows(oos, f"{edge.id}|{window}|{symbol}|{horizon}", draws)
         if split is not None
         else (),
