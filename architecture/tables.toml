@@ -726,7 +726,7 @@ note = "the stored headline of a site edge's verdict (ADR 0053 amendment 2026-10
 [[table]]
 name = "results/edge_picks"
 owner = "apps/ingestion/algotrade_ingestion/tasks/edges/picks.py"
-note = "what each site edge took at a session (ADR 0081): one row per (user, edge, screener) in the partition of the decision session, status picked / not_decision_day / unjudged / skipped with pick_ids (place 1 first) by the harness's one pick rule (picks.long_picks); framed by services/evaluation/edge_picks/, published by the edge-picks task (resumable: stored keys are skipped), read only by services/read/evaluation/pick_edges.py for the served session (a session or an edge with no row is not_stored, never an older partition); derived, a re-run rebuilds it"
+note = "what each site edge took at a session (ADR 0081): one row per (user, edge, screener) in the partition of the decision session, status picked / gate_closed / not_decision_day / unjudged / skipped with pick_ids (place 1 first), pick_sides (long / short, null in older rows: long) and pick_weights (a book's; null otherwise) by the harness's own pick rules (picks.long_picks, picks.side_picks; ADR 0088 decision 9); framed by services/evaluation/edge_picks/, published by the edge-picks task (resumable: stored keys are skipped), read only by services/read/evaluation/pick_edges.py for the served session (a session or an edge with no row is not_stored, never an older partition); derived, a re-run rebuilds it"
 
 [[table]]
 name = "results/edge_paper"

@@ -83,7 +83,7 @@ detect = [{ call = "ingest_delisted_tickers" }]
 
 [[responsibility]]
 id = "edge-picks"
-description = "Store what every site edge took at a session in results/edge_picks (ADR 0081): per site edge and screener it lists, the picks the harness's one rule gave (services/evaluation/edge_picks/night.py over picks.long_picks, the edge's universe, schedule and top_k) or why none (not_decision_day, unjudged, skipped), one publish per run, resumable by the stored keys, an optional nightly step after the screens with its acceptance check; decides nothing itself (the rule is the harness's)"
+description = "Store what every site edge took at a session in results/edge_picks (ADR 0081): per site edge and screener it lists, the picks the harness's one rule gave (services/evaluation/edge_picks/night.py over picks.long_picks or picks.side_picks, the edge's universe, schedule, top_k and setup gate) with each pick's side, or why none (gate_closed, not_decision_day, unjudged, skipped), one publish per run, resumable by the stored keys, an optional nightly step after the screens with its acceptance check; decides nothing itself (the rule is the harness's)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/edges/picks.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
