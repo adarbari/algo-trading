@@ -108,7 +108,7 @@ id = "ideas_watchlist"
 term = "Showing your watchlist"
 short = "Ideas lists only the names on your watchlist; the line says how many of the list's ideas those are."
 body = """
-The list is built the same way for everyone first. The setups pick, one rule ranks the picks and the list stops at 15. Only then does your watchlist keep the names on it. A watched name ranked 16th or lower is not shown, and each name keeps the rank it has in the whole list. "3 of 15" means 3 of the 15 ideas under the cap are on your watchlist. The counts of what was left out never include a name your watchlist hides.
+The list is built the same way for everyone first. The setups pick, one rule ranks the picks and the list stops at 15. Only then does your watchlist keep the names on it. A watched name ranked 16th or lower is not shown, and each name keeps the rank it has in the whole list. "Showing 3 of 15 ideas" means 3 of the 15 ideas under the cap are on your watchlist. The counts of what was left out never include a name your watchlist hides.
 
 When no setup qualifies, the Unproven list of screener matches is filtered the same way. Each screener's first picks are ranked as usual, and only your watched names among them are listed.
 

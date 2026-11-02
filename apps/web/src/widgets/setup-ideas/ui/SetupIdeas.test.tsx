@@ -115,7 +115,7 @@ describe('SetupIdeas', () => {
   it('says how many of the ideas under the cap are on the watchlist, and opens Settings', async () => {
     hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>({ ...listed, watchlist: 15 }));
     render(<SetupIdeas {...props} />);
-    expect(screen.getByText('Showing 1 of 15 on your watchlist')).toBeVisible();
+    expect(screen.getByText('Showing 1 of 15 ideas: your watchlist')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Edit watchlist' }));
     expect(props.onOpenSettings).toHaveBeenCalled();
   });
@@ -123,7 +123,7 @@ describe('SetupIdeas', () => {
   it('shows no watchlist line without a watchlist', () => {
     hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>(listed));
     render(<SetupIdeas {...props} />);
-    expect(screen.queryByText(/on your watchlist/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/your watchlist/)).not.toBeInTheDocument();
   });
 
   it('says so when nothing is stored', () => {

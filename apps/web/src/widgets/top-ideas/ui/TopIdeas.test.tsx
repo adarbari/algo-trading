@@ -321,7 +321,7 @@ describe('TopIdeas', () => {
   it('says how many of the ranked ideas are on the watchlist, and opens Settings', async () => {
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>({ ...data, total: 2, watchlist: 9 }));
     const { onOpenSettings } = setup();
-    expect(screen.getByText('Showing 2 of 9 on your watchlist')).toBeVisible();
+    expect(screen.getByText('Showing 2 of 9 ideas: your watchlist')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Edit watchlist' }));
     expect(onOpenSettings).toHaveBeenCalled();
   });

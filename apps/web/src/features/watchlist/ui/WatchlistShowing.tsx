@@ -23,7 +23,7 @@ export function WatchlistShowing({ shown, of, help, onEdit }: WatchlistShowingPr
       <Text
         size="sm"
         tone="muted"
-      >{`Showing ${String(shown)} of ${String(of)} on your watchlist`}</Text>
+      >{`Showing ${String(shown)} of ${String(of)} ideas: your watchlist`}</Text>
       {help}
       <Button size="sm" variant="ghost" onClick={onEdit}>
         Edit watchlist

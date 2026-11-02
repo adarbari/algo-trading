@@ -120,7 +120,8 @@ class SetupGroup:
     "evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; "
     "`leftOut` counts by kind; `ruleVersion` the ranking rule's; `watchlist`: the ideas under "
     "the cap before the viewer's watchlist kept the watched ones (only those are in `ideas`; "
-    "`total`, `picked` and the ranks are unfiltered, no count counts a hidden name), null: no "
+    "`total`, `picked` and the ranks are the whole list's, `shown` and the licence left-out "
+    "count only watched names), null: no "
     "watchlist, no filter"
 )
 class SetupIdeas:

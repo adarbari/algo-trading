@@ -9,8 +9,8 @@ The viewer's watchlist (``[watchlist] instruments``, ADR 0083 amendment (c)) fil
 after the cap: of the ideas under the cap only the watched ones are listed, their ``rank`` still
 their place in the whole list, and ``watchlist`` says how many were under the cap (None: no
 watchlist, no filter). The watchlist never changes the rule, the cap, ``total`` or a group's
-``picked``; a group's ``shown`` counts the ideas listed, and the licence's left-out count only
-watched names, so a count never counts a name the watchlist hides.
+``picked`` (the whole list's counts); a group's ``shown`` counts the ideas listed, and the
+licence's left-out count only watched names, so no left-out count counts a name it hides.
 
 ``state`` is ``LISTED`` when any setup qualifies for the tab (a night that picks nothing is then
 an empty list with the reason on each group, never a fall back) and ``UNPROVEN`` when none does:

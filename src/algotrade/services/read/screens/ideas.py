@@ -411,8 +411,8 @@ def load_ideas(
     end = start + max(limit, 0)
     shown = matched[start:end]
     standings = pool_standing(pool, rule)
-    paused_all = [p for p in rank_paused(pool, rule) if not watched or p.instrument_id in watched]
-    held: list[PausedPick] = paused_all[: max(limit, 0)] if start == 0 else []
+    watched_held = [p for p in rank_paused(pool, rule) if not watched or p.instrument_id in watched]
+    held: list[PausedPick] = watched_held[: max(limit, 0)] if start == 0 else []
     wanted: dict[str, list[str]] = {}
     for idea in shown:
         wanted.setdefault(idea.best.run_id, []).append(idea.instrument_id)
@@ -458,7 +458,11 @@ def load_ideas(
         for st in standings
     )
     read = {p.run_id for p in pool if p.status == RAN}  # a withheld run's held rows are not counted
-    paused_total = len(paused_all) if watched else sum(r.paused for r in runs if r.run_id in read)
+    paused_total = (
+        sum(1 for p in pool if p.status == RAN for r in p.paused if r.instrument_id in watched)
+        if watched
+        else sum(r.paused for r in runs if r.run_id in read)
+    )  # every held row of a read run, the watched ones under a watchlist
     more = encode_cursor(stamp, end) if end < len(matched) and shown else None
     return Ideas(
         ctx.session.date,
