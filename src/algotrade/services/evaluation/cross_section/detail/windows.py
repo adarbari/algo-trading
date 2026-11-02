@@ -159,7 +159,7 @@ def series_facts(
         legs = [leg for leg in block if leg.entry in closed]
         windows.append(
             BlockWindow(
-                entry=legs[0].entry,
+                entry=legs[0].candidates[0],  # an entry condition: its wait's first S
                 exit=exit_session(legs[-1].entry, horizon),
                 days=len(legs),
                 lost_table=next((lost[leg.decision] for leg in legs if leg.decision in lost), None),

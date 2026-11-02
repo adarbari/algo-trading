@@ -15,7 +15,8 @@ horizon apart so the windows do not overlap and the sessions are independent:
   ``event_blocks`` pools them into blocks of ``h`` sessions
 
 ``entry_session`` is S = D + the document's ``start_offset_sessions``; for an event schedule
-S = anchor + offset and D = S - 1, so S = D + 1.
+S = anchor + offset and D = S - 1, so S = D + 1. With an entry condition (``entry_leg``) a name's
+S is t + offset for the first close t of the wait whose rule is TRUE (``reads/entry.py``).
 """
 
 from collections.abc import Sequence
@@ -39,10 +40,19 @@ from algotrade.services.evaluation.cross_section.events import EventSchedule
 @dataclass(frozen=True)
 class Leg:
     """One decision session D and its entry session S: the screen and the names are read at D,
-    the outcome rows of the partition at S."""
+    the outcome rows of the partition at S. With an entry condition (``[outcome.entry]``, ADR
+    0088) each name has its own S among ``entries`` (one per close of the wait, ascending) and
+    ``entry`` is the last of them, so a leg is measured only once every window of its wait can
+    be read; the cohort stays D."""
 
     decision: date
     entry: date
+    entries: tuple[date, ...] = ()
+
+    @property
+    def candidates(self) -> tuple[date, ...]:
+        """Every entry session a name of this leg may have (just ``entry`` without a wait)."""
+        return self.entries or (self.entry,)
 
 
 def decision_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> list[date]:
@@ -90,6 +100,20 @@ def entry_session(decision: date, offset: int) -> date:
     for _ in range(offset):
         day = next_session(day)
     return day
+
+
+def wait_closes(decision: date, wait: int) -> list[date]:
+    """The closes of an entry condition's wait: D and the ``wait`` - 1 sessions after it."""
+    closes = [decision]
+    while len(closes) < wait:
+        closes.append(next_session(closes[-1]))
+    return closes
+
+
+def entry_leg(decision: date, offset: int, wait: int) -> Leg:
+    """The leg of D under an entry condition: S = t + ``offset`` for each close t of the wait."""
+    entries = tuple(entry_session(t, offset) for t in wait_closes(decision, wait))
+    return Leg(decision, entries[-1], entries)
 
 
 def event_blocks(
@@ -143,9 +167,23 @@ def leg_blocks(
     harness and the paper record both build their legs here: a paper trade is the backtest's leg."""
     if events is None:
         offset = edge.outcome.start_offset_sessions
+        if edge.outcome.entry is not None:  # a late entrant's window ends wait - 1 later
+            wait = edge.outcome.entry.within_sessions
+            reach = horizon + wait - 1  # D far enough apart that no two windows overlap
+            spaced = (
+                _spaced(decision_sessions(edge.schedule, days, horizon), days, reach)
+                if window_name(edge.schedule) is not None  # a calendar window's length is fixed
+                else decision_sessions(edge.schedule, days, reach)
+            )
+            return [[entry_leg(d, offset, wait)] for d in spaced]
         return [[Leg(d, entry_session(d, offset))] for d in decision_sessions(
             edge.schedule, days, horizon
         )]  # fmt: skip
+    if edge.outcome.entry is not None:
+        raise ConfigurationError(
+            f"edge {edge.id}: an entry condition with an on_event schedule is not evaluated "
+            f"(S = D + 1 is the event rule)"
+        )
     return [
         [Leg(d, entry_session(d, 1)) for d in block]
         for block in event_blocks(sorted(events.names), days, horizon)

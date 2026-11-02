@@ -9,6 +9,9 @@ Two lanes run side by side:
   - python: `make numbering` (ADR numbers vs origin/main) and `FAST_TESTS`, the file- and
     TOML-only tests that failed most (page-latency view coverage, the ADR index, recorded page
     documents, layout caps, the Guide's coverage and style, the CI workflow shape), at `-n 2`;
+    then the ownership check over the changed Python files only (`check_ownership.py --files`,
+    seconds; the full scan is 2 min under load and stays CI's; 2026-11-02, #1064 and #1065 both
+    reached CI with a new violation);
   - web, when `apps/web` changed: Prettier and Stylelint over the changed files and `ds:check`;
     when `src/` or `design-system/` changed, the production build, the bundle budgets (with their
     raise reasons) and the DOM / request budgets, the two web CI failures seen most.
@@ -63,6 +66,7 @@ FAST_TESTS = (
     "tests/architecture/test_layout_web.py",
 )
 Step = tuple[str, list[str], dict[str, str]]
+OWNERSHIP_ROOTS = ("src/", "libs/", "apps/")  # check_ownership.SCAN_ROOTS
 # [1, 2026-11-02 #1035] a budget for a removed page, or a lazy page without one
 BUDGET_PAGES: Step = (
     "budget for every lazy page",
@@ -111,11 +115,21 @@ def free_port_base() -> str:
         return str(s.getsockname()[1] - 7)
 
 
-def python_lane() -> list[Step]:
-    return [
+def python_lane(files: list[str] | tuple[str, ...] = ()) -> list[Step]:
+    steps: list[Step] = [
         ("numbering", ["make", "--no-print-directory", "numbering"], {}),
         ("fast tests", [PY, "-m", "pytest", "-q", "-x", "-n", "2", *FAST_TESTS], {}),
     ]
+    scanned = sorted(f for f in files if f.endswith(".py") and f.startswith(OWNERSHIP_ROOTS))
+    if scanned:
+        steps.append(
+            (
+                "ownership (changed files)",
+                [PY, "scripts/check_ownership.py", "--files", *scanned],
+                {},
+            )
+        )
+    return steps
 
 
 def web_lane(files: list[str], root: Path | None = WEB) -> list[Step]:
@@ -151,7 +165,7 @@ def touches_budget_pages(files: list[str]) -> bool:
 def plan(files: list[str], merge_only: bool, root: Path | None = WEB) -> dict[str, list[Step]]:
     """The lanes to run: `python` always; `web` unless the push only merges main, which still
     runs `BUDGET_PAGES` when the branch touches the pages or the budgets."""
-    lanes = {"python": python_lane()}
+    lanes = {"python": python_lane(files)}
     web = [] if merge_only else web_lane(files, root)
     if touches_budget_pages(files):
         web.append(BUDGET_PAGES)

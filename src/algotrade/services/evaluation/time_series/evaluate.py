@@ -10,7 +10,7 @@ its reason in ``lost``, never filled (an instrument with none has an empty ``all
 frozen one, so the verdict says there is nothing to judge)."""
 
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
@@ -24,6 +24,7 @@ from algotrade.core.time.windows import window_length, window_name
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.cross_section.measures import SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import DEFAULT_DRAWS
+from algotrade.services.evaluation.cross_section.reads.entry import read_entries
 from algotrade.services.evaluation.evidence.shapes import series_trades
 from algotrade.services.evaluation.time_series import harness
 from algotrade.services.evaluation.time_series.measures import (
@@ -75,12 +76,15 @@ def evaluate_time_series(
     exploratory: bool,
     draws: int = DEFAULT_DRAWS,
     gate: Callable[[date], str] | None = None,
+    domains: Mapping[str, Sequence[str]] | None = None,
 ) -> TimeSeriesRun:
     """``edge`` (``base = "out_of_window"``) over the periods of ``start..end``. ``label``: the
     site's regime label at a session (the regime slices); ``split``: the run's split date;
     ``gate``: the setup gate's state (open / closed / unknown) at a decision session, ``None`` for
     an ungated edge. A gated edge's result is its open periods; the closed and unknown ones are
-    kept as the ``gate`` slices (ADR 0088)."""
+    kept as the ``gate`` slices (ADR 0088). With an entry condition each period of an instrument
+    starts at its own S (``_entries``; ``domains``: the catalogue's string domains), windows and
+    base stretches alike; a period it never entered is lost under its reason."""
     trigger = edge.market_trigger
     name = trigger or window_name(edge.schedule)
     if name is None or not isinstance(edge.universe, Selection):
@@ -90,11 +94,13 @@ def evaluate_time_series(
     placed = trigger_periods(reader, trigger, start, end, horizon, as_of) if trigger else None
     ps = placed.periods if placed else periods(name, start, end)
     ids, unknown = harness.resolve_symbols(reader, symbols, end, as_of)
-    read = harness.read_returns(reader, list(ids.values()), [p.entry for p in ps], horizon, as_of)
+    starts = _entries(reader, edge, list(ids.values()), ps, domains)
+    wanted = {p.entry for p in ps} | {s for s in starts.values() if isinstance(s, date)}
+    read = harness.read_returns(reader, list(ids.values()), sorted(wanted), horizon, as_of)
     bills = harness.bill_returns(reader, [p.decision for p in ps], horizon, as_of)
     results = [
         _instrument(s, ids.get(s), ps, read, bills, label, edge, split, exploratory, draws,
-                    horizon, unknown.get(s), gate)
+                    horizon, unknown.get(s), gate, starts)
         for s in symbols
     ]  # fmt: skip
     if placed and placed.dropped:  # base stretches left out for a stale trigger reading
@@ -120,12 +126,17 @@ def _instrument(
     horizon: int,
     unknown: str | None,
     gate: Callable[[date], str] | None = None,
+    starts: Mapping[tuple[str, date], date | str] | None = None,
 ) -> InstrumentResult:
     lost: Counter[str] = Counter()
     obs: list[Obs] = []
-    for p in ps:
+    for period_ in ps:
+        start = (starts or {}).get((instrument or "", period_.first), period_.entry)
+        p = replace(period_, entry=start) if isinstance(start, date) else period_
         if instrument is None:
             lost[unknown or harness.UNKNOWN_SYMBOL] += 1
+        elif isinstance(start, str):  # an entry condition never entered: its reason
+            lost[start] += 1
         elif (instrument, p.entry) in read.values:
             state = "" if gate is None else gate(p.decision)
             obs.append(Obs(p, read.values[instrument, p.entry], label(p.decision), state))
@@ -160,3 +171,29 @@ def _instrument(
         lost=dict(lost),
         trades=None if kept is None else series_trades(edge, kept),
     )
+
+
+def _entries(
+    reader: StoreReader,
+    edge: Edge,
+    ids: Sequence[str],
+    ps: Sequence[Period],
+    domains: Mapping[str, Sequence[str]] | None,
+) -> dict[tuple[str, date], date | str]:
+    """With an entry condition, each (instrument, period's first session) -> its own S (the first
+    close t of the wait from the period's D whose rule holds, S = t + 1 as the period's own S is
+    D + 1), or the reason it never entered (``NOT_TRIGGERED``, ``ENTRY_UNKNOWN``, or the market
+    table of a gap); empty without one."""
+    spec = edge.outcome.entry
+    if spec is None:
+        return {}
+    if spec.within_sessions > 1:  # a shifted window would run into the stretch beside it
+        raise ConfigurationError(
+            f"edge {edge.id} outcome.entry: a time-series edge takes within_sessions = 1"
+        )
+    out: dict[tuple[str, date], date | str] = {}
+    for p in ps:
+        found = read_entries(reader, spec, 1, ids, p.decision, domains)
+        for i in ids:
+            out[i, p.first] = found.gap or found.at.get(i) or found.reasons[i]
+    return out

@@ -1,9 +1,10 @@
 """The licence of a trial and of each per-name column of its ledger (ADR 0064 decision 10, ADR
 0028): the most restrictive catalogue licence of what the trial reads. The trial's (on
 ``edge_eval`` and every ledger row) is that of its implied-vol field (when the outcome reads one),
-its screen's features and its universe's features; a ledger column's is that of what it is
-derived from: the outcome value (with its gross value, reference and touch) from the implied-vol
-field, the score from the screen's features, the ADV from its own field. A field the catalogue
+its screen's features, its universe's features and its entry condition's fields (E13); a ledger
+column's is that of what it is derived from: the outcome value (with its gross value, reference
+and touch) from the implied-vol field, the score from the screen's features, the ADV from its
+own field. A field the catalogue
 does not know (a reference field such as ``instrument.status``) is open. A reader redacts a
 per-name value by the licence recorded here, never by a column's name."""
 
@@ -77,9 +78,11 @@ def trial_licences(
     (None: the outcome reads none); ``outcome``: that of the outcome rows joined."""
     score = strictest(_of(features, screen_fields(c, edge)) for c in configs)
     universe_licence = _of(features, selection_fields(universe))
+    entry = edge.outcome.entry  # what decides each trade's S is read by the trial too (E13)
+    entry_licence = _of(features, sorted({r.field for r in entry.when.rules()})) if entry else OPEN
     value = iv_licence or OPEN
     return TrialLicences(
-        trial=strictest((value, score, universe_licence, outcome)),
+        trial=strictest((value, score, universe_licence, outcome, entry_licence)),
         value=value,
         score=score,
         adv=_of(features, (ADV_FIELD,)),
