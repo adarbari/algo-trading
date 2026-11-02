@@ -195,3 +195,10 @@ def test_script_clones_node_modules_when_the_lockfile_matches_main() -> None:
     # being a real directory, keeps `npm ci` in the worktree away from main's install.
     text = SCRIPT.read_text()
     assert "cp -cR" in text and "cmp -s" in text and "npm ci --prefix" in text
+
+
+def test_create_plan_installs_the_merge_drivers_in_the_common_config() -> None:
+    # five UI PRs re-conflicted on the shared budget files at every merge to main (2026-11-02)
+    out = _run("feat/my-thing").stdout
+    assert "install_merge_drivers.sh" in out
+    assert out.index("worktree add") < out.index("install_merge_drivers.sh")
