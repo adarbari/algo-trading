@@ -180,6 +180,8 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "ranked_share": sum(s.ranked for s in r.stats) / eligible if eligible else None,
         "outside_universe": sum(s.outside_universe for s in r.stats),
         "no_entry_bar": sum(s.no_entry_bar for s in r.stats),
+        "not_triggered": sum(s.not_triggered for s in r.stats),  # an entry condition's (E13)
+        "entry_unknown": sum(s.entry_unknown for s in r.stats),
         "excluded_coverage": m.excluded_coverage,
         "lost_sessions": dict(r.lost_sessions),  # table with no data -> decision sessions
         "timing": None if r.timing is None else dict(r.timing),  # time-series edge (ADR 0073)

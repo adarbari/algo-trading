@@ -92,8 +92,8 @@ def _row(ev: EdgeEvaluation, r: VariantResult, leg: LegDetail, pick: Pick) -> di
         "split_from": ev.split_from,
         "exploratory": ev.exploratory,
         "decision_session": leg.decision,
-        "entry_session": leg.entry,
-        "exit_session": pick.exit_session or window_end(leg.entry, r.horizon),
+        "entry_session": pick.entry_session or leg.entry,  # an entry condition: its own S
+        "exit_session": pick.exit_session or window_end(pick.entry_session or leg.entry, r.horizon),
         "exit_kind": pick.exit_kind,
         "capital_basis": r.capital_basis,
         "return_on_capital": pick.roc,
