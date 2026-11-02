@@ -818,7 +818,7 @@ option prices exist. Chains are stored from 2026-10-02, so a P&L of real quotes 
 It is a second outcomes grain and a second outcome kind; the first is unchanged.
 
 1. **Grain.** `outcomes/option/structure_pnl@v1` (`architecture/tables.toml`, one producer: the
-   ingestion task `option-outcomes`, `tasks/derived/option_outcomes.py`, the window arithmetic in
+   ingestion task `option-outcomes`, `tasks/derived/paths/option_outcomes.py`, the window arithmetic in
    `option_paths.py`, the maths in `quant/edges/chain_pnl.py`). One row per (underlying,
    start session S, structure, tenor rule, horizon); `session_date = S`, partition S, runs
    merge on that key. `structure` is the position held *long*: `atm_straddle` or
