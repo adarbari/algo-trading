@@ -20,7 +20,7 @@ def test_a_slice_file_maps_to_its_folder_and_the_type_gate() -> None:
     assert cmds("apps/web/src/entities/feature/columns.tsx") == [
         "npx prettier --check --ignore-unknown src/entities/feature/columns.tsx",
         "npm run ds:check",
-        "npx eslint --max-warnings=0 src/entities/feature/columns.tsx",
+        "npx eslint --max-warnings=0 --no-warn-ignored src/entities/feature/columns.tsx",
         "npm run typecheck",
         "npx vitest run src/entities/feature",
         "env VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key"
@@ -106,3 +106,10 @@ def test_app_and_design_system_code_adds_the_bundle_budgets_but_a_config_file_do
     assert "npm run perf:bundle" in cmds("apps/web/design-system/components/Banner/Banner.tsx")
     assert "npm run perf:bundle" not in cmds("apps/web/package.json")
     assert not any(c.startswith("npx eslint") for c in cmds("apps/web/package.json"))
+
+
+def test_eslint_does_not_fail_on_a_changed_file_the_config_ignores() -> None:
+    # the generated GraphQL client is in eslint.config.js `ignores`: handed to eslint as an
+    # argument it warns "File ignored", and --max-warnings=0 turned that into a failed push
+    got = cmds("apps/web/src/shared/api/generated/graphql/gql.ts")
+    assert any(c.startswith("npx eslint") and "--no-warn-ignored" in c for c in got)
