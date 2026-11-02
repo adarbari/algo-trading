@@ -20,6 +20,7 @@ from datetime import date
 
 from algotrade.config.edges import loading
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.positions.templates import paired_symbol
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict as load_verdict_settings
 from algotrade.services.read.context import Stores
@@ -331,7 +332,13 @@ def load_compare(ctx: Stores, edge: Edge) -> EdgeCompare | None:
                 )
             )
     for name in sorted(
-        {r.variant for r in rows if r.role == "baseline" and r.horizon_sessions == horizon}
+        {
+            r.variant
+            for r in rows
+            if r.role == "baseline"
+            and r.horizon_sessions == horizon
+            and paired_symbol(r.variant) in (None, variant)  # a sleeve's: the basis's symbol
+        }
     ):
         lines.append(_line("baseline", name, None, run, rows, name, horizon, hidden, "baseline"))
     return EdgeCompare(edge.id, edge.extends, hidden, "", tuple(x for x in lines if x is not None))

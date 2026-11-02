@@ -14,6 +14,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from algotrade.config.edges.positions.templates import paired_symbol
 from algotrade.services.evaluation.cross_section.measures import (
     BASELINE,
     SCREENER,
@@ -101,6 +102,7 @@ def decoy_overlaps(results: Sequence[Result]) -> tuple[DecoyOverlap, ...]:
             for r in results
             if r.role == BASELINE
             and (r.edge_variant, r.horizon) == (edge.edge_variant, edge.horizon)
+            and paired_symbol(r.variant) in (None, edge.variant)  # a sleeve's: its own symbol
         ):
             sessions, overlap = mean_overlap(edge.stats, decoy.stats)
             out.append(

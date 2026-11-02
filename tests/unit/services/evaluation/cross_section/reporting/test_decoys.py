@@ -96,3 +96,14 @@ def test_a_decoy_never_compared_is_flagged_not_read_as_no_overlap() -> None:
     ok = result("size_small", BASELINE, (stat(D1, "a"),), 0.01, 0.0)
     flags = {d.decoy: d.measured for d in decoy_overlaps(cast(Any, [mine, never, nospread, ok]))}
     assert flags == {"beta_low": False, "ivol_high": False, "size_small": True}
+
+
+def test_a_sleeve_symbol_is_reported_against_its_own_symbols_position_baseline_only() -> None:
+    """A named sleeve's baselines are per symbol (``position:<t>:<SYM>``, ADR 0088 G19): SPY's
+    trial is read against SPY's shares, never QQQ's; an E16 ``position:<t>`` pairs with any."""
+    s = (stat(D1, "a"),)
+    spy, qqq = result("SPY", SCREENER, s, 0.1, 0.1), result("QQQ", SCREENER, s, 0.1, 0.1)
+    own = result("position:long_shares:SPY", BASELINE, s, 0.0, 0.0)
+    other = result("position:long_shares:QQQ", BASELINE, s, 0.0, 0.0)
+    found = {(d.screener, d.decoy) for d in decoy_overlaps(cast(Any, [spy, qqq, own, other]))}
+    assert found == {("SPY", own.variant), ("QQQ", other.variant)}

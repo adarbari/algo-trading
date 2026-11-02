@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Final
 
+from algotrade.config.edges.positions.templates import paired_symbol
 from algotrade.quant.edges import paths
 from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause
@@ -168,7 +169,11 @@ def load_baseline_series(ctx: Stores, basis: OfficialBasis) -> tuple[BasisSeries
         return ()
     by: dict[str, list[SeriesRow]] = {}
     for r in runs.load_run_series(ctx, basis.run):
-        if r.role == runs.BASELINE and r.horizon_sessions == basis.key[1]:
+        if (
+            r.role == runs.BASELINE
+            and r.horizon_sessions == basis.key[1]
+            and paired_symbol(r.variant) in (None, basis.key[0])  # a sleeve's: its own symbol
+        ):
             by.setdefault(r.variant, []).append(r)
     return tuple(
         _series_of(by[v], (v, basis.key[1]), basis.split_from, basis.hidden) for v in sorted(by)
