@@ -8,7 +8,9 @@ through ``runs.load_run_trades`` (which keeps ``oos_hidden`` and tells PRUNED fr
 With fewer than ``min_winners`` such trades the stop is the fallback, ``atr_multiple`` x
 ``momentum.atr_14`` of the name at the session. The *hold* is the verdict's stored
 ``basis_horizon``. A setup that declares its own stop publishes it (``declared``: the hook the
-declared share exits of E3c fill); the percentile applies only without one.
+declared share exits of E3c fill); the percentile applies only without one. An option setup's
+rule (E12b, ADR 0088 decision 19) is not published yet: UNKNOWN with that reason, never the
+share percentile over option trades.
 
 Point in time at the served session S: the canonical run must end by S (``range_to <= S``) and
 only trades that exited by S count. Nothing is filled: a missing input is an ``Unknown`` with its
@@ -21,12 +23,13 @@ from enum import StrEnum
 import numpy as np
 
 from algotrade.config.edges.positions.exit_rule import ExitRuleSettings
+from algotrade.config.edges.positions.templates import holds_options
 from algotrade.config.site.settings import site_document
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.evaluation import runs
-from algotrade.services.read.evaluation.edges import Edge
+from algotrade.services.read.evaluation.edges import Edge, parsed_edges
 from algotrade.services.read.evaluation.verdict import (
     EdgeSummary,
     load_edge_summary,
@@ -149,6 +152,10 @@ def exit_rule_at(
     hold included, is read from a canonical run that ends after the session. ``bounded``: the
     canonical run is the latest committed on or before the session (as Ideas reads the verdict,
     ``runs.load_canonical_run``), so the rule and the verdict it sits beside name one run."""
+    doc = next((e for e in parsed_edges(ctx, ctx.user.user_id) if e.id == edge.id), None)
+    if declared is None and doc is not None and holds_options(doc.outcome, ctx.configs):
+        why = "the exit rule of an option setup is not published yet"
+        return ExitRule(edge.id, None, None, _unknown(edge, UnknownCode.NOT_APPLICABLE, why))
     canonical = (
         runs.load_canonical_run(ctx, edge, True) if bounded else runs.load_canonical_run(ctx, edge)
     )

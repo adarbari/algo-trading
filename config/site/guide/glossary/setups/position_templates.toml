@@ -1,0 +1,68 @@
+# L3 site setting: the Guide glossary, a setup's position, its template, its declared exits and its verdict
+# profile (ADR 0088, design 2.4 to 2.6; ADR 0051). One [[term]] each: id, term, short (one sentence), body,
+# see_also. Typed by src/algotrade/config/site/guide/glossary.py; fitness tests:
+# tests/unit/config/site/guide/test_glossary.py. Templates: config/site/positions/templates.toml; exits:
+# `[outcome.exit]` (config/edges/positions/spec.py); profiles: config/edges/verdict.py `PROFILES`.
+
+[[term]]
+id = "position"
+term = "Position"
+short = "What a setup holds for each pick: one or more legs of shares or options, with the capital they tie up."
+body = """
+A position is a list of legs. A share leg is a number of shares, negative for a short. An option leg is a put or a call chosen at entry from that session's chain by a strike rule. A share setup holds one share leg. An option setup holds at least one option leg; a covered call holds both kinds. Every return the setup reports is measured on the position's capital, so read it with the template in mind.
+"""
+see_also = ["position_template", "position_collateral", "screener_vs_setup"]
+
+[[term]]
+id = "position_template"
+term = "Position template"
+short = "A named shape of legs a setup can hold, such as long shares, a short put or an iron fly."
+body = """
+The site keeps a short list of templates. Long shares and short shares hold 100 shares. Short put sells one put near 0.30 delta. Put spread also buys a 0.10-delta put below it. Covered call holds 100 shares and sells one 0.30-delta call. Short straddle sells an at-the-money put and call. Iron fly adds two wings 5% out of the money. A setup names one template and may change its numbers, such as the delta. The shape decides the tab: any option leg puts a setup's picks on Premium.
+"""
+see_also = ["position", "position_collateral", "exit_take_profit"]
+
+[[term]]
+id = "position_collateral"
+term = "Collateral"
+short = "The capital a position's return is measured on: its notional, the cash behind a put, its maximum loss or margin."
+body = """
+Shares are measured on their notional, the price times the quantity. A short put is measured on the cash that secures it: the strike times 100. A spread or iron fly is measured on its maximum loss, the width times 100 less the credit. A straddle is measured on a Reg T margin estimate. A 2% return on a cash-secured put and 2% on a spread are not the same risk. Compare setups only on the same collateral.
+"""
+see_also = ["position", "position_template"]
+
+[[term]]
+id = "exit_take_profit"
+term = "Take profit (declared exit)"
+short = "A declared exit that closes an option position once it has kept this share of the credit received."
+body = """
+An option setup may declare when it closes early. With a take profit of 0.5, a put sold for $2.00 is bought back once it costs $1.00. For a share setup the same setting is a move of the entry price, not a credit. The backtest closed its trades by this rule, so the evidence already includes it. Taking profit early raises the hit rate and lowers each win: read both together.
+"""
+see_also = ["exit_stop_loss", "exit_dte", "exit_stop_declared"]
+
+[[term]]
+id = "exit_stop_loss"
+term = "Stop loss (declared exit)"
+short = "A declared exit that closes an option position once its loss reaches this multiple of the credit."
+body = """
+With a stop loss of 2, a put sold for $2.00 is closed when buying it back would lose $4.00. For a share setup it is a fall of the entry price, as a fraction. The backtest used the rule, and the page publishes it as written in place of the historical stop. A stop checked at the close can be passed by a gap: the loss can be larger than the multiple.
+"""
+see_also = ["exit_take_profit", "exit_dte", "exit_stop_declared", "exit_stop_history"]
+
+[[term]]
+id = "exit_dte"
+term = "Days to expiry exit"
+short = "A declared exit that closes an option position this many calendar days before its nearest expiry."
+body = """
+An exit of 21 days closes the position when 21 calendar days are left, whatever its profit. Short options lose value fastest near expiry, and their risk to a sharp move grows there too. Closing early gives up the last of the decay to avoid that risk. Without this exit, the setup holds to expiry or to its holding cap, whichever comes first.
+"""
+see_also = ["exit_take_profit", "exit_stop_loss", "exit_hold"]
+
+[[term]]
+id = "verdict_profile"
+term = "Verdict profile"
+short = "Which tests a setup's verdict uses: return (the average result) or tails (also the worst losses)."
+body = """
+Every setup is judged by one profile, fixed in its document. The return profile asks whether the picks beat the other names on average, with enough trades. The tails profile adds the size of the worst 5% of outcomes and how stable the average is when resampled. Option-selling setups use tails: they win often and lose rarely but large, so an average alone can look good until one bad month. A change of profile is a new test, never a relabel.
+"""
+see_also = ["verdict", "verdict_basis", "screener_vs_setup"]

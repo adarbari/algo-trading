@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.edges.positions import templates
 from algotrade.config.edges.positions.templates import parse_templates
 from algotrade.services.read.ideas import setups
 
@@ -35,7 +36,7 @@ TEMPLATES = parse_templates(
 
 @pytest.fixture(autouse=True)
 def _templates(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(setups, "load_templates", lambda configs: TEMPLATES)
+    monkeypatch.setattr(templates, "load_templates", lambda configs: TEMPLATES)
     CTX.configs = None
     CTX.memo = {}
 
@@ -53,7 +54,7 @@ def test_the_tab_is_the_kind_of_the_position(
 ) -> None:
     named = SimpleNamespace(template=position) if position else None
     outcome = SimpleNamespace(position=named, kind="x", structure=structure)
-    monkeypatch.setattr(setups, "position_of", lambda o: (position,) if position else None)
+    monkeypatch.setattr(templates, "position_of", lambda o: (position,) if position else None)
     assert setups.tab_of(CTX, outcome) == tab
 
 

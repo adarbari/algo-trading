@@ -17,7 +17,9 @@ not the run's picked rows) says so (``by_score``); a name in both legs of a thin
 ``long_short`` night reads its long place. An edge
 whose evidence the viewer lacks the licence of is not listed at all, so it adds no pick (ADR 0084
 decision 1: ``evidence_licence``). It reads no
-outcome: it says what the edge would take, not what it has already earned."""
+outcome: it says what the edge would take, not what it has already earned. ``load_edge_night`` is
+the same table's answer for a whole edge at the served session (the stored status and reason), read
+by the setup state (``verdict/state.py``, ADR 0088 decision 16)."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -90,13 +92,41 @@ def _stored(ctx: ReadContext, run: ScreenerRun) -> dict[tuple[str, str], _Row]:
     out = {}
     for r in site.itertuples():
         picks, sides = _ids(r.pick_ids), _ids(getattr(r, "pick_sides", None))
-        why = getattr(r, "reason", None)
-        reason = "" if why is None or isinstance(why, float) else str(why)
+        reason = _reason(getattr(r, "reason", None))
         out[str(r.edge_id), str(r.screener)] = _Row(
             str(r.status), picks, sides if len(sides) == len(picks) else [LONG] * len(picks),
             reason,
         )  # fmt: skip
     return out
+
+
+@dataclass(frozen=True)
+class EdgeNight:
+    """What a site edge stored at the served session: the stored ``status`` (``picked``,
+    ``gate_closed``, ``not_decision_day``, ``unjudged`` or ``skipped``) and its ``reason``. The
+    setup gate is decided once per edge and night, so every screener row says the same; a
+    ``gate_closed`` row wins over any other."""
+
+    status: str
+    reason: str
+
+
+def load_edge_night(ctx: ReadContext, edge_id: str) -> EdgeNight | None:
+    """The site's stored night of ``edge_id`` at ``ctx.session`` (None: none stored)."""
+    found = partition(ctx, TABLE)
+    if isinstance(found, Unknown) or found.empty:
+        return None
+    rows = found[(found["user_id"] == SITE_USER) & (found["edge_id"] == edge_id)]
+    if rows.empty:
+        return None
+    nights = [
+        EdgeNight(str(r.status), _reason(getattr(r, "reason", None))) for r in rows.itertuples()
+    ]
+    return next((n for n in nights if n.status == GATE_CLOSED), nights[0])
+
+
+def _reason(why: Any) -> str:
+    return "" if why is None or isinstance(why, float) else str(why)
 
 
 def _ids(value: Any) -> list[str]:

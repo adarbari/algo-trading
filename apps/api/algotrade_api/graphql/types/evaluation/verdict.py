@@ -10,6 +10,10 @@ from strawberry.scalars import JSON
 
 from algotrade.services.read.evaluation import decay, edges, evidence, robustness
 from algotrade.services.read.evaluation import verdict as read
+from algotrade.services.read.evaluation.verdict import state as setup_state
+from algotrade_api.graphql.types.instruments.feature import Unknown
+
+strawberry.enum(setup_state.SetupStateCode, description="A setup's state at the served session")
 
 
 @strawberry.type(description="A source the edge rests on; `url` is empty when it has none")
@@ -585,3 +589,21 @@ class EdgeSummary:
             lift=d.lift,
             lift_pts=d.lift_pts,
         )
+
+
+@strawberry.type(
+    description="A setup's state at the served session (ADR 0088 decision 16): ON (a good "
+    "stored verdict, the gate open or none), OFF (any other judged verdict), PAUSED (a good "
+    "verdict, the gate closed: stand aside) or UNKNOWN; `reason`: the server's sentence (for "
+    "PAUSED the gate's), empty for UNKNOWN, whose `unknown` says why"
+)
+class SetupState:
+    edge_id: str
+    state: setup_state.SetupStateCode
+    reason: str
+    unknown: Unknown | None
+
+    @classmethod
+    def of(cls, d: setup_state.SetupState) -> Self:
+        unknown = Unknown.of(d.unknown) if d.unknown is not None else None
+        return cls(edge_id=d.edge_id, state=d.state, reason=d.reason, unknown=unknown)
