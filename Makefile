@@ -107,9 +107,9 @@ integration:
 e2e:
 	$(PY) -m pytest tests/e2e
 
-changed:         ## narrow first check: mirrored tests of files changed vs origin/main (BASE=...), tests/architecture + tests/unit/config in full, then the fast gates; `make check` still gates
+changed:         ## narrow first check: mirrored tests of files changed vs a freshly fetched origin/main (BASE=...), tests/architecture + tests/unit/config in full, then the fast gates; CI gates
 	@paths="$$($(PY) scripts/changed_tests.py $(BASE))"; \
-	if [ -n "$$paths" ]; then $(PY) -m pytest -q -x --no-header --tb=short $$paths; else echo "no covering tests changed"; fi
+	if [ -n "$$paths" ]; then $(PY) -m pytest -q -x --no-header --tb=short -n $(WORKERS) $$paths; else echo "no covering tests changed"; fi
 	@$(PY) -m pytest -q -x --no-header --tb=short -n $(WORKERS) tests/architecture tests/unit/config
 	@$(PY) scripts/changed_web.py $(BASE)
 	@$(MAKE) --no-print-directory arch layout ownership

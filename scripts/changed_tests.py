@@ -10,6 +10,10 @@ changed` and failed CI on them).
 This narrows the first check. `--areas` prints the areas the change touches, `python`, `web`
 and / or `docs`, by the same rule as CI's "Changed areas" job (.github/workflows/ci.yml), so
 `make check` runs the gates for those areas; a branch with no change (main) is every area.
+
+A remote base (`origin/main`) is fetched first: a worktree's `origin/main` can be days old, so
+work merged since counted as changed and one push ran over 10 min of other PRs' tests (V2, V5,
+2026-11-02). A failed fetch (offline, a shallow CI checkout) keeps the ref as it is.
 """
 
 from __future__ import annotations
@@ -36,6 +40,20 @@ WEB_FITNESS = "tests/architecture/test_layout_web.py"
 # Tests that read config/site/ as shipped (the API graph, the read model, the config fitness
 # tests): a site config change has no mirrored test, so these cover it.
 SITE_CONFIG_TESTS = ("tests/architecture", "tests/apps/api/graphql", "tests/unit/services/read")
+# A site config folder whose readers are known maps to them alone: a Guide entry (the most
+# common UI-branch config change) ran the whole graph and read-model suites, thousands of tests
+# (V2, V5, 2026-11-02). The Guide fitness and config tests run in full in step 2 anyway.
+SITE_CONFIG_READERS = {
+    "config/site/guide/": (
+        "tests/architecture/guide",
+        "tests/unit/config/site/guide",
+        "tests/unit/services/read/guide",
+        "tests/apps/api/graphql/types/guide",
+    ),
+}
+# `make changed` runs these in full after the mirrored tests (its step 2), so step 1 leaves
+# them out instead of running them twice.
+FULL_RUNS = ("tests/architecture", "tests/unit/config")
 
 # The feature catalogue is exported to the web (`make features-doc` runs
 # scripts/export_catalogue.py): a new feature or expression feature changes it (#330).
@@ -46,6 +64,26 @@ CATALOGUE_TESTS = ("tests/scripts/test_export_catalogue.py",)
 def _git(*args: str) -> list[str]:
     out = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True)
     return [line for line in out.stdout.splitlines() if line]
+
+
+FETCH_TIMEOUT = 60
+
+
+def refresh(base: str) -> None:
+    """Fetch `base` when it names a remote branch (`origin/main`), so the merge base is fresh."""
+    remote, _, branch = base.partition("/")
+    try:
+        if not branch or remote not in _git("remote"):
+            return
+        subprocess.run(
+            ["git", "fetch", "--quiet", remote, branch],
+            cwd=REPO,
+            capture_output=True,
+            timeout=FETCH_TIMEOUT,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        print(f"changed_tests: could not fetch {base} ({exc}); using it as it is", file=sys.stderr)
 
 
 def changed_files(base: str) -> list[str]:
@@ -81,7 +119,11 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
         if name.startswith("architecture/"):
             paths.add("tests/architecture")
         if name.startswith("config/site/"):
-            paths.update(p for p in SITE_CONFIG_TESTS if present(p))
+            readers = next(
+                (t for prefix, t in SITE_CONFIG_READERS.items() if name.startswith(prefix)),
+                SITE_CONFIG_TESTS,
+            )
+            paths.update(p for p in readers if present(p))
         if name.startswith(CATALOGUE_SOURCES):
             paths.update(p for p in CATALOGUE_TESTS if present(p))
         paths.update(test for prefixes, test in FITNESS_BY_PREFIX if name.startswith(prefixes))
@@ -108,6 +150,11 @@ BOTH_AREAS = (".github/workflows/ci.yml", "apps/api/openapi.json", "apps/api/sch
 DOCS_PREFIXES = ("docs/", ".claude/")
 
 
+def without_full_runs(paths: list[str]) -> list[str]:
+    """`paths` less what `make changed` step 2 runs in full (`FULL_RUNS`)."""
+    return [p for p in paths if not any(p == f or p.startswith(f"{f}/") for f in FULL_RUNS)]
+
+
 def changed_areas(files: list[str]) -> list[str]:
     """The areas `files` touch: `python`, `web`, `docs` (CI's rule); nothing changed = all code."""
     areas: set[str] = set()
@@ -126,6 +173,8 @@ def changed_areas(files: list[str]) -> list[str]:
 def main(argv: list[str]) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     base = args[0] if args else "origin/main"
+    if "--no-fetch" not in argv:
+        refresh(base)
     if "--areas" in argv:
         try:
             files = changed_files(base)
@@ -134,7 +183,7 @@ def main(argv: list[str]) -> int:
             files = []
         print(" ".join(changed_areas(files)))
     else:
-        print("\n".join(covering_tests(changed_files(base))))
+        print("\n".join(without_full_runs(covering_tests(changed_files(base)))))
     return 0
 
 

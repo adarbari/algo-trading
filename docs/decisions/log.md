@@ -901,7 +901,6 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: reversible; the empty Ideas window is at most one trading day on the pre-launch site and closes itself; decided while the owner was away.
 - Reasoning: the owner-away rule (2026-11-01: PRs merge as built, no `needs-owner`); CLAUDE.md "PRs auto-merge"; the live-store rule in `.claude/skills/review-and-release` section 2 (a dry run is a read; the nightly step is the sanctioned writer); ADR 0083 decision 2 fixes "stored verdict"; ADR 0088 design 2.6 fixes the thresholds as design calls under review-and-release section 2.
-
 ## 2026-11-01 | ADR 0088 S2 / S3 / F2 | B2 reuses the two existing presets; S3 already merged; F2 is a coverage test
 - Question: S2 says reuse `low_volatility` and `ivol_high` and add `total_vol_high` only if a run shows the sort differs. Build it now?
 - Options: add `total_vol_high` now / add nothing until a run of the two edges (X4) shows the sort differs.
@@ -909,3 +908,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the build doc's own condition ("only if the run shows the sort differs") cannot be met before X4's run exists, and a third near-duplicate preset would add code the owner's less-code rule (2026-10-25) asks to avoid.
+## 2026-11-02 | `make changed` about 3x faster (pre-push gate) | Fresh base, parallel step 1, related vitest, no local e2e; then affected-only tests
+- Question: each pre-push `make changed` took 10-12+ min on the shared Mac and the queue (#1048) backed up; what may the local gate drop or narrow while CI stays the gate (rule 9)?
+- Options: keep the gate as it is / narrow it in two PRs (A: fetch `origin/main` before computing the changed files and diff from the merge base; the mirrored tests at `-n $(WORKERS)`; one `vitest related` run instead of one vitest per folder; the Playwright e2e specs CI-only; the bundle budgets kept local; caches kept across runs. B: affected-only tests with `pytest-testmon`, `tests/architecture` in full whenever an architecture-sensitive path changes, architect-reviewed) / drop the local gate.
+- Decision: the two PRs as described; the bundle build and budgets stay local (the web CI failure seen most).
+- decided by: owner
+- status: final
+- Reasoning: the owner's decision in chat (2026-11-02); the local hook exists to catch the common CI failures early (architecture and layout tests, bundle budgets, Guide coverage, lint and types), not to repeat CI.
