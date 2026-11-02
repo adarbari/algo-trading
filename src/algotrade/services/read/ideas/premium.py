@@ -7,8 +7,9 @@ chain, never the bought history) shown as derived figures only (ADR 0083 amendme
 each leg's right, strike, expiry, signed quantity and our mid; the net credit and the collateral
 per contract (the template's collateral, ``SHARES_PER_CONTRACT`` shares); the return on
 collateral (credit over collateral); and the chance of assignment, the risk-neutral chance at least
-one sold leg ends in the money at the expiry (``quant.options.premium.assignment_chance`` over each
-sold leg's stored IV, calendar days from S to the expiry). Never a bid, ask, last or size.
+one sold leg ends in the money at the expiry (``quant.options.position.assignment_chance``, the
+idea page's own maths, over each leg's stored IV and calendar days from S to its expiry).
+Never a bid, ask, last or size.
 
 Point in time: everything is read at S (the chain, its spot and the exit rule's hold, bounded by
 the canonical run committed on or before S). The licence filter is the one Ideas already applies:
@@ -22,9 +23,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
+import numpy as np
+
 from algotrade.engines.structures.trades import SHARES_PER_CONTRACT
-from algotrade.quant.options.premium import assignment_chance
-from algotrade.quant.rates import DAYS_PER_YEAR
+from algotrade.quant.options.position import assignment_chance
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.evaluation.edges import parsed_edges
@@ -35,7 +37,7 @@ from algotrade.services.read.evaluation.positions.option_example import (
 from algotrade.services.read.ideas.setups import QualifyingSetup
 from algotrade.services.read.values import Unknown, UnknownCode
 
-PUT, CALL = "P", "C"
+CALL = "C"  # a call leg's right
 
 
 @dataclass(frozen=True)
@@ -75,17 +77,20 @@ def _gap(edge_id: str, why: str) -> Unknown:
 
 
 def _chance(example: OptionExample, day: date) -> tuple[float | None, Unknown | None]:
-    sold = [leg for leg in example.legs if leg.qty < 0]
-    if example.spot is None or not sold:
+    legs = example.legs
+    if example.spot is None or not any(leg.qty < 0 for leg in legs):
         return None, _gap(example.edge_id, "no sold leg or no underlying price at the session")
-    if any(leg.iv is None for leg in sold):
+    if any(leg.iv is None for leg in legs if leg.qty < 0):
         return None, _gap(example.edge_id, "a sold leg has no stored implied volatility")
-    expiry = min(leg.expiry for leg in sold)
-    years = (expiry - day).days / DAYS_PER_YEAR
-    puts = [(leg.strike, float(leg.iv or 0)) for leg in sold if leg.right == PUT]
-    calls = [(leg.strike, float(leg.iv or 0)) for leg in sold if leg.right == CALL]
-    found = assignment_chance(example.spot, puts, calls, years)
-    if math.isnan(found):  # a vol or the time to expiry is not positive
+    found = assignment_chance(
+        example.spot,
+        np.array([leg.strike for leg in legs]),
+        np.array([np.nan if leg.iv is None else leg.iv for leg in legs]),
+        np.array([(leg.expiry - day).days for leg in legs], dtype=np.float64),
+        np.array([leg.right == CALL for leg in legs]),
+        np.array([leg.qty for leg in legs]),
+    )
+    if math.isnan(found):  # an IV or the days to expiry are not positive
         return None, _gap(example.edge_id, "the implied volatility or the time to expiry is zero")
     return found, None
 
