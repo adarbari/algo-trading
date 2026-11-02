@@ -124,10 +124,8 @@ def test_the_entry_condition_parses_for_both_kinds() -> None:
 
 
 def test_what_no_run_applies_yet_is_refused_at_load() -> None:
-    entry = {"when": HIGH_IV}
-    with pytest.raises(ConfigurationError, match=r"entry: not applied by any run yet \(E13\)"):
-        check_edge(parse(entry=entry), WHERE, TEMPLATES)
-    with pytest.raises(ConfigurationError, match=r"case values: not applied.*\(E13\)"):
+    check_edge(parse(entry={"when": HIGH_IV}), WHERE, TEMPLATES)  # applied by the harness (E13a)
+    with pytest.raises(ConfigurationError, match=r"case values: not applied.*\(E13b\)"):
         check_edge(parse(tenor_days=tenor_cases()), WHERE, TEMPLATES)
 
 

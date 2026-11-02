@@ -156,6 +156,7 @@ from algotrade.services.evaluation.cross_section.random_picks import (
     pool_random,
     random_measures,
 )
+from algotrade.services.evaluation.cross_section.reads.entry import check_entries, check_entry
 from algotrade.services.evaluation.cross_section.reads.screens import ScreenCache
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.reporting.report_containment import (
@@ -562,7 +563,12 @@ def evaluate_edge(
             residual_plans(plans),
             crosses(plans, variants),  # a baseline the setup cannot be valued as fails here
         ),
-        "requested" if full else None,
+        # an entry condition is refused here (G9-M3, G9-M4) or its legs are never reused
+        "requested"
+        if full
+        else "entry_condition"
+        if check_entries(reader, [c.edge for c in scopes], features, start, end, as_of)
+        else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
@@ -746,13 +752,14 @@ def _time_series(
     stored as the rows the verdict reads; no per-session series, legs or ledger (there is no
     screen to replay)."""
     split, exploratory = effective_split(split_from, edge)
-    session = SessionReads(
-        reader, site_regime(configs.load).label, domains=gate_domains(configs, edge)
-    )
+    domains = gate_domains(configs, edge)  # also an entry condition's (G9-M3, G9-M4 here too)
+    check_entry(reader, edge, catalogue(configs, user.user_id), start, end, as_of)
+    session = SessionReads(reader, site_regime(configs.load).label, domains=domains)
     gate = None if edge.gate is None else partial(session.gate, edge.gate)
     run = evaluate_time_series(
-        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate
-    )
+        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,
+        domains,
+    )  # fmt: skip
     keys = {
         r.symbol: hashlib.sha256(
             f"{edge.id}|{run.window}|{r.symbol}|{HARNESS_VERSION}".encode()

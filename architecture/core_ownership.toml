@@ -11,13 +11,13 @@ scope = ["src/algotrade/core/", "src/algotrade/config/"]
 
 [[responsibility]]
 id = "case-values"
-description = "Parameters of an outcome chosen by rule (ADR 0088, design 2.4): a literal or `{ cases = [{ when, value }], default }` parsed fail closed (config/edges/positions/cases.py: the case table split from the outcome leaving its default as the literal, `[outcome.entry]`, the canonical form of a rule group so a reordered group has one identity) and resolved at one session by `resolve_case` (engines/selection/cases.py, pure: the first TRUE case, the default only when every case is FALSE, an UNKNOWN case first is CASE_UNKNOWN); callers resolve through it, never re-evaluate a case table"
-owner = ["src/algotrade/config/edges/positions/cases.py", "src/algotrade/engines/selection/cases.py"]
+description = "Parameters of an outcome chosen by rule (ADR 0088, design 2.4): a literal or `{ cases = [{ when, value }], default }` parsed fail closed (config/edges/positions/cases.py: the case table split from the outcome leaving its default as the literal, `[outcome.entry]`, the canonical form of a rule group so a reordered group has one identity) and resolved at one session by `resolve_case` (engines/selection/cases.py, pure: the first TRUE case, the default only when every case is FALSE, an UNKNOWN case first is CASE_UNKNOWN) and the entry condition's close by `first_entry` (engines/selection/entry.py, pure: the first TRUE close of the wait, an UNKNOWN close first is ENTRY_UNKNOWN, never TRUE is NOT_TRIGGERED); callers resolve through them, never re-evaluate a case table or an entry rule"
+owner = ["src/algotrade/config/edges/positions/cases.py", "src/algotrade/engines/selection/cases.py", "src/algotrade/engines/selection/entry.py"]
 allowed = [
     "src/algotrade/config/edges/document.py",  # splits the case tables off an outcome before typing it
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
-detect = [{ call = "resolve_case" }, { call = "split_cases" }]
+detect = [{ call = "resolve_case" }, { call = "split_cases" }, { call = "first_entry" }]
 
 [[responsibility]]
 id = "edge-documents"
@@ -158,6 +158,7 @@ owner = ["src/algotrade/core/model/predicates.py"]
 allowed = [
     "src/algotrade/engines/selection/evaluate.py",  # the selection's per-rule funnel audit evaluates each top-level child
     "src/algotrade/engines/selection/cases.py",  # a case-valued parameter's rules at one session (ADR 0088)
+    "src/algotrade/engines/selection/entry.py",  # an entry condition's rule at each close of its wait (ADR 0088)
     "src/algotrade/engines/screening/gate.py",  # the open / closed / unknown decision of a setup gate and a screener's pause_in (ADR 0088)
     "src/algotrade/engines/structures/exits.py",  # the ordered exit rules over a trade's closes (ADR 0088)
     "src/algotrade/strategies/screeners/rules/*",  # rule screens evaluate criteria, tiers and flags with it

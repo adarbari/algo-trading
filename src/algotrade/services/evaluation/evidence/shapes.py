@@ -19,7 +19,7 @@ frames, called right after ``hit.apply_outcome`` (which it never edits, so ``val
 
 A figure not known is null, never 0."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
@@ -141,15 +141,16 @@ def _options(
 
 
 def trade_frame(
-    edge: Edge, rows: pd.DataFrame, result: pd.DataFrame, *, entry: date,
-    bars_exit: date | None, side: str, option_costs: OptionCosts | None = None,
+    edge: Edge, rows: pd.DataFrame, result: pd.DataFrame, *, entry: date | Mapping[str, date],
+    bars_exit: date | Mapping[str, date] | None, side: str,
+    option_costs: OptionCosts | None = None,
 ) -> pd.DataFrame:  # fmt: skip
     """The contract's rows for ``result`` (``apply_outcome``'s frame, or ``hit.short_view`` of it
     for a short leg; ``instrument_id`` a column or the index): one row per name of it, from the
     stored outcome ``rows`` it was scored over (the first row of each name, the edge's own
     position key for an option trade). ``entry``: S; ``bars_exit``: S + h sessions, the exit of a
-    row over stored prices; ``option_costs``: the commission an option row pays (none: no
-    commission)."""
+    row over stored prices (with an entry condition both by name: each trade's own S, E13);
+    ``option_costs``: the commission an option row pays (none: no commission)."""
     o = edge.outcome
     res = result if "instrument_id" in result.columns else result.reset_index()
     res = res.reset_index(drop=True)
@@ -166,7 +167,11 @@ def trade_frame(
     borrow = borrow_cost(o.borrow_bps_annual, _column(stored, "horizon_sessions"))
     short = side == "short"
     source, licence = BARS, np.full(n, OPEN, dtype=object)
-    exits: Sequence[date | None] = [bars_exit] * n
+    ids = res["instrument_id"].tolist()
+    entries: Any = [entry.get(i) for i in ids] if isinstance(entry, Mapping) else entry
+    exits: Sequence[date | None] = (
+        [bars_exit.get(i) for i in ids] if isinstance(bars_exit, Mapping) else [bars_exit] * n
+    )
     figures: dict[str, Any]
     if o.kind == CHAIN_KIND:
         figures = _options(stored, cost, option_costs)
@@ -189,7 +194,7 @@ def trade_frame(
         source = MODEL if o.kind == "option_model_pnl" else BARS
     return _assemble(
         instrument_id=res["instrument_id"].to_numpy(dtype=object),
-        side=side, entry_session=entry, exit_session=exits,
+        side=side, entry_session=entries, exit_session=exits,
         value=res["value"].to_numpy(dtype=np.float64, na_value=np.nan),
         higher_is_better=o.sign > 0, hit=res["hit"].to_numpy(dtype=bool),
         excluded=res["excluded"].astype(str).to_numpy(dtype=object),
