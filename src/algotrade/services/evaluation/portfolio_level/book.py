@@ -20,6 +20,7 @@ from algotrade.services.licences import OPEN
 
 PERSONAL_BOOK = "personal_book"
 EXIT_UNKNOWN = "exit_unknown"
+LEG_LOST = "leg_lost"  # a decision whose leg was lost: its trades are not known (walk.py ``Book``)
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,16 @@ class PortfolioRow:
 
     values: Mapping[str, int | float | None]
     reason: str | None = None
+
+
+def field_names(option: bool) -> list[str]:
+    """The level's field names a book has (``open_collateral`` only for an option setup's)."""
+    return [f.name for f in PORTFOLIO_FIELDS if option or f.applies == BOTH]
+
+
+def unknown_row(reason: str, *, option: bool = False) -> PortfolioRow:
+    """A row where every field is None (UNKNOWN to a rule), with its ``reason``."""
+    return PortfolioRow({portfolio_field(n): None for n in field_names(option)}, reason)
 
 
 def open_at(trades: Sequence[OpenTrade], decision: date) -> tuple[list[OpenTrade], bool]:
@@ -77,13 +88,13 @@ def portfolio_row(
     """The portfolio fields at ``decision`` over ``trades`` (``sectors``: instrument id -> sector
     at ``decision``; ``option``: the book is an option setup's, which also has ``open_collateral``).
     An empty book is a known state (0 trades, no concentration)."""
-    names = [f.name for f in PORTFOLIO_FIELDS if option or f.applies == BOTH]
+    names = field_names(option)
     held, unsettled = open_at(trades, decision)
     reason = EXIT_UNKNOWN if unsettled else None
     if any(t.licence != OPEN for t in held):
         reason = PERSONAL_BOOK
     if reason is not None:
-        return PortfolioRow({portfolio_field(n): None for n in names}, reason)
+        return unknown_row(reason, option=option)
     total = len(held)
     by_name = Counter(t.instrument_id for t in held)
     known = {t.instrument_id: sectors.get(t.instrument_id) for t in held}

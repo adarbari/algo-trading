@@ -7,10 +7,11 @@ no row or no partition reads as ``None``, unknown, never an older session), and 
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 
+from algotrade.config.strategy.levels import is_computed
 from algotrade.config.strategy.regime import gate_fields
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.instruments import market_id
-from algotrade.core.model.predicates import Group
+from algotrade.core.model.predicates import FieldValue, Group
 from algotrade.core.views.feature_view import FeatureValue
 from algotrade.data import StoreReader
 from algotrade.data.rollups import group_view
@@ -57,8 +58,16 @@ def edge_gate(
     session: date,
     domains: Mapping[str, Sequence[str]] | None = None,
     as_of: datetime | None = None,
+    extra: Mapping[str, FieldValue] | None = None,
 ) -> GateDecision:
     """A setup's gate at ``session`` (ADR 0088): the rule over the session's market row, every
     field it names read from that session only (``session_market``). Never reads
-    ``[regime].enabled``: the gate applies whatever the overlay says."""
-    return decide_gate(group, session_market(reader, gate_fields(group), session, as_of), domains)
+    ``[regime].enabled``: the gate applies whatever the overlay says. A field of a computed level
+    (``portfolio.*``) is no market column: it is dropped from the read and taken from ``extra``
+    (missing: None, UNKNOWN)."""
+    names = gate_fields(group)
+    values: dict[str, FeatureValue] = dict(
+        session_market(reader, [n for n in names if not is_computed(n)], session, as_of)
+    )
+    values.update({n: (extra or {}).get(n) for n in names if is_computed(n)})
+    return decide_gate(group, values, domains)

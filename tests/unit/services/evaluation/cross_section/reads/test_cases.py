@@ -11,9 +11,11 @@ import pandas as pd
 import pytest
 
 from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.positions.cases import Case, CaseValue
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.predicates import Group, Rule
 from algotrade.core.time.calendar import next_session
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.engines.selection.cases import CASE_UNKNOWN
@@ -25,6 +27,7 @@ from algotrade.services.evaluation.cross_section.reads.cases import (
     cased_rows,
     check_cases,
     read_cases,
+    session_tables,
 )
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
@@ -208,3 +211,16 @@ def test_a_baseline_holds_out_the_setup_s_unselectable_names() -> None:
     assert found.at == dict.fromkeys(IDS[:19], leg.entry)  # the others enter at the leg's own S
     assert kept is not None and IDS[19] not in set(kept["instrument_id"])
     assert len(kept) == len(IDS) - 1
+
+
+def test_a_computed_levels_field_is_taken_from_extra_not_read() -> None:
+
+    rule = Group("all", (Rule("portfolio.open_positions", "lt", 3),))
+    cases = (CaseValue("n", (Case(rule, 1),), 0),)
+    w = build_world()
+    assert session_tables(site_features(), "portfolio.open_positions") == []
+    got = read_cases(w.reader, cases, IDS[:2], DAYS[0], extra={"portfolio.open_positions": 1})
+    assert got.chosen == dict.fromkeys(IDS[:2], (1,))
+    assert read_cases(w.reader, cases, IDS[:2], DAYS[0]).reasons == dict.fromkeys(
+        IDS[:2], CASE_UNKNOWN
+    )

@@ -19,7 +19,7 @@ from algotrade.config.edges.verdict import OPTION_LEVELS, OptionCosts
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
-from algotrade.core.model.predicates import Group
+from algotrade.core.model.predicates import FieldValue, Group
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
 from algotrade.data.listings.membership import TABLE as MEMBERSHIP_TABLE
@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from algotrade.services.evaluation.cross_section.sessions import Leg
 
 UNKNOWN = "UNKNOWN"
+type Extra = tuple[tuple[str, FieldValue], ...]  # a book's values, as a cache key part
 SECTOR_FIELD = "instrument.sector"  # the stratum of a pick's sector-matched random draws (ADR 0053)
 ADV_FIELD = "rollup.price_stats@v2.adv_usd_20d"  # a pick's liquidity at D (leg v2, ADR 0064)
 # Not an input table a screener lacks for a session but the run's own wiring (market features
@@ -74,6 +75,12 @@ WIRING_DATASETS = (
     LISTING_TABLE,
     MEMBERSHIP_TABLE,
 )
+
+
+def _frozen(extra: Mapping[str, FieldValue] | None) -> Extra:
+    """``extra`` as a hashable, ordered key: the shared (group, day) caches must never serve one
+    book's read to another's (ADR 0088, G15)."""
+    return tuple(sorted((extra or {}).items()))
 
 
 class SessionReads:
@@ -101,9 +108,9 @@ class SessionReads:
         self._runs: dict[tuple[str, date], RankedRun | None] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}  # (universe repr, D)
         self._labels: dict[date, str] = {}
-        self._gates: dict[tuple[Group, date], str] = {}
-        self._entries: dict[tuple[EntrySpec, int, frozenset[str], date], Entered] = {}
-        self._cases: dict[tuple[tuple[CaseValue, ...], frozenset[str], date], Resolved] = {}
+        self._gates: dict[tuple[Group, date, Extra], str] = {}
+        self._entries: dict[tuple[EntrySpec, int, frozenset[str], date, Extra], Entered] = {}
+        self._cases: dict[tuple[tuple[CaseValue, ...], frozenset[str], date, Extra], Resolved] = {}
         self._case_keys: dict[str, CaseKeys | None] = {}  # by the outcome's text: kept all run
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
@@ -223,22 +230,32 @@ class SessionReads:
             self._labels[day] = UNKNOWN if value is None else str(value)
         return self._labels[day]
 
-    def gate(self, group: Group, day: date) -> str:
+    def gate(self, group: Group, day: date, extra: Mapping[str, FieldValue] | None = None) -> str:
         """The setup gate's state at ``day`` (open / closed / unknown): the rule over that
-        session's market row alone, whatever ``[regime].enabled`` says (ADR 0088)."""
-        if (group, day) not in self._gates:
-            self._gates[group, day] = edge_gate(self._reader, group, day, self._domains).state
-        return self._gates[group, day]
+        session's market row alone, whatever ``[regime].enabled`` says (ADR 0088). ``extra``: the
+        values of a computed level's fields (the book at ``day``), part of the cache key so two
+        books never share a state."""
+        key = (group, day, _frozen(extra))
+        if key not in self._gates:
+            self._gates[key] = edge_gate(self._reader, group, day, self._domains, extra=extra).state
+        return self._gates[key]
 
-    def entries(self, spec: EntrySpec, offset: int, ids: frozenset[str], decision: date) -> Entered:
+    def entries(
+        self,
+        spec: EntrySpec,
+        offset: int,
+        ids: frozenset[str],
+        decision: date,
+        extra: Mapping[str, FieldValue] | None = None,
+    ) -> Entered:
         """The entry session of each of ``ids`` under an entry condition decided at D
         (``reads/entry.py``). Cached per decision session only, never across them: a later D
         whose wait shares a close would log no read for it and keep a stale leg after a
         restatement (as ``history``)."""
-        key = (spec, offset, ids, decision)
+        key = (spec, offset, ids, decision, _frozen(extra))
         if key not in self._entries:
             self._entries[key] = read_entries(
-                self._reader, spec, offset, ids, decision, self._domains
+                self._reader, spec, offset, ids, decision, self._domains, extra
             )
         return self._entries[key]
 
@@ -251,6 +268,7 @@ class SessionReads:
         by_entry: Mapping[date, pd.DataFrame],
         rows: pd.DataFrame,
         setup: Edge | None = None,
+        extra: Mapping[str, FieldValue] | None = None,
     ) -> tuple[Entered | None, pd.DataFrame | None, date | None]:
         """``(None, rows, None)`` for an edge with no entry condition and no case values. An entry
         condition: its entries at ``leg`` over the eligible names and the entered names' rows at
@@ -261,12 +279,13 @@ class SessionReads:
         so the two are compared over the same names. Read inside the leg's attribution, so a
         restated partition invalidates the leg. A market gap at a reached close or at D loses the
         leg to the market table (``lost``; the rows are None); an S some name entered at with no
-        partition is returned last, for the caller to lose the leg to the outcome table."""
+        partition is returned last, for the caller to lose the leg to the outcome table. ``extra``:
+        the book's values the entry and case rules read."""
         spec, keys = edge.outcome.entry, self.case_keys(edge)
         held = self.case_keys(setup) if setup is not None and keys is None else None
         if held is not None:  # a baseline of a cased setup: the setup's unselectable names out
             eligible = self.eligible(universe, leg.decision)
-            out = self.cases(held.cases, eligible, leg.decision)
+            out = self.cases(held.cases, eligible, leg.decision, extra)
             if out.gap is not None:
                 self.lost[variant_id, leg.decision] = out.gap
                 return Entered(gap=out.gap), None, None
@@ -280,11 +299,13 @@ class SessionReads:
         kept: pd.DataFrame | None = rows
         missing: date | None = None
         if spec is not None:
-            found = self.entries(spec, edge.outcome.start_offset_sessions, eligible, leg.decision)
+            found = self.entries(
+                spec, edge.outcome.start_offset_sessions, eligible, leg.decision, extra
+            )
             if found.gap is None:
                 kept, missing = entered_rows(by_entry, found, leg.entry)
         if keys is not None and found.gap is None and kept is not None:
-            resolved = self.cases(keys.cases, eligible, leg.decision)
+            resolved = self.cases(keys.cases, eligible, leg.decision, extra)
             if resolved.gap is not None:
                 found = Entered(gap=resolved.gap)
             else:
@@ -303,11 +324,17 @@ class SessionReads:
             self._case_keys[text] = case_keys(edge.outcome)
         return self._case_keys[text]
 
-    def cases(self, cases: tuple[CaseValue, ...], ids: frozenset[str], decision: date) -> Resolved:
+    def cases(
+        self,
+        cases: tuple[CaseValue, ...],
+        ids: frozenset[str],
+        decision: date,
+        extra: Mapping[str, FieldValue] | None = None,
+    ) -> Resolved:
         """Each of ``ids``' case values at D (``reads/cases.py``), cached per D only."""
-        key = (cases, ids, decision)
+        key = (cases, ids, decision, _frozen(extra))
         if key not in self._cases:
-            self._cases[key] = read_cases(self._reader, cases, ids, decision, self._domains)
+            self._cases[key] = read_cases(self._reader, cases, ids, decision, self._domains, extra)
         return self._cases[key]
 
     def implied(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
