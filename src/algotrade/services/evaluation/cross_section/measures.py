@@ -21,6 +21,7 @@ from typing import Protocol
 
 import numpy as np
 
+from algotrade.config.edges.verdict import TailsVerdict
 from algotrade.quant.edges.statistics import (
     Moments,
     decile_spread,
@@ -35,9 +36,12 @@ from algotrade.quant.edges.statistics import (
     sharpe_t,
     spread_summary,
 )
+from algotrade.services.evaluation.evidence.measures import TailMeasures, tail_measures
 
 BUCKETS = 10
 PBO_SPLITS = 16
+SIDES = ("long", "short")  # a long-short session's two legs
+BOOTSTRAPPED = ("all", "in_sample", "frozen", "split")  # the slice kinds the verdict reads
 UNCOUNTED_BAND = "uncounted"  # the reason of a band name with no counted value (never held)
 
 
@@ -305,6 +309,24 @@ class SliceMeasure:
     pick_adv_median: float | None = field(default=None)
     pick_adv_known: int | None = field(default=None)
     pick_adv_low: int | None = field(default=None)
+    # The evidence measures over the return on capital (ADR 0088, design 2.6): all None on a cost
+    # row, a random draw and a run without ``TailSpec``, for an outcome with no money and where no
+    # return on capital is stored (a leg from before leg v5).
+    tail: TailMeasures = field(default=TailMeasures(), repr=False)  # off the repr: pinned digests
+
+
+@dataclass(frozen=True)
+class TailSpec:
+    """What the evidence measures need beyond the stats: ``seed_key`` the trial's identity (the
+    bootstrap seed, never a code version), ``tails`` the settings, ``bootstrap`` whether the
+    interval and t are drawn (the judged screener only), ``base`` whether the base's return on
+    capital follows from the values (``session_rocs``): not for an option position (its base
+    return is stored with the leg, E6b-2) nor an outcome whose sign flips the stored values."""
+
+    seed_key: str
+    tails: TailsVerdict
+    bootstrap: bool = True
+    base: bool = True
 
 
 def decile_means(values_in_rank_order: Sequence[float]) -> tuple[float, ...]:
@@ -341,6 +363,57 @@ def _capacity(
     return median, len(known), sum(1 for a in known if a < floor)
 
 
+def session_rocs(
+    rows: Sequence[SessionStat], base: bool
+) -> tuple[list[date], list[float], list[float]]:
+    """``(days, roc, base_roc)``: per measured session the mean return on capital of its counted
+    picks (a ``long_short`` session: the long leg's mean plus the short leg's, both needed) and the
+    base's on the same names. A pick with no return on capital is left out of its session's mean
+    and a session with none is left out of the series; a banded run (the held names are not the
+    picks) and an outcome with no money have no series (nothing is measured, never zero).
+    The base: the picks' return on capital less the picks' value minus the base's value mean. For
+    ``excess_return``, ``option_model_pnl`` and ``pair_spread`` the return on capital less the
+    value is one constant per session (the benchmark's return and the cost), so this is the
+    base's own return on capital; NaN when ``base`` is off, for a spread and for a book."""
+    if any(r.banded_values is not None for r in rows):
+        return [], [], []
+    days: list[date] = []
+    rocs: list[float] = []
+    bases: list[float] = []
+    for r in sorted(rows, key=lambda r: r.session):
+        counted = [p for p in r.picks if not p.reason]
+        known = [(p.side, p.roc) for p in counted if p.roc is not None]
+        if r.weights:  # a book: its one session value is the return
+            roc = r.pick_values[0] if r.pick_values else None
+        elif r.short_values is not None:
+            legs = [[v for side, v in known if side == leg] for leg in SIDES]
+            roc = None if not all(legs) else float(sum(np.mean(leg) for leg in legs))
+        else:
+            roc = float(np.mean([v for _, v in known])) if known else None
+        if roc is None:
+            continue
+        days.append(r.session)
+        rocs.append(roc)
+        simple = not r.weights and r.short_values is None and len(known) == len(counted)
+        mean, eligible = r.pick_mean, r.eligible
+        if base and simple and mean is not None and eligible:
+            everyone = (sum(r.pick_values) + r.rest[0] * r.rest[1]) / eligible
+            bases.append(roc - (mean - everyone))
+        else:
+            bases.append(float("nan"))
+    return days, rocs, bases
+
+
+def _tail_measures(
+    sl: Slice, rows: Sequence[SessionStat], horizon: int, spec: TailSpec
+) -> TailMeasures:
+    days, roc, base = session_rocs(rows, spec.base)
+    return tail_measures(
+        days, roc, base, horizon, spec.seed_key, f"{sl.kind}:{sl.value}:{horizon}",
+        spec.tails, spec.bootstrap and sl.kind in BOOTSTRAPPED,
+    )  # fmt: skip
+
+
 def _measure(
     sl: Slice,
     kept: Sequence[SessionStat],
@@ -348,6 +421,7 @@ def _measure(
     adv_floor: float | None = None,
     wins: bool = False,
     horizon: int = 1,
+    tail: TailSpec | None = None,
 ) -> SliceMeasure:
     rows = [r for r in kept if not r.excluded_coverage]
     adv_median, adv_known, adv_low = _capacity(rows, adv_floor)
@@ -406,6 +480,7 @@ def _measure(
         pick_adv_median=adv_median,
         pick_adv_known=adv_known,
         pick_adv_low=adv_low,
+        tail=TailMeasures() if tail is None else _tail_measures(sl, rows, horizon, tail),
     )
     if any(r.short_values is not None for r in rows):
         return _long_short(measure, means)
@@ -506,6 +581,7 @@ def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) ->
                 pick_adv_median=None,
                 pick_adv_known=None,
                 pick_adv_low=None,
+                tail=TailMeasures(),  # a cost row is not a tail row
                 slice_kind=COST,
                 slice_value=f"{m.slice_kind}:{bp:g}",
                 hits=hits,
@@ -545,6 +621,7 @@ def slice_measures(
     adv_floor: float | None = None,
     wins: bool = False,
     horizon: int = 1,
+    tail: TailSpec | None = None,
 ) -> list[SliceMeasure]:
     """One ``SliceMeasure`` per slice, in the slices' order, over the stats it keeps. A ``model``
     screener's score was fitted on sessions before ``frozen_from`` (a fitness test): a slice that
@@ -552,12 +629,13 @@ def slice_measures(
     ``adv_floor``: the site's capacity floor for the capacity columns (none: not measured);
     ``wins``: the outcome is not a return, so the Sharpe ratio is of the excess wins;
     ``horizon``: the holding period in sessions, which sets how far the windows overlap (the
-    t-ratios count independent sessions, ``statistics.window_weights``)."""
+    t-ratios count independent sessions, ``statistics.window_weights``); ``tail``: the evidence
+    measures' inputs (none: not measured, the random draws' and the old callers' case)."""
     out = []
     for sl in slices:
         kept = [r for r in rows if sl.keep(r)]
         seen = model and (frozen_from is None or any(r.session < frozen_from for r in kept))
-        out.append(_measure(sl, kept, seen, adv_floor, wins, horizon))
+        out.append(_measure(sl, kept, seen, adv_floor, wins, horizon, tail))
     return out
 
 

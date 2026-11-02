@@ -4,12 +4,13 @@ value and bound (ED8)."""
 from collections.abc import Sequence
 from dataclasses import replace
 
-from algotrade.config.edges.verdict import VerdictSettings
+from algotrade.config.edges.verdict import MAIN_OPTION_LEVEL, VerdictSettings
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.robustness import (
     beat_share,
 )
-from algotrade.services.read.evaluation.runs import Draws
+from algotrade.services.read.evaluation.runs import Draws, EdgeRow
 from algotrade.services.read.evaluation.verdict.model import (
     NO_DECOYS,
     NOT_APPLICABLE,
@@ -125,15 +126,79 @@ def _portfolio_criteria(
     return tuple(out)
 
 
+TAILS = "tails"  # the verdict profile of an option setup (``config/edges/verdict.PROFILES``)
+CVAR_NEEDS_LOSS = "the base has no loss tail"  # the value of a CVaR ratio with nothing to divide by
+
+
+def _cvar_ratio(oos: EdgeRow, t: VerdictSettings) -> tuple[str, bool | None]:
+    """The setup's CVaR 5% over the base's, in words, and whether it is at most ``max_cvar_ratio``
+    (None: not measured). Both are returns, so a loss tail on both gives a positive ratio; fewer
+    than ``min_tail_windows`` in the tail, a missing figure or a base with no loss (its CVaR is
+    not below zero: nothing to compare the setup's tail against) is never a pass."""
+    own, base, n = oos.cvar_5, oos.base_cvar_5, oos.cvar_5_n
+    if own is None or base is None or n is None or n < t.tails.min_tail_windows:
+        return "not measured yet", None
+    if base >= 0:
+        return CVAR_NEEDS_LOSS, None
+    ratio = own / base
+    return f"{ratio:.2f}x the base's", ratio <= t.tails.max_cvar_ratio
+
+
+def _tails_criteria(
+    crit: Sequence[VerdictCriterion], c: _Candidate, t: VerdictSettings
+) -> tuple[VerdictCriterion, ...]:
+    """The ``tails`` profile (ADR 0088, design 2.6) over ``crit``, the shared criteria: the
+    bootstrap t of the return on capital against the base takes the decile t's place (the same
+    ids and t bounds, Promising and Works), and the probabilistic Sharpe ratio and the CVaR ratio
+    join. The trades, win rate, deflated Sharpe, PBO, baselines, random picks and the rest are
+    shared. Only the main option cost level is judged: another one (``mid``, ``effective``) would
+    be read as if it were ``full``, so it is refused (plan A7)."""
+    oos, tails = c.oos, t.tails
+    if tails.option_cost_level != MAIN_OPTION_LEVEL:
+        raise ConfigurationError(
+            f"tails_verdict option_cost_level {tails.option_cost_level!r}: a tails verdict is "
+            f"judged at {MAIN_OPTION_LEVEL!r} only; the other levels are not read yet"
+        )
+    label = "Return on capital vs base, block bootstrap t"
+    ratio_value, ratio_ok = _cvar_ratio(oos, t)
+    psr = oos.psr
+    extra = {
+        "dsr": (
+            _crit("psr", "Probabilistic Sharpe ratio", _num(psr),
+                  f"at least {tails.promising_psr:g}", _at_least(psr, tails.promising_psr),
+                  PROMISING),
+            _crit("cvar_ratio", "Worst 5% of windows against the base's", ratio_value,
+                  f"at most {tails.max_cvar_ratio:g}x", ratio_ok, PROMISING),
+        ),
+        "works_dsr": (
+            _crit("works_psr", "Probabilistic Sharpe ratio", _num(psr),
+                  f"at least {tails.works_psr:g}", _at_least(psr, tails.works_psr), WORKS),
+        ),
+    }  # fmt: skip
+    out: list[VerdictCriterion] = []
+    for x in crit:
+        bound = t.promising_t if x.id == "decile_t" else t.works_t
+        swapped = _crit(x.id, label, _num(oos.excess_roc_t), f"at least {bound:g}",
+                        _at_least(oos.excess_roc_t, bound), x.level)  # fmt: skip
+        out.append(swapped if x.id in ("decile_t", "works_t") else x)
+        out.extend(extra.get(x.id, ()))
+    return tuple(out)
+
+
 def _criteria(
     c: _Candidate,
     t: VerdictSettings,
     draws: Draws,
     decoys: bool,
     portfolio: bool = False,
+    profile: str = "return",
 ) -> tuple[VerdictCriterion, ...]:
+    """The criteria of ``c`` under the edge's verdict ``profile``: ``return`` is the criteria of
+    every edge today, ``tails`` replaces the decile t by the bootstrap t of the return on capital
+    and adds the PSR and the CVaR ratio (``_tails_criteria``). A book is read first as a book."""
     found = _all_criteria(c, t, draws, decoys)
-    return _portfolio_criteria(found, c, t) if portfolio else found
+    found = _portfolio_criteria(found, c, t) if portfolio else found
+    return _tails_criteria(found, c, t) if profile == TAILS else found
 
 
 def _all_criteria(

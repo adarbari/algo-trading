@@ -72,7 +72,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges/positions"
-purpose = "positions of an edge document (ADR 0088), split from config/edges (at its module cap): the site's position templates and position_of (templates.py), the position key of a stored option trade (key.py), the option parameters and [outcome.exit] of an outcome (spec.py), the variant grids (grid.py), the published exit rule's settings (exit_rule.py) and the option_pnl outcome's structures, tenor rule and checks (chain.py, moved here)"
+purpose = "positions of an edge document (ADR 0088), split from config/edges (at its module cap): the site's position templates and position_of (templates.py), the position key of a stored option trade (key.py), the option parameters and [outcome.exit] of an outcome (spec.py), the variant grids (grid.py), the published exit rule's settings (exit_rule.py), the option selector's quote filters (quotes.py) and the option_pnl outcome's structures, tenor rule and checks (chain.py, moved here)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
@@ -368,7 +368,7 @@ contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow
 
 [[dir]]
 path = "src/algotrade/quant/edges"
-purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py); the maths of a chain P&L: two-sided mids, long P&L, our own delta of a leg, the daily delta-hedged P&L (chain_pnl.py, EB H13)"
+purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); the tail statistics of a setup's return on capital: CVaR with the windows in the tail, the worst window, the stationary block bootstrap and the probabilistic Sharpe ratio (tails.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py); the maths of a chain P&L: two-sided mids, long P&L, our own delta of a leg, the daily delta-hedged P&L (chain_pnl.py, EB H13)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -466,7 +466,7 @@ purpose = "what each site edge took at a session (ADR 0081): the decision by the
 
 [[dir]]
 path = "src/algotrade/services/evaluation/evidence"
-purpose = "the evidence of a setup (ADR 0088, design 2.5a / 2.6): the common trade contract TRADE_COLUMNS every outcome shape maps to (contract.py: columns, capital bases, price sources, the validator) and the mapping of each shape, share returns, option P&L, expires_otm / hit_target with no capital, the model P&L, a pair as one row, the time-series windows and a book's series for the evidence only (shapes.py); pure over frames, never a store or data.outcomes"
+purpose = "the evidence of a setup (ADR 0088, design 2.5a / 2.6): the common trade contract TRADE_COLUMNS every outcome shape maps to (contract.py: columns, capital bases, price sources, the validator) and the mapping of each shape, share returns, option P&L, expires_otm / hit_target with no capital, the model P&L, a pair as one row, the time-series windows and a book's series for the evidence only (shapes.py), and the evidence measures over the return on capital: mean and bootstrap interval, paired excess and its bootstrap t, CVaR with counts, worst window, PSR (measures.py); pure over frames and arrays, never a store or data.outcomes"
 contracts = ["The trade evidence reads only frames: no store, no outcomes reader, no harness internals (ADR 0088)"]
 
 [[dir]]

@@ -60,11 +60,16 @@ EDGE_EVAL = fixed(
         "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
         "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
         "pre_snapshot_sessions", "pick_adv_known", "pick_adv_low",
+        # The evidence measures (ADR 0088 2.6): null in a row written before E6b, on cost rows and
+        # random draws, for a setup with no return on capital and where a slice has no series.
+        "roc_sessions", "cvar_5_n", "cvar_1_n",
     )),
     *floats(
         "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
         "decile_spread", "decile_t", "effect_size", "sharpe", "picks_t", "deflated_sharpe", "pbo",
         "reference_rate", "touch_rate", "pick_adv_median",
+        "mean_roc", "mean_roc_lo", "mean_roc_hi", "excess_roc", "excess_roc_t", "cvar_5", "cvar_1",
+        "base_cvar_5", "worst_window", "psr",
         *(f"decile_mean_{i:02d}" for i in range(1, 11)),
     ),
     runs="merge",

@@ -1,12 +1,14 @@
 """``slice_measures``: per-slice numbers pooled from per-session stats, by hand. Counts are
 explicit; a statistic that is undefined is None (one session has no sd), never a made-up zero."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
 import numpy as np
+import pandas as pd
 import pytest
 
+from algotrade.config.edges.verdict import TailsVerdict
 from algotrade.core.time.calendar import sessions_between
 from algotrade.quant.edges.statistics import (
     break_even_cost,
@@ -18,20 +20,26 @@ from algotrade.quant.edges.statistics import (
     sharpe_t,
 )
 from algotrade.services.evaluation.cross_section.detail.windows import counts_wins
+from algotrade.services.evaluation.cross_section.hit import apply_outcome, short_view
 from algotrade.services.evaluation.cross_section.measures import (
     CostGrid,
     Pick,
     SessionStat,
     Slice,
     SliceMeasure,
+    TailSpec,
     cost_measures,
     decile_means,
     deflate,
     edge_slices,
     pool_stats,
+    session_rocs,
     slice_measures,
     trial_value,
 )
+from algotrade.services.evaluation.evidence.measures import TailMeasures
+from algotrade.services.evaluation.evidence.shapes import trade_frame
+from tests.unit.services.evaluation.cross_section.conftest import IDS, edge, outcome_row
 
 ALL = Slice("all", "all", lambda _: True)
 
@@ -564,3 +572,145 @@ def test_a_pooled_event_block_keeps_its_days_short_legs_only_when_some_day_has_o
     assert pool_stats([one, two]).short_values == (0.01, 0.03)
     plain = stat(date(2026, 1, 5), (0.02,), (0.0,), 1)
     assert pool_stats([plain, plain]).short_values is None
+
+
+# ---- the evidence measures (ADR 0088, design 2.6) ----
+
+BENCH = 0.01  # a session's benchmark return in the constancy fixtures
+
+
+def roc_pick(
+    name: str, roc: float | None, value: float, side: str = "long", reason: str = ""
+) -> Pick:
+    return Pick(name, 1, reason, value=value, side=side, roc=roc)
+
+
+def roc_stat(
+    day: date, picks: tuple[Pick, ...], rest: tuple[float, ...], **kw: object
+) -> SessionStat:
+    return SessionStat(
+        session=day, regime="BULL",
+        pick_values=tuple(p.value or 0.0 for p in picks if not p.reason),
+        rest=moments(rest), picks=picks, **kw,
+    )  # type: ignore[arg-type]  # fmt: skip
+
+
+def test_the_session_roc_is_the_picks_mean_and_the_base_the_names_mean_plus_the_offset() -> None:
+    """Values are excess returns net of cost; the return on capital is the same plus the
+    benchmark: 0.01 each. The base's roc is the eligible names' mean value plus that offset."""
+    picks = (roc_pick("A", 0.04 + BENCH, 0.04), roc_pick("B", -0.01 + BENCH, -0.01))
+    s = roc_stat(date(2026, 1, 5), picks, (0.0, 0.02, -0.02, 0.0))
+    days, roc, base = session_rocs([s], True)
+    assert days == [date(2026, 1, 5)]
+    assert roc == [pytest.approx(0.025)]  # (0.05 + 0.00) / 2
+    assert base == [pytest.approx(0.005 + BENCH)]  # the six names' mean value, 0.03 / 6, + offset
+
+
+def test_a_pick_with_no_roc_is_left_out_and_a_session_with_none_has_no_series() -> None:
+    both = roc_stat(
+        date(2026, 1, 5), (roc_pick("A", 0.05, 0.04), roc_pick("B", None, -0.01)), (0.0,)
+    )
+    none = roc_stat(date(2026, 1, 6), (roc_pick("A", None, 0.04),), (0.0,))
+    days, roc, base = session_rocs([both, none], True)
+    assert days == [date(2026, 1, 5)] and roc == [0.05]
+    assert np.isnan(base[0])  # a pick without a roc: the offset is not constant, no base
+    assert session_rocs([none], True) == ([], [], [])  # an outcome with no money: nothing, never 0
+
+
+def test_a_banded_run_and_a_base_switched_off_have_no_series_or_no_base() -> None:
+    s = roc_stat(date(2026, 1, 5), (roc_pick("A", 0.05, 0.04),), (0.0,), banded_values=(0.01,))
+    assert session_rocs([s], True) == ([], [], [])
+    plain = roc_stat(date(2026, 1, 5), (roc_pick("A", 0.05, 0.04),), (0.0,))
+    _, roc, base = session_rocs([plain], False)
+    assert roc == [0.05] and np.isnan(base[0])
+
+
+def test_a_long_short_session_is_the_long_legs_mean_plus_the_short_legs_and_has_no_base() -> None:
+    picks = (roc_pick("L", 0.03, 0.02), roc_pick("S", 0.01, 0.01, "short"))
+    s = roc_stat(date(2026, 1, 5), picks, (0.0,), short_values=(0.01,))
+    _, roc, base = session_rocs([s], True)
+    assert roc == [pytest.approx(0.04)] and np.isnan(base[0])
+    half = roc_stat(date(2026, 1, 6), (picks[0],), (0.0,), short_values=())
+    assert session_rocs([half], True) == ([], [], [])  # never half a spread
+
+
+def test_a_book_session_is_its_value_and_has_no_base() -> None:
+    s = SessionStat(
+        session=date(2026, 1, 5), regime="BULL", pick_values=(0.013,), weights=(("X", 1.0),)
+    )
+    _, roc, base = session_rocs([s], True)
+    assert roc == [0.013] and np.isnan(base[0])
+
+
+def test_the_roc_less_value_is_one_constant_per_session_for_every_kind_with_a_base() -> None:
+    """The base's roc is derived from values, which holds only if roc - value is the same for every
+    name of a session: the benchmark's return (and the cost) for shares, nothing for the model's
+    P&L and a pair. If a kind's mapping changes, this fails before a verdict moves."""
+    day, out = date(2026, 9, 11), date(2026, 9, 15)
+    names = [
+        outcome_row(
+            IDS[i],
+            i + 10,
+            day,
+            fwd_excess_return=(i + 0.5) / 100 - BENCH,
+            fwd_return=(i + 0.5) / 100,
+        )
+        for i in range(5)
+    ]
+    rows = pd.DataFrame(names)
+    for side, cost in (("long", 20), ("short", 20)):
+        sided = {"side": "short", "borrow_bps_annual": 252} if side == "short" else {}
+        e = edge(outcome={"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+                          "start_offset_sessions": 1, "cost_bps": cost, **sided})  # fmt: skip
+        res = apply_outcome(e, rows)
+        view = short_view(res) if side == "short" else res
+        f = trade_frame(e, rows, view, entry=day, bars_exit=out, side=side)
+        gap = (f["return_on_capital"] - f["value"]).round(12)
+        assert gap.nunique() == 1, side
+        assert gap.iloc[0] == pytest.approx(BENCH if side == "long" else -BENCH)
+    model = edge(outcome={"kind": "option_model_pnl", "horizon_sessions": [21], "benchmark": "none",
+                          "start_offset_sessions": 1, "structure": "atm_straddle_long",
+                          "iv_field": "rollup.ibkr_iv@v1.iv30_ibkr", "cost_bps": 10},
+                 schedule="every_session")  # fmt: skip
+    rows = rows.assign(horizon_sessions=21)
+    res = apply_outcome(model, rows, dict.fromkeys(IDS, 0.2))
+    f = trade_frame(model, rows, res, entry=day, bars_exit=out, side="long")
+    counted = f[f["excluded"] == ""]
+    assert len(counted) and (counted["return_on_capital"] - counted["value"]).abs().max() == 0.0
+
+
+def test_the_tail_measures_are_new_columns_and_move_no_existing_figure() -> None:
+    days = [date(2026, 1, 5) + timedelta(days=i) for i in range(6)]
+    stats = [
+        roc_stat(d, (roc_pick("A", 0.02 * (i % 3 - 1) + BENCH, 0.02 * (i % 3 - 1)),), (0.0, 0.01))
+        for i, d in enumerate(days)
+    ]
+    spec = TailSpec("trial", TailsVerdict(bootstrap_draws=100))
+    plain = slice_measures(stats, [ALL])
+    judged = slice_measures(stats, [ALL], tail=spec)
+    assert plain[0].tail == TailMeasures()  # no spec: not measured
+    assert judged[0].tail.roc_sessions == 6 and judged[0].tail.mean_roc_lo is not None
+    assert replace(judged[0], tail=TailMeasures()) == plain[0]  # every pre-E6b figure is equal
+    other = slice_measures(
+        stats, [ALL], tail=TailSpec("trial", TailsVerdict(bootstrap_draws=100), False)
+    )
+    assert other[0].tail.mean_roc_lo is None and other[0].tail.cvar_5 == judged[0].tail.cvar_5
+
+
+def test_the_bootstrap_runs_for_the_judged_slice_kinds_only_and_a_cost_row_is_not_a_tail_row() -> (
+    None
+):
+    days = [date(2026, 1, 5) + timedelta(days=i) for i in range(8)]
+    stats = [
+        roc_stat(d, (roc_pick("A", 0.01 * (i % 4), 0.01 * (i % 4)),), (0.0,))
+        for i, d in enumerate(days)
+    ]
+    year = Slice("year", "2026", lambda _: True)
+    spec = TailSpec("trial", TailsVerdict(bootstrap_draws=100))
+    all_, yr = slice_measures(stats, [ALL, year], tail=spec)
+    assert all_.tail.mean_roc_lo is not None and yr.tail.mean_roc_lo is None
+    assert (
+        yr.tail.cvar_5 is not None and yr.tail.psr is not None
+    )  # the cheap measures run everywhere
+    costed = cost_measures(stats, [ALL], [all_], CostGrid(None, (0.0, 15.0)))
+    assert costed and all(c.tail == TailMeasures() for c in costed)
