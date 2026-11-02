@@ -1,7 +1,7 @@
 # Data vendors
 
 Decision record: [ADR 0012](../adr/0012-data-vendors.md). Researched 2026-10-02; re-check
-limits and prices before relying on them.
+limits and prices before relying on them. Free vs paid at a glance: [vendor-inventory/inventory.md](vendor-inventory/inventory.md).
 
 Every vendor sits behind the same source interface in `libs/sources/algotrade_sources/`. Adding or
 swapping a vendor never touches storage, features, strategies or the UI.

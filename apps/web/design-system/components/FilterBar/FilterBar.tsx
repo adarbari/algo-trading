@@ -2,11 +2,9 @@
  * FilterBar: a table's filter bar (search, quick toggle chips, the many-valued filters in
  * force, and a "more filters" panel) that uses a phone's space well. Wide, the search takes
  * the row, under it the quick chips, the active chips and a "+ Filter" popover with the
- * fields. Narrow (the bar's own width under `sm`), `sheet`: the search and one "Filters · N"
- * button share a row, the button opens a side sheet with the quick chips and the fields, and
- * the active chips scroll sideways under the row. Narrow, `scroll`: the search, then one row
- * that scrolls sideways ("+ Filter" first, then the quick and the active chips). The two
- * narrow forms are proposals; the owner picks one (ADR 0011).
+ * fields. Narrow (the bar's own width under `sm`): the search and one "Filters · N" button
+ * share a row, the button opens a side sheet with the quick chips and the fields, and the
+ * active chips scroll sideways under the row (the one narrow form; decisions log 2026-11-02).
  * ADR 0082 adds: `groups` (`FilterGroupButton`s) on the toolbar row beside the search and the
  * "More filters" trigger; below the chips a count line with `count` (an `aria-live=polite`
  * region; narrow with the sheet open it is repeated in the sheet's footer: "12 of 340") and `actions` (Clear all, Save view); and, narrow, the sheet's footer
@@ -34,8 +32,6 @@ export interface FilterBarProps {
   moreLabel?: string;
   /** How many filters are in force: shown on the narrow button as "Filters · 2". */
   activeCount?: number;
-  /** The narrow form: `sheet` (default) or `scroll`. */
-  narrow?: 'sheet' | 'scroll';
   /** Accessible name of the bar (default "Filters"). */
   label?: string;
   /** The narrow filters sheet starts open (a story's open state). */
@@ -59,7 +55,6 @@ export function FilterBar({
   more,
   moreLabel = 'Filter',
   activeCount,
-  narrow: narrowForm = 'sheet',
   label = 'Filters',
   defaultOpen = false,
   groups,
@@ -113,17 +108,6 @@ export function FilterBar({
           {active}
           {trigger}
         </Stack>
-      </Stack>
-    );
-  } else if (narrowForm === 'scroll') {
-    body = (
-      <Stack gap={2}>
-        {search}
-        <div className={styles.scrollRow}>
-          {trigger}
-          {quick}
-          {active}
-        </div>
       </Stack>
     );
   } else {
