@@ -79,6 +79,7 @@ allowed = [
     "src/algotrade/services/evaluation/cross_section/hit.py",  # the reader selects the edge's own key
     "src/algotrade/services/evaluation/cross_section/reads/cases.py",  # the reader keys each name's resolved case point as the writer did (E13b)
     "src/algotrade/services/evaluation/time_series/sleeve.py",  # a sleeve trial's identity is its position key
+    "src/algotrade/services/evaluation/time_series/cycle.py",  # a cycle phase's rows are read by its position key (X7)
 ]
 section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
 detect = [{ call = "position_key" }, { call = "parse_position_key" }, { call = "resolve_legs" }, { call = "share_position_key" }]

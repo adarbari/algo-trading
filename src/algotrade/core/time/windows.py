@@ -65,6 +65,9 @@ WINDOW_NAMES = tuple(WINDOW_LENGTHS)
 # may hold up to this many sessions, the window placing only its entry, and its holds never
 # overlap. Only the windows a sleeve may use are declared.
 WINDOW_GAPS: dict[str, int] = {"after_monthly_expiry": 17}
+# The most sessions from one window's first session to the next's over 2000-2040 (a test recomputes
+# it): a wheel's holds, one per gap, lie between ``WINDOW_GAPS`` and this.
+WINDOW_LONGEST_GAPS: dict[str, int] = {"after_monthly_expiry": 25}
 _QUARTER_MONTHS = (3, 6, 9, 12)
 
 

@@ -9,13 +9,24 @@ variants and a grid. Pure: it reads the parsed selection only; turning a symbol 
 harness's, through ``SymbolResolver`` (ADR 0018), never a string built here."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.schedules.events import ON_EVENT
+from algotrade.config.site.fields import Table
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import Rule
-from algotrade.core.time.windows import WINDOW_GAPS, window_length
+from algotrade.core.time.windows import (
+    WINDOW_GAPS,
+    WINDOW_LONGEST_GAPS,
+    window_length,
+    window_name,
+)
+
+if TYPE_CHECKING:
+    from algotrade.config.edges.document import Outcome
 
 OUT_OF_WINDOW = "out_of_window"  # the ``base`` of a time-series edge
 DELTA_EQUIVALENT = "delta_equivalent"  # the ``base`` of a named option sleeve (ADR 0088)
@@ -25,6 +36,43 @@ TIME_SERIES = (OUT_OF_WINDOW, DELTA_EQUIVALENT)  # the bases the time-series har
 LADDER = "every_session_ladder"
 SYMBOL_FIELD = "instrument.symbol"
 MAX_NAMED = 10
+WHEEL_WINDOW = "after_monthly_expiry"  # a wheel's entries: the session after each monthly expiry
+WHEEL_PUT = "short_put"  # the put phase: the outcome's own position
+WHEEL_CALL = "covered_call"  # the call phase: ``[outcome.wheel] position``
+WHEEL_KEYS = ("position", "strike_delta", "tenor_days")
+
+
+@dataclass(frozen=True)
+class WheelSpec:
+    """The call phase of a wheel (ADR 0088, EF-G13): the covered call written on the shares an
+    assigned put delivers, a template ``position`` at ``strike_delta`` and ``tenor_days``."""
+
+    position: str
+    strike_delta: float
+    tenor_days: int
+
+
+def wheel_of(o: Table, base: str, schedule: str) -> WheelSpec | None:
+    """``[outcome.wheel]`` (None: not a wheel): only a named option sleeve entering the session
+    after each monthly expiry has one; the call phase is a ``covered_call`` at a delta in (0, 1)
+    and a tenor in whole days. Its put phase, the outcome's own position, is checked by
+    ``check_sleeve`` (``short_put``, no exit rules)."""
+    if "wheel" not in o.names():
+        return None
+    if base != DELTA_EQUIVALENT or window_name(schedule) != WHEEL_WINDOW:
+        raise ConfigurationError(
+            f"{o.where} wheel: a named option sleeve (base {DELTA_EQUIVALENT!r}) on "
+            f"calendar:{WHEEL_WINDOW}, got base {base!r} on schedule {schedule!r}"
+        )
+    t = o.table("wheel", WHEEL_KEYS)
+    delta = t.number("strike_delta", None)
+    if delta is None or not 0 < delta < 1:
+        raise ConfigurationError(f"{t.where} strike_delta: required, a fraction in (0, 1)")
+    if "tenor_days" not in t.names():
+        raise ConfigurationError(f"{t.where} tenor_days: required")
+    return WheelSpec(
+        t.choice("position", WHEEL_CALL, (WHEEL_CALL,)), delta, t.integer("tenor_days", 0, 1)
+    )
 
 
 def check_raw_returns(where: str, kind: str, benchmark: str, timed: bool) -> None:
@@ -64,12 +112,25 @@ def check_variants(
         )
 
 
-def check_window_hold(where: str, window: str, horizons: Sequence[int], sleeve: bool) -> None:
+def check_window_hold(
+    where: str, window: str, horizons: Sequence[int], base: str, wheel: WheelSpec | None
+) -> None:
     """The hold of an edge on ``calendar:<window>``: the window's length (ADR 0073 decision 2),
-    or for a named option ``sleeve``, whose window places only the entry, one hold from that
-    length to the window's declared gap (``WINDOW_GAPS``), so two holds never overlap."""
-    low = window_length(window)
+    or for a named option sleeve (``base``), whose window places only the entry, one hold from
+    that length to the window's declared gap (``WINDOW_GAPS``), so two holds never overlap. A
+    ``wheel`` holds one per gap between its windows (each hold ends on a monthly expiry, so the
+    set is the gaps the calendar makes: a fitness test derives it), from ``WINDOW_GAPS`` to
+    ``WINDOW_LONGEST_GAPS``."""
+    low, sleeve = window_length(window), base == DELTA_EQUIVALENT
     high = WINDOW_GAPS.get(window, low) if sleeve else low
+    if wheel is not None:
+        longest = WINDOW_LONGEST_GAPS[window]
+        if horizons and all(high - 1 <= h <= longest for h in horizons):
+            return
+        raise ConfigurationError(
+            f"{where} horizon_sessions: a wheel holds one value per gap between monthly expiries, "
+            f"each {high - 1} to {longest} sessions, got {list(horizons)}"
+        )
     if len(horizons) == 1 and low <= horizons[0] <= high:
         return
     if not sleeve:
@@ -83,22 +144,34 @@ def check_window_hold(where: str, window: str, horizons: Sequence[int], sleeve: 
     )
 
 
-def check_sleeve(
-    where: str, kind: str, horizons: int, base: str, tracks: str | None = None
-) -> None:
+def check_sleeve(where: str, held: "Outcome", base: str) -> None:
     """A named option sleeve (an outcome measured at ``base = "delta_equivalent"``) holds one
-    ``option_pnl`` position of one hold (``horizons``: the number of its ``horizon_sessions``);
-    only a sleeve ``tracks`` a Cboe strategy index (E8b)."""
-    if tracks is not None and base != DELTA_EQUIVALENT:
+    ``option_pnl`` position of one hold (a wheel: one per gap, a ``short_put`` with no exit
+    rules, its call phase in ``held.wheel``); only a sleeve ``tracks`` a Cboe strategy index
+    (E8b) or has a ``wheel``."""
+    if held.tracks is not None and base != DELTA_EQUIVALENT:
         raise ConfigurationError(
             f"{where} tracks: only a named option sleeve (base {DELTA_EQUIVALENT!r}) is tracked "
             f"against a Cboe strategy index, got base {base!r}"
         )
-    if base == DELTA_EQUIVALENT and (kind != CHAIN_KIND or horizons != 1):
+    holds = len(held.horizon_sessions)
+    if base == DELTA_EQUIVALENT and (held.kind != CHAIN_KIND or (holds != 1 and not held.wheel)):
         raise ConfigurationError(
             f"{where} kind: base {DELTA_EQUIVALENT!r} pairs an option position with its "
             f"delta-equivalent stock, so an {CHAIN_KIND!r} outcome with one horizon_sessions "
-            f"value, got {kind!r} over {horizons}"
+            f"value, got {held.kind!r} over {holds}"
+        )
+    position = held.position
+    if held.wheel is not None and (
+        position is None or position.template != WHEEL_PUT or position.exit is not None
+    ):
+        raise ConfigurationError(
+            f"{where} wheel: the put phase is position = {WHEEL_PUT!r} with no [outcome.exit] "
+            f"(the call phase is the wheel's own)"
+        )
+    if held.wheel is not None and not position.book:  # type: ignore[union-attr]
+        raise ConfigurationError(
+            f"{where} wheel: book = true (the cycle reads each row's spot path for the shares' gap)"
         )
 
 

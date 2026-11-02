@@ -46,7 +46,7 @@ from algotrade.core.model.predicates import Group, Rule
 if TYPE_CHECKING:
     from algotrade.config.edges.document import Outcome
 
-KEYS = ("position", "expiry_cycle", "skip_report_in_life", "book", "exit")
+KEYS = ("position", "expiry_cycle", "skip_report_in_life", "book", "exit", "wheel")
 EXIT_KEYS = ("take_profit", "stop_loss", "exit_dte", "when")
 OPTION_KIND = "option_pnl"
 SLEEVE_BASE = "delta_equivalent"  # named.DELTA_EQUIVALENT (named imports positions: no cycle)
