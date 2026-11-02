@@ -30,7 +30,13 @@ const meta = {
   component: Tabs,
   args: { items: views, value: 'compare', label: 'View', onChange: () => undefined },
   render: (args) => (
-    <Controlled items={args.items} label={args.label} initial={args.value} size={args.size ?? 'md'}>
+    <Controlled
+      items={args.items}
+      label={args.label}
+      initial={args.value}
+      size={args.size ?? 'md'}
+      variant={args.variant ?? 'underline'}
+    >
       panel
     </Controlled>
   ),
@@ -65,8 +71,26 @@ export const CountsAndDisabled: Story = {
   },
 };
 
+/** Segmented: a page's views (Ideas: Stocks, Premium, Past lists, Yours). */
+export const Segmented: Story = {
+  args: {
+    variant: 'segmented',
+    value: 'premium',
+    label: 'Ideas views',
+    items: [
+      { id: 'stocks', label: 'Stocks' },
+      { id: 'premium', label: 'Premium' },
+      { id: 'past', label: 'Past lists' },
+      { id: 'yours', label: 'Yours' },
+    ],
+  },
+};
+
 /** Small tabs in a dense toolbar. */
 export const Dense: Story = { args: { size: 'sm' } };
 
 /** A 375 px phone frame; under a coarse pointer the control floors apply. */
 export const Narrow: Story = { ...Dense, decorators: [narrow] };
+
+/** The segmented track at phone width. */
+export const SegmentedNarrow: Story = { ...Segmented, decorators: [narrow] };

@@ -29,6 +29,8 @@ test('the Calendar page shows the scope list, then the picks of a screener', asy
   const events = await mockEventsApi(page);
   await page.goto('/calendar');
   await expect(page.getByRole('heading', { level: 1, name: 'Calendar' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Earnings week', selected: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Next 90 days' }).click();
   const grid = page.getByRole('table', { name: 'Events, next 90 days: scope list' });
   await expect(grid).toBeVisible();
   await expect(grid.getByRole('columnheader', { name: 'Market' })).toBeVisible();
@@ -43,6 +45,16 @@ test('the Calendar page shows the scope list, then the picks of a screener', asy
   const last = events.calendarAsked.at(-1);
   expect(last?.scope).toBe(false);
   expect(last?.instrumentIds).toContain('EQ:AAPL');
+  expect(errors).toEqual([]);
+});
+
+test('the Macro view lists the market-wide days alone', async ({ page }) => {
+  const errors = collectErrors(page);
+  await mockEventsApi(page);
+  await page.goto('/calendar');
+  await page.getByRole('tab', { name: 'Macro' }).click();
+  await expect(page.getByRole('list', { name: /Market-wide events/ })).toBeVisible();
+  await expectAccessible(page);
   expect(errors).toEqual([]);
 });
 

@@ -98,3 +98,54 @@ export const NarrowMany: Story = { ...Many, decorators: [narrow] };
 
 /** A phone-width container (375 px): the stats stack in one column. */
 export const Narrow: Story = { decorators: [narrow] };
+
+const evidence: StatItem[] = [
+  {
+    label: 'A typical trade',
+    value: '+2.1%',
+    sub: 'comparable stocks +0.5% · range +1.4 to +2.8',
+  },
+  {
+    label: 'A bad trade',
+    value: '\u221211.2%',
+    sub: '1 in 20 (13 of 260) this bad or worse · comparable stocks \u22121.8%',
+  },
+  {
+    label: 'Against the simple alternative',
+    value: '56 in 100',
+    sub: 'beat comparable stocks · 50 by chance',
+  },
+];
+
+/** A setup's evidence: the basis line is required, backtested or forward. */
+export const Evidence: Story = {
+  args: {
+    items: evidence,
+    label: 'Evidence',
+    variant: 'evidence',
+    basis: {
+      kind: 'backtested',
+      label:
+        'Backtested (hypothetical) · out of sample 2023 to 2026, 260 trades · after 20 bp costs',
+    },
+  },
+};
+
+export const EvidenceForward: Story = {
+  args: {
+    items: evidence,
+    label: 'Evidence',
+    variant: 'evidence',
+    basis: { kind: 'forward', label: 'Forward paper record · since 2 Nov, 14 picks' },
+  },
+};
+
+export const EvidenceNarrow: Story = {
+  args: {
+    items: evidence,
+    label: 'Evidence',
+    variant: 'evidence',
+    basis: { kind: 'backtested', label: 'Backtested (hypothetical) · out of sample 2023 to 2026' },
+  },
+  decorators: [narrow],
+};

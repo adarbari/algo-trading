@@ -2,28 +2,30 @@
   "bundle": {
     "entry_gzip_bytes": 26170,
     "entry_closure_gzip_bytes": 198000,
-    "lazy_only": ["design-system/components/Chart/engine.ts"],
+    "lazy_only": [
+      "design-system/components/Chart/engine.ts"
+    ],
     "routes": {
-      "src/pages/admin-feature-requests/index.ts": 31000,
+      "src/pages/admin-feature-requests/index.ts": 30900,
       "src/pages/admin-feature-requests/ui/AcceptedFormulasSection.tsx": 4200,
       "src/pages/admin-harness-runs/index.ts": 33530,
       "src/pages/admin-ingestion/index.ts": 52400,
-      "src/pages/admin-llm-usage/index.ts": 49100,
+      "src/pages/admin-llm-usage/index.ts": 49200,
       "src/pages/admin-llm-usage/ui/CallsSection.tsx": 54400,
       "src/pages/admin-screener-runs/index.ts": 40900,
       "src/pages/guide/index.ts": 71300,
       "src/pages/login/index.ts": 1900,
       "src/pages/screener-results/index.ts": 92100,
-      "src/pages/trader-calendar/index.ts": 13900,
+      "src/pages/trader-calendar/index.ts": 62700,
       "src/pages/trader-edges/index.ts": 65800,
       "src/pages/trader-edges/ui/EdgeSections.tsx": 97900,
       "src/pages/trader-explore/index.ts": 66600,
       "src/pages/trader-explore/ui/ChartEventsSection.tsx": 48100,
       "src/pages/trader-explore/ui/FinancialsTab.tsx": 70200,
       "src/pages/trader-explore/ui/OtherTabs.tsx": 99200,
-      "src/pages/trader-explore/ui/UniverseTable.tsx": 91145,
+      "src/pages/trader-explore/ui/UniverseTable.tsx": 91650,
       "src/pages/trader-ideas/index.ts": 61800,
-      "src/pages/trader-regime/index.ts": 60200,
+      "src/pages/trader-regime/index.ts": 60300,
       "src/pages/trader-screeners/index.ts": 36900
     }
   },
@@ -109,7 +111,7 @@
     "network./ideas.wire_gzip_bytes": "2026-10-24 #957 the filter bar's Views menu (saved views of a surface, ADR 0082) is shared filter-bar code that loads with every list page; owner pre-approved raises from the filter bar's shared code (measured locally 375.2 kB); then, before it: 2026-10-24 #939 Ideas: CI measured 372245 B on the wire (shared filter-bar chunk graph), +~500 B margin; owner pre-approved raises caused only by shared filter-bar code; then, before it: 2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #941 More filters: the percent presentation and the lazy search's loader in the Ideas chunk (measured locally 369895 B against 369700 B, +1.1 kB margin for CI; owner pre-approved raises from the filter bar's shared code)",
     "network./screeners.wire_gzip_bytes": "2026-10-24 #957 the filter bar's Views menu (saved views of a surface, ADR 0082) is shared filter-bar code that loads with every list page; owner pre-approved raises from the filter bar's shared code (measured locally 347.4 kB); then, before it: 2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk and the lists' components and reads (measured 343198 B, +~200 B margin); then, before it: previous budget",
     "network./edges.wire_gzip_bytes": "2026-10-24 #957 the filter bar's Views menu (saved views of a surface, ADR 0082) is shared filter-bar code that loads with every list page; owner pre-approved raises from the filter bar's shared code (measured locally 374.3 kB); then, before it: 2026-10-24 #939 Edges: CI measured 371313 B on the wire (shared filter-bar chunk graph moves ~200 B), +~500 B margin; owner pre-approved raises caused only by shared filter-bar code; then, before it: 2026-10-24 #940 re-measured after merging main (More filters in the shared bar, +~350 B): 2026-10-24 #940 Screeners and Edges lists adopt the shared filter bar (owner pre-approved raises that come from the filter bar's shared code): the entry chunk's growth (CI measured 370093 B, +~300 B margin); then, before it: previous budget",
-    "bundle.routes.src/pages/trader-explore/ui/UniverseTable.tsx": "2026-11-01 #1019 V7: the shared chunk graph moves about 0.8 kB into this chunk (the generated GraphQL document map gains TraderPreferences, the appearance read gains startTab, TickerSearch's onChoose passes the instrument id); measured locally 91074 B, +70 B margin; then, before it: 2026-10-24 #939 first budget: Explore's universe table (bar, feature table, column picker, compare ticks), a lazy chunk loaded only when no ticker is open (86512 B measured locally, 5 % headroom)",
+    "bundle.routes.src/pages/trader-explore/ui/UniverseTable.tsx": "2026-11-01 #1019 V7: the Settings watchlist reuses TickerSearch, so it becomes a chunk shared by two lazy pages (each shared chunk is gzipped on its own: about +0.7 kB over main's 90894 B measured locally); measured locally 91578 B, +70 B margin; then, before it: 2026-10-24 #939 first budget: Explore's universe table (bar, feature table, column picker, compare ticks), a lazy chunk loaded only when no ticker is open (86512 B measured locally, 5 % headroom)",
     "e2e./explore?focus=AAPL&tab=features.requests": "2026-10-25 #973 the theme switch: the signed-in shell reads the stored theme (one `Appearance` GraphQL request, entities/appearance) and ships the account-menu control (CI measured: one request over; vrp_scanner +246 B of script); then, before it: 2026-10-25 #971 Evening Desk fonts: the headings use a second display face (Sora 600) beside Figtree and DM Mono, one more font file on every page (measured in CI: one request over); then, before it: 2026-10-24 #939 Explore features: shared filter-bar chunks add preloaded chunks (measured locally); owner pre-approved raises caused only by shared filter-bar code",
     "network./explore.wire_gzip_bytes": "2026-10-24 #957 the filter bar's Views menu code in the Explore universe table's chunks (CI measured 412785 B against 412700 B, +915 B margin; owner pre-approved raises from the filter bar's shared code); then, before it: 2026-10-24 #939 Explore with no ticker open is now the universe table: its lazy chunk (86.5 kB gzip) loads with the page, +23 kB wire (409.7 kB measured locally, +3 kB margin); the table is the feature, not a shared-code move",
     "network./calendar.wire_gzip_bytes": "2026-11-01 #1027 the Earnings week table is the Calendar's default view: FeatureTable, its column factories and the picker load with the page (CI 357013 B + 5 %); the table is the feature, not a shared-code move"

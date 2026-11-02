@@ -329,3 +329,16 @@ body = """
 The service is offered to residents of the United States only, which you confirmed when you signed
 up. It is shown here for reference and cannot be changed in Settings.
 """
+
+[[term]]
+id = "macro_days"
+term = "Macro and market days"
+short = "The days that move the whole market at once: economic releases, option expiry days and index dates."
+body = """
+A macro release is a scheduled government number, such as inflation or jobs. An expiry day is when listed options end, and an index date is when a major index changes its members. None of them belongs to one stock, so they sit on their own timeline instead of in a name's column.
+
+Read the timeline as a list of days to be careful on. A release can move every stock in minutes, and an expiry day can swing prices near a popular strike. The dates come from the release schedules and the exchange calendar, and each shows the day it became known.
+
+A date can move after it is published. A day marked as moved is replaced by a new row for its new date.
+"""
+see_also = ["unknown"]

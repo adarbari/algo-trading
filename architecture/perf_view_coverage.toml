@@ -15,7 +15,7 @@
 
 [baseline]
 # The pins: the size of each list; a PR only lowers them (adding an entry fails the test).
-max_operation = 14
+max_operation = 13
 max_view = 0
 
 [[operation]]
@@ -35,8 +35,8 @@ name = "EtfHoldings"
 reason = "not yet captured"
 
 [[operation]]
-name = "FeatureTable"
-reason = "not yet captured"
+name = "GuideHelpField"
+reason = "sent by the shell's help buttons (the footer risk line, V1) and every field header; not yet captured"
 
 [[operation]]
 name = "GuideSearch"
@@ -64,10 +64,6 @@ reason = "not yet captured"
 
 [[operation]]
 name = "ScreenVersions"
-reason = "not yet captured"
-
-[[operation]]
-name = "ScreenerPicks"
 reason = "not yet captured"
 
 [[operation]]

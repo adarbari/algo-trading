@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24 22:50 UTC",
+ "generated": "2026-11-01 22:50 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -7,7 +7,9 @@
    "clicks": [],
    "params": {},
    "ops": [
+    "Appearance",
     "DataStatus",
+    "GuideHelpField",
     "GuideSearch",
     "Regime",
     "SessionDate",
@@ -15,9 +17,13 @@
     "Viewer"
    ],
    "uncertain": [
+    "Appearance",
+    "GuideHelpField",
     "GuideSearch"
    ],
-   "interaction": [],
+   "interaction": [
+    "GuideEntries"
+   ],
    "source": "static",
    "shell": true
   },
@@ -27,12 +33,9 @@
    "clicks": [],
    "params": {},
    "ops": [
-    "FeatureRequests",
-    "GuideHelpField"
+    "FeatureRequests"
    ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
+   "uncertain": [],
    "interaction": [
     "GuideEntries"
    ],
@@ -51,8 +54,7 @@
     "HarnessRun"
    ],
    "interaction": [
-    "GuideEntries",
-    "GuideHelpField"
+    "GuideEntries"
    ],
    "source": "static"
   },
@@ -80,7 +82,6 @@
    "params": {},
    "ops": [
     "FigiReview",
-    "GuideHelpField",
     "IngestionCell",
     "IngestionCompleteness",
     "LeverageReview",
@@ -90,7 +91,6 @@
     "Verification"
    ],
    "uncertain": [
-    "GuideHelpField",
     "IngestionCell",
     "RunRecord"
    ],
@@ -109,7 +109,6 @@
    "params": {},
    "ops": [
     "FigiReview",
-    "GuideHelpField",
     "IngestionCell",
     "IngestionCompleteness",
     "LeverageReview",
@@ -119,7 +118,6 @@
     "Verification"
    ],
    "uncertain": [
-    "GuideHelpField",
     "IngestionCell",
     "RunRecord"
    ],
@@ -145,18 +143,95 @@
    "source": "static",
    "parent": "/admin/ingestion?session={session}"
   },
+  "/admin/ingestion?session={session} > tab:Nightly run views:Checks against IBKR": {
+   "route": "/admin/ingestion",
+   "search": {
+    "session": "{session}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Nightly run views",
+     "name": "Checks against IBKR"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/ingestion?session={session}",
+   "target": true
+  },
+  "/admin/ingestion?session={session} > tab:Nightly run views:Data coverage": {
+   "route": "/admin/ingestion",
+   "search": {
+    "session": "{session}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Nightly run views",
+     "name": "Data coverage"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/ingestion?session={session}",
+   "target": false
+  },
+  "/admin/ingestion?session={session} > tab:Nightly run views:Review items": {
+   "route": "/admin/ingestion",
+   "search": {
+    "session": "{session}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Nightly run views",
+     "name": "Review items"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/ingestion?session={session}",
+   "target": true
+  },
+  "/admin/ingestion?session={session} > tab:Nightly run views:Tonight": {
+   "route": "/admin/ingestion",
+   "search": {
+    "session": "{session}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Nightly run views",
+     "name": "Tonight"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/admin/ingestion?session={session}",
+   "target": false
+  },
   "/admin/llm-usage": {
    "route": "/admin/llm-usage",
    "search": {},
    "clicks": [],
    "params": {},
    "ops": [
-    "GuideHelpField",
     "LlmUsage"
    ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
+   "uncertain": [],
    "interaction": [
     "GuideEntries"
    ],
@@ -169,12 +244,10 @@
    "params": {},
    "ops": [
     "AdminScreenerRun",
-    "AdminScreenerRuns",
-    "GuideHelpField"
+    "AdminScreenerRuns"
    ],
    "uncertain": [
-    "AdminScreenerRun",
-    "GuideHelpField"
+    "AdminScreenerRun"
    ],
    "interaction": [
     "GuideEntries"
@@ -188,14 +261,82 @@
    "params": {},
    "ops": [
     "EventCalendar",
+    "FeatureTable",
     "ScreenerConfigs",
+    "ScreenerPicks"
+   ],
+   "uncertain": [
+    "FeatureTable",
+    "ScreenerPicks"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/calendar > tab:Calendar views:Earnings week": {
+   "route": "/calendar",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Calendar views",
+     "name": "Earnings week"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "FeatureTable",
+    "ScreenerPicks"
+   ],
+   "uncertain": [
+    "FeatureTable",
+    "ScreenerPicks"
+   ],
+   "interaction": [],
+   "source": "static",
+   "parent": "/calendar",
+   "target": true
+  },
+  "/calendar > tab:Calendar views:Macro": {
+   "route": "/calendar",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Calendar views",
+     "name": "Macro"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/calendar",
+   "target": true
+  },
+  "/calendar > tab:Calendar views:Next 90 days": {
+   "route": "/calendar",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Calendar views",
+     "name": "Next 90 days"
+    }
+   ],
+   "params": {},
+   "ops": [
     "ScreenerPicks"
    ],
    "uncertain": [
     "ScreenerPicks"
    ],
    "interaction": [],
-   "source": "static"
+   "source": "static",
+   "parent": "/calendar",
+   "target": true
   },
   "/edges": {
    "route": "/edges",
@@ -220,14 +361,12 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
-    "GuideHelpField",
     "TableView"
    ],
    "uncertain": [
     "EdgeResultDrawdown",
     "EdgeResultHorizons",
     "EdgeResultRegimes",
-    "GuideHelpField",
     "TableView"
    ],
    "interaction": [
@@ -245,13 +384,11 @@
    },
    "ops": [
     "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
+    "EdgeDocument"
    ],
    "uncertain": [
     "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
+    "EdgeDocument"
    ],
    "interaction": [
     "GuideEntries"
@@ -284,13 +421,11 @@
    "params": {},
    "ops": [
     "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
+    "EdgeDocument"
    ],
    "uncertain": [
     "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
+    "EdgeDocument"
    ],
    "interaction": [
     "GuideEntries"
@@ -339,14 +474,12 @@
     "EdgeTrades",
     "EdgeVariantGrid",
     "EdgesPage",
-    "GuideHelpField",
     "TableView"
    ],
    "uncertain": [
     "EdgeResultDrawdown",
     "EdgeResultHorizons",
     "EdgeResultRegimes",
-    "GuideHelpField",
     "TableView"
    ],
    "interaction": [],
@@ -385,15 +518,10 @@
    ],
    "params": {},
    "ops": [
-    "EdgeResultDrawdown",
-    "GuideHelpField"
+    "EdgeResultDrawdown"
    ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
+   "uncertain": [],
+   "interaction": [],
    "source": "static",
    "parent": "/edges?edge={edge}",
    "target": true
@@ -412,15 +540,10 @@
    ],
    "params": {},
    "ops": [
-    "EdgeResultHorizons",
-    "GuideHelpField"
+    "EdgeResultHorizons"
    ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
+   "uncertain": [],
+   "interaction": [],
    "source": "static",
    "parent": "/edges?edge={edge}",
    "target": true
@@ -439,15 +562,10 @@
    ],
    "params": {},
    "ops": [
-    "EdgeResultRegimes",
-    "GuideHelpField"
+    "EdgeResultRegimes"
    ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
+   "uncertain": [],
+   "interaction": [],
    "source": "static",
    "parent": "/edges?edge={edge}",
    "target": true
@@ -465,15 +583,9 @@
     }
    ],
    "params": {},
-   "ops": [
-    "GuideHelpField"
-   ],
-   "uncertain": [
-    "GuideHelpField"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
    "source": "static",
    "parent": "/edges?edge={edge}",
    "target": true
@@ -489,7 +601,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -506,7 +617,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -536,7 +646,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -553,7 +662,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -580,7 +688,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -597,7 +704,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -624,7 +730,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -641,7 +746,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -668,7 +772,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -685,7 +788,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -712,7 +814,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -729,7 +830,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -756,7 +856,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -773,7 +872,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -800,7 +898,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -817,7 +914,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -912,10 +1008,7 @@
     "FeatureDistribution",
     "InstrumentFeatureValues"
    ],
-   "interaction": [
-    "GuideEntries",
-    "GuideHelpField"
-   ],
+   "interaction": [],
    "source": "static",
    "parent": "/explore?sel={instrument}",
    "target": true
@@ -1045,7 +1138,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -1062,7 +1154,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -1089,7 +1180,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -1106,7 +1196,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -1133,7 +1222,6 @@
     "FeatureDistribution",
     "FeatureTable",
     "FilterSet",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -1150,7 +1238,6 @@
     "EtfHoldings",
     "FeatureDistribution",
     "FeatureTable",
-    "GuideHelpField",
     "InstrumentEventList",
     "InstrumentEventStudy",
     "InstrumentEvents",
@@ -1192,14 +1279,12 @@
     "FeatureCatalogue",
     "GuideEdge",
     "GuideEdgeIndex",
-    "GuideHelpField",
     "GuideIndex",
     "GuideMechanism",
     "GuideMechanisms"
    ],
    "uncertain": [
-    "GuideEdgeIndex",
-    "GuideHelpField"
+    "GuideEdgeIndex"
    ],
    "interaction": [
     "GuideEntries"
@@ -1394,15 +1479,13 @@
    "ops": [
     "FeatureCatalogue",
     "GuideEdgeIndex",
-    "GuideHelpField",
     "GuideIndex",
     "GuideMechanisms",
     "GuideScreener",
     "GuideScreenerEdges"
    ],
    "uncertain": [
-    "GuideEdgeIndex",
-    "GuideHelpField"
+    "GuideEdgeIndex"
    ],
    "interaction": [
     "GuideEntries"
@@ -1512,12 +1595,10 @@
    "ops": [
     "EdgeDesk",
     "FilterSet",
-    "GuideHelpField",
     "IdeasPage",
     "TableView"
    ],
    "uncertain": [
-    "GuideHelpField",
     "TableView"
    ],
    "interaction": [
@@ -1558,14 +1639,12 @@
    "clicks": [],
    "params": {},
    "ops": [
-    "GuideHelpField",
     "MarketHistory",
     "RegimeEpisodes",
     "RegimeSignals",
     "RegimeSources"
    ],
    "uncertain": [
-    "GuideHelpField",
     "MarketHistory"
    ],
    "interaction": [
@@ -1607,8 +1686,7 @@
     "TableView"
    ],
    "interaction": [
-    "GuideEntries",
-    "GuideHelpField"
+    "GuideEntries"
    ],
    "source": "static"
   },
@@ -1620,13 +1698,11 @@
     "id": "screener"
    },
    "ops": [
-    "GuideHelpField",
     "ScreenerEdges",
     "ScreenerResults",
     "TableView"
    ],
    "uncertain": [
-    "GuideHelpField",
     "ScreenerResults",
     "TableView"
    ],
@@ -1647,12 +1723,10 @@
     "id": "screener"
    },
    "ops": [
-    "GuideHelpField",
     "ScreenDetail",
     "ScreenVersions"
    ],
    "uncertain": [
-    "GuideHelpField",
     "ScreenDetail",
     "ScreenVersions"
    ],

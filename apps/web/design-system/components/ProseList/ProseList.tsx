@@ -24,13 +24,25 @@ export interface ProseListProps {
   ordered?: boolean;
   /** Accessible name of the list, when the surrounding heading does not name it. */
   'aria-label'?: string;
+  /** `disc` (default) or `box`: an empty box before each line, a "before you act" checklist. */
+  marker?: 'disc' | 'box';
 }
 
-export function ProseList({ items, ordered = false, 'aria-label': ariaLabel }: ProseListProps) {
+export function ProseList({
+  items,
+  ordered = false,
+  'aria-label': ariaLabel,
+  marker = 'disc',
+}: ProseListProps) {
   if (items.length === 0) return null;
   const List = ordered ? 'ol' : 'ul';
   return (
-    <List className={styles.list} aria-label={ariaLabel} data-ordered={ordered || undefined}>
+    <List
+      className={styles.list}
+      aria-label={ariaLabel}
+      data-ordered={ordered || undefined}
+      data-marker={ordered ? undefined : marker}
+    >
       {items.map((item) => (
         <li key={item.id} className={styles.item}>
           {item.lead !== undefined && (
