@@ -245,6 +245,9 @@ function ideaDetail(symbol: string | undefined): unknown {
           holdSessions: 5,
           winners: 80,
           inSampleOnly: false,
+          takeProfit: null,
+          takeProfitBasis: null,
+          conditionFields: [],
           stop: {
             kind: 'HISTORY',
             fraction: 0.062,
@@ -252,9 +255,11 @@ function ideaDetail(symbol: string | undefined): unknown {
             multiple: null,
             winners: 80,
             beyond: 0.2,
+            basis: 'ENTRY',
           },
           unknown: null,
         },
+        exitPrices: { stop: 187.6, target: null, unknown: null },
         evidence: {
           level: 'works',
           result: 'Held out: lift 3.2 points on 120 trades.',
