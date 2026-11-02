@@ -20,6 +20,7 @@ from algotrade.services.evaluation.evidence.measures import (
 
 NAN = float("nan")
 TAILS = TailsVerdict(bootstrap_draws=200)
+ONE_TAIL = TailsVerdict(bootstrap_draws=200, min_tail_windows=1)
 
 
 def _weekdays(n: int) -> list[date]:
@@ -31,22 +32,28 @@ def _weekdays(n: int) -> list[date]:
     return out
 
 
-def _measures(roc: list[float], base: list[float], bootstrap: bool = False, horizon: int = 1):
+def _measures(
+    roc: list[float],
+    base: list[float],
+    bootstrap: bool = False,
+    horizon: int = 1,
+    tails: TailsVerdict = TAILS,
+):
     return tail_measures(
-        _weekdays(len(roc)), roc, base, horizon, "trial", "all:all:1", TAILS, bootstrap
+        _weekdays(len(roc)), roc, base, horizon, "trial", "all:all:1", tails, bootstrap
     )
 
 
 def test_hand_computed_measures_with_the_pairs_kept_where_both_are_known() -> None:
     roc = [0.02, 0.01, NAN, -0.03, 0.04]
     base = [0.01, NAN, 0.00, -0.01, 0.01]
-    got = _measures(roc, base)
+    got = _measures(roc, base, tails=ONE_TAIL)
     assert got.roc_sessions == 4  # the sessions with a return on capital
     assert got.mean_roc == pytest.approx(0.01)
     assert got.excess_roc == pytest.approx((0.01 - 0.02 + 0.03) / 3)  # pairs 0, 3 and 4
     assert (got.cvar_5, got.cvar_5_n, got.cvar_1, got.cvar_1_n) == (-0.03, 1, -0.03, 1)
     assert got.worst_window == -0.03
-    assert got.base_cvar_5 == pytest.approx(-0.01)  # the base's own lowest, 4 finite sessions
+    assert got.base_cvar_5 == pytest.approx(-0.01)  # the base's lowest over the 3 paired sessions
     assert got.psr is not None and 0 < got.psr < 1
     assert (got.mean_roc_lo, got.mean_roc_hi, got.excess_roc_t) == (
         None,
@@ -57,9 +64,27 @@ def test_hand_computed_measures_with_the_pairs_kept_where_both_are_known() -> No
 
 def test_cvar_counts_the_windows_in_the_tail() -> None:
     roc = [float(i) for i in range(-30, 30)]  # 60 sessions: ceil(0.05 * 60) = 3, ceil(0.6) = 1
-    got = _measures(roc, [0.0] * 60)
+    got = _measures(roc, [0.0] * 60, tails=ONE_TAIL)
     assert (got.cvar_5, got.cvar_5_n) == (-29.0, 3) and (got.cvar_1, got.cvar_1_n) == (-30.0, 1)
     assert got.base_cvar_5 == 0.0
+
+
+def test_the_base_cvar_is_over_the_paired_sessions_not_the_bases_own() -> None:
+    """The base's worst window lies on a session the setup has no return for: it is not in the
+    ratio's denominator (own and base tails must cover the same sessions)."""
+    roc = [0.01, NAN, 0.02, 0.01]
+    base = [-0.01, -0.50, -0.02, -0.01]
+    got = _measures(roc, base, tails=ONE_TAIL)
+    assert got.base_cvar_5 == pytest.approx(-0.02)  # not -0.50
+
+
+def test_a_base_tail_under_min_tail_windows_is_not_measured() -> None:
+    roc = [float(i) / 100 for i in range(-30, 30)]
+    base = [-0.01] * 60  # 3 windows in the 5% tail, the setting asks for 5
+    assert _measures(roc, base).base_cvar_5 is None
+    assert _measures(roc, base, tails=ONE_TAIL).base_cvar_5 == pytest.approx(-0.01)
+    long_enough = _measures([0.0] * 100, [-0.01] * 100)  # 5 windows
+    assert long_enough.base_cvar_5 == pytest.approx(-0.01)
 
 
 def test_fewer_than_two_sessions_measure_nothing_and_no_series_is_all_null() -> None:

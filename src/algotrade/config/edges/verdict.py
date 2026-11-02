@@ -54,6 +54,7 @@ TAILS_KEYS = (
 )
 OPTION_COSTS_KEYS = ("levels", "effective_share_by_legs", "commission_usd")
 OPTION_LEVELS = ("mid", "effective", "full")  # the contract's option ``cost_level`` names, in order
+MAIN_OPTION_LEVEL = "full"  # the one level a ``tails`` verdict reads (plan A7)
 PROFILES = ("return", "tails")  # ``verdict_profile`` (design 2.6)
 EDGE_COSTS_KEYS = ("levels_bps", "borrow_bps_annual")
 LEGS = ("long", "short", "long_short")  # ``[published] leg`` (ADR 0065; outcome sides)

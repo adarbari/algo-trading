@@ -22,7 +22,8 @@ user's edge, a hidden copy, an exploratory run or an older run (the list reads n
   (``services/evaluation/cross_section/detail/verdict.py``), from the run's committed rows through
   the reader's own judge call, so the stored headline is the live one.
 - Every new row of the run is written in ONE publish (several partitions, one commit): all or none.
-  A failure of one edge is counted (the run is PARTIAL) and never stops the others.
+  A failure of one edge is counted (the run is PARTIAL) and never stops the others; under
+  ``--expect-same-headlines`` it FAILS the run and skips the publish (it was not compared).
 - Point in time: ``knowledge_ts`` is the run's clock at the write, never back-dated (a verdict
   under today's judge was not known when the run ended).
 - Takes no lock of its own: it runs under the CLI's ingest lock, or the post-session workflow's
@@ -86,6 +87,12 @@ class _Pass:
         self.changed: list[str] = []  # ``--expect-same-headlines``: a headline that moved
         self._stored: dict[date, dict[tuple[str, str, str], EdgeSummary]] = {}
         self._headlines: dict[date, dict[tuple[str, str], list[framer.Headline]]] = {}
+
+    @property
+    def blocked(self) -> bool:
+        """``--expect-same-headlines`` found a moved headline, or could not compare an edge (its
+        re-judge raised): nothing may publish, a deploy gate cannot pass on a partial comparison."""
+        return bool(self.changed) or (self.opt.expect_same and bool(self.failed))
 
     def _note(self, key: str, status: str, count: str) -> None:
         self.run.record_item(key, status)
@@ -177,7 +184,7 @@ class _Pass:
 
     def publish(self) -> None:
         """Every new row, all partitions, in one commit (or none)."""
-        if not self.new or self.opt.dry_run or self.opt.verify or self.changed:
+        if not self.new or self.opt.dry_run or self.opt.verify or self.blocked:
             return
         with self.run.writer.publishing(self.run.run_id, self.clock()):
             for day, frames in sorted(self.new.items()):
@@ -188,7 +195,7 @@ class _Pass:
 
     def finish(self, edges_seen: int) -> None:
         run, opt = self.run, self.opt
-        if self.changed:  # nothing was written: the rows queued are withheld
+        if self.blocked:  # nothing was written: the rows queued are withheld
             self.counts["withheld"] = self.counts["written"]
             self.counts["written"] = 0
         run.stats.update(self.counts)
@@ -209,6 +216,11 @@ class _Pass:
             run.failed(f"every edge failed ({edges_seen}): {self.failed[0]}")
         if self.counts["not_reached"]:
             run.partial(f"{self.counts['not_reached']} edges left by --limit: run it again")
+        if self.opt.expect_same and self.failed:
+            run.failed(
+                f"{len(self.failed)} edges could not be compared (nothing published): "
+                f"{self.failed[0]}"
+            )
         if self.changed:
             run.failed(
                 f"{len(self.changed)} headlines differ from the earlier rows: {self.changed[0]}"

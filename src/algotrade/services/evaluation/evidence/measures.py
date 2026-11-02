@@ -93,8 +93,7 @@ def tail_measures(
     c5, n5 = cvar(r, 0.05)
     c1, n1 = cvar(r, 0.01)
     base = np.asarray(base_roc, dtype=np.float64)
-    _, b = _series(days, base)
-    base_c5 = cvar(b, 0.05)[0] if b.size >= 2 else None
+    base_c5 = _base_cvar(days, roc, base, tails)
     lo = hi = None
     if bootstrap:
         block = mean_block(got, horizon, tails)
@@ -118,6 +117,20 @@ def tail_measures(
         worst_window=worst(r),
         psr=psr(r),
     )
+
+
+def _base_cvar(
+    days: Sequence[date], roc: npt.ArrayLike, base: np.ndarray, tails: TailsVerdict
+) -> float | None:
+    """The base's CVaR 5% over the sessions where the setup's return is also known (the ones the
+    ratio's own CVaR is over); None below two such sessions or with fewer than
+    ``min_tail_windows`` in the base's own tail (a ratio of tails needs both read)."""
+    paired = np.where(np.isfinite(np.asarray(roc, dtype=np.float64)), base, np.nan)
+    _, b = _series(days, paired)
+    if b.size < 2:
+        return None
+    value, n = cvar(b, 0.05)
+    return value if n >= tails.min_tail_windows else None
 
 
 def _excess(

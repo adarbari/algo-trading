@@ -141,7 +141,14 @@ def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.Edg
         settings,
         run.lost_inputs,
         decoys=decoys,
-        basis=verdict.choose_basis(_own(served), settings, _declared(edge), decoys, _is_book(edge)),
+        basis=verdict.choose_basis(
+            _own(served),
+            settings,
+            _declared(edge),
+            decoys,
+            _is_book(edge),
+            verdict.profile_of(edge),
+        ),
         facts=verdict.EdgeFacts(
             edge.published,
             edge.schedule,
@@ -211,7 +218,12 @@ def basis_of(ctx: Stores, edge: Edge, rows: Sequence[EdgeRow]) -> verdict.BasisC
     ``edge``'s ``rows`` (ADR 0065: declared, else the best in-sample; never out-of-sample)."""
     settings = load_verdict_settings(ctx.configs)
     return verdict.choose_basis(
-        _own(rows), settings, _declared(edge), bool(edge.baselines), _is_book(edge)
+        _own(rows),
+        settings,
+        _declared(edge),
+        bool(edge.baselines),
+        _is_book(edge),
+        verdict.profile_of(edge),
     )
 
 

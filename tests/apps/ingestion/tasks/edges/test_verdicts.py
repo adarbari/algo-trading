@@ -340,6 +340,30 @@ def test_a_differing_prior_fails_the_run_and_writes_nothing(evaluated: World) ->
     pd.testing.assert_frame_equal(rows(evaluated), before)  # not one row, the equal edge's neither
 
 
+def test_an_edge_that_could_not_be_compared_fails_the_run_and_writes_nothing(
+    evaluated: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A re-judge that raises is no comparison: the other edge's row must not publish either."""
+    run(evaluated, configs())
+    before = rows(evaluated)
+    real = framer.rejudged_frame
+
+    def flaky(ctx: Any, edge: Any, found: Any, **kw: Any) -> Any:
+        if edge.id == "drift":
+            raise ValueError("the judge broke on this one")
+        return real(ctx, edge, found, **kw)
+
+    monkeypatch.setattr(framer, "rejudged_frame", flaky)
+    record = run(evaluated, tuned(bootstrap_draws=3000), expect_same=True)
+    assert record.status is RunStatus.FAILED
+    assert record.stats["failed"] == 1 and record.stats["written"] == 0
+    assert record.stats["withheld"] == 1
+    pd.testing.assert_frame_equal(rows(evaluated), before)
+    # without the flag the same failure stays PARTIAL and the other edge is written
+    plain = run(evaluated, tuned(bootstrap_draws=3500))
+    assert plain.status is RunStatus.PARTIAL and plain.stats["written"] == 1
+
+
 def test_one_changed_edge_withholds_the_unchanged_ones_too(evaluated: World) -> None:
     run(evaluated, configs())
     moved = configs(

@@ -4,7 +4,8 @@ value and bound (ED8)."""
 from collections.abc import Sequence
 from dataclasses import replace
 
-from algotrade.config.edges.verdict import VerdictSettings
+from algotrade.config.edges.verdict import MAIN_OPTION_LEVEL, VerdictSettings
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.robustness import (
     beat_share,
@@ -150,8 +151,14 @@ def _tails_criteria(
     bootstrap t of the return on capital against the base takes the decile t's place (the same
     ids and t bounds, Promising and Works), and the probabilistic Sharpe ratio and the CVaR ratio
     join. The trades, win rate, deflated Sharpe, PBO, baselines, random picks and the rest are
-    shared."""
+    shared. Only the main option cost level is judged: another one (``mid``, ``effective``) would
+    be read as if it were ``full``, so it is refused (plan A7)."""
     oos, tails = c.oos, t.tails
+    if tails.option_cost_level != MAIN_OPTION_LEVEL:
+        raise ConfigurationError(
+            f"tails_verdict option_cost_level {tails.option_cost_level!r}: a tails verdict is "
+            f"judged at {MAIN_OPTION_LEVEL!r} only; the other levels are not read yet"
+        )
     label = "Return on capital vs base, block bootstrap t"
     ratio_value, ratio_ok = _cvar_ratio(oos, t)
     psr = oos.psr

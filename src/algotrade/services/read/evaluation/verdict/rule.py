@@ -377,7 +377,14 @@ def judge(
     choice = (
         basis
         if basis is not None
-        else choose_basis(rows, t, declared, decoys, facts.portfolio if facts else False)
+        else choose_basis(
+            rows,
+            t,
+            declared,
+            decoys,
+            facts.portfolio if facts else False,
+            facts.profile if facts else "return",
+        )
     )
     if choice.key is None:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs and not found else ""

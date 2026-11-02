@@ -8,6 +8,7 @@ from dataclasses import replace
 import pytest
 
 from algotrade.config.edges.verdict import TailsVerdict, VerdictSettings
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.read.evaluation.runs import EdgeRow
 from algotrade.services.read.evaluation.verdict import (
     NOT_ENOUGH,
@@ -16,6 +17,7 @@ from algotrade.services.read.evaluation.verdict import (
     WORKS,
     EdgeFacts,
     EdgeVerdict,
+    choose_basis,
     judge,
 )
 from tests.unit.services.read.evaluation.verdict.test_rule import (
@@ -24,6 +26,7 @@ from tests.unit.services.read.evaluation.verdict.test_rule import (
     T,
     book_result,
     draws,
+    grid,
     result,
 )
 
@@ -186,3 +189,29 @@ def test_the_shared_criteria_stay_shared_under_tails() -> None:
     assert [i for i in ids("tails") if i not in ("psr", "cvar_ratio", "works_psr")] == shared
     for id in ("trades", "dsr", "pbo", "works_dsr", "works_trades", "works_picks_t", "random"):
         assert _crit(_judge(rows, "tails"), id) == _crit(_judge(rows, "return"), id)
+
+
+def test_a_tails_basis_is_ranked_on_the_t_it_is_judged_on() -> None:
+    """The basis choice passed no profile on, so a ``tails`` edge picked its horizon by the decile
+    t and was judged on the bootstrap t. 15 d has the better lift but a failing bootstrap t."""
+    rows = grid({15: 0.55, 21: 0.52}, {15: 0.55, 21: 0.52})
+    bad = {"excess_roc_t": -9.0, "psr": 0.5, "cvar_5": -0.1, "cvar_5_n": 8, "base_cvar_5": -0.1}
+    rows = [
+        replace(r, **(bad if r.horizon_sessions == 15 else GOOD))  # type: ignore[arg-type]
+        if r.slice_kind == "in_sample" and r.role != "baseline"
+        else r
+        for r in rows
+    ]
+    assert choose_basis(rows, T).key == ("vrp", 15)  # return: by lift, as before
+    assert choose_basis(rows, T, profile="return") == choose_basis(rows, T)
+    assert choose_basis(rows, T, profile="tails").key == ("vrp", 21)
+
+
+@pytest.mark.parametrize("level", ["mid", "effective"])
+def test_a_tails_judge_refuses_an_option_cost_level_it_does_not_read(level: str) -> None:
+    """``option_cost_level`` was accepted and ignored: a ``mid`` setting judged at ``full``."""
+    settings = replace(T, tails=replace(T.tails, option_cost_level=level))
+    facts = EdgeFacts(profile="tails")
+    with pytest.raises(ConfigurationError, match="judged at 'full' only"):
+        judge("e", _strong(), SPLIT, settings, facts=facts)
+    judge("e", _strong(), SPLIT, settings)  # the return profile never reads it
