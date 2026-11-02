@@ -134,6 +134,11 @@ values = { HISTORY = "term:exit_stop_history", FALLBACK = "term:exit_stop_fallba
 names = { HISTORY = "Historical stop", FALLBACK = "Fallback stop", DECLARED = "Declared stop" }
 
 [[enum]]
+source = "graphql:ExampleShape"
+values = { LONG_SHARES = "term:example_long_shares", SHORT_SHARES = "term:example_short_shares", BOOK = "term:example_book" }
+names = { LONG_SHARES = "Long shares", SHORT_SHARES = "Short shares", BOOK = "Book name" }
+
+[[enum]]
 source = "graphql:SetupStateCode"
 values = { ON = "term:setup_state_on", OFF = "term:setup_state_off", PAUSED = "term:setup_state_paused", UNKNOWN = "term:setup_state_unknown" }
 names = { ON = "On", OFF = "Off", PAUSED = "Paused", UNKNOWN = "Unknown" }
