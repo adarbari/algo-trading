@@ -43,7 +43,8 @@ def test_any_web_change_maps_to_the_web_fitness_tests() -> None:
     # #319: a .tsx string and an 11-module apps/web/e2e passed `make changed`, failed CI.
     web = "tests/architecture/test_layout_web.py"
     guide = "tests/architecture/guide"
-    assert covering("apps/web/src/pages/ideas/ui/IdeasPage.tsx") == [guide, web]
+    views = changed_tests.VIEWS_FITNESS
+    assert covering("apps/web/src/pages/ideas/ui/IdeasPage.tsx") == [guide, web, views]
     assert covering("apps/web/e2e/screeners.spec.ts") == [web]
     assert covering("architecture/web_prose.toml") == ["tests/architecture"]
 
@@ -105,3 +106,11 @@ def test_a_feature_change_runs_the_web_catalogue_export_test() -> None:
     assert set(changed_tests.CATALOGUE_TESTS) <= set(found)
     found = changed_tests.covering_tests(["config/site/features/technical/bands.toml"], present)
     assert set(changed_tests.CATALOGUE_TESTS) <= set(found)
+
+
+def test_a_web_source_change_maps_to_the_page_latency_views_test() -> None:
+    # a new web view or operation fails CI until `make api-latency-views` lists it
+    views = changed_tests.VIEWS_FITNESS
+    assert views in covering("apps/web/src/pages/calendar/index.ts")
+    assert views in covering("apps/api/schema.graphql")
+    assert views not in covering("apps/web/design-system/index.ts")

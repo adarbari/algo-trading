@@ -31,6 +31,9 @@ test('the list shows your screeners and the site presets in one list', async ({ 
   await page.goto('/screeners');
   await expect(page).toHaveURL(/\/test$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Test' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Trader sections' }).getByRole('link', { name: 'Test' }),
+  ).toHaveAttribute('aria-current', 'page');
   const list = page.getByRole('table', { name: 'Screeners' });
   const rowOf = (text: string) => list.getByRole('row').filter({ hasText: text });
   await expect(rowOf('my-vrp')).toContainText('No run today');

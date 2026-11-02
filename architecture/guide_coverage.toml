@@ -31,8 +31,7 @@
 # fails until its line is removed. `enums` are sources, `sections` are paths, `panels` are the
 # uncovered titled containers per file.
 
-# /test: the Test flow (V9); the bar entry "Test" and its Start here page arrive with V1 (workspaces.ts).
-non_sections = ["/test"]
+non_sections = ["/explore", "/regime", "/screeners"]  # off the bar (ADR 0083 amendment 2026-11-01): reached by search, the regime chip and links; /screeners only redirects to /test (V9)
 
 [panels]
 tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]
@@ -440,16 +439,12 @@ path = "/ideas"
 start = "start:read_a_result"
 
 [[section]]
-path = "/screeners"
-start = "start:build_a_screen"
+path = "/test"
+start = "start:test_a_setup"
 
 [[section]]
 path = "/edges"
-start = "start:read_an_edge_page"
-
-[[section]]
-path = "/regime"
-start = "start:read_the_regime_page"
+start = "start:read_the_setups_page"
 
 [[section]]
 path = "/admin/feature-requests"
@@ -481,7 +476,7 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 [baseline]
 # The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
 max_enums = 32
-max_sections = 5
+max_sections = 4
 max_panels = 63
 enums = [
   "graphql:Adjustment",
@@ -517,7 +512,7 @@ enums = [
   "graphql:SignalState",
   "graphql:UsageCap.kind",
 ]
-sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/calendar", "/explore"]
+sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/calendar"]
 
 [baseline.panels]
 "src/entities/llm-usage/ui/UsagePanel.tsx" = 1

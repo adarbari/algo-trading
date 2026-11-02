@@ -35,9 +35,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/');
     await expect(page).toHaveURL(/\/ideas$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Ideas' })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Trader sections' })).toContainText(
-      'Explore',
-    );
+    await expect(page.getByRole('navigation', { name: 'Trader sections' })).toContainText('Setups');
     await useTheme(page, theme);
     await expectAccessible(page);
     expect(errors).toEqual([]);
@@ -60,9 +58,9 @@ test('the top bar switches workspace and section', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/ideas');
   await expect(page.getByRole('link', { name: 'Ideas' })).toHaveAttribute('aria-current', 'page');
-  await page.getByRole('link', { name: 'Explore' }).click();
-  await expect(page).toHaveURL(/\/explore$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
+  await page.getByRole('link', { name: 'Calendar' }).click();
+  await expect(page).toHaveURL(/\/calendar$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Calendar' })).toBeVisible();
   // The workspace switch lives in the account menu (the viewer's name), not in the bar.
   await expect(page.getByRole('radio', { name: 'Admin' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Abhi Admin' }).click();

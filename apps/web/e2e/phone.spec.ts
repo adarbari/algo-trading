@@ -73,23 +73,22 @@ for (const route of ROUTES) {
   });
 }
 
-test('Explore: the search adds a ticker as a tab and the tab strip stays on the screen', async ({
+test('Explore: the bar search opens a ticker and the tab strip stays on the screen', async ({
   page,
 }) => {
   await page.goto('/explore?sel=AAPL,MSFT');
-  const box = page.getByRole('combobox', { name: 'Search tickers' });
-  await box.fill('nvda');
-  await page.getByRole('option').first().tap();
+  await page.getByRole('button', { name: 'Alexandra Montgomery-Fitzwilliam' }).tap();
+  await page.getByRole('button', { name: 'Search', exact: true }).tap();
+  await page.getByRole('searchbox', { name: 'Search' }).fill('nvda');
+  await page.getByRole('region', { name: 'Tickers' }).getByRole('link').first().tap();
+  await expect(page).toHaveURL(/focus=NVDA/);
   const tabs = page.getByRole('tablist', { name: 'Open tickers' });
-  await expect(tabs.getByRole('tab')).toHaveText(['AAPL', 'MSFT', 'NVDA']);
   await expect(tabs.getByRole('tab', { name: 'NVDA' })).toHaveAttribute('aria-selected', 'true');
   const { scrollWidth, innerWidth } = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     innerWidth: window.innerWidth,
   }));
   expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
-  await tabs.getByRole('tab', { name: 'MSFT' }).tap();
-  await expect(page).toHaveURL(/focus=MSFT/);
 });
 
 test('Ideas: the filter bar is one Filters button and a sheet, "Show N results" narrows the table, and an empty result offers the way back', async ({
@@ -380,7 +379,7 @@ test('Guide search: the rail button opens the dialog inside the viewport, a tapp
 }) => {
   await page.goto('/guide/glossary');
   await page.getByRole('button', { name: 'Search the Guide' }).tap();
-  const dialog = page.getByRole('dialog', { name: 'Search the Guide' });
+  const dialog = page.getByRole('dialog', { name: 'Search' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('searchbox').fill('session');
   const result = dialog.getByRole('link', { name: /^Session/ });
@@ -744,6 +743,8 @@ for (const [state, newer, full, short] of PILL_STATES) {
   }) => {
     await mockDataStatus(page, state, newer);
     await page.goto('/ideas');
+    await expect(page.getByText(/Backtested results are hypothetical/)).toBeVisible(); // listeners are on
+    await page.keyboard.press('Shift'); // the footer's pill loads with the first interaction
     const pill = page.getByRole('button', { name: full });
     await expect(pill).toBeVisible();
     await expect(pill.getByText(short, { exact: true })).toBeVisible();
@@ -759,6 +760,8 @@ for (const [state, newer, full, short] of PILL_STATES) {
 test('Data-status pill: a tap opens the datasets inside the phone screen', async ({ page }) => {
   await mockDataStatus(page, 'PARTIAL', null);
   await page.goto('/ideas');
+  await expect(page.getByText(/Backtested results are hypothetical/)).toBeVisible(); // listeners are on
+  await page.keyboard.press('Shift'); // the footer's pill loads with the first interaction
   await page.getByRole('button', { name: 'Data: 22 Oct, partial' }).tap();
   const panel = page.getByRole('dialog', { name: 'Data status' });
   for (const name of ['Prices', 'Options chains', 'Fundamentals'])

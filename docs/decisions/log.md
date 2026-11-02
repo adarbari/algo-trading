@@ -849,6 +849,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner's instruction of 2026-11-01 ("new screens are available and work end to end, incrementally"); the architect review (file-disjointness, ownership, licence, cache key) and the simplicity review (cut two components, merge slices).
 
+## 2026-11-01 | Evening Desk V1 | Wording of the conflicts statement and the bar's Test tab
+- Question: what may the Guide's "Conflicts" section claim, and where does the bar's Test tab point before V9?
+- Options: claim only what ADR 0083 fixes / also state owner holdings and data-vendor ties.
+- Decision: the section states only what ADR 0083 decision 4 and ADR 0026 fix (subscription-funded, no broker links, buttons or commissions, one list for everyone, setups published rather than advice, no name listed for payment); a statement about the owner's own holdings or paid data vendors is not written until the owner decides it. The bar's Test tab points at `/screeners` until V9 moves the flow to `/test` and redirects.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: a Fable agent reviewed the draft: every sentence maps to ADR 0083 decision 4 or ADR 0026, nothing to cut, nothing to add (no "independent" or "unbiased"), owner holdings and vendor ties stay unwritten; a conflicts page that claims more than the product rules fix would be an invented policy; "no name listed for payment" follows from the one fixed list built by rules.
 ## 2026-11-01 | V8 Calendar PR (#1027) | /calendar distant-link budget raised by the Earnings week table
 - Question: the Earnings week table (FeatureTable, the column factories and the column picker now load on `/calendar`) puts the route at 357013 B gzip on the wire against the shrink-only `network` budget of 334800 B (+22 kB). Raise once, or make the week view lighter?
 - Options: raise the one route budget to measured + the 5 % headroom with a dated reason / a lighter week view (a lazy table chunk, the picker split out) / drop the table for a list.
