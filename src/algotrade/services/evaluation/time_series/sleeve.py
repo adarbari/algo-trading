@@ -39,7 +39,7 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.services.evaluation.cross_section.hit import apply_outcome, chain_rows
+from algotrade.services.evaluation.cross_section.hit import apply_outcome, own_rows
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
 from algotrade.services.evaluation.evidence.contract import empty_trades
 from algotrade.services.evaluation.evidence.shapes import trade_frame
@@ -103,7 +103,7 @@ def evaluate_sleeve(
                 harness.read_returns(reader, found, entries, horizon, as_of),
             )
         ps, trades, stock = reads[at]
-        mine = chain_rows(held, trades)
+        mine = own_rows(held, trades)
         for symbol in symbols:
             results.append(
                 _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,

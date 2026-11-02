@@ -39,6 +39,12 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   ``entry_spot``; ``cost_bps`` once on top. No hedge cost and no financing. A row whose exit rule
   was UNKNOWN on a close (``exit_unknown_closes`` above 0) is UNMEASURED (the strictest stand-in
   until the verdict names a share). A hit is ``value > 0``.
+- ``excess_return`` with an ``[outcome.exit]`` on its shares position (ADR 0088, E3c-2): the same
+  value over the rows of the share path grain (``outcomes/instrument/share_path@v1``, the edge's
+  own ``position_key`` and benchmark only), where ``fwd_excess_return`` is the underlying's return
+  to the exit less the benchmark's over the same sessions; a row whose exit rule was UNKNOWN on a
+  close is UNMEASURED as an ``option_pnl``'s is, and a short's borrow runs over the sessions held
+  (``exit_index``), not the hold cap.
 - ``side`` ``short`` or ``long_short`` (an ``excess_return`` outcome only): ``short_value`` is the
   value of being short the name, ``-fwd_excess_return - cost_bps / 1e4 - borrow``, with the
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
@@ -74,8 +80,8 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import EXCESS_MEASURES, Edge
-from algotrade.config.edges.positions.chain import CHAIN_KIND
-from algotrade.config.edges.positions.key import position_key
+from algotrade.config.edges.positions.chain import CHAIN_KIND, reads_share_path
+from algotrade.config.edges.positions.key import position_key, share_position_key
 from algotrade.config.edges.verdict import OptionCosts
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant.black_scholes import (
@@ -324,21 +330,38 @@ def _pair_outcome(
     return np.asarray(value, dtype=np.float64)
 
 
-def chain_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
-    """The rows of ``outcomes`` (the option trade grain's, every position key) the edge's
-    ``option_pnl`` outcome names: the ``position_key`` of its resolved legs, parameters, exits and
-    each of its horizons (one row per instrument); any other outcome's rows unchanged."""
+def own_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
+    """The rows of ``outcomes`` the edge's outcome names when the grain holds every setup's: for
+    an ``option_pnl`` the ``position_key`` of its resolved legs, parameters, exits and each of its
+    horizons (one row per instrument); for a share outcome with an ``[outcome.exit]`` its keys
+    (``own_keys``) and benchmark; any other outcome's rows unchanged."""
     o = edge.outcome
-    if o.kind != CHAIN_KIND:
-        return outcomes
-    keys = {position_key(o, h) for h in o.horizon_sessions}
-    return outcomes[outcomes["position_key"].isin(keys)]
+    if o.kind == CHAIN_KIND:
+        chain = {position_key(o, h) for h in o.horizon_sessions}
+        return outcomes[outcomes["position_key"].isin(chain)]
+    if reads_share_path(o):
+        keys: set[tuple[str, str]] = set().union(*(own_keys(edge, h) for h in o.horizon_sessions))
+        return outcomes[
+            [k in keys for k in zip(outcomes["position_key"], outcomes["benchmark"], strict=True)]
+        ]
+    return outcomes
+
+
+def own_keys(edge: Edge, horizon: int) -> frozenset[tuple[str, str]]:
+    """The (``position_key``, benchmark) the option trade and share path readers hold ``edge``'s
+    outcome to at ``horizon``; empty for an outcome on the price grain."""
+    o = edge.outcome
+    if o.kind == CHAIN_KIND:
+        return frozenset({(position_key(o, horizon), o.benchmark)})
+    if reads_share_path(o):
+        return frozenset({(share_position_key(o, horizon), o.benchmark)})
+    return frozenset()
 
 
 def _chain_pnl(
     edge: Edge, outcomes: pd.DataFrame, option_costs: OptionCosts | None = None
 ) -> np.ndarray:
-    """The ``option_pnl`` value per row of ``chain_rows`` (NaN where a price is missing): the
+    """The ``option_pnl`` value per row of ``own_rows`` (NaN where a price is missing): the
     position's mid P&L less the half-spreads paid at entry and at exit, over the entry underlying
     price, less ``cost_bps``. A short position's sign is already in ``pnl_mid`` (quantities are
     signed). The commission per contract is paid too (``evidence.values``: the frame's own
@@ -390,7 +413,8 @@ def _short_value(edge: Edge, outcomes: pd.DataFrame, counted: np.ndarray) -> np.
     o = edge.outcome
     if o.side == "long":
         return np.full(len(outcomes), np.nan)
-    horizon = _numbers(outcomes, "horizon_sessions")
+    held = "exit_index" if reads_share_path(o) else "horizon_sessions"  # a path's own length
+    horizon = _numbers(outcomes, held)
     gross = _numbers(outcomes, _gross_field(edge))
     value = -gross - (o.cost_bps or 0.0) / 1e4 - borrow_cost(o.borrow_bps_annual, horizon)
     return np.where(counted, value, np.nan)
@@ -451,6 +475,23 @@ def _chain_outcome(
     return value
 
 
+def _return_outcome(edge: Edge, outcomes: pd.DataFrame, excluded: np.ndarray) -> np.ndarray:
+    """The net excess (or residual) return per row; ``excluded`` gets the reason of each row that
+    has no value (a share path row whose exit rule was UNKNOWN on a close is unmeasured, as
+    ``_chain_outcome``'s)."""
+    o = edge.outcome
+    if needs_residual(edge) and "residual_status" not in outcomes.columns:
+        raise ConfigurationError(
+            f"{edge.id}: a residual_return outcome needs the residual-returns rows "
+            f"(attach_residuals), which this read did not attach"
+        )
+    value = _numbers(outcomes, _gross_field(edge)) - (o.cost_bps or 0.0) / 1e4
+    excluded[~np.isfinite(value)] = MISSING_VALUE
+    if reads_share_path(o):
+        excluded[_numbers(outcomes, "exit_unknown_closes") > 0] = UNMEASURED
+    return value
+
+
 def apply_outcome(
     edge: Edge,
     outcomes: pd.DataFrame,
@@ -465,7 +506,7 @@ def apply_outcome(
     ``option_costs``: the commission an ``option_pnl`` value pays (no other kind reads it; none:
     no commission)."""
     o = edge.outcome
-    outcomes = chain_rows(edge, outcomes)
+    outcomes = own_rows(edge, outcomes)
     _refuse_book(edge)
     n = len(outcomes)
     excluded = np.full(n, "", dtype=object)
@@ -481,13 +522,7 @@ def apply_outcome(
     elif o.kind == "pair_spread":
         value = _pair_outcome(edge, outcomes, pairs, excluded)
     elif is_return(edge):
-        if needs_residual(edge) and "residual_status" not in outcomes.columns:
-            raise ConfigurationError(
-                f"{edge.id}: a residual_return outcome needs the residual-returns rows "
-                f"(attach_residuals), which this read did not attach"
-            )
-        value = _numbers(outcomes, _gross_field(edge)) - (o.cost_bps or 0.0) / 1e4
-        excluded[~np.isfinite(value)] = MISSING_VALUE
+        value = _return_outcome(edge, outcomes, excluded)
     elif o.measure == "realised_to_implied_vol":
         value = _vol_ratio(edge, outcomes, implied, excluded)
     else:

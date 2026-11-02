@@ -207,7 +207,7 @@ contracts = ["Option history is quarantined: only ingestion reads it (ADR 0084)"
 
 [[dir]]
 path = "src/algotrade/data/outcomes"
-purpose = "reads of the outcomes grains (outcomes/instrument/ price windows, reading.py; outcomes/option/ chain P&L of option structures, chain.py; ADR 0053 and its EB H13 amendment): what happened after a start session, the tables read across sessions, only by the edge harness"
+purpose = "reads of the outcomes grains (outcomes/instrument/ price windows, reading.py; outcomes/option/ chain P&L of option structures, chain.py; outcomes/instrument/share_path@v1 share paths to a declared exit, share_path.py, ADR 0088; grains.py the one dispatch between the three; ADR 0053 and its EB H13 amendment): what happened after a start session, the tables read across sessions, only by the edge harness"
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
 
 [[dir]]

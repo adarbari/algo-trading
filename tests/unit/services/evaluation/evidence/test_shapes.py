@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from algotrade.config.edges.positions.key import position_key
+from algotrade.config.edges.positions.key import position_key, share_position_key
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, short_view
 from algotrade.services.evaluation.evidence import shapes
@@ -22,7 +22,12 @@ from algotrade.services.evaluation.evidence.contract import (
     capital_basis_of,
     trade_problems,
 )
-from algotrade.services.evaluation.evidence.shapes import book_trades, series_trades, trade_frame
+from algotrade.services.evaluation.evidence.shapes import (
+    book_trades,
+    series_trades,
+    share_path_trades,
+    trade_frame,
+)
 from tests.unit.services.evaluation.cross_section.conftest import IDS, edge, outcome_row
 
 DAY, EXIT = date(2026, 9, 11), date(2026, 9, 15)
@@ -285,3 +290,63 @@ def test_no_ledger_module_imports_the_book() -> None:
     for path in root.glob("*.py"):
         text = ast.dump(ast.parse(path.read_text()))
         assert "book_trades" not in text, path
+
+
+# ---- a shares position with an [outcome.exit]: rows of the share path grain (E3c-2b) -------
+
+PATH = {"position": "long_shares", "exit": {"take_profit": 0.05}}
+
+
+def _path_rows(key_edge: Any, n: int = 2, **changes: Any) -> pd.DataFrame:
+    """``select_share_path``'s shape for ``n`` names: 6% to a take profit at the second close, the
+    benchmark's 1%, the position's own key."""
+    key = share_position_key(key_edge.outcome, 2)
+    base = {
+        "position_key": key, "benchmark": "SPY", "horizon_sessions": 2, "fwd_return": 0.06,
+        "fwd_excess_return": 0.05, "gross_return": 0.06, "exit_index": 2, "licence": "open",
+        "exit_session": date(2026, 9, 14), "exit_kind": "TAKE_PROFIT", "fwd_max_drawdown": 0.0,
+        "max_adverse": 0.0, "exit_unknown_closes": 0, "outcome_status": "COMPLETE",
+        "outcome_reason": None,
+    }  # fmt: skip
+    return pd.DataFrame([{**base, "instrument_id": IDS[i], **changes} for i in range(n)])
+
+
+def test_a_share_path_row_gives_its_exit_return_dip_and_licence_to_the_contract() -> None:
+    e = edge(outcome=_outcome(cost_bps=20, **PATH))
+    rows = _path_rows(e, licence="personal")
+    f = trade_frame(e, rows, apply_outcome(e, rows), entry=DAY, bars_exit=EXIT, side="long")
+    assert trade_problems(f) == []
+    row = f.iloc[0]
+    assert (row["exit_kind"], row["exit_session"], row["outcome_licence"]) == (
+        "TAKE_PROFIT", date(2026, 9, 14), "personal",
+    )  # fmt: skip
+    assert row["return_on_capital_gross"] == pytest.approx(0.06)  # the stored gross to the exit
+    assert row["return_on_capital"] == pytest.approx(0.06 - 0.002)
+    assert row["underlying_return"] == pytest.approx(0.06) and row["max_adverse"] == 0.0
+    assert row["value"] == pytest.approx(0.05 - 0.002)  # the harness's own (excess), unedited
+
+
+def test_a_short_share_path_pays_its_borrow_over_the_sessions_held() -> None:
+    e = edge(
+        outcome=_outcome(
+            side="short", borrow_bps_annual=252, **{**PATH, "position": "short_shares"}
+        )
+    )
+    rows = _path_rows(e, gross_return=-0.06, max_adverse=None, exit_index=5)
+    f = trade_frame(e, rows, short_view(apply_outcome(e, rows)), entry=DAY, bars_exit=EXIT,
+                    side="short")  # fmt: skip
+    # 252 bp a year over the 5 sessions held (the hold cap of 2 is not the length of the trade)
+    assert f.iloc[0]["return_on_capital"] == pytest.approx(-0.06 - 252e-4 * 5 / 252)
+    assert pd.isna(f.iloc[0]["max_adverse"])
+
+
+def test_the_walkers_own_frame_carries_its_licence_to_the_contract() -> None:
+    walks = pd.DataFrame(
+        [{"instrument_id": "EQ:X", "exit_session": EXIT, "exit_index": 2, "exit_kind": "CONDITION",
+          "gross_return": 0.02, "underlying_return": 0.02, "max_adverse": 0.0,
+          "licence": "personal"}]
+    )  # fmt: skip
+    f = share_path_trades(walks, entry=DAY, side="long", cost_bps=0.0)
+    assert f.iloc[0]["outcome_licence"] == "personal"
+    assert share_path_trades(walks.drop(columns="licence"), entry=DAY, side="long",
+                             cost_bps=0.0).iloc[0]["outcome_licence"] == "open"  # fmt: skip
