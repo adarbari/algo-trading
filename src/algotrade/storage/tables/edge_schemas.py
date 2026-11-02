@@ -363,11 +363,18 @@ EDGE_VERDICT = fixed(
 # partition of the decision session D, written nightly by the ``edge-picks`` task and read only by
 # ``services/read/evaluation/pick_edges.py`` for the screener page's "counts toward". ``status``:
 # ``picked`` (the edge decides at D; ``pick_ids`` its picks, place 1 first, possibly none),
-# ``not_decision_day`` (its schedule does not fire at D), ``unjudged`` (its outcome is not a long
-# leg of the screener's picks; ``reason`` says why) or ``skipped`` (the data to decide was
-# missing; ``reason`` says what). ``top_k`` the edge's cut (null: every qualified name),
+# ``gate_closed`` (the setup gate is closed at D, ADR 0088 decision 7; ``reason`` is the gate's;
+# read as ``paused``, apart from a name the screener's own pause holds back),
+# ``not_decision_day`` (its schedule does not fire at D), ``unjudged`` (its outcome holds a book;
+# ``reason`` says why) or ``skipped`` (the data to decide was missing, or the gate's state is
+# unknown; ``reason`` says what). ``top_k`` the edge's cut (null: every qualified name),
 # ``config_hash`` the screener's resolved config the picks came from. ``user_id`` is always
 # ``site``. Runs merge per key; ``knowledge_ts`` is the write instant, never back-dated.
+# ``pick_sides`` (ADR 0088 decision 9): the side of each pick, ``long`` or ``short``, aligned with
+# ``pick_ids`` (a ``long_short`` edge: its long leg, then its short leg ranked by its own score
+# ascending); null in rows written before the column, read as every pick ``long`` (only long picks
+# were stored then). ``pick_weights``: a book's weight of each pick, aligned with ``pick_ids``;
+# null when the edge is not a book and in rows written before the column.
 EDGE_PICKS = fixed(
     "results/edge_picks",
     "results",
@@ -376,6 +383,8 @@ EDGE_PICKS = fixed(
     *strings("reason", "config_hash"),
     "top_k int64",
     "pick_ids string[]",
+    "pick_sides string[]",
+    "pick_weights float64[]",
     runs="merge",
     key=("user_id", "edge_id", "screener"),
 )  # fmt: skip
