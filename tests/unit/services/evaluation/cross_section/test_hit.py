@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from algotrade.config.edges.positions.key import position_key
+from algotrade.config.edges.positions.key import position_key, share_position_key
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.quant.black_scholes import (
@@ -24,6 +24,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     borrow_cost,
     needs_implied_vol,
     needs_pairs,
+    own_keys,
     short_view,
 )
 from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
@@ -655,3 +656,69 @@ def test_an_excess_return_edge_never_reads_the_residual_rows() -> None:
         _write_residuals(w, day, scale=-5.0)  # would flip every figure if they were read
     m = run(w, edge()).results[0].measures[0]
     assert m.mean_excess_picks == pytest.approx(0.075)
+
+
+# ---- excess_return with an [outcome.exit]: the share path grain (E3c-2b) --------------------
+
+SHARES_EXIT = {
+    "kind": "excess_return", "horizon_sessions": [5], "benchmark": "SPY",
+    "start_offset_sessions": 1, "position": "long_shares", "cost_bps": 20,
+    "exit": {"take_profit": 0.1},
+}  # fmt: skip
+
+
+def path_edge(**changes: object):  # type: ignore[no-untyped-def]
+    return edge(outcome={**SHARES_EXIT, **changes}, schedule="every_session")
+
+
+def path_rows(n: int = 3, hold: int = 5, e=None, **columns: object) -> pd.DataFrame:  # type: ignore[no-untyped-def]
+    """Rows of the share path grain of ``e`` (default: ``path_edge()``, ``select_share_path``'s
+    shape): each name returned 6% to its exit on the second close, the benchmark 1%."""
+    key = share_position_key((e or path_edge()).outcome, hold)
+    base: dict[str, object] = {
+        "instrument_id": [f"EQ:{i}" for i in range(n)], "position_key": [key] * n,
+        "benchmark": ["SPY"] * n, "horizon_sessions": [hold] * n, "fwd_return": [0.06] * n,
+        "fwd_excess_return": [0.05] * n, "gross_return": [0.06] * n, "exit_index": [2] * n,
+        "exit_unknown_closes": [0] * n, "fwd_max_drawdown": [0.0] * n,
+        "outcome_status": ["COMPLETE"] * n, "outcome_reason": [None] * n,
+    }  # fmt: skip
+    return pd.DataFrame({**base, **columns})
+
+
+def test_a_share_path_row_is_scored_on_the_excess_to_its_exit_less_the_cost() -> None:
+    out = apply_outcome(path_edge(), path_rows())
+    assert np.allclose(out["value"], 0.05 - 0.002)
+    assert list(out["hit"]) == [True] * 3 and set(out["excluded"]) == {""}
+
+
+def test_only_the_edges_own_key_and_benchmark_are_scored() -> None:
+    other = path_edge(exit={"take_profit": 0.2})  # another exit is another key
+    frame = pd.concat(
+        [path_rows(2), path_rows(2, e=other, fwd_excess_return=[0.5] * 2),
+         path_rows(2, benchmark=["none"] * 2, fwd_excess_return=[0.9] * 2)],
+        ignore_index=True,
+    )  # fmt: skip
+    out = apply_outcome(path_edge(), frame)
+    assert list(out["instrument_id"]) == ["EQ:0", "EQ:1"] and np.allclose(out["value"], 0.048)
+    assert own_keys(path_edge(), 5) == {(share_position_key(path_edge().outcome, 5), "SPY")}
+    assert own_keys(edge(), 5) == frozenset()  # a setup with no exit reads the price grain
+    assert np.allclose(apply_outcome(other, frame)["value"], 0.498)
+
+
+def test_a_short_pays_the_borrow_over_the_sessions_held_not_the_hold_cap() -> None:
+    e = path_edge(position="short_shares", side="short", borrow_bps_annual=252)
+    held = apply_outcome(e, path_rows(e=e, exit_index=[2, 5, 2]))
+    # short: minus the excess, 20 bp, and the borrow of 252 bp a year over the days held
+    assert np.allclose(held["short_value"], [-0.05 - 0.002 - 0.0002, -0.05 - 0.002 - 0.0005,
+                                             -0.05 - 0.002 - 0.0002])  # fmt: skip
+    assert np.allclose(short_view(held)["value"], held["short_value"])
+
+
+def test_a_share_path_whose_exit_rule_was_unknown_on_a_close_is_unmeasured() -> None:
+    out = apply_outcome(path_edge(), path_rows(2, exit_unknown_closes=[0, 2]))
+    assert list(out["excluded"]) == ["", "unmeasured"] and not out["hit"].iloc[1]
+
+
+def test_a_share_path_row_with_no_benchmark_return_is_excluded_not_a_miss() -> None:
+    out = apply_outcome(path_edge(), path_rows(2, fwd_excess_return=[0.05, NAN]))
+    assert list(out["excluded"]) == ["", "missing_value"] and not out["hit"].iloc[1]

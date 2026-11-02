@@ -40,7 +40,9 @@ from tests.unit.services.evaluation.cross_section.test_harness import (
 )
 from tests.unit.services.evaluation.cross_section.test_harness_trials import (
     CHAIN_OUTCOME,
+    SHARE_EXIT_OUTCOME,
     _with_chain_outcomes,
+    _with_share_paths,
 )
 from tests.unit.services.evaluation.forward.conftest import (
     NOW,
@@ -606,3 +608,42 @@ def test_the_night_settles_option_trades_with_the_verdicts_option_costs(
     costs = OptionCosts(commission_usd=1.5)
     results._settlements(None, {"e": object()}, book, date(2026, 1, 9), datetime.now(UTC), costs)  # type: ignore[arg-type]
     assert seen == [costs]
+
+
+def _share_exit_desk(world: object) -> Desk:
+    d = desk(world, outcome=SHARE_EXIT_OUTCOME)  # type: ignore[arg-type]
+    d.configs = MemoryConfigStore(
+        {**d.configs._docs, ("site", "positions", "templates"): TEMPLATES_DOC}  # type: ignore[attr-defined]
+    )
+    return d
+
+
+def test_a_share_trade_with_an_exit_settles_on_its_own_share_path_row_at_its_exit() -> None:
+    """E3c-2b: the paper trade of a setup with an ``[outcome.exit]`` is closed by the setup's own
+    share path row (its exit kind and session, the return to the exit), not the horizon rows of
+    ``forward_returns`` the same world also stores."""
+    d = _share_exit_desk(_with_share_paths(build_world()))
+    night(d, DAYS[0])
+    night(d, SELL)
+    settled = book(d).query("signal_session == @DAYS[0] and status != 'skipped'")
+    assert len(settled) and set(settled["status"]) == {"won"}
+    top = settled.set_index("instrument_id").loc["EQ:N19"]
+    assert top["return"] == pytest.approx(0.125)  # the underlying's return to the exit (+3% shown)
+    assert top["excess_return"] == pytest.approx(0.113)  # less the benchmark's 1% and 20 bp
+    assert (top["exit_kind"], top["price_source"]) == ("TAKE_PROFIT", "bars")
+    assert set(settled["licence"]) == {"open"}
+
+
+def test_a_missing_own_share_path_row_waits_and_another_setups_row_never_settles_it() -> None:
+    """The partition of the buy session holds only another setup's rows: the trades stay open
+    (never a loss, never settled on the fixed-horizon rows), then are skipped with the reason."""
+    w = _with_share_paths(build_world(), key="another")
+    d = _share_exit_desk(w)
+    night(d, DAYS[0])
+    night(d, SELL)
+    assert set(book(d).query("signal_session == @DAYS[0]")["status"]) == {"open"}
+    late = SELL + timedelta(days=14)
+    night(d, late)
+    skipped = book(d, until=late).query("signal_session == @DAYS[0]")
+    assert set(skipped["status"]) == {"skipped"}
+    assert set(skipped["reason"]) == {"no outcome stored for its window"}

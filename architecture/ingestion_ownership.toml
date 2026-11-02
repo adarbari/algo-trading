@@ -381,7 +381,10 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/derived/paths/wanted.py",
     "src/algotrade/data/outcomes/chain.py",
 ]
-allowed = ["src/algotrade/storage/tables/schemas/outcomes.py"]  # declares the grain's schema
+allowed = [
+    "src/algotrade/storage/tables/schemas/outcomes.py",  # declares the grain's schema
+    "src/algotrade/data/outcomes/grains.py",  # the one dispatch between the outcome grains' reads (E3c-2b)
+]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-18-optionpnl-the-chain-pl-grain-eb-h13"
 detect = [{ string_prefix = "outcomes/option/" }, { call = "position_rows" }, { call = "frame_and_publish" }, { call = "read_chain_stored" }]
 

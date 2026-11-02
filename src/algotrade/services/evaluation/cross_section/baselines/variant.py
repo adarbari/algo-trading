@@ -12,7 +12,7 @@ from typing import Any
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.portfolio import ENSEMBLE
-from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.chain import grain_name
 from algotrade.config.edges.positions.templates import Templates
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
@@ -67,17 +67,22 @@ def variant_scope(scope: _Scope, variant: Variant) -> _Scope:
     )
 
 
-def on_chain(scope: _Scope) -> bool:
-    """Whether the scope's outcome is an option P&L read from the chain grain."""
-    return scope.edge.outcome.kind == CHAIN_KIND
+def grain_of(scope: _Scope) -> str:
+    """The outcome grain the scope's outcome is read from (``data/outcomes/grains.py``): the
+    option trades, the share paths of a shares position with an exit, or the price windows."""
+    return grain_name(scope.edge.outcome)
 
 
-def crosses(plans: Sequence[Any], variants: Sequence[Variant]) -> bool:
-    """Whether a position baseline is valued on the other outcome grain than its plan's (an option
-    setup against the stock alone, or the reverse): the run then reads both."""
-    return any(
-        on_chain(variant_scope(p.scope, v)) != on_chain(p.scope)
+def beside(plans: Sequence[Any], variants: Sequence[Variant]) -> str | None:
+    """The other outcome grain a position baseline is valued on than its plan's (an option or
+    share path setup against the stock alone): the run then reads both. None: every variant is on
+    its plan's grain. A baseline is valued on the stock or the option grain only
+    (``baselines/outcome.py``), so there is at most one."""
+    other = {
+        grain
         for p in plans
         for v in variants
         if v.position is not None
-    )
+        and (grain := grain_of(variant_scope(p.scope, v))) != grain_of(p.scope)
+    }
+    return next(iter(other), None)

@@ -29,9 +29,8 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import read_outcomes
+from algotrade.data.outcomes import BENCHMARK, read_outcomes
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, needs_implied_vol
-from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.picks import eligible
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions, entry_session
 from algotrade.services.evaluation.training.no_ml import refuse_no_ml
