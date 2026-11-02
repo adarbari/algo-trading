@@ -109,10 +109,10 @@ id = "option_grid"
 term = "Option grid"
 short = "The puts and calls of one stock at several strikes and expiry dates, each cell the figures of one sold option."
 body = """
-Each row is an expiry about 7, 14, 30, 45, 60 or 90 days away, the nearest listed one. Each column is a delta from 0.10 to 0.30, the strike whose delta of ours is nearest it. A cell shows the premium we compute as the middle of the stored bid and ask, never the bid or ask itself, and the figures that follow from it. A cell that says why it is empty (no listed expiry, too thin a quote, no strike near that delta) is not a zero. The prices are the last stored quotes of the session, end of day and delayed, so judge a trade on a live quote.
+Each row is a delta from 0.10 to 0.30, the strike whose delta of ours is nearest it. Each column is an expiry about 7, 14, 30, 45, 60 or 90 days away, the nearest listed one. A cell shows the premium we compute as the middle of the stored bid and ask, never the bid or ask itself, and the figures that follow from it. A cell that says why it is empty (no listed expiry, too thin a quote, no strike near that delta) is not a zero. The prices are the last stored quotes of the session, end of day and delayed, so judge a trade on a live quote.
 """
-next = "Pick the expiry first, then read down the delta you are comfortable with."
-see_also = ["delta_band", "return_on_collateral", "yield_a_year", "breakeven_price", "chance_below_strike", "spread_of_mid", "report_inside_expiry"]
+next = "Pick the delta you are comfortable with, then read across the expiries."
+see_also = ["delta_band", "return_on_collateral", "yield_a_year", "breakeven_price", "chance_below_strike", "spread_of_mid", "report_inside_expiry", "grid_strike", "grid_mid", "open_interest"]
 
 [[term]]
 id = "delta_band"
@@ -176,3 +176,33 @@ body = """
 An earnings report inside the life of the option can move the stock past the strike, so the premium may be paying for it. When the report date is not known the column says so rather than showing no report. An ETF has no earnings report, so the question does not apply to it.
 """
 see_also = ["option_grid"]
+
+[[term]]
+id = "grid_strike"
+term = "Strike"
+short = "The price at which the sold option is struck: the price you would buy the shares at (a put) or sell them at (a call)."
+body = """
+The grid shows, for each delta band and expiry, the listed strike whose delta of ours is nearest the band. A strike farther below the share price (for a put) pays less and is less likely to be reached. Strikes come from the stored chain, so a strike that was not listed that day cannot appear.
+"""
+next = "Compare it with the breakeven, which also counts the premium."
+see_also = ["option_grid", "delta_band", "breakeven_price"]
+
+[[term]]
+id = "grid_mid"
+term = "Our mid"
+short = "The premium we compute as the middle of the stored bid and ask, per share."
+body = """
+It is a calculation from the end-of-day quote, not a price you can be filled at: real fills are usually worse, by about half the spread. The grid never shows the bid or the ask itself. Multiply by 100 for the premium of one contract.
+"""
+next = "Judge a trade on a live quote before acting."
+see_also = ["option_grid", "spread_of_mid"]
+
+[[term]]
+id = "open_interest"
+term = "Open interest"
+short = "The number of contracts of this option that are still open at the end of the day."
+body = """
+A higher number means more people hold the contract and it is easier to trade near the middle price. A small number means a thin market and a wider real spread. When the feed did not send it for that contract the cell says unknown, which is not zero.
+"""
+next = "Treat a thin contract with care even when its yield looks high."
+see_also = ["option_grid", "spread_of_mid"]

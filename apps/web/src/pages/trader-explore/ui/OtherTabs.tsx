@@ -11,15 +11,18 @@ import { EventStudyPanel } from '@/widgets/event-study-panel';
 import { EventsPanel } from '@/widgets/events-panel';
 import { FeatureTable } from '@/widgets/feature-table';
 import { FeaturesPanel } from '@/widgets/features-panel';
+import { OptionGrid } from '@/widgets/option-grid';
 import { OptionsPanel } from '@/widgets/options-panel';
 import { ScreenerHitsPanel, WhyIdeaPanel } from '@/widgets/screener-hits-panel';
 
 import { DEFAULT_DIMENSIONS, joinList } from '@/entities/explore';
+import { useViewer } from '@/entities/viewer';
 import { exploreState, openTicker } from '../model/state';
 import type { DetailTabsProps } from './DetailTabs';
 
 export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsProps) {
   const state = exploreState(search);
+  const admin = useViewer().data?.role === 'admin';
   const open = (other: string) => {
     onSearchChange(openTicker(state, other));
   };
@@ -56,6 +59,8 @@ export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: De
         <WhyIdeaPanel symbol={symbol} screenerId={state.via} onOpenScreener={onOpenScreener} />
       ) : null;
     case 'options':
+      // Traders read the derived grid; the raw chain stays an admin's tool (decision B, ADR 0083).
+      if (!admin) return <OptionGrid symbol={symbol} />;
       return (
         <OptionsPanel
           symbol={symbol}

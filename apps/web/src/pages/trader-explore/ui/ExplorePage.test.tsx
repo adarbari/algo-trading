@@ -78,6 +78,15 @@ vi.mock('@/widgets/screener-hits-panel', async () => {
     },
   };
 });
+const viewer = vi.hoisted(() => ({ role: 'admin' }));
+vi.mock('@/entities/viewer', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useViewer: () => ({ data: { role: viewer.role } }),
+}));
+vi.mock('@/widgets/option-grid', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { OptionGrid: ({ symbol }: { symbol: string }) => <Text>{`option grid ${symbol}`}</Text> };
+});
 vi.mock('@/widgets/options-panel', async () => {
   const { Text } = await import('@algotrade/ui');
   return {
@@ -147,6 +156,17 @@ describe('ExplorePage', () => {
     );
     await user.click(screen.getByRole('tab', { name: 'Options' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'options' });
+  });
+
+  it('shows a trader the derived option grid and an admin the raw chain', async () => {
+    viewer.role = 'trader';
+    const { unmount } = render(page({ sel: 'AAPL', tab: 'options' }));
+    expect(await screen.findByText('option grid AAPL', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByText('options panel')).not.toBeInTheDocument();
+    unmount();
+    viewer.role = 'admin';
+    render(page({ sel: 'AAPL', tab: 'options' }));
+    expect(await screen.findByText('options panel', {}, { timeout: 5000 })).toBeInTheDocument();
   });
 
   it('adds a searched ticker as a tab and selects it on its overview', () => {
