@@ -770,3 +770,7 @@ contracts = ["Strategies and screeners are pure: they only see core and quant"]
 [[dir]]
 path = "src/algotrade/strategies/trading"
 purpose = "backtest strategies and their registry"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/portfolio_level"
+purpose = "the portfolio level's provider (ADR 0088, G15; the `portfolio` row of LEVELS): the setup's own book at a decision session as `portfolio.<name>` values from its trades (book.py, pure, fail closed), the in-order walk of decision sessions a setup that reads the level needs (walk.py) and the paper record's book of one edge for its record owner (paper.py); reads only the setup's own trades, never a user store or another setup's picks"
