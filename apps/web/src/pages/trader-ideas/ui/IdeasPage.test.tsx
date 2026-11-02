@@ -122,6 +122,7 @@ describe('IdeasPage', () => {
         onOpenScreener={onOpenScreener}
         onOpenRegime={onOpenRegime}
         onOpenEdge={onOpenEdge}
+        onOpenIdea={vi.fn()}
         onOpenSettings={vi.fn()}
       />,
     );

@@ -87,7 +87,10 @@ limited, and `ci.yml`'s `concurrency` cancels a branch's superseded run). Target
 at `-n 2`, whatever changed) and web (Prettier and Stylelint over the changed files, `ds:check`,
 `visual:missing` for a changed story; for a change under `src/` or `design-system/` the
 production build, `perf:bundle` and the DOM / request budgets `perf:e2e` on a free preview
-port). A push whose new commits are all clean merges of main runs the python lane alone. A
+port). A push whose new commits are all clean merges of main runs the python lane alone, except the
+budget for every lazy page (one vitest file, seconds), which runs on every push whose branch
+touches `src/` or `perf-budgets.json`: the budgets merge driver keeps a budget main raised for a
+page the branch removed (2026-11-02, #1035). A
 fast test that stops failing leaves the list; one that starts failing often joins it, if it
 is seconds (`make perf` checks the python lane against the budget on an idle machine). The
 table understates what the old hook already stopped (mirrored pytest, `tsc`, vitest, ESLint,
@@ -366,4 +369,4 @@ entry budgets stay shrink-only.
 
 ### Shared perf and latency files merge themselves
 
-`apps/web/perf-budgets.json`, `benchmarks/api_latency_views.json` and `benchmarks/api_latency_views.captured.json` are touched by every UI PR, so each merge to main re-conflicted all the open ones (owner decision 2026-11-02). `.gitattributes` gives them merge drivers (`scripts/ops/merge_budgets.py`): budgets are unioned per key, the larger number wins with its own reason text, a route one side removed stays removed (its e2e entry and reasons with it); views are unioned by key with the changed side winning, so captured documents are kept. Unparsable JSON falls back to a normal conflict. The driver is local git config, set once in the clone's common `.git/config` (every worktree sees it) by `scripts/ops/install_merge_drivers.sh`, which `scripts/worktree.sh`, `scripts/merge_main.sh` and `make doctor` (a check) run or verify. `scripts/merge_main.sh` also regenerates the static view list (`make api-latency-views`) when main changed it.
+`apps/web/perf-budgets.json`, `benchmarks/api_latency_views.json` and `benchmarks/api_latency_views.captured.json` are touched by every UI PR, so each merge to main re-conflicted all the open ones (owner decision 2026-11-02). `.gitattributes` gives them merge drivers (`scripts/ops/merge_budgets.py`): budgets are unioned per key, the larger number wins with its own reason text, a route one side removed stays removed (its e2e entry and reasons with it); views are unioned by key with the changed side winning, so captured documents are kept. Unparsable JSON falls back to a normal conflict. The driver is local git config, set once in the clone's common `.git/config` (every worktree sees it) by `scripts/ops/install_merge_drivers.sh`, which `scripts/worktree.sh`, `scripts/merge_main.sh` and `make doctor` (a check) run or verify. The generated `docs/perf/view-coverage.md` (its timestamp line made two regenerations always conflict, #1033 / #1035) merges with `keepours` (`true`: our copy, no conflict). `scripts/merge_main.sh` regenerates the static view list and that page (`make api-latency-views`) when main changed either.

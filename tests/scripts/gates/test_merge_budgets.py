@@ -3,6 +3,9 @@ files (owner decision 2026-11-02: five UI PRs re-conflicted on them at every mer
 
 import importlib.util
 import json
+import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -53,10 +56,26 @@ def test_a_route_removed_on_one_side_goes_with_its_e2e_entry_and_reasons() -> No
     out = mb.merge_budgets(BASE, ours, theirs)
     assert "/gone" not in out["e2e"] and "e2e./gone.requests" not in out["reasons"]
     assert out["bundle"]["routes"]["a.ts"] == 11
-    # a side that changed what the other removed keeps it
-    ours2 = doc()
-    ours2["e2e"]["/gone"]["requests"] = 12
-    assert mb.merge_budgets(BASE, ours2, theirs)["e2e"]["/gone"]["requests"] == 12
+
+
+def test_a_removal_wins_over_a_raise_on_the_other_side() -> None:
+    # 2026-11-02 #1035: the branch removed two pages and their e2e routes while main raised
+    # their budgets; keeping the raises left page budgets without pages and half e2e entries
+    base = json.loads(json.dumps(BASE))
+    base["e2e"]["/gone"].update({"dom_nodes": 200, "first_load_js_gzip_bytes": 1000})
+    removed = json.loads(json.dumps(base))
+    del removed["e2e"]["/gone"], removed["bundle"]["routes"]["old.ts"]
+    for key in ("e2e./gone.requests", "bundle.routes.old.ts"):
+        del removed["reasons"][key]
+    raised = json.loads(json.dumps(base))
+    raised["e2e"]["/gone"]["requests"] = 12
+    raised["bundle"]["routes"]["old.ts"] = 6
+    raised["reasons"]["e2e./gone.requests"] = "main raised it"
+    for ours, theirs in ((removed, raised), (raised, removed)):
+        out = mb.merge_budgets(base, ours, theirs)
+        assert "/gone" not in out["e2e"] and "old.ts" not in out["bundle"]["routes"]
+        assert "e2e./gone.requests" not in out["reasons"]
+        assert "bundle.routes.old.ts" not in out["reasons"]
 
 
 def test_an_orphan_reason_is_dropped() -> None:
@@ -109,3 +128,42 @@ def test_captured_views_are_unioned_and_our_changed_entry_wins() -> None:
     # a view theirs dropped (ours unchanged) stays dropped
     gone = {"generated": "d2", "views": {"mine": view("B", True)}}
     assert "keep" not in mb.merge_views(base, base, gone)["views"]
+
+
+def test_the_generated_view_coverage_merges_as_ours_without_a_conflict(tmp_path: Path) -> None:
+    # 2026-11-02 #1033 / #1035: both sides regenerate it (a timestamp line), so every merge of
+    # main conflicted; `keepours` keeps the branch's copy and merge_main.sh regenerates it
+    repo = SCRIPT.parents[2]
+    doc = "docs/perf/view-coverage.md"
+    assert f"{doc} merge=keepours" in (repo / ".gitattributes").read_text().split("\n")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=tmp_path, env=env, capture_output=True, text=True, check=False,
+        )  # fmt: skip
+
+    git("init", "-q", "-b", "main")
+    (tmp_path / "scripts/ops").mkdir(parents=True)
+    shutil.copy(repo / "scripts/ops/install_merge_drivers.sh", tmp_path / "scripts/ops")
+    (tmp_path / ".gitattributes").write_text(f"{doc} merge=keepours\n")
+    (tmp_path / "docs/perf").mkdir(parents=True)
+    (tmp_path / doc).write_text("Generated (09:00 UTC)\n")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    installed = subprocess.run(
+        ["bash", "scripts/ops/install_merge_drivers.sh"], cwd=tmp_path, env=env, check=False
+    )
+    assert installed.returncode == 0
+    git("checkout", "-qb", "branch")
+    (tmp_path / doc).write_text("Generated (10:00 UTC)\n")
+    git("commit", "-qam", "ours")
+    git("checkout", "-q", "main")
+    (tmp_path / doc).write_text("Generated (11:00 UTC)\n")
+    git("commit", "-qam", "theirs")
+    git("checkout", "-q", "branch")
+    merged = git("merge", "--no-edit", "main")
+    assert merged.returncode == 0, merged.stdout + merged.stderr
+    assert (tmp_path / doc).read_text() == "Generated (10:00 UTC)\n"

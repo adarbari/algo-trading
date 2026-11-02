@@ -73,6 +73,7 @@ const props = {
   unproven: <Text>pool here</Text>,
   onOpen: vi.fn(),
   onOpenEdge: vi.fn(),
+  onOpenIdea: vi.fn(),
   onOpenSettings: vi.fn(),
 };
 
@@ -82,6 +83,7 @@ describe('SetupIdeas', () => {
   beforeEach(() => {
     hooks.useSetupIdeas.mockReset();
     props.onOpen.mockReset();
+    props.onOpenIdea.mockReset();
   });
 
   it('groups the picks by setup with the labelled figures and the left-out counts', async () => {
@@ -99,8 +101,10 @@ describe('SetupIdeas', () => {
     hooks.useSetupIdeas.mockReturnValue(fakeQuery<Data>(listed));
     render(<SetupIdeas {...props} />);
     await userEvent.click(screen.getByText('AAA'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Open AAA' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Open AAA in Explore' }));
     expect(props.onOpen).toHaveBeenCalledWith('AAA', 'drift_scr');
+    await userEvent.click(screen.getByRole('button', { name: 'Open the idea' }));
+    expect(props.onOpenIdea).toHaveBeenCalledWith('AAA', 'drift');
   });
 
   it('shows the Unproven section, not the list, when no setup qualifies', () => {

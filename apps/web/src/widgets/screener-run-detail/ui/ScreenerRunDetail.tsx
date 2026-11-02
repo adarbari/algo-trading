@@ -61,7 +61,7 @@ export function ScreenerRunDetail({ id }: ScreenerRunDetailProps) {
             <KeyValue label="Changes" items={changes} />
           </Stack>
           <UnavailableNote gaps={run.unavailable} />
-          <TextLink href={`/screeners/${run.configId}`}>Open the screener's results</TextLink>
+          <TextLink href={`/test/result/${run.configId}`}>Open the screener's results</TextLink>
         </Stack>
       )}
     </Panel>
