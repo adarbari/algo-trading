@@ -13,7 +13,8 @@ for a return outcome, the session's excess wins (win rate minus base rate) for a
 value is not a return, a cushion or a ratio (ADR 0064 amendment 2026-10-11: ``trial_value``).
 """
 
-from collections.abc import Callable, Sequence
+import math
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import partial
@@ -96,6 +97,22 @@ class Pick:
     hedged_roc: float | None = None
     stock_roc: float | None = None
     wing_cost: float | None = None
+    # With an entry condition (E13): the pick's own entry session S (the first close its rule
+    # held, plus the offset); None for every other edge, whose picks enter at the leg's S.
+    entry_session: date | None = None
+
+
+def band_picks(ids: Sequence[str], first: int, view: Mapping[Hashable, float]) -> tuple[Pick, ...]:
+    """The picks of a buy/hold band, ranks from ``first``: ``view`` is the oriented value of each
+    counted name of the leg's side (as its picks are). A name with no counted value has none,
+    never 0: it cannot be held (``reporting/turnover.py``)."""
+    out = []
+    for rank, i in enumerate(ids, start=first):
+        value = float(view[i]) if i in view else math.nan
+        counted = math.isfinite(value)
+        out.append(Pick(i, rank, "" if i in view else UNCOUNTED_BAND,
+                        value=value if counted else None))  # fmt: skip
+    return tuple(out)
 
 
 @dataclass(frozen=True)
@@ -128,6 +145,8 @@ class SessionStat:
     pre_snapshot: bool = False
     outside_universe: int = 0  # qualified names the edge's universe does not contain
     no_entry_bar: int = 0  # names eligible at D with no outcome row at S (over the base names)
+    not_triggered: int = 0  # base names whose entry condition never held in the wait (E13)
+    entry_unknown: int = 0  # base names whose entry condition was UNKNOWN first (E13)
     pick_reference: tuple[float, ...] = ()  # expires_otm: risk-neutral chance of a hit, per pick
     pick_touches: int = 0  # expires_otm: counted picks whose strike was touched intraday
     no_implied_vol: int = 0  # picks excluded for a missing or invalid implied vol at D
@@ -252,6 +271,8 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         pre_snapshot=any(leg.pre_snapshot for leg in legs),
         outside_universe=sum(leg.outside_universe for leg in legs),
         no_entry_bar=sum(leg.no_entry_bar for leg in legs),
+        not_triggered=sum(leg.not_triggered for leg in legs),
+        entry_unknown=sum(leg.entry_unknown for leg in legs),
         pick_reference=tuple(v for leg in legs for v in leg.pick_reference),
         pick_touches=sum(leg.pick_touches for leg in legs),
         no_implied_vol=sum(leg.no_implied_vol for leg in legs),

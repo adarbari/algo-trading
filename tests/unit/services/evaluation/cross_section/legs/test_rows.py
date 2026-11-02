@@ -4,7 +4,7 @@ store, where lists come back as arrays and nulls as None or NaN. A v2 leg's pick
 their unknowns as None, never 0; a v1 row has none."""
 
 from dataclasses import replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -475,3 +475,17 @@ def test_the_option_figures_of_a_pick_round_trip_and_a_share_leg_stores_none() -
     legacy = {k: v for k, v in row.items() if k != "pick_option"}
     assert all(p.wing_cost is None for p in decode_leg(legacy).stat.picks)
     assert "pick_option" in {c.name for c in EDGE_LEGS.columns}
+
+
+def test_an_entry_conditions_counts_and_each_picks_own_s_round_trip_and_older_rows_hold_none() -> (
+    None
+):
+    picks = tuple(replace(p, entry_session=S + timedelta(days=k)) for k, p in enumerate(PICKS))
+    original = leg(stat=stat(picks=picks, not_triggered=3, entry_unknown=1))
+    row = encode_leg(original, "site", "drift")
+    back = decode_leg(row)
+    assert back.stat == original.stat
+    assert [p.entry_session for p in back.stat.picks] == [p.entry_session for p in picks]
+    plain = encode_leg(leg(), "site", "drift")  # no entry condition: nothing new is stored
+    assert (plain["pick_entry"], plain["not_triggered"], plain["entry_unknown"]) == (None,) * 3
+    assert decode_leg(plain).stat.not_triggered == 0

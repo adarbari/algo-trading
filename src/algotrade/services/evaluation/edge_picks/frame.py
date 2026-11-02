@@ -26,6 +26,8 @@ def edge_picks_frame(
             "config_hash": [r.config_hash for r in rows],
             "top_k": pd.array([r.top_k for r in rows], dtype="Int64"),
             "pick_ids": [list(r.pick_ids) for r in rows],
+            "pick_sides": [list(r.pick_sides) for r in rows],
+            "pick_weights": [list(r.pick_weights) if r.pick_weights else None for r in rows],
         }
     )
     frame["session_date"] = session

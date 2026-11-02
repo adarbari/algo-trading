@@ -84,7 +84,9 @@ Owner decision 2026-11-02: the hook runs locally only what fails often and costs
 shared Mac; the rest is GitHub CI's (a public repo: hosted minutes are free, only concurrency is
 limited, and `ci.yml`'s `concurrency` cancels a branch's superseded run). Target: 90 s warm.
 `scripts/pre_push.py` runs two lanes side by side: python (`make numbering`, then `FAST_TESTS`
-at `-n 2`, whatever changed) and web (Prettier and Stylelint over the changed files, `ds:check`,
+at `-n 2`, whatever changed, then `check_ownership.py --files` over the branch's changed Python
+files: seconds, where the full scan is 2 min under load and stays CI's; #1064 and #1065 both
+reached CI with a new violation, 2026-11-02) and web (Prettier and Stylelint over the changed files, `ds:check`,
 `visual:missing` for a changed story; for a change under `src/` or `design-system/` the
 production build, `perf:bundle` and the DOM / request budgets `perf:e2e` on a free preview
 port). A push whose new commits are all clean merges of main runs the python lane alone, except the

@@ -95,6 +95,21 @@ def test_known_violations_allow_todays_hits_but_not_more(tmp_path: Path) -> None
     assert checker.main(["--root", str(root)]) == 1
 
 
+def test_files_scans_only_the_named_files_and_skips_the_stale_check(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # 2026-11-02 #1064 / #1065: new violations reached CI only; the pre-push hook runs this
+    stale = (
+        '[[violation]]\nresponsibility = "snapshot-selection"\nfile = "apps/old.py"\ncount = 1\n'
+    )
+    root = _tree(tmp_path, {"apps/rogue.py": "latest_date()\n", "apps/clean.py": "x = 1\n"}, stale)
+    assert checker.main(["--root", str(root), "--files", "apps/clean.py", "README.md"]) == 0
+    assert "OK for 1 changed file(s)" in capsys.readouterr().out
+    assert checker.main(["--root", str(root), "--files", "apps/rogue.py"]) == 1
+    assert "[snapshot-selection] apps/rogue.py: 1 hit(s), 0 allowed" in capsys.readouterr().out
+    assert checker.main(["--root", str(root)]) == 1  # the full run still fails on both
+
+
 def test_stale_known_violation_fails_until_removed(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
