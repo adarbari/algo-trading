@@ -140,10 +140,12 @@ describe('SetupLibrary', () => {
     expect(within(momentum).getByText(edgeFixture('momentum_12_1').thesis)).toBeInTheDocument();
     expect(within(momentum).getByText('Win rate 57% · base rate 52%')).toBeInTheDocument();
     expect(within(momentum).getByText('70')).toBeInTheDocument();
+    expect(within(momentum).getByText('On')).toBeInTheDocument(); // tonight: the setup's state
     expect(within(momentum).getByText('Candidate')).toBeInTheDocument();
     const drift = within(table).getByRole('row', { name: /Earnings drift/ });
     expect(within(drift).getByText(edgeFixture('earnings_drift').thesis)).toBeInTheDocument();
     expect(within(drift).getByText('Below range')).toBeInTheDocument(); // its live state
+    expect(within(drift).getByText('Paused')).toBeInTheDocument();
     expect(within(momentum).queryByText('Below range')).not.toBeInTheDocument(); // none recorded
     const waiting = within(table).getByRole('row', { name: /S&P 500 index changes/ });
     expect(
@@ -153,6 +155,7 @@ describe('SetupLibrary', () => {
     for (const id of [
       'verdict',
       'live_state',
+      'setup_state',
       'edge_state',
       'trades',
       'out_of_sample',

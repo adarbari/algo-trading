@@ -49,6 +49,10 @@ const EdgesPage = graphql(`
           result
           trades
         }
+        setupState {
+          state
+          reason
+        }
       }
     }
   }
@@ -78,6 +82,10 @@ const EdgeDetail = graphql(`
       oosHidden
       mine
       extends
+      setupState {
+        state
+        reason
+      }
       thesis
       mechanism
       persistence

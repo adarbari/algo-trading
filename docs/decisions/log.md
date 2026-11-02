@@ -268,3 +268,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the build row's own condition ("add only if the run shows the sort differs") is met at the depth the harness trades; reference snapshots start 2026-10-02, so the earlier sessions used the first snapshot's security type and optionable flag (a measurement caveat, not a point-in-time read by any setup).
+
+## 2026-11-02 | X1's every-session ladder (ADR 0088, backend-plan G18) | A sibling setup `index_put_ladder`, X1's parameters, joint trial counting deferred
+- Question: (1) the owner's 2026-11-01 (c) made the every-session ladder a variant of `index_put_write`, but G18 forbids a schedule as a variant key: ship it as its own setup naming X1, hold it, or reopen G18? (2) its parameters and variants; (3) the deflated Sharpe ratio counts trials per edge, so the two setups' trials are not counted together: required before it ships, or a dated follow-up?
+- Options: (1) sibling setup / hold until the owner answers / schedule as a variant key; (2) X1's position, gate and tracking with X1's fomc_clear variant and grid / with none; (3) before shipping (needs `harness.py`, being split) / after the split, before any verdict.
+- Decision: (1) a sibling setup `index_put_ladder` on a new sleeve-only schedule `every_session_ladder` (one entry every session, 17 overlapping puts per symbol on 51 slots), read beside X1, never as separate proof. (2) X1's symbols, 20 delta, tenor 21, hold 17, gate and PUT tracking; no variants, no grid (only the entry dates differ). (3) deferred, due before either setup's first verdict (after 2027-02-03, the holdout), on the roadmap; meanwhile the ladder's own deflated Sharpe ratio and t-ratios count independent windows, not overlapping trades.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: G18 settled that a schedule is not a variant key after the owner's (c), so the ladder is a sibling naming X1; identical parameters isolate the entry-date axis; joint trial counting cannot affect a verdict before the holdout closes, so it is a dated follow-up, not a blocker.

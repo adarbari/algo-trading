@@ -17,6 +17,7 @@ export interface RuleRow {
 
 const SCHEDULES: Record<string, string> = {
   every_session: 'Every session',
+  every_session_ladder: 'Every session, overlapping',
   month_end: 'Each month end',
 };
 const COLLATERALS: Record<string, string> = {

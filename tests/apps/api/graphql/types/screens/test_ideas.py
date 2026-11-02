@@ -4,6 +4,7 @@ stored results but no config, so it is no screener (and picks nothing)."""
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.user import UserContext
@@ -151,3 +152,48 @@ def test_an_empty_store_has_no_ideas_not_an_error(tmp_path: Path) -> None:
     query = '{ ideas(first: 5) { total } screeners { id } view(scope: "x") { scope } }'
     body = client.post("/graphql", json={"query": query}).json()
     assert body == {"data": {"ideas": None, "screeners": [], "view": None}}
+
+
+def test_a_setup_group_carries_the_setups_state_for_the_chip() -> None:
+    """O2: an Ideas group asks `setupState` (ON / PAUSED for a listed setup) through the same
+    read as `Edge.setupState`, so the chip is one source on the library, the page and Ideas."""
+    from algotrade_api.graphql.schema import schema  # noqa: PLC0415
+
+    sdl = schema.as_str()
+    group = sdl[sdl.index("type SetupGroup {") :].split("}")[0]
+    assert "setupState: SetupState" in group
+
+
+def test_a_groups_state_is_read_for_the_groups_own_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review of #1093: `setupState` goes through one read-model loader with the context the
+    group was read with, so a dated `setupIdeas(date: D)` never mixes in another session."""
+    import asyncio  # noqa: PLC0415
+
+    from algotrade.services.read.ideas import inverse  # noqa: PLC0415
+    from algotrade_api.graphql.types.screens import setup_ideas  # noqa: PLC0415
+
+    seen: list[tuple[object, str]] = []
+
+    def fake(c: object, edge_id: str) -> None:
+        seen.append((c, edge_id))
+
+    monkeypatch.setattr(inverse, "load_state_of_setup", fake)
+    ctx = object()
+    group = setup_ideas.SetupGroup(  # type: ignore[call-arg]
+        edge_id="drift",
+        name="n",
+        level="works",
+        lift_pts=None,
+        oos_trades=None,
+        basis_screener="s",
+        basis_horizon=None,
+        state="picked",
+        unknown=None,
+        picked=1,
+        shown=1,
+        ctx=ctx,
+    )
+    assert asyncio.run(group.setup_state(None)) is None  # type: ignore[arg-type]
+    assert seen == [(ctx, "drift")]

@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from functools import cached_property
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.named import LADDER
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
@@ -92,7 +93,7 @@ def fires(edge: Edge, session: date) -> bool:
     harness spaces its decisions a horizon apart for an independent statistic; the stored picks
     are what the edge would take that session), a month end or a calendar window on its own days
     (``sessions.decision_sessions`` over the sessions around ``session``)."""
-    if edge.schedule == EVERY_SESSION:
+    if edge.schedule in (EVERY_SESSION, LADDER):
         return True
     around = sessions_between(
         session - timedelta(days=AROUND_DAYS), session + timedelta(days=AROUND_DAYS)

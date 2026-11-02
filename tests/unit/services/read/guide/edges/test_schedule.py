@@ -16,6 +16,7 @@ TERMS = {
     "event_class_filing_8k_4_02",
     "event_class_index_change",
     "market_trigger_vix_spike",
+    "option_ladder",
 }
 
 
@@ -23,6 +24,7 @@ TERMS = {
     ("schedule", "text", "term"),
     [
         ("every_session", "Every trading day", None),
+        ("every_session_ladder", "Every trading day, positions overlapping", "option_ladder"),
         ("month_end", "Once a month, at the month end", None),
         ("calendar:opex_week", "In option-expiration week", "calendar_opex_week"),
         ("on_event:index_change", "When the S&P 500 changes a member", "event_class_index_change"),

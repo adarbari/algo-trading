@@ -179,9 +179,11 @@ def _picks(e: document.Edge) -> str:
         if market
         else f"every {window.replace('_', ' ')}"
         if window
-        else {"every_session": "every session", "month_end": "every month end"}.get(
-            e.schedule, e.schedule
-        )
+        else {
+            "every_session": "every session",
+            "every_session_ladder": "every session, overlapping",
+            "month_end": "every month end",
+        }.get(e.schedule, e.schedule)
     )
     top = "all that qualify" if e.top_k is None else f"top {e.top_k} of the screen"
     return f"{when.capitalize()} · {top}"

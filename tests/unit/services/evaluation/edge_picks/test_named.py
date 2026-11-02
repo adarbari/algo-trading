@@ -5,8 +5,11 @@ gate applied as for a screener setup, and a symbol nobody knows said, never drop
 from datetime import date
 from types import SimpleNamespace
 
+import pytest
+
 from algotrade.config.user import UserContext
-from algotrade.services.evaluation.edge_picks.named import is_named, named_night
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.evaluation.edge_picks.named import decides, is_named, named_night
 from algotrade.services.evaluation.edge_picks.night import (
     GATE_CLOSED,
     NOT_DECISION_DAY,
@@ -68,3 +71,17 @@ def test_a_closed_setup_gate_stores_gate_closed_for_a_named_setup() -> None:
     gate = {"all": [{"field": "market.regime@v3.label", "op": "not_in", "value": ["STRESS"]}]}
     row = named_night(_night(w), timed_edge(gate=gate))
     assert row.status == GATE_CLOSED and row.pick_ids == () and row.reason
+
+
+def test_a_plain_scheduled_sleeve_decides_every_session_and_a_timed_edge_needs_its_window() -> None:
+    """index_put_ladder (and X3's every_session sleeve) store a row every session: the picks are
+    what the setup takes that night; a time-series edge with no window or trigger is refused."""
+
+    def plain(schedule: str, base: str) -> SimpleNamespace:
+        return SimpleNamespace(id="x", market_trigger=None, schedule=schedule, base=base)
+
+    w = build_world()
+    for schedule in ("every_session_ladder", "every_session"):
+        assert decides(w.reader, plain(schedule, "delta_equivalent"), D)  # type: ignore[arg-type]
+    with pytest.raises(ConfigurationError, match="not a time-series edge"):
+        decides(w.reader, plain("every_session", "out_of_window"), D)  # type: ignore[arg-type]

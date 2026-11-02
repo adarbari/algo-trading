@@ -1,0 +1,106 @@
+# Edge document (ADR 0053, ADR 0088; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/options-volatility.md
+# (c19_index_put_write). index_put_write's idea tested again as an every-session ladder: a separate
+# setup, not a variant, because a schedule is not a variant key (backend-plan G18; X1's review,
+# pending owner confirmation). A named option sleeve (base delta_equivalent, ADR 0088 decision 14).
+id = "index_put_ladder"
+name = "Index put write, every-session ladder"
+family = "C"
+thesis = "Selling a cash-secured put on SPY, QQQ or IWM every session, each held 17 sessions so the puts overlap as a ladder, earns more on its collateral than holding the same share delta, because index puts are priced above the moves that follow."
+mechanism = """Investors pay for index protection (insurance mandates, portfolio overlays), and dealers
+who sell it charge for carrying the short-gamma risk; index implied volatility sits above the
+realised volatility that follows (Driessen, Maenhout and Vilkov: 24.7% against 20.8%, 1996-2003)."""
+persistence = """The demand for protection is structural and the seller is paid for a tail few hold
+through, but most of a put writer's return is its equity beta (Israelov and Nielsen), so the claim
+tested here is the part beyond the delta-equivalent stock, on the same collateral and cost. Entering
+every session spreads the entry date over the month, so the result does not rest on the roll day."""
+schedule = "every_session_ladder"
+top_k = "all"
+screeners = []
+base = "delta_equivalent"
+status = "candidate"
+mechanism_kind = "paid_for_risk"
+asset_class = "options"
+frozen_from = 2026-04-01
+holdout_from = 2026-11-03  # ADR 0088 d15: the first session of the unseen holdout, the session after this document was written; no verdict until closed trades from it reach 3 months
+notes = """The same idea as index_put_write (X1), tested again with every-session entries: a second
+trial of the index put-write premium, read beside index_put_write, never as independent evidence.
+The two share the symbols, the 20-delta put, the 17-session hold, the gate and the PUT tracking;
+only the entry dates differ. Each named symbol is one trial of the deflated Sharpe ratio; no
+variants and no grid, so the idea's tries stay few (X1 holds the gate variant and the grid). The
+deflated Sharpe ratio counts this edge's trials only, not X1's (trial logs are kept per edge):
+counting the two together is a follow-up after the harness split, due before either can have a
+verdict (2027-02-03).
+Entry: every session S = D + 1, a 20-delta put on the first monthly expiry at least 21 days after S
+and not before the hold's last session, held 17 sessions, so 17 puts per symbol are open at once.
+The book (E8b) is 51 fixed slots (3 symbols x 17), each trade one slot's share of the collateral,
+an empty slot cash; never levered. Overlapping trades share most of their days, so the t-ratios
+and the deflated Sharpe ratio count the independent windows (one per 17 sessions), not the trades.
+A window still open at the run's as-of is lost under its reason, never filled.
+NO VERDICT before a 3-month unseen holdout (ADR 0088): the holdout starts at 2026-11-03, so the
+earliest verdict is on trades whose window closed after 2027-02-03, and the judge enforces it.
+Built on the Cboe-era store only (chains from 2026-10-02); the bought option history (build row
+E5) is not purchased, and evidence derived from it would be owner-only (personal). Not paper traded
+(the record refuses a setup with no screener). Tracking: each window's return on collateral beside
+the Cboe PUT index's (personal licence); the SPX index itself is not traded."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "QQQ", "IWM"] },
+]
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[outcome]
+kind = "option_pnl"
+horizon_sessions = [17]
+benchmark = "none"
+start_offset_sessions = 1
+position = "short_put"
+strike_delta = 0.20
+tenor_days = 21
+tracks = "PUT"
+
+[quality_bar]
+outcome = """The option position's return on its cash-secured collateral (strike x 100) from the entry
+close to the close 17 sessions later (or its declared exit), net of the site's option cost levels,
+against the delta-equivalent stock held over the same sessions on the same collateral and cost
+(base delta_equivalent); the T-bill on the collateral is set beside it."""
+trigger_timing = """Every session is a decision session D and S the session after it; the gate reads
+market_conditions@v2 at D (the VIX curve, implied against realised volatility, trend), and the
+expiry is chosen from S's chain by the exchange calendar, so nothing beyond D is read to place an
+entry."""
+replication = """The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and
+holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the first
+monthly expiry 21 or more days out, a new one every session, each held 17 sessions, a setup gate on
+top. index_put_write is the same position entered once a month after the roll."""
+expected_size = """PUT has matched the S&P 500 total return over 1986-2024 with about two thirds of its
+volatility (Cboe-commissioned study; not a harness figure); against beta-matched equity the excess
+is about 1 to 2% a year before costs (practitioner estimates, not verified). Expect about
+index_put_write's excess with a smoother book, and losses in sharp sell-offs (2008, 2020, 2022)."""
+capacity_costs = """SPY, QQQ and IWM options are among the most liquid listed; a cash-secured put
+needs the strike x 100 in cash, split over 17 open puts per symbol. About 250 entries a year per
+symbol, so 17 times index_put_write's round trips; each pays the option cost levels and commission
+in verdict.toml [option_costs]."""
+failure_modes = """A crash inside the hold hits every open put at once (the ladder spreads the entry
+date, not the market risk); a regime where implied volatility no longer exceeds realised; the gate
+keeping the sleeve out of the best-paid sessions; the extra round trips eating the premium. Retire
+if the frozen-period return on collateral over the delta-equivalent stock is not above zero after
+costs, or its tail (CVaR) is worse than the stock's on the same collateral."""
+decoys = """Equity beta (the delta-equivalent stock on the same collateral is the base), the T-bill
+on the collateral, the Cboe PUT index's own return over each window (the tracking figure), and
+index_put_write, the same position entered monthly."""
+
+[[sources]]
+title = "Israelov, R. and Nielsen, L., Covered Calls Uncovered, Financial Analysts Journal, 2015"
+url = "https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered"
+
+[[sources]]
+title = "Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk, Journal of Finance, 2009"
+
+[[sources]]
+title = "Cboe S&P 500 PutWrite Index (PUT) methodology"
+url = "https://www.cboe.com/us/indices/dashboard/put/"
