@@ -8,7 +8,7 @@ store readers it is handed (``data.outcomes``), as the harness does."""
 import hashlib
 import json
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -17,11 +17,9 @@ import pandas as pd
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import LONG, LONG_SHORT, SHORT, identity_dict
-from algotrade.config.edges.portfolio import CASH, ENSEMBLE, PORTFOLIO_KIND, blend
+from algotrade.config.edges.portfolio import CASH, PORTFOLIO_KIND, blend
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.verdict import OptionCosts
-from algotrade.config.strategy.resolve import ResolvedConfig
-from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
@@ -43,6 +41,13 @@ from algotrade.data.outcomes import (
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.features.framework.feature import strictest
 from algotrade.quant.edges.statistics import moments
+from algotrade.services.evaluation.cross_section.baselines.variant import (
+    Variant,
+    _Scope,
+    crosses,
+    on_chain,
+    variant_scope,
+)
 from algotrade.services.evaluation.cross_section.detail.licences import outcome_licence
 from algotrade.services.evaluation.cross_section.events import EventSchedule
 from algotrade.services.evaluation.cross_section.hit import (
@@ -127,38 +132,6 @@ MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 CHUNK_SESSIONS = 20  # decision sessions screened and measured before the frames are dropped
 OUTCOME_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS)  # kept per entry session
 NO_ENTRY_BAR = "no_entry_bar"  # a pick's reason when its name has no outcome row at S
-
-
-@dataclass(frozen=True)
-class Variant:
-    """One screener or baseline of the run; the ``ensemble`` variant (ADR 0074) has the screeners
-    of its pre-registered grid as ``members`` (their ``role`` is ``member``) and, as ``config``,
-    the first one's (only its kind is read)."""
-
-    id: str
-    role: str  # "screener" | "baseline" | "member"
-    config: ResolvedConfig
-    members: tuple["Variant", ...] = ()
-
-    @property
-    def hash(self) -> str:
-        """What the variant's trial is: its config's hash; an ensemble's is that of its grid (the
-        members' hashes, in no order: an average does not depend on it)."""
-        if not self.members:
-            return self.config.hash
-        grid = json.dumps(sorted(m.config.hash for m in self.members))
-        return hashlib.sha256(f"{ENSEMBLE}:{grid}".encode()).hexdigest()
-
-
-@dataclass(frozen=True)
-class _Scope:
-    """One evaluation of the edge: ``main`` or one of its ``[[variants]]``."""
-
-    key: str
-    edge: Edge  # the edge with the variant's outcome and universe applied
-    universe: Selection
-    iv_field: str  # the outcome's own, else the run's
-    overrides: tuple[str, ...] = ()  # the variant's base / picks overrides, in its trial key
 
 
 @dataclass(frozen=True)
@@ -609,7 +582,7 @@ def _needs(
     for p in plans:
         events = schedules.get(p.scope.key)
         for variant in variants:
-            key = spec.key_for(p.scope, variant)
+            key = spec.key_for(variant_scope(p.scope, variant), variant)
             for block in p.blocks:
                 drawing = _drawing(spec, variant, block, p.scope.edge)
                 for leg in block:
@@ -647,6 +620,7 @@ class _Measured:
     outcome_reads: dict[tuple[str, int, date], OutcomeRead] = field(default_factory=dict)
     seqs: Mapping[date, int] = field(default_factory=dict)  # entry session -> outcome partition seq
     outcome_licence: str = "open"  # the strictest licence of the outcome rows read (E1)
+    closed_other: dict[int, set[date]] = field(default_factory=dict)  # a position baseline's grain
 
 
 @dataclass(frozen=True)
@@ -730,7 +704,8 @@ def _measure(
     computes a leg and one that reads it hold the same numbers. Only the sessions of ``reuse``
     are computed; its stored legs are taken as they are (``legs/reuse.py``)."""
     out = _Measured({}, {}, {}, {}, {})
-    out.outcome_licence = _entries_licence(reader, plans, as_of)  # reused legs included
+    cross = crosses(plans, variants)  # a position baseline on the other outcome grain
+    out.outcome_licence = _entries_licence(reader, plans, as_of, cross)  # reused legs included
     todo = reuse.days
     legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
     days = sorted({leg.decision for leg in legs})
@@ -740,11 +715,18 @@ def _measure(
     out.seqs = (  # before any outcome row is read
         chain_seqs(reader, entries) if chain else outcome_seqs(reader, entries, residuals)
     )
+    out.seqs = both_seqs(reader, entries, chain, out.seqs, cross)  # a commit to either is new
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
+    out.closed_other.update({h: set(c) for h, c in out.closed.items()})
     for at in range(0, len(days), CHUNK_SESSIONS):
         chunk = set(days[at : at + CHUNK_SESSIONS])
-        closed = _read_closed(reader, plans, chunk, as_of, out, failed)
+        closed = _read_closed(reader, plans, chunk, as_of, out, failed, chain)
+        beside = (  # the other grain: a baseline lacking its rows is not measured, never a failure
+            _read_closed(reader, plans, chunk, as_of, out, {}, not chain, out.closed_other)
+            if cross
+            else closed
+        )
         for day in sorted(chunk):  # lockstep over the scopes: one selection read per session
             with session.attribute(day):
                 for p in plans:
@@ -753,7 +735,8 @@ def _measure(
         for p in plans:
             for variant in variants:
                 events = schedules.get(p.scope.key)
-                _measure_plan(p, variant, session, events, chunk, closed, out, spec, as_of)
+                grains = {chain: closed, not chain: beside}
+                _measure_plan(p, variant, session, events, chunk, grains, out, spec, as_of)
         session.release()
     reuse.adopt(out.legs, out.lost, out.randoms, {p.key for p in plans})
     for (entry, horizon), names in reuse.names.items():  # the entries no chunk read
@@ -769,12 +752,32 @@ def _measure(
     return out
 
 
-def _entries_licence(reader: StoreReader, plans: Sequence[_Plan], as_of: datetime) -> str:
+def both_seqs(
+    reader: StoreReader,
+    entries: Collection[date],
+    chain: bool,
+    seqs: Mapping[date, int],
+    cross: bool,
+) -> dict[date, int]:
+    """``seqs`` (those of the run's own grain, ``chain`` or the stock grain) plus the other
+    grain's of each entry session when ``cross`` (a position baseline reads it): a commit to
+    either makes a stored leg stale (ADR 0063)."""
+    if not cross:
+        return dict(seqs)
+    other = outcome_seqs(reader, entries) if chain else chain_seqs(reader, entries)
+    return {d: n + other.get(d, 0) for d, n in seqs.items()}
+
+
+def _entries_licence(
+    reader: StoreReader, plans: Sequence[_Plan], as_of: datetime, cross: bool = False
+) -> str:
     """The strictest licence recorded on the outcome rows of every entry session the plans
     cover, a stored leg reused by this run included (its outcome rows are not read again, so the
     chunk reads alone would miss them)."""
     entries = {leg.entry for p in plans for b in p.blocks for leg in b}
     found = licence_frames(reader, _chain(plans), entries, as_of)
+    if cross:  # the other grain's rows a position baseline reads
+        found = [*found, *licence_frames(reader, not _chain(plans), entries, as_of)]
     return strictest(outcome_licence(f) for f in found)
 
 
@@ -791,8 +794,12 @@ def _read_closed(
     as_of: datetime,
     out: _Measured,
     failed: dict[int, MissingDataError],
+    chain: bool | None = None,
+    seen: dict[int, set[date]] | None = None,
 ) -> dict[int, dict[date, pd.DataFrame]]:
-    """The outcome rows of the chunk's entry sessions by horizon and entry session."""
+    """The outcome rows of the chunk's entry sessions by horizon and entry session, of the chain
+    grain or the stock grain. ``seen``: the closed entry sessions of the other grain (``out``
+    keeps the plans' own, and the names it holds, for the plans' grain only)."""
     closed: dict[int, dict[date, pd.DataFrame]] = {}
     wanted = {
         h: sorted(
@@ -802,10 +809,10 @@ def _read_closed(
         for h in sorted({p.horizon for p in plans})
     }  # fmt: skip
     entries = sorted({d for days in wanted.values() for d in days})
-    chain = _chain(plans)
+    chain = _chain(plans) if chain is None else chain
     read = read_chain_stored if chain else read_stored
     stored = read(reader, entries, as_of) if entries else None  # once for the horizons
-    residual_horizons = {p.horizon for p in plans if needs_residual(p.scope.edge)}
+    residual_horizons = {p.horizon for p in plans if needs_residual(p.scope.edge) and not chain}
     residuals = read_residuals(reader, entries, as_of) if entries and residual_horizons else None
     have: set[date] = set()  # the entry sessions with a partition visible at ``as_of``
     if stored is not None:  # plain strings: the ``isin`` over arrow strings is the slow path
@@ -829,6 +836,9 @@ def _read_closed(
                 columns += RESIDUAL_FIELDS
         kept = frame[columns]  # what apply_outcome reads, no more
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
+        if seen is not None:
+            seen[horizon] |= set(closed[horizon])
+            continue
         out.closed[horizon] |= set(closed[horizon])
         for entry, rows in closed[horizon].items():
             out.stored[horizon, entry] = frozenset(rows["instrument_id"])
@@ -841,7 +851,7 @@ def _measure_plan(
     session: SessionReads,
     events: EventSchedule | None,
     chunk: set[date],
-    closed: Mapping[int, Mapping[date, pd.DataFrame]],
+    grains: Mapping[bool, Mapping[int, Mapping[date, pd.DataFrame]]],
     out: _Measured,
     spec: _RandomSpec,
     as_of: datetime,
@@ -849,6 +859,9 @@ def _measure_plan(
     """The statistic of each of ``p``'s legs in the chunk whose window closed; for a screener
     and a split, also its random-pick draws on the legs it measured (``_measure_random``). The
     reads of a leg are logged against its decision session."""
+    scope = variant_scope(p.scope, variant)  # a position baseline: the template's outcome
+    other = on_chain(scope) != on_chain(p.scope)  # on the grain the plans do not read
+    closed = grains[on_chain(scope)]
     mine = out.legs.setdefault((p.key, variant.id), {})
     lost = out.lost.setdefault((p.key, variant.id), {})
     for block in p.blocks:
@@ -857,10 +870,10 @@ def _measure_plan(
                 continue
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
-            drawing = _drawing(spec, variant, block, p.scope.edge)
+            drawing = _drawing(spec, variant, block, scope.edge)
             with session.attribute(leg.decision):
                 stat = _stat(
-                    p.scope, session, variant, leg, p.horizon, rows, names, spec.costs,
+                    scope, session, variant, leg, p.horizon, rows, names, spec.costs,
                     spec.adv_floor, spec.option_costs,
                 )  # fmt: skip
                 drawn = (
@@ -869,8 +882,8 @@ def _measure_plan(
                     else None
                 )
             record = LegRecord(
-                key=spec.key_for(p.scope, variant),
-                trial_hash=_trial_hash(p.scope, variant),
+                key=spec.key_for(scope, variant),
+                trial_hash=_trial_hash(scope, variant),
                 edge_variant=p.scope.key,
                 variant=variant.id,
                 horizon=p.horizon,
@@ -891,9 +904,10 @@ def _measure_plan(
                 out.randoms.setdefault((p.key, variant.id), {})[leg.decision] = stored.random
             if stored.lost_table is not None:
                 lost[leg.decision] = stored.lost_table
-            out.outcome_reads[p.scope.key, p.horizon, leg.decision] = OutcomeRead(
-                leg.decision, p.scope.key, p.horizon, leg.entry, as_of, out.seqs.get(leg.entry)
-            )
+            if not other:  # the plans' own grain is the one whose reads are logged
+                out.outcome_reads[p.scope.key, p.horizon, leg.decision] = OutcomeRead(
+                    leg.decision, p.scope.key, p.horizon, leg.entry, as_of, out.seqs.get(leg.entry)
+                )
 
 
 def _measure_random(

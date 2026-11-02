@@ -53,6 +53,7 @@ from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.templates import POSITION_PREFIX, load_templates
 from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
@@ -69,6 +70,13 @@ from algotrade.data.outcomes import (
     stored_sessions,
 )
 from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.baselines.variant import (
+    Variant,
+    _Scope,
+    crosses,
+    on_chain,
+    variant_scope,
+)
 from algotrade.services.evaluation.cross_section.detail.licences import (
     TrialLicences,
     trial_licences,
@@ -123,7 +131,6 @@ from algotrade.services.evaluation.cross_section.measures import (
     slice_measures,
 )
 from algotrade.services.evaluation.cross_section.measuring import (
-    Variant,
     _chain,
     _drawn,
     _measure,
@@ -131,8 +138,8 @@ from algotrade.services.evaluation.cross_section.measuring import (
     _needs,
     _Plan,
     _RandomSpec,
-    _Scope,
     _trial_hash,
+    both_seqs,
 )
 from algotrade.services.evaluation.cross_section.random_picks import (
     DEFAULT_DRAWS,
@@ -376,6 +383,14 @@ def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Varia
         ),
         *(Variant(s, BASELINE, resolve_config(configs, s, user)) for s in edge.baselines),
     ]
+    if edge.position_baselines:  # the setup's own picks, valued as another position (G19)
+        own = next((v for v in found if v.role == SCREENER), found[0] if found else None)
+        if own is None:
+            raise ConfigurationError(f"edge {edge.id}: a position baseline needs a screener")
+        found += [
+            Variant(f"{POSITION_PREFIX}{t}", BASELINE, own.config, position=t)
+            for t in edge.position_baselines
+        ]
     if edge.ensemble:
         members = tuple(v for v in found if v.role == MEMBER)
         found.append(Variant(ENSEMBLE, SCREENER, members[0].config, members))
@@ -539,6 +554,7 @@ def evaluate_edge(
             _earnings_horizons(plans),
             _chain(plans),
             residual_plans(plans),
+            crosses(plans, variants),  # a baseline the setup cannot be valued as fails here
         ),
         "requested" if full else None,
     )
@@ -574,6 +590,9 @@ def evaluate_edge(
             scope.edge, plan.blocks, closed, horizon, start, projected
         )  # the blocks with a closed leg (measured) and the projected exits (ADR 0064)
         for variant in variants:
+            vscope, vclosed, vkept, vexits = _valued_as(
+                plan, variant, stats, (closed, kept, exits), start, projected
+            )
             legs = stats.randoms.get((plan.key, variant.id), {})
             pooled = [
                 pool_random([legs[leg.decision] for leg in block if leg.decision in legs])
@@ -584,73 +603,81 @@ def evaluate_edge(
                 scope.key,
                 horizon,
                 variant.id,
-                _trial_hash(scope, variant),
+                _trial_hash(vscope, variant),
                 pooled,
-                scope.edge.outcome.result_side,
+                vscope.edge.outcome.result_side,
             )
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
-                pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
-                for block in kept
+                pool_stats(
+                    [
+                        found[leg.decision]
+                        for leg in block
+                        if leg.entry in vclosed and leg.decision in found
+                    ]
+                )
+                for block in vkept
             )
-            block_stats = _turned_over(scope.edge.outcome, block_stats)
+            block_stats = _turned_over(vscope.edge.outcome, block_stats)
             measures, costed = _slice_rows(
                 block_stats,
                 split,
                 exploratory,
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
-                CostGrid(None, (), scope.edge.outcome.sign, OPTION_LEVELS)
-                if scope.edge.outcome.kind == CHAIN_KIND
-                else CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
-                if is_return(scope.edge)
-                and scope.edge.outcome.side != LONG_SHORT
-                and scope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
+                CostGrid(None, (), vscope.edge.outcome.sign, OPTION_LEVELS)
+                if vscope.edge.outcome.kind == CHAIN_KIND
+                else CostGrid(vscope.edge.outcome.cost_bps, spec.costs, vscope.edge.outcome.sign)
+                if is_return(vscope.edge)
+                and vscope.edge.outcome.side != LONG_SHORT
+                and vscope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
                 else None,  # a spread has no hit rate to cost
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
-                counts_wins(unit_of(scope.edge)),
+                counts_wins(unit_of(vscope.edge)),
                 horizon,
                 TailSpec(
-                    _trial_hash(scope, variant),  # config identity, never a code version (the seed)
+                    _trial_hash(
+                        vscope, variant
+                    ),  # config identity, never a code version (the seed)
                     verdict.tails,
                     bootstrap=variant.role == SCREENER,  # the verdict reads the screener's only
-                    base=scope.edge.outcome.sign > 0,  # an option's: its stored base_roc
+                    base=vscope.edge.outcome.sign > 0,  # an option's: its stored base_roc
                 ),
             )
             results.append(
                 VariantResult(
                     variant.id,
                     variant.role,
-                    _trial_hash(scope, variant),
+                    _trial_hash(vscope, variant),
                     horizon,
                     block_stats,
                     measures,
                     edge_variant=scope.key,
-                    side=scope.edge.outcome.result_side,
+                    side=vscope.edge.outcome.result_side,
                     capital_basis=None
-                    if scope.edge.outcome.kind == PORTFOLIO_KIND
-                    else capital_basis_of(scope.edge),
+                    if vscope.edge.outcome.kind == PORTFOLIO_KIND
+                    else capital_basis_of(vscope.edge),
                     iv_source=scope.iv_field if needs_iv else None,
                     grid=len(variant.members) or None,
                     licences=trial_licences(
                         features,
-                        scope.edge,
+                        vscope.edge,
                         scope.universe,
                         [m.config for m in variant.members] or [variant.config],
                         licences[scope.key],
                         stats.outcome_licence,
                     ),
-                    legs=_details(kept, block_stats, found, closed) if scope.key == MAIN else (),
+                    legs=_details(vkept, block_stats, found, vclosed) if scope.key == MAIN else (),
                     report_containment=diagnostic,
                     series=series_facts(
-                        scope.edge,
-                        kept,
-                        closed,
+                        vscope.edge,
+                        vkept,
+                        vclosed,
                         horizon,
                         block_stats,
                         stats.lost.get((plan.key, variant.id), {}),
                         split,
-                        exits,
+                        vexits,
                     ),
                     costs=costed,
                     lost_sessions=dict(
@@ -806,12 +833,34 @@ def _leg_rows(
     return (*stats.rows, *(r for r in reads if r["session_date"] in held), *outcomes, *gone)
 
 
+def _valued_as(
+    plan: _Plan,
+    variant: Variant,
+    stats: _Measured,
+    own: tuple[Collection[date], Any, Any],
+    start: date,
+    projected: int,
+) -> tuple[_Scope, Collection[date], Any, Any]:
+    """The scope ``variant`` is valued in (a position baseline's is the template's, on its own
+    grain) with the closed sessions, measured blocks and projected exits of that grain; ``own``
+    are the plan's."""
+    scope = variant_scope(plan.scope, variant)
+    if on_chain(scope) == on_chain(plan.scope):
+        return scope, *own
+    found = stats.legs.get((plan.key, variant.id), {})  # only the sessions it holds a leg for
+    held = {leg.entry for block in plan.blocks for leg in block if leg.decision in found}
+    closed = stats.closed_other[plan.horizon] & held
+    kept, exits = plan_exits(scope.edge, plan.blocks, closed, plan.horizon, start, projected)
+    return scope, closed, kept, exits
+
+
 def _outcome_stamps(
     reader: StoreReader,
     as_of: datetime,
     names_for: Collection[int],
     chain: bool,
     residuals: bool,
+    cross: bool,
     entries: Collection[date],
 ) -> tuple[
     dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
@@ -821,9 +870,13 @@ def _outcome_stamps(
     sequence (the harness is the one reader of outcomes)."""
     if chain:  # an option_pnl edge reads the chain grain (EB H13)
         known, names = chain_stamps(reader, entries, as_of, names_for)
-        return known, names, chain_seqs(reader, entries)
-    known, names = outcome_stamps(reader, entries, as_of, names_for=names_for, residuals=residuals)
-    return known, names, outcome_seqs(reader, entries, residuals)
+        seqs = chain_seqs(reader, entries)
+    else:
+        known, names = outcome_stamps(
+            reader, entries, as_of, names_for=names_for, residuals=residuals
+        )
+        seqs = outcome_seqs(reader, entries, residuals)
+    return known, names, both_seqs(reader, entries, chain, seqs, cross)
 
 
 def residual_plans(plans: Sequence[_Plan]) -> bool:
@@ -848,7 +901,17 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
     reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
     borrow = load_verdict(configs).borrow_bps_annual
     edge = replace(edge, outcome=_borrowing(edge.outcome, borrow))
-    scopes = [_Scope(MAIN, edge, edge_universe(configs, user, edge), iv_field_of(edge, iv_field))]
+    templates = load_templates(configs) if edge.position_baselines else {}
+    scopes = [
+        _Scope(
+            MAIN,
+            edge,
+            edge_universe(configs, user, edge),
+            iv_field_of(edge, iv_field),
+            (),
+            templates,
+        )
+    ]
     for v in edge.variants:
         base, picks = v.base or edge.base, v.picks or edge.picks
         applied = replace(
@@ -862,7 +925,9 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
         field_name = v.outcome.iv_field or iv_field
         marks = (f"base={base}", f"picks={picks}") if v.base or v.picks else ()
         scopes.append(
-            _Scope(v.id, applied, edge_universe(configs, user, applied), field_name, marks)
+            _Scope(
+                v.id, applied, edge_universe(configs, user, applied), field_name, marks, templates
+            )
         )
     return scopes
 
