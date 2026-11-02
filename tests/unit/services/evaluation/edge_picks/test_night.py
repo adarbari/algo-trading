@@ -3,7 +3,11 @@ screen and universe, and why a session has none."""
 
 from dataclasses import replace
 from datetime import date, timedelta
+from typing import Any
 
+import pytest
+
+from algotrade.config.edges.portfolio import ENSEMBLE
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.edge_picks.night import (
@@ -11,7 +15,7 @@ from algotrade.services.evaluation.edge_picks.night import (
     NOT_DECISION_DAY,
     PICKED,
     SKIPPED,
-    UNJUDGED,
+    EdgePicks,
     Night,
     edge_night,
     fires,
@@ -25,6 +29,10 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     World,
     build_world,
     edge,
+)
+from tests.unit.services.evaluation.cross_section.portfolio.test_ensemble import BLEND
+from tests.unit.services.evaluation.cross_section.portfolio.test_ensemble import (
+    _world as _ensemble_world,
 )
 
 USER = UserContext("site")
@@ -143,11 +151,39 @@ def test_a_long_edge_stores_every_pick_as_long(world: World) -> None:
     assert stored.pick_sides == ("long",) * 3
 
 
-def test_a_portfolio_edge_is_unjudged_until_its_book_is_replayed(world: World) -> None:
-    book = edge(outcome={**_outcome(), "kind": "portfolio_return", "horizon_sessions": [1],
-                         "weighting": "equal"}, top_k=5)  # fmt: skip
-    (stored,) = edge_night(night(world), book)
-    assert stored.status == UNJUDGED and "book" in stored.reason
+def _book_edge(**doc: Any):  # type: ignore[no-untyped-def]
+    outcome = {"kind": "portfolio_return", "horizon_sessions": [1], "benchmark": BLEND,
+               "start_offset_sessions": 1, "cost_bps": 0, "weighting": "equal"}  # fmt: skip
+    return edge(outcome=outcome, top_k=5, screeners=["momo", "lowmo"], **doc)
+
+
+def _weights(row: EdgePicks) -> dict[str, float]:
+    return dict(zip(row.pick_ids, row.pick_weights, strict=True))
+
+
+def test_a_book_edge_stores_the_book_the_harness_holds_with_its_weights() -> None:
+    """One allocation edge: the stored weights are the harness's book at the same D."""
+    w, book = _ensemble_world(), _book_edge()
+    momo, lowmo = edge_night(night(w), book)
+    assert (momo.screener, momo.status) == ("momo", PICKED)
+    harness = evaluate_edge(w.reader, w.results, w.configs, USER, book, *_range(), AS_OF)
+    held = {r.variant: dict(r.stats[0].weights) for r in harness.results}
+    assert dict(zip(momo.pick_ids, momo.pick_weights, strict=True)) == pytest.approx(held["momo"])
+    assert dict(zip(lowmo.pick_ids, lowmo.pick_weights, strict=True)) == pytest.approx(
+        held["lowmo"]
+    )
+    assert momo.pick_sides == ("long",) * 5
+
+
+def test_an_ensemble_stores_each_members_book_and_the_averaged_one() -> None:
+    w, book = _ensemble_world(), _book_edge(ensemble={"variants": ["momo", "lowmo"]})
+    rows = {r.screener: r for r in edge_night(night(w), book)}
+    assert set(rows) == {"momo", "lowmo", ENSEMBLE}
+    harness = evaluate_edge(w.reader, w.results, w.configs, USER, book, *_range(), AS_OF)
+    held = {r.variant: dict(r.stats[0].weights) for r in harness.results}
+    mixed = rows[ENSEMBLE]
+    assert mixed.status == PICKED and len(mixed.pick_ids) == 10
+    assert _weights(mixed) == pytest.approx(held[ENSEMBLE])
 
 
 def test_a_session_with_no_features_is_skipped_with_the_reason_never_empty_picks() -> None:

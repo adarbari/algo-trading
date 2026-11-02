@@ -3,7 +3,7 @@ parameters and ``[outcome.exit]`` round trip through ``parse_edge`` and are chec
 site's templates where the edge loads; ``position`` with ``structure`` is refused, an entry at D's
 close is refused, an edge that never names the keys hashes as before."""
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any
 
 import pytest
@@ -11,7 +11,12 @@ import pytest
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.edges.positions.spec import ExitSettings, PositionSpec, check_edge
+from algotrade.config.edges.positions.spec import (
+    ExitSettings,
+    PositionSpec,
+    check_edge,
+    exits_digest,
+)
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import FileConfigStore
@@ -167,3 +172,12 @@ def test_every_site_edge_hashes_without_the_new_keys() -> None:
     for edge in load_edges(FileConfigStore(REPO_ROOT / "config")):
         assert not set(new) & set(identity_dict(asdict(edge))), edge.id
         assert "position" not in identity_dict(asdict(edge.outcome)), edge.id
+
+
+def test_the_exits_digest_names_the_declared_exits_and_only_them() -> None:
+    """What the run records so the exit rule it publishes is the one it tested (ADR 0088 d19)."""
+    spec = parse_edge(put(), "drift", WHERE).outcome.position
+    assert spec is not None and exits_digest(spec) == exits_digest(spec)
+    assert exits_digest(replace(spec, exit=ExitSettings(0.5, 3.0, 21))) != exits_digest(spec)
+    assert exits_digest(replace(spec, book=False)) == exits_digest(spec)  # not an exit
+    assert exits_digest(None) is None

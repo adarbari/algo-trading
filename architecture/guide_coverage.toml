@@ -134,6 +134,11 @@ values = { HISTORY = "term:exit_stop_history", FALLBACK = "term:exit_stop_fallba
 names = { HISTORY = "Historical stop", FALLBACK = "Fallback stop", DECLARED = "Declared stop" }
 
 [[enum]]
+source = "graphql:StopBasis"
+values = { ENTRY = "term:exit_basis_entry", CREDIT = "term:exit_basis_credit", COLLATERAL = "term:exit_basis_collateral" }
+names = { ENTRY = "Entry price", CREDIT = "Credit", COLLATERAL = "Collateral" }
+
+[[enum]]
 source = "graphql:UnavailableKind"
 exempt = "covered by GUIDE_TERMS (one glossary term per kind), kept complete by tests/unit/services/read/availability/test_cause.py"
 

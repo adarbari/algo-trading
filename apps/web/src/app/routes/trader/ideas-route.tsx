@@ -55,6 +55,7 @@ function IdeasRoute() {
       onOpenIdea={(symbol, setup) =>
         void navigate({ to: '/ideas/$symbol', params: { symbol }, search: { setup } })
       }
+      onOpenSettings={() => void navigate({ to: '/settings' })}
       onOpenScreener={(id) => void navigate({ to: '/test/result/$id', params: { id } })}
       onOpen={(symbol, via) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol, via } })

@@ -121,4 +121,4 @@ def test_picks_of_a_run_the_viewer_may_not_rank_are_dropped_and_counted(
         withheld=frozenset({"iv_rank"}),
     )
     found = of_setup.load_pick_set(CTX, SETUP)
-    assert found.picks == () and found.dropped == 1
+    assert found.picks == () and len(found.dropped) == 1
