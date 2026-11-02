@@ -20,6 +20,7 @@ import { gql, GraphQLRequestError, graphql, queryKeys } from '@/shared/api';
 
 import { IDEA_FEATURES } from '../model/facts';
 import { toIdeasData, type IdeasResponse } from '../model/idea';
+import { gqlTab, type IdeaTab } from '../model/search';
 
 /** Ideas fetched per page: the first load and each "show more" (the API's default and half its maximum). */
 export const IDEAS_PAGE = 50;
@@ -28,8 +29,14 @@ export const IDEAS_PAGE = 50;
 export const IDEAS_OPERATION = 'IdeasPage';
 
 const IdeasPage = graphql(`
-  query IdeasPage($first: Int!, $after: String, $names: [FeatureName!]!, $filters: [FilterInput!]) {
-    ideas(first: $first, after: $after, filters: $filters) {
+  query IdeasPage(
+    $first: Int!
+    $after: String
+    $names: [FeatureName!]!
+    $filters: [FilterInput!]
+    $tab: IdeaTab
+  ) {
+    ideas(first: $first, after: $after, filters: $filters, tab: $tab) {
       session
       total
       hasMore
@@ -177,7 +184,8 @@ const IdeasPage = graphql(`
  * same filters). A cursor is only good for the filters it was issued under, so each filter list
  * has its own: changing the filters starts over from the first page.
  */
-const moreKey = (filters: readonly FilterInput[] | null) => ['ideas-more', filters] as const;
+const moreKey = (filters: readonly FilterInput[] | null, tab: IdeaTab | null) =>
+  (tab === null ? ['ideas-more', filters] : ['ideas-more', filters, tab]) as readonly unknown[];
 const NO_CURSORS: readonly string[] = [];
 const NO_FILTERS: readonly AppliedFilter[] = [];
 
@@ -189,10 +197,13 @@ const NO_FILTERS: readonly AppliedFilter[] = [];
  * screeners and the paused picks are the first page's. (Not `useInfiniteQuery`: its observer
  * would sit in the entry's static graph, which is at its budget.)
  */
-export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
+export function useIdeas(
+  applied: readonly AppliedFilter[] = NO_FILTERS,
+  tab: IdeaTab | null = null,
+) {
   const client = useQueryClient();
   const filters = useMemo(() => toFilterInputs(applied), [applied]);
-  const moreQueryKey = useMemo(() => moreKey(filters), [filters]);
+  const moreQueryKey = useMemo(() => moreKey(filters, tab), [filters, tab]);
   const more = useQuery({
     queryKey: moreQueryKey,
     queryFn: () => NO_CURSORS,
@@ -202,7 +213,7 @@ export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
   });
   const cursors = more.data;
   const state = useQueries({
-    queries: [null, ...cursors].map((after) => pageOptions(after, filters)),
+    queries: [null, ...cursors].map((after) => pageOptions(after, filters, tab)),
     combine: (results) => joinPages(results, cursors),
   });
 
@@ -225,9 +236,9 @@ export function useIdeas(applied: readonly AppliedFilter[] = NO_FILTERS) {
         queryKey: queryKeys.gqlAll(IDEAS_OPERATION),
         predicate: (q) => 'after' in (q.queryKey[2] as object),
       });
-      void client.resetQueries({ queryKey: pageOptions(null, filters).queryKey, exact: true });
+      void client.resetQueries({ queryKey: pageOptions(null, filters, tab).queryKey, exact: true });
     }
-  }, [client, refused, moreQueryKey, filters]);
+  }, [client, refused, moreQueryKey, filters, tab]);
 
   const { next, laterFailed, refetchLater, refetchFirst } = state;
   return {
@@ -313,11 +324,16 @@ function toPagedIdeas(pages: IdeasResponse[]) {
 }
 
 /** One page: the first (no cursor) keeps the key the page cache and the route prefetch know. */
-function pageOptions(after: string | null, filters: readonly FilterInput[] | null = null) {
+function pageOptions(
+  after: string | null,
+  filters: readonly FilterInput[] | null = null,
+  tab: IdeaTab | null = null,
+) {
   const variables = {
     first: IDEAS_PAGE,
     names: [...IDEA_FEATURES],
     ...(filters && { filters: [...filters] }),
+    ...(tab && { tab: gqlTab(tab) }),
   };
   return queryOptions({
     queryKey: queryKeys.gql(IDEAS_OPERATION, after === null ? variables : { ...variables, after }),
@@ -328,6 +344,6 @@ function pageOptions(after: string | null, filters: readonly FilterInput[] | nul
 }
 
 /** Start the ideas read before the page mounts (a route loader); the hook then joins it. */
-export function prefetchIdeas(client: QueryClient): void {
-  void client.query(pageOptions(null)).catch(() => undefined);
+export function prefetchIdeas(client: QueryClient, tab: IdeaTab | null = null): void {
+  void client.query(pageOptions(null, null, tab)).catch(() => undefined);
 }

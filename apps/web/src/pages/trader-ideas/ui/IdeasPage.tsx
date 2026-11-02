@@ -1,22 +1,14 @@
 /**
- * Trader > Ideas (home): the ticker-level ideas table across the user's screeners, full width,
- * under the regime strip, the paused picks and the shared filter bar (search params). A row opens its ticker in Explore (or a compare set) with the screener that surfaced it.
- * The signals of the followed edges sit above the table and load on demand (their own chunk).
+ * Trader > Ideas (home): the ideas of one tab,
+ * per tab (Stocks | Premium, `?tab`): the picks of setups with a good stored verdict grouped by setup, beside a detail (ADR 0083); with no qualifying setup the tab shows its Unproven section, the screeners' matches with the paused picks and the shared filter bar. A row opens its ticker in Explore with the screener that surfaced it.
  */
 import { Stack } from '@algotrade/ui';
-import { Suspense } from 'react';
-
-import { lazyPage } from '@/shared/lib/lazy';
 import type { IdeaCompareSearch } from '@/features/idea-compare';
 import { IdeasHeading } from '@/widgets/ideas-heading';
+import { SetupIdeas } from '@/widgets/setup-ideas';
 import { PausedIdeas } from '@/widgets/paused-ideas';
 import { RegimeStrip } from '@/widgets/regime-strip';
 import { TopIdeas, type TopIdeasSearch, type TopIdeasSearchPatch } from '@/widgets/top-ideas';
-
-const EdgeSignals = lazyPage(() => import('@/widgets/edge-signals'), 'EdgeSignals');
-
-/** Fetch the edge signals' chunk ahead of the page (a route loader), so it renders unsuspended. */
-export const preloadEdgeSignals = EdgeSignals.preload;
 
 export interface IdeasPageProps {
   /** The column set and the filters in force (the URL's search params). */
@@ -32,10 +24,8 @@ export interface IdeasPageProps {
   onOpenScreener: (screenerId: string) => void;
   /** Open the Regime page (the strip's chip). */
   onOpenRegime: () => void;
-  /** Open an edge's page (a followed edge's row). */
+  /** Open a setup's page. */
   onOpenEdge: (edgeId: string) => void;
-  /** Open the Edges list (where an edge is followed). */
-  onOpenEdges: () => void;
 }
 
 export function IdeasPage({
@@ -47,22 +37,34 @@ export function IdeasPage({
   onOpenScreener,
   onOpenRegime,
   onOpenEdge,
-  onOpenEdges,
 }: IdeasPageProps) {
+  const tab = search.tab ?? 'stocks';
   return (
     <Stack gap={3}>
-      <IdeasHeading />
+      <IdeasHeading
+        tab={tab}
+        onTabChange={(next) => {
+          onSearchChange({ tab: next === 'stocks' ? undefined : next });
+        }}
+      />
       <RegimeStrip onOpen={onOpenRegime} />
-      <Suspense fallback={null}>
-        <EdgeSignals onOpen={onOpen} onOpenEdge={onOpenEdge} onOpenEdges={onOpenEdges} />
-      </Suspense>
-      <PausedIdeas onOpen={onOpen} onOpenScreener={onOpenScreener} />
-      <TopIdeas
-        search={search}
-        onSearchChange={onSearchChange}
-        onCompare={onCompare}
+      <SetupIdeas
+        tab={tab}
         onOpen={onOpen}
-        onScreeners={onScreeners}
+        onOpenEdge={onOpenEdge}
+        unproven={
+          <Stack gap={3}>
+            <PausedIdeas tab={tab} onOpen={onOpen} onOpenScreener={onOpenScreener} />
+            <TopIdeas
+              tab={tab}
+              search={search}
+              onSearchChange={onSearchChange}
+              onCompare={onCompare}
+              onOpen={onOpen}
+              onScreeners={onScreeners}
+            />
+          </Stack>
+        }
       />
     </Stack>
   );

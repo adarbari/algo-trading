@@ -27,7 +27,6 @@ const STRUCTURE = [
   'src/widgets/setup-record/model/trade-columns.tsx', // a followed setup's paper trades, one row each
   'src/widgets/edge-diagnostics/model/variant-columns.tsx', // an edge's variant grid, one screen at one holding period per row
   'src/widgets/edge-diagnostics/ui/EdgeMonthly.tsx', // an edge's gain or loss by month, one year per row
-  'src/widgets/edge-signals/model/columns.tsx', // an edge's paper trades and the followed edges, one row each
   'src/widgets/setup-record/model/figures.tsx', // one figure of an edge's verdict per row, a column per side of the split
   'src/widgets/setup-library/model/columns.tsx', // the edge documents, one row each
   'src/widgets/setup-record/model/columns.tsx', // an edge's years and deepest drawdowns, one row each
@@ -44,6 +43,7 @@ const STRUCTURE = [
   'src/widgets/holdings-panel/model/columns.tsx', // an ETF's holdings (issuer-dated weights)
   'src/widgets/options-panel/model/columns.tsx', // an option chain's quotes by strike
   'src/widgets/regime-episodes/model/columns.tsx', // the regime's reference market falls
+  'src/widgets/setup-ideas/model/columns.tsx', // one setup's picks tonight, one pick per row (rank, place, also in)
   'src/widgets/screener-run-list/model/columns.tsx', // admin: screener runs, one record each
   'src/widgets/screener-list/model/columns.tsx', // the user's screeners
   'src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx', // admin: data-quality checks

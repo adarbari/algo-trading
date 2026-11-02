@@ -470,3 +470,43 @@ def test_outcome_rows_recording_a_personal_licence_make_the_trial_personal(
     }
     frame = edge_eval_frame(personal, "r", AS_OF)
     assert set(frame["evidence_licence"].dropna()) == {"personal"}
+
+
+def test_an_option_pnl_edge_over_a_partition_with_several_position_keys_scores_its_own() -> None:
+    """A chain partition holds every edge's position keys at the same hold: the picks of one
+    edge must read its own key's rows (E6a: ``_picks`` once crashed on the second row of a name)."""
+    w = _with_chain_outcomes(build_world())
+    for day in [*DAYS, next_session(DAYS[-1])]:
+        other = [{**_chain_row(iid, i, day), "position_key": "another", "pnl_mid": 99.0,
+                  "option_pnl": 99.0, "collateral": 1.0} for i, iid in enumerate(IDS)]  # fmt: skip
+        w.writer.write_table(STRUCTURE_PNL, day, f"cq-{day}", stamped(other, day, f"cq-{day}"))
+    ev = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), edge(outcome=CHAIN_OUTCOME),
+        DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+    (r,) = ev.results
+    assert r.measures[0].mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004)
+    first = r.stats[0].picks[
+        0
+    ]  # name 19: pnl_mid 9.5, half-spreads 0.4, collateral 95 (its own key)
+    assert first.capital == 95.0 and first.roc_gross == pytest.approx(9.5 / 95)
+    assert first.price_source == "option_history" and first.outcome_licence == "personal"
+    assert first.exit_session is not None and first.exit_kind == "HORIZON"
+    assert r.capital_basis == edge(outcome=CHAIN_OUTCOME).outcome.position.collateral
+
+
+def test_a_share_edges_picks_carry_the_contract_and_its_result_the_capital_basis() -> None:
+    ev = evaluate_edge(
+        (w := build_world()).reader, w.results, w.configs, UserContext("site"),
+        edge(top_k=3, outcome={"kind": "excess_return", "horizon_sessions": [2],
+                               "benchmark": "SPY", "start_offset_sessions": 1,
+                               "cost_bps": 20}),
+        DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+    (r,) = ev.results
+    assert r.capital_basis == "notional"
+    first = r.stats[0].picks[0]  # name 19: fwd_return 9.5%
+    assert first.roc_gross == pytest.approx(0.095) and first.roc == pytest.approx(0.093)
+    assert (first.exit_kind, first.price_source, first.outcome_licence) == (
+        "HORIZON", "bars", "open",
+    )  # fmt: skip

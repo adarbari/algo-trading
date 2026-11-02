@@ -32,7 +32,8 @@ def job_name(user_id: str) -> str:
 PAPER_COLUMNS = (
     "user_id", "edge_id", "signal_session", "instrument_id", "config_hash", "outcome_hash",
     "screener", "status", "reason", "buy_session", "sell_session", "horizon_sessions", "rank",
-    "delisted", "excess_return", "return", "licence", "knowledge_ts",
+    "delisted", "excess_return", "return", "licence", "exit_kind", "return_on_capital",
+    "price_source", "knowledge_ts",
 )  # fmt: skip
 
 
