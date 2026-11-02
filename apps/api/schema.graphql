@@ -2359,7 +2359,7 @@ type IdeaWhy {
 }
 
 """
-The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
+The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`); `watchlist` (a tab's pool only): the ideas the rule ranked before the viewer's watchlist kept the watched ones, null: no watchlist, no filter (ADR 0083)
 """
 type Ideas {
   session: Date!
@@ -2370,6 +2370,7 @@ type Ideas {
   paused: [PausedIdea!]!
   nextCursor: String
   facets: FilterFacets
+  watchlist: Int
 
   """Whether another page follows this one"""
   hasMore: Boolean!
@@ -4108,7 +4109,7 @@ type SetupIdea {
 }
 
 """
-The Ideas of one tab for the session. `state`: listed (a setup qualifies; a night that picks nothing is an empty list, never a fall back) or unproven (none does: the page shows `Query.ideas(tab)` as Unproven). `groups` the qualifying setups, strongest evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; `leftOut` counts by kind; `ruleVersion` the ranking rule's
+The Ideas of one tab for the session. `state`: listed (a setup qualifies; a night that picks nothing is an empty list, never a fall back) or unproven (none does: the page shows `Query.ideas(tab)` as Unproven). `groups` the qualifying setups, strongest evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; `leftOut` counts by kind; `ruleVersion` the ranking rule's; `watchlist`: the ideas under the cap before the viewer's watchlist kept the watched ones (only those are in `ideas`; `total`, `picked` and the ranks are the whole list's, `shown` and the licence left-out count only watched names), null: no watchlist, no filter
 """
 type SetupIdeas {
   session: Date!
@@ -4119,6 +4120,7 @@ type SetupIdeas {
   ideas: [SetupIdea!]!
   total: Int!
   leftOut: [LeftOut!]!
+  watchlist: Int
 }
 
 """

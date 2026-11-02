@@ -91,6 +91,7 @@ const response: IdeasResponse = {
   ideas: {
     session: '2026-10-02',
     total: 3,
+    watchlist: null,
     hasMore: false,
     nextCursor: null,
     facets: null,
