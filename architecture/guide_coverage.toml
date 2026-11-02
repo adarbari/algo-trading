@@ -487,7 +487,7 @@ start = "start:read_screener_runs"
 
 [[section]]
 path = "/admin/users"
-exempt = "placeholder page, not built yet"
+exempt = "admin page with no Guide start page yet"
 
 [[enum]]
 source = "graphql:MyFeatureRequest.status"
@@ -508,7 +508,7 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 # The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
 max_enums = 32
 max_sections = 4
-max_panels = 62
+max_panels = 61
 enums = [
   "graphql:Adjustment",
   "graphql:AheadEvent.kind",
@@ -588,7 +588,6 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/widgets/regime-header/ui/RegimeHeader.tsx" = 1
 "src/widgets/regime-indicators/ui/RegimeIndicators.tsx" = 2
 "src/widgets/regime-legend/ui/RegimeLegend.tsx" = 1
-"src/widgets/regime-sizing/ui/RegimeSizing.tsx" = 1
 "src/widgets/review-items-panel/ui/ReviewItemsPanel.tsx" = 1
 "src/widgets/screen-funnel/ui/ScreenFunnel.tsx" = 1
 "src/widgets/screen-summary/ui/ScreenSummary.tsx" = 2

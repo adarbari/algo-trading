@@ -368,7 +368,7 @@ Screeners as explicit entities (G8) need no code: the entities, the pick rule an
 | X6 | Re-file c12, c13, c14, c16; retire c18 (P2) | E6b, F6, F7 |
 | X7 | The wheel book (P2) | E8b |
 | X8 | Guide: setups, positions and templates, entry and exit rules, states, "why nothing is on today", "why we do not publish put-buying setups", the bootstrap caveat | E10 |
-| X9 | Optional (owner decision 7): a share setup re-filed as a new version with `verdict_profile = "tails"`, judged beside its `return` version | E6b; decision 7 |
+| X9 | Optional (owner decision 7): a share setup re-filed as a new version with `verdict_profile = "tails"`, judged beside its `return` version | E6b; decision 7 **Skipped (2026-11-02, decision log, pending owner confirmation):** the judged long setups with enough trades (`momentum_at_earnings`, `momentum_12_1`) have positive skew, so the tails criteria would not change a `return` verdict, the fat-tailed setups are short and G20 leaves those unjudged, 63 of 66 edges read `not_enough_data`, and a new id is one more deflated-Sharpe trial with no verdict to deflate. Reopen after E6b-1 has deployed and the first share setup reaches `promising`: `momentum_at_earnings_tails` (`verdict_profile = "tails"`, `baselines = ["momentum_at_earnings"]`, the `return` version kept live). |
 
 ### Dependency map and parallel start
 
