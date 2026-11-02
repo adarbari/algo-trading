@@ -7,8 +7,9 @@ the public kind of its reason (``EXCLUDED_KINDS``); eligible names that were not
 listed. ``exit_session`` is S + h sessions (the window's close, from the calendar) for a share
 and the trade's own for an option; the trade contract's columns (ADR 0088, 2.5a: ``exit_kind``,
 ``capital_basis``, ``return_on_capital`` at the document's cost, ``max_adverse``, ``price_source``)
-are the pick's, null when not known; ``value_licence`` is per row the strictest of the trial's and
-the outcome row's (a bought-history option trade is personal);
+are the pick's, with its ``capital``, the return on capital before cost and an option's hedged and
+stock returns on capital and wing cost (E11), null when not known; ``value_licence`` is per row
+the strictest of the trial's and the outcome row's (a bought-history option trade is personal);
 ``before_split`` is the side of the run's split the leg's block is on, as for the slices (a run
 with no split has no out-of-sample side: every row is before it). A block the screen could not
 measure has no rows, as it has no statistic. Rows are ordered by their key, so a run's ledger is
@@ -98,6 +99,11 @@ def _row(ev: EdgeEvaluation, r: VariantResult, leg: LegDetail, pick: Pick) -> di
         "capital_basis": r.capital_basis,
         "return_on_capital": pick.roc,
         "max_adverse": pick.adverse,
+        "capital": pick.capital,
+        "return_on_capital_gross": pick.roc_gross,
+        "hedged_roc": pick.hedged_roc,
+        "stock_roc": pick.stock_roc,
+        "wing_cost": pick.wing_cost,
         "price_source": pick.price_source,
         "before_split": ev.split_from is None or leg.block < ev.split_from,
         "instrument_id": pick.instrument_id,

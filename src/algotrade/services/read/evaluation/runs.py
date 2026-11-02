@@ -208,6 +208,11 @@ class SeriesRow:
     pick_mean: float | None
     base_mean: float | None
     decile_means: tuple[float | None, ...] = ()
+    # E11: the trade contract's basis and the block's mean return on capital (picks, base);
+    # None in rows stored before them.
+    capital_basis: str | None = None
+    pick_roc_mean: float | None = None
+    base_roc_mean: float | None = None
 
 
 def lift_points(hit_rate: float | None, base_rate: float | None) -> float | None:
@@ -508,6 +513,9 @@ def _series_row(row: Mapping[str, Any]) -> SeriesRow:
         pick_mean=_float(row.get("pick_mean")),
         base_mean=_float(row.get("base_mean")),
         decile_means=_deciles(row),
+        capital_basis=_text(row.get("capital_basis")),
+        pick_roc_mean=_float(row.get("pick_roc_mean")),
+        base_roc_mean=_float(row.get("base_roc_mean")),
     )
 
 
@@ -682,7 +690,19 @@ OPEN = "open"
 # contract's ``max_adverse`` is under the row's value licence (ADR 0088 2.5a: a bought-history
 # option trade is personal).
 LICENSED: Final = {
-    "value_licence": ("value", "gross_value", "reference", "touch", "max_adverse"),
+    "value_licence": (
+        "value",
+        "gross_value",
+        "reference",
+        "touch",
+        "max_adverse",
+        "return_on_capital",
+        "return_on_capital_gross",
+        "capital",
+        "hedged_roc",
+        "stock_roc",
+        "wing_cost",
+    ),
     "score_licence": ("score",),
     "adv_licence": ("adv_usd_20d",),
 }
@@ -746,6 +766,18 @@ class TradeRow:
     # the trade contract's worst loss as a share of capital (ADR 0088 2.5a; an option's worst
     # mark loss over its collateral; null in rows written before it)
     max_adverse: TradeCell = TradeCell()
+    # E11, the rest of the contract's columns: how the trade closed (``exit_kind``), what its
+    # return is on (``capital_basis``: notional for a share, the collateral for an option), the
+    # return on capital at the document's cost and before it, the ``capital`` per unit, and an
+    # option's hedged and stock returns on capital and wing cost; null in older rows
+    exit_kind: str | None = None
+    capital_basis: str | None = None
+    return_on_capital: TradeCell = TradeCell()
+    return_on_capital_gross: TradeCell = TradeCell()
+    capital: TradeCell = TradeCell()
+    hedged_roc: TradeCell = TradeCell()
+    stock_roc: TradeCell = TradeCell()
+    wing_cost: TradeCell = TradeCell()
 
 
 @dataclass(frozen=True)
@@ -801,6 +833,14 @@ def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
         touch=cell("touch", _flag),
         side=str(to_scalar(row.get("side")) or "long"),
         max_adverse=cell("max_adverse"),
+        exit_kind=_text(row.get("exit_kind")),
+        capital_basis=_text(row.get("capital_basis")),
+        return_on_capital=cell("return_on_capital"),
+        return_on_capital_gross=cell("return_on_capital_gross"),
+        capital=cell("capital"),
+        hedged_roc=cell("hedged_roc"),
+        stock_roc=cell("stock_roc"),
+        wing_cost=cell("wing_cost"),
     )
 
 

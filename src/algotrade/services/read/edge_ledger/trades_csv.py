@@ -18,6 +18,8 @@ COLUMNS = (
     "instrument_id", "symbol", "company", "symbol_as_of", "rank", "status", "excluded_reason",
     "hit", "delisted", "before_split",
     "score", "value", "gross_value", "max_drawdown", "adv_usd", "reference", "touch",
+    "exit_kind", "capital_basis", "return_on_capital", "return_on_capital_gross", "capital",
+    "max_adverse", "hedged_roc", "stock_roc", "wing_cost",
 )  # fmt: skip
 
 
