@@ -20,8 +20,12 @@ def test_a_slice_file_maps_to_its_folder_and_the_type_gate() -> None:
     assert cmds("apps/web/src/entities/feature/columns.tsx") == [
         "npx prettier --check --ignore-unknown src/entities/feature/columns.tsx",
         "npm run ds:check",
+        "npx eslint --max-warnings=0 src/entities/feature/columns.tsx",
         "npm run typecheck",
         "npx vitest run src/entities/feature",
+        "env VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key"
+        " npx vite build",
+        "npm run perf:bundle",
     ]
 
 
@@ -102,3 +106,9 @@ def test_a_design_system_change_makes_the_missing_screenshot_baselines_first() -
     got = cmds("apps/web/design-system/components/Banner/Banner.stories.tsx")
     assert got.index("npm run visual:missing") < got.index("npm run ds:check")
     assert "npm run visual:missing" not in cmds("apps/web/src/entities/feature/columns.tsx")
+
+
+def test_app_and_design_system_code_adds_the_bundle_budgets_but_a_config_file_does_not() -> None:
+    assert "npm run perf:bundle" in cmds("apps/web/design-system/components/Banner/Banner.tsx")
+    assert "npm run perf:bundle" not in cmds("apps/web/package.json")
+    assert not any(c.startswith("npx eslint") for c in cmds("apps/web/package.json"))
