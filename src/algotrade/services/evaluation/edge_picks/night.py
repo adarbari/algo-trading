@@ -7,11 +7,13 @@ universe, and an event schedule's event names, best first, the first ``top_k``:
 outcome's are ``picks.side_picks``, the harness's own legs ranked by the edge's score, with
 ``pick_sides`` the side of each, ADR 0088 decision 9), ``gate_closed`` when the setup gate is closed
 at the session (read as ``paused``, with the gate's reason), ``not_decision_day`` when its schedule
-does not fire, ``unjudged`` when its outcome holds a book (a portfolio outcome's weights are
-replayed from the book, not ranked here) and ``skipped`` with the reason when the data to decide was
-missing or the gate's state unknown. Reads only what was known at the session (``screen_variant``
-and ``eligible`` are point in time) and no outcome. A screener's run is made once per session
-whatever the number of edges that list it (``Night``)."""
+does not fire and ``skipped`` with the reason when the data to decide was missing or the gate's
+state unknown. A ``portfolio_return`` outcome's picks are the book it holds at D by the harness's
+own rule (``portfolio.book``: the screener's book after the overlays; CASH an id like the names)
+with ``pick_weights``; an ensemble's averaged book is one more row under the screener ``ENSEMBLE``.
+A named-symbol setup's row is ``named.py``'s. Reads only what was known at the session
+(``screen_variant`` and ``eligible`` are point in time) and no outcome. A screener's run is made
+once per session whatever the number of edges that list it (``Night``)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -19,8 +21,9 @@ from datetime import date, timedelta
 from functools import cached_property
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
 from algotrade.config.site.settings import load_verdict
+from algotrade.config.strategy.regime import site_regime
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.model.predicates import Group
@@ -44,7 +47,12 @@ from algotrade.services.evaluation.cross_section.picks import (
     screen_variant,
     side_picks,
 )
-from algotrade.services.evaluation.cross_section.reads.session import ADV_FIELD, numbers_at
+from algotrade.services.evaluation.cross_section.portfolio.book import book_at, held_book
+from algotrade.services.evaluation.cross_section.reads.session import (
+    ADV_FIELD,
+    SessionReads,
+    numbers_at,
+)
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.services.evaluation.forward.signals import legs_between
 from algotrade.services.screening.regime import edge_gate
@@ -52,6 +60,8 @@ from algotrade.storage.configs.store import ConfigStore
 
 PICKED, NOT_DECISION_DAY, UNJUDGED, SKIPPED = "picked", "not_decision_day", "unjudged", "skipped"
 GATE_CLOSED = "gate_closed"  # the setup gate closed at the session (ADR 0088 decision 7)
+# ``unjudged`` is no longer written (E9 decides short, long-short and book picks); a row stored
+# before says it.
 STATUSES = (PICKED, GATE_CLOSED, NOT_DECISION_DAY, UNJUDGED, SKIPPED)
 EVERY_SESSION = "every_session"
 LONG = "long"
@@ -75,16 +85,6 @@ class EdgePicks:
     config_hash: str | None = None
     pick_sides: tuple[str, ...] = ()
     pick_weights: tuple[float, ...] = ()
-
-
-def _unjudged(edge: Edge) -> str | None:
-    """Why the edge's pick is not ranked from the screener's run (None: it is)."""
-    if edge.outcome.kind == PORTFOLIO_KIND:
-        return "a portfolio outcome holds a book, not the screener's picks"
-    cased = edge.outcome.position is not None and edge.outcome.position.cases
-    if edge.outcome.entry is not None or cased:  # E9 applies them at the served session
-        return "its entry condition or case values are not applied to tonight's picks yet"
-    return None
 
 
 def fires(edge: Edge, session: date) -> bool:
@@ -119,6 +119,14 @@ class Night:
         self.selections = SelectionReads(self.reader)
 
     @cached_property
+    def reads(self) -> SessionReads:
+        """The harness's per-session reads (a book's vol field, trailing returns, bill yield)."""
+        return SessionReads(
+            self.reader, site_regime(self.configs.load).label, owner=self.user.user_id,
+            domains=field_catalog(self.configs).domains,
+        )  # fmt: skip
+
+    @cached_property
     def adv_floor(self) -> float:
         """The least 20-day dollar volume of a name a short leg may hold (the harness's
         ``capacity_adv_floor_usd``, ``verdict.toml``), read once."""
@@ -135,8 +143,12 @@ class Night:
         return config.hash, self.runs[config.hash]
 
 
-def _decide(night: Night, edge: Edge, screener: str, names: frozenset[str] | None) -> EdgePicks:
-    """``edge``'s picks of ``screener`` at the session; ``names``: an event schedule's names."""
+def _inputs(
+    night: Night, edge: Edge, screener: str, names: frozenset[str] | None
+) -> EdgePicks | tuple[EdgePicks, RankedRun, Eligible, Names]:
+    """What ``edge`` decides ``screener``'s picks from at the session (the run, the universe and
+    the pickable names, with the row to fill), or the ``skipped`` row that says what is missing;
+    ``names``: an event schedule's names."""
     day = night.session
     try:
         digest, run = night.run(screener)
@@ -155,11 +167,62 @@ def _decide(night: Night, edge: Edge, screener: str, names: frozenset[str] | Non
     except MissingDataError as missing:
         reason = f"no {missing.dataset} for {day.isoformat()}"
         return replace(made, reason=reason)
-    found = names_for(edge, universe.ids, names)
+    return made, run, universe, names_for(edge, universe.ids, names)
+
+
+def _decide(night: Night, edge: Edge, screener: str, names: frozenset[str] | None) -> EdgePicks:
+    """``edge``'s picks of ``screener`` at the session; ``names``: an event schedule's names."""
+    got = _inputs(night, edge, screener, names)
+    if isinstance(got, EdgePicks):
+        return got
+    made, run, universe, found = got
+    cased = edge.outcome.position is not None and edge.outcome.position.cases
+    if edge.outcome.entry is not None or cased:  # never the default point or D's offset (E13)
+        reason = "its entry condition or case values are not applied to tonight's picks yet"
+        return replace(made, reason=reason)
+    if edge.outcome.kind == PORTFOLIO_KIND:
+        return _booked(night, edge, made, (run,), found)
     if edge.outcome.side == LONG:
         picks = long_picks(edge, run.qualified, found.pickable)
         return replace(made, status=PICKED, pick_ids=tuple(picks), pick_sides=(LONG,) * len(picks))
     return _sided(night, edge, run, universe, found, made)
+
+
+def _ensemble(night: Night, edge: Edge, names: frozenset[str] | None) -> EdgePicks:
+    """An ensemble's row (``ENSEMBLE``): the average of its members' books, held as one; a member
+    whose book cannot be read leaves the row ``skipped`` with its reason, never a book of the
+    others (the harness's rule: the grid is pre-registered whole)."""
+    made = EdgePicks(edge.id, ENSEMBLE, SKIPPED, top_k=edge.top_k)
+    runs: list[RankedRun] = []
+    found: Names | None = None
+    for member in edge.ensemble:
+        got = _inputs(night, edge, member, names)
+        if isinstance(got, EdgePicks):
+            return replace(made, reason=f"{got.reason}:{member}")
+        runs.append(got[1])
+        found = got[3]
+    assert found is not None  # an ensemble has two or more members
+    return _booked(night, edge, made, tuple(runs), found)
+
+
+def _booked(
+    night: Night, edge: Edge, made: EdgePicks, runs: tuple[RankedRun, ...], found: Names
+) -> EdgePicks:
+    """The book ``runs`` give at the session (one screener's, or an ensemble's members'), after
+    the overlays, as picks with their weights; ``skipped`` with the reason it cannot be formed."""
+    day, books = night.session, []
+    for run in runs:
+        weights, why = book_at(edge, night.reads, run, found.pickable, day)
+        if why:
+            return replace(made, reason=why)
+        books.append(weights)
+    held, _, _, why = held_book(edge, night.reads, day, books)
+    if why:
+        return replace(made, reason=why)
+    return replace(
+        made, status=PICKED, pick_ids=tuple(i for i, _ in held),
+        pick_sides=(LONG,) * len(held), pick_weights=tuple(float(w) for _, w in held),
+    )  # fmt: skip
 
 
 def _sided(
@@ -184,7 +247,7 @@ def _sided(
     return replace(made, status=PICKED, pick_ids=ids, pick_sides=sides)
 
 
-def _gate_shut(night: Night, gate: Group) -> tuple[str, str] | None:
+def gate_shut(night: Night, gate: Group) -> tuple[str, str] | None:
     """``(status, reason)`` when the setup gate holds the session's picks back (None: it is open),
     whatever ``[regime].enabled`` says: closed is ``gate_closed`` with the gate's reason, unknown
     is ``skipped`` (fail closed: neither picks)."""
@@ -201,13 +264,13 @@ def edge_night(
     night: Night, edge: Edge, wanted: Callable[[str], bool] = lambda _: True
 ) -> list[EdgePicks]:
     """The rows of ``edge`` at the session, one per listed screener ``wanted`` says to make (a
-    resumed run skips what is stored). An edge with no screener has none."""
-    screeners = [s for s in edge.screeners if wanted(s)]
+    resumed run skips what is stored), and an ensemble's ``ENSEMBLE`` row. An edge with no
+    screener has none."""
+    listed = (*edge.screeners, ENSEMBLE) if edge.ensemble else edge.screeners
+    screeners = [s for s in listed if wanted(s)]
     if not screeners:
         return []
     top_k = edge.top_k
-    if (why := _unjudged(edge)) is not None:
-        return [EdgePicks(edge.id, s, UNJUDGED, reason=why, top_k=top_k) for s in screeners]
     names: frozenset[str] | None = None
     try:
         if edge.event_class is not None:
@@ -229,7 +292,10 @@ def edge_night(
         return [EdgePicks(edge.id, s, SKIPPED, reason=why, top_k=top_k) for s in screeners]
     if not fired:
         return [EdgePicks(edge.id, s, NOT_DECISION_DAY, top_k=top_k) for s in screeners]
-    if edge.gate is not None and (shut := _gate_shut(night, edge.gate)) is not None:
+    if edge.gate is not None and (shut := gate_shut(night, edge.gate)) is not None:
         status, why = shut
         return [EdgePicks(edge.id, s, status, reason=why, top_k=top_k) for s in screeners]
-    return [_decide(night, edge, s, names) for s in screeners]
+    return [
+        _ensemble(night, edge, names) if s == ENSEMBLE else _decide(night, edge, s, names)
+        for s in screeners
+    ]

@@ -46,7 +46,7 @@ class Placed:
 
 
 def reading(
-    reader: StoreReader, trigger: str, day: date, as_of: datetime
+    reader: StoreReader, trigger: str, day: date, as_of: datetime | None
 ) -> tuple[bool, bool] | None:
     """``(triggered, known)`` of ``trigger`` at session ``day`` from the stored market row:
     triggered when its date is ``day``, known unless the age field is null (a stale reading).
@@ -122,3 +122,54 @@ def trigger_periods(
     kept = [p for p in base if not stale & {p.decision, p.entry, *sessions_after(p, horizon)}]
     found = [*(period(w, True) for w in counted), *kept]
     return Placed(sorted(found, key=lambda p: p.first), len(base) - len(kept))
+
+
+RESET_CAP = 252  # the sessions before D a trigger's chain of windows is walked back over at most
+
+
+def trigger_decides(
+    reader: StoreReader, trigger: str, day: date, horizon: int, as_of: datetime | None
+) -> bool:
+    """Whether ``trigger`` opens a window decided at ``day`` (the stored picks, ADR 0088): it fired
+    at D and its window does not overlap the last window counted before it. Which earlier windows
+    were counted depends on where the chain starts (``trigger_periods`` starts it at its range's
+    first session), so it is walked back to the last reset: ``horizon`` sessions in a row with no
+    trigger, after which the next trigger is counted whatever came before. Reads only sessions up
+    to D. A session whose row is not stored, at D or on the way back to the reset, is an error
+    (fail closed: a gap could hide a trigger and pass for a reset), and so is no reset within
+    ``RESET_CAP`` sessions."""
+    got = reading(reader, trigger, day, as_of)
+    if got is None:
+        raise ConfigurationError(
+            f"market trigger {trigger}: no stored market row for {day}: run the market rollups "
+            f"before the picks"
+        )
+    if not got[0]:
+        return False
+    before = sessions_ending(day, RESET_CAP + 1)[:-1]
+    fired: dict[date, bool] = {}
+    quiet, start = 0, None
+    for earlier in reversed(before):
+        seen = reading(reader, trigger, earlier, as_of)
+        if seen is None:
+            raise ConfigurationError(
+                f"market trigger {trigger}: no stored market row for {earlier}, before {day}"
+            )
+        fired[earlier] = seen[0]
+        quiet = 0 if fired[earlier] else quiet + 1
+        if quiet >= horizon:
+            start = earlier
+            break
+    if start is None:
+        raise ConfigurationError(
+            f"market trigger {trigger}: no {horizon} sessions without a trigger in the "
+            f"{RESET_CAP} before {day}: the window chain cannot be placed"
+        )
+    last: date | None = None
+    for earlier in (d for d in before if d >= start):
+        if not fired[earlier]:
+            continue
+        window = _window(earlier, horizon)
+        if last is None or window[0] > last:
+            last = window[-1]
+    return last is None or _window(day, horizon)[0] > last
