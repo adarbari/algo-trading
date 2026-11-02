@@ -126,3 +126,9 @@ export function useFeatureTable(query: FeatureTableQuery, enabled = true) {
     placeholderData: keepPreviousData,
   });
 }
+
+/** One page of the table without a hook, for code that loads on demand (the app's search). */
+export function fetchFeatureTable(query: FeatureTableQuery) {
+  const variables = tableVariables(query);
+  return gql(FeatureTable, variables, queryKeys.gql('FeatureTable', variables)).then(select);
+}

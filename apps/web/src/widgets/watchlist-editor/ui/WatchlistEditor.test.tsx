@@ -14,8 +14,8 @@ vi.mock('@/entities/trader-preferences', async (importOriginal) => ({
   useTraderPreferences: hooks.prefs,
   useSaveWatchlist: () => ({ mutate: hooks.mutate }),
 }));
-vi.mock('@/features/ticker-search', () => ({
-  TickerSearch: ({ onChoose }: { onChoose: (s: string, id: string) => void }) => (
+vi.mock('@/features/watchlist', () => ({
+  WatchlistSearch: ({ onChoose }: { onChoose: (s: string, id: string) => void }) => (
     <Button
       onClick={() => {
         onChoose('CCC', 'EQ:C');

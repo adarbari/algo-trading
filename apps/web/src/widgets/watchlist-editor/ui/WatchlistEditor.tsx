@@ -11,7 +11,7 @@ import {
   useTraderPreferences,
   type WatchedName,
 } from '@/entities/trader-preferences';
-import { TickerSearch } from '@/features/ticker-search';
+import { WatchlistSearch } from '@/features/watchlist';
 
 export function WatchlistEditor() {
   const prefs = useTraderPreferences();
@@ -28,7 +28,7 @@ export function WatchlistEditor() {
   return (
     <Stack gap={2}>
       {names.length < MAX_WATCHLIST ? (
-        <TickerSearch
+        <WatchlistSearch
           chosen={names.flatMap((n) => (n.symbol ? [n.symbol] : []))}
           onChoose={(symbol, instrumentId) => {
             if (!names.some((n) => n.instrumentId === instrumentId)) {

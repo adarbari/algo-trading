@@ -1,5 +1,5 @@
 /**
- * The ticker search: the design system's search combobox over the feature table's `q` filter
+ * The watchlist's ticker search (the old Explore search, folded into the global search by V1): the design system's search combobox over the feature table's `q` filter
  * (the server matches the symbol or the name over the whole universe and returns a handful).
  * The query is sent about 200 ms after the last keystroke; choosing a result calls `onChoose`
  * with its symbol and clears the box. Tickers already chosen are marked "open".
@@ -15,7 +15,7 @@ export const SEARCH_DEBOUNCE_MS = 200;
 /** Suggestions listed. */
 export const SUGGESTIONS = 8;
 
-export interface TickerSearchProps {
+export interface WatchlistSearchProps {
   /** A ticker was chosen (and the instrument id the server gave it). */
   onChoose: (symbol: string, instrumentId: string) => void;
   /** Tickers already chosen: their suggestion says so. */
@@ -24,7 +24,7 @@ export interface TickerSearchProps {
   focusKey?: string;
 }
 
-export function TickerSearch({ onChoose, chosen = [], focusKey }: TickerSearchProps) {
+export function WatchlistSearch({ onChoose, chosen = [], focusKey }: WatchlistSearchProps) {
   const [typed, setTyped] = useState('');
   const asked = useDebounced(typed.trim(), SEARCH_DEBOUNCE_MS);
   const found = useFeatureTable({ columns: [], q: asked, size: SUGGESTIONS }, asked !== '');

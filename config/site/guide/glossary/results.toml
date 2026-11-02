@@ -504,3 +504,17 @@ The rank is the average position among the stocks that have a value. It is scale
 
 A percentile is null for an ETF, fund or trust, because only stocks count as the group. It is also null for a name with no sector or industry at that level, and for a group too small to rank (a site setting for each level). A name whose own value is missing is null too, and it is not counted in its group. On a partial trading day, when too few stocks have a price, every price percentile is null. A sector or industry percentile says how the name stands against its peers. That can differ a lot from its rank against the whole universe.
 """
+
+# ------------------------------------------------------------- the risk statement (ADR 0083 decision 4)
+# Shown in the footer of every page and beside every list through an InfoButton (widgets/status-strip SiteFooter).
+
+[[term]]
+id = "risk_statement"
+term = "Risk statement"
+short = "Every figure here is a backtest (hypothetical) or a forward paper record; neither is a promise, and nothing on the site is investment advice."
+body = """
+The site publishes setups: rules that picked names in the past, with how those picks did. A backtested figure is hypothetical: it was computed after the fact on stored data, with the costs the page states, and no one traded it. A forward paper record counts the picks made after a setup was frozen; it is also not a trade. Either can be wrong about the future, and a setup that worked can stop working.
+The site never knows your account, your size or your other positions, so it cannot say what is suitable for you. A stop or an exit shown on a page is the setup's historical exit rule, not an instruction. Trading, and options in particular, can lose more than you put in. Read the methodology and conflicts page before acting on anything here.
+"""
+next = "Look for the label beside each figure: backtested (hypothetical) or forward paper record since a date."
+see_also = ["paper_trading", "verdict", "not_a_return"]

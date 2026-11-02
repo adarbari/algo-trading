@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
-import { SUGGESTIONS, TickerSearch } from './TickerSearch';
+import { SUGGESTIONS, WatchlistSearch } from './WatchlistSearch';
 
 const hooks = vi.hoisted(() => ({ useFeatureTable: vi.fn() }));
 
@@ -23,9 +23,9 @@ beforeEach(() => {
   hooks.useFeatureTable.mockReturnValue(fakeQuery({ rows }));
 });
 
-describe('TickerSearch', () => {
+describe('WatchlistSearch', () => {
   it('asks the server for a handful of matches once something is typed', async () => {
-    render(<TickerSearch onChoose={vi.fn()} />);
+    render(<WatchlistSearch onChoose={vi.fn()} />);
     await userEvent.type(screen.getByRole('combobox', { name: 'Search tickers' }), 'nv');
     await waitFor(() => {
       expect(hooks.useFeatureTable).toHaveBeenLastCalledWith(
@@ -38,7 +38,7 @@ describe('TickerSearch', () => {
 
   it('lists symbol and name, marks open tickers, and chooses with arrows and Enter', async () => {
     const onChoose = vi.fn();
-    const { container } = render(<TickerSearch onChoose={onChoose} chosen={['NVO']} />);
+    const { container } = render(<WatchlistSearch onChoose={onChoose} chosen={['NVO']} />);
     const box = screen.getByRole('combobox', { name: 'Search tickers' });
     await userEvent.type(box, 'nv');
     await waitFor(() => {
@@ -53,16 +53,16 @@ describe('TickerSearch', () => {
 
   it('says when nothing matches and when the search failed', async () => {
     hooks.useFeatureTable.mockReturnValue(fakeQuery({ rows: [] }));
-    const { rerender } = render(<TickerSearch onChoose={vi.fn()} />);
+    const { rerender } = render(<WatchlistSearch onChoose={vi.fn()} />);
     await userEvent.type(screen.getByRole('combobox'), 'zzz');
     expect(await screen.findByText('No ticker matches “zzz”')).toBeInTheDocument();
     hooks.useFeatureTable.mockReturnValue({ ...fakeQuery(undefined), isError: true });
-    rerender(<TickerSearch onChoose={vi.fn()} />);
+    rerender(<WatchlistSearch onChoose={vi.fn()} />);
     expect(await screen.findByText('The search failed')).toBeInTheDocument();
   });
 
   it('focuses on its key from anywhere outside a text field', async () => {
-    render(<TickerSearch onChoose={vi.fn()} focusKey="/" />);
+    render(<WatchlistSearch onChoose={vi.fn()} focusKey="/" />);
     await userEvent.keyboard('/');
     expect(screen.getByRole('combobox')).toHaveFocus();
   });
