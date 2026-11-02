@@ -152,6 +152,8 @@ def _check(edge: Edge, horizon: int) -> None:
         )
     if edge.outcome.kind == PORTFOLIO_KIND:
         raise ConfigurationError(f"edge {edge.id}: a portfolio book is not fitted per name")
+    if edge.outcome.entry is not None:  # its rows would be labelled at D's offset, not the rule's S
+        raise ConfigurationError(f"edge {edge.id}: an entry condition is not fitted yet")
     if horizon not in edge.outcome.horizon_sessions:
         raise ConfigurationError(f"edge {edge.id}: horizon {horizon} is not one of its horizons")
 

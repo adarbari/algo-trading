@@ -10,9 +10,12 @@ import pytest
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.evaluation.cross_section.sessions import (
+    Leg,
     decision_sessions,
+    entry_leg,
     entry_session,
     event_blocks,
+    wait_closes,
 )
 
 DAYS = sessions_between(date(2026, 1, 2), date(2026, 4, 15))
@@ -110,3 +113,13 @@ def test_a_calendar_horizon_must_equal_the_window_length_and_the_window_must_exi
         decision_sessions("calendar:turn_of_month", DAYS, 5)
     with pytest.raises(ConfigurationError, match="unknown calendar window"):
         decision_sessions("calendar:fomc", DAYS, 1)
+
+
+def test_an_entry_leg_has_one_s_per_close_of_the_wait_and_ends_at_the_last() -> None:
+    d = date(2026, 9, 3)  # Thursday; Sept 7 is a holiday
+    leg = entry_leg(d, 1, 3)
+    assert wait_closes(d, 3) == [d, date(2026, 9, 4), date(2026, 9, 8)]
+    assert leg.entries == (date(2026, 9, 4), date(2026, 9, 8), date(2026, 9, 9))
+    assert leg.entry == leg.candidates[-1] and Leg(d, date(2026, 9, 4)).candidates == (
+        date(2026, 9, 4),
+    )
