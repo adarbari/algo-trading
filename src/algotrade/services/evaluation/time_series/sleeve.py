@@ -29,7 +29,7 @@ The one-session rule holds: the option and stock rows are read at their own S as
 through ``harness.py`` (the package's one importer of ``data.outcomes``)."""
 
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import date, datetime
 
@@ -86,10 +86,13 @@ def evaluate_sleeve(
     exploratory: bool,
     gate: Callable[[date], str] | None = None,
     option_costs: OptionCosts | None = None,
+    gates: Mapping[str, Callable[[date], str]] | None = None,
 ) -> TimeSeriesRun:
     """``edge`` (``base = "delta_equivalent"``) for each of ``outcomes`` (``sleeve_outcomes``)
     over the decision sessions in ``start..end``; ``label``, ``split`` and ``gate`` as for
-    ``evaluate_time_series``; ``option_costs``: the commission a trade pays."""
+    ``evaluate_time_series``; ``option_costs``: the commission a trade pays; ``gates``: a
+    variant's own setup gate by its id (ADR 0088 decision 7), in place of ``gate`` for its trials
+    (the legs are the same: only which sessions count as open differs)."""
     if edge.base != DELTA_EQUIVALENT or not isinstance(edge.universe, Selection):
         raise ConfigurationError(f"edge {edge.id}: not a named option sleeve")
     symbols = named_symbols(edge.universe, base=DELTA_EQUIVALENT)
@@ -119,7 +122,8 @@ def evaluate_sleeve(
         mine = own_rows(held, trades)
         trials = [
             _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
-                   stock, label, gate, split, exploratory, option_costs)
+                   stock, label, (gates or {}).get(variant, gate), split, exploratory,
+                   option_costs)
             for symbol in symbols
         ]  # fmt: skip
         book = _book(reader, held, trials, ps, days, len(symbols), start, end, as_of)

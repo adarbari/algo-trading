@@ -168,7 +168,6 @@ from algotrade.core.model.ids import validate_id
 from algotrade.core.time.windows import (
     CALENDAR,
     WINDOW_NAMES,
-    window_length,
     window_name,
 )
 
@@ -228,7 +227,8 @@ OUTCOME_KEYS = (
     "vol_target", "vol_window", "vol_return_field", "canary", *POSITION_KEYS, "entry", "tracks",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
-VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
+VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks", "gate")
+VARIANT_SETS = ("universe", "gate")  # the keys ``named.check_variants`` is told a variant sets
 EVIDENCE_KEYS = ("run_id", "split_from")
 IMPLEMENTATION_KEYS = ("promoted", "horizon", "compared")
 COMPARED_KEYS = ("horizon", "screener", "lift", "decile_spread", "sessions", "decile_sessions")
@@ -307,6 +307,7 @@ class EdgeVariant:
     universe: str | Selection
     base: str | None = None  # None: the edge's own
     picks: str | None = None  # None: the edge's own
+    gate: Group | None = None  # a sleeve's own gate (ADR 0088 d7; None: the edge's), never picks
 
 
 @dataclass(frozen=True)
@@ -751,12 +752,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
                 f"{o.where} start_offset_sessions: a calendar window starts at the session after "
                 f"the decision session (D = S - 1), so 1, got {offset}"
             )
-        if horizons != (window_length(window),):
-            raise ConfigurationError(
-                f"{o.where} horizon_sessions: calendar:{window} is {window_length(window)} "
-                f"sessions long, so its one horizon is [{window_length(window)}], "
-                f"got {list(horizons)}"
-            )
+        named.check_window_hold(o.where, window, horizons, base == named.DELTA_EQUIVALENT)
     if event is None and offset < 1:
         raise ConfigurationError(
             f"{o.where} start_offset_sessions: the screen runs after the decision session's "
@@ -865,15 +861,16 @@ def _variants(
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         v_base = _base(v, schedule) if "base" in v.names() else None
-        named.check_variants(v.where, v_base, edge_base, "universe" in v.names())
+        named.check_variants(v.where, v_base, edge_base, *(n in v.names() for n in VARIANT_SETS))
         _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(
                 id=vid,
-                outcome=_outcome_of(merged, schedule),
+                outcome=_outcome_of(merged, schedule, v_base or edge_base),
                 universe=_universe(v, f"{edge_id}-{vid}") if "universe" in v.names() else universe,
                 base=v_base,
                 picks=v.choice("picks", "event", PICKS) if "picks" in v.names() else None,
+                gate=gate_of(v),
             )
         )
     return tuple(found)

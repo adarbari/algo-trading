@@ -359,6 +359,9 @@ def check_rules(edge: Any, where: str, catalog: FieldCatalog, templates: Templat
     case chooses among templates of one kind."""
     if edge.gate is not None:
         check_gate(edge.gate, catalog, where)
+    for variant in edge.variants:
+        if variant.gate is not None:
+            check_gate(variant.gate, catalog, f"{where} [[variants]] {variant.id}")
     for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
         if outcome.entry is not None:
             catalog.check(outcome.entry.when, f"{where} outcome.entry.when", ENTRY)

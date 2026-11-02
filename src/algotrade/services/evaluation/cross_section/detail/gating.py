@@ -68,8 +68,12 @@ def gate_domains(configs: ConfigStore, edge: Edge) -> dict[str, tuple[str, ...]]
     case values (a strict site): a label the rule never saw is read as missing (UNKNOWN), never
     open."""
     outcomes = (edge.outcome, *(v.outcome for v in edge.variants))
-    strict = edge.gate is not None or any(
-        o.entry is not None or (o.position is not None and o.position.cases) for o in outcomes
+    strict = (
+        edge.gate is not None
+        or any(v.gate is not None for v in edge.variants)
+        or any(
+            o.entry is not None or (o.position is not None and o.position.cases) for o in outcomes
+        )
     )
     return dict(field_catalog(configs).domains) if strict else None
 

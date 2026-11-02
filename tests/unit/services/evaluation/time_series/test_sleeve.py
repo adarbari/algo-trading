@@ -185,6 +185,24 @@ def test_a_gated_sleeve_keeps_its_open_sessions_and_slices_the_rest() -> None:
     assert gates == {"open": opened, "closed": n - opened}
 
 
+def test_a_variant_gate_narrows_only_its_own_trials_on_the_same_legs() -> None:
+    """ADR 0088 decision 7, X1: a variant with a stricter gate (e.g. also no FOMC within 2
+    sessions) has fewer open trades than main on the same legs; main is unchanged."""
+    gated = [{"id": "strict", "gate": {"all": [
+        {"field": "market.market_conditions@v2.sessions_to_fomc", "op": "gt", "value": 2}
+    ]}}]  # fmt: skip
+    edge = sleeve_edge(variants=gated)
+    reader, every = world(edge), entries(edge)
+    plain = run(reader, edge, gate=lambda d: "open")
+    strict = run(reader, edge, gate=lambda d: "open", gates={"strict": lambda d: (
+        "open" if d.day < 16 else "closed")})  # fmt: skip
+    by = {r.edge_variant: r for r in strict.results if r.symbol == "SPY"}
+    before = {r.edge_variant: r for r in plain.results if r.symbol == "SPY"}
+    assert len(by["main"].in_window) == len(before["main"].in_window) == len(every)
+    assert len(by["strict"].in_window) == sum(d.day < 16 for d, _ in every)
+    assert edge.variants[0].gate is not None
+
+
 def test_evaluate_edge_gives_one_trial_per_grid_point_and_variant_of_the_sleeve() -> None:
     edge = sleeve_edge(variants=[{"id": "wide", "outcome": {"strike_delta": 0.15}}])
     reader = world(edge)

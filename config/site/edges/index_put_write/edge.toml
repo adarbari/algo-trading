@@ -1,0 +1,106 @@
+# Edge document (ADR 0053, ADR 0088; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/options-volatility.md
+# (c19_index_put_write). A named option sleeve (base delta_equivalent, ADR 0088 decision 14): no
+# screener, the instruments are the universe; build row X1 of docs/options/backend-build.md.
+id = "index_put_write"
+name = "Index put write"
+family = "C"
+thesis = "Selling a cash-secured put on SPY, QQQ or IWM each month earns more on its collateral than holding the same share delta, because index puts are priced above the moves that follow."
+mechanism = """Investors pay for index protection (insurance mandates, portfolio overlays), and dealers
+who sell it charge for carrying the short-gamma risk; index implied volatility sits above the
+realised volatility that follows (Driessen, Maenhout and Vilkov: 24.7% against 20.8%, 1996-2003)."""
+persistence = """The demand for protection is structural and the seller is paid for a tail few hold
+through, but most of a put writer's return is its equity beta (Israelov and Nielsen), so the claim
+tested here is the part beyond the delta-equivalent stock, on the same collateral and cost."""
+schedule = "calendar:after_monthly_expiry"
+top_k = "all"
+screeners = []
+base = "delta_equivalent"
+status = "candidate"
+mechanism_kind = "paid_for_risk"
+asset_class = "options"
+frozen_from = 2026-04-01
+notes = """NO VERDICT before a 3-month unseen holdout (ADR 0088): the holdout starts at 2026-11-03,
+the session after this document was committed (frozen_from is the site's 2026-04-01, before any
+Cboe chain), so the earliest verdict is on trades whose window closed after 2027-02-03. Built on the Cboe-era store only (chains from 2026-10-02); the bought
+option history (build row E5) is not purchased, so no earlier trades exist, and evidence derived
+from it would be owner-only (personal). Entry: the first session after each monthly expiry (the
+date the Cboe PUT index rolls; owner decision 2026-11-01 (c)), a 20-delta put on the next monthly
+expiry (tenor_days 21 always selects it), held 17 sessions (the shortest gap between two such
+entries, so holds never overlap; the put is closed two to four sessions before its expiry, where
+the PUT index holds to expiry). The every-session ladder (overlapping puts) is a separate setup to
+build, not a variant here: a schedule is not a variant key (backend-plan G18); it must name this
+edge in its notes, since it is the same idea tested again. Each named symbol, the no-FOMC variant
+and every grid point is one trial of the deflated Sharpe ratio. Tracking: each window's return on
+collateral beside the Cboe PUT index's (personal licence); the SPX index itself is not traded."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "QQQ", "IWM"] },
+]
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[outcome]
+kind = "option_pnl"
+horizon_sessions = [17]
+benchmark = "none"
+start_offset_sessions = 1
+position = "short_put"
+strike_delta = 0.20
+tenor_days = 21
+tracks = "PUT"
+
+[[variants]]
+id = "no_fomc"
+gate = { all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+  { field = "market.market_conditions@v2.sessions_to_fomc", op = "gt", value = 2 },
+] }
+
+[[variant_grid]]
+prefix = "g"
+strike_delta = [0.16, 0.30]
+tenor_days = [21, 49]
+take_profit = [0.5]
+
+[quality_bar]
+outcome = """The option position's return on its cash-secured collateral (strike x 100) from the entry
+close to the close 17 sessions later (or its declared exit), net of the site's option cost levels,
+against the delta-equivalent stock held over the same sessions on the same collateral and cost
+(base delta_equivalent); the T-bill on the collateral is set beside it."""
+trigger_timing = """The monthly expiry is fixed by the exchange calendar ahead of time; D is the
+monthly expiry session and S the session after it, so nothing beyond D is read to place an entry.
+The gate reads market_conditions@v2 at D (the VIX curve, implied against realised volatility,
+trend); the no-FOMC variant also needs more than 2 sessions to the next FOMC decision known at D."""
+replication = """The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and
+holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the next
+monthly expiry, entered the session after the roll, held 17 sessions, a setup gate on top. A 16 and
+30 delta, a two-month tenor and a 50% take-profit are the pre-registered grid."""
+expected_size = """PUT has matched the S&P 500 total return over 1986-2024 with about two thirds of its
+volatility (Cboe-commissioned study; not a harness figure); against beta-matched equity the excess
+is about 1 to 2% a year before costs (practitioner estimates, not verified). Expect a small excess
+over the delta-equivalent stock, and losses in sharp sell-offs (2008, 2020, 2022)."""
+capacity_costs = """SPY, QQQ and IWM options are among the most liquid listed; a cash-secured put
+needs the strike x 100 in cash. 12 entries a year per symbol; the round trip pays the option cost
+levels and commission in verdict.toml [option_costs]."""
+failure_modes = """A crash inside the hold (the put loses many times its credit); a regime where implied
+volatility no longer exceeds realised; the gate keeping the sleeve out of the best-paid months.
+Retire if the frozen-period return on collateral over the delta-equivalent stock is not above zero
+after costs, or its tail (CVaR) is worse than the stock's on the same collateral."""
+decoys = """Equity beta (the delta-equivalent stock on the same collateral is the base), the T-bill
+on the collateral, and the Cboe PUT index's own return over each window (the tracking figure)."""
+
+[[sources]]
+title = "Israelov, R. and Nielsen, L., Covered Calls Uncovered, Financial Analysts Journal, 2015"
+url = "https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered"
+
+[[sources]]
+title = "Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk, Journal of Finance, 2009"
+
+[[sources]]
+title = "Cboe S&P 500 PutWrite Index (PUT) methodology"
+url = "https://www.cboe.com/us/indices/dashboard/put/"
