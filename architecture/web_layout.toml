@@ -163,7 +163,7 @@ purpose = "the router instance (only src/app imports the router library)"
 
 [[web_dir]]
 path = "apps/web/src/app/routes"
-purpose = "the route tree: root, the section-route builder, one route group per workspace"
+purpose = "the route tree: root, one route group per workspace"
 
 [[web_dir]]
 path = "apps/web/src/app/routes/*"

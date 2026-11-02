@@ -57,13 +57,12 @@ describe('pageRoute', () => {
 });
 
 describe('every page route loads its chunk in a loader', () => {
-  // Routes that render no lazy page: layouts, the index redirect, placeholders and the sign-in.
+  // Routes that render no lazy page: layouts, the index redirect and the sign-in.
   const NO_PAGE = new Set(['', '/', '/login', '/admin', '/guide']);
-  const placeholders = ['/admin/users'];
 
   it('has a loader and a static preload on each', () => {
     const missing = flatten(routeTree as unknown as AnyRoute)
-      .filter((r) => !NO_PAGE.has(r.full) && !placeholders.includes(r.full))
+      .filter((r) => !NO_PAGE.has(r.full))
       .filter((r) => r.options.component && !r.options.loader)
       .map((r) => r.full);
     expect(missing).toEqual([]);

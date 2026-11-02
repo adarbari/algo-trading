@@ -87,7 +87,7 @@ and feature pages. Field help is the Guide (`/guide/fields`): every feature name
 tab, like every feature-table column header, carries its `GuideHelp` button (hover: the entry's
 first sentence; click: the help drawer, with "Open full page"). The Overview ends with "In rough markets" (`episode_behaviour@v1` features
 read by name: beta to SPY, drawdown per reference episode; the episodes' plain names are the
-`entities/regime` map until the API serves `episodes.toml`). Unbuilt sections render the placeholder page.
+`entities/regime` map until the API serves `episodes.toml`).
 
 ## Rules and how they are enforced
 

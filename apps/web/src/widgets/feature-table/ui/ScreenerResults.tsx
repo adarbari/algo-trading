@@ -256,11 +256,7 @@ export function ScreenerResults({
           />
         </Stack>
       }
-      summary={
-        run
-          ? `${count(run.results.total)} shown${facets ? ` · ${count(facets.total)} in the run` : ''}`
-          : 'Loading rows…'
-      }
+      summary={run ? '' : 'Loading rows…'}
       pager={
         run
           ? { page, pages: pageCount(run.results.total, run.results.size), onPage: setPage }

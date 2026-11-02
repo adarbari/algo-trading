@@ -42,8 +42,8 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    `onDetailClose` clears the chosen row in the URL; every name that opens something is a
    Button. The e2e `phone` project covers the route; add its flows to `e2e/phone.spec.ts`.
    Export it from `index.ts`; add `<Page>.test.tsx`.
-6. **Route** (`src/app/routes/<workspace>/routes.tsx`): replace the section's
-   `placeholderRoute` with a `createRoute` whose component is the page (params validated
+6. **Route** (`src/app/routes/<workspace>/routes.tsx`): add a
+   `createRoute` whose component is the page (params validated
    here). Role gating stays in `workspaceGuard` (`src/app/workspaces/guard.ts`).
 7. **Missing component?** Stop and follow `.claude/skills/add-ui-component` (design system
    first; mockup gate: a new page or a visual pattern in no approved mockup needs an

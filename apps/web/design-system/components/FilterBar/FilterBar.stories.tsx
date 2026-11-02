@@ -81,28 +81,16 @@ export const WithActive: Story = {
 /** No many-valued filters: no "+ Filter" trigger. */
 export const NoMore: Story = { args: { more: undefined } };
 
-/**
- * A phone (375 px), the sheet proposal: the search and a "Filters · N" button on one row, the
- * active chips scrolling under it. The owner's choice against `NarrowScroll` (ADR 0011).
- */
+/** A phone (375 px): the search and a "Filters · N" button on one row, the active chips scrolling under it. */
 export const Narrow: Story = {
   decorators: [narrow],
-  args: { ...WithActive.args, narrow: 'sheet' },
+  args: { ...WithActive.args },
 };
 
-/** The sheet proposal with the filters sheet open. The owner's choice (ADR 0011). */
+/** The filters sheet open. */
 export const NarrowOpen: Story = {
   ...Narrow,
   args: { ...Narrow.args, defaultOpen: true },
-};
-
-/**
- * A phone (375 px), the scroll proposal: the search, then one row scrolling sideways with the
- * "+ Filter" trigger first. The owner's choice against `Narrow` (ADR 0011).
- */
-export const NarrowScroll: Story = {
-  decorators: [narrow],
-  args: { ...WithActive.args, narrow: 'scroll' },
 };
 
 const groups = (
