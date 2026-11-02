@@ -20,7 +20,7 @@ from algotrade.services.read.evaluation.positions.exit_rule import ATR, ExitRule
 from algotrade.services.read.values import Unknown, UnknownCode
 
 S = date(2026, 10, 30)  # a Friday: the entry is Monday's close
-EDGE: Any = SimpleNamespace(id="drift")
+EDGE: Any = SimpleNamespace(id="drift", schedule="every_session")
 CTX: Any = SimpleNamespace(session=SimpleNamespace(date=S))
 GONE = Unknown(UnknownCode.NO_ROW, None)  # type: ignore[arg-type]
 
@@ -71,7 +71,7 @@ def test_the_atr_fallback_is_taken_per_name_and_placed_below_the_close(
     own = ExitRule("drift", Stop(StopKind.FALLBACK, atr=9.0, multiple=2.0, winners=3), 20)
     asked = _wire(monkeypatch, {"EQ:A": 50.0, "EQ:B": 20.0}, shared, {"EQ:A": own})
     a, b = load_example_positions(CTX, EDGE, [PickInput("EQ:A"), PickInput("EQ:B")])
-    assert asked == [None, "EQ:A"]  # the multiple once; every ATR in one read
+    assert asked == ["EQ:A"]  # the rule once, for the first long; every ATR in one read
     assert a.stop_price == pytest.approx(45.0) and b.stop_price == pytest.approx(15.0)
     assert a.stop is not None and a.stop.kind is StopKind.FALLBACK and a.exit_session
 
@@ -90,9 +90,11 @@ def test_a_short_pick_assumes_borrow_and_its_stop_is_unknown(
 def test_a_book_name_carries_its_weight_and_no_stop(monkeypatch: pytest.MonkeyPatch) -> None:
     rule = ExitRule("drift", Stop(StopKind.HISTORY, fraction=0.06, winners=40), 21)
     _wire(monkeypatch, {"EQ:A": 100.0}, rule)
-    (pos,) = load_example_positions(CTX, EDGE, [PickInput("EQ:A", weight=0.25)])
-    assert pos.shape is Shape.BOOK and pos.weight == 0.25
+    book: Any = SimpleNamespace(id="drift", schedule="month_end")
+    (pos,) = load_example_positions(CTX, book, [PickInput("EQ:A", book=True)])
+    assert pos.shape is Shape.BOOK and not hasattr(pos, "weight")  # no weight or size served
     assert pos.stop_price is None and pos.stop_unknown is not None
+    assert pos.exit_session == date(2026, 12, 1)  # the entry after November's last session
 
 
 def test_a_missing_close_and_a_missing_rule_are_unknown_never_filled(
@@ -104,6 +106,28 @@ def test_a_missing_close_and_a_missing_rule_are_unknown_never_filled(
     assert pos.reference_close is None and pos.close_unknown is GONE
     assert pos.stop_price is None and pos.stop_unknown is not_run
     assert pos.exit_session is None and pos.exit_unknown is not_run
+
+
+def test_a_first_long_without_atr_still_falls_back_for_the_others(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rule asked for the first long found no ATR (a feature gap): the site's multiple and
+    every pick's own ATR, never "no name to take the fallback from" for all."""
+    gap = Unknown(UnknownCode.NO_ROW, None)  # type: ignore[arg-type]
+    _wire(monkeypatch, {"EQ:A": 50.0, "EQ:B": 20.0}, ExitRule("drift", None, 20, gap, winners=3))
+    monkeypatch.setattr(module, "fallback_multiple", lambda ctx: 2.0)
+    a, b = load_example_positions(CTX, EDGE, [PickInput("EQ:A"), PickInput("EQ:B")])
+    assert a.stop_price == pytest.approx(45.0) and b.stop_price == pytest.approx(15.0)
+
+
+def test_a_setup_with_an_entry_condition_has_no_entry_or_exit_from_s(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rule = ExitRule("drift", Stop(StopKind.HISTORY, fraction=0.06, winners=40), 20)
+    _wire(monkeypatch, {"EQ:A": 100.0}, rule)
+    (pos,) = load_example_positions(CTX, EDGE, [PickInput("EQ:A")], entry_condition=True)
+    assert pos.entry_session is None and pos.exit_session is None and pos.exit_unknown
+    assert pos.stop_price == pytest.approx(94.0)
 
 
 def test_no_picks_read_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
