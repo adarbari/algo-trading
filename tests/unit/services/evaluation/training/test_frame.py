@@ -5,10 +5,12 @@ from datetime import date
 
 import pytest
 
+from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.evaluation.cross_section.harness import edge_universe
 from algotrade.services.evaluation.discovery.frame import feature_reads
+from algotrade.services.evaluation.training import frame as module
 from algotrade.services.evaluation.training import no_ml
 from algotrade.services.evaluation.training.frame import LABEL, purge_cutoff, training_frame
 from algotrade.services.features import site_features
@@ -26,9 +28,11 @@ USER = UserContext("site")
 FROZEN = "2026-09-10"  # h = 2: windows must close before Sept 8 (Sept 7 is Labor Day)
 
 
-def frame(w: World, **changes):  # type: ignore[no-untyped-def]
+def frame(w: World, option_costs=None, **changes):  # type: ignore[no-untyped-def]
     e = edge(scorer={"features": [PRICE]}, frozen_from=FROZEN, **changes)
-    return training_frame(w.reader, e, edge_universe(w.configs, USER, e), DAYS[0], DAYS[-1])
+    return training_frame(
+        w.reader, e, edge_universe(w.configs, USER, e), DAYS[0], DAYS[-1], option_costs=option_costs
+    )
 
 
 def test_the_cutoff_is_one_horizon_before_the_frozen_period() -> None:
@@ -105,3 +109,20 @@ def test_an_unresolvable_scorer_field_is_refused() -> None:
     e = edge(scorer={"features": ["rollup.nope@v1.x"]}, frozen_from=FROZEN)
     with pytest.raises(ConfigurationError, match="unknown inputs"):
         training_frame(w.reader, e, edge_universe(w.configs, USER, e), DAYS[0], DAYS[-1])
+
+
+def test_the_frame_scores_labels_with_the_given_option_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """E6b-2 review: the fit's labels were scored without the commission the backtest pays."""
+    seen: list[object] = []
+    real = module.apply_outcome
+
+    def spy(edge, outcomes, *args, option_costs=None, **kw):  # type: ignore[no-untyped-def]
+        seen.append(option_costs)
+        return real(edge, outcomes, *args, option_costs=option_costs, **kw)
+
+    monkeypatch.setattr(module, "apply_outcome", spy)
+    costs = OptionCosts(commission_usd=1.5)
+    frame(build_world(), option_costs=costs)
+    assert seen and all(c == costs for c in seen)
