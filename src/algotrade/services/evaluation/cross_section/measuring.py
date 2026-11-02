@@ -114,6 +114,7 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
 from algotrade.services.evaluation.cross_section.sessions import Leg
 from algotrade.services.evaluation.evidence.shapes import roc_moments, trade_frame
 from algotrade.services.evaluation.evidence.values import figures_by_name
+from algotrade.services.evaluation.training.bound import scored_identity
 
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
 # A session is measured only when at least ``picks.MIN_SCORE_COVERAGE`` of the eligible names
@@ -986,6 +987,8 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
         payload.append(f"picks={scope.edge.picks}")
     if scope.overrides:  # a main or plain variant keeps its earlier key
         payload.append(scope.overrides)
+    if scope.scores:  # a refit is another feature version, so another trial (E14)
+        payload.append(scored_identity(scope.scores))
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 

@@ -132,14 +132,16 @@ detect = [{ call = "edge_night" }, { call = "edge_picks_frame" }]
 
 [[responsibility]]
 id = "edge-scorer-fit"
-description = "Fit a learned scorer for an edge (ADR 0053 amendment, ED7): the training frame (the edge's eligible names at each decision session D with the features its document declares under [scorer] read at D only, and the edge's hit at the entry session S as the label, only windows closing before frozen_from less one horizon: purged and embargoed, never the frozen period), the probit of the hit on the standardised features (quant/probit.py is the model), and the coefficients written as the TOML expression feature edge_score_<edge> in config/site/features/scores/edge_scores.toml with fitted_through; run by algotrade-backtest fit-edge-scorer through the edge-score-fit job; nightly scoring is the expression engine's ncdf over the file, with no label at score time"
+description = "Fit a learned scorer for an edge (ADR 0053 amendment, ED7): the training frame (the edge's eligible names at each decision session D with the features its document declares under [scorer] read at D only, and the edge's hit at the entry session S as the label, only windows closing before frozen_from less one horizon: purged and embargoed, never the frozen period), the probit of the hit on the standardised features (quant/probit.py is the model), and the coefficients written as the TOML expression feature edge_score_<edge> in config/site/features/scores/edge_scores.toml with fitted_through; and where a rule reading the score may be judged (E14, training/bound.py: the scores a field depends on, the first session judged after fitted_through plus the fit's horizon, the in-sample slice before it, the identity a refit changes); run by algotrade-backtest fit-edge-scorer through the edge-score-fit job; nightly scoring is the expression engine's ncdf over the file, with no label at score time"
 owner = ["src/algotrade/services/evaluation/training/*"]
 allowed = [
     "src/algotrade/services/jobs/handlers.py",  # the edge-score-fit job kind (ADR 0010)
     "apps/backtest/algotrade_backtest/commands.py",  # fit-edge-scorer writes the features file
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the in-sample cutoff of a rule reading a score (E14)
+    "src/algotrade/services/evaluation/cross_section/measuring.py",  # a refit is another trial (E14)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-08-ed7a-the-first-learned-scorer-a-probit-in-site-config"
-detect = [{ call = "fit_scorer" }, { call = "training_frame" }, { call = "render_scorer" }, { call = "merge_scorers" }]
+detect = [{ call = "fit_scorer" }, { call = "training_frame" }, { call = "render_scorer" }, { call = "merge_scorers" }, { call = "first_judged_session" }, { call = "scored_identity" }]
 
 [[responsibility]]
 id = "edge-time-series-evaluation"

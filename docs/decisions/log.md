@@ -306,3 +306,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: G15 names the setup's own trades and tonight's list; for a site setup the forward paper record is that single, point-in-time-clean source of truth (ADR 0083: every forward statistic is the paper record), and an empty-book default would let a concentration gate pass vacuously; B's self-reference adds a race the harness never has.
+## 2026-11-02 | ADR 0088 E14 / open decision 10 | Setups whose rules read a fitted score: owner-only until a forward record, one setting
+- Question: publish setups whose rules read a fitted score (`edge_score_<edge>`, ED7), given ADR 0083 ("publishes setups"; the model only translates a sentence into rules) and ADR 0053 (ML proposes and implements, never judges)?
+- Options: (a) yes, judged only after `fitted_through` plus a horizon, labelled "ranks with a fitted score"; (b) owner-only.
+- Decision: (a) gated on a forward record, (b) until then, as one setting: `verdict.toml` `fitted_score_setups`, `owner_only` (the default; the trial's rules licence is at least `personal`, so the ADR 0084 licence hide applies and no Ideas pick is added) or `forward_verdict` (published on a `works` / `promising` verdict, which reads no in-sample slice). No `always` value: it would publish in-sample ranks. Switching needs an ADR 0083 amendment for the label and one scored setup with a forward record. The architect review of the plan found the default must stay `owner_only` (the owner's 2026-11-02 answer to decision 10 was "(b) until one scored setup has a forward record, then (a), decide again at E14"), so Fable's first proposal of `forward_verdict` as the default was not taken.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: ADR 0083 bars the model from writing rules, not from being a field a rule reads, and the judge stays the harness (ADR 0053); the score is a catalogue feature like any other. With no scorer on main either value is harmless today.

@@ -16,6 +16,19 @@ from typing import Any
 import pytest
 
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.user import UserContext
+from algotrade.services.evaluation.cross_section.detail.licences import edge_fields
+from algotrade.services.evaluation.cross_section.run.scopes import (
+    edge_universe,
+    edge_variants,
+    refuse_fitted_scores,
+)
+from algotrade.services.evaluation.training.bound import (
+    FITTED,
+    HORIZON,
+    first_judged_session,
+    scored,
+)
 from algotrade.services.evaluation.training.fit import ScorerFit
 from algotrade.services.evaluation.training.frame import purge_cutoff
 from algotrade.services.evaluation.training.render import (
@@ -24,6 +37,7 @@ from algotrade.services.evaluation.training.render import (
     expression_name,
     render_scorer,
 )
+from algotrade.services.features import catalogue
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 
@@ -31,8 +45,6 @@ STORE = FileConfigStore(REPO_ROOT / "config", local=False)
 EDGES = {e.id: e for e in load_edges(STORE)}
 FILE = REPO_ROOT / "config" / "site" / "features" / "scores" / "edge_scores.toml"
 SCORES = tomllib.loads(FILE.read_text()) if FILE.exists() else {}
-FITTED = re.compile(r"fitted_through=(\d{4}-\d{2}-\d{2})")
-HORIZON = re.compile(r"horizon=(\d+) sessions")
 
 
 def check_scorer(name: str, table: Mapping[str, Any], edges: Mapping[str, Any]) -> None:
@@ -131,3 +143,25 @@ def test_the_model_check_passes_a_fitted_score_and_fails_an_unfitted_or_late_one
         check_model_screener("m", doc, late, edges)
     with pytest.raises(AssertionError, match="does not list"):
         check_model_screener("m", doc, good, EDGES)
+
+
+# E14: every site document that reads a fitted score is judged by its bound.
+USER = UserContext("site")
+FEATURES = catalogue(STORE, USER.user_id)
+
+
+@pytest.mark.parametrize("edge", list(EDGES.values()), ids=lambda e: e.id)
+def test_a_site_edge_reading_a_fitted_score_has_a_judging_bound_and_is_refused_where_none_exists(
+    edge,  # type: ignore[no-untyped-def]
+) -> None:
+    refuse_fitted_scores(STORE, USER, edge)  # exit rules and time-series edges: refused, not run
+    configs = (
+        [v.config for v in edge_variants(STORE, USER, edge)]
+        if edge.screeners or edge.baselines
+        else []
+    )
+    reads = scored(FEATURES, edge_fields(edge, edge_universe(STORE, USER, edge), configs))
+    for score in reads:  # a score records its fit, and its licence is its inputs' (inherited)
+        assert first_judged_session([score]) is not None, score.name
+        assert score.licence is not None
+    assert not reads or edge.frozen_from is not None, f"{edge.id}: a scored edge needs frozen_from"

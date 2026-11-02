@@ -16,6 +16,7 @@ from algotrade.config.edges.positions.chain import grain_name
 from algotrade.config.edges.positions.templates import Templates
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
+from algotrade.features.framework.feature import Feature
 from algotrade.services.evaluation.cross_section.baselines.outcome import position_outcome
 from algotrade.services.evaluation.cross_section.hit import own_keys
 
@@ -54,6 +55,7 @@ class _Scope:
     iv_field: str  # the outcome's own, else the run's
     overrides: tuple[str, ...] = ()  # the variant's base / picks overrides, in its trial key
     templates: Templates = field(default_factory=dict)  # the site's, for a position baseline
+    scores: tuple[Feature, ...] = ()  # the fitted scores the edge reads (E14): in its trial key
 
 
 def variant_scope(scope: _Scope, variant: Variant) -> _Scope:
