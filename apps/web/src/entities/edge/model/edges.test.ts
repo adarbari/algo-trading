@@ -36,7 +36,8 @@ describe('verdict words', () => {
       'Diagnostic only',
     ]);
     expect(verdictTone('works')).toBe('positive');
-    expect(verdictTone('not_working')).toBe('negative');
+    expect(verdictTone('promising')).toBe('accent');
+    expect(verdictTone('not_working')).toBe('neutral');
     expect(verdictTone('something else')).toBe('neutral');
     expect(verdictLabel('something else')).toBe('something else');
   });
