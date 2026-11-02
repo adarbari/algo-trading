@@ -288,6 +288,7 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "IdeasPage",
         "InstrumentPickedBy",  # the inverse of Ideas: setup verdicts and the picks they read
         "SetupIdeas",
+        "IdeaDetail",
         "StatusStrip",
         "DataStatus",
         "ScreenerConfigs",

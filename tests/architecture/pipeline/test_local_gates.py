@@ -30,10 +30,12 @@ def test_the_vitest_pool_is_the_decided_one() -> None:
 
 
 def test_ci_is_the_gate_and_the_machine_never_runs_the_full_check() -> None:
-    # Owner decision 2026-10-08: local = `make changed` for what changed, then push; CI gates.
+    # Owner decisions 2026-10-08, 2026-11-02: push and let the queued `make pre-push` hook
+    # check; CI gates; no `make changed` or full `make check` before a push.
     text = " ".join((ROOT / "CLAUDE.md").read_text().split())
-    assert "then push; CI is the gate" in text and "never the full `make check`" in text
-    assert "When `make changed` passes, push" in text
+    assert "Push and let the hook check; CI is the gate" in text
+    assert "`make pre-push`" in text and "scripts/ops/push_queue.py" in text
+    assert "never run `make changed` or the full `make check` before a push" in text
 
 
 def test_make_check_is_scope_aware_and_the_release_runs_every_gate() -> None:

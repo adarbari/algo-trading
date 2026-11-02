@@ -9,10 +9,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.screen_spec import ScreenSpec
 from algotrade.strategies.screeners.base import Screener
 from algotrade.strategies.screeners.rules import RULES, RuleScreener
-from algotrade.strategies.screeners.short_premium_liquidity import ShortPremiumLiquidity
 
 SCREENERS: Mapping[str, Callable[..., Screener]] = {
-    ShortPremiumLiquidity.name: ShortPremiumLiquidity,
     RULES: RuleScreener,
 }
 

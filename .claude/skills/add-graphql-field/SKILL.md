@@ -134,7 +134,7 @@ GET: remove its entry from `architecture/rest_allowlist.toml`, run `make rest-al
 and enable any derivation entry the plan names for the PR. A new web operation is also declared
 for the 1 s page gate: `make api-latency-views`, commit `benchmarks/api_latency_views*.json` (CI
 fails otherwise; `docs/perf/page-latency-bar.md`, "Cover a new page"). Then
-`make changed`, then push: CI is the full gate.
+Push (the `pre-push` hook runs `make pre-push`): CI is the full gate.
 
 ## Worked example: "Overview should show the next earnings date"
 

@@ -37,6 +37,7 @@ function setup() {
           onOpenScreener={vi.fn()}
           onOpenRegime={vi.fn()}
           onOpenEdge={vi.fn()}
+          onOpenIdea={vi.fn()}
         />
       </QueryClientProvider>
     </ToastProvider>,

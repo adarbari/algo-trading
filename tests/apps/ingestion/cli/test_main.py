@@ -84,7 +84,9 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     cboe.write_text(off)
     # Every site screener runs nightly (ADR 0033); the rule preset reads rollups this fixture
     # does not build, so the pipeline test keeps to the one screener its data supports.
-    shutil.rmtree(tmp_path / "config" / "site" / "presets" / "screeners")
+    for preset in (tmp_path / "config" / "site" / "presets" / "screeners").iterdir():
+        if preset.name != "short_premium_liquidity":  # a rule preset since ADR 0088 S5
+            shutil.rmtree(preset)
     shutil.rmtree(tmp_path / "config" / "site" / "edges")  # they name the presets removed above
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.chdir(tmp_path)  # the nightly writes var/logs/nightly-latest.json here
@@ -165,7 +167,7 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     assert code == 0 and nightly["status"] == "SUCCEEDED" and nightly["sessions"] == [DAY], why
     screens = steps["screens"]["result"]["screens"]
     assert screens[0]["coverage"] == "COMPLETE" and screens[0]["job_id"].startswith("job-screen")
-    assert screens[0]["decisions"] == {"QUALIFIED": 1, "LIQUIDITY_RISK": 1}
+    assert screens[0]["decisions"] == {"QUALIFIED": 1, "REJECT": 1}
     assert screens[0]["universe_pre_snapshot"] is False
     assert all("duration_s" in s for s in steps.values())
     purged = nightly["steps"]["purge-raw"]["result"]

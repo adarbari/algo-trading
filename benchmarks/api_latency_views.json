@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 08:23 UTC",
+ "generated": "2026-11-02 09:01 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -1735,6 +1735,25 @@
    "interaction": [],
    "source": "static",
    "parent": "/ideas"
+  },
+  "/ideas/:symbol": {
+   "route": "/ideas/:symbol",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "symbol": "link"
+   },
+   "ops": [
+    "GuideHelpField",
+    "IdeaDetail"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
   },
   "/login": {
    "route": "/login",

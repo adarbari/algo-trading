@@ -50,7 +50,7 @@ settings owner and must drive code (a test checks).
    - A field known only later (e.g. `instrument_id`) is filled as its own later version, with
      its own `known_from`, never by rewriting the earlier row.
    - A table over a restricted-licence source says so in its `tables.toml` note and its features carry `licence` (ADR 0028).
-9. Update `docs/data/storage.md`, run `make changed`, push (CI is the full gate).
+9. Update `docs/data/storage.md`, push (the `pre-push` hook runs `make pre-push`; CI is the full gate).
 
 ## Choosing a store
 
