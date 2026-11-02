@@ -3,7 +3,7 @@ no site setup declares an option template yet: the legs the harness's own select
 the credit and collateral, the declared exits as dollar marks, the exit session, and every missing
 part UNKNOWN with its reason (no chain, no price, no legs, case values not applied yet)."""
 
-from datetime import date, timedelta
+from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
@@ -15,6 +15,7 @@ from algotrade.config.edges.positions.spec import PositionSpec
 from algotrade.config.edges.positions.templates import OPTION, Leg
 from algotrade.core.model.predicates import Group
 from algotrade.features.rollups.options.wing_search import select_legs
+from algotrade.features.rollups.positioning.chain_inputs import one_row_per_contract
 from algotrade.services.read.evaluation.positions import option_example as module
 from algotrade.services.read.evaluation.positions.exit_rule import (
     ExitRule,
@@ -34,7 +35,7 @@ SHORT_PUT = (Leg(OPTION, -1, "P", "delta", delta=0.30),)
 
 def _outcome(**changes: Any) -> Any:
     spec = PositionSpec("short_put", legs=SHORT_PUT, collateral="cash_secured", **changes)
-    return SimpleNamespace(position=spec, tenor_days=30, start_offset_sessions=0)
+    return SimpleNamespace(position=spec, tenor_days=30, start_offset_sessions=1)
 
 
 def _chain() -> pd.DataFrame:
@@ -71,11 +72,7 @@ def _wire(
     monkeypatch.setattr(
         module, "load_chains", lambda ctx, ids: {i: SimpleNamespace(status=status) for i in ids}
     )
-    monkeypatch.setattr(
-        module,
-        "load_feature_values",
-        lambda ctx, ids, names: {i: (SimpleNamespace(value=spot, unknown=None),) for i in ids},
-    )
+    monkeypatch.setattr(module, "load_chain_spots", lambda ctx, ids: dict.fromkeys(ids, spot))
     return asked
 
 
@@ -86,8 +83,9 @@ def test_the_legs_are_the_harnesss_selection_with_credit_collateral_and_declared
     rule = ExitRule("put_write", declared, 15, take_profit=0.5, exit_dte=21)
     asked = _wire(monkeypatch, rule)
     (ex,) = load_option_examples(CTX, EDGE, _outcome(), [SPY])
+    entry = date(2026, 11, 2)  # the close one session after Friday's S
     expected = select_legs(
-        _chain(), SHORT_PUT, 500.0, S, 30, "monthly", not_before=module._advance(S, 15)
+        _chain(), SHORT_PUT, 500.0, S, 30, "monthly", not_before=module._advance(entry, 15)
     )
     assert [leg.instrument_id for leg in ex.legs] == [c.instrument_id for c in expected.legs]
     (leg,) = ex.legs
@@ -96,8 +94,11 @@ def test_the_legs_are_the_harnesss_selection_with_credit_collateral_and_declared
     assert ex.collateral == pytest.approx(leg.strike)  # cash secured: the strike per share
     assert ex.stop_debit == pytest.approx(leg.mid * 3.0)  # a loss of 2x the credit
     assert ex.take_profit_debit == pytest.approx(leg.mid * 0.5)
-    assert ex.exit_dte_date == leg.expiry - timedelta(days=21)
-    assert ex.exit_session is not None and ex.exit_session <= leg.expiry
+    assert leg.expiry == date(2026, 12, 18)  # 20 Nov is before entry + hold: refused
+    assert ex.exit_dte_date == date(2026, 11, 27)  # 21 days before 18 Dec, a session
+    assert ex.entry_session == entry
+    assert ex.exit_session == min(module._advance(entry, 15), leg.expiry)
+    assert ex.share_entry_close is None  # no share leg
     assert ex.chain_asof == S and ex.unknown is None
     assert asked == [None, leg.expiry]  # the hold cap, then the rule given the selected expiry
 
@@ -140,3 +141,22 @@ def test_no_hold_and_no_picks(monkeypatch: pytest.MonkeyPatch) -> None:
     (ex,) = load_option_examples(CTX, EDGE, _outcome(), [SPY])
     assert ex.unknown is not None and ex.unknown.code == UnknownCode.NOT_RUN
     assert load_option_examples(CTX, EDGE, _outcome(), []) == ()
+
+
+def test_the_expiry_floor_counts_the_hold_from_the_entry_not_s(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A hold that reaches past the November expiry from the entry takes December's, as the
+    harness's window end (entry + hold) refuses an earlier expiry."""
+    _wire(monkeypatch, ExitRule("put_write", None, 15))
+    (ex,) = load_option_examples(CTX, EDGE, _outcome(), [SPY])
+    floor = module._advance(date(2026, 11, 2), 15)
+    assert all(leg.expiry >= floor for leg in ex.legs) and ex.legs
+
+
+def test_duplicate_quotes_of_a_contract_keep_the_latest_row() -> None:
+    rows = pd.DataFrame(
+        {"instrument_id": ["A", "A"], "ts": ["2026-10-30T19:00Z", "2026-10-30T20:00Z"],
+         "bid": [1.0, 2.0]}
+    )  # fmt: skip
+    assert list(one_row_per_contract(rows)["bid"]) == [2.0]
