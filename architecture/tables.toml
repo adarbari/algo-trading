@@ -464,6 +464,11 @@ name = "rollups/instrument/flow_history@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/earnings_moves@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the signed move of the last 12 earnings reports (earnings_reaction's window rule) and how often the stored earnings straddle at the session before was above the move (reads implied_move@v1 partitions)"
+
+[[table]]
 name = "rollups/instrument/implied_move@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -494,6 +499,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 [[table]]
 name = "rollups/instrument/call_wing@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/short_premium@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the 0.20-delta, 30-day short put and call (strike, breakeven, yield a year) the lists filter on; the option grid's (0.20, 30-day) cell (ADR 0083 amendment 2026-11-01); backfill with rollups --only short_premium@v1"
 
 [[table]]
 name = "rollups/instrument/price_moves@v1"
@@ -808,9 +818,9 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
 note = "ADR 0053: forward outcomes per (instrument, start session, horizon, benchmark); read only by the edge harness through algotrade.data.outcomes"
 
 [[table]]
-name = "outcomes/option/structure_pnl@v1"
+name = "outcomes/option/structure_pnl@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py"
-note = "ADR 0053 amendment (EB H13): chain P&L per (underlying, start session, structure, tenor rule, horizon) from the stored chains, forward-only from 2026-10-02; read only by the edge harness through algotrade.data.outcomes"
+note = "ADR 0088, design 2.5 (replaces the v1 structure grain, ADR 0053 amendment EB H13): one option trade per (underlying, start session, position_key built from the resolved legs) from the stored chains, written only by frame_and_publish; read only by the edge harness through algotrade.data.outcomes"
 
 [[table]]
 name = "outcomes/instrument/residual_returns@v1"

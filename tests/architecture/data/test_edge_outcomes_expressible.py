@@ -96,7 +96,7 @@ def test_every_model_structure_names_the_stored_fields_it_reads() -> None:
 
 def test_an_option_pnl_outcome_reads_only_fields_the_chain_grain_writes() -> None:
     """``option_pnl`` adds a grain (ADR 0053 amendment, EB H13): the fields its value reads are
-    the ones ``outcomes/option/structure_pnl@v1`` carries to the harness."""
+    the ones ``outcomes/option/structure_pnl@v2`` carries to the harness."""
     assert set(CHAIN_PNL_FIELDS) <= set(CHAIN_FIELDS)
 
 

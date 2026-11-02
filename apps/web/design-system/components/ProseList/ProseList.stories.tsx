@@ -40,6 +40,9 @@ export const Default: Story = {};
 /** Numbered: a fixed order the reader follows. */
 export const Ordered: Story = { args: { ordered: true } };
 
+/** A checklist ("Before you act"): an empty box before each line. */
+export const Checklist: Story = { args: { marker: 'box' } };
+
 /** Long items wrap inside a phone-width container. */
 export const Dense: Story = {
   args: {

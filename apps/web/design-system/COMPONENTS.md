@@ -951,7 +951,7 @@ Source: `design-system/components/KeyValue`
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `items` | `readonly KeyValueItem[]` | yes |  |
-| `layout` | `'columns' \| 'stacked'` | no | `columns` (label beside value, the default) or `stacked` (label above value). |
+| `layout` | `'columns' \| 'stacked' \| 'grid'` | no | `columns` (label beside value, the default), `stacked` (label above value) or `grid` (a fixed label column and roomy lines, no row rules: a setup's rules, a pick's plan). |
 | `alignValues` | `'start' \| 'end'` | no | Align values to the end of the value column (numbers). |
 | `loading` | `boolean` | no | Show placeholders instead of values. |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
@@ -1309,6 +1309,7 @@ Source: `design-system/components/ProseList`
 | `items` | `readonly ProseListItem[]` | yes |  |
 | `ordered` | `boolean` | no | Numbered instead of bulleted (a fixed order the reader follows). |
 | `'aria-label'` | `string` | no | Accessible name of the list, when the surrounding heading does not name it. |
+| `marker` | `'disc' \| 'box'` | no | `disc` (default) or `box`: an empty box before each line, a "before you act" checklist. |
 
 ### RangeFilter
 
@@ -1594,11 +1595,6 @@ Source: `design-system/components/StatStrip`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `items` | `readonly StatItem[]` | yes |  |
-| `label` | `string` | yes | Accessible name of the strip, e.g. "Summary". |
-| `loading` | `boolean` | no | Show placeholders instead of values. |
-| `error` | `ReactNode` | no | Replaces the values with this message (the summary failed to load). |
-| `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
 
 ### StatusBadge
 
@@ -1657,6 +1653,7 @@ Source: `design-system/components/Tabs`
 | `label` | `string` | yes | Accessible name of the tab list, e.g. "View". |
 | `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
 | `size` | `'sm' \| 'md'` | no | Text size: `md` (default) or `sm` (dense toolbars). |
+| `variant` | `'underline' \| 'segmented'` | no | `underline` (default) or `segmented`: pills in one bordered track (a page's views: Stocks, Premium, Past lists). |
 
 ### TaggedSentence
 

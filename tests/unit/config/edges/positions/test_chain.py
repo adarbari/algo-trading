@@ -1,7 +1,8 @@
-"""The ``option_pnl`` outcome of an edge document (ADR 0053 amendment, EB H13): each chain
-structure types and is labelled ``chain``; a put needs its delta, a straddle takes none; the tenor
-rule is required; no benchmark, no implied-vol field; an edge and its variants are all option_pnl
-or none is (another grain); a document that never names a tenor hashes as it did before."""
+"""The ``option_pnl`` outcome of an edge document (ADR 0053 amendment, EB H13; ADR 0088, E4): it
+names a position template (the old structure enum is gone) and is labelled ``chain``; the tenor
+rule is required; no benchmark, no implied-vol field, no ``otm_pct``; an edge and its variants are
+all option_pnl or none is (another grain); a document that never names a tenor hashes as it did
+before."""
 
 from dataclasses import asdict
 from typing import Any
@@ -10,13 +11,12 @@ import pytest
 
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
-from algotrade.config.edges.positions.chain import CHAIN_STRUCTURES, grain_structure
 from algotrade.core.model.errors import ConfigurationError
 from tests.unit.config.edges.test_document import WHERE, document
 
 CHAIN = {
     "kind": "option_pnl", "horizon_sessions": [5, 21], "benchmark": "none",
-    "start_offset_sessions": 1, "structure": "atm_straddle_long", "tenor_days": 30,
+    "start_offset_sessions": 1, "position": "short_put", "tenor_days": 30,
 }  # fmt: skip
 
 
@@ -25,29 +25,20 @@ def chain(**changes: Any) -> dict[str, Any]:
     return document(schedule="every_session", outcome=body)
 
 
-@pytest.mark.parametrize("structure", [s for s in CHAIN_STRUCTURES if s != "put_short"])
-def test_each_chain_structure_types_and_is_labelled_chain(structure: str) -> None:
-    o = parse_edge(chain(structure=structure, cost_bps=5), "drift", WHERE).outcome
-    assert (o.structure, o.tenor_days, o.strike_delta, o.iv_field) == (structure, 30, None, None)
+def test_a_positioned_option_pnl_types_and_is_labelled_chain() -> None:
+    o = parse_edge(chain(cost_bps=5, strike_delta=0.25), "drift", WHERE).outcome
+    assert (o.structure, o.tenor_days, o.strike_delta, o.iv_field) == (None, 30, 0.25, None)
+    assert o.position is not None and o.position.template == "short_put"
     assert o.basis == "chain" and not o.is_return and o.cost_bps == 5
-
-
-def test_a_short_put_names_its_delta_and_the_grain_stores_the_long_put_of_that_delta() -> None:
-    o = parse_edge(chain(structure="put_short", strike_delta=0.25), "drift", WHERE).outcome
-    assert o.strike_delta == 0.25 and grain_structure(o.structure or "", o.strike_delta) == (
-        "put_delta_25"
-    )
-    assert grain_structure("delta_hedged_atm_short", None) == "atm_straddle"
 
 
 @pytest.mark.parametrize(
     ("changes", "match"),
     [
-        ({"structure": "put_short"}, "strike_delta: a put_short names the put's delta"),
-        ({"structure": "put_short", "strike_delta": 0.9}, "strike_delta: a put_short names"),
-        ({"strike_delta": 0.25}, "only a put_short has a strike"),
-        ({"structure": "put"}, "structure"),  # an expires_otm structure
-        ({"structure": None}, "structure: required"),
+        ({"structure": "atm_straddle_long"}, "names a position template"),
+        ({"structure": "put_short", "strike_delta": 0.25}, "names a position template"),
+        ({"position": None}, "position: required for an option_pnl"),
+        ({"strike_delta": 0.9}, "strike_delta"),
         ({"tenor_days": None}, "tenor_days: required"),
         ({"tenor_days": 0}, "tenor_days: required"),
         ({"benchmark": "SPY"}, "has no benchmark"),
@@ -76,9 +67,9 @@ def test_an_edge_and_its_variants_read_one_grain() -> None:
     }]  # fmt: skip
     with pytest.raises(ConfigurationError, match="all option_pnl or none is"):
         parse_edge(doc, "drift", WHERE)
-    doc["variants"] = [{"id": "short", "outcome": {"structure": "atm_straddle_short"}}]
+    doc["variants"] = [{"id": "spread", "outcome": {"position": "put_spread"}}]
     edge = parse_edge(doc, "drift", WHERE)
-    assert edge.variants[0].outcome.structure == "atm_straddle_short"
+    assert edge.variants[0].outcome.position.template == "put_spread"  # type: ignore[union-attr]
     assert edge.variants[0].outcome.tenor_days == 30  # the variant keeps the edge's tenor
 
 

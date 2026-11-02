@@ -102,6 +102,13 @@ composing `Disclosure` + `Dialog`.
   filter bar serve them (ADR 0038); or (b) a compact catalogue group only. `put_wing@v1` and
   `call_wing@v1` stay as they are and share `wing_search.py`; any later retirement is a version bump,
   never an alias. `features/rollups/options/` is at its cap: `make layout` first.
+  **Decided (V6, 2026-11-01): (a).** The filter bar needs only the summary (a 0.20-delta, 30-day put
+  and call: `short_premium@v1`, in the new `features/rollups/premium/`), and 540 columns are not
+  features; the grid is `services/read/options/grid.py` (`Instrument.optionGrid`), the pricing is
+  `quant/options/premium.py`, and one pick (`premium/band_pick.py`, on `wing_search.select_legs`) serves
+  both, so the summary is the grid's (0.20, 30-day) cell. Known inconsistency: the chance below the
+  strike uses r = q = 0 (ADR 0053), the IV behind it is inverted with the session's rate and yield;
+  they differ by about 0.01 at 30 days.
 - **Earnings pricing (V8):** the options-priced move at the expiry after the report, the past 12
   reports' moves and "options overpaid N of M" over `earnings_reaction@v2` and the chain; a TOML
   expression where it is a formula, else a feature group (architect).

@@ -207,6 +207,7 @@ test('Admin ingestion: a tapped completeness cell opens its drill-down in a shee
   page,
 }) => {
   await page.goto('/admin/ingestion');
+  await page.getByRole('tab', { name: 'Data coverage' }).tap();
   const grid = page.getByRole('grid', { name: 'Completeness by dataset and session' });
   await grid
     .getByRole('gridcell', { name: /^Option chains, / })
@@ -273,6 +274,21 @@ test('Screener results: the pick opens as a full-height sheet; next, previous an
   await page.getByRole('dialog').getByRole('button', { name: 'Back to list' }).tap();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(picks.getByRole('row', { name: /AAPL/ })).toBeVisible();
+});
+
+test('Calendar: the three views each fit the screen', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/calendar');
+  for (const view of ['Next 90 days', 'Macro', 'Earnings week']) {
+    await page.getByRole('tab', { name: view }).click();
+    await settled(page);
+    const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    expect(scrollWidth, `${view} scrolls the page sideways`).toBeLessThanOrEqual(innerWidth);
+  }
+  expect(errors).toEqual([]);
 });
 
 test('Regime: a tapped card help button opens the indicator drawer as a sheet', async ({

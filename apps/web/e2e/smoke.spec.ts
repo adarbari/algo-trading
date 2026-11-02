@@ -44,7 +44,7 @@ for (const theme of ['dark', 'light'] as const) {
   test(`the admin workspace is reachable (${theme})`, async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto('/admin/ingestion');
-    await expect(page.getByRole('heading', { level: 1, name: 'Ingestion' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Nightly run' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Admin sections' })).toContainText(
       'Users & configs',
     );

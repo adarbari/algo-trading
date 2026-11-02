@@ -97,12 +97,14 @@ from algotrade.features.rollups.positioning import (
     chain_flow,
     cp_iv,
     cp_iv_history,
+    earnings_moves,
     flow_history,
     implied_move,
     iv_term,
     skew,
     skew_history,
 )
+from algotrade.features.rollups.premium import short_premium
 from algotrade.features.rollups.price import (
     anchored_vwap,
     bands,
@@ -183,6 +185,7 @@ GROUPS: dict[str, FeatureGroup] = {
             qmj.GROUP,
             put_wing.GROUP,
             call_wing.GROUP,
+            short_premium.GROUP,
             price_moves.GROUP,
             max_return.GROUP,
             session_returns.GROUP,
@@ -206,6 +209,7 @@ GROUPS: dict[str, FeatureGroup] = {
             chain_flow.GROUP,
             flow_history.GROUP,
             implied_move.GROUP,
+            earnings_moves.GROUP,
             skew.GROUP,
             skew_history.GROUP,
             cp_iv.GROUP,

@@ -70,4 +70,20 @@ describe('StatStrip', () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  it('shows the basis line under an evidence strip', async () => {
+    const { container } = render(
+      <StatStrip
+        label="Evidence"
+        variant="evidence"
+        basis={{ kind: 'backtested', label: 'Backtested (hypothetical)' }}
+        items={[{ label: 'A typical trade', value: '+2.1%' }]}
+      />,
+    );
+    expect(screen.getByText('Backtested (hypothetical)')).toHaveAttribute(
+      'data-basis',
+      'backtested',
+    );
+    await expectNoA11yViolations(container);
+  });
 });
