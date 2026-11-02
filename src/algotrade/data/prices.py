@@ -10,7 +10,8 @@ Corporate actions are applied here, at read time (ADR 0016), from ``events/split
                     each ex-date, so returns include dividends
 
 ``session_bars`` serves rollups: one load for a range of sessions, then each session's
-lookback window split-adjusted as of that session (never by a later split).
+lookback window split-adjusted as of that session (never by a later split). ``bar_stamps`` is
+when each session's bars were known (a row derived from them is knowable no earlier).
 
 **Flagged bars** (ADR 0061): a bar the ``bar-quality`` task flagged in ``events/bar_flag``
 (``FLAGGED``, latest version per bar, read with the same ``as_of`` as the bars) is dropped at
@@ -23,7 +24,7 @@ when a requested instrument lost one.
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -377,6 +378,17 @@ def session_bars(
             for i, d in zip(dropped["instrument_id"], dropped["session_date"], strict=True)
         ),
     )
+
+
+def bar_stamps(reader: StoreReader, start: date, end: date) -> dict[date, datetime]:
+    """Session -> the latest ``knowledge_ts`` of the stored daily bars of that session, for
+    ``start..end`` (a session with no bars is absent): a row derived from closes up to a session
+    is knowable no earlier than the latest of these through it."""
+    frame = reader.table_range("bars/1d", start, end, columns=["knowledge_ts"])
+    if frame is None or frame.empty:
+        return {}
+    latest = frame.groupby(pd.to_datetime(frame["session_date"]).dt.date)["knowledge_ts"].max()
+    return {cast(date, d): pd.Timestamp(v).to_pydatetime() for d, v in latest.items()}
 
 
 # ------------------------------------------------------------------ fixed windows of closes

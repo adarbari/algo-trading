@@ -150,7 +150,7 @@ columns entry mid / ask, exit mid / bid (or intrinsic at expiry), contract ids, 
 premium and per underlying, the daily-hedged P&L (hedge with our own Greeks from each
 session's chain), `status` COMPLETE | UNMEASURED with a reason (a missing or STALE chain on any
 hedge session, `chains/status`, ADR 0054) and never a zero. Writer: ingestion
-`tasks/derived/option_outcomes.py` (owner + `tables.toml` entry); reader: `data/outcomes`
+`tasks/derived/paths/option_outcomes.py` (owner + `tables.toml` entry); reader: `data/outcomes`
 (same import contract). Structures and horizons from the documents, like the price grain.
 Outcome kind `option_pnl`. ADR: amendment to 0053 (a second outcomes grain) and 0065 (no
 pre-frozen basis exists; the basis is declared at filing and every row is out-of-sample).
