@@ -27,8 +27,8 @@ export interface KeyValueItem {
 
 export interface KeyValueProps {
   items: readonly KeyValueItem[];
-  /** `columns` (label beside value, the default) or `stacked` (label above value). */
-  layout?: 'columns' | 'stacked';
+  /** `columns` (label beside value, the default), `stacked` (label above value) or `grid` (a fixed label column and roomy lines, no row rules: a setup's rules, a pick's plan). */
+  layout?: 'columns' | 'stacked' | 'grid';
   /** Align values to the end of the value column (numbers). */
   alignValues?: 'start' | 'end';
   /** Show placeholders instead of values. */

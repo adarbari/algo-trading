@@ -275,6 +275,7 @@ class Reactions:
     spy: int | None
     by_report: dict[str, list[date]]
     all_reports: dict[str, list[date]]  # every report known by the session, newest first
+    pre: frozenset[tuple[str, date]] = frozenset()  # (instrument, report date) of a pre-open report
 
 
 def read_reactions(inputs: Inputs, session: date, lookback: int = LOOKBACK) -> Reactions:
@@ -297,28 +298,43 @@ def read_reactions(inputs: Inputs, session: date, lookback: int = LOOKBACK) -> R
         str(iid): _one_per_quarter(list(g["report"])) for iid, g in rows.groupby("instrument_id")
     }
     by_report = {i: r for i, r in all_reports.items() if _window(grid, r[0]) is not None}
+    stamped = (
+        rows[rows["time"].map(earnings.TIMES).eq("pre")] if "time" in rows.columns else rows[:0]
+    )
+    pre = frozenset(
+        (str(i), d) for i, d in zip(stamped["instrument_id"], stamped["report"], strict=True)
+    )
     return Reactions(
-        grid, px.close, px.close * px.volume, px.ids, column_of, spy, by_report, all_reports
+        grid, px.close, px.close * px.volume, px.ids, column_of, spy, by_report, all_reports, pre
     )
 
 
-def past_moves(read: Reactions, iid: str) -> list[float]:
-    """The signed E-1 to E+1 moves of ``iid``'s last ``MOVE_REPORTS`` reports with a closed
-    window on the grid (newest first); a report whose window lacks a bar is not counted. A report
-    with an open window (ahead of the session, or E+1 not yet closed) is skipped, not the name."""
+def counted_moves(
+    read: Reactions, iid: str, limit: int = MOVE_REPORTS
+) -> list[tuple[date, date, float]]:
+    """``(report E, the session E-1, signed E-1 to E+1 move)`` of ``iid``'s last ``limit``
+    reports with a closed window on the grid (newest first); a report whose window lacks a bar
+    is not counted. A report with an open window (ahead of the session, or E+1 not yet closed)
+    is skipped, not the name. The one reading of the window: ``earnings_moves@v1`` takes 12."""
     column = read.column_of.get(iid)
     if column is None:
         return []
     closed = [r for r in read.all_reports.get(iid, []) if _window(read.grid, r) is not None]
     moves = []
-    for report in closed[:MOVE_REPORTS]:
+    for report in closed[:limit]:
         window = _window(read.grid, report)
         assert window is not None
         before, after = window
         move = _share(float(read.px[after, column]), float(read.px[before, column])) - 1.0
         if np.isfinite(move):
-            moves.append(move)
+            moves.append((report, read.grid[before], move))
     return moves
+
+
+def past_moves(read: Reactions, iid: str) -> list[float]:
+    """The signed E-1 to E+1 moves of ``iid``'s last ``MOVE_REPORTS`` counted reports (newest
+    first)."""
+    return [move for _, _, move in counted_moves(read, iid)]
 
 
 def window_ratio(read: Reactions, iid: str, report: date) -> float:

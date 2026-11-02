@@ -5,12 +5,14 @@ setups, ADR 0083)."""
 import strawberry
 
 from algotrade.services.read.filtering.masks import FilterInput
+from algotrade.services.read.ideas import detail as idea_detail
 from algotrade.services.read.ideas import picks as setup_picks
 from algotrade.services.read.screens import ideas
 from algotrade.services.read.screens.ideas import FIRST_PAGE as IDEAS_FIRST_PAGE
 from algotrade_api.graphql.limits import MAX_FILTERS, MAX_IDEAS_PAGE, MaxItems
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.query_args import Ctx, Day
+from algotrade_api.graphql.types.screens.idea_detail import IdeaDetail
 from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.setup_ideas import IdeaTab, SetupIdeas
 
@@ -61,3 +63,18 @@ class IdeasQuery:
             else None
         )
         return SetupIdeas.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="One idea's page for the session: the ticker (or instrument id) `symbol` "
+        "as picked by a qualifying setup, shown under `setup` (default: the best by the Ideas "
+        "rule), with why it is here, the setup's historical exit rule, its evidence, what could "
+        "go wrong and the setup to learn (ADR 0083). Null: the name is unknown, no setup picked "
+        "it at the session, or `setup` is not one that did"
+    )
+    async def idea(
+        self, info: Ctx, symbol: str, setup: str | None = None, date: Day = None
+    ) -> IdeaDetail | None:
+        ctx = await info.context.aread(date)
+        load = idea_detail.load_idea_detail
+        found = await off_loop(load, ctx, symbol, setup) if ctx is not None else None
+        return IdeaDetail.of(found, ctx) if found is not None and ctx is not None else None

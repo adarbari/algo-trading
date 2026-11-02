@@ -950,7 +950,7 @@ Source: `design-system/components/KeyValue`
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `items` | `readonly KeyValueItem[]` | yes |  |
-| `layout` | `'columns' \| 'stacked'` | no | `columns` (label beside value, the default) or `stacked` (label above value). |
+| `layout` | `'columns' \| 'stacked' \| 'grid'` | no | `columns` (label beside value, the default), `stacked` (label above value) or `grid` (a fixed label column and roomy lines, no row rules: a setup's rules, a pick's plan). |
 | `alignValues` | `'start' \| 'end'` | no | Align values to the end of the value column (numbers). |
 | `loading` | `boolean` | no | Show placeholders instead of values. |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
@@ -1595,11 +1595,6 @@ Source: `design-system/components/StatStrip`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `items` | `readonly StatItem[]` | yes |  |
-| `label` | `string` | yes | Accessible name of the strip, e.g. "Summary". |
-| `loading` | `boolean` | no | Show placeholders instead of values. |
-| `error` | `ReactNode` | no | Replaces the values with this message (the summary failed to load). |
-| `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
 
 ### StatusBadge
 

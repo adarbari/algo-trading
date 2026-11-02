@@ -411,3 +411,70 @@ Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
 - A name keeps counting up until its next report, so a large value is a stale report, not a fresh one.
 
 Sources: Site convention (docs/data/features.md, earnings_reaction_session@v1)
+
+### `rollup.earnings_moves@v1.abs_move_mean_12`
+
+**How to read it.** How far the stock usually moves on a report over a longer memory, as a decimal (0.06 is 6%). It is the mean of the absolute move of its last twelve reports (three years). Each move runs from the close before the report to the close after it. The longer sibling of rollup.earnings_reaction@v2.abs_move_mean_8.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that usually move at least 5% on a report | `gte 0.05` | hard | - | illustrative: pair with rollup.earnings_moves@v1.moves_counted_12 gte 8 |
+
+**When the reading lies**
+
+- Twelve reports is three years: a company that changed is averaged with its old self, and one extreme report moves the mean. Check rollup.earnings_moves@v1.moves_counted_12.
+- Same two-session window and exclusions as the eight-report mean: the report ahead is never in it, and a report without both bars is left out.
+
+Sources: Site convention (docs/data/features.md, earnings_moves@v1)
+
+### `rollup.earnings_moves@v1.options_overpaid_n`
+
+**How to read it.** How many of the name's past reports had an implied move, stored the session before the report, above the absolute move that followed: the times the straddle's buyer lost. Read it as n of m, with rollup.earnings_moves@v1.options_overpaid_m.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose straddle has overpaid at least twice | `gte 2` | hard | - | illustrative: read with options_overpaid_m; a null drops the name |
+
+**When the reading lies**
+
+- Null until a past report has a stored straddle: option chains are stored only since 2026-10-02, so every name reads unknown until the first report after that date has closed. It is not zero.
+- A handful of reports is a thin record: 3 of 4 is not a pattern. The straddle also pays for the days to the expiry after the report, which the two-session move does not include.
+
+Sources: Site convention (docs/data/features.md, earnings_moves@v1)
+
+### `rollup.earnings_moves@v1.options_overpaid_m`
+
+**How to read it.** How many of the name's past reports have the options' implied move stored from the session before the report (an earnings-basis straddle): the denominator of rollup.earnings_moves@v1.options_overpaid_n.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a measured record of straddles | `gte 2` | hard | - | - |
+
+**When the reading lies**
+
+- Null until the first stored chain before a report has closed its window (chains are stored only since 2026-10-02); a small count says how little record stands behind the n.
+
+Sources: Site convention (docs/data/features.md, earnings_moves@v1)
+
+### `feature.earnings_move_vs_usual`
+
+**How to read it.** Whether the options price the next report above, below or in line with the name's usual report move. It is feature.earnings_move_ratio read in words: 1.15 or more is above, 0.85 or less is below. It says the price differs from the history, not that a trade on it pays.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| options pricing the report above the name's history | `eq "above"` | hard | - | - |
+
+**When the reading lies**
+
+- Null when the ratio is null (no report-covering expiry, fewer than 4 past reports); not 'in line'.
+- The cut-offs are chosen for this label, not published; compare the ratio itself for a finer reading.
+
+Sources: Site convention (config/site/features/options/earnings.toml)
