@@ -27,6 +27,7 @@ SHORT_PUT = Leg("option", -1, "P", "delta", 0.30)
 WING = Leg("option", 1, "P", "delta", 0.10)
 STOCK = Leg("shares", 100)
 CALL = Leg("option", -1, "C", "delta", 0.30)
+CALL_WING = Leg("option", 1, "C", "delta", 0.10)
 
 
 def quotes(name: str, day: date, spot: float, expiry: date = EXPIRY) -> pd.DataFrame:
@@ -166,6 +167,9 @@ def test_collateral_is_cash_secured_max_loss_or_not_computed() -> None:
     assert collateral_of("max_loss", legs, put_spread, 100.0, -1.2) == pytest.approx(5.0 - 1.2)
     naked_call = LegSelection((chosen(CALL, 105.0),))
     assert np.isnan(collateral_of("max_loss", [CALL], naked_call, 100.0, -1.0))  # unbounded
+    call_spread = LegSelection((chosen(CALL, 105.0), chosen(CALL_WING, 115.0)))
+    spread_legs = [CALL, CALL_WING]  # the call_spread template (X4): width less the credit
+    assert collateral_of("max_loss", spread_legs, call_spread, 100.0, -1.5) == pytest.approx(8.5)
     assert np.isnan(collateral_of("regt", legs, put_spread, 100.0, -1.2))  # not in this slice
     assert np.isnan(collateral_of("cash_secured", [CALL], naked_call, 100.0, -1.0))  # no short put
     assert np.isnan(collateral_of("notional", [SHORT_PUT], put_spread, 100.0, -1.2))  # no stock leg

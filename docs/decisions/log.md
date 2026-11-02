@@ -268,3 +268,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the build row's own condition ("add only if the run shows the sort differs") is met at the depth the harness trades; reference snapshots start 2026-10-02, so the earlier sessions used the first snapshot's security type and optionable flag (a measurement caveat, not a point-in-time read by any setup).
+## 2026-11-02 | ADR 0088 X4 | B2 sleeves: position, parameters, total-vol decoy
+- Question: which position `high_vol_call_write` holds (no `short_call` template exists), the strike and tenor of each sleeve, and the role of `total_vol_high` (S2).
+- Options: `covered_call` / a naked `short_call` / a call spread; X2's defaults with or without a `delta16` variant; `total_vol_high` as a decoy / its own setup / unused.
+- Decision: `covered_call` as the basis, a `spread` variant on a new `call_spread` template (short 0.30, long 0.10 call, `max_loss` collateral, the mirror of `put_spread`) and a `position:long_shares` baseline; no naked call template. X2's defaults for both sleeves (0.30 delta, 30 days, holds 15 and 21, declared 21, the `short_premium_allowed` gate, `liquid_optionable_floored`, every session, top 20) with one `delta16` variant each. `total_vol_high` is a decoy baseline of `high_vol_call_write` only.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: a naked call has unbounded loss and needs the highest broker option level, so it is not publishable to retail traders (ADR 0083); the spread variant and the shares baseline separate the call premium from the IVOL-puzzle drag on the share leg; a third setup would spend a trial on a question a decoy answers.

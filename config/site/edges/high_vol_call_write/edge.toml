@@ -1,0 +1,122 @@
+# Edge document (ADR 0053, ADR 0088; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Research B2 (calls on high-vol names, puts on low-vol
+# names, never the reverse), build row X4 of docs/options/backend-build.md: one of two sleeves,
+# each the other's decoy (low_vol_put_write). Position and parameters decided by Fable on the
+# owner's behalf, pending owner confirmation (docs/decisions/log.md, 2026-11-02 X4).
+id = "high_vol_call_write"
+name = "Covered calls on high idiosyncratic volatility"
+family = "C"
+thesis = "Covered calls written on the liquid optionable stocks with the highest idiosyncratic volatility earn more on their collateral than the same calls written on the calmest names."
+mechanism = """Investors who want lottery-like payoffs buy calls on volatile, speculative stocks, and the
+dealers who sell them cannot hedge the jump risk away, so those options are priced above the
+volatility that follows: delta-hedged option returns fall as idiosyncratic volatility rises (Cao and
+Han 2013; Boyer and Vorkink 2014)."""
+persistence = """The demand comes from a preference for skewed payoffs and from leverage limits that send
+speculators to options, both structural; dealers' capital limits keep the premium from being
+competed away (Garleanu, Pedersen and Poteshman 2009). The IVOL puzzle (the same stocks' low
+returns, Ang, Hodrick, Xing and Zhang 2006) drags on the covered call's share leg."""
+schedule = "every_session"
+universe = "liquid_optionable_floored"
+top_k = 20
+# One implementation and a declared horizon ([implementation]): the chains leave no in-sample slice
+# to choose a basis from. low_volatility is the other sleeve (calls on the calmest names: the
+# reverse B2 rules out); total_vol_high asks whether the idiosyncratic part adds anything over
+# total volatility (S2); position:long_shares values the same picks as shares alone.
+screeners = ["ivol_high"]
+baselines = ["low_volatility", "total_vol_high", "position:long_shares"]
+status = "candidate"
+mechanism_kind = "lottery_demand"
+asset_class = "options"
+frozen_from = 2026-04-01
+holdout_from = 2026-11-03  # ADR 0088 d15: the session after this document was committed; no verdict until closed trades from it reach 3 months
+notes = """Each session, the 20 liquid optionable stocks with the highest four-factor idiosyncratic
+volatility (ivol_high v1; no ETF, which has no idiosyncratic risk of its own) are bought as 100
+shares with one 0.30-delta call sold on the first monthly expiry at least 30 days out (up to about
+58 days) (the covered_call template), entered at S's close and held 15 or 21 sessions; the
+return is on the notional of the shares, net of the site's option cost levels; judged by the tails
+profile (the option_pnl default). A naked call is not filed: its loss is unbounded and the site
+does not publish undefined-risk positions. The spread variant sells the same call and buys a
+0.10-delta call above it (call_spread, measured on its maximum loss): the call premium without the
+share leg's drag. Gated: no entry unless market_conditions@v2.short_premium_allowed is true at D.
+The verdict rests on the 21-session hold (declared); the 15-session one is reported beside it.
+Data: Cboe-era chains only (from 2026-10-02); the single-name bought history waits on F7 and D6,
+and evidence derived from it would be owner-only (personal licence). No option verdict before the
+3-month unseen holdout from 2026-11-03 (ADR 0088, enforced by the judge), and the 40
+out-of-sample trades a verdict needs. An earnings date inside the window is not excluded: a
+volatile name's report is part of why its options are rich, and the comparison sleeve has the same
+rule."""
+
+[implementation]
+horizon = 21
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[outcome]
+kind = "option_pnl"
+position = "covered_call"
+strike_delta = 0.30
+tenor_days = 30
+horizon_sessions = [15, 21]
+benchmark = "none"
+start_offset_sessions = 1
+
+[[variants]]
+id = "delta16"
+[variants.outcome]
+strike_delta = 0.16
+
+[[variants]]
+id = "spread"
+[variants.outcome]
+position = "call_spread"
+
+[quality_bar]
+outcome = """The covered call's return on its notional (100 shares at the entry close) from the entry
+close to the close 15 or 21 sessions later, the call marked at the chain's mid less the quoted
+half-spreads and the site's option cost levels (verdict.toml [option_costs]); the spread variant's on
+its maximum loss. The tails profile weighs the return, its bootstrap t, the probabilistic Sharpe
+ratio and the CVaR of the worst trades."""
+trigger_timing = """The screen's field (ivol_252d, a 252-session regression) and the gate's market
+conditions are stored after the close of the decision session D, so the first fill is the next
+session's close: the entry session is S = D + 1 (start_offset_sessions = 1); the call is chosen on
+S's chain."""
+replication = """The source sorts every optionable stock each month on idiosyncratic volatility, sells one
+at-the-money call about 1.5 months out, delta-hedges it daily and reads the decile spread (Cao and
+Han 2013). Here the hedge is the share leg held statically (a covered call, about 0.70 delta net),
+the call is out of the money, the harness holds the top 20 every session, and the comparison is the
+same position on the calmest names (low_volatility) and on the most volatile by total volatility
+(total_vol_high), plus the shares alone."""
+expected_size = """Cao and Han (2013) report delta-hedged call returns about 1% a month lower for the
+highest idiosyncratic-volatility decile than the lowest (not verified against the tables, so no
+figure is filed). A covered call's return is mostly its share leg's move, so the spread between
+sleeves is small next to their volatility. The put's and call's P&L need the stored chains, kept
+from 2026-10-02 only: a verdict waits for the 40 out-of-sample trades and the 3-month holdout."""
+capacity_costs = """The cost is the call's bid-ask spread, wider on volatile single names; the quoted
+half-spreads are paid at entry and exit, and the universe requires $50M of 20-day dollar volume
+and a price above $5. An individual's size is far below the open interest."""
+failure_modes = """A takeover or a squeeze takes the shares through the strike and caps the gain, while
+a collapse loses the share leg's fall less the premium: the most volatile names do both. Retire if,
+in the frozen period, the picks' return on collateral after costs is not above the same position on
+the low_volatility picks, or their CVaR is worse."""
+decoys = """The reverse sleeve (calls on the calmest names, low_volatility), total volatility in
+place of the idiosyncratic part (total_vol_high), and the same picks held as shares alone
+(position:long_shares): the premium must add to the share leg, not just track it."""
+
+[[sources]]
+title = "Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013"
+url = "https://doi.org/10.1016/j.jfineco.2012.11.010"
+
+[[sources]]
+title = "Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finance, 2014"
+url = "https://doi.org/10.1111/jofi.12152"
+
+[[sources]]
+title = "Garleanu, N., Pedersen, L. H. and Poteshman, A., Demand-Based Option Pricing, Review of Financial Studies, 2009"
+url = "https://doi.org/10.1093/rfs/hhp005"
+
+[[sources]]
+title = "Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006"
+url = "https://doi.org/10.1111/j.1540-6261.2006.00836.x"

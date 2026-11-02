@@ -11,7 +11,9 @@ Back to the [index of every edge](../edges.md).
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
 | Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`) | candidate | every session | option pnl, over 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 45-day tenor, forward-only from 2026-10-02), costs 35 bps | none yet |
+| Covered calls on high idiosyncratic volatility (`high_vol_call_write`) | candidate | every session | option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02) | `ivol_high` |
 | Index put write (`index_put_write`) | candidate | calendar:after monthly expiry | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
+| Short puts on low-volatility names (`low_vol_put_write`) | candidate | every session | option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02) | `low_volatility` |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 100% SVXY, entered 1 session after the decision session, costs 10 bps | `etf_priced` |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle long (basis model, not a quote), costs 35 bps | none yet |
@@ -215,6 +217,38 @@ Back to the [index of every edge](../edges.md).
 - Israelov, R. and Nielsen, L. N. (2014), Covered Call Strategies: One Fact and Eight Myths, Financial Analysts Journal <https://www.aqr.com/-/media/AQR/Documents/Insights/Journal-Article/FAJ-Covered-Call-Strategies-One-Fact-and-Eight-Myths.pdf>
 - Driessen, J., Maenhout, P. and Vilkov, G. (2009), The Price of Correlation Risk, Journal of Finance
 
+## Covered calls on high idiosyncratic volatility (`high_vol_call_write`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Covered calls written on the liquid optionable stocks with the highest idiosyncratic volatility earn more on their collateral than the same calls written on the calmest names.
+
+- **Outcome:** option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02)
+- **Schedule:** every session
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** 20
+- **Screeners:** `ivol_high`
+- **Baselines:** `low_volatility`, `total_vol_high`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Each session, the 20 liquid optionable stocks with the highest four-factor idiosyncratic volatility (ivol_high v1; no ETF, which has no idiosyncratic risk of its own) are bought as 100 shares with one 0.30-delta call sold on the first monthly expiry at least 30 days out (up to about 58 days) (the covered_call template), entered at S's close and held 15 or 21 sessions; the return is on the notional of the shares, net of the site's option cost levels; judged by the tails profile (the option_pnl default). A naked call is not filed: its loss is unbounded and the site does not publish undefined-risk positions. The spread variant sells the same call and buys a 0.10-delta call above it (call_spread, measured on its maximum loss): the call premium without the share leg's drag. Gated: no entry unless market_conditions@v2.short_premium_allowed is true at D. The verdict rests on the 21-session hold (declared); the 15-session one is reported beside it. Data: Cboe-era chains only (from 2026-10-02); the single-name bought history waits on F7 and D6, and evidence derived from it would be owner-only (personal licence). No option verdict before the 3-month unseen holdout from 2026-11-03 (ADR 0088, enforced by the judge), and the 40 out-of-sample trades a verdict needs. An earnings date inside the window is not excluded: a volatile name's report is part of why its options are rich, and the comparison sleeve has the same rule.
+
+**Quality bar**
+
+1. **Mechanism:** Investors who want lottery-like payoffs buy calls on volatile, speculative stocks, and the dealers who sell them cannot hedge the jump risk away, so those options are priced above the volatility that follows: delta-hedged option returns fall as idiosyncratic volatility rises (Cao and Han 2013; Boyer and Vorkink 2014).
+2. **Persistence:** The demand comes from a preference for skewed payoffs and from leverage limits that send speculators to options, both structural; dealers' capital limits keep the premium from being competed away (Garleanu, Pedersen and Poteshman 2009). The IVOL puzzle (the same stocks' low returns, Ang, Hodrick, Xing and Zhang 2006) drags on the covered call's share leg.
+3. **Outcome:** The covered call's return on its notional (100 shares at the entry close) from the entry close to the close 15 or 21 sessions later, the call marked at the chain's mid less the quoted half-spreads and the site's option cost levels (verdict.toml [option_costs]); the spread variant's on its maximum loss. The tails profile weighs the return, its bootstrap t, the probabilistic Sharpe ratio and the CVaR of the worst trades.
+4. **Trigger timing:** The screen's field (ivol_252d, a 252-session regression) and the gate's market conditions are stored after the close of the decision session D, so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1); the call is chosen on S's chain.
+5. **Faithful replication:** The source sorts every optionable stock each month on idiosyncratic volatility, sells one at-the-money call about 1.5 months out, delta-hedges it daily and reads the decile spread (Cao and Han 2013). Here the hedge is the share leg held statically (a covered call, about 0.70 delta net), the call is out of the money, the harness holds the top 20 every session, and the comparison is the same position on the calmest names (low_volatility) and on the most volatile by total volatility (total_vol_high), plus the shares alone.
+6. **Expected size and sample:** Cao and Han (2013) report delta-hedged call returns about 1% a month lower for the highest idiosyncratic-volatility decile than the lowest (not verified against the tables, so no figure is filed). A covered call's return is mostly its share leg's move, so the spread between sleeves is small next to their volatility. The put's and call's P&L need the stored chains, kept from 2026-10-02 only: a verdict waits for the 40 out-of-sample trades and the 3-month holdout.
+7. **Capacity and costs:** The cost is the call's bid-ask spread, wider on volatile single names; the quoted half-spreads are paid at entry and exit, and the universe requires $50M of 20-day dollar volume and a price above $5. An individual's size is far below the open interest.
+8. **Failure modes and retirement:** A takeover or a squeeze takes the shares through the strike and caps the gain, while a collapse loses the share leg's fall less the premium: the most volatile names do both. Retire if, in the frozen period, the picks' return on collateral after costs is not above the same position on the low_volatility picks, or their CVaR is worse.
+9. **Decoys:** The reverse sleeve (calls on the calmest names, low_volatility), total volatility in place of the idiosyncratic part (total_vol_high), and the same picks held as shares alone (position:long_shares): the premium must add to the share leg, not just track it.
+
+**Sources**
+
+- Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013 <https://doi.org/10.1016/j.jfineco.2012.11.010>
+- Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finance, 2014 <https://doi.org/10.1111/jofi.12152>
+- Garleanu, N., Pedersen, L. H. and Poteshman, A., Demand-Based Option Pricing, Review of Financial Studies, 2009 <https://doi.org/10.1093/rfs/hhp005>
+- Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006 <https://doi.org/10.1111/j.1540-6261.2006.00836.x>
+
 ## Index put write (`index_put_write`)
 
 **Status:** candidate. **Family:** C. **Thesis:** Selling a cash-secured put on SPY, QQQ or IWM each month earns more on its collateral than holding the same share delta, because index puts are priced above the moves that follow.
@@ -245,6 +279,38 @@ Back to the [index of every edge](../edges.md).
 - Israelov, R. and Nielsen, L., Covered Calls Uncovered, Financial Analysts Journal, 2015 <https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered>
 - Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk, Journal of Finance, 2009
 - Cboe S&P 500 PutWrite Index (PUT) methodology <https://www.cboe.com/us/indices/dashboard/put/>
+
+## Short puts on low-volatility names (`low_vol_put_write`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Cash-secured puts sold on the calmest liquid optionable names earn more on their collateral than the same puts sold on the names with the highest idiosyncratic volatility.
+
+- **Outcome:** option pnl, over 15, 21 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 30-day tenor, forward-only from 2026-10-02)
+- **Schedule:** every session
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** 20
+- **Screeners:** `low_volatility`
+- **Baselines:** `ivol_high`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Each session, the 20 liquid optionable names with the lowest 60-session realised volatility (low_volatility v1; stocks, ADRs and ETFs) each sell one 0.30-delta put on the first monthly expiry at least 30 days out (up to about 58 days) (the short_put template), entered at S's close and held 15 or 21 sessions; the return is on the cash-secured collateral (strike x 100), net of the site's option cost levels; judged by the tails profile (the option_pnl default). Gated: no entry unless market_conditions@v2.short_premium_allowed is true at D. The verdict rests on the 21-session hold (declared); the 15-session one is reported beside it. The comparison sleeve, ivol_high, holds stocks only, so a gap can partly be the ETFs': the main sleeve's ETF share is in its picks. Data: Cboe-era chains only (from 2026-10-02); the single-name bought history waits on F7 and D6, and evidence derived from it would be owner-only (personal licence). No option verdict before the 3-month unseen holdout from 2026-11-03 (ADR 0088, enforced by the judge), and the 40 out-of-sample trades a verdict needs. A takeover target pinned near its offer is the calmest name of all: its put is cheap and the deal's break is the loss.
+
+**Quality bar**
+
+1. **Mechanism:** Calm stocks and funds earn about as much as volatile ones with far less risk (the low-volatility anomaly, Blitz and van Vliet 2007), so a put on them is assigned less often than its price implies; on the volatile names the put sits under a stock whose returns lag (Ang, Hodrick, Xing and Zhang 2006) and whose crashes are larger.
+2. **Persistence:** Benchmarked managers avoid calm stocks' tracking error and leverage-constrained investors prefer volatile ones (Frazzini and Pedersen 2014; Baker, Bradley and Wurgler 2011), and a put seller is paid for crash risk that clusters, so neither side is competed away.
+3. **Outcome:** The short put's return on its cash-secured collateral (strike x 100) from the entry close to the close 15 or 21 sessions later, net of the site's option cost levels (verdict.toml [option_costs]); the tails profile weighs the return, its bootstrap t, the probabilistic Sharpe ratio and the CVaR of the worst trades.
+4. **Trigger timing:** The screen's field (hv60) and the gate's market conditions are stored after the close of the decision session D, so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1); the put is chosen on S's chain.
+5. **Faithful replication:** No paper tests this exact sleeve: it joins the low-volatility sort (Blitz and van Vliet 2007, three-year volatility; 60 sessions here, the longest window stored) with a cash-secured put write. The comparison is the same put on the most volatile names by idiosyncratic volatility (ivol_high), the reverse sleeve B2 rules out.
+6. **Expected size and sample:** Not published for the sleeve. A low-volatility name's put collects less premium on the same delta, so the claim is a better return on collateral and a smaller tail, not a larger average. The P&L needs the stored chains, kept from 2026-10-02 only: a verdict waits for the 40 out-of-sample trades and the 3-month holdout.
+7. **Capacity and costs:** The cost is the put's bid-ask spread, narrow on the calm large names and ETFs the sort favours; the quoted half-spreads are paid at entry and exit, and the universe requires $50M of 20-day dollar volume and a price above $5.
+8. **Failure modes and retirement:** Calm names can gap on news (a takeover break, a guidance cut), and low premium leaves little cushion. Retire if, in the frozen period, the picks' return on collateral after costs is not above the same put on the ivol_high picks, or their CVaR is worse.
+9. **Decoys:** The reverse sleeve (puts on the most volatile names, ivol_high) on the same sessions: the calm names' puts must do better, not just lose less often while collecting less.
+
+**Sources**
+
+- Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk Without Lower Return, Journal of Portfolio Management, 2007 <https://papers.ssrn.com/abstract=980865>
+- Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006 <https://doi.org/10.1111/j.1540-6261.2006.00836.x>
+- Frazzini, A. and Pedersen, L. H., Betting Against Beta, Journal of Financial Economics, 2014 <https://doi.org/10.1016/j.jfineco.2013.10.005>
+- Baker, M., Bradley, B. and Wurgler, J., Benchmarks as Limits to Arbitrage: Understanding the Low-Volatility Anomaly, Financial Analysts Journal, 2011 <https://doi.org/10.2469/faj.v67.n1.4>
 
 ## Option-implied signals (`option_cp_iv_signals`)
 

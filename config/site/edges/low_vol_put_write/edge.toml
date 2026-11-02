@@ -1,0 +1,104 @@
+# Edge document (ADR 0053, ADR 0088; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Research B2 (calls on high-vol names, puts on low-vol
+# names, never the reverse), build row X4 of docs/options/backend-build.md: one of two sleeves,
+# each the other's decoy (high_vol_call_write). Parameters decided by Fable on the owner's behalf,
+# pending owner confirmation (docs/decisions/log.md, 2026-11-02 X4).
+id = "low_vol_put_write"
+name = "Short puts on low-volatility names"
+family = "C"
+thesis = "Cash-secured puts sold on the calmest liquid optionable names earn more on their collateral than the same puts sold on the names with the highest idiosyncratic volatility."
+mechanism = """Calm stocks and funds earn about as much as volatile ones with far less risk (the
+low-volatility anomaly, Blitz and van Vliet 2007), so a put on them is assigned less often than its
+price implies; on the volatile names the put sits under a stock whose returns lag (Ang, Hodrick,
+Xing and Zhang 2006) and whose crashes are larger."""
+persistence = """Benchmarked managers avoid calm stocks' tracking error and leverage-constrained
+investors prefer volatile ones (Frazzini and Pedersen 2014; Baker, Bradley and Wurgler 2011), and
+a put seller is paid for crash risk that clusters, so neither side is competed away."""
+schedule = "every_session"
+universe = "liquid_optionable_floored"
+top_k = 20
+# One implementation and a declared horizon ([implementation]). ivol_high is the other sleeve
+# (puts on the most volatile names: the reverse B2 rules out).
+screeners = ["low_volatility"]
+baselines = ["ivol_high"]
+status = "candidate"
+mechanism_kind = "paid_for_risk"
+asset_class = "options"
+frozen_from = 2026-04-01
+holdout_from = 2026-11-03  # ADR 0088 d15: the session after this document was committed; no verdict until closed trades from it reach 3 months
+notes = """Each session, the 20 liquid optionable names with the lowest 60-session realised volatility
+(low_volatility v1; stocks, ADRs and ETFs) each sell one 0.30-delta put on the first monthly expiry at least 30
+days out (up to about 58 days) (the short_put template), entered at S's close and
+held 15 or 21 sessions; the return is on the cash-secured collateral (strike x 100), net of the
+site's option cost levels; judged by the tails profile (the option_pnl default). Gated: no entry
+unless market_conditions@v2.short_premium_allowed is true at D. The verdict rests on the
+21-session hold (declared); the 15-session one is reported beside it. The comparison sleeve,
+ivol_high, holds stocks only, so a gap can partly be the ETFs': the main sleeve's ETF share is in
+its picks. Data: Cboe-era chains only (from 2026-10-02); the single-name bought history waits on
+F7 and D6, and evidence derived from it would be owner-only (personal licence). No option verdict
+before the 3-month unseen holdout from 2026-11-03 (ADR 0088, enforced by the judge), and the 40
+out-of-sample trades a verdict needs. A takeover target pinned near its offer is the calmest name
+of all: its put is cheap and the deal's break is the loss."""
+
+[implementation]
+horizon = 21
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[outcome]
+kind = "option_pnl"
+position = "short_put"
+strike_delta = 0.30
+tenor_days = 30
+horizon_sessions = [15, 21]
+benchmark = "none"
+start_offset_sessions = 1
+
+[[variants]]
+id = "delta16"
+[variants.outcome]
+strike_delta = 0.16
+
+[quality_bar]
+outcome = """The short put's return on its cash-secured collateral (strike x 100) from the entry close
+to the close 15 or 21 sessions later, net of the site's option cost levels (verdict.toml
+[option_costs]); the tails profile weighs the return, its bootstrap t, the probabilistic Sharpe
+ratio and the CVaR of the worst trades."""
+trigger_timing = """The screen's field (hv60) and the gate's market conditions are stored after the
+close of the decision session D, so the first fill is the next session's close: the entry session
+is S = D + 1 (start_offset_sessions = 1); the put is chosen on S's chain."""
+replication = """No paper tests this exact sleeve: it joins the low-volatility sort (Blitz and van
+Vliet 2007, three-year volatility; 60 sessions here, the longest window stored) with a cash-secured
+put write. The comparison is the same put on the most volatile names by idiosyncratic volatility
+(ivol_high), the reverse sleeve B2 rules out."""
+expected_size = """Not published for the sleeve. A low-volatility name's put collects less premium on
+the same delta, so the claim is a better return on collateral and a smaller tail, not a larger
+average. The P&L needs the stored chains, kept from 2026-10-02 only: a verdict waits for the 40
+out-of-sample trades and the 3-month holdout."""
+capacity_costs = """The cost is the put's bid-ask spread, narrow on the calm large names and ETFs the
+sort favours; the quoted half-spreads are paid at entry and exit, and the universe requires $50M of
+20-day dollar volume and a price above $5."""
+failure_modes = """Calm names can gap on news (a takeover break, a guidance cut), and low premium leaves
+little cushion. Retire if, in the frozen period, the picks' return on collateral after costs is not
+above the same put on the ivol_high picks, or their CVaR is worse."""
+decoys = """The reverse sleeve (puts on the most volatile names, ivol_high) on the same sessions: the
+calm names' puts must do better, not just lose less often while collecting less."""
+
+[[sources]]
+title = "Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk Without Lower Return, Journal of Portfolio Management, 2007"
+url = "https://papers.ssrn.com/abstract=980865"
+
+[[sources]]
+title = "Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006"
+url = "https://doi.org/10.1111/j.1540-6261.2006.00836.x"
+
+[[sources]]
+title = "Frazzini, A. and Pedersen, L. H., Betting Against Beta, Journal of Financial Economics, 2014"
+url = "https://doi.org/10.1016/j.jfineco.2013.10.005"
+
+[[sources]]
+title = "Baker, M., Bradley, B. and Wurgler, J., Benchmarks as Limits to Arbitrage: Understanding the Low-Volatility Anomaly, Financial Analysts Journal, 2011"
+url = "https://doi.org/10.2469/faj.v67.n1.4"

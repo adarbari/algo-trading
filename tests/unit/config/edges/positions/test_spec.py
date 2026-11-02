@@ -13,6 +13,7 @@ from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.named import DELTA_EQUIVALENT
 from algotrade.config.edges.positions.chain import grain_name, reads_share_path
+from algotrade.config.edges.positions.key import parsed_key, position_key
 from algotrade.config.edges.positions.spec import (
     SLEEVE_BASE,
     ExitSettings,
@@ -183,9 +184,10 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
 
 
 # Site setups written with ADR 0088's keys from the start (no stored hash of theirs can change).
-# X1; X2 (vrp_short_premium's new version and its iv_rank_high twin)
+# X1; X2 (vrp_short_premium's new version and its iv_rank_high twin); X3; X4 (the B2 sleeves)
 BORN_WITH_THE_KEYS = (
     "index_put_write", "vrp_short_put", "iv_rank_short_put", "covered_call_strike_tenor",
+    "high_vol_call_write", "low_vol_put_write",
 )  # fmt: skip
 
 
@@ -195,6 +197,16 @@ def test_every_site_edge_hashes_without_the_new_keys() -> None:
     for edge in (e for e in edges if e.id not in BORN_WITH_THE_KEYS):
         assert not set(new) & set(identity_dict(asdict(edge))), edge.id
         assert "position" not in identity_dict(asdict(edge.outcome)), edge.id
+
+
+def test_the_b2_spread_variant_keeps_its_wing_on_max_loss_and_keys_apart_from_the_main() -> None:
+    edge = next(e for e in load_edges(FileConfigStore(REPO_ROOT / "config"))
+                if e.id == "high_vol_call_write")  # fmt: skip
+    spread = next(v for v in edge.variants if v.id == "spread")
+    parsed = parsed_key(spread.outcome, 21)
+    legs = [(leg.right, leg.qty, leg.delta) for leg in parsed.legs]
+    assert legs == [("C", -1, 0.30), ("C", 1, 0.10)] and parsed.collateral == "max_loss"
+    assert position_key(spread.outcome, 21) != position_key(edge.outcome, 21)  # its own trades
 
 
 SHARE_EXIT = {
