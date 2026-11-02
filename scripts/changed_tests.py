@@ -10,6 +10,10 @@ changed` and failed CI on them).
 This narrows the first check. `--areas` prints the areas the change touches, `python`, `web`
 and / or `docs`, by the same rule as CI's "Changed areas" job (.github/workflows/ci.yml), so
 `make check` runs the gates for those areas; a branch with no change (main) is every area.
+
+A remote base (`origin/main`) is fetched first: a worktree's `origin/main` can be days old, so
+work merged since counted as changed and one push ran over 10 min of other PRs' tests (V2, V5,
+2026-11-02). A failed fetch (offline, a shallow CI checkout) keeps the ref as it is.
 """
 
 from __future__ import annotations
@@ -46,6 +50,26 @@ CATALOGUE_TESTS = ("tests/scripts/test_export_catalogue.py",)
 def _git(*args: str) -> list[str]:
     out = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True)
     return [line for line in out.stdout.splitlines() if line]
+
+
+FETCH_TIMEOUT = 60
+
+
+def refresh(base: str) -> None:
+    """Fetch `base` when it names a remote branch (`origin/main`), so the merge base is fresh."""
+    remote, _, branch = base.partition("/")
+    try:
+        if not branch or remote not in _git("remote"):
+            return
+        subprocess.run(
+            ["git", "fetch", "--quiet", remote, branch],
+            cwd=REPO,
+            capture_output=True,
+            timeout=FETCH_TIMEOUT,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        print(f"changed_tests: could not fetch {base} ({exc}); using it as it is", file=sys.stderr)
 
 
 def changed_files(base: str) -> list[str]:
@@ -126,6 +150,8 @@ def changed_areas(files: list[str]) -> list[str]:
 def main(argv: list[str]) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     base = args[0] if args else "origin/main"
+    if "--no-fetch" not in argv:
+        refresh(base)
     if "--areas" in argv:
         try:
             files = changed_files(base)
