@@ -48,7 +48,7 @@ def test_ideas_rank_the_runs_of_the_session_and_serve_the_best_pick(graph: Graph
     ideas = body["data"]["ideas"]
     assert (ideas["session"], ideas["total"]) == ("2022-11-23", 2)
     [screener] = [s for s in ideas["screeners"] if s["screener"]["id"] == "vrp_scanner"]
-    assert len(ideas["screeners"]) == 95  # the other ninety-four site presets: NOT_RUN
+    assert len(ideas["screeners"]) == 96  # the other ninety-five site presets: NOT_RUN
     assert screener["screener"] == {
         "id": "vrp_scanner", "owner": "site", "scope": "site", "name": "VRP", "version": 4,
         "latestRun": {"runId": screener["run"]["runId"]}, "notRun": None,
@@ -132,7 +132,7 @@ def test_screeners_and_a_view(graph: Graph) -> None:
         ' missing: view(scope: "screener:nope") { scope } }'
     )
     screeners = {s["id"]: s for s in body["data"]["screeners"]}
-    assert len(screeners) == 95  # vrp_scanner and ninety-four other presets
+    assert len(screeners) == 96  # vrp_scanner and ninety-five other presets
     assert screeners["vrp_scanner"] == {
         "id": "vrp_scanner", "name": "VRP", "latestRun": {"picked": 2}, "notRun": None
     }  # fmt: skip
