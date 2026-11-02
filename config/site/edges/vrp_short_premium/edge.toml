@@ -1,6 +1,6 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Edge zero (plan ED4a): the harness end to end on the
-# existing short-premium screens, with no new rules.
+# src/algotrade/config/edges/document.py. Edge zero (plan ED4a), re-filed 2026-11-02 as an option
+# setup (ADR 0088, build row X2): the put's own P&L on the stored chains, a new version (a trial).
 id = "vrp_short_premium"
 name = "Volatility risk premium"
 thesis = "Option implied volatility on liquid names tends to exceed the volatility that follows, so selling premium where implied is richest earns the gap."
@@ -15,31 +15,35 @@ top_k = 20
 # vrp_iv_hv reads feature.vrp_iv30 (IBKR-only before 2026-10-02) and HV30, ~500 sessions of history. short_premium_liquidity
 # (option_liquidity@v1) and vrp_scanner v4 (put_wing@v1, option_tier) need option chains, stored
 # only from 2026-10-02: each rejoins once >= 40 independent sessions of chain data exist.
-screeners = ["vrp_iv_hv"]
+screeners = ["vrp_iv_hv", "iv_rank_high"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
-notes = """The one-IV rule (ADR 0053) governs the outcome (iv_field, the IBKR IV30), not the screener's selection, which reads feature.vrp_iv30.
-Hit (ED4a, owner intent 2026-10-08): the short put is not assigned, struck at a 0.30
-delta at the entry close on the IBKR IV30 read at D, held to the horizon's close (15, 21 or 31
-sessions: the 21 to 45 DTE the owner trades, the horizon the tenor). The strike is the exact
-Black-Scholes delta strike (r = q = 0): K = P exp(-z iv sqrt(T) + iv^2 T / 2), z = N^-1(1 - 0.30),
-T = horizon / 252, P the entry close; the hit is the window's return above K / P - 1. Reported
-beside the hit rate, never in it: reference_rate (the mean risk-neutral N(d2), the win rate an
-efficient premium would give) and touch_rate (the strike reached intraday). No premium and no
-P&L is modelled: a win rate overstates expectancy, because the rare losses are large. IBKR's IV
-is personal-use (licence recorded on the result rows), fine for this private evaluation. Variants:
-delta 0.16, strangle, call, our own IV30, windows with no report expected, and the older
-realised-to-implied ratio below 1. IV30 (a 30-day tenor) is applied to the 15- and 31-session
-horizons too: a term-structure approximation, the same in the hit and in the reference rate."""
+notes = """RE-FILED 2026-11-02 (ADR 0088, X2): from expires_otm (a modelled not-assigned rate on the
+IBKR IV30) to option_pnl short_put, the put's own P&L on the stored Cboe chains: a 0.30-delta put
+on the expiry nearest 30 days, entered at S's close, held 15 or 21 sessions, its return on the
+cash-secured collateral net of the site's option cost levels; judged by the tails profile (the
+option_pnl default). A new version: a new trial, the expires_otm runs stay as they were. Gated:
+no entry unless market_conditions@v2.short_premium_allowed is true at D. iv_rank_high joins
+vrp_iv_hv as a second implementation, each measured apart (one row each in edge_picks). Dropped:
+realised_below_implied (the old ratio is not a position), and the strangle, call and our_iv30
+variants (no short strangle or short call template is filed yet; an IV source only fed the
+modelled hit). Data: Cboe-era chains only (from 2026-10-02); the single-name bought history waits
+on F7 and D6, so no verdict before ADR 0088's 3-month holdout, and today none before the 40
+out-of-sample trades a verdict needs. The no_earnings variant reads earnings_expected@v1 at D."""
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
 
 [outcome]
-kind = "expires_otm"
-structure = "put"
+kind = "option_pnl"
+position = "short_put"
 strike_delta = 0.30
-iv_field = "rollup.ibkr_iv@v1.iv30_ibkr"
-horizon_sessions = [15, 21, 31]
+tenor_days = 30
+horizon_sessions = [15, 21]
 benchmark = "none"
 start_offset_sessions = 1
 
@@ -48,24 +52,8 @@ id = "delta16"
 [variants.outcome]
 strike_delta = 0.16
 
-[[variants]]
-id = "strangle"
-[variants.outcome]
-structure = "strangle"
-strike_delta = 0.16
-
-[[variants]]
-id = "call"
-[variants.outcome]
-structure = "call"
-
-[[variants]]
-id = "our_iv30"
-[variants.outcome]
-iv_field = "rollup.iv30@v1.iv30"
-
 # Windows with no report expected inside the largest window (read at D, the window ends at
-# D + 1 + 31, so more than 32 sessions to the expected report): the premium is not an earnings
+# D + 1 + 21, so more than 22 sessions to the expected report): the premium is not an earnings
 # premium. A stock whose date is UNKNOWN (null) never passes, never read as "no earnings"
 # (earnings_expected@v1); an ETF has no earnings, so it stays.
 [[variants]]
@@ -82,45 +70,39 @@ all = [
     { field = "instrument.security_type", op = "eq", value = "ETF" },
     { all = [
       { field = "rollup.earnings_expected@v1.expected_basis", op = "ne", value = "UNKNOWN" },
-      { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 32 },
+      { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 22 },
     ] },
   ] },
 ]
 
-[[variants]]
-id = "realised_below_implied"
-[variants.outcome]
-kind = "hit_target"
-measure = "realised_to_implied_vol"
-direction = "below"
-target = 1.0
-
 [quality_bar]
-outcome = """The short put is not assigned at the horizon's close (expires_otm): how often the
-option the owner sells finishes out of the money, beside the risk-neutral rate and the share of
-windows whose strike was touched on the way."""
-trigger_timing = """IV30 (ibkr_iv@v1, Cboe chains) and HV30 are stored after the close of the
-decision session D, so the first fill is the next session's close: the entry session is S = D + 1
-(start_offset_sessions = 1). The screen and the implied vol are read at D, the outcome at S."""
-replication = """The screen is vrp_iv_hv v1 (IV30 minus HV30 at least 10 points, IV30 / HV30
+outcome = """The short put's return on its cash-secured collateral (strike x 100) from the entry
+close to the close 15 or 21 sessions later, net of the site's option cost levels
+(verdict.toml [option_costs]); the tails profile weighs the return, its bootstrap t, the
+probabilistic Sharpe ratio and the CVaR of the worst trades."""
+trigger_timing = """The screens' fields (IV30, HV30, IV rank) and the gate's market conditions are
+stored after the close of the decision session D, so the first fill is the next session's close:
+the entry session is S = D + 1 (start_offset_sessions = 1); the contract is chosen on S's chain."""
+replication = """The screens are vrp_iv_hv v1 (IV30 minus HV30 at least 10 points, IV30 / HV30
 at least 1.25, $50M of 20-day dollar volume, price above $5, no leveraged or inverse fund), the
-history-evaluable part of vrp_scanner (IV30 at least 50% there). short_premium_liquidity (tradable
+history-evaluable part of vrp_scanner (IV30 at least 50% there), and iv_rank_high v1 (IV rank at
+least 0.5). short_premium_liquidity (tradable
 put and call wings, option_liquidity@v1) and vrp_scanner rejoin once >= 40 independent sessions of
 chain data exist. The published setting is index variance (Carr and Wu 2009); single
 names are a step away from it."""
 expected_size = """Implied variance exceeds realised on average for the S&P 500 and most large
 stocks (Carr and Wu 2009); the single-name premium is smaller than the index's (Driessen,
-Maenhout and Vilkov 2009). IV30 history covers 502 sessions (ibkr_iv@v1, roadmap): 20-session
-windows spaced a horizon apart give about 25 independent sessions, under the 40 the bar asks,
-unless ED4a counts names within a session; chains are stored from 2026-10-02 only
-(docs/screeners/vrp-scanner.md), so short_premium_liquidity has days of history."""
+Maenhout and Vilkov 2009). The put's P&L needs the stored chains, kept from 2026-10-02 only:
+a verdict waits for the 40 out-of-sample trades and the 3-month holdout, and for the single-name
+bought history (F7, D6) before any earlier trade exists."""
 capacity_costs = """The cost is the option bid-ask spread, judged live; vrp_scanner (from v2) scores
 the put's stored spread (under 15% of mid), open interest and volume (over 1,000 each), and v3
 requires $50M of 20-day dollar volume. An individual's size is far below the open interest."""
 failure_modes = """Losses arrive together in volatility spikes (short premium is short the left
-tail), so the drawdown cap, not the hit rate, decides; an earnings date inside the window raises
-implied for a reason. Retire if, in the frozen period, the picks' hit rate is not above the base
-rate of every liquid optionable name, or the cap is breached more often than the base rate."""
+tail), so the tail of the return (CVaR), not the win rate, decides; an earnings date inside the
+window raises implied for a reason. Retire if, in the frozen period, the picks' return on
+collateral after costs is not above the base of every liquid optionable name's same put, or
+their CVaR is worse."""
 decoys = """Implied above realised before every earnings date and after every shock (a known event,
 not a premium), and high-IV names are small: compare with the size and 12-1 momentum baselines on
 the same sessions, and log windows without an earnings date as a variant."""

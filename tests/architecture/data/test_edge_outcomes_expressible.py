@@ -256,5 +256,5 @@ def test_the_vrp_earnings_exclusion_keeps_etfs_and_clears_the_whole_window() -> 
     variant = next(v for v in edge.variants if v.id == "no_earnings")
     text = repr(variant.universe)
     window = max(edge.outcome.horizon_sessions) + edge.outcome.start_offset_sessions
-    assert window == 32 and f"value={window}" in text.replace(" ", "")
+    assert window == 22 and f"value={window}" in text.replace(" ", "")  # 1 + 21 since X2
     assert "'ETF'" in text and "UNKNOWN" in text
