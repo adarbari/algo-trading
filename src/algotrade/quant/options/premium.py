@@ -16,6 +16,11 @@ All inputs broadcast (scalars or numpy arrays); ``right`` is ``"put"`` or ``"cal
   rights; the grid's IV is inverted with the session's rate and dividend yield, so the two
   differ by about 0.01 at 30 days (documented in docs/options/backend-concepts-2.md).
 
+- **Chance of assignment** (``assignment_chance``): the risk-neutral chance at least one sold leg
+  ends in the money at the expiry, from ``p_below`` per leg: below the highest sold put's strike
+  or above the lowest sold call's, the two disjoint while the put's strike is under the call's
+  (their sum), and certain when they overlap (a straddle: one of them always ends in the money).
+
 NaN propagates: a missing mid, a non-positive collateral, strike or vol gives NaN.
 """
 
@@ -63,3 +68,23 @@ def p_below(
     if _check(right):
         return prob_otm(spot, strike, sigma, t_years, "call")
     return np.asarray(1.0 - prob_otm(spot, strike, sigma, t_years, "put"), dtype=np.float64)
+
+
+def assignment_chance(
+    spot: float,
+    puts: list[tuple[float, float]],
+    calls: list[tuple[float, float]],
+    t_years: float,
+) -> float:
+    """The chance at least one sold leg ends in the money at the expiry; ``puts`` and ``calls``:
+    the sold legs' ``(strike, sigma)``. NaN where a leg's sigma or ``t_years`` is not positive
+    (``p_below``'s NaN), 0 with no sold leg. In [0, 1]."""
+    put = max(puts, default=None, key=lambda leg: leg[0])
+    call = min(calls, default=None, key=lambda leg: leg[0])
+    if put is not None and call is not None and put[0] >= call[0]:
+        legs = [put, call]
+        known = all(sigma > 0 for _, sigma in legs) and t_years > 0
+        return 1.0 if known else float("nan")
+    below = 0.0 if put is None else float(p_below(spot, put[0], put[1], t_years, "put"))
+    above = 0.0 if call is None else 1.0 - float(p_below(spot, call[0], call[1], t_years, "call"))
+    return float(min(below + above, 1.0))
