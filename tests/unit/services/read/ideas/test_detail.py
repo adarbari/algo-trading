@@ -9,7 +9,12 @@ from typing import Any
 import pytest
 
 from algotrade.services.ideas.setup_rule import CandidatePick
-from algotrade.services.read.evaluation.positions.exit_rule import ExitRule
+from algotrade.services.read.evaluation.positions.exit_rule import (
+    ExitRule,
+    Stop,
+    StopBasis,
+    StopKind,
+)
 from algotrade.services.read.ideas import detail, of_setup
 from algotrade.services.read.ideas.inverse import InstrumentSetup
 from algotrade.services.read.ideas.setups import QualifyingSetup, SessionSetups
@@ -165,6 +170,54 @@ def test_an_unreadable_pick_row_and_a_missing_earnings_source_are_unknown_not_em
     monkeypatch.setattr(detail, "load_instrument_events", lambda ctx, ids, days: {})
     none = detail.load_idea_detail(CTX, "X")
     assert none is not None and none.risks.unknown is not None
+
+
+def _close(monkeypatch: pytest.MonkeyPatch, value: float | None) -> None:
+    why = Unknown(UnknownCode.NO_ROW, None)  # type: ignore[arg-type]
+    cell = SimpleNamespace(value=value, unknown=None if value is not None else why)
+    monkeypatch.setattr(detail, "load_feature_values", lambda ctx, ids, names: {"EQ:X": (cell,)})
+
+
+def test_a_declared_share_stop_and_target_are_prices_of_the_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _close(monkeypatch, 100.0)
+    own = Stop(StopKind.DECLARED, fraction=0.05, basis=StopBasis.ENTRY)
+    rule = ExitRule("e", own, 5, take_profit=0.1, take_profit_basis=StopBasis.ENTRY)
+    prices = detail._exit_prices(CTX, "EQ:X", rule)
+    assert (round(prices.stop or 0, 6), round(prices.target or 0, 6)) == (95.0, 110.0)
+    assert prices.unknown is None
+
+
+def test_an_atr_fallback_stop_is_the_close_less_its_multiple_of_the_atr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _close(monkeypatch, 100.0)
+    fallback = Stop(StopKind.FALLBACK, atr=1.5, multiple=2.0)
+    prices = detail._exit_prices(CTX, "EQ:X", ExitRule("e", fallback, 5))
+    assert (prices.stop, prices.target) == (97.0, None)
+
+
+def test_an_option_setups_credit_based_exits_have_no_price(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def never(*args: Any) -> Any:
+        raise AssertionError("no close is read for an option basis")
+
+    monkeypatch.setattr(detail, "load_feature_values", never)
+    credit = Stop(StopKind.DECLARED, fraction=2.0, basis=StopBasis.CREDIT)
+    prices = detail._exit_prices(CTX, "EQ:X", ExitRule("e", credit, 5, take_profit=0.5))
+    assert prices == detail.IdeaExitPrices()
+
+
+def test_a_missing_close_leaves_both_prices_unknown_never_filled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _close(monkeypatch, None)
+    own = Stop(StopKind.DECLARED, fraction=0.05, basis=StopBasis.ENTRY)
+    rule = ExitRule("e", own, 5, take_profit=0.1, take_profit_basis=StopBasis.ENTRY)
+    prices = detail._exit_prices(CTX, "EQ:X", rule)
+    assert (prices.stop, prices.target) == (None, None) and prices.unknown is not None
 
 
 def test_a_premium_setups_pick_carries_the_option_sections_and_a_stocks_pick_does_not(

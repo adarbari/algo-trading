@@ -131,10 +131,10 @@ id = "idea_exit_rule"
 term = "Historical exit rule"
 short = "How the setup's past winners behaved: how far they dipped and how long they were held."
 body = """
-The stop distance is the drawdown that 80% of the setup's winning trades never went past, measured from the entry close. The other 20% went past it. The hold is the number of sessions the verdict was judged over. Both come from the setup's backtest, and a stop from fewer winning trades than a set minimum falls back to a multiple of the stock's recent average range. The page says which. The rule describes the past; it is not an instruction, and it knows nothing about the size you trade or your account. Don't treat the stop as a limit on loss: a price can gap through it.
+The stop distance is the drawdown that 80% of the setup's winning trades never went past, measured from the entry close. The other 20% went past it. The hold is the number of sessions the verdict was judged over. Both come from the setup's backtest, and a stop from fewer winning trades than a set minimum falls back to a multiple of the stock's recent average range. The page says which. The rule describes the past; it is not an instruction, and it knows nothing about the size you trade or your account. A setup that declares its own stop and take profit shows them as declared, with the stop and target as prices. Don't treat the stop as a limit on loss: a price can gap through it.
 """
 next = "Copy the rule as text to keep it with your own notes."
-see_also = ["idea_evidence", "idea_risks"]
+see_also = ["idea_evidence", "idea_risks", "exit_stop_declared", "exit_prices", "exit_take_profit"]
 
 [[term]]
 id = "idea_evidence"
