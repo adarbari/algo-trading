@@ -716,7 +716,7 @@ Source: `design-system/components/Field`
 
 ### FilterBar
 
-FilterBar: a table's filter bar (search, quick toggle chips, the many-valued filters in force, and a "more filters" panel) that uses a phone's space well. Wide, the search takes the row, under it the quick chips, the active chips and a "+ Filter" popover with the fields. Narrow (the bar's own width under `sm`), `sheet`: the search and one "Filters · N" button share a row, the button opens a side sheet with the quick chips and the fields, and the active chips scroll sideways under the row. Narrow, `scroll`: the search, then one row that scrolls sideways ("+ Filter" first, then the quick and the active chips). The two narrow forms are proposals; the owner picks one (ADR 0011). ADR 0082 adds: `groups` (`FilterGroupButton`s) on the toolbar row beside the search and the "More filters" trigger; below the chips a count line with `count` (an `aria-live=polite` region; narrow with the sheet open it is repeated in the sheet's footer: "12 of 340") and `actions` (Clear all, Save view); and, narrow, the sheet's footer button (`applyLabel` / `onApply`: "Show 12 results"). Without them the bar is as before.
+FilterBar: a table's filter bar (search, quick toggle chips, the many-valued filters in force, and a "more filters" panel) that uses a phone's space well. Wide, the search takes the row, under it the quick chips, the active chips and a "+ Filter" popover with the fields. Narrow (the bar's own width under `sm`): the search and one "Filters · N" button share a row, the button opens a side sheet with the quick chips and the fields, and the active chips scroll sideways under the row (the one narrow form; decisions log 2026-11-02). ADR 0082 adds: `groups` (`FilterGroupButton`s) on the toolbar row beside the search and the "More filters" trigger; below the chips a count line with `count` (an `aria-live=polite` region; narrow with the sheet open it is repeated in the sheet's footer: "12 of 340") and `actions` (Clear all, Save view); and, narrow, the sheet's footer button (`applyLabel` / `onApply`: "Show 12 results"). Without them the bar is as before.
 
 Source: `design-system/components/FilterBar`
 
@@ -728,7 +728,6 @@ Source: `design-system/components/FilterBar`
 | `more` | `ReactNode` | no | The fields of the many-valued filters (a `Field` + `Select` stack). |
 | `moreLabel` | `string` | no | Text of the wide "+ Filter" trigger (default "Filter"). |
 | `activeCount` | `number` | no | How many filters are in force: shown on the narrow button as "Filters · 2". |
-| `narrow` | `'sheet' \| 'scroll'` | no | The narrow form: `sheet` (default) or `scroll`. |
 | `label` | `string` | no | Accessible name of the bar (default "Filters"). |
 | `defaultOpen` | `boolean` | no | The narrow filters sheet starts open (a story's open state). |
 | `groups` | `ReactNode` | no | One `FilterGroupButton` per group, on the toolbar row beside the search. |
@@ -1280,6 +1279,18 @@ Source: `design-system/components/PendingRow`
 | `name` | `string` | yes | What is waiting, in monospace (the field the criterion reads). |
 | `summary` | `string \| undefined` | no | One line about it (the operator and threshold the criterion will have). |
 | `actions` | `ReactNode \| undefined` | no | The decision: buttons, primary first. |
+
+### PhoneFold
+
+PhoneFold: secondary content that is shown in place on a wide container and folds behind a `Disclosure` summary under `sm`, so a phone reaches the first row of a table sooner (ADR 0052). It measures its own width (a container, not the viewport) and keeps the same children in both.
+
+Source: `design-system/components/PhoneFold`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `ReactNode` | yes | The summary of the folded form. |
+| `count` | `ReactNode` | no | A count or short value at the end of the summary. |
+| `children` | `ReactNode` | yes | The content: shown in place when wide, behind the summary when narrow. |
 
 ### Popover
 
