@@ -13,12 +13,13 @@ amendment): ``formulas`` (B1,
 ``formulas.py``: checked, deduplicated by fingerprint and dry-run, pending until the trader
 accepts), ``missing`` and ``unresolved`` (``gaps.py``). The document holds only A criteria (the
 existing-field rewrite of a duplicate formula and the default reading of each unresolved term
-among them); a pending formula and its criterion travel beside it and are never auto-applied,
-nor are the ``suggestions`` (protective soft / score checks the sentence did not ask for,
-``suggestions.py``). A sentence the structured phrasebook entries resolve in full
-(``phrasebook/resolve.py``) is drafted with no model call (``phrasebook/shortcut.py``, ADR 0041
-amended 2026-10-12): its answer, in the model's own shape, goes through the same ``_draft`` and
-``_finished``, so the validators, the ``current`` criteria and the parts are the same; any
+among them); a pending formula and its criterion travel beside it and are never auto-applied.
+The model only translates the sentence (ADR 0083 decision 4): an answer's ``suggestions`` key
+(checks the sentence did not ask for, removed) is ignored. A sentence the structured phrasebook
+entries resolve in full (``phrasebook/resolve.py``) is drafted with no model call
+(``phrasebook/shortcut.py``, ADR 0041 amended 2026-10-12): its answer, in the model's own shape,
+goes through the same ``_draft`` and ``_finished``, so the validators, the ``current`` criteria and
+the parts are the same; any
 doubt (a criterion dropped or refused, a field ``current`` has) falls through to the model.
 A deterministic verifier (``parts/verify.py``, amended 2026-10-17) then reads the parts of a valid
 model draft: words nothing maps, an "or" left out of the words, an item tied to no words, "X or Y"
@@ -74,11 +75,6 @@ from algotrade.services.drafting.contract.missing_notes import (
     exclusion_notes,
     field_labels,
     without_false_claims,
-)
-from algotrade.services.drafting.contract.suggestions import (
-    DroppedSuggestion,
-    Suggestion,
-    suggestions_of,
 )
 from algotrade.services.drafting.parts.build import build_parts
 from algotrade.services.drafting.parts.items import items_of
@@ -153,8 +149,6 @@ class ScreenDraft:
     formulas_dropped: tuple[DroppedFormula, ...] = ()
     missing: tuple[MissingFeature, ...] = ()  # B2 / C: asked for, not buildable here
     unresolved: tuple[Unresolved, ...] = ()  # ambiguous terms; the document has the default
-    suggestions: tuple[Suggestion, ...] = ()  # soft / score checks offered, never in the document
-    suggestions_dropped: tuple[DroppedSuggestion, ...] = ()
     sentence: str = ""  # the whitespace-normalised sentence the parts' offsets count in
     parts: tuple[Part, ...] | None = None  # explained parts; None: the model gave none
     parts_stats: PartsStats | None = None  # how they were made (golden scoring; never served)
@@ -412,12 +406,6 @@ def _draft(
         document["rank"] = rank
     document, dropped = validated(ctx, screener_id, document, dropped)
     unresolved, reset_notes = _defaults_kept(unresolved, placed, document["criteria"])
-    suggestions, suggestions_dropped = suggestions_of(
-        proposal,
-        lambda raw, name: _alternative(ctx, screener_id, raw, name, catalogue),
-        list(document["criteria"].values()),
-        [alt.criterion for term in unresolved for alt in term.alternatives],
-    )
     notes = (
         *without_false_claims(notes_of(proposal)), *formulas.notes, *unresolved_notes,
         *missing_notes, *reset_notes,
@@ -425,7 +413,7 @@ def _draft(
     tie = proposal.get("tie_break")
     items = items_of(
         document["criteria"], tags, current, [(d.id, d.field) for d in dropped],
-        formulas.formulas, unresolved, missing, suggestions,
+        formulas.formulas, unresolved, missing,
         (part_tag(tie), document["rank"]["tie_break"]) if document.get("rank") else None, spans,
     )  # fmt: skip
     raw_parts = proposal.get("parts")
@@ -451,7 +439,6 @@ def _draft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
         missing=missing, unresolved=unresolved,
-        suggestions=suggestions, suggestions_dropped=suggestions_dropped,
         sentence=sentence, parts=explained[0] if explained else None,
         parts_stats=explained[1] if explained else None,
     )  # fmt: skip

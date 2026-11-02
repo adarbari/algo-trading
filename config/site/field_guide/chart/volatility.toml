@@ -138,7 +138,7 @@ op = "gte"
 value = 0.5
 mode = "soft"
 tolerance = 0.1
-note = "suggest rollup.earnings@v1.days_to_earnings gt 10 (soft, EVENT_RISK) and feature.iv_hv_spread gte 0.05"
+note = "an earnings date inside the hold lifts IV for a reason; rollup.earnings@v1.days_to_earnings gt 10 and feature.iv_hv_spread gte 0.05 apply only when the sentence asks for them"
 [[field.use]]
 for = "options cheap for this name (buy premium)"
 op = "lte"
@@ -325,7 +325,7 @@ for = "the premium's denominator is real"
 op = "gte"
 value = 0.10
 mode = "hard"
-note = "the floor the VRP ratio lacks by design; suggest it for any IV/HV screen"
+note = "the floor the VRP ratio lacks by design; applies when the sentence asks for a real premium"
 [[field.use]]
 for = "a volatile name (realised, a month and a half)"
 op = "gte"

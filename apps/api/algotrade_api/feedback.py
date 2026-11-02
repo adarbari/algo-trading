@@ -216,7 +216,7 @@ def parts_payload(parts: Sequence[Any] | None, replaced: str | None = None) -> l
         {
             "id": p.id, "words": p.words, "reading": p.reading, "kind": p.kind, "origin": p.origin,
             "items": len(p.criteria) + len(p.dropped) + len(p.formulas) + len(p.unresolved)
-            + len(p.missing) + len(p.suggestions) + int(p.rank),
+            + len(p.missing) + int(p.rank),
             **({"prior": "client"} if replaced is not None and p.id != replaced else {}),
         }
         for p in parts or ()

@@ -43,7 +43,7 @@ def test_no_parts_from_the_model_is_none_and_so_is_none_located() -> None:
     assert build_parts(SENTENCE, "nonsense", ITEMS, []) is None
 
 
-def test_the_kind_follows_the_refs_by_priority_and_suggestions_never_change_it() -> None:
+def test_the_kind_follows_the_refs_by_priority() -> None:
     def kind(*groups: str) -> str:
         items = [Item(g, f"r{n}", "p1") for n, g in enumerate(groups)]
         return build([{"id": "p1", "words": "liquid stocks", "reading": None}], items)[0]["p1"].kind
@@ -52,9 +52,7 @@ def test_the_kind_follows_the_refs_by_priority_and_suggestions_never_change_it()
     assert kind("criteria", "missing", "formulas") == "formula"
     assert kind("criteria", "missing") == "not_available"
     assert kind("criteria", "dropped") == "not_available"
-    assert kind("criteria", "suggestions") == "applied"
     assert kind("rank") == "applied"
-    assert kind("suggestions") == "not_understood"  # a suggestion alone understands nothing
     assert kind() == "not_understood"
 
 

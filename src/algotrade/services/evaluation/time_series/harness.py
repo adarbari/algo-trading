@@ -6,7 +6,9 @@ anything the partition did not hold at ``as_of``; a period with no usable row ha
 value (an unclosed window, a missing row and an UNMEASURED one are excluded, never a zero). It also
 turns the edge's symbols into ids through ``SymbolResolver`` (ADR 0018) and reads the Treasury bill
 rate known at a decision session D, for the "long in the window, bills otherwise" Sharpe ratio.
-``Returns.rows`` keeps the measured stored rows (the trade contract's windows, ADR 0088)."""
+``Returns.rows`` keeps the measured stored rows (the trade contract's windows, ADR 0088). For a
+named option sleeve (``sleeve.py``, ADR 0088 decision 14) it reads the stored option trades at
+each S the same way (``read_trades``), beside the stock's raw return over the same hold."""
 
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field, replace
@@ -16,7 +18,13 @@ import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import read_stored, select_outcomes
+from algotrade.data.outcomes import (
+    CHAIN_COLUMNS,
+    read_chain_stored,
+    read_stored,
+    select_chain,
+    select_outcomes,
+)
 from algotrade.data.rates import curve
 from algotrade.data.reference import resolver
 
@@ -25,6 +33,7 @@ BILL_DAYS = 91  # the curve's tenor nearest this one is the bill (about 3 months
 TRADING_DAYS = 252
 NO_OUTCOME = "NO_OUTCOME"  # no row at S: the window is not closed, or not computed, or no entry bar
 UNKNOWN_SYMBOL = "UNKNOWN_SYMBOL"  # the reference snapshot does not know the symbol
+CHAIN_KEYS = ("session_date", "benchmark", "window_end", "knowledge_ts")  # beside CHAIN_COLUMNS
 
 
 @dataclass(frozen=True)
@@ -80,6 +89,24 @@ def read_returns(
     if measured:
         out = replace(out, rows=pd.DataFrame(measured).reset_index(drop=True))
     return out
+
+
+def read_trades(
+    reader: StoreReader,
+    ids: Collection[str],
+    entries: Sequence[date],
+    horizon: int,
+    as_of: datetime,
+) -> pd.DataFrame:
+    """The stored option trades (every position key, one source per S) of ``ids`` held at most
+    ``horizon`` sessions from each of the ``entries`` (S), as the partitions held them at
+    ``as_of`` (``select_chain``'s columns; none stored: an empty frame of them)."""
+    wanted = sorted(set(entries))
+    stored = read_chain_stored(reader, wanted, as_of) if wanted and ids else None
+    if stored is None:
+        return pd.DataFrame(columns=[*CHAIN_COLUMNS, *CHAIN_KEYS])
+    found = select_chain(stored, horizon, wanted, as_of)
+    return found[found["instrument_id"].isin(set(ids))].reset_index(drop=True)
 
 
 def bill_returns(

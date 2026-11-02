@@ -291,7 +291,11 @@ beside `exit_rule.py` (responsibility `pick-positions`). The parent folder is at
 it cannot sit beside `pick_edges.py`. It reads the picks through `pick_edges.py` (owner
 `edge-picks-decision`), the option legs through the same selector (which owns the selection) and the
 share fields by catalogue name (ADR 0038). E9 measures the read; above 0.2 s it becomes a table
-written with `edge_picks` (an ADR 0081 amendment). Personal history never reaches it: `services`
+written with `edge_picks` (an ADR 0081 amendment). The budget is judged warm: the session's chain
+and feature reads stay in the result cache until the next publish, so only the first page view
+after a publish pays the cold read. Measured 2026-11-02 for 15 picks: shares 0.04 s warm beyond
+the exit rule; options (a fixture short put over the 2026-10-30 chains) 0.12 s warm, 0.59 s cold.
+So no table; re-measure when the first site option template ships. Personal history never reaches it: `services`
 cannot import `data.option_history`, and the loader reads `chains/*` only (fitness test).
 
 **Named-symbol setups** (A1 on SPY / QQQ / IWM): their picks are the named symbols eligible at D,

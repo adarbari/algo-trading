@@ -4,6 +4,7 @@ and notes come through; the sentence is bounded; a model that cannot answer is u
 nothing is written."""
 
 import json
+from dataclasses import fields
 from typing import Any
 
 import pytest
@@ -19,6 +20,7 @@ from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.screens import (
     MAX_TEXT,
     DroppedCriterion,
+    ScreenDraft,
     criteria_of,
     did_you_mean_candidates,
     draft_screen,
@@ -689,52 +691,17 @@ def sug(**over: Any) -> dict[str, Any]:
     return {**base, **over}
 
 
-def test_suggestions_are_offered_beside_the_document_never_in_it(ctx: ReadContext) -> None:
-    answer = proposal(
-        ACTIVE, PRICE_GT,
-        suggestions=[
-            sug(), sug(field=PRICE, op="gt", value=50), sug(mode="hard", value=7),
-            sug(field="nope.x"),
-            sug(field=OI, op="gte", value=500, mode="soft", tolerance=100, on_miss="EVENT_RISK"),
-        ],
-    )  # fmt: skip
-    draft = draft_screen(ctx, Canned(answer), "my_screen", "over $50")
-    assert set(draft.document["criteria"]) == {"active", "price"}
-    assert [(s.criterion["field"], s.criterion["mode"], s.source) for s in draft.suggestions] == [
-        (OI, "score", PRICE),
-        (OI, "soft", PRICE),
-    ]
-    assert draft.suggestions[1].criterion["on_miss"] == "EVENT_RISK"
-    assert [d.field for d in draft.suggestions_dropped] == [OI, "nope.x"]  # hard, then invented
-    resolve_rule_draft(ctx.configs, "my_screen", ctx.user, draft.document)
-
-
-def test_a_soft_suggestion_without_a_tolerance_is_refused_by_the_criterion_validator(
-    ctx: ReadContext,
-) -> None:
-    draft = draft_screen(ctx, Canned(proposal(ACTIVE, suggestions=[sug(mode="soft")])), "s", "x")
-    assert draft.suggestions == () and "tolerance" in draft.suggestions_dropped[0].reason
-
-
-def test_an_answer_without_suggestions_offers_none(ctx: ReadContext) -> None:
-    draft = draft_screen(ctx, Canned(proposal(ACTIVE)), "my_screen", "active")
-    assert (draft.suggestions, draft.suggestions_dropped) == ((), ())
-
-
-def test_a_suggestion_equal_to_a_non_default_alternative_is_not_offered_twice(
-    ctx: ReadContext,
-) -> None:
-    other = {"label": "price", "criterion": {"id": None, "field": PRICE, "op": "gt", "value": 50}}
-    term = {**READINGS, "alternatives": [READINGS["alternatives"][1], other], "default_index": 0}
-    answer = proposal(
-        ACTIVE, unresolved=[term],
-        suggestions=[
-            sug(field=PRICE, op="gt", value=50, mode="score"), sug(field=OI, op="lt", value=9),
-        ],
-    )  # fmt: skip
-    draft = draft_screen(ctx, Canned(answer), "my_screen", "deep")
-    assert [(s.criterion["field"], s.criterion["op"]) for s in draft.suggestions] == [(OI, "lt")]
-    assert draft.suggestions_dropped == ()
+def test_checks_the_model_offers_beyond_the_sentence_are_ignored(ctx: ReadContext) -> None:
+    """ADR 0083 decision 4: the model only translates the sentence. An answer that still carries
+    ``suggestions`` drafts exactly what it would without them, and the draft has no place for
+    them (nothing to serve, nothing for the Builder to add)."""
+    plain = proposal(ACTIVE, PRICE_GT)
+    offered = {**plain, "suggestions": [sug(), sug(mode="soft", tolerance=100)]}
+    with_them = draft_screen(ctx, Canned(offered), "my_screen", "over $50")
+    without = draft_screen(ctx, Canned(plain), "my_screen", "over $50")
+    assert with_them.document == without.document
+    assert (with_them.dropped, with_them.notes) == (without.dropped, without.notes)
+    assert "suggestions" not in {f.name for f in fields(ScreenDraft)}
 
 
 # --------------------------- the verifier: doubts repair, then escalate (ADR 0041, 2026-10-17)

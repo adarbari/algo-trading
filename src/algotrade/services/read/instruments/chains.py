@@ -18,7 +18,11 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.data.chains import CHAIN_STATUS, OPTION_QUOTES
+from algotrade.data.chains import CHAIN_STATUS, OPTION_QUOTES, UNDERLYING_QUOTES
+from algotrade.features.rollups.positioning.chain_inputs import (
+    closing_spots,
+    one_row_per_contract,
+)
 from algotrade.services.read.context import ReadContext, partition
 from algotrade.services.read.values import to_scalar
 
@@ -94,6 +98,25 @@ def _rows(ctx: ReadContext, underlying_ids: Sequence[str]) -> pd.DataFrame:
         found = frame.reset_index(drop=True)
         ctx.cache.put(key, found)
     return found
+
+
+def load_chain_quotes(ctx: ReadContext, underlying_ids: Sequence[str]) -> pd.DataFrame:
+    """The session's stored quotes of the chains of ``underlying_ids`` as one frame, one row per
+    contract (the latest, ``chain_inputs.one_row_per_contract``, as the harness reads a chain;
+    empty: none stored): what a position's legs are chosen from (the example position, ADR 0088
+    2.8)."""
+    rows = _rows(ctx, underlying_ids)
+    return rows if rows.empty or "ts" not in rows.columns else one_row_per_contract(rows)
+
+
+def load_chain_spots(ctx: ReadContext, underlying_ids: Sequence[str]) -> dict[str, float | None]:
+    """Each underlying's spot captured with the session's chain, as the harness reads it
+    (``chain_inputs.closing_spots``: the close when positive, else the price; None: none)."""
+    frame = partition(ctx, UNDERLYING_QUOTES)
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return dict.fromkeys(underlying_ids)
+    spots = closing_spots(frame[frame["instrument_id"].astype(str).isin(list(underlying_ids))])
+    return {i: _number(spots.get(i)) for i in underlying_ids}
 
 
 def _by_id(ctx: ReadContext, table: str, ids: Sequence[str]) -> dict[str, Mapping[Any, Any]]:

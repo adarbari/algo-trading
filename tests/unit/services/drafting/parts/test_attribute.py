@@ -43,9 +43,9 @@ def test_the_phrasebook_places_an_untagged_criterion_by_its_field() -> None:
 def test_nothing_fits_a_criterion_carried_over_is_kept_and_another_is_unplaced() -> None:
     carried = Item("criteria", "old", field="feature.other", carried=True)
     stray = Item("criteria", "new", field="feature.other")
-    suggestion = Item("suggestions", "s1", field="feature.other")
-    got, tagged = attribute([carried, stray, suggestion], PLACED, BOOK)
-    assert got == {KEPT_ID: [carried], UNPLACED_ID: [stray, suggestion]} and tagged == 0
+    formula = Item("formulas", "draft_x", field="feature.other")
+    got, tagged = attribute([carried, stray, formula], PLACED, BOOK)
+    assert got == {KEPT_ID: [carried], UNPLACED_ID: [stray, formula]} and tagged == 0
 
 
 def test_an_item_with_no_part_to_go_to_is_still_placed() -> None:

@@ -907,22 +907,6 @@
             "title": "Sentence",
             "type": "string"
           },
-          "suggestions": {
-            "items": {
-              "$ref": "#/components/schemas/Suggestion"
-            },
-            "maxItems": 40,
-            "title": "Suggestions",
-            "type": "array"
-          },
-          "suggestions_dropped": {
-            "items": {
-              "$ref": "#/components/schemas/DroppedSuggestion"
-            },
-            "maxItems": 40,
-            "title": "Suggestions Dropped",
-            "type": "array"
-          },
           "unresolved": {
             "items": {
               "$ref": "#/components/schemas/Unresolved"
@@ -1030,24 +1014,6 @@
           "existing"
         ],
         "title": "DroppedFormula",
-        "type": "object"
-      },
-      "DroppedSuggestion": {
-        "properties": {
-          "field": {
-            "title": "Field",
-            "type": "string"
-          },
-          "reason": {
-            "title": "Reason",
-            "type": "string"
-          }
-        },
-        "required": [
-          "field",
-          "reason"
-        ],
-        "title": "DroppedSuggestion",
         "type": "object"
       },
       "EdgeDocument": {
@@ -2515,14 +2481,6 @@
             "title": "Start",
             "type": "integer"
           },
-          "suggestions": {
-            "description": "ids of suggestions",
-            "items": {
-              "type": "string"
-            },
-            "title": "Suggestions",
-            "type": "array"
-          },
           "unresolved": {
             "description": "terms of the unresolved readings",
             "items": {
@@ -2551,7 +2509,6 @@
           "formulas",
           "unresolved",
           "missing",
-          "suggestions",
           "rank"
         ],
         "title": "Part",
@@ -3474,21 +3431,6 @@
             "title": "Sentence",
             "type": "string"
           },
-          "suggestions": {
-            "description": "protective checks offered (soft or score), never in the document: the trader accepts or skips each",
-            "items": {
-              "$ref": "#/components/schemas/Suggestion"
-            },
-            "title": "Suggestions",
-            "type": "array"
-          },
-          "suggestions_dropped": {
-            "items": {
-              "$ref": "#/components/schemas/DroppedSuggestion"
-            },
-            "title": "Suggestions Dropped",
-            "type": "array"
-          },
           "unresolved": {
             "description": "ambiguous terms; the document has each default",
             "items": {
@@ -3680,46 +3622,6 @@
           "in_the_money"
         ],
         "title": "Stress",
-        "type": "object"
-      },
-      "Suggestion": {
-        "properties": {
-          "criterion": {
-            "additionalProperties": true,
-            "description": "a soft or score criterion, never in the document",
-            "title": "Criterion",
-            "type": "object"
-          },
-          "id": {
-            "description": "the server's id (s1, s2...), what a part's suggestions name",
-            "title": "Id",
-            "type": "string"
-          },
-          "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "the field guide entry or field that raised it",
-            "title": "Source"
-          },
-          "why": {
-            "description": "the short reason, from the caveat or situation",
-            "title": "Why",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "criterion",
-          "why",
-          "source"
-        ],
-        "title": "Suggestion",
         "type": "object"
       },
       "TableView": {
