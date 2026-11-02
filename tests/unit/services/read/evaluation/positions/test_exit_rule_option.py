@@ -11,11 +11,11 @@ from typing import Any
 import pytest
 
 from algotrade.config.edges.positions.cases import Case, CaseValue
-from algotrade.config.edges.positions.spec import ExitSettings
+from algotrade.config.edges.positions.spec import ExitSettings, exits_digest
 from algotrade.config.edges.positions.templates import KIND, NAME
 from algotrade.core.model.predicates import Group, Rule
 from algotrade.core.time.calendar import next_session, sessions_to
-from algotrade.services.read.evaluation import edges
+from algotrade.services.read.evaluation import edges, runs
 from algotrade.services.read.evaluation.positions import exit_rule as module
 from algotrade.services.read.evaluation.positions.exit_rule import (
     ExitRule,
@@ -59,13 +59,20 @@ WINNERS = [adverse(i, round(0.01 * (i + 1), 2)) for i in range(10)]  # losses 0.
 
 
 def world(
-    trades: list[dict[str, Any]] | None, day: date = END, **outcome: Any
+    trades: list[dict[str, Any]] | None,
+    day: date = END,
+    recorded: Any = "same",
+    **outcome: Any,
 ) -> tuple[Any, edges.Edge]:
+    """``recorded``: the exits digest on the run record ("same": the document's; None: a run
+    from before it was recorded; else that digest)."""
     backend = MemoryBackend()
-    write_run(backend, "r1", FROZEN, 0.6, trades=trades)
     doc = {**EDGE, "outcome": {**OPTION, **outcome}}
     docs = {**DOCS, **SETTINGS, ("site", "edges", "drift"): doc, ("site", KIND, NAME): TEMPLATES}
     ctx = stores(backend, docs=docs)
+    parsed = next(e for e in edges.parsed_edges(ctx, "site") if e.id == "drift")
+    digest = exits_digest(parsed.outcome.position) if recorded == "same" else recorded
+    write_run(backend, "r1", FROZEN, 0.6, trades=trades, exits_digest=digest)
     edge = edges.load_edge(ctx, "drift")
     assert edge is not None
     return session_ctx(ctx, day), edge
@@ -73,13 +80,14 @@ def world(
 
 def at(trades: list[dict[str, Any]] | None, **kwargs: Any) -> ExitRule:
     outcome = kwargs.pop("outcome", {})
-    ctx, edge = world(trades, **outcome)
+    ctx, edge = world(trades, recorded=kwargs.pop("recorded", "same"), **outcome)
     return exit_rule_at(ctx, edge, **kwargs)
 
 
 def test_the_world_is_an_option_setup_with_a_verdict_basis() -> None:
     ctx, edge = world(WINNERS)
-    assert module.option_outcome(ctx, edge) is not None
+    run = runs.load_canonical_run(ctx, edge).run
+    assert run is not None and module.option_outcome(ctx, edge, run) is not None
 
 
 def test_a_declared_stop_is_published_as_it_is_with_the_other_declared_exits() -> None:
@@ -164,20 +172,72 @@ def test_a_case_valued_exit_is_published_only_as_resolved_for_the_pick(
     high = Group("all", (Rule("market.vix_close", "gt", 30),))
     case = CaseValue("stop_loss", (Case(high, 3.0),), 2.0)
     loaded = module.option_outcome
+    exits = ExitSettings(take_profit=0.5, stop_loss=2.0)
 
-    def with_case(ctx: Any, edge: Any) -> Any:
-        found = loaded(ctx, edge)
+    def with_case(ctx: Any, edge: Any, run: Any) -> Any:
+        found = loaded(ctx, edge, run)
         assert found is not None and found.position is not None
-        exits = ExitSettings(take_profit=0.5, stop_loss=2.0)
         return replace(found, position=replace(found.position, exit=exits, cases=(case,)))
 
     monkeypatch.setattr(module, "option_outcome", with_case)
-    unresolved = at(WINNERS)
+    ctx, edge = world(None)
+    run = runs.load_canonical_run(ctx, edge).run
+    assert run is not None
+    tested = exits_digest(with_case(ctx, edge, run).position)
+    unresolved = at(WINNERS, recorded=tested)
     assert unresolved.stop is None and unresolved.take_profit is None
     assert unresolved.unknown is not None
     assert unresolved.unknown.code is UnknownCode.NOT_APPLICABLE
-    rule = at(WINNERS, resolved={"stop_loss": 3.0})
+    rule = at(WINNERS, recorded=tested, resolved={"stop_loss": 3.0})
     assert rule.stop == Stop(StopKind.DECLARED, fraction=3.0, basis=StopBasis.CREDIT)
     assert rule.take_profit == 0.5 and rule.unknown is None
-    off = at(WINNERS, resolved={"stop_loss": 0})  # 0 is off, as a grid spells it: the percentile
+    off = at(
+        WINNERS, recorded=tested, resolved={"stop_loss": 0}
+    )  # 0 is off, as a grid spells it: the percentile
     assert off.stop is not None and off.stop.kind is StopKind.HISTORY
+
+
+def test_exits_edited_after_the_run_are_not_published_beside_its_verdict() -> None:
+    """The rule published is the one the run tested: a document edited since (2.0 -> 3.0) is
+    UNKNOWN until re-run, and a run from before the digest was recorded is NOT_STORED."""
+    old = ExitSettings(stop_loss=2.0)
+    ctx, edge = world(WINNERS, exit={"stop_loss": 3.0})
+    run = runs.load_canonical_run(ctx, edge).run
+    outcome = module.option_outcome(ctx, edge, run) if run else None
+    assert outcome is not None and outcome.position is not None
+    tested = exits_digest(replace(outcome.position, exit=old))
+    edited = at(WINNERS, outcome={"exit": {"stop_loss": 3.0}}, recorded=tested)
+    assert edited.stop is None and edited.unknown is not None
+    assert edited.unknown.code is UnknownCode.NOT_RUN and edited.hold_sessions == 20
+    older = at(WINNERS, outcome={"exit": {"stop_loss": 3.0}}, recorded=None)
+    assert older.stop is None and older.unknown is not None
+    assert older.unknown.code is UnknownCode.NOT_STORED
+
+
+def test_the_document_is_read_as_the_runs_owner_never_the_viewer() -> None:
+    ctx, edge = world(WINNERS, exit={"stop_loss": 2.0})
+    run = runs.load_canonical_run(ctx, edge).run
+    assert run is not None and run.owner == "site"
+    seen: list[str] = []
+    real = edges.parsed_edges
+
+    def spy(c: Any, user: str) -> Any:
+        seen.append(user)
+        return real(c, user)
+
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(module, "parsed_edges", spy)
+        module.option_outcome(ctx, edge, run)
+    assert seen == ["site"]
+
+
+def test_one_winner_with_no_max_adverse_stored_is_unknown_never_a_subset() -> None:
+    rule = at([*WINNERS, adverse(11, None)])
+    assert rule.stop is None and rule.unknown is not None
+    assert rule.unknown.code is UnknownCode.NOT_STORED
+
+
+def test_an_expiry_not_after_the_entry_session_is_unknown() -> None:
+    rule = at(WINNERS, expiry=next_session(END))
+    assert rule.stop is None and rule.hold_sessions is None and rule.unknown is not None
+    assert rule.unknown.code is UnknownCode.NOT_APPLICABLE

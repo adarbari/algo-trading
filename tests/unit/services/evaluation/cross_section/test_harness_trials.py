@@ -17,6 +17,7 @@ import pandas as pd
 import pytest
 
 from algotrade.config.edges.positions.key import position_key
+from algotrade.config.edges.positions.spec import exits_digest
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import next_session
@@ -435,6 +436,8 @@ def test_an_option_pnl_edge_is_scored_on_the_chain_grain_net_of_the_quoted_sprea
     assert m.mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004 - 0.00013)
     assert (m.sessions, m.picks, m.hits) == (4, 20, 20) and ev.unclosed_sessions == {2: 0}
     assert r.licence == "personal"  # the trade rows are bought history: their licence is read
+    # the declared exits it tested, for the exit rule the setup publishes (ADR 0088 d19)
+    assert ev.exits_digest == exits_digest(edge(outcome=CHAIN_OUTCOME).outcome.position)
 
 
 def test_an_option_pnl_edge_has_a_cost_row_per_level_a_stored_base_and_picks_at_each_level() -> (

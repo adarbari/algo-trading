@@ -96,6 +96,7 @@ class EdgeRun:
     trigger: str | None = None
     screener_hashes: tuple[tuple[str, str], ...] = ()
     evidence_licence: str = "open"  # the strictest licence of the outcome rows it joined (E1)
+    exits_digest: str | None = None  # the declared exits it tested (None: none, or an older run)
 
 
 @dataclass(frozen=True)
@@ -269,6 +270,7 @@ def run_of_record(
         trigger=stats.get("trigger"),
         screener_hashes=tuple(sorted((stats.get("screener_hashes") or {}).items())),
         evidence_licence=str(stats.get("evidence_licence") or "open"),
+        exits_digest=stats.get("exits_digest"),
     )
 
 

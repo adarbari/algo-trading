@@ -35,7 +35,12 @@ import numpy as np
 from algotrade.config.edges.document import Outcome
 from algotrade.config.edges.positions.cases import EXIT_CASE_NAMES
 from algotrade.config.edges.positions.exit_rule import ExitRuleSettings
-from algotrade.config.edges.positions.spec import OPTION_KIND, ExitSettings, PositionSpec
+from algotrade.config.edges.positions.spec import (
+    OPTION_KIND,
+    ExitSettings,
+    PositionSpec,
+    exits_digest,
+)
 from algotrade.config.site.settings import site_document
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session, sessions_to
@@ -172,11 +177,12 @@ def _from_history(
     return ExitRule(edge.id, fallback, horizon, unknown, len(dips), run.oos_hidden)
 
 
-def option_outcome(ctx: ReadContext, edge: Edge) -> Outcome | None:
-    """``edge``'s main outcome when it is an option setup (an ``option_pnl`` outcome with a
-    position), else None. The ledger and the verdict basis are the main edge variant's
-    (``edge_variant`` null), so its declared exits are the main outcome's."""
-    doc = next((e for e in parsed_edges(ctx, ctx.user.user_id) if e.id == edge.id), None)
+def option_outcome(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> Outcome | None:
+    """``edge``'s main outcome as ``run``'s owner resolves it (never as the viewer, as the run
+    resolved it) when it is an option setup (an ``option_pnl`` outcome with a position), else
+    None. The ledger and the verdict basis are the main edge variant's (``edge_variant`` null),
+    so its declared exits are the main outcome's."""
+    doc = next((e for e in parsed_edges(ctx, run.owner) if e.id == edge.id), None)
     if doc is None or doc.outcome.kind != OPTION_KIND or doc.outcome.position is None:
         return None
     return doc.outcome
@@ -200,15 +206,50 @@ def _declared_exits(
     return ExitSettings(take_profit, stop_loss, exit_dte, exits.when), None
 
 
-def _option_hold(ctx: ReadContext, offset: int, cap: int, expiry: date | None) -> int:
+def _option_hold(ctx: ReadContext, offset: int, cap: int, expiry: date | None) -> int | None:
     """The earlier of the cap and the selected expiry, in sessions after the entry session (the
-    ``offset``-th session after the served one)."""
+    ``offset``-th session after the served one); None: the expiry is not after the entry."""
     if expiry is None:
         return cap
     entry = ctx.session.date
     for _ in range(offset):
         entry = next_session(entry)
-    return min(cap, sessions_to(entry, expiry))
+    return min(cap, sessions_to(entry, expiry)) if expiry > entry else None
+
+
+def _tested(edge: Edge, run: runs.EdgeRun, outcome: Outcome) -> Unknown | None:
+    """Why the document's declared exits are not the ones ``run`` tested, else None."""
+    if run.exits_digest is None:
+        why = f"run {run.run_id} is older than its recorded exits: re-run the backtest"
+        return _unknown(edge, UnknownCode.NOT_STORED, why)
+    if run.exits_digest != exits_digest(outcome.position):
+        why = f"the setup's declared exits changed after run {run.run_id}: re-run the backtest"
+        return _unknown(edge, UnknownCode.NOT_RUN, why)
+    return None
+
+
+def _percentile(
+    ctx: ReadContext, edge: Edge, run: runs.EdgeRun, summary: EdgeSummary
+) -> tuple[Stop | None, Unknown | None, int]:
+    """The percentile stop of the basis's winners' ``max_adverse`` (a share of collateral), the
+    reason there is none, and the winners read. A winner's loss the viewer may not read, or one
+    not stored, makes it UNKNOWN: never a percentile over a subset."""
+    known, unknown = _ledger(ctx, edge, run, summary)
+    winners = [t.max_adverse for t in known if t.hit is True]
+    losses = [float(c.value) for c in winners if c.value is not None]
+    hidden = next((c.unknown for c in winners if c.unknown is not None), None)
+    t = _settings(ctx)
+    if unknown is None and hidden is not None:
+        unknown = hidden
+    elif unknown is None and len(losses) < len(winners):
+        why = f"run {run.run_id} has winning trades with no max_adverse stored: re-run it"
+        unknown = _unknown(edge, UnknownCode.NOT_STORED, why)
+    elif unknown is None and len(losses) < t.min_winners:
+        why = f"only {len(losses)} winning trades, fewer than {t.min_winners}: no stop from so few"
+        unknown = _unknown(edge, UnknownCode.NOT_APPLICABLE, why)
+    if unknown is not None:
+        return None, unknown, len(losses)
+    return history_stop(losses, t.stop_percentile, StopBasis.COLLATERAL), None, len(losses)
 
 
 def _from_option(
@@ -221,37 +262,27 @@ def _from_option(
     resolved: Mapping[str, float] | None,
 ) -> ExitRule:
     """An option setup's own declared exits; only without a declared stop the percentile of its
-    winners' ``max_adverse``, UNKNOWN below ``min_winners`` (the module docstring)."""
+    winners' ``max_adverse``, UNKNOWN below ``min_winners`` (the module docstring). An UNKNOWN
+    rule publishes no declared exit, only the hold (as a share setup's keeps its hold)."""
     assert outcome.position is not None  # option_outcome returns only an outcome with one
     hold = _option_hold(ctx, outcome.start_offset_sessions, summary.basis_horizon or 0, expiry)
+    base = ExitRule(edge.id, None, hold, expiry=expiry)
+    if hold is None:
+        why = f"the expiry {expiry} is not after the entry session"
+        return replace(base, unknown=_unknown(edge, UnknownCode.NOT_APPLICABLE, why))
     exits, unknown = _declared_exits(edge, outcome.position, resolved)
-    fields = tuple(sorted({r.field for r in exits.when.rules()})) if exits.when else ()
-    rule = ExitRule(
-        edge.id, None, hold, unknown, in_sample_only=run.oos_hidden, take_profit=exits.take_profit,
-        exit_dte=exits.exit_dte, condition_fields=fields, expiry=expiry,
-    )  # fmt: skip
+    unknown = _tested(edge, run, outcome) or unknown
     if unknown is not None:
-        return replace(rule, take_profit=None, exit_dte=None)
+        return replace(base, unknown=unknown)
+    rule = replace(
+        base, take_profit=exits.take_profit, exit_dte=exits.exit_dte,
+        condition_fields=tuple(sorted({r.field for r in exits.when.rules()})) if exits.when else (),
+    )  # fmt: skip
     if exits.stop_loss is not None:
         own = Stop(StopKind.DECLARED, fraction=exits.stop_loss, basis=StopBasis.CREDIT)
-        return replace(rule, stop=own, in_sample_only=False)
-    known, unknown = _ledger(ctx, edge, run, summary)
-    winners = [t.max_adverse for t in known if t.hit is True]
-    hidden = next((c.unknown for c in winners if c.unknown is not None), None)
-    losses = [float(c.value) for c in winners if c.value is not None]
-    count, least = len(losses), _settings(ctx).min_winners
-    if unknown is None and hidden is not None:
-        unknown = hidden  # one winner's loss the viewer may not read: never a partial percentile
-    elif unknown is None and winners and not losses:
-        why = f"run {run.run_id} is older than the trades' max_adverse: re-run the backtest"
-        unknown = _unknown(edge, UnknownCode.NOT_STORED, why)
-    elif unknown is None and count < least:
-        why = f"only {count} winning trades, fewer than {least}: no stop from so few"
-        unknown = _unknown(edge, UnknownCode.NOT_APPLICABLE, why)
-    if unknown is not None:
-        return replace(rule, unknown=unknown, winners=count)
-    stop = history_stop(losses, _settings(ctx).stop_percentile, StopBasis.COLLATERAL)
-    return replace(rule, stop=stop, winners=count)
+        return replace(rule, stop=own)
+    stop, unknown, winners = _percentile(ctx, edge, run, summary)
+    return replace(rule, stop=stop, unknown=unknown, winners=winners, in_sample_only=run.oos_hidden)
 
 
 def exit_rule_at(
@@ -285,7 +316,7 @@ def exit_rule_at(
     if summary.basis_screener is None or summary.basis_horizon is None:
         why = f"{edge.id} has no verdict basis ({summary.result})"
         return ExitRule(edge.id, None, None, _unknown(edge, UnknownCode.NOT_RUN, why))
-    option = option_outcome(ctx, edge)
+    option = option_outcome(ctx, edge, run)
     if option is not None:
         return _from_option(ctx, edge, run, summary, option, expiry, resolved)
     if declared is not None:
