@@ -295,10 +295,6 @@
               }
             ]
           },
-          "price": {
-            "title": "Price",
-            "type": "number"
-          },
           "priced_at": {
             "title": "Priced At",
             "type": "number"
@@ -315,10 +311,6 @@
             "title": "Session",
             "type": "string"
           },
-          "shares": {
-            "title": "Shares",
-            "type": "integer"
-          },
           "underlying_id": {
             "title": "Underlying Id",
             "type": "string"
@@ -328,8 +320,6 @@
           "underlying_id",
           "session",
           "priced_at",
-          "shares",
-          "price",
           "contracts",
           "above_price",
           "rows",

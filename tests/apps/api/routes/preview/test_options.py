@@ -105,7 +105,7 @@ def test_calls_carry_their_totals_and_an_unknown_dividend(
 ) -> None:
     row = calls.CallRow(EXPIRY, 30, 85.0, 2.13, 0.0255, 0.042, False, True, None, None, None)
     preview = calls.CallsPreview(
-        "EQ:AAA", date(2022, 11, 23), 84.2, 100, 83.6, 1, 0.007, (row,), (213.0,), _unknown()
+        "EQ:AAA", date(2022, 11, 23), 84.2, 1, 0.007, (row,), (213.0,), _unknown()
     )
     monkeypatch.setattr(route.calls, "preview_calls", lambda *a, **k: preview)
     got = client.post(PATHS[1], json=CALLS).json()["preview"]
