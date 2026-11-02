@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 import { useNarrow } from '../../responsive';
 import { Disclosure } from '../Disclosure';
+import styles from './PhoneFold.module.css';
 
 export interface PhoneFoldProps {
   /** The summary of the folded form. */
@@ -20,7 +21,7 @@ export interface PhoneFoldProps {
 export function PhoneFold({ label, count, children }: PhoneFoldProps) {
   const [ref, isNarrow] = useNarrow('sm');
   return (
-    <div ref={ref}>
+    <div ref={ref} className={styles.root}>
       {isNarrow ? (
         <Disclosure label={label} count={count}>
           {children}
