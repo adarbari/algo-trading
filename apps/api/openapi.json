@@ -2015,6 +2015,220 @@
         "title": "LiveOptionQuote",
         "type": "object"
       },
+      "MarginBody": {
+        "properties": {
+          "contracts": {
+            "description": "how many contracts",
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000.0,
+            "title": "Contracts",
+            "type": "integer"
+          },
+          "expiry": {
+            "description": "its expiry",
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "key": {
+            "description": "the underlying: a ticker or an instrument id",
+            "title": "Key",
+            "type": "string"
+          },
+          "right": {
+            "default": "put",
+            "description": "the right of the option",
+            "enum": [
+              "put",
+              "call"
+            ],
+            "title": "Right",
+            "type": "string"
+          },
+          "strike": {
+            "description": "its strike",
+            "exclusiveMinimum": 0.0,
+            "title": "Strike",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "strike",
+          "expiry",
+          "contracts"
+        ],
+        "title": "MarginBody",
+        "type": "object"
+      },
+      "MarginPreview": {
+        "properties": {
+          "cash_secured": {
+            "title": "Cash Secured",
+            "type": "number"
+          },
+          "contracts": {
+            "title": "Contracts",
+            "type": "integer"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "expiry": {
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "margin_held": {
+            "title": "Margin Held",
+            "type": "number"
+          },
+          "open_interest_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Interest Share"
+          },
+          "premium": {
+            "title": "Premium",
+            "type": "number"
+          },
+          "premium_over_cash": {
+            "title": "Premium Over Cash",
+            "type": "number"
+          },
+          "premium_over_margin": {
+            "title": "Premium Over Margin",
+            "type": "number"
+          },
+          "premium_total": {
+            "title": "Premium Total",
+            "type": "number"
+          },
+          "priced_at": {
+            "title": "Priced At",
+            "type": "number"
+          },
+          "right": {
+            "enum": [
+              "put",
+              "call"
+            ],
+            "title": "Right",
+            "type": "string"
+          },
+          "rule": {
+            "description": "the margin rule applied: reg_t, the exchange minimum",
+            "title": "Rule",
+            "type": "string"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "stress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stress_unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strike": {
+            "title": "Strike",
+            "type": "number"
+          },
+          "underlying_id": {
+            "title": "Underlying Id",
+            "type": "string"
+          },
+          "volume_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Share"
+          }
+        },
+        "required": [
+          "underlying_id",
+          "session",
+          "priced_at",
+          "right",
+          "strike",
+          "expiry",
+          "contracts",
+          "rule",
+          "days",
+          "premium",
+          "premium_total",
+          "cash_secured",
+          "margin_held",
+          "premium_over_cash",
+          "premium_over_margin",
+          "volume_share",
+          "open_interest_share",
+          "stress",
+          "stress_unknown"
+        ],
+        "title": "MarginPreview",
+        "type": "object"
+      },
+      "MarginResult": {
+        "properties": {
+          "gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why there is no preview (None: there is one)"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarginPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "what it ties up (None: see gap)"
+          }
+        },
+        "required": [
+          "preview",
+          "gap"
+        ],
+        "title": "MarginResult",
+        "type": "object"
+      },
       "MissingFeature": {
         "properties": {
           "closest": {
@@ -3450,6 +3664,29 @@
           }
         },
         "title": "StateBody",
+        "type": "object"
+      },
+      "Stress": {
+        "properties": {
+          "drop": {
+            "title": "Drop",
+            "type": "number"
+          },
+          "episode": {
+            "title": "Episode",
+            "type": "string"
+          },
+          "in_the_money": {
+            "title": "In The Money",
+            "type": "number"
+          }
+        },
+        "required": [
+          "episode",
+          "drop",
+          "in_the_money"
+        ],
+        "title": "Stress",
         "type": "object"
       },
       "Suggestion": {
@@ -5089,6 +5326,47 @@
           }
         },
         "summary": "Preview Calls",
+        "tags": [
+          "preview"
+        ]
+      }
+    },
+    "/preview/options/margin": {
+      "post": {
+        "operationId": "preview_margin_preview_options_margin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarginBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarginResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Margin",
         "tags": [
           "preview"
         ]

@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.site.users import Role
-from algotrade.services.preview.options import calls, roll
+from algotrade.services.preview.options import calls, margin, pool, roll
 from algotrade.services.read.availability.cause import Cause, table_cause
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade_api.deps import ApiSettings, ReadStore
@@ -18,10 +18,11 @@ from algotrade_api.main import create_app
 from algotrade_api.routes.preview import options as route
 from tests.helpers.api_store import as_user
 
-PATHS = ("/preview/options/roll", "/preview/options/calls")
+PATHS = ("/preview/options/roll", "/preview/options/calls", "/preview/options/margin")
 EXPIRY = date(2022, 12, 23)
 ROLL = {"key": "AAA", "strike": 87.125, "expiry": EXPIRY.isoformat(), "sold_at": 1.4375}
 CALLS = {"key": "AAA", "shares": 4321, "price": 83.6125}
+MARGIN = {"key": "AAA", "strike": 87.125, "expiry": EXPIRY.isoformat(), "contracts": 4321}
 TYPED = ("87.125", "1.4375", "4321", "83.6125")
 
 
@@ -37,7 +38,11 @@ def test_nothing_typed_reaches_a_log_and_no_answer_is_cached(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level(logging.DEBUG):
-        answers = [client.post(PATHS[0], json=ROLL), client.post(PATHS[1], json=CALLS)]
+        answers = [
+            client.post(PATHS[0], json=ROLL),
+            client.post(PATHS[1], json=CALLS),
+            client.post(PATHS[2], json=MARGIN),
+        ]
     for answer in answers:
         assert answer.status_code == 200, answer.text
         assert answer.headers["cache-control"] == "no-store"
@@ -65,6 +70,7 @@ def test_a_gap_is_public_words_and_its_cause_is_an_admins_only(
 def test_an_unknown_ticker_is_not_found(client: TestClient) -> None:
     assert client.post(PATHS[0], json={**ROLL, "key": "NOPE"}).status_code == 404
     assert client.post(PATHS[1], json={**CALLS, "key": "NOPE"}).status_code == 404
+    assert client.post(PATHS[2], json={**MARGIN, "key": "NOPE"}).status_code == 404
 
 
 def test_bad_figures_are_rejected(client: TestClient) -> None:
@@ -79,7 +85,7 @@ def _unknown() -> Unknown:
 def test_a_roll_is_served_flat_with_an_undefined_figure_null(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    contract = roll.Contract("put", 85.0, EXPIRY)
+    contract = pool.Contract("put", 85.0, EXPIRY)
     later = EXPIRY + timedelta(days=7)
     preview = roll.RollPreview(
         "EQ:AAA", date(2022, 11, 23), 84.2, contract, 1.4, 1.85, 0.45, -0.0094, 30,
@@ -105,3 +111,17 @@ def test_calls_carry_their_totals_and_an_unknown_dividend(
     got = client.post(PATHS[1], json=CALLS).json()["preview"]
     assert got["rows"][0]["premium_total"] == 213.0 and got["contracts"] == 1
     assert got["dividend"] is None and got["dividend_unknown"]["code"] == "NULL"
+
+
+def test_buying_power_serves_the_stress_or_why_not(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    preview = margin.MarginPreview(
+        "EQ:AAA", date(2022, 11, 23), 84.2, pool.Contract("put", 80.5, EXPIRY), 5, margin.REG_T,
+        14, 0.59, 295.0, 40250.0, 6865.0, 0.0073, 0.043, None, 0.001, _unknown(),
+    )  # fmt: skip
+    monkeypatch.setattr(route.margin, "preview_margin", lambda *a, **k: preview)
+    got = client.post(PATHS[2], json=MARGIN).json()["preview"]
+    assert (got["margin_held"], got["cash_secured"], got["rule"]) == (6865.0, 40250.0, "reg_t")
+    assert got["volume_share"] is None and got["stress"] is None
+    assert got["stress_unknown"]["code"] == "NULL"

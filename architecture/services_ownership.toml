@@ -271,11 +271,14 @@ detect = [{ call = "OnDemandScreens" }]
 
 [[responsibility]]
 id = "option-calculators"
-description = "The option calculators (services/preview/options/, plan V11; screens OptRoll, OptCalls): from figures a trader types (a sold contract and its price, shares held and their price), never stored or logged, the rolls of a sold option to later expiries (extra credit, new breakeven, credit per extra day, our delta), and the calls they could sell on shares (premium over their price, the return if called away, the ex-dividend date and early-exercise risk); priced from exactly the session's chain through session_inputs (an Unknown when it cannot be), derived figures only (the vendor quote stops in pool.py); the API serves them as body-only POSTs"
+description = "The option calculators (services/preview/options/, plan V11; screens OptRoll, OptCalls, OptMargin): from figures a trader types (a sold contract and its price, shares held and their price, a contract and a count), never stored or logged, the rolls of a sold option to later expiries (extra credit, new breakeven, credit per extra day, our delta), the calls they could sell on shares (premium over their price, the return if called away, the ex-dividend date and early-exercise risk) and the buying power a contract ties up (cash-secured, and the Reg-T exchange minimum on a margin account, no named broker's rule: decision 2026-11-02; the premium's share of each, size against the day's volume and open interest, a put's stress over the worst stored episode); priced from exactly the session's chain through session_inputs (an Unknown when it cannot be), derived figures only (the vendor quote stops in pool.py); the API serves them as body-only POSTs"
 owner = ["src/algotrade/services/preview/options/*"]
 allowed = ["apps/api/algotrade_api/routes/preview/options.py"]  # the REST routes: one call each
 section = "docs/ui/evening-desk-plan.md#5-vertical-slices"
-detect = [{ call = "preview_roll" }, { call = "preview_calls" }, { call = "priced_pool" }]
+detect = [
+    { call = "preview_roll" }, { call = "preview_calls" }, { call = "preview_margin" },
+    { call = "priced_pool" }, { call = "reg_t_per_share" },
+]
 
 [[responsibility]]
 id = "option-structures"

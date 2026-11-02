@@ -314,6 +314,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preview/options/margin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Margin */
+        post: operations["preview_margin_preview_options_margin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preview/options/roll": {
         parameters: {
             query?: never;
@@ -1329,6 +1346,95 @@ export interface components {
             /** Volume */
             volume: number | null;
         };
+        /** MarginBody */
+        MarginBody: {
+            /**
+             * Contracts
+             * @description how many contracts
+             */
+            contracts: number;
+            /**
+             * Expiry
+             * Format: date
+             * @description its expiry
+             */
+            expiry: string;
+            /**
+             * Key
+             * @description the underlying: a ticker or an instrument id
+             */
+            key: string;
+            /**
+             * Right
+             * @description the right of the option
+             * @default put
+             * @enum {string}
+             */
+            right: "put" | "call";
+            /**
+             * Strike
+             * @description its strike
+             */
+            strike: number;
+        };
+        /** MarginPreview */
+        MarginPreview: {
+            /** Cash Secured */
+            cash_secured: number;
+            /** Contracts */
+            contracts: number;
+            /** Days */
+            days: number;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /** Margin Held */
+            margin_held: number;
+            /** Open Interest Share */
+            open_interest_share: number | null;
+            /** Premium */
+            premium: number;
+            /** Premium Over Cash */
+            premium_over_cash: number;
+            /** Premium Over Margin */
+            premium_over_margin: number;
+            /** Premium Total */
+            premium_total: number;
+            /** Priced At */
+            priced_at: number;
+            /**
+             * Right
+             * @enum {string}
+             */
+            right: "put" | "call";
+            /**
+             * Rule
+             * @description the margin rule applied: reg_t, the exchange minimum
+             */
+            rule: string;
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            stress: components["schemas"]["Stress"] | null;
+            stress_unknown: components["schemas"]["OptionGap"] | null;
+            /** Strike */
+            strike: number;
+            /** Underlying Id */
+            underlying_id: string;
+            /** Volume Share */
+            volume_share: number | null;
+        };
+        /** MarginResult */
+        MarginResult: {
+            /** @description why there is no preview (None: there is one) */
+            gap: components["schemas"]["OptionGap"] | null;
+            /** @description what it ties up (None: see gap) */
+            preview: components["schemas"]["MarginPreview"] | null;
+        };
         /** MissingFeature */
         MissingFeature: {
             /** Closest */
@@ -2012,6 +2118,15 @@ export interface components {
              * @description the user's own edge: researching | candidate | live | retired | rejected; none keeps it
              */
             status?: string | null;
+        };
+        /** Stress */
+        Stress: {
+            /** Drop */
+            drop: number;
+            /** Episode */
+            episode: string;
+            /** In The Money */
+            in_the_money: number;
         };
         /** Suggestion */
         Suggestion: {
@@ -2866,6 +2981,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CallsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_margin_preview_options_margin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarginBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarginResult"];
                 };
             };
             /** @description Validation Error */

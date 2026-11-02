@@ -30,8 +30,9 @@ from algotrade.features.rollups.premium.band_pick import OurDeltas
 from algotrade.quant.options import payoff
 from algotrade.services.preview.options.pool import (
     CALL,
-    RIGHT_CODE,
+    Contract,
     figures,
+    listed_contract,
     listed_expiries,
     priced_pool,
     underlying,
@@ -52,15 +53,6 @@ MAX_DAYS = 120  # calendar days from the session
 STRIKES_EACH = 3  # strikes per expiry: the one sold and the next ones out of the money
 STRIKE_RANGE = 0.10  # how far from the sold strike a further strike may be
 _MATCH = 1e-6  # a typed strike matches a listed one within this
-
-
-@dataclass(frozen=True)
-class Contract:
-    """A sold option as the trader typed it: ``right`` put or call, its strike and expiry."""
-
-    right: str
-    strike: float
-    expiry: date
 
 
 @dataclass(frozen=True)
@@ -178,27 +170,11 @@ def preview_roll(
     inputs, _ = found
     session = ctx.session.date
     what = f"{underlying_id} {contract.right} {contract.strike:g} expiring {contract.expiry}"
-    if contract.expiry <= session:
-        why = f"{what}: the expiry is not after {session}"
-        return gap(ctx, UnknownCode.NOT_APPLICABLE, "EXPIRED", why, OPTION_QUOTES)
     deltas = OurDeltas(inputs.curve, inputs.q)
-    pool = priced_pool(inputs, deltas, session, contract.expiry, contract.right)
-    sold = pool[(pool["strike"] - contract.strike).abs() <= _MATCH]
-    if sold.empty:
-        chain = inputs.chain
-        listed = chain[
-            (chain["right"] == RIGHT_CODE[contract.right])
-            & (chain["expiry"] == contract.expiry)
-            & ((chain["strike"] - contract.strike).abs() <= _MATCH)
-        ]
-        code, status = (
-            (UnknownCode.ILLIQUID, "ILLIQUID")
-            if not listed.empty
-            else (UnknownCode.NOT_APPLICABLE, "NOT_LISTED")
-        )
-        why = f"{what}: {status.lower().replace('_', ' ')} on {session}"
-        return gap(ctx, code, status, why, OPTION_QUOTES)
-    buy_back, delta = float(sold["mid"].iloc[0]), float(sold["delta"].iloc[0])
+    sold = listed_contract(ctx, inputs, deltas, contract)
+    if isinstance(sold, Unknown):
+        return sold
+    buy_back, delta = sold.mid, sold.delta
     if same_delta and not math.isfinite(delta):  # no vol inverts: no delta to match
         why = f"{what}: no delta of ours on {session} to roll to"
         return gap(ctx, UnknownCode.NOT_APPLICABLE, "NO_DELTA", why, OPTION_QUOTES)
