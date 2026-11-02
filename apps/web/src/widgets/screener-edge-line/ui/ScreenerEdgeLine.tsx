@@ -6,7 +6,7 @@
  * edge lists says so, and one whose edge has not run says why (the server's words). Only the
  * frozen-period record is read, never an exploratory run.
  */
-import { Box, Button, Skeleton, Stack, StatusBadge, Surface, Text } from '@algotrade/ui';
+import { Box, Button, PhoneFold, Skeleton, Stack, StatusBadge, Surface, Text } from '@algotrade/ui';
 import { useId, useState } from 'react';
 
 import { statusLabel, statusTone, useScreenerEdges } from '@/entities/edge';
@@ -76,7 +76,9 @@ export function ScreenerEdgeLine({ screenerId, onOpenEdge }: ScreenerEdgeLinePro
             Evidence
           </Button>
         </Stack>
-        <EdgeRecord edge={headline} onOpenEdge={onOpenEdge} compact />
+        <PhoneFold label="Record">
+          <EdgeRecord edge={headline} onOpenEdge={onOpenEdge} compact />
+        </PhoneFold>
         {open ? (
           <Box id={panel}>
             <Stack gap={3}>

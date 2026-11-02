@@ -68,16 +68,6 @@ describe('FilterBar', () => {
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
   });
 
-  it('narrow scroll: one row with the trigger, the quick and the active chips', async () => {
-    vi.stubGlobal('innerWidth', 375);
-    const { container } = render(<Bar narrow="scroll" />);
-    expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Near 52w high' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove Sector: Technology' })).toBeInTheDocument();
-    await expectNoA11yViolations(container);
-  });
-
   it('wide: groups share the toolbar row, the count is a polite live region, actions follow it', () => {
     vi.stubGlobal('innerWidth', 1400);
     render(

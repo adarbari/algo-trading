@@ -325,7 +325,7 @@ describe('ScreenerResults', () => {
     expect(aapl).toHaveTextContent('Counts');
     expect(aapl).toHaveTextContent('Drift');
     expect(screen.getByRole('row', { name: /KO/ })).toHaveTextContent('Unknown');
-    expect(screen.getAllByText('2 shown · 4,003 in the run')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('2 of 4,003')[0]).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

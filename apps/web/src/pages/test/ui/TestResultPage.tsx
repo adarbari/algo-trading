@@ -7,7 +7,7 @@
  * header an edge line says which edge this screener implements and its record, so a pick's
  * evidence is on the page it is reviewed on.
  */
-import { Button, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
+import { Button, Heading, PhoneFold, Stack, Text, type ChartRange } from '@algotrade/ui';
 import { useState } from 'react';
 
 import { ScreenerDescription, useMyScreeners, useScreenerRuns } from '@/entities/screen';
@@ -76,10 +76,12 @@ export function TestResultPage({
               </Button>
             </Stack>
           ) : null}
-          <Text size="sm" tone="secondary">
-            What this screener found in its latest run. Add any catalogue feature as a column; your
-            columns and filters are saved as your view of it.
-          </Text>
+          <PhoneFold label="About this page">
+            <Text size="sm" tone="secondary">
+              What this screener found in its latest run. Add any catalogue feature as a column;
+              your columns and filters are saved as your view of it.
+            </Text>
+          </PhoneFold>
         </Stack>
         <Stack direction="row" gap={2} align="center">
           {compared.length >= 2 ? (
@@ -117,7 +119,11 @@ export function TestResultPage({
         }}
         dismissed={dismissed}
         compared={compared}
-        renderRunLine={(runs, gaps) => <ScreenerRunLine id={id} runs={runs} gaps={gaps} />}
+        renderRunLine={(runs, gaps) => (
+          <PhoneFold label="Run details">
+            <ScreenerRunLine id={id} runs={runs} gaps={gaps} />
+          </PhoneFold>
+        )}
         onShowDismissed={() => {
           setDismissed(new Set());
         }}
