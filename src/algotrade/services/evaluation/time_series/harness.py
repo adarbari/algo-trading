@@ -5,10 +5,11 @@ over a window's length from the outcome partition at each period's entry session
 anything the partition did not hold at ``as_of``; a period with no usable row has a reason, not a
 value (an unclosed window, a missing row and an UNMEASURED one are excluded, never a zero). It also
 turns the edge's symbols into ids through ``SymbolResolver`` (ADR 0018) and reads the Treasury bill
-rate known at a decision session D, for the "long in the window, bills otherwise" Sharpe ratio."""
+rate known at a decision session D, for the "long in the window, bills otherwise" Sharpe ratio.
+``Returns.rows`` keeps the measured stored rows (the trade contract's windows, ADR 0088)."""
 
 from collections.abc import Collection, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
 import pandas as pd
@@ -33,6 +34,8 @@ class Returns:
 
     values: dict[tuple[str, date], float] = field(default_factory=dict)
     reasons: dict[tuple[str, date], str] = field(default_factory=dict)
+    # the measured stored rows themselves, for the trade contract (ADR 0088); not part of equality
+    rows: pd.DataFrame | None = field(default=None, compare=False)
 
 
 def resolve_symbols(
@@ -56,6 +59,7 @@ def read_returns(
     the ``entries`` (S), as the partitions held it at ``as_of``."""
     wanted = sorted(set(entries))
     out = Returns()
+    measured: list[pd.Series] = []
     stored = read_stored(reader, wanted, as_of, list(ids)) if wanted and ids else None
     rows: dict[tuple[str, date], pd.Series] = {}
     if stored is not None:
@@ -72,6 +76,9 @@ def read_returns(
                 out.reasons[i, entry] = f"UNMEASURED:{why}"
             else:
                 out.values[i, entry] = float(found_row["fwd_return"])
+                measured.append(found_row)
+    if measured:
+        out = replace(out, rows=pd.DataFrame(measured).reset_index(drop=True))
     return out
 
 
