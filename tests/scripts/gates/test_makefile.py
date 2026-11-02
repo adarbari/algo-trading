@@ -85,3 +85,13 @@ def test_the_gates_run_in_parallel_under_one_sub_make() -> None:
     text = MAKEFILE.read_text()
     recipe = re.search(r"^check:.*?(?=^\S)", text, re.S | re.M)
     assert recipe and "-j$(CHECK_JOBS)" in recipe.group(0) and "check_lock.sh" in recipe.group(0)
+
+
+def test_changed_runs_the_mirrored_tests_in_parallel() -> None:
+    # step 1 ran on one core: 10+ min a push when many tests were mapped (owner 2026-11-02)
+    recipe = re.search(r"^changed:.*?(?=^\S)", MAKEFILE.read_text(), re.S | re.M)
+    assert recipe
+    step1 = next(
+        line for line in recipe.group(0).splitlines() if "$$paths" in line and "pytest" in line
+    )
+    assert "-n $(WORKERS)" in step1 and " -x " in step1
