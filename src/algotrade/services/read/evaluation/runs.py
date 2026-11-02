@@ -75,8 +75,9 @@ class EdgeRun:
     (``nightly`` | ``ui`` | ``cli``; None for a run from before it was recorded);
     ``screener_hashes``: each screener's config hash as the run resolved it (empty for a run from
     before it was recorded), what the provenance line compares the current configs with;
-    ``evidence_licence``: the strictest licence of the outcome rows the run joined (``open``
-    for a run from before it): a viewer who lacks it is not served the setup (ADR 0084 d1)."""
+    ``evidence_licence``: the strictest licence of the outcome rows the run joined and of the
+    fields its rules read (``open`` for a run from before it): a viewer who lacks it is not
+    served the setup (ADR 0084 d1, ADR 0088 d20)."""
 
     run_id: str
     edge_id: str
@@ -95,7 +96,7 @@ class EdgeRun:
     legacy_owner: str | None = None
     trigger: str | None = None
     screener_hashes: tuple[tuple[str, str], ...] = ()
-    evidence_licence: str = "open"  # the strictest licence of the outcome rows it joined (E1)
+    evidence_licence: str = "open"  # its outcome rows' and rules' strictest licence (E1)
     exits_digest: str | None = None  # the declared exits it tested (None: none, or an older run)
 
 

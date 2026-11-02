@@ -105,7 +105,7 @@ def _row(
         "iv_source": result.iv_source if result else None,
         "side": result.side if result else side,
         "licence": result.licence if result else None,
-        "evidence_licence": result.licences.outcome if result and result.licences else None,
+        "evidence_licence": result.licences.evidence if result and result.licences else None,
         **_projection(m, result),
         # Filled by an expires_otm outcome only (ADR 0053 amendment 2026-10-08).
         "reference_rate": _nan(m.reference_rate),
@@ -384,7 +384,7 @@ def write_edge_eval(
         "as_of": evaluation.as_of.isoformat(),
         "trials_counted": evaluation.trials,
         "evidence_licence": strictest(
-            r.licences.outcome for r in evaluation.results if r.licences is not None
+            r.licences.evidence for r in evaluation.results if r.licences is not None
         ),
         "trials": [_trial(evaluation, r) for r in evaluation.results],
         "start_sessions": dict(evaluation.start_sessions),

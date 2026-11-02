@@ -54,6 +54,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.framework.feature import strictest
+from algotrade.services.evaluation.cross_section.detail.licences import outcome_licence
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, own_rows
 from algotrade.services.evaluation.cross_section.measures import BASELINE, SCREENER
 from algotrade.services.evaluation.cross_section.portfolio.ladder import (
@@ -269,7 +271,19 @@ def _trial(
         identity=f"{edge.id}|{edge.schedule}|{symbol}|{key}|{edge.outcome.cost_bps}"
         + (f"|{POSITION_PREFIX}{shares}" if shares is not None else "")
         + (f"|gate:{gate_key}" if gate_key else ""),  # a variant's own gate: another trial
+        outcome_licence=_read_licence(mine, stock, instrument),
     )
+
+
+def _read_licence(mine: pd.DataFrame, stock: harness.Returns, instrument: str | None) -> str:
+    """The strictest licence of the outcome rows a trial read: its option rows (their price
+    source's licence, per row) and the stock rows of its base."""
+    based = (
+        stock.rows[stock.rows["instrument_id"] == instrument]
+        if instrument is not None and stock.rows is not None
+        else pd.DataFrame()
+    )
+    return strictest((outcome_licence(mine), outcome_licence(based)))
 
 
 def _cased(

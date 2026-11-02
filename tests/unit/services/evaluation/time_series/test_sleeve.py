@@ -92,10 +92,9 @@ def world(
             structure_pnl_row(
                 SPY_ID, keys[v], day, hold=H, ts=datetime.combine(day, datetime.min.time(), UTC),
                 window_end=day + timedelta(days=3), exit_session=day + timedelta(days=3),
-                price_source="option_history",
-                licence="personal", entry_spot=100.0, collateral=COLLATERAL,
-                **{"pnl_mid": pnl_mid, "position_delta": delta,
-                   **(changes or {}).get((v, day), {})},
+                entry_spot=100.0, collateral=COLLATERAL,
+                **{"price_source": "option_history", "licence": "personal", "pnl_mid": pnl_mid,
+                   "position_delta": delta, **(changes or {}).get((v, day), {})},
             )
             for v, (pnl_mid, delta) in (pnl or PNL).items()
             if v in keys and (v, day) not in skip

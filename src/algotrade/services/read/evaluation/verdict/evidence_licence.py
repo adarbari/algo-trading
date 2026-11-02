@@ -1,12 +1,14 @@
 """Whether the viewer may be served a setup at all (ADR 0084 decision 1, ADR 0088 decision
 20): a setup with a committed run (the site's, or the viewer's own for their own edge) that
-joined outcome rows under a licence the viewer does not hold (``EdgeRun.evidence_licence``, the
-strictest ``licence`` of the outcome rows the run read) is not listed for them, has no verdict
-and adds no pick to their Ideas, never an UNKNOWN or a blank. The strictest of every run decides,
-not the canonical one: ``edge_runs`` serves them all, and a history slice is a trial only the
-owner sees (owner answer 1). Only the outcome gates it: the screen's and universe's fields keep
-their per-column redaction (ADR 0064 decision 10; ADR 0088 decision B), so a setup over a
-personal screener field stays listed. A setup with no run has no evidence to protect."""
+joined outcome rows, or read a rule field (gate, entry, case, schedule; ADR 0088 decision 20),
+under a licence the viewer does not hold (``EdgeRun.evidence_licence``, the strictest of the
+outcome rows' ``licence`` and the rules' fields, of every trial kind) is not listed for them,
+has no verdict and adds no pick to their Ideas, never an UNKNOWN or a blank. The strictest of
+every run decides, not the canonical one: ``edge_runs`` serves them all, and a history slice is
+a trial only the owner sees (owner answer 1). Only the outcome and the rules gate it: the
+screen's and universe's fields keep their per-column redaction (ADR 0064 decision 10; ADR 0088
+decision B), so a setup over a personal screener field stays listed. A setup with no run has no
+evidence to protect."""
 
 from algotrade.config.site.settings import load_users
 from algotrade.services.licences import held_by
