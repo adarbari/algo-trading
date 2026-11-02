@@ -9,10 +9,9 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.evaluation import edges as edge_reads
 from algotrade.services.read.evaluation.positions import state
 from algotrade.services.read.ideas import picks
-from algotrade.services.read.ideas.setups import Tab
+from algotrade.services.read.ideas.setups import Tab, load_session_setups
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.evaluation.verdict import SetupState
 from algotrade_api.graphql.types.instruments.feature import Unknown
@@ -100,9 +99,10 @@ class SetupGroup:
     unknown: Unknown | None
     picked: int
     shown: int
+    ctx: strawberry.Private[ReadContext]
 
     @classmethod
-    def of(cls, d: picks.SetupGroup) -> Self:
+    def of(cls, d: picks.SetupGroup, ctx: ReadContext) -> Self:
         return cls(
             edge_id=d.edge_id,
             name=d.name,
@@ -115,6 +115,7 @@ class SetupGroup:
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
             picked=d.picked,
             shown=d.shown,
+            ctx=ctx,
         )
 
     @strawberry.field(  # type: ignore[untyped-decorator]
@@ -123,11 +124,13 @@ class SetupGroup:
         "ON or PAUSED; null: no session is served or the setup is not readable"
     )
     async def setup_state(self, info: Info) -> SetupState | None:
-        read = await info.context.aread(None)
-        found = edge_reads.load_edge(read, self.edge_id) if read is not None else None
+        # the request's own context (the date the groups were read for), and the edge the tab
+        # already loaded (memoised per request): no second read of every edge per group
+        setups = await off_loop(load_session_setups, self.ctx)
+        found = next((q.edge for q in setups.qualifying if q.edge.id == self.edge_id), None)
         if found is None:
             return None
-        decided = await off_loop(state.load_setup_state, read, found)
+        decided = await off_loop(state.load_setup_state, self.ctx, found)
         return SetupState.of(decided) if decided is not None else None
 
 
@@ -160,7 +163,7 @@ class SetupIdeas:
             tab=IdeaTab(d.tab),
             state=d.state,
             rule_version=d.rule_version,
-            groups=[SetupGroup.of(g) for g in d.groups],
+            groups=[SetupGroup.of(g, ctx) for g in d.groups],
             ideas=[SetupIdea.of(i, ctx) for i in d.ideas],
             total=d.total,
             left_out=[LeftOut.of(c) for c in d.left_out],
