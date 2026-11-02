@@ -3,10 +3,21 @@
  * with the catalogue names linked), "Where to look next" (the Guide entries the page links to,
  * each by its kind) and the next page in the order.
  */
-import { EmptyState, ErrorState, Heading, Skeleton, Stack, Text, TextLink } from '@algotrade/ui';
+import {
+  DocSection,
+  EmptyState,
+  ErrorState,
+  Heading,
+  NavList,
+  Skeleton,
+  Stack,
+  Text,
+  TextLink,
+} from '@algotrade/ui';
 
 import {
   GUIDE_KIND_TITLES,
+  GUIDE_START_PATH,
   GuideProse,
   guideEntryPath,
   startPath,
@@ -17,6 +28,21 @@ import {
 export interface GuideStartProps {
   /** The page's id in the URL. */
   id: string;
+}
+
+const sectionId = (i: number) => `section-${String(i + 1)}`;
+
+/** "On this page": the anchors of a Start here page's sections, in reading order. */
+export function StartOutline({ id }: GuideStartProps) {
+  const sections = useGuideStartPage(id).data?.sections ?? [];
+  if (sections.length === 0) return null;
+  return (
+    <NavList
+      aria-label="On this page"
+      size="sm"
+      items={sections.map((section, i) => ({ href: `#${sectionId(i)}`, label: section.title }))}
+    />
+  );
 }
 
 export function GuideStart({ id }: GuideStartProps) {
@@ -41,6 +67,11 @@ export function GuideStart({ id }: GuideStartProps) {
   return (
     <Stack gap={6}>
       <Stack gap={1}>
+        <Stack direction="row">
+          <TextLink href={GUIDE_START_PATH} size="sm">
+            Start here
+          </TextLink>
+        </Stack>
         <Text size="sm" tone="muted">
           {`Start here · step ${String(page.entry.order)}`}
         </Text>
@@ -51,13 +82,15 @@ export function GuideStart({ id }: GuideStartProps) {
           {page.entry.summary}
         </Text>
       </Stack>
-      {page.sections.map((section) => (
-        <Stack key={section.title} gap={2} as="section" aria-label={section.title}>
-          <Heading level={2}>{section.title}</Heading>
-          <Text as="p">
-            <GuideProse prose={section.body} />
-          </Text>
-        </Stack>
+      {page.sections.map((section, i) => (
+        <DocSection key={section.title} id={sectionId(i)}>
+          <Stack gap={2} as="section" aria-label={section.title}>
+            <Heading level={2}>{section.title}</Heading>
+            <Text as="p">
+              <GuideProse prose={section.body} />
+            </Text>
+          </Stack>
+        </DocSection>
       ))}
       {page.links.length > 0 && (
         <Stack gap={2} as="section" aria-label="Where to look next">
