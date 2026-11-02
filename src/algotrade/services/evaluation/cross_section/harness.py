@@ -68,7 +68,8 @@ from algotrade.data.outcomes import (
     outcome_stamps,
     stored_sessions,
 )
-from algotrade.services.configs import resolve_config
+from algotrade.engines.screening.gate import OPEN
+from algotrade.services.configs import field_catalog, resolve_config
 from algotrade.services.evaluation.cross_section.detail.licences import (
     TrialLicences,
     trial_licences,
@@ -493,7 +494,7 @@ def evaluate_edge(
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
-    session = SessionReads(reader, label, screens, user.user_id)
+    session = SessionReads(reader, label, screens, user.user_id, _gate_domains(configs, edge))
     days = sessions_between(start, end)
     scopes = _scopes(configs, user, edge, iv_field)
     licences: dict[str, str | None] = {}
@@ -575,9 +576,15 @@ def evaluate_edge(
         )  # the blocks with a closed leg (measured) and the projected exits (ADR 0064)
         for variant in variants:
             legs = stats.randoms.get((plan.key, variant.id), {})
+            found = _gated(stats.legs.get((plan.key, variant.id), {}), scope.edge, session)
+            every = tuple(
+                pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
+                for block in kept
+            )  # the slices read every session; the edge's own series only the open ones
+            blocks_open, block_stats = _open_only(scope.edge, kept, every)
             pooled = [
                 pool_random([legs[leg.decision] for leg in block if leg.decision in legs])
-                for block in plan.blocks
+                for block in _open_blocks(scope.edge, plan.blocks, found)
                 if _drawn(block, legs, closed)
             ]
             randoms += _random_sets(
@@ -588,14 +595,9 @@ def evaluate_edge(
                 pooled,
                 scope.edge.outcome.result_side,
             )
-            found = stats.legs.get((plan.key, variant.id), {})
-            block_stats = tuple(
-                pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
-                for block in kept
-            )
             block_stats = _turned_over(scope.edge.outcome, block_stats)
             measures, costed = _slice_rows(
-                block_stats,
+                every,
                 split,
                 exploratory,
                 variant.config.config.impl == MODEL_IMPL,
@@ -640,11 +642,13 @@ def evaluate_edge(
                         licences[scope.key],
                         stats.outcome_licence,
                     ),
-                    legs=_details(kept, block_stats, found, closed) if scope.key == MAIN else (),
+                    legs=_details(blocks_open, block_stats, found, closed)
+                    if scope.key == MAIN
+                    else (),
                     report_containment=diagnostic,
                     series=series_facts(
                         scope.edge,
-                        kept,
+                        blocks_open,
                         closed,
                         horizon,
                         block_stats,
@@ -701,6 +705,42 @@ def evaluate_edge(
     )
 
 
+def _gated(
+    found: Mapping[date, SessionStat], edge: Edge, session: SessionReads
+) -> Mapping[date, SessionStat]:
+    """``found`` with each session tagged by the setup gate's state at D (none: unchanged)."""
+    if edge.gate is None:
+        return found
+    return {d: replace(s, gate=session.gate(edge.gate, d)) for d, s in found.items()}
+
+
+def _open_blocks(
+    edge: Edge, blocks: Sequence[Sequence[Leg]], found: Mapping[date, SessionStat]
+) -> list[Sequence[Leg]]:
+    """``blocks`` of a gated edge whose first decision session's gate is open (the edge's own
+    result: the random draws, the series and the ledger read these; the slices read them all);
+    every block of an ungated edge."""
+    if edge.gate is None:
+        return list(blocks)
+    return [b for b in blocks if (s := found.get(b[0].decision)) is not None and s.gate == OPEN]
+
+
+def _open_only(
+    edge: Edge, kept: Sequence[Sequence[Leg]], every: tuple[SessionStat, ...]
+) -> tuple[list[Sequence[Leg]], tuple[SessionStat, ...]]:
+    """The measured blocks of a gated edge and their pooled statistics, the open ones only."""
+    if edge.gate is None:
+        return list(kept), every
+    pairs = [(b, s) for b, s in zip(kept, every, strict=True) if s.gate == OPEN]
+    return [b for b, _ in pairs], tuple(s for _, s in pairs)
+
+
+def _gate_domains(configs: ConfigStore, edge: Edge) -> dict[str, tuple[str, ...]] | None:
+    """The catalogue's string domains, read only for a gated edge: a label the gate never saw is
+    read as missing (UNKNOWN), never open."""
+    return None if edge.gate is None else dict(field_catalog(configs).domains)
+
+
 def _time_series(
     reader: StoreReader,
     writer: ResultWriter,
@@ -718,9 +758,12 @@ def _time_series(
     stored as the rows the verdict reads; no per-session series, legs or ledger (there is no
     screen to replay)."""
     split, exploratory = effective_split(split_from, edge)
-    session = SessionReads(reader, site_regime(configs.load).label)
+    session = SessionReads(
+        reader, site_regime(configs.load).label, domains=_gate_domains(configs, edge)
+    )
+    gate = None if edge.gate is None else partial(session.gate, edge.gate)
     run = evaluate_time_series(
-        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws
+        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate
     )
     keys = {
         r.symbol: hashlib.sha256(
