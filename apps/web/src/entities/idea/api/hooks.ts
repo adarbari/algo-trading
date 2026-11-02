@@ -39,6 +39,7 @@ const IdeasPage = graphql(`
     ideas(first: $first, after: $after, filters: $filters, tab: $tab) {
       session
       total
+      watchlist
       hasMore
       nextCursor
       facets {

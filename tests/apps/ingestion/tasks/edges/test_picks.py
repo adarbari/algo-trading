@@ -10,9 +10,11 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from algotrade.config.edges.portfolio import ENSEMBLE
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus
+from algotrade.storage.tables.edge_schemas import NAMED
 from algotrade_ingestion.tasks.edges import picks as task
 from algotrade_ingestion.tasks.framework import entries_ops
 from algotrade_ingestion.workflows.nightly.nightly import skip_reason
@@ -127,3 +129,42 @@ def test_a_skipped_row_is_decided_again_by_the_next_run() -> None:
     w.write_features(DAYS[3])  # the data arrives late
     again = run(w, configs(), session=DAYS[3])
     assert again.stats["written"] == 2 and set(rows(w, DAYS[3])["status"]) == {"picked"}
+
+
+def _book_and_named() -> MemoryConfigStore:
+    """A book edge with an ensemble of two screeners and a named-symbol setup beside ``drift``."""
+    named = {"where": {"all": [{"field": "instrument.symbol", "op": "in", "value": ["N05"]}]}}
+    book = {"kind": "portfolio_return", "horizon_sessions": [1], "benchmark": "SPY",
+            "start_offset_sessions": 1, "weighting": "equal"}  # fmt: skip
+    timed = {"kind": "excess_return", "horizon_sessions": [4], "benchmark": "none",
+             "start_offset_sessions": 1}  # fmt: skip
+    return MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "momo"): screen(),
+            ("site", "strategies", "lowmo"): {**screen("asc"), "id": "lowmo"},
+            ("site", "edges", "drift"): edge_document(),
+            ("site", "edges", "book"): edge_document(
+                id="book", name="Book", outcome=book, screeners=["momo", "lowmo"],
+                ensemble={"variants": ["momo", "lowmo"]},
+            ),
+            ("site", "edges", "tom"): edge_document(
+                id="tom", name="Tom", outcome=timed, schedule="calendar:turn_of_month",
+                base="out_of_window", universe=named, screeners=[], top_k="all",
+            ),
+        }
+    )  # fmt: skip
+
+
+def test_books_ensembles_and_named_setups_store_their_rows_resume_and_pass_the_check(
+    world: World,  # noqa: F811
+) -> None:
+    cfg = _book_and_named()
+    first = run(world, cfg)
+    found = rows(world)
+    keys = set(zip(found["edge_id"], found["screener"], strict=True))
+    assert {("book", "momo"), ("book", "lowmo"), ("book", ENSEMBLE), ("tom", NAMED)} <= keys
+    assert first.stats["pairs"] == len(keys) == 5  # drift's one, the book's three, tom's one
+    assert run(world, cfg).stats["written"] == 0  # every key is stored: nothing decided again
+    (check,) = task.check_edge_picks(world.reader, DAY, None)  # type: ignore[arg-type]
+    assert check.status in ("PASS", "WARN")

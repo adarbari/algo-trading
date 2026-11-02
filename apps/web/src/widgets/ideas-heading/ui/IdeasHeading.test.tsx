@@ -21,6 +21,7 @@ const listed: SetupIdeas = {
   session: '2026-10-02',
   state: 'listed',
   total: 0,
+  watchlist: null,
   leftOut: [],
   groups: [],
   ideas: [],

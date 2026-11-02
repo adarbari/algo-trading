@@ -24,7 +24,7 @@ def _read(
     """``load_pick_edges`` over one stored row (``row``: extra columns, e.g. ``pick_sides``)."""
     edge = SimpleNamespace(
         id="e1", name="E", screeners=("scr",), owner="site", top_k=None,
-        outcome=SimpleNamespace(side=side),
+        outcome=SimpleNamespace(side=side, kind="excess_return"),
     )  # fmt: skip
     monkeypatch.setattr(pick_edges, "parsed_edges", lambda ctx, user: [edge])
     monkeypatch.setattr(pick_edges, "load_edges", lambda ctx, ids: [edge])

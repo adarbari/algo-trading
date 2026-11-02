@@ -162,7 +162,8 @@ class PausedIdea:
     "whole list, `facets.total` before the filters) (`nextCursor`, for the `after` "
     "argument, starts the next; null on the last page, `hasMore` false), `paused` the first "
     "`first` of `pausedTotal` picks the regime gate held back on the first page only (never "
-    "counted in `total`)"
+    "counted in `total`); `watchlist` (a tab's pool only): the ideas the rule ranked before "
+    "the viewer's watchlist kept the watched ones, null: no watchlist, no filter (ADR 0083)"
 )
 class Ideas:
     session: dt.date
@@ -173,6 +174,7 @@ class Ideas:
     paused: list[PausedIdea]
     next_cursor: str | None
     facets: FilterFacets | None
+    watchlist: int | None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Whether another page follows this one"
@@ -191,4 +193,5 @@ class Ideas:
             paused=[PausedIdea.of(p, ctx) for p in d.paused],
             next_cursor=d.next_cursor,
             facets=FilterFacets.of(d.facets) if d.facets is not None else None,
+            watchlist=d.watchlist,
         )
