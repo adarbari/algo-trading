@@ -46,3 +46,21 @@ class AppearanceBody(BaseModel):
 
 class Appearance(Schema):
     theme: str = Field(description="the saved choice: light, dark or system")
+
+
+class WatchlistBody(BaseModel):
+    instruments: list[str] = Field(
+        description="instrument ids (never tickers), each once, at most 50; replaces the list"
+    )
+
+
+class Watchlist(Schema):
+    instruments: list[str] = Field(description="the saved instrument ids, in order")
+
+
+class IdeasBody(BaseModel):
+    default_tab: str = Field(description="stocks or premium: the Ideas tab to open on")
+
+
+class Ideas(Schema):
+    default_tab: str = Field(description="the saved choice: stocks or premium")

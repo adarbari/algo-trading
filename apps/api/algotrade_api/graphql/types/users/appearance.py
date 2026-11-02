@@ -13,7 +13,12 @@ from algotrade.services.read.users import appearance
 )
 class Appearance:
     theme: str
+    start_tab: str | None = strawberry.field(
+        default=None,
+        description="The Ideas tab the user opens on (`stocks` or `premium`); null until they "
+        "answered the sign-up question (ADR 0083)",
+    )
 
     @classmethod
     def of(cls, d: appearance.Appearance) -> Self:
-        return cls(theme=d.theme)
+        return cls(theme=d.theme, start_tab=d.start_tab)
