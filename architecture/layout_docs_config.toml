@@ -213,6 +213,10 @@ path = "docs/data"
 purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue and field guide (both generated), options positioning, swing levels"
 
 [[docs_dir]]
+path = "docs/data/vendor-inventory"
+purpose = "the source inventory: every data source, free or paid, what it feeds, its licence and the recommended actions (the owner's one-page view; detail is docs/data/vendors.md)"
+
+[[docs_dir]]
 path = "docs/data/field-guide"
 purpose = "the field guide, generated pages in one folder per theme group (make features-doc from config/site/field_guide/; the index is docs/data/field-guide.md)"
 
