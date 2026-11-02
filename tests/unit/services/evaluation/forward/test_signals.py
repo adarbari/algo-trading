@@ -162,3 +162,18 @@ def test_a_gated_edge_is_not_paper_traded_until_the_record_applies_its_gate() ->
     gate = {"all": [{"field": "market.regime@v3.label", "op": "not_in", "value": ["STRESS"]}]}
     why = not_possible(edge(gate=gate))
     assert why is not None and "gate" in why
+
+
+def test_an_entry_condition_or_case_values_are_never_paper_traded_until_applied() -> None:
+    """E13: the record enters at D's offset and the default point; an edge whose entry or
+    parameters are rules says why instead of trading what its rules rule out."""
+    rule = {"all": [{"field": "x", "op": "gt", "value": 0}]}
+    shares = {"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+              "start_offset_sessions": 1}  # fmt: skip
+    option = {"kind": "option_pnl", "horizon_sessions": [2], "benchmark": "none",
+              "start_offset_sessions": 1, "position": "short_put", "strike_delta": 0.25,
+              "tenor_days": {"cases": [{"when": rule, "value": 45}], "default": 30}}  # fmt: skip
+    assert "entry condition" in (
+        not_possible(edge(outcome={**shares, "entry": {"when": rule}})) or ""
+    )
+    assert "case values" in (not_possible(edge(outcome=option)) or "")

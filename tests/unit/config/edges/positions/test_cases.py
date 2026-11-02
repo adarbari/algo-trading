@@ -123,10 +123,9 @@ def test_the_entry_condition_parses_for_both_kinds() -> None:
             parse(entry=bad)
 
 
-def test_what_no_run_applies_yet_is_refused_at_load() -> None:
-    check_edge(parse(entry={"when": HIGH_IV}), WHERE, TEMPLATES)  # applied by the harness (E13a)
-    with pytest.raises(ConfigurationError, match=r"case values: not applied.*\(E13b\)"):
-        check_edge(parse(tenor_days=tenor_cases()), WHERE, TEMPLATES)
+def test_an_entry_condition_and_case_values_load_as_the_harness_applies_both() -> None:
+    check_edge(parse(entry={"when": HIGH_IV}), WHERE, TEMPLATES)  # E13a
+    check_edge(parse(tenor_days=tenor_cases()), WHERE, TEMPLATES)  # E13b
 
 
 def test_the_exit_settings_compile_to_one_ordered_rule_list() -> None:
@@ -227,3 +226,12 @@ def test_which_templates_are_credit_and_a_case_axis_is_not_a_grid_axis() -> None
 def test_a_position_outcomes_identity_drops_absent_cases_and_exit_condition() -> None:
     o = identity_dict(asdict(parse().outcome))
     assert "cases" not in o["position"] and "when" not in o["position"]["exit"]
+
+
+def test_case_values_making_more_points_than_a_grid_may_are_refused() -> None:
+    wide = {"cases": [{"when": HIGH_IV, "value": d} for d in (20, 25, 35, 40, 50, 55, 60, 75, 90)],
+            "default": 45}  # fmt: skip
+    values = (0.1, 0.15, 0.2, 0.35, 0.4, 0.45, 0.5)
+    deltas = {"cases": [{"when": HIGH_IV, "value": v} for v in values], "default": 0.3}
+    with pytest.raises(ConfigurationError, match=r"at most 64"):
+        check_edge(parse(tenor_days=wide, strike_delta=deltas), WHERE, TEMPLATES)

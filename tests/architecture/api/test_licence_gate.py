@@ -67,6 +67,7 @@ EXEMPT = {
     "services/read/market/features.py": GATED_LOADERS,
     "services/read/market/history.py": GATED_LOADERS,
     "services/read/evaluation/positions/exit_rule.py": GATED_LOADERS,  # momentum.atr_14 (open)
+    "services/read/evaluation/positions/example.py": GATED_LOADERS,  # close, atr_14 (open)
     "services/read/evaluation/positions/option_example.py": GATED_LOADERS,  # chain price (open)
     "services/read/regime/fields.py": GATED_LOADERS,
     "services/read/regime/history.py": GATED_LOADERS,
@@ -78,6 +79,9 @@ EXEMPT = {
     "services/read/options/grid.py": "stored open data (Cboe chain, spot, Treasury curve); the "
     "per-name facts (report date, dividend yield, the open iv_history@v2 rank, never the IBKR "
     "one) go through load_feature_values, the gated loader",
+    "services/read/options/session_inputs.py": "stored open data (Cboe chain, spot, Treasury "
+    "curve); the per-name facts (report date, dividend yield, dividend schedule, episode "
+    "drawdowns) go through load_feature_values, the gated loader",
     "services/read/ops/ingestion.py": STORED_OPEN,
     "services/read/screens/runs.py": "run rows: names and decisions; values are gated in results",
     "services/read/screens/views.py": "saved views: configs, no values",

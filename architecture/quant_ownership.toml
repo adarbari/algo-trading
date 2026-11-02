@@ -16,6 +16,14 @@ section = "docs/adr/0021-option-pricing-conventions.md#implied-volatility"
 detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|bisect|fsolve)$" }]
 
 [[responsibility]]
+id = "option-payoff-figures"
+description = "The payoff of a short option held to expiry, per share at the mid (quant/options/payoff.py, the option calculators' maths, plan V11): the breakeven over every credit collected (a put's strike - credit, a call's strike + credit), a roll's credit per extra calendar day (NaN where it adds none), the return if a covered call is called away ((strike + premium - basis) / basis) and the extrinsic value (mid less intrinsic) that decides an early exercise before a dividend. Written once; the calculators in services/preview/options/ call it"
+owner = ["src/algotrade/quant/options/payoff.py"]
+allowed = ["src/algotrade/services/preview/options/*"]  # the calculators: the one caller
+section = "docs/ui/evening-desk-plan.md#5-vertical-slices"
+detect = [{ call = "short_breakeven" }, { call = "called_away_return" }, { call = "credit_per_day" }]
+
+[[responsibility]]
 id = "option-premium-figures"
 description = "The figures of a sold option from its mid premium (quant/options/premium.py, the option grid's maths): return on collateral (a put's mid / strike, a call's mid / spot), yield a year (roc x 365 / days, simple, NaN where days <= 0), breakeven (strike or spot minus the mid) and the risk-neutral chance of ending below the strike (r = q = 0, ADR 0053's convention: a put's 1 - prob_otm, a call's prob_otm). Written once; the grid and short_premium@v1 call it through features/rollups/premium/band_pick.py"
 owner = ["src/algotrade/quant/options/premium.py"]

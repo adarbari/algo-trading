@@ -183,6 +183,10 @@ name = "EdgeCompare.reason"
 reason = "a fixed public sentence about the caller's own edge (not run yet, no figures): no source, step or table named"
 
 [[fact]]
+name = "SetupState.reason"
+reason = "a fixed public sentence about a setup's verdict level and gate, or the gate's rule in field terms (decide_gate names no value, source, step or table); empty for UNKNOWN, whose cause is AdminCause"
+
+[[fact]]
 name = "EdgeProblem.reason"
 reason = "why the caller's own edge file does not load (a config fault in their own document: the file and key, no source, step or table)"
 

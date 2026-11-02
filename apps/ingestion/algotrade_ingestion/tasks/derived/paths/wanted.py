@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Any
 
 from algotrade.config.edges.document import CLOSED, Edge, Outcome
-from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND, reads_share_path
 from algotrade.config.edges.positions.key import (
     case_points,
     grid_outcomes,
@@ -23,9 +23,7 @@ from algotrade.config.edges.positions.key import (
 from algotrade.config.edges.positions.spec import ExitRule, exit_rules, share_exit_rules
 from algotrade.config.edges.positions.templates import (
     OPTION,
-    RETURN_KINDS,
     SHARES,
-    SIDE_TEMPLATES,
     Templates,
 )
 from algotrade.core.model.fields import is_position_field
@@ -53,8 +51,9 @@ def _stored(outcome: Outcome, kind: str) -> bool:
         return False
     if kind == OPTION:
         return outcome.kind == CHAIN_KIND
-    share = outcome.kind in RETURN_KINDS and outcome.side in SIDE_TEMPLATES
-    return share and outcome.position.exit is not None and outcome.side != "long_short"
+    # the one predicate the harness reads by (``reads_share_path``); the writer stores no
+    # long_short path (the spec check refuses one with an exit)
+    return reads_share_path(outcome) and outcome.side != "long_short"
 
 
 def positions_wanted(

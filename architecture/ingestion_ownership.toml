@@ -383,6 +383,7 @@ owner = [
 ]
 allowed = [
     "src/algotrade/storage/tables/schemas/outcomes.py",  # declares the grain's schema
+    "src/algotrade/data/outcomes/grains.py",  # the one dispatch between the outcome grains' reads (E3c-2b)
     "src/algotrade/services/evaluation/time_series/harness.py",  # reads a named option sleeve's trades (ADR 0088 decision 14)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-18-optionpnl-the-chain-pl-grain-eb-h13"

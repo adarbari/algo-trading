@@ -30,16 +30,18 @@ import pandas as pd
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
-from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND, reads_share_path
 from algotrade.config.edges.verdict import OptionCosts
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
+    BENCHMARK,
     NO_RESIDUAL_ROW,
     attach_residuals,
     read_chain,
     read_outcomes,
     read_residuals,
+    read_share_path,
 )
 from algotrade.services.evaluation.cross_section.harness import iv_field_of
 from algotrade.services.evaluation.cross_section.hit import (
@@ -51,8 +53,8 @@ from algotrade.services.evaluation.cross_section.hit import (
     is_return,
     needs_implied_vol,
     needs_residual,
+    own_keys,
 )
-from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.reads.session import implied_at
 from algotrade.services.evaluation.evidence.shapes import trade_frame
 from algotrade.services.evaluation.forward.signals import advance
@@ -104,6 +106,23 @@ def _skipped(instrument: str, why: str) -> Settled:
     return Settled(instrument, SKIPPED, why, None, False)
 
 
+def _stored_rows(
+    reader: StoreReader, edge: Edge, horizon: int, buy: date, now: datetime
+) -> pd.DataFrame:
+    """The outcome rows of the edge's grain for a buy session read as of ``now`` (empty: none
+    stored): the option trades of an ``option_pnl`` (EB H13), the edge's own share path rows of a
+    shares position with an exit (ADR 0088, E3c-2: a row of another setup's key never stands in,
+    so a missing own row waits), else the price windows."""
+    try:
+        if edge.outcome.kind == CHAIN_KIND:
+            return read_chain(reader, horizon, [buy], as_of=now)
+        if reads_share_path(edge.outcome):
+            return read_share_path(reader, horizon, [buy], own_keys(edge, horizon), as_of=now)
+        return read_outcomes(reader, horizon, [buy], BENCHMARK, as_of=now)
+    except MissingDataError:
+        return pd.DataFrame()
+
+
 def settle_group(
     reader: StoreReader,
     edge: Edge,
@@ -128,13 +147,7 @@ def settle_group(
         return out
     if edge.outcome.kind == PORTFOLIO_KIND:  # a book is valued whole, never name by name
         return out + [_skipped(i, "a portfolio book is not settled name by name") for i in names]
-    try:
-        if edge.outcome.kind == CHAIN_KIND:  # an option P&L reads the chain grain (EB H13)
-            stored = read_chain(reader, horizon, [buy], as_of=now)
-        else:
-            stored = read_outcomes(reader, horizon, [buy], BENCHMARK, as_of=now)
-    except MissingDataError:
-        stored = pd.DataFrame()
+    stored = _stored_rows(reader, edge, horizon, buy, now)
     if stored.empty:
         late = session >= advance(first["sell_session"], GRACE_SESSIONS)
         return out + (

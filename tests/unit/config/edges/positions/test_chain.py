@@ -65,7 +65,7 @@ def test_an_edge_and_its_variants_read_one_grain() -> None:
     doc["variants"] = [{
         "id": "excess", "outcome": {"kind": "excess_return", "benchmark": "SPY"},
     }]  # fmt: skip
-    with pytest.raises(ConfigurationError, match="all option_pnl or none is"):
+    with pytest.raises(ConfigurationError, match="all read one outcome grain"):
         parse_edge(doc, "drift", WHERE)
     doc["variants"] = [{"id": "spread", "outcome": {"position": "put_spread"}}]
     edge = parse_edge(doc, "drift", WHERE)
