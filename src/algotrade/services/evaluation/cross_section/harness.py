@@ -753,20 +753,19 @@ def _time_series(
     random_draws: int,
 ) -> EdgeEvaluation:
     """A time-series edge (ADR 0073) or named option sleeve (ADR 0088) as an ``EdgeEvaluation``:
-    one trial per named instrument (``variant`` its symbol, ``horizon`` the window's length or
-    the hold; a sleeve's per edge variant and grid point too), its slices and random window sets
-    stored as the rows the verdict reads; no per-session series, legs or ledger (there is no
-    screen to replay)."""
+    one trial per named instrument (``variant`` its symbol, ``horizon`` the window's length or the
+    hold; a sleeve's per edge variant and grid point too), its slices and random window sets stored
+    as the rows the verdict reads; no per-session series, legs or ledger (no screen to replay)."""
     split, exploratory = effective_split(split_from, edge)
-    domains = gate_domains(configs, edge)  # also an entry condition's (G9-M3, G9-M4 here too)
-    check_entry(reader, edge, catalogue(configs, user.user_id), start, end, as_of)
+    domains, features = gate_domains(configs, edge), catalogue(configs, user.user_id)
+    check_entry(reader, edge, features, start, end, as_of)  # G9-M3, G9-M4 (a sleeve: each trial)
     session = SessionReads(reader, site_regime(configs.load).label, domains=domains)
     gate = None if edge.gate is None else partial(session.gate, edge.gate)
     gates, gate_keys = variant_gates(edge, session)
     run = (
         evaluate_sleeve(reader, edge, sleeve_outcomes(edge, load_templates(configs)), start, end,
                         as_of, session.label, split, exploratory, gate,
-                        load_verdict(configs).option_costs, gates, gate_keys)  # check_entry: ok
+                        load_verdict(configs).option_costs, gates, gate_keys, domains, features)
         if edge.base == DELTA_EQUIVALENT
         else evaluate_time_series(
             reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,

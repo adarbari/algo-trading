@@ -135,3 +135,63 @@ A none group is an except. Each member is turned into its opposite, so none of R
 """
 next = "To find why a row failed, look for the excluded condition it matched."
 see_also = ["criterion_group", "group_all", "near_miss", "reject"]
+
+# ---------------------------------------------------------------------------- entry and parameters by rule (ADR 0088, E13)
+
+[[term]]
+id = "entry_condition"
+term = "Entry condition"
+short = "A rule a name must meet at a close before the setup enters it, waited for over a few sessions."
+body = """
+A setup may say when to enter, not only what to pick. Each close from the decision session on,
+for at most the wait it names (within_sessions), the rule is read from that session's data alone.
+The name enters after the first close at which the rule holds, at the next session or later. It
+never enters at that close itself. The picks and the names they are compared with wait for the same rule, so a rule
+that only explains the market's moves adds nothing to the setup's lift. A name that never meets it
+is counted as not triggered; one whose data is missing first is counted as unknown.
+"""
+see_also = ["not_triggered", "entry_unknown", "criterion"]
+
+[[term]]
+id = "not_triggered"
+term = "Not triggered"
+short = "The name's entry condition never held during the wait, so it was not entered."
+body = """
+A picked name whose entry condition was false at every close of the wait is not traded. It is a
+real outcome of the rule, counted beside the trades, and never a loss or a missing result. It is
+left out of the base the picks are compared with too.
+"""
+see_also = ["entry_condition", "entry_unknown"]
+
+[[term]]
+id = "entry_unknown"
+term = "Entry unknown"
+short = "A value the entry condition needs was missing before the rule held, so the name was not entered."
+body = """
+Missing data never decides an entry. When a value the rule reads is absent at a close before the
+rule held, the wait stops there. The name is counted as unknown, not entered later on a guess.
+"""
+see_also = ["entry_condition", "not_triggered"]
+
+[[term]]
+id = "case_value"
+term = "Case value"
+short = "A position parameter chosen by rule at the decision session, such as a 30-day tenor when implied volatility rank is high, else 45."
+body = """
+A setup may set its tenor, strike delta, expiry cycle, exits or position by cases. The first case
+whose rule holds at the decision session gives the value. The default applies only when every
+case is false. Each name is measured at the position its own cases chose, read from that session's data
+alone.
+"""
+see_also = ["case_unknown", "criterion"]
+
+[[term]]
+id = "case_unknown"
+term = "Case unknown"
+short = "A value a case rule needs was missing at the decision session, so the name was not traded."
+body = """
+When a case cannot be decided because a value it reads is missing, the name is not traded and is
+counted as unknown. It is never traded at the default, which would let missing data choose the
+position.
+"""
+see_also = ["case_value"]
