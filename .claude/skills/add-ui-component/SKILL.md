@@ -66,4 +66,4 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
    needs an owner-approved mockup (mockup gate, step 2).
 8. A component that adds a tab or panel with its own read: `make api-latency-views` and commit
    `benchmarks/api_latency_views*.json` (the 1 s page gate; CI fails otherwise; `add-web-page` step 12).
-9. Run `make changed` (it maps the web checks), `make web-visual` when the design system changed, then push: CI is the full gate.
+9. `npm run visual:missing` when a story is new, then push (the `pre-push` hook runs `make pre-push`): CI is the full gate.

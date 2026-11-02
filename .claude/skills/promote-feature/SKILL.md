@@ -95,7 +95,7 @@ This skill decides the class, then hands the building to `add-feature` (and `add
 
 ## 4. PR checklist
 
-`make features-doc`, `make changed`, the golden file loads (`tests/unit/services/drafting/`),
+`make features-doc`, the golden file loads (`tests/unit/services/drafting/`),
 backlog test passes. PR description: class, fingerprint hash(es) and the users' count (no user
 ids), the paraphrased golden case, what stays manual. No label (docs / config only); a B2 or
 C that adds a table or group version is a code change: normal flow.

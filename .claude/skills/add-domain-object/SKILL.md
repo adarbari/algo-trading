@@ -105,7 +105,7 @@ with `@strawberry.type`, fields copied from the dataclass, one `of()` classmetho
 call one loader. A status / state / kind / label / verdict the object carries (an enum or a
 string from a fixed tuple) gets its Guide entries in `architecture/guide_coverage.toml`
 (`add-graphql-field`, "Guide entry"). Then the snapshot (`.venv/bin/python scripts/export_graphql_schema.py`) and
-`make changed`, then push: CI is the full gate.
+Push (the `pre-push` hook runs `make pre-push`): CI is the full gate.
 
 ## Worked example: Holdings (an ETF's top holdings)
 

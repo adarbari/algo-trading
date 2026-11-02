@@ -45,7 +45,7 @@ Owners are listed in `architecture/*_ownership.toml`.
    "screener"`, `impl`, `params`, a `selection` preset or inline selection; `schedule =
    "nightly"` if it should run every night). Never filter instruments inside the screener
    itself; that is the selection's job. Check it with `algotrade-backtest config validate <id>`.
-9. Run `make changed`, then push: CI is the full gate.
+9. Push (the `pre-push` hook runs `make pre-push`): CI is the full gate.
 
 ## Edge-document checklist (from eight architect reviews; the edge document is `config/site/edges/<id>/edge.toml`)
 
@@ -62,7 +62,7 @@ Owners are listed in `architecture/*_ownership.toml`.
 - **Every new feature column ships its field-guide entry**, whether or not a screen reads it
   (`scripts/features_doc.py` lists unguided fields).
 - **Guide text**: sentences under 30 words, no banned words (`tests/unit/config/site/guide/test_style.py`,
-  not mapped by `make changed`: run it); a screener folder holds at most 12 files.
+  run it before the push); a screener folder holds at most 12 files.
 - **After a merge of main**: recount preset and screener test totals as the SUM; on a
   `benchmarks/baseline.json` conflict take main's, then `make baseline`, never hand-edit. Run
   `git fetch origin main` before every merge, never merge a local copy.

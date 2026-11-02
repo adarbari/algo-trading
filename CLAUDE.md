@@ -137,16 +137,18 @@ Every table, list or feed uses the shared filter bar (ADR 0082, once accepted) a
 8. Secrets come only from environment variables. Never commit credentials.
    Dependencies go in the pyproject of the package that needs them (an app's own, not the
    library's), then `uv lock`; commit `uv.lock`.
-9. **Check locally only what changed, then push; CI is the gate** (owner decision
-   2026-10-08: CI has the hardware, the machine does not). Before the push run `make changed`
-   (the mirrored tests of the changed files, `tests/architecture` + `tests/unit/config`, the mapped web checks, the fast gates) and the
-   one gate for what you touched when `changed` cannot map it; never the full `make check`
-   on the machine (396 runs in one week, 30-40 min each, were the bottleneck). After a CI
+9. **Push and let the hook check; CI is the gate** (owner decisions 2026-10-08, 2026-11-02:
+   CI has the hardware, the machine does not). `git push` runs the `pre-push` hook: `make pre-push`
+   (about 90 s, the checks that fail most per second) through the machine-wide queue
+   (`scripts/ops/push_queue.py`, ordered by the PRs waiting on yours; `Unblocks:` in the PR body
+   counts); never run `make changed` or the full `make check` before a push (unqueued runs swapped
+   the Mac on 2026-11-01). `make changed` is an optional full local check; tests run by hand use
+   `-n 2` at most. After a CI
    failure rerun only the failed gate locally (`make <gate>` / `npm run <script>`), fix, push
    again. A bare `make check` refuses; `make check SCOPED=1` is a deliberate run of the areas
    changed vs `origin/main` (`make check-scope`; the two sides in parallel, one run per
    worktree) and `make check FULL=1` every gate (the release).
-10. **Push and open the PR yourself, then move on.** When `make changed` passes, push the
+10. **Push and open the PR yourself, then move on.** Push the
     feature branch (never `main`, never force-push; merge `origin/main` right before every push
     when other sessions are landing PRs), open the PR from the template and start
     the next work item; do not ask the owner first and do not wait for CI (owner decision
@@ -269,9 +271,8 @@ Token habits (every session):
   `architecture/*_ownership.toml`; the feature catalogue `docs/data/features.md` by grep.
 - **Never open generated or bulk files**: `uv.lock`, `apps/web/package-lock.json`,
   `apps/api/openapi.json`, `datasets/golden/**`, `tests/fixtures/**`, `__screenshots__/`.
-- **Verify narrow first**: `make changed` (the mirrored tests of every file changed vs
-  `origin/main`, then `arch`, `layout`, `ownership`), or one test file (`.venv/bin/python -m
-  pytest <path> -q -x`); then push (rule 9: no full `make check` locally). Send long runs to `checker`
+- **Verify narrow first**: one test file (`.venv/bin/python -m pytest <path> -q -x -n 2`)
+  while working; then push and let the hook run (rule 9). Send long runs to `checker`
   or pipe through `tail`. Re-run `make web-visual` only when the design system changed.
 - **Brief by pointer, report in the PR**: brief a subagent with paths, the owner, the skill
   and the acceptance check, not pasted file contents. A subagent's hand-back is at most 150

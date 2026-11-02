@@ -135,7 +135,7 @@ web-storybook web-e2e` in parallel), so `tsc -b` runs once (typecheck) and `vite
 whatever changed: CI runs the gates per job and the release runs `make check FULL=1`.
 `CHECK_SCOPE="python web"` overrides the detection. The outputs interleave (GNU make 3.81 on
 macOS has no `-O`); make names the failed target at the end. It runs under the per-worktree
-lock below. With rule 9 (sessions push after `make changed`; CI gates) full local runs are
+lock below. With rule 9 (sessions push through the queued `make pre-push` hook; CI gates) full local runs are
 rare, so the `WORKERS=2 WEB_WORKERS=2` caps go: a run gets every core (10, 4 performance;
 16 GB). The caps dated from the overloads of #94 / #95 / #98, when three to five full checks
 ran side by side.

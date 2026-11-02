@@ -82,7 +82,7 @@ must pass with `architecture/known_violations.toml` still empty.
     floor and the free space (`nightly.toml [history_copy]`; `docs/hosting.md`, "Disk floors"),
     not a FAIL (the existing filing-text floor, which ends PARTIAL, excepted); every other "did nothing while work existed" FAILS. (history-copy reported complete with nothing built; screen-runs-backfill and
     edge-verdicts defaulted to today only and reported complete with 0 sessions.)
-12. Before you push: `make changed`, then `tests/architecture` and `tests/unit/config` run
-    fully (`make changed` does), new task modules in a NEW folder by kind when the parent is at
+12. Before you push: run the new adapter's tests (`-n 2`); CI runs `tests/architecture` and
+    `tests/unit/config` fully; new task modules in a NEW folder by kind when the parent is at
     8+ modules (`make layout`), schemas in the schemas package modules (file-length cap).
 13. Push: CI is the full gate.
