@@ -172,6 +172,12 @@ def _outcome_with_legs(outcome: "Outcome", templates: Templates) -> "Outcome":
     return replace(outcome, position=replace(spec, legs=legs, collateral=template.collateral))
 
 
+def with_template(outcome: "Outcome", template_id: str, templates: Templates) -> "Outcome":
+    """``outcome`` holding the template ``template_id`` instead, its legs and collateral resolved
+    from it (a position baseline's outcome, ``services/evaluation/cross_section/baselines``)."""
+    return _apply(outcome, "position", template_id, templates)
+
+
 def _apply(outcome: "Outcome", name: str, value: Any, templates: Templates) -> "Outcome":
     """``outcome`` with the case-valued parameter ``name`` set to ``value``, its legs resolved
     again from the (possibly other) template."""

@@ -53,6 +53,7 @@ from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.templates import POSITION_PREFIX, load_templates
 from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
@@ -68,8 +69,20 @@ from algotrade.data.outcomes import (
     outcome_stamps,
     stored_sessions,
 )
-from algotrade.engines.screening.gate import OPEN
-from algotrade.services.configs import field_catalog, resolve_config
+from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.baselines.variant import (
+    Variant,
+    _Scope,
+    crosses,
+    on_chain,
+    variant_scope,
+)
+from algotrade.services.evaluation.cross_section.detail.gating import (
+    gate_domains,
+    open_blocks,
+    pooled_blocks,
+    tagged,
+)
 from algotrade.services.evaluation.cross_section.detail.licences import (
     TrialLicences,
     trial_licences,
@@ -120,11 +133,9 @@ from algotrade.services.evaluation.cross_section.measures import (
     cost_measures,
     deflate,
     edge_slices,
-    pool_stats,
     slice_measures,
 )
 from algotrade.services.evaluation.cross_section.measuring import (
-    Variant,
     _chain,
     _drawn,
     _measure,
@@ -132,8 +143,8 @@ from algotrade.services.evaluation.cross_section.measuring import (
     _needs,
     _Plan,
     _RandomSpec,
-    _Scope,
     _trial_hash,
+    both_seqs,
 )
 from algotrade.services.evaluation.cross_section.random_picks import (
     DEFAULT_DRAWS,
@@ -377,6 +388,14 @@ def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Varia
         ),
         *(Variant(s, BASELINE, resolve_config(configs, s, user)) for s in edge.baselines),
     ]
+    if edge.position_baselines:  # the setup's own picks, valued as another position (G19)
+        own = next((v for v in found if v.role == SCREENER), found[0] if found else None)
+        if own is None:
+            raise ConfigurationError(f"edge {edge.id}: a position baseline needs a screener")
+        found += [
+            Variant(f"{POSITION_PREFIX}{t}", BASELINE, own.config, position=t)
+            for t in edge.position_baselines
+        ]
     if edge.ensemble:
         members = tuple(v for v in found if v.role == MEMBER)
         found.append(Variant(ENSEMBLE, SCREENER, members[0].config, members))
@@ -494,7 +513,7 @@ def evaluate_edge(
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
-    session = SessionReads(reader, label, screens, user.user_id, _gate_domains(configs, edge))
+    session = SessionReads(reader, label, screens, user.user_id, gate_domains(configs, edge))
     days = sessions_between(start, end)
     scopes = _scopes(configs, user, edge, iv_field)
     licences: dict[str, str | None] = {}
@@ -540,6 +559,7 @@ def evaluate_edge(
             _earnings_horizons(plans),
             _chain(plans),
             residual_plans(plans),
+            crosses(plans, variants),  # a baseline the setup cannot be valued as fails here
         ),
         "requested" if full else None,
     )
@@ -575,86 +595,87 @@ def evaluate_edge(
             scope.edge, plan.blocks, closed, horizon, start, projected
         )  # the blocks with a closed leg (measured) and the projected exits (ADR 0064)
         for variant in variants:
+            vscope, vclosed, vkept, vexits = _valued_as(
+                plan, variant, stats, (closed, kept, exits), start, projected
+            )
             legs = stats.randoms.get((plan.key, variant.id), {})
-            found = _gated(stats.legs.get((plan.key, variant.id), {}), scope.edge, session)
-            every = tuple(
-                pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
-                for block in kept
-            )  # the slices read every session; the edge's own series only the open ones
-            blocks_open, block_stats = _open_only(scope.edge, kept, every)
+            found = tagged(stats.legs.get((plan.key, variant.id), {}), scope.edge, session)
+            every, blocks_open, block_stats = pooled_blocks(scope.edge, found, vkept, vclosed)
             pooled = [
                 pool_random([legs[leg.decision] for leg in block if leg.decision in legs])
-                for block in _open_blocks(scope.edge, plan.blocks, found)
+                for block in open_blocks(scope.edge, plan.blocks, found)
                 if _drawn(block, legs, closed)
             ]
             randoms += _random_sets(
                 scope.key,
                 horizon,
                 variant.id,
-                _trial_hash(scope, variant),
+                _trial_hash(vscope, variant),
                 pooled,
-                scope.edge.outcome.result_side,
+                vscope.edge.outcome.result_side,
             )
-            block_stats = _turned_over(scope.edge.outcome, block_stats)
+            block_stats = _turned_over(vscope.edge.outcome, block_stats)
             measures, costed = _slice_rows(
                 every,
                 split,
                 exploratory,
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
-                CostGrid(None, (), scope.edge.outcome.sign, OPTION_LEVELS)
-                if scope.edge.outcome.kind == CHAIN_KIND
-                else CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
-                if is_return(scope.edge)
-                and scope.edge.outcome.side != LONG_SHORT
-                and scope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
+                CostGrid(None, (), vscope.edge.outcome.sign, OPTION_LEVELS)
+                if vscope.edge.outcome.kind == CHAIN_KIND
+                else CostGrid(vscope.edge.outcome.cost_bps, spec.costs, vscope.edge.outcome.sign)
+                if is_return(vscope.edge)
+                and vscope.edge.outcome.side != LONG_SHORT
+                and vscope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
                 else None,  # a spread has no hit rate to cost
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
-                counts_wins(unit_of(scope.edge)),
+                counts_wins(unit_of(vscope.edge)),
                 horizon,
                 TailSpec(
-                    _trial_hash(scope, variant),  # config identity, never a code version (the seed)
+                    _trial_hash(
+                        vscope, variant
+                    ),  # config identity, never a code version (the seed)
                     verdict.tails,
                     bootstrap=variant.role == SCREENER,  # the verdict reads the screener's only
-                    base=scope.edge.outcome.sign > 0,  # an option's: its stored base_roc
+                    base=vscope.edge.outcome.sign > 0,  # an option's: its stored base_roc
                 ),
             )
             results.append(
                 VariantResult(
                     variant.id,
                     variant.role,
-                    _trial_hash(scope, variant),
+                    _trial_hash(vscope, variant),
                     horizon,
                     block_stats,
                     measures,
                     edge_variant=scope.key,
-                    side=scope.edge.outcome.result_side,
+                    side=vscope.edge.outcome.result_side,
                     capital_basis=None
-                    if scope.edge.outcome.kind == PORTFOLIO_KIND
-                    else capital_basis_of(scope.edge),
+                    if vscope.edge.outcome.kind == PORTFOLIO_KIND
+                    else capital_basis_of(vscope.edge),
                     iv_source=scope.iv_field if needs_iv else None,
                     grid=len(variant.members) or None,
                     licences=trial_licences(
                         features,
-                        scope.edge,
+                        vscope.edge,
                         scope.universe,
                         [m.config for m in variant.members] or [variant.config],
                         licences[scope.key],
                         stats.outcome_licence,
                     ),
-                    legs=_details(blocks_open, block_stats, found, closed)
+                    legs=_details(blocks_open, block_stats, found, vclosed)
                     if scope.key == MAIN
                     else (),
                     report_containment=diagnostic,
                     series=series_facts(
-                        scope.edge,
+                        vscope.edge,
                         blocks_open,
-                        closed,
+                        vclosed,
                         horizon,
                         block_stats,
                         stats.lost.get((plan.key, variant.id), {}),
                         split,
-                        exits,
+                        vexits,
                     ),
                     costs=costed,
                     lost_sessions=dict(
@@ -705,42 +726,6 @@ def evaluate_edge(
     )
 
 
-def _gated(
-    found: Mapping[date, SessionStat], edge: Edge, session: SessionReads
-) -> Mapping[date, SessionStat]:
-    """``found`` with each session tagged by the setup gate's state at D (none: unchanged)."""
-    if edge.gate is None:
-        return found
-    return {d: replace(s, gate=session.gate(edge.gate, d)) for d, s in found.items()}
-
-
-def _open_blocks(
-    edge: Edge, blocks: Sequence[Sequence[Leg]], found: Mapping[date, SessionStat]
-) -> list[Sequence[Leg]]:
-    """``blocks`` of a gated edge whose first decision session's gate is open (the edge's own
-    result: the random draws, the series and the ledger read these; the slices read them all);
-    every block of an ungated edge."""
-    if edge.gate is None:
-        return list(blocks)
-    return [b for b in blocks if (s := found.get(b[0].decision)) is not None and s.gate == OPEN]
-
-
-def _open_only(
-    edge: Edge, kept: Sequence[Sequence[Leg]], every: tuple[SessionStat, ...]
-) -> tuple[list[Sequence[Leg]], tuple[SessionStat, ...]]:
-    """The measured blocks of a gated edge and their pooled statistics, the open ones only."""
-    if edge.gate is None:
-        return list(kept), every
-    pairs = [(b, s) for b, s in zip(kept, every, strict=True) if s.gate == OPEN]
-    return [b for b, _ in pairs], tuple(s for _, s in pairs)
-
-
-def _gate_domains(configs: ConfigStore, edge: Edge) -> dict[str, tuple[str, ...]] | None:
-    """The catalogue's string domains, read only for a gated edge: a label the gate never saw is
-    read as missing (UNKNOWN), never open."""
-    return None if edge.gate is None else dict(field_catalog(configs).domains)
-
-
 def _time_series(
     reader: StoreReader,
     writer: ResultWriter,
@@ -759,7 +744,7 @@ def _time_series(
     screen to replay)."""
     split, exploratory = effective_split(split_from, edge)
     session = SessionReads(
-        reader, site_regime(configs.load).label, domains=_gate_domains(configs, edge)
+        reader, site_regime(configs.load).label, domains=gate_domains(configs, edge)
     )
     gate = None if edge.gate is None else partial(session.gate, edge.gate)
     run = evaluate_time_series(
@@ -849,12 +834,34 @@ def _leg_rows(
     return (*stats.rows, *(r for r in reads if r["session_date"] in held), *outcomes, *gone)
 
 
+def _valued_as(
+    plan: _Plan,
+    variant: Variant,
+    stats: _Measured,
+    own: tuple[Collection[date], Any, Any],
+    start: date,
+    projected: int,
+) -> tuple[_Scope, Collection[date], Any, Any]:
+    """The scope ``variant`` is valued in (a position baseline's is the template's, on its own
+    grain) with the closed sessions, measured blocks and projected exits of that grain; ``own``
+    are the plan's."""
+    scope = variant_scope(plan.scope, variant)
+    if on_chain(scope) == on_chain(plan.scope):
+        return scope, *own
+    found = stats.legs.get((plan.key, variant.id), {})  # only the sessions it holds a leg for
+    held = {leg.entry for block in plan.blocks for leg in block if leg.decision in found}
+    closed = stats.closed_other[plan.horizon] & held
+    kept, exits = plan_exits(scope.edge, plan.blocks, closed, plan.horizon, start, projected)
+    return scope, closed, kept, exits
+
+
 def _outcome_stamps(
     reader: StoreReader,
     as_of: datetime,
     names_for: Collection[int],
     chain: bool,
     residuals: bool,
+    cross: bool,
     entries: Collection[date],
 ) -> tuple[
     dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
@@ -864,9 +871,13 @@ def _outcome_stamps(
     sequence (the harness is the one reader of outcomes)."""
     if chain:  # an option_pnl edge reads the chain grain (EB H13)
         known, names = chain_stamps(reader, entries, as_of, names_for)
-        return known, names, chain_seqs(reader, entries)
-    known, names = outcome_stamps(reader, entries, as_of, names_for=names_for, residuals=residuals)
-    return known, names, outcome_seqs(reader, entries, residuals)
+        seqs = chain_seqs(reader, entries)
+    else:
+        known, names = outcome_stamps(
+            reader, entries, as_of, names_for=names_for, residuals=residuals
+        )
+        seqs = outcome_seqs(reader, entries, residuals)
+    return known, names, both_seqs(reader, entries, chain, seqs, cross)
 
 
 def residual_plans(plans: Sequence[_Plan]) -> bool:
@@ -891,7 +902,17 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
     reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
     borrow = load_verdict(configs).borrow_bps_annual
     edge = replace(edge, outcome=_borrowing(edge.outcome, borrow))
-    scopes = [_Scope(MAIN, edge, edge_universe(configs, user, edge), iv_field_of(edge, iv_field))]
+    templates = load_templates(configs) if edge.position_baselines else {}
+    scopes = [
+        _Scope(
+            MAIN,
+            edge,
+            edge_universe(configs, user, edge),
+            iv_field_of(edge, iv_field),
+            (),
+            templates,
+        )
+    ]
     for v in edge.variants:
         base, picks = v.base or edge.base, v.picks or edge.picks
         applied = replace(
@@ -905,7 +926,9 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
         field_name = v.outcome.iv_field or iv_field
         marks = (f"base={base}", f"picks={picks}") if v.base or v.picks else ()
         scopes.append(
-            _Scope(v.id, applied, edge_universe(configs, user, applied), field_name, marks)
+            _Scope(
+                v.id, applied, edge_universe(configs, user, applied), field_name, marks, templates
+            )
         )
     return scopes
 

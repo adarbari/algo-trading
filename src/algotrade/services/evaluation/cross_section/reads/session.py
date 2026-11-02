@@ -46,7 +46,7 @@ from algotrade.services.screening.regime import edge_gate, session_market
 from algotrade.services.selection import fields_view
 
 if TYPE_CHECKING:
-    from algotrade.services.evaluation.cross_section.measuring import Variant
+    from algotrade.services.evaluation.cross_section.baselines.variant import Variant
 
 UNKNOWN = "UNKNOWN"
 SECTOR_FIELD = "instrument.sector"  # the stratum of a pick's sector-matched random draws (ADR 0053)
