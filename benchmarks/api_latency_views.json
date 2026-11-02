@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 05:43 UTC",
+ "generated": "2026-11-02 09:03 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -455,9 +455,6 @@
     "TableView"
    ],
    "uncertain": [
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultRegimes",
     "GuideHelpField",
     "TableView"
    ],
@@ -496,10 +493,68 @@
     "TableView"
    ],
    "uncertain": [
+    "GuideHelpField",
     "TableView"
    ],
    "interaction": [],
    "source": "static"
+  },
+  "/edges?edge={edge} > expand:By holding period": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "By holding period"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
+  },
+  "/edges?edge={edge} > expand:Compared against, tested, and why it should last": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Compared against, tested, and why it should last"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
+  },
+  "/edges?edge={edge} > expand:Dig deeper": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Dig deeper"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
   },
   "/explore": {
    "route": "/explore",
@@ -1587,6 +1642,25 @@
    "source": "static",
    "parent": "/ideas"
   },
+  "/ideas/:symbol": {
+   "route": "/ideas/:symbol",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "symbol": "link"
+   },
+   "ops": [
+    "GuideHelpField",
+    "IdeaDetail"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
   "/login": {
    "route": "/login",
    "search": {},
@@ -1909,63 +1983,6 @@
    "interaction": [],
    "source": "static",
    "parent": "/test/setup/:id"
-  },
-  "/edges?edge={edge} > expand:By holding period": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "By holding period"
-    }
-   ],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}"
-  },
-  "/edges?edge={edge} > expand:Compared against, tested, and why it should last": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Compared against, tested, and why it should last"
-    }
-   ],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}"
-  },
-  "/edges?edge={edge} > expand:Dig deeper": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Dig deeper"
-    }
-   ],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}"
   }
  }
 }

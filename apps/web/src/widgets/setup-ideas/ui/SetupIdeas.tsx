@@ -34,6 +34,8 @@ export interface SetupIdeasProps {
   onOpen: (symbol: string, via: string) => void;
   /** Open a setup's page. */
   onOpenEdge: (edgeId: string) => void;
+  /** Open a name's idea page under the setup that ranks it. */
+  onOpenIdea: (symbol: string, setupId: string) => void;
 }
 
 function GroupHeader({
@@ -85,11 +87,13 @@ function Detail({
   group,
   onOpen,
   onOpenEdge,
+  onOpenIdea,
 }: {
   idea: SetupIdea;
   group: SetupGroup | undefined;
   onOpen: SetupIdeasProps['onOpen'];
   onOpenEdge: SetupIdeasProps['onOpenEdge'];
+  onOpenIdea: SetupIdeasProps['onOpenIdea'];
 }) {
   const symbol = idea.symbol;
   return (
@@ -114,14 +118,24 @@ function Detail({
         </Stack>
       )}
       <Stack direction="row" gap={2} wrap>
-        {symbol && group && (
+        {symbol && (
           <Button
             variant="primary"
+            onClick={() => {
+              onOpenIdea(symbol, idea.setupId);
+            }}
+          >
+            Open the idea
+          </Button>
+        )}
+        {symbol && group && (
+          <Button
+            variant="secondary"
             onClick={() => {
               onOpen(symbol, group.basisScreener);
             }}
           >
-            Open {symbol}
+            {`Open ${symbol} in Explore`}
           </Button>
         )}
         <Button
@@ -137,7 +151,7 @@ function Detail({
   );
 }
 
-export function SetupIdeas({ tab, unproven, onOpen, onOpenEdge }: SetupIdeasProps) {
+export function SetupIdeas({ tab, unproven, onOpen, onOpenEdge, onOpenIdea }: SetupIdeasProps) {
   const found = useSetupIdeas(tab);
   const [chosen, setChosen] = useState<string | null>(null);
   const data = found.data;
@@ -221,6 +235,7 @@ export function SetupIdeas({ tab, unproven, onOpen, onOpenEdge }: SetupIdeasProp
               group={data.groups.find((g) => g.edgeId === idea.setupId)}
               onOpen={onOpen}
               onOpenEdge={onOpenEdge}
+              onOpenIdea={onOpenIdea}
             />
           ) : (
             <Text tone="muted">Choose a name to see its setup.</Text>

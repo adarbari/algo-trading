@@ -76,7 +76,7 @@ merges on green; never `gh pr merge`. The sweep runs on CI completion and every 
 - A PR with an open owner decision stays `no-automerge`.
 - `needs-owner` is the explicit "owner must look" label (e.g. a requested visual review);
   never remove it. `scripts/auto_merge.sh` skips a PR carrying it, as it skips `no-automerge`.
-- Push rules are unchanged (rule 9: `make changed`, merge origin/main right before, never
+- Push rules are unchanged (rule 9: push through the `make pre-push` hook, merge origin/main right before, never
   force-push).
 
 ## 4. Orchestrating a multi-PR plan

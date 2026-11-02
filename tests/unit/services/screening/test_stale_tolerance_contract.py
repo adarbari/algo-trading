@@ -1,8 +1,9 @@
-"""The contract between the chains acceptance check and the screens (ADR 0054): the stale
-chains the gate tolerates are EXCLUDED from a screen's coverage, never a pick; one stale name
-more than it tolerates and the gate FAILS and the screen is PARTIAL again. Both read the same
-status frame through ``data.chains`` (the gate through ``stale_in_tier``, the screen through
-``tolerated_stale``), so they cannot drift.
+"""The contract between the chains acceptance check and the screens (ADR 0054, ADR 0088 S5):
+a stale chain is never a pick. The gate decides how many stale names it tolerates (through
+``stale_in_tier``, the screen's ``tolerated_stale`` reads the same status frame, so they cannot
+drift); a screen over option_liquidity is a rule screen since S5, which decides every name
+(a name with no usable tier is a REJECT, ADR 0030), so a stale name is a reject in the run and
+the chains step, not the screen's coverage, is what fails when too many are stale.
 
 The exact limits are ``max_chain_stale_share_core`` 2% and ``max_chain_stale_share`` 20%:
 50 core names tolerate 1 stale, 50 rest names tolerate 10."""
@@ -46,48 +47,36 @@ def screened(
     )
 
 
-def test_stale_names_at_the_gates_limits_are_excluded_and_the_run_is_complete() -> None:
+def test_stale_names_are_rejected_never_picked() -> None:
     reader, outcome = screened(core_stale=1, rest_stale=10)
     run = outcome.run
     assert len(tolerated_stale(chain_status(reader, DAY), DAY, SOURCES)) == 11
     assert run.coverage is RunCoverage.COMPLETE
-    assert (run.excluded, run.processed, run.coverage_pct) == (11, 89, 1.0)
-    assert outcome.audit["excluded"] == 11 and outcome.audit["skipped"] == 0
-    assert outcome.audit["excluded_reasons"] == {"STALE_DATA: chain is for 2026-10-01": 11}
-    stale = [r for r in run.rows if r.decision is Decision.EXCLUDED]
-    assert {r.instrument_id for r in stale} == {
-        *(f"EQ:C{i}" for i in range(1)),
-        *(f"EQ:R{i}" for i in range(10)),
-    }
-    assert all(
-        r.reasons[0].startswith("STALE_DATA") for r in stale
-    )  # then the screener's own reason
-    saved = reader.table("results/short_premium_liquidity", DAY)
+    stale_ids = {*(f"EQ:C{i}" for i in range(1)), *(f"EQ:R{i}" for i in range(10))}
+    rows = {r.instrument_id: r for r in run.rows}
+    assert all(rows[i].decision is Decision.REJECT for i in stale_ids)
+    saved = reader.table("results/rule_screen", DAY)
     assert saved is not None
-    assert set(
-        saved.loc[saved["instrument_id"].isin([r.instrument_id for r in stale]), "decision"]
-    ) == {"EXCLUDED"}
+    assert set(saved.loc[saved["instrument_id"].isin(stale_ids), "decision"]) == {"REJECT"}
 
 
 @pytest.mark.parametrize(("core_stale", "rest_stale"), [(2, 10), (1, 11), (0, 11), (3, 0)])
-def test_one_more_stale_name_than_the_gate_tolerates_is_partial_again(
+def test_one_more_stale_name_than_the_gate_tolerates_fails_the_gate(
     core_stale: int, rest_stale: int
 ) -> None:
     reader, outcome = screened(core_stale, rest_stale)
     assert tolerated_stale(chain_status(reader, DAY), DAY, SOURCES) == {}  # the gate FAILED
-    assert outcome.run.coverage is RunCoverage.PARTIAL
     assert outcome.run.excluded == 0 and outcome.audit["excluded"] == 0
 
 
-def test_chronically_stale_chains_are_never_excluded() -> None:
+def test_chronically_stale_chains_are_never_tolerated() -> None:
     """Stale for more than ``max_chain_stale_sessions`` (5): fetch failures, 11 of 100 over the
-    2% limit, so the gate FAILS and the screen is PARTIAL with nothing excluded."""
+    2% limit, so the gate FAILS and nothing is tolerated."""
     reader, outcome = screened(core_stale=1, rest_stale=10, chain_day="2026-09-24")
     assert tolerated_stale(chain_status(reader, DAY), DAY, SOURCES) == {}
-    assert outcome.run.coverage is RunCoverage.PARTIAL and outcome.run.excluded == 0
+    assert outcome.run.excluded == 0
 
 
 def test_without_the_sources_nothing_is_excluded() -> None:
     _, outcome = screened(core_stale=1, rest_stale=10, sources=None)
-    assert outcome.run.coverage is RunCoverage.PARTIAL  # 89 of 100: below the 98% minimum
     assert outcome.run.excluded == 0

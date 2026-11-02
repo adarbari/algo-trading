@@ -1,0 +1,73 @@
+# Short premium liquidity (port of the Python screener of the same id, options-setups design S5;
+# the nightly liquidity screen and the source of the legacy CSV exports): an active optionable
+# stock, ADR or ETF whose short put or short call passes the tier gate of option_liquidity@v1
+# (tier A or B: the spread, zone open interest, chain open interest and bid at the short strike),
+# on a chain that is current. A name with no chain, no standard series or no target expiry has no tier and never passes
+# (ADR 0030). Each column below is a legacy export column, so the CSV reads this run.
+# What it does not check: IV, earnings, the quote at the time you would trade.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "short_premium_liquidity"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Short premium liquidity"
+description = "Optionable names whose puts or calls trade tightly enough to sell premium on."
+selection = "liquid_optionable"   # the daily universe snapshot: active optionable stocks, ADRs, ETFs
+exports = ["legacy_liquidity_csv"]
+
+# ------------------------------------------------------------------------ the gate
+# A chain that is stale or failed never passes, whatever tier its old quotes would give.
+[criteria.chain_ok]
+field = "rollup.option_liquidity@v1.liq_status"
+op = "eq"
+value = "OK"
+label = "Option chain fetched and current"
+
+# the short put or the short call at tier A or B
+[criteria.short_put_ok]
+field = "rollup.option_liquidity@v1.short_put_ok"
+op = "eq"
+value = true
+label = "Short put tier A or B"
+
+[criteria.short_call_ok]
+field = "rollup.option_liquidity@v1.short_call_ok"
+op = "eq"
+value = true
+label = "Short call tier A or B"
+
+[groups.tradeable_side]
+any = ["short_put_ok", "short_call_ok"]
+
+[columns]
+short_put_ok = "rollup.option_liquidity@v1.short_put_ok"
+short_call_ok = "rollup.option_liquidity@v1.short_call_ok"
+put_tier = "rollup.option_liquidity@v1.put_tier"
+call_tier = "rollup.option_liquidity@v1.call_tier"
+put_spread_pct = "rollup.option_liquidity@v1.put_spread_pct"
+put_spread_abs = "rollup.option_liquidity@v1.put_spread_abs"
+put_strike = "rollup.option_liquidity@v1.put_strike"
+put_delta = "rollup.option_liquidity@v1.put_delta"
+put_bid = "rollup.option_liquidity@v1.put_bid"
+put_ask = "rollup.option_liquidity@v1.put_ask"
+put_strike_oi = "rollup.option_liquidity@v1.put_strike_oi"
+put_zone_oi = "rollup.option_liquidity@v1.put_zone_oi"
+call_spread_pct = "rollup.option_liquidity@v1.call_spread_pct"
+call_spread_abs = "rollup.option_liquidity@v1.call_spread_abs"
+call_strike = "rollup.option_liquidity@v1.call_strike"
+call_delta = "rollup.option_liquidity@v1.call_delta"
+call_bid = "rollup.option_liquidity@v1.call_bid"
+call_ask = "rollup.option_liquidity@v1.call_ask"
+call_strike_oi = "rollup.option_liquidity@v1.call_strike_oi"
+call_zone_oi = "rollup.option_liquidity@v1.call_zone_oi"
+chain_oi = "rollup.option_liquidity@v1.chain_oi"
+target_expiry = "rollup.option_liquidity@v1.target_expiry"
+target_dte = "rollup.option_liquidity@v1.target_dte"
+underlying_price = "rollup.option_liquidity@v1.underlying_price"
+iv30 = "rollup.option_liquidity@v1.iv30"
+liq_status = "rollup.option_liquidity@v1.liq_status"
+chain_asof = "rollup.option_liquidity@v1.chain_asof"
+
+[rank]
+tie_break = "rollup.option_liquidity@v1.chain_oi"   # every pick scores the same: deepest chain first
+tie_break_order = "desc"

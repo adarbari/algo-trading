@@ -200,6 +200,24 @@ def _levels_of(flat: Sequence[Any], at: int) -> tuple[float, ...] | None:
     return tuple(v for v in mine if v is not None)
 
 
+_OPTION_FIELDS = ("hedged_roc", "stock_roc", "wing_cost")  # ``pick_option``, three per pick
+
+
+def _flat_option(picks: Sequence[Pick]) -> list[float | None] | None:
+    """The picks' option figures flattened, three per pick; None when no pick has any, so a leg
+    of a share edge stores nothing new."""
+    if not any(getattr(p, f) is not None for p in picks for f in _OPTION_FIELDS):
+        return None
+    return [getattr(p, f) for p in picks for f in _OPTION_FIELDS]
+
+
+def _option_of(flat: Sequence[Any], at: int) -> dict[str, float | None]:
+    """Pick ``at``'s option figures out of the flat list; none where the column is absent."""
+    width = len(_OPTION_FIELDS)
+    mine = [_maybe(v) for v in flat[at * width : (at + 1) * width]]
+    return dict(zip(_OPTION_FIELDS, mine, strict=False))
+
+
 def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any] | None]:
     """A leg's picks as the ``pick_*`` list columns, aligned to ``pick_ids``."""
     return {
@@ -221,6 +239,7 @@ def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any] | None]:
         "pick_roc": [p.roc for p in picks],
         "pick_adverse": [p.adverse for p in picks],
         "pick_values_at": _flat_levels(picks),
+        "pick_option": _flat_option(picks),
     }
 
 
@@ -239,6 +258,7 @@ def decode_picks(
     is_short = [bool(int(f) & SHORT) for f in flags]
     contract = {c: _list(row.get(c)) or [None] * len(ids) for c in CONTRACT_LISTS}  # null: v4 row
     levels = _list(row.get("pick_values_at"))  # E6b-2: the option cost levels, flat
+    option = _list(row.get("pick_option"))  # E6b-3: the hedged / stock / wing figures, flat
     split = shorts is not None
     kept = [sh for r, sh in zip(reasons, is_short, strict=True) if r == ""]  # counted picks
     short_n = sum(kept) if split else 0
@@ -275,6 +295,7 @@ def decode_picks(
                 price_source=_opt_str(contract["pick_source"][at]),
                 outcome_licence=_opt_str(contract["pick_licence"][at]),
                 values_at=_levels_of(levels, at),
+                **_option_of(option, at),
             )
         )
     return tuple(out)

@@ -103,24 +103,19 @@ def test_run_screener_saves_audited_result() -> None:
         reader, writer, preset(screening={"min_coverage": 0.7}), DAY, now=T0, held=HARNESS_ALL
     )
     assert outcome.run.coverage is RunCoverage.COMPLETE
-    assert outcome.audit["decisions"] == {
-        "QUALIFIED": 1,
-        "LIQUIDITY_RISK": 1,
-        "UNKNOWN": 1,
-        "REJECT": 1,
-    }
+    assert outcome.audit["decisions"] == {"QUALIFIED": 1, "REJECT": 3}  # a rule screen fails closed
     assert outcome.audit["universe_version"] == "v1"
-    saved = reader.table("results/short_premium_liquidity", DAY)
+    saved = reader.table("results/rule_screen", DAY)
     assert saved is not None
-    assert set(saved["decision"]) == {"QUALIFIED", "LIQUIDITY_RISK", "UNKNOWN", "REJECT"}
+    assert set(saved["decision"]) == {"QUALIFIED", "REJECT"}
     (record,) = reader.runs("screen-short_premium_liquidity-site", DAY)
     assert record.status is RunStatus.COMPLETE
 
 
 def test_partial_and_stale_universe() -> None:
     reader, writer = seeded()
-    partial = run_screener(reader, writer, preset(), DAY, now=T0, held=HARNESS_ALL)
-    assert partial.run.coverage is RunCoverage.PARTIAL  # 3/4 processed < 98%
+    complete = run_screener(reader, writer, preset(), DAY, now=T0, held=HARNESS_ALL)
+    assert complete.run.coverage is RunCoverage.COMPLETE  # a rule screen decides every row
     stale_reader, stale_writer = seeded(last_verified="2026-06-01")
     stale = run_screener(
         stale_reader,
@@ -133,15 +128,15 @@ def test_partial_and_stale_universe() -> None:
     assert stale.run.coverage is RunCoverage.UNIVERSE_INCOMPLETE
 
 
-def test_missing_inputs_raise_with_hint() -> None:
+def test_missing_inputs_raise_or_leave_the_run_partial() -> None:
     reader, writer = StoreReader(MemoryBackend()), StoreWriter(MemoryBackend())
     with pytest.raises(MissingDataError, match="universe import"):
         run_screener(reader, writer, preset(), DAY, held=HARNESS_ALL)
     seeded_reader, seeded_writer = seeded()
-    with pytest.raises(MissingDataError, match="ingest rollups"):
-        run_screener(
-            seeded_reader, seeded_writer, preset(), DAY + timedelta(days=1), held=HARNESS_ALL
-        )
+    next_day = run_screener(  # no option_liquidity rows for the day: a rule screen is PARTIAL
+        seeded_reader, seeded_writer, preset(), DAY + timedelta(days=1), held=HARNESS_ALL
+    )
+    assert next_day.run.coverage is RunCoverage.PARTIAL
 
 
 def test_legacy_exports_match_original_layout(tmp_path: Path) -> None:
@@ -180,7 +175,7 @@ def test_results_carry_user_and_config_hash() -> None:
     reader, writer = seeded()
     config = preset(screening={"min_coverage": 0.5})
     run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
-    saved = reader.table("results/short_premium_liquidity", DAY)
+    saved = reader.table("results/rule_screen", DAY)
     assert saved is not None
     assert set(saved["user_id"]) == {"site"}
     assert set(saved["config_hash"]) == {config.hash}
@@ -204,7 +199,7 @@ def test_wrong_kind_or_missing_selection_is_rejected() -> None:
     with pytest.raises(ConfigurationError, match="not a screener"):
         run_screener(reader, writer, strategy, DAY, held=HARNESS_ALL)
     no_selection = ResolvedConfig(
-        preset().config.__class__(id="x", kind="screener", impl="short_premium_liquidity"),
+        preset().config.__class__(id="x", kind="screener", impl="rules"),
         None,
         preset().settings,
         UserContext(),

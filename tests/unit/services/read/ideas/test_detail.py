@@ -107,6 +107,7 @@ def test_the_sections_come_from_the_setup_and_the_pick(wired: Any) -> None:
         ("c1",),
     )
     assert (found.evidence.level, found.evidence.oos_trades, found.learn) == ("works", 90, "strong")
+    assert found.why.basis_screener == "s_strong"
     assert found.exit_rule.hold_sessions == 5
 
 

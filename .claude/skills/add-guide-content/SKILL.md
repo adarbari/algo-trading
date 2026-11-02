@@ -78,8 +78,8 @@ an item, then delete its baseline line.
    `.venv/bin/python -m pytest tests/unit/config/site/guide/test_style.py -q` (lengths, banned
    words, orphan jargon, `next` on state terms, at most 7 Start sections; long sentences that
    shipped before it are the shrink-only `architecture/guide_style_baseline.toml`: split a new
-   one, lower the count when you fix one, never add a line), then `make changed` and push (CI
-   is the full gate). A false finding of the prose test (a long label, say) is shortened, never
+   one, lower the count when you fix one, never add a line), then push (the `pre-push` hook runs
+   `make pre-push`; CI is the full gate). A false finding of the prose test (a long label, say) is shortened, never
    added to the baseline; a banned word is rewritten, never the pattern widened.
 
 ## Before you ship (beyond the bar in step 3)

@@ -177,8 +177,8 @@ def test_screener_contract_and_registry() -> None:
     assert screener.params() == {"spec": "vrp", "version": 2}
     with pytest.raises(Exception, match="needs its spec"):
         create_screener(RULES)
-    with pytest.raises(Exception, match="takes no spec"):
-        create_screener("short_premium_liquidity", spec())
+    with pytest.raises(Exception, match="Unknown screener"):
+        create_screener("nope", spec())
 
 
 def test_decide_without_misses_is_qualified() -> None:
