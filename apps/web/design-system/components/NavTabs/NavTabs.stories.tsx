@@ -56,3 +56,20 @@ export const Narrow: Story = {
   args: { ...Dense.args, activeHref: '/s8' },
   decorators: [narrow],
 };
+
+/** The steps of the Test flow, numbered; the current one underlined. */
+export const Steps: Story = {
+  args: {
+    variant: 'steps',
+    'aria-label': 'Test steps',
+    activeHref: '/test/expert',
+    items: [
+      { href: '/test', label: 'Start' },
+      { href: '/test/expert', label: 'Expert' },
+      { href: '/test/result', label: 'Result' },
+    ],
+  },
+};
+
+/** Steps in a phone frame. */
+export const StepsNarrow: Story = { ...Steps, decorators: [narrow] };

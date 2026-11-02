@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EdgeBuilderPage } from './EdgeBuilderPage';
+import { TestSetupPage } from './TestSetupPage';
 
 interface Runner {
   running: boolean;
@@ -67,11 +67,11 @@ function setup(id: string | null = 'mine') {
     onCancel: vi.fn(),
     onOpenEdge: vi.fn(),
   };
-  render(<EdgeBuilderPage id={id} {...props} />);
+  render(<TestSetupPage id={id} {...props} />);
   return props;
 }
 
-describe('EdgeBuilderPage', () => {
+describe('TestSetupPage', () => {
   it('shows the builder and tells which edge opens the Screen Builder', async () => {
     const { onOpenScreen } = setup('mine');
     expect(screen.getByText('builder mine')).toBeInTheDocument();

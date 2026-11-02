@@ -27,13 +27,10 @@ test.beforeEach(async ({ page }) => {
 
 test('the list shows your screeners and the site presets in one list', async ({ page }) => {
   const errors = collectErrors(page);
+  // The old /screeners URL redirects to the Test start.
   await page.goto('/screeners');
-  await expect(page.getByRole('heading', { level: 1, name: 'Screeners' })).toBeVisible();
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Trader sections' })
-      .getByRole('link', { name: 'Screeners' }),
-  ).toHaveAttribute('aria-current', 'page');
+  await expect(page).toHaveURL(/\/test$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Test' })).toBeVisible();
   const list = page.getByRole('table', { name: 'Screeners' });
   const rowOf = (text: string) => list.getByRole('row').filter({ hasText: text });
   await expect(rowOf('my-vrp')).toContainText('No run today');
@@ -85,7 +82,7 @@ test('a row does not expand: the picks open the screener and the pencil copies a
   await expectAccessible(page);
   await page.keyboard.press('Escape');
   await preset.getByRole('button', { name: /: 12 picks$/ }).click();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
+  await expect(page).toHaveURL(/\/test\/result\/vrp_scanner$/);
 });
 
 test('the pencil of one of yours opens its edit page', async ({ page }) => {
@@ -96,7 +93,7 @@ test('the pencil of one of yours opens its edit page', async ({ page }) => {
     .filter({ hasText: 'my-vrp' })
     .getByRole('button', { name: 'Edit criteria' })
     .click();
-  await expect(page).toHaveURL(/\/screeners\/my-vrp\/edit$/);
+  await expect(page).toHaveURL(/\/test\/expert\/my-vrp$/);
 });
 
 test('the Builder header’s link opens the preset’s screener', async ({ page }) => {
@@ -308,7 +305,7 @@ test('a preset is copied to a named screener from the list', async ({ page }) =>
   await dialog.getByLabel('Name of your copy').fill('my-copy');
   await dialog.getByRole('button', { name: 'Copy' }).click();
   await expect.poll(() => mock.copies).toEqual([{ id: 'my-copy', preset: 'vrp_scanner' }]);
-  await expect(page).toHaveURL(/\/screeners\/my-copy\/edit/);
+  await expect(page).toHaveURL(/\/test\/expert\/my-copy/);
   await expect(page.getByText('Your copy of vrp_scanner v2')).toBeVisible();
 });
 
@@ -378,10 +375,10 @@ test('an inherited tie-break can be cleared in your copy', async ({ page }) => {
 
 test('a new screener starts with the base gates as criteria', async ({ page }) => {
   const mock = await mockBuilderApi(page);
-  await page.goto('/screeners');
-  await page.getByRole('button', { name: '+ New screener' }).click();
-  await expect(page).toHaveURL(/\/screeners\/new/);
-  await expect(page.getByRole('heading', { level: 1, name: 'New screener' })).toBeVisible();
+  await page.goto('/test');
+  await page.getByRole('button', { name: /^Expert/ }).click();
+  await expect(page).toHaveURL(/\/test\/expert$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Expert' })).toBeVisible();
   await page.getByRole('textbox', { name: 'Name' }).fill('Bad Name');
   await expect(page.getByText('Use 1-64 of a-z, 0-9, _ and -.')).toBeVisible();
   await page.getByRole('textbox', { name: 'Name' }).fill('fresh');
@@ -397,7 +394,7 @@ test('a new screener starts with the base gates as criteria', async ({ page }) =
     },
   });
   expect(mock.drafts[0]?.document).not.toHaveProperty('selection'); // ADR 0030
-  await expect(page).toHaveURL(/\/screeners\/fresh\/edit/);
+  await expect(page).toHaveURL(/\/test\/expert\/fresh/);
   // The base gates are ordinary criteria: three hard rows to edit or remove, then add more.
   await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(3);
   await expectAccessible(page);

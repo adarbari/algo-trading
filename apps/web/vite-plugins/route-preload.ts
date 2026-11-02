@@ -12,7 +12,7 @@ import type { Plugin } from 'vite';
 /** URL path -> the manifest sources of the page chunks that URL opens (a path not listed: none). */
 export const ROUTE_PAGES: Record<string, string[]> = {
   '/ideas': ['src/pages/trader-ideas/index.ts', 'src/widgets/edge-signals/index.ts'],
-  '/screeners': ['src/pages/trader-screeners/index.ts'],
+  '/test': ['src/pages/test/index.ts'],
   '/edges': ['src/pages/trader-edges/index.ts'],
   '/regime': ['src/pages/trader-regime/index.ts'],
   '/calendar': ['src/pages/trader-calendar/index.ts'],

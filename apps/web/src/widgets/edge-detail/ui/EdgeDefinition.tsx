@@ -33,7 +33,7 @@ function parts(edge: Edge): KeyValueItem[] {
         ) : (
           <Stack gap={0}>
             {edge.screeners.map((id) => (
-              <TextLink key={id} href={`/screeners/${id}`} mono size="sm">
+              <TextLink key={id} href={`/test/result/${id}`} mono size="sm">
                 {id}
               </TextLink>
             ))}

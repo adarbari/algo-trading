@@ -41,11 +41,11 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(aapl).toContainText('Apple Inc. · XLK');
     await expect(aapl.getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
       'href',
-      '/screeners/vrp-scanner',
+      '/test/result/vrp-scanner',
     );
     await expect(aapl.getByRole('link', { name: 'Short premium liquidity' })).toHaveAttribute(
       'href',
-      /^\/screeners\/[\w-]+$/,
+      /^\/test\/result\/[\w-]+$/,
     );
     await expect(aapl).not.toContainText('more');
     await expect(aapl).toContainText('226.80');
@@ -69,7 +69,7 @@ test('the screener chips show each run state and link to the screener, with no R
   await expect(vrp).toContainText('16 picks');
   await expect(vrp.getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
     'href',
-    '/screeners/vrp-scanner',
+    '/test/result/vrp-scanner',
   );
   const partial = chips.getByRole('listitem').filter({ hasText: 'Post-earnings IV crush' });
   await expect(partial).toContainText('4 picks · partial');

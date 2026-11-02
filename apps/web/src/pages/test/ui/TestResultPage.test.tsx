@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ScreenerResultsPage } from './ScreenerResultsPage';
+import { TestResultPage } from './TestResultPage';
 
 vi.mock('@/widgets/feature-table', () => ({ ScreenerResults: () => <Text>results</Text> }));
 vi.mock('@/widgets/screener-edge-line', () => ({
@@ -21,13 +21,14 @@ vi.mock('@/entities/screen', async (importOriginal) => ({
   useMyScreeners: hooks.mine,
 }));
 
-const renderPage = (onEdit = vi.fn()) =>
+const renderPage = (onEdit = vi.fn(), onBuildSetup = vi.fn()) =>
   render(
-    <ScreenerResultsPage
+    <TestResultPage
       id="my-vrp"
       f={undefined}
       onFilterChange={vi.fn()}
       onEdit={onEdit}
+      onBuildSetup={onBuildSetup}
       onOpenTicker={vi.fn()}
       onCompare={vi.fn()}
       onOpenEdge={vi.fn()}
@@ -40,7 +41,7 @@ const served = (description: string | null, mine: boolean) => {
   hooks.mine.mockReturnValue({ data: mine ? [{ screenerId: 'my-vrp' }] : [] });
 };
 
-describe('ScreenerResultsPage', () => {
+describe('TestResultPage', () => {
   beforeEach(() => {
     served(null, false);
   });
@@ -66,12 +67,14 @@ describe('ScreenerResultsPage', () => {
 
   it('Edit criteria goes straight to the Builder, with no drawer first', async () => {
     const onEdit = vi.fn();
+    const onBuildSetup = vi.fn();
     render(
-      <ScreenerResultsPage
+      <TestResultPage
         id="my-vrp"
         f={undefined}
         onFilterChange={vi.fn()}
         onEdit={onEdit}
+        onBuildSetup={onBuildSetup}
         onOpenTicker={vi.fn()}
         onCompare={vi.fn()}
         onOpenEdge={vi.fn()}
@@ -83,5 +86,8 @@ describe('ScreenerResultsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Edit criteria' }));
     expect(onEdit).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Test it as a setup' }));
+    expect(onBuildSetup).toHaveBeenCalledOnce();
+    expect(screen.getByRole('navigation', { name: 'Test steps' })).toHaveTextContent('Result');
   });
 });

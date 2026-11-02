@@ -269,7 +269,7 @@ test('Edit criteria opens the Builder; an edit there shows who would enter or le
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
   await page.getByRole('button', { name: 'Edit criteria' }).click();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit$/);
+  await expect(page).toHaveURL(/\/test\/expert\/vrp_scanner$/);
   await expect(page.getByRole('dialog')).toHaveCount(0); // no drawer on the way
   const threshold = page.getByRole('spinbutton', { name: 'Threshold' }).first();
   await threshold.fill('60');

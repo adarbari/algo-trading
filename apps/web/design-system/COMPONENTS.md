@@ -1097,7 +1097,7 @@ Source: `design-system/components/NavList`
 
 ### NavTabs
 
-NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links are plain anchors unless `renderLink` renders the app's router link with the given props (the design system never imports the router). One row that scrolls sideways when the sections do not fit, the current link scrolled into view. For switching views inside a page use Tabs.
+NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links go through the app's `LinkProvider` (plain anchors without one), or `renderLink` renders the router link with the given props (the design system never imports the router). One row that scrolls sideways when the sections do not fit, the current link scrolled into view. `variant="steps"` numbers the links as the steps of a flow (the Test flow: Start, Build, Result); the number is a CSS counter, the label stays the link's name. For switching views inside a page use Tabs.
 
 Source: `design-system/components/NavTabs`
 
@@ -1106,7 +1106,8 @@ Source: `design-system/components/NavTabs`
 | `items` | `readonly NavItem[]` | yes | The sections, in order. |
 | `activeHref` | `string` | no | The `href` of the current section. |
 | `'aria-label'` | `string` | yes | The navigation landmark's name ("Trader sections"). |
-| `renderLink` | `(link: NavLinkRenderProps) => ReactNode` | no | Renders one link (e.g. the router's Link); a plain anchor by default. |
+| `renderLink` | `(link: NavLinkRenderProps) => ReactNode` | no | Renders one link (e.g. the router's Link); default: the app's `LinkProvider` link, else a plain anchor. |
+| `variant` | `'bar' \| 'steps'` | no | `bar` (default): section links; `steps`: the links numbered as the steps of a flow. |
 
 ### NoticeLine
 
@@ -1159,7 +1160,7 @@ Source: `design-system/components/OddsLine`
 
 ### OptionList
 
-OptionList: a scrolling list of choices, each a short name (optionally monospace, for field and symbol names) over a one-line description, one of them the current choice. A choice is a button; the current one carries `aria-current` and the accent tint, so colour is never the only signal (the selected row is also announced). Controlled: `value` in, `onSelect(id)` out. Taller than `maxHeight` it scrolls inside itself, so it never grows a page; loading shows placeholders, an empty list shows the empty message. For a choice made once and closed use Select; for many choices to filter use Combobox. With `values` it is a multi-select: each option is a toggle (`aria-pressed`, a check mark) and `count` shows how many rows hold it.
+OptionList: a scrolling list of choices, each a short name (optionally monospace, for field and symbol names) over a one-line description, one of them the current choice. A choice is a button; the current one carries `aria-current` and the accent tint, so colour is never the only signal (the selected row is also announced). Controlled: `value` in, `onSelect(id)` out. Taller than `maxHeight` it scrolls inside itself, so it never grows a page; loading shows placeholders, an empty list shows the empty message. For a choice made once and closed use Select; for many choices to filter use Combobox. With `values` it is a multi-select: each option is a toggle (`aria-pressed`, a check mark) and `count` shows how many rows hold it. `variant="card"` lays the choices out as bordered cards in a responsive grid (a way in, an onboarding choice): the same buttons, the title larger, the description under it.
 
 Source: `design-system/components/OptionList`
 
@@ -1174,6 +1175,7 @@ Source: `design-system/components/OptionList`
 | `maxHeight` | `'md' \| 'lg'` | no | Scroll inside the list taller than this: `md` (360 px) or `lg` (560 px); none by default. |
 | `loading` | `boolean` | no | Placeholders while the items load. |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
+| `variant` | `'list' \| 'card'` | no | `list` (default): rows; `card`: bordered cards in a grid that wraps to the width. |
 
 ### OutcomeDots
 

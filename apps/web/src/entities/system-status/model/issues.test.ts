@@ -93,7 +93,7 @@ describe('systemIssues', () => {
       'Screener "Screener 1" has no run for 2026-10-08',
       'Screener "Screener 2" has no run for 2026-10-08',
     ]);
-    expect(named[0]?.links).toEqual([{ label: 'Open screener', href: '/screeners/s1' }]);
+    expect(named[0]?.links).toEqual([{ label: 'Open screener', href: '/test/result/s1' }]);
     const grouped = systemIssues(null, screens(['s0', 's1', 's2', 's3']));
     expect(grouped).toHaveLength(1);
     expect(grouped[0]?.title).toBe('4 screeners have no run for 2026-10-08');

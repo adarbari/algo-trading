@@ -18,7 +18,7 @@ describe('EdgeDefinition', () => {
     }
     expect(screen.getByRole('link', { name: 'momentum_12_1' })).toHaveAttribute(
       'href',
-      '/screeners/momentum_12_1',
+      '/test/result/momentum_12_1',
     );
     expect(screen.getByRole('link', { name: /Jegadeesh and Titman 1993/ })).toHaveAttribute(
       'href',

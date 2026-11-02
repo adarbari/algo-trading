@@ -31,7 +31,8 @@
 # fails until its line is removed. `enums` are sources, `sections` are paths, `panels` are the
 # uncovered titled containers per file.
 
-non_sections = []
+# /test: the Test flow (V9); the bar entry "Test" and its Start here page arrive with V1 (workspaces.ts).
+non_sections = ["/test"]
 
 [panels]
 tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]
@@ -526,8 +527,8 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/features/formula-feature/ui/FormulaFeatureDialog.tsx" = 1
 "src/features/screener-describe/ui/DescribeForm.tsx" = 1
 "src/features/screener-finalise/ui/RebaseBanner.tsx" = 1
-"src/pages/edge-builder/ui/EdgeBuilderPage.tsx" = 1
-"src/pages/screener-builder/ui/NewScreenerPage.tsx" = 1
+"src/pages/test/ui/TestNewPage.tsx" = 1
+"src/pages/test/ui/TestSetupPage.tsx" = 1
 "src/widgets/compare-panel/ui/ComparePanel.tsx" = 1
 "src/widgets/completeness-panel/ui/CompletenessPanel.tsx" = 1
 "src/widgets/criteria-table/ui/CriteriaTable.tsx" = 2

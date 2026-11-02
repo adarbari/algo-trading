@@ -1,5 +1,5 @@
 /**
- * Trader > Edges > the builder: the six-step form, and after "Save and run backtest" the running
+ * Test > Setup: the edge builder (a setup is an edge in the code): the six-step form, and after "Save and run backtest" the running
  * backtest (the existing evaluation job: the user may leave, the result lands on the edge page).
  */
 import { Banner, Button, Heading, Panel, Stack, StatusBadge, Text } from '@algotrade/ui';
@@ -10,10 +10,10 @@ import { EdgeBuilder, HelpProvider } from '@/features/edge-builder';
 import { evaluationMessage, useRunEvaluation } from '@/features/edge-evaluation';
 import { termHelp } from '@/features/guide-help';
 
-export interface EdgeBuilderPageProps {
+export interface TestSetupPageProps {
   /** The edge to build or change; null: a new one. */
   id: string | null;
-  /** Open the Screen Builder on a screen (null: a new one). */
+  /** Open Expert on a screen (null: a new one). */
   onOpenScreen: (id: string | null, from: string | null) => void;
   /** Leave the builder without saving. */
   onCancel: () => void;
@@ -21,7 +21,7 @@ export interface EdgeBuilderPageProps {
   onOpenEdge: (id: string) => void;
 }
 
-export function EdgeBuilderPage({ id, onOpenScreen, onCancel, onOpenEdge }: EdgeBuilderPageProps) {
+export function TestSetupPage({ id, onOpenScreen, onCancel, onOpenEdge }: TestSetupPageProps) {
   const [running, setRunning] = useState<string | null>(null);
   if (running !== null) return <Running edgeId={running} onOpenEdge={onOpenEdge} />;
   return (

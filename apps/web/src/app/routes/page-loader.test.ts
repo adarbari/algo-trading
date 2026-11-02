@@ -74,7 +74,7 @@ describe('the reads each page starts with its chunk', () => {
   const tree = routeTree as unknown as AnyRoute;
   const cases: [string, string[]][] = [
     [
-      '/screeners',
+      '/test',
       ['MyScreens', 'ScreenerConfigs', 'ScreenerListPage', 'ScreenerRuns', 'ScreenerTrackRecords'],
     ],
     ['/regime', ['RegimeEpisodes', 'RegimeSignals']],

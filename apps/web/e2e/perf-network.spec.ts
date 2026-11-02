@@ -23,7 +23,7 @@ import { mockApi } from './mock-api';
 
 const ROUTES: { name: string; url: string }[] = [
   { name: 'Ideas', url: '/ideas' },
-  { name: 'Screeners', url: '/screeners' },
+  { name: 'Test', url: '/test' },
   { name: 'Edges', url: '/edges' },
   { name: 'Regime', url: '/regime' },
   { name: 'Calendar', url: '/calendar' },

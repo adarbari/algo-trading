@@ -185,10 +185,10 @@ test('a screener opens today’s hits and its Builder', async ({ page }) => {
   await page.goto('/guide/screeners/c/income');
   await page.getByRole('link', { name: 'VRP scanner' }).first().click();
   await page.getByRole('button', { name: 'See today’s hits' }).click();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
+  await expect(page).toHaveURL(/\/test\/result\/vrp_scanner/);
   await page.goto('/guide/screeners/vrp_scanner');
   await page.getByRole('button', { name: 'Open in Builder' }).click();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit$/);
+  await expect(page).toHaveURL(/\/test\/expert\/vrp_scanner$/);
   await page.goto('/guide/screeners/nope');
   await expect(page.getByText('No such screener')).toBeVisible();
   expect(errors).toEqual([]);
