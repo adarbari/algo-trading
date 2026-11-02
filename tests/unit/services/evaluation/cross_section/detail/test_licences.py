@@ -56,3 +56,18 @@ def test_a_personal_outcome_makes_the_trial_personal_and_nothing_else() -> None:
     assert (found.trial, found.outcome) == ("personal", "personal")
     assert (found.value, found.score, found.adv) == ("open",) * 3  # the columns keep their own
     assert licences(PRICE, None).outcome == "open"
+
+
+def test_an_entry_condition_over_a_personal_feature_makes_the_trial_personal() -> None:
+    store = configs(PRICE)
+    resolved = resolve_config(store, "momo", USER)
+    universe = parse_selection(ACTIVE, "active")
+    entering = edge(
+        outcome={
+            "kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+            "start_offset_sessions": 1,
+            "entry": {"when": {"all": [{"field": IBKR, "op": "gt", "value": 0.2}]}},
+        }
+    )  # fmt: skip
+    found = trial_licences(catalogue(store, "site"), entering, universe, [resolved], None)
+    assert (found.trial, found.score, found.value) == ("personal", "open", "open")

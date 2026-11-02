@@ -122,6 +122,11 @@ def _int(value: Any) -> int | None:
     return None if _null(value) else int(value)
 
 
+def _count(value: Any) -> int:
+    """A nullable count column: null (an older leg, or none counted) is 0."""
+    return _int(value) or 0
+
+
 def _day(value: Any) -> date:
     if isinstance(value, datetime):
         return value.date()
@@ -240,7 +245,16 @@ def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any] | None]:
         "pick_adverse": [p.adverse for p in picks],
         "pick_values_at": _flat_levels(picks),
         "pick_option": _flat_option(picks),
+        "pick_entry": _entries(picks),
     }
+
+
+def _entries(picks: Sequence[Pick]) -> list[date | None] | None:
+    """Each pick's own entry session (an entry condition, E13); None when no pick has one, so a
+    leg of an edge without an entry condition stores nothing new."""
+    if not any(p.entry_session is not None for p in picks):
+        return None
+    return [p.entry_session for p in picks]
 
 
 def decode_picks(
@@ -259,6 +273,7 @@ def decode_picks(
     contract = {c: _list(row.get(c)) or [None] * len(ids) for c in CONTRACT_LISTS}  # null: v4 row
     levels = _list(row.get("pick_values_at"))  # E6b-2: the option cost levels, flat
     option = _list(row.get("pick_option"))  # E6b-3: the hedged / stock / wing figures, flat
+    entries = _list(row.get("pick_entry")) or [None] * len(ids)  # E13: each pick's own S
     split = shorts is not None
     kept = [sh for r, sh in zip(reasons, is_short, strict=True) if r == ""]  # counted picks
     short_n = sum(kept) if split else 0
@@ -295,6 +310,7 @@ def decode_picks(
                 price_source=_opt_str(contract["pick_source"][at]),
                 outcome_licence=_opt_str(contract["pick_licence"][at]),
                 values_at=_levels_of(levels, at),
+                entry_session=_opt_day(entries[at]),
                 **_option_of(option, at),
             )
         )
@@ -392,6 +408,8 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         base_roc_n=None if s.base_roc is None else s.base_roc[0],
         base_roc_mean=None if s.base_roc is None else s.base_roc[1],
         base_roc_m2=None if s.base_roc is None else s.base_roc[2],
+        not_triggered=s.not_triggered or None,
+        entry_unknown=s.entry_unknown or None,
         **encode_picks(s.picks),
         **encode_band(s.band),
     )
@@ -466,6 +484,8 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         book_vol=_opt(row.get("book_vol")),
         risk_off=_opt(row.get("risk_off")),
         base_roc=_base_roc(row),
+        not_triggered=_count(row.get("not_triggered")),
+        entry_unknown=_count(row.get("entry_unknown")),
     )
     drawn = None
     if rand is not None:

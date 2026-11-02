@@ -39,6 +39,7 @@ from algotrade.data.outcomes import (
     select_outcomes,
 )
 from algotrade.engines.screening.runner import RunCoverage
+from algotrade.engines.selection.entry import ENTRY_UNKNOWN, NOT_TRIGGERED
 from algotrade.features.framework.feature import strictest
 from algotrade.quant.edges.statistics import moments
 from algotrade.services.evaluation.cross_section.baselines.variant import (
@@ -83,12 +84,17 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
     encode_leg,
 )
 from algotrade.services.evaluation.cross_section.measures import (
-    UNCOUNTED_BAND,
     Pick,
     SessionStat,
+    band_picks,
     decile_means,
 )
-from algotrade.services.evaluation.cross_section.picks import RankedRun, long_picks
+from algotrade.services.evaluation.cross_section.picks import (
+    MIN_SCORE_COVERAGE,
+    RankedRun,
+    long_picks,
+    side_picks,
+)
 from algotrade.services.evaluation.cross_section.portfolio.overlays import apply_overlays
 from algotrade.services.evaluation.cross_section.portfolio.session import (
     cash_return,
@@ -108,6 +114,7 @@ from algotrade.services.evaluation.cross_section.random_picks import (
     long_short_stat,
     random_stat,
 )
+from algotrade.services.evaluation.cross_section.reads.entry import Entered
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.reporting.report_containment import window_end
 from algotrade.services.evaluation.cross_section.sessions import Leg
@@ -118,13 +125,8 @@ BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols
 
 
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
-# A session is measured only when at least this share of the eligible names carries the edge's
-# score; the rest are counted as ``unscored`` and never ranked (recent listings lack a year of
-# history, but a session where the signal was not computed at all is dropped). The screen's own
-# coverage (``DEFAULT_MIN_COVERAGE``) is a different check.
-MIN_SCORE_COVERAGE = 0.8
-
-
+# A session is measured only when at least ``picks.MIN_SCORE_COVERAGE`` of the eligible names
+# carries the edge's score. The screen's own coverage (``DEFAULT_MIN_COVERAGE``) is another check.
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 
 
@@ -203,14 +205,16 @@ def _stat(
     costs: Sequence[float],
     adv_floor: float | None = None,
     option_costs: OptionCosts | None = None,
+    entered: Entered | None = None,
 ) -> SessionStat:
     """One variant at one decision session: ``rows`` are the stored outcomes at the entry
-    session. The eligible names, the screen, the implied vol and the picks' ADV are read at D.
+    session (``entered``, an entry condition's: each entered name's row at its own S, the rest
+    counted by reason). The eligible names, the screen, the implied vol and the ADV are at D.
     ``event_names`` (an event schedule): the picks are the qualified names within them, and the
     base is them (``base = "event"``) or every eligible name. ``costs``: the site's cost grid
     (bp), whose hits a return outcome's leg also counts. ``adv_floor``: the least 20-day dollar
-    volume of a name a short leg may hold (``_side_picks``); ``option_costs``: an ``option_pnl``
-    edge's levels and commission."""
+    volume of a name a short leg may hold (``picks.side_picks``); ``option_costs``: an
+    ``option_pnl`` edge's levels and commission."""
     edge, day = scope.edge, leg.decision
     if variant.members:
         return _ensemble_stat(scope, session, variant, leg, horizon, rows, event_names)
@@ -239,7 +243,7 @@ def _stat(
         if thin:  # fail closed: the session is not measured, as an incomplete screen is not
             return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
         in_universe = []
-        legs, below = _side_picks(edge, run.scores, pickable, adv, adv_floor, hold)
+        legs, below = side_picks(edge, run.scores, pickable, adv, adv_floor, hold)
     picks = [i for _, ids_ in legs for i in ids_]
     pick_set = set(picks)
     unmeasured = set(res.index[res["excluded"] == UNMEASURED])  # a window over a bad bar (ADR 0061)
@@ -247,6 +251,7 @@ def _stat(
     if picks and len(lost) * 2 > len(picks):  # most picks unmeasured: the session is not measured
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     have = set(res.index)
+    held = entered.reasons if entered is not None else {}  # names the entry condition kept out
     views = {LONG: counted, SHORT: counted if side == LONG else short_view(res).loc[counted.index]}
     lead = SHORT if side == SHORT else LONG  # the leg ``pick_values`` hold; the base is its view
     base = views[lead]
@@ -292,7 +297,9 @@ def _stat(
         delisted=int(counted.loc[all_got, "delisted"].sum()),
         pre_snapshot=run.pre_snapshot,
         outside_universe=len(run.qualified) - len(in_universe) if side == LONG else 0,
-        no_entry_bar=len(ids - have),
+        no_entry_bar=len(ids - have - held.keys()),
+        not_triggered=sum(held.get(i) == NOT_TRIGGERED for i in ids),
+        entry_unknown=sum(held.get(i) == ENTRY_UNKNOWN for i in ids),
         pick_reference=tuple(float(v) for v in counted.loc[got, "reference"].dropna()),
         pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
         no_implied_vol=sum(1 for i in picks if i in no_iv),
@@ -313,11 +320,13 @@ def _stat(
                 window_end(leg.entry, horizon),
                 at_levels,
                 option_costs,
+                entered,
+                horizon,
             )
         ),
         base_hits_at=tuple(int(hits.sum()) for hits in levels),
         pick_hits_at=tuple(int(hits.loc[got].sum()) for hits in levels),
-        band=_band(below, (edge.top_k or 0) + 1, base),
+        band=band_picks(below, (edge.top_k or 0) + 1, base["oriented"].to_dict()),
         base_roc=roc_moments(edge, rows, counted, leg.entry, option_costs),
         short_values=(
             tuple(float(v) for v in views[SHORT].loc[short_got, "oriented"])
@@ -442,48 +451,6 @@ def _ensemble_stat(
     return _valued(scope, session, leg, horizon, rows, average_books(books), "")
 
 
-def _side_picks(
-    edge: Edge,
-    scores: Mapping[str, float],
-    pickable: frozenset[str],
-    adv: Mapping[str, float | None],
-    adv_floor: float | None,
-    hold: int | None = None,
-) -> tuple[list[tuple[str, list[str]]], list[str]]:
-    """The legs of a ``short`` or ``long_short`` outcome at one session (ADR 0053 amendment,
-    outcome sides), each ``(side, ids)`` with rank 1 first: the scored pickable names ranked by
-    score (never by the rule rank; a name with no score is in neither leg, as the deciles
-    leave it out), the long leg the best ``top_k``, the short leg the worst ``top_k`` among the
-    names whose 20-day dollar volume at D is known and at least ``adv_floor`` (the microcap short
-    cannot be done by an individual: ``capacity_adv_floor_usd``; unknown volume is not liquid).
-    Also the ids of a ``short`` outcome's buy/hold band, the shortable names ranked ``top_k + 1``
-    to ``hold`` (none for any other side)."""
-    assert edge.top_k is not None  # the document requires it for a side other than long
-    ranked = sorted((i for i in pickable if i in scores), key=lambda i: (-scores[i], i))
-    floor = adv_floor or 0.0
-    shortable = [i for i in ranked if (volume := adv.get(i)) is not None and volume >= floor]
-    short = shortable[::-1][: edge.top_k]
-    if edge.outcome.side == SHORT:
-        below = shortable[::-1][edge.top_k : hold] if hold is not None else []
-        return [(SHORT, short)], below
-    return [(LONG, ranked[: edge.top_k]), (SHORT, short)], []
-
-
-def _band(ids: Sequence[str], first: int, view: pd.DataFrame) -> tuple[Pick, ...]:
-    """The picks of a buy/hold band, ranks from ``first``: ``view`` is the counted names of the
-    leg's side (oriented as its picks are). A name with no counted value has none, never 0: it
-    cannot be held (``reporting/turnover.py``)."""
-    return tuple(
-        Pick(
-            i,
-            rank,
-            "" if i in view.index else UNCOUNTED_BAND,
-            value=_finite(view.at[i, "oriented"]) if i in view.index else None,
-        )
-        for rank, i in enumerate(ids, start=first)
-    )
-
-
 def _picks(
     edge: Edge,
     picks: Sequence[str],
@@ -492,10 +459,12 @@ def _picks(
     rows: pd.DataFrame,
     adv: Mapping[str, float | None],
     side: str,
-    entry: date,
-    exit_on: date,
+    entry: date | Mapping[str, date],
+    exit_on: date | Mapping[str, date],
     levels: Sequence[pd.DataFrame] = (),
     option_costs: OptionCosts | None = None,
+    entered: Entered | None = None,
+    horizon: int = 0,
 ) -> tuple[Pick, ...]:
     """Every pick of a session in rank order (leg v2, ADR 0064): counted or with its reason.
     ``res`` is the scored outcomes of the base names, ``rows`` the stored ones at S (the option
@@ -503,7 +472,11 @@ def _picks(
     leg's value and hit are the short's. The contract's fields (leg v5, ADR 0088 2.5a) come from
     ``trade_frame`` over the picks only; ``entry`` is S, ``exit_on`` S + h sessions;
     ``levels``: an option edge's outcomes at each cost level (``values_at``); ``option_costs``: the
-    commission its return on capital pays, as the pick value and the base do."""
+    commission its return on capital pays, as the pick value and the base do. ``entered``: an
+    entry condition's (each pick's own S and exit, or why it did not enter)."""
+    held = entered.reasons if entered is not None else {}
+    if entered is not None:  # each name its own S and exit
+        entry, exit_on = entered.at, {i: window_end(d, horizon) for i, d in entered.at.items()}
     res = short_view(res) if side == SHORT else res
     rows = chain_rows(edge, rows[rows["instrument_id"].isin(set(picks))])
     stored = rows.set_index("instrument_id")
@@ -515,8 +488,9 @@ def _picks(
     gross = is_return(edge)
     out = []
     for rank, i in enumerate(picks, start=1):
-        if i not in res.index:
-            out.append(Pick(i, rank, NO_ENTRY_BAR, score=scores.get(i), adv=adv.get(i), side=side))
+        if i not in res.index:  # not entered (its reason), or no row at its S
+            why = held.get(i, NO_ENTRY_BAR)
+            out.append(Pick(i, rank, why, score=scores.get(i), adv=adv.get(i), side=side))
             continue
         r = res.loc[i]
         counted = r["excluded"] == ""
@@ -544,6 +518,7 @@ def _picks(
                 price_source=str(trades.at[i, "price_source"]),
                 outcome_licence=str(trades.at[i, "outcome_licence"]),
                 values_at=level_values(levels, i) if counted else None,
+                entry_session=entry.get(i) if isinstance(entry, Mapping) else None,
                 **(figures.get(i, {}) if counted else {}),
             )
         )
@@ -710,7 +685,7 @@ def _measure(
     days = sorted({leg.decision for leg in legs})
     residuals = any(needs_residual(p.scope.edge) for p in plans)  # their stamps count too
     chain = _chain(plans)  # an option_pnl edge reads the chain grain
-    entries = {leg.entry for leg in legs}
+    entries = {day for leg in legs for day in leg.candidates}
     out.seqs = (  # before any outcome row is read
         chain_seqs(reader, entries) if chain else outcome_seqs(reader, entries, residuals)
     )
@@ -773,7 +748,7 @@ def _entries_licence(
     """The strictest licence recorded on the outcome rows of every entry session the plans
     cover, a stored leg reused by this run included (its outcome rows are not read again, so the
     chunk reads alone would miss them)."""
-    entries = {leg.entry for p in plans for b in p.blocks for leg in b}
+    entries = {day for p in plans for b in p.blocks for leg in b for day in leg.candidates}
     found = licence_frames(reader, _chain(plans), entries, as_of)
     if cross:  # the other grain's rows a position baseline reads
         found = [*found, *licence_frames(reader, not _chain(plans), entries, as_of)]
@@ -802,8 +777,8 @@ def _read_closed(
     closed: dict[int, dict[date, pd.DataFrame]] = {}
     wanted = {
         h: sorted(
-            {leg.entry for p in plans if p.horizon == h for b in p.blocks for leg in b
-             if leg.decision in chunk}
+            {day for p in plans if p.horizon == h for b in p.blocks for leg in b
+             if leg.decision in chunk for day in leg.candidates}
         )
         for h in sorted({p.horizon for p in plans})
     }  # fmt: skip
@@ -873,15 +848,24 @@ def _measure_plan(
             with session.attribute(leg.decision):
                 if p.scope.edge.gate is not None:  # its market read is logged against D
                     session.gate(p.scope.edge.gate, leg.decision)
-                stat = _stat(
-                    scope, session, variant, leg, p.horizon, rows, names, spec.costs,
-                    spec.adv_floor, spec.option_costs,
-                )  # fmt: skip
-                drawn = (
-                    _measure_random(p, variant, leg, stat, session, names, rows, spec)
-                    if drawing
-                    else None
+                entered, kept, missing = session.entered(  # an entry condition: own S per name
+                    scope.edge, scope.universe, variant.id, leg, closed[p.horizon], rows
                 )
+                if missing is not None:  # no partition at an S a name entered at: lost
+                    session.lost[variant.id, leg.decision] = missing_outcomes([missing]).dataset
+                if kept is None:  # lost to a table (``session.lost``): counted, not measured
+                    regime, drawn = session.label(leg.decision), None
+                    stat = SessionStat(leg.decision, regime, excluded_coverage=1)
+                else:
+                    stat = _stat(
+                        scope, session, variant, leg, p.horizon, kept, names, spec.costs,
+                        spec.adv_floor, spec.option_costs, entered,
+                    )  # fmt: skip
+                    drawn = (
+                        _measure_random(p, variant, leg, stat, session, names, kept, spec)
+                        if drawing
+                        else None
+                    )
             record = LegRecord(
                 key=spec.key_for(scope, variant),
                 trial_hash=_trial_hash(scope, variant),

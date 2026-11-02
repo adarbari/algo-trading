@@ -105,6 +105,7 @@ EDGE_SERIES = fixed(
         "block_days", "picks", "pick_hits", "eligible", "base_hits", "excluded_missing",
         "excluded_unmeasured", "excluded_score_coverage", "no_entry_bar", "no_implied_vol",
         "outside_universe", "delisted", "unscored",
+        "not_triggered", "entry_unknown",  # E13: an entry condition's (nullable in older rows)
     )),
     *floats("pick_mean", "base_mean", *(f"decile_mean_{i:02d}" for i in range(1, 11))),
     runs="merge",
@@ -236,6 +237,13 @@ EDGE_LEGS = fixed(
     # E6b-3 (nullable, no version bump): an option pick's hedged return on capital, stock return
     # on capital and wing cost, flat, three per pick, aligned to ``pick_ids`` (``pick_option``).
     "pick_option float64[]",
+    # E13 (nullable, no version bump): with an entry condition, each pick's own entry session S
+    # (``pick_entry``, aligned to ``pick_ids``) and, over the base names, those whose rule never
+    # held in the wait (``not_triggered``) or was UNKNOWN first (``entry_unknown``); null for an
+    # edge without one and in older legs.
+    "pick_entry date[]",
+    "not_triggered int64",
+    "entry_unknown int64",
     *(f"{n} int64[]" for n in ("pick_ranks", "pick_flags", "base_hits_at", "pick_hits_at")),
     *(f"{n} string[]" for n in ("pick_ids", "pick_reasons")),
     *(f"{n} int64" for n in (
@@ -363,11 +371,18 @@ EDGE_VERDICT = fixed(
 # partition of the decision session D, written nightly by the ``edge-picks`` task and read only by
 # ``services/read/evaluation/pick_edges.py`` for the screener page's "counts toward". ``status``:
 # ``picked`` (the edge decides at D; ``pick_ids`` its picks, place 1 first, possibly none),
-# ``not_decision_day`` (its schedule does not fire at D), ``unjudged`` (its outcome is not a long
-# leg of the screener's picks; ``reason`` says why) or ``skipped`` (the data to decide was
-# missing; ``reason`` says what). ``top_k`` the edge's cut (null: every qualified name),
+# ``gate_closed`` (the setup gate is closed at D, ADR 0088 decision 7; ``reason`` is the gate's;
+# read as ``paused``, apart from a name the screener's own pause holds back),
+# ``not_decision_day`` (its schedule does not fire at D), ``unjudged`` (its outcome holds a book;
+# ``reason`` says why) or ``skipped`` (the data to decide was missing, or the gate's state is
+# unknown; ``reason`` says what). ``top_k`` the edge's cut (null: every qualified name),
 # ``config_hash`` the screener's resolved config the picks came from. ``user_id`` is always
 # ``site``. Runs merge per key; ``knowledge_ts`` is the write instant, never back-dated.
+# ``pick_sides`` (ADR 0088 decision 9): the side of each pick, ``long`` or ``short``, aligned with
+# ``pick_ids`` (a ``long_short`` edge: its long leg, then its short leg ranked by its own score
+# ascending); null in rows written before the column, read as every pick ``long`` (only long picks
+# were stored then). ``pick_weights``: a book's weight of each pick, aligned with ``pick_ids``;
+# null when the edge is not a book and in rows written before the column.
 EDGE_PICKS = fixed(
     "results/edge_picks",
     "results",
@@ -376,6 +391,8 @@ EDGE_PICKS = fixed(
     *strings("reason", "config_hash"),
     "top_k int64",
     "pick_ids string[]",
+    "pick_sides string[]",
+    "pick_weights float64[]",
     runs="merge",
     key=("user_id", "edge_id", "screener"),
 )  # fmt: skip

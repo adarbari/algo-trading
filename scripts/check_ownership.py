@@ -222,8 +222,8 @@ def scan_file(path: Path, rel: str, registry: list[Responsibility]) -> list[Hit]
     return hits
 
 
-def scan(root: Path, registry: list[Responsibility]) -> list[Hit]:
-    """Every detect hit outside its responsibility's allowed modules."""
+def scan(root: Path, registry: list[Responsibility], only: set[str] | None = None) -> list[Hit]:
+    """Every detect hit outside its responsibility's allowed modules (in `only`, when given)."""
     by_id = {r.id: r for r in registry}
     hits = []
     for top in SCAN_ROOTS:
@@ -231,6 +231,8 @@ def scan(root: Path, registry: list[Responsibility]) -> list[Hit]:
             if {".venv", "node_modules"} & set(path.parts):
                 continue  # vendored dependencies (apps/web/node_modules), not our code
             rel = path.relative_to(root).as_posix()
+            if only is not None and rel not in only:
+                continue
             hits += [
                 h
                 for h in scan_file(path, rel, registry)
@@ -317,8 +319,25 @@ def main(argv: list[str] | None = None) -> int:
         "--update", action="store_true", help="shrink the ratchet to current counts"
     )
     parser.add_argument("--summary", action="store_true", help="print counts per responsibility")
+    parser.add_argument(
+        "--files",
+        nargs="*",
+        help="scan only these repo-relative files and report only their new violations "
+        "(the pre-push hook: seconds instead of the 2 min full scan; CI runs the full one)",
+    )
     args = parser.parse_args(argv)
     registry = load_registry(args.root)
+    if args.files is not None:
+        only = {f for f in args.files if f.endswith(".py")}
+        hits = scan(args.root, registry, only)
+        new, _ = compare(hits, load_known(args.root), registry)
+        if new:
+            print("NEW ownership violations: extend the owner instead of re-implementing it.")
+            print(f"A new responsibility needs an entry + owner in {REGISTRY}.\n")
+            print("\n\n".join(new))
+            return 1
+        print(f"ownership: OK for {len(only)} changed file(s)")
+        return 0
     hits = scan(args.root, registry)
     new, stale = compare(hits, load_known(args.root), registry)
     if args.summary:

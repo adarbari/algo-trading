@@ -708,7 +708,7 @@ note = "the edge harness's per-session series (ADR 0064): one row per (main edge
 name = "results/edge_legs"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the edge harness's stored legs (ADR 0063): per decision session, each screener's statistic, the partitions the session read and the outcome partition it joined; session_date = the decision session, runs merge per key; framed, written and read only by services/evaluation/cross_section/legs/ (a fitness test) ; leg version 5 (ADR 0088, E6a): each pick's trade-contract fields as aligned pick_exit .. pick_adverse lists, null in older rows; E6b-2 (nullable, no version bump): pick_values_at (an option pick's value at each cost level, flat, three per pick) and base_roc_n / base_roc_mean / base_roc_m2 (an option position's base return on capital)"
+note = "the edge harness's stored legs (ADR 0063): per decision session, each screener's statistic, the partitions the session read and the outcome partition it joined; session_date = the decision session, runs merge per key; framed, written and read only by services/evaluation/cross_section/legs/ (a fitness test) ; leg version 5 (ADR 0088, E6a): each pick's trade-contract fields as aligned pick_exit .. pick_adverse lists, null in older rows; E6b-2 (nullable, no version bump): pick_values_at (an option pick's value at each cost level, flat, three per pick) and base_roc_n / base_roc_mean / base_roc_m2 (an option position's base return on capital); E13 (nullable, no version bump): pick_entry (each pick's own S under an entry condition), not_triggered and entry_unknown (base names an entry condition kept out)"
 
 [[table]]
 name = "results/edge_trades"
@@ -726,7 +726,7 @@ note = "the stored headline of a site edge's verdict (ADR 0053 amendment 2026-10
 [[table]]
 name = "results/edge_picks"
 owner = "apps/ingestion/algotrade_ingestion/tasks/edges/picks.py"
-note = "what each site edge took at a session (ADR 0081): one row per (user, edge, screener) in the partition of the decision session, status picked / not_decision_day / unjudged / skipped with pick_ids (place 1 first) by the harness's one pick rule (picks.long_picks); framed by services/evaluation/edge_picks/, published by the edge-picks task (resumable: stored keys are skipped), read only by services/read/evaluation/pick_edges.py for the served session (a session or an edge with no row is not_stored, never an older partition); derived, a re-run rebuilds it"
+note = "what each site edge took at a session (ADR 0081): one row per (user, edge, screener) in the partition of the decision session, status picked / gate_closed / not_decision_day / unjudged / skipped with pick_ids (place 1 first), pick_sides (long / short, null in older rows: long) and pick_weights (a book's; null otherwise) by the harness's own pick rules (picks.long_picks, picks.side_picks; ADR 0088 decision 9); framed by services/evaluation/edge_picks/, published by the edge-picks task (resumable: stored keys are skipped), read only by services/read/evaluation/pick_edges.py for the served session (a session or an edge with no row is not_stored, never an older partition); derived, a re-run rebuilds it"
 
 [[table]]
 name = "results/edge_paper"
