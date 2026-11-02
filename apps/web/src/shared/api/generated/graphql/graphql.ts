@@ -158,6 +158,12 @@ export type SignalState =
   | 'NEVER_FIRED'
   | 'UNKNOWN';
 
+/** What a published stop's `fraction` is of */
+export type StopBasis =
+  | 'COLLATERAL'
+  | 'CREDIT'
+  | 'ENTRY';
+
 /** Where a published stop comes from */
 export type StopKind =
   | 'DECLARED'
@@ -571,7 +577,7 @@ export type IdeaDetailQueryVariables = Exact<{
 }>;
 
 
-export type IdeaDetailQuery = { idea: { session: string, instrumentId: string, tab: IdeaTab, learn: string, instrument: { symbol: string, name: string } | null, setup: { edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }, setups: Array<{ edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }>, why: { thesis: string, mechanism: string, basisScreener: string, decision: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, exitRule: { edgeId: string, holdSessions: number | null, winners: number, inSampleOnly: boolean, stop: { kind: StopKind, fraction: number | null, atr: number | null, multiple: number | null, winners: number | null, beyond: number | null } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, evidence: { level: string, result: string, basis: string | null, basisHorizon: number | null, liftPts: number | null, lift: number | null, trades: number | null, oosTrades: number | null }, risks: { persistence: string, holdEnds: string | null, watchOut: Array<string>, events: Array<{ date: string, kind: string, label: string, name: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type IdeaDetailQuery = { idea: { session: string, instrumentId: string, tab: IdeaTab, learn: string, instrument: { symbol: string, name: string } | null, setup: { edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }, setups: Array<{ edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }>, why: { thesis: string, mechanism: string, basisScreener: string, decision: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, exitRule: { edgeId: string, holdSessions: number | null, winners: number, inSampleOnly: boolean, takeProfit: number | null, takeProfitBasis: StopBasis, conditionFields: Array<string>, stop: { kind: StopKind, fraction: number | null, atr: number | null, multiple: number | null, winners: number | null, beyond: number | null, basis: StopBasis } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, exitPrices: { stop: number | null, target: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, evidence: { level: string, result: string, basis: string | null, basisHorizon: number | null, liftPts: number | null, lift: number | null, trades: number | null, oosTrades: number | null }, risks: { persistence: string, holdEnds: string | null, watchOut: Array<string>, events: Array<{ date: string, kind: string, label: string, name: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
 
 export type SetupIdeasQueryVariables = Exact<{
   tab: IdeaTab;
@@ -3253,6 +3259,9 @@ export const IdeaDetailDocument = new TypedDocumentString(`
       holdSessions
       winners
       inSampleOnly
+      takeProfit
+      takeProfitBasis
+      conditionFields
       stop {
         kind
         fraction
@@ -3260,7 +3269,27 @@ export const IdeaDetailDocument = new TypedDocumentString(`
         multiple
         winners
         beyond
+        basis
       }
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+    }
+    exitPrices {
+      stop
+      target
       unknown {
         code
         kind

@@ -23,7 +23,15 @@ condition beside it. Only without a declared stop is the stop the percentile of 
 same point-in-time bounds; below ``min_winners`` it is UNKNOWN (no ATR fallback: an ATR of the
 underlying is no loss on an option position). Its hold is the earlier of the cap (the basis
 horizon) and the selected expiry, when the caller gives one. An exit chosen by case is published
-only as the caller resolved it at the session (``resolved``), else UNKNOWN."""
+only as the caller resolved it at the session (``resolved``), else UNKNOWN.
+
+A share setup that declares an ``[outcome.exit]`` (``reads_share_path``, E3c-2) publishes it the
+same way, checked against the run's ``exits_digest``: its hold is the basis horizon, a declared
+``stop_loss`` is the stop as declared (a fall of the entry close, ``StopBasis.ENTRY``) and its
+``take_profit`` a rise of the entry close (``take_profit_basis`` ENTRY, where an option's is a share
+of the credit), with the fields of its ``when`` condition. Without a declared stop the stop is the
+percentile (or the ATR fallback) of the winners, beside the declared target. A short share setup is
+published for long picks only (NOT_APPLICABLE)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -33,7 +41,9 @@ from enum import StrEnum
 import numpy as np
 
 from algotrade.config.edges.document import Outcome
+from algotrade.config.edges.identity import LONG
 from algotrade.config.edges.positions.cases import EXIT_CASE_NAMES
+from algotrade.config.edges.positions.chain import reads_share_path
 from algotrade.config.edges.positions.exit_rule import ExitRuleSettings
 from algotrade.config.edges.positions.spec import (
     OPTION_KIND,
@@ -66,8 +76,9 @@ class StopKind(StrEnum):
 
 
 class StopBasis(StrEnum):
-    ENTRY = "ENTRY"  # a share setup: a fall below the entry reference close
-    CREDIT = "CREDIT"  # an option setup's declared stop: a loss of this multiple of the credit
+    ENTRY = "ENTRY"  # a share setup: a fall below (a target: a rise above) the entry close
+    CREDIT = "CREDIT"  # an option's declared stop: a loss of this multiple of the credit; its
+    # take profit: this share of the credit
     COLLATERAL = "COLLATERAL"  # an option setup's history: a mark loss of this share of collateral
 
 
@@ -100,8 +111,10 @@ class ExitRule:
     unknown: Unknown | None = None
     winners: int = 0
     in_sample_only: bool = False  # the canonical run hides its out-of-sample trades: not read
-    # an option setup's other declared exits, published as declared (None: not declared)
-    take_profit: float | None = None  # close when this share of the credit is captured
+    # a setup's other declared exits, published as declared (None: not declared)
+    take_profit: float | None = None  # close when this share of the credit is captured (CREDIT)
+    # or the entry close has risen by this fraction (ENTRY, a share setup)
+    take_profit_basis: StopBasis = StopBasis.CREDIT
     exit_dte: int | None = None  # close at this many calendar days to expiry
     condition_fields: tuple[str, ...] = ()  # the catalogue fields its exit condition reads
     expiry: date | None = None  # the selected expiry the hold was cut to (None: not given)
@@ -177,15 +190,22 @@ def _from_history(
     return ExitRule(edge.id, fallback, horizon, unknown, len(dips), run.oos_hidden)
 
 
-def option_outcome(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> Outcome | None:
+def declared_outcome(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> Outcome | None:
     """``edge``'s main outcome as ``run``'s owner resolves it (never as the viewer, as the run
-    resolved it) when it is an option setup (an ``option_pnl`` outcome with a position), else
-    None. The ledger and the verdict basis are the main edge variant's (``edge_variant`` null),
-    so its declared exits are the main outcome's."""
+    resolved it) when it publishes its own declared exits: an option setup (an ``option_pnl``
+    outcome with a position) or a share setup that reads the share path (``reads_share_path``),
+    else None. The ledger and the verdict basis are the main edge variant's (``edge_variant``
+    null), so its declared exits are the main outcome's."""
     doc = next((e for e in parsed_edges(ctx, run.owner) if e.id == edge.id), None)
-    if doc is None or doc.outcome.kind != OPTION_KIND or doc.outcome.position is None:
+    if doc is None or doc.outcome.position is None:
+        return None
+    if doc.outcome.kind != OPTION_KIND and not reads_share_path(doc.outcome):
         return None
     return doc.outcome
+
+
+def _when_fields(exits: ExitSettings) -> tuple[str, ...]:
+    return tuple(sorted({r.field for r in exits.when.rules()})) if exits.when else ()
 
 
 def _declared_exits(
@@ -264,7 +284,7 @@ def _from_option(
     """An option setup's own declared exits; only without a declared stop the percentile of its
     winners' ``max_adverse``, UNKNOWN below ``min_winners`` (the module docstring). An UNKNOWN
     rule publishes no declared exit, only the hold (as a share setup's keeps its hold)."""
-    assert outcome.position is not None  # option_outcome returns only an outcome with one
+    assert outcome.position is not None  # declared_outcome returns only an outcome with one
     hold = _option_hold(ctx, outcome.start_offset_sessions, summary.basis_horizon or 0, expiry)
     base = ExitRule(edge.id, None, hold, expiry=expiry)
     if hold is None:
@@ -276,13 +296,61 @@ def _from_option(
         return replace(base, unknown=unknown)
     rule = replace(
         base, take_profit=exits.take_profit, exit_dte=exits.exit_dte,
-        condition_fields=tuple(sorted({r.field for r in exits.when.rules()})) if exits.when else (),
+        condition_fields=_when_fields(exits),
     )  # fmt: skip
     if exits.stop_loss is not None:
         own = Stop(StopKind.DECLARED, fraction=exits.stop_loss, basis=StopBasis.CREDIT)
         return replace(rule, stop=own)
     stop, unknown, winners = _percentile(ctx, edge, run, summary)
     return replace(rule, stop=stop, unknown=unknown, winners=winners, in_sample_only=run.oos_hidden)
+
+
+def _from_share(
+    ctx: ReadContext,
+    edge: Edge,
+    run: runs.EdgeRun,
+    summary: EdgeSummary,
+    outcome: Outcome,
+    instrument_id: str | None,
+) -> ExitRule:
+    """A share setup's own declared exits (the module docstring): the hold is the basis horizon,
+    a declared stop is published as declared and the percentile (or ATR fallback) only without
+    one, the declared target and condition fields beside either. Never decided by case."""
+    assert outcome.position is not None and outcome.position.exit is not None
+    exits = outcome.position.exit
+    hold = summary.basis_horizon or 0
+    base = ExitRule(edge.id, None, hold, take_profit_basis=StopBasis.ENTRY)
+    if outcome.side != LONG:
+        why = "the exit rule is published for long picks only"
+        return replace(base, unknown=_unknown(edge, UnknownCode.NOT_APPLICABLE, why))
+    unknown = _tested(edge, run, outcome)
+    if unknown is not None:
+        return replace(base, unknown=unknown)
+    declared = replace(base, take_profit=exits.take_profit, condition_fields=_when_fields(exits))
+    if exits.stop_loss is not None:
+        own = Stop(StopKind.DECLARED, fraction=exits.stop_loss, basis=StopBasis.ENTRY)
+        return replace(declared, stop=own)
+    found = _from_history(ctx, edge, run, summary, instrument_id)
+    return replace(
+        found, take_profit=declared.take_profit, take_profit_basis=StopBasis.ENTRY,
+        condition_fields=declared.condition_fields,
+    )  # fmt: skip
+
+
+def _from_document(
+    ctx: ReadContext,
+    edge: Edge,
+    run: runs.EdgeRun,
+    summary: EdgeSummary,
+    outcome: Outcome,
+    instrument_id: str | None,
+    expiry: date | None,
+    resolved: Mapping[str, float] | None,
+) -> ExitRule:
+    """The rule of a setup whose document declares its exits: by kind, an option's or a share's."""
+    if outcome.kind == OPTION_KIND:
+        return _from_option(ctx, edge, run, summary, outcome, expiry, resolved)
+    return _from_share(ctx, edge, run, summary, outcome, instrument_id)
 
 
 def exit_rule_at(
@@ -316,9 +384,9 @@ def exit_rule_at(
     if summary.basis_screener is None or summary.basis_horizon is None:
         why = f"{edge.id} has no verdict basis ({summary.result})"
         return ExitRule(edge.id, None, None, _unknown(edge, UnknownCode.NOT_RUN, why))
-    option = option_outcome(ctx, edge, run)
-    if option is not None:
-        return _from_option(ctx, edge, run, summary, option, expiry, resolved)
+    own = declared_outcome(ctx, edge, run)
+    if own is not None:
+        return _from_document(ctx, edge, run, summary, own, instrument_id, expiry, resolved)
     if declared is not None:
         return ExitRule(edge.id, declared, summary.basis_horizon)
     return _from_history(ctx, edge, run, summary, instrument_id)

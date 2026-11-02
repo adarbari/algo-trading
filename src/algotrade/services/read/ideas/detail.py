@@ -5,7 +5,8 @@ pick, one section each:
 * ``why``: the setup's thesis and mechanism and the criteria this name met in its basis screener's
   run (the stored result row of that pick);
 * ``exit_rule``: the setup's historical exit rule for the pick (``positions.exit_rule``: the
-  stop and the hold, or why not);
+  stop and the hold, or why not) and ``exit_prices``: the stop and target as prices from the
+  reference close at S;
 * ``evidence``: the stored verdict headline the setup was listed on (every figure is backtested,
   hypothetical, a statement the page labels);
 * ``risks``: why the setup's edge should persist (what would break it), the ticker's own earnings
@@ -24,12 +25,18 @@ from datetime import date
 from algotrade.core.time.calendar import next_session
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.evaluation.positions.exit_rule import ExitRule, exit_rule_at
+from algotrade.services.read.evaluation.positions.example import CLOSE, stop_price
+from algotrade.services.read.evaluation.positions.exit_rule import (
+    ExitRule,
+    StopBasis,
+    exit_rule_at,
+)
 from algotrade.services.read.events.ahead import AheadEvent
 from algotrade.services.read.events.instrument_events import load_instrument_events
 from algotrade.services.read.ideas import of_setup
 from algotrade.services.read.ideas.inverse import InstrumentSetup, load_setups_of_instrument
 from algotrade.services.read.ideas.setups import QualifyingSetup, load_session_setups
+from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments, resolve_id
 from algotrade.services.read.screens.ideas import (
     IdeaMetric,
@@ -54,6 +61,19 @@ class IdeaWhy:
     basis_screener: str
     decision: str | None
     criteria: tuple[CriterionResult, ...]
+    unknown: Unknown | None = None
+
+
+@dataclass(frozen=True)
+class IdeaExitPrices:
+    """The exit rule in prices for the pick, from the reference close at the session: ``stop`` (a
+    fall of the entry close: close x (1 - fraction), or close - multiple x ATR for the fallback)
+    and ``target`` (close x (1 + take profit)). Each is None when the rule publishes none or its
+    meaning is not a move of the entry price (an option's credit); ``unknown``: the close could
+    not be read (the rule's own gaps are on ``IdeaDetail.exit_rule``)."""
+
+    stop: float | None = None
+    target: float | None = None
     unknown: Unknown | None = None
 
 
@@ -98,6 +118,7 @@ class IdeaDetail:
     setups: tuple[InstrumentSetup, ...]
     why: IdeaWhy
     exit_rule: ExitRule
+    exit_prices: IdeaExitPrices
     evidence: IdeaEvidence
     risks: IdeaRisks
     learn: str
@@ -162,6 +183,23 @@ def _risks(
     return IdeaRisks(persistence, ends, events, flags, None if gap is None else gap.unknown)
 
 
+def _exit_prices(ctx: ReadContext, iid: str, rule: ExitRule) -> IdeaExitPrices:
+    """The stop and target of ``rule`` as prices of the name's close at the session; only a move
+    of the entry price (``StopBasis.ENTRY``) has one."""
+    stop = rule.stop if rule.stop is not None and rule.stop.basis is StopBasis.ENTRY else None
+    rise = rule.take_profit if rule.take_profit_basis is StopBasis.ENTRY else None
+    if stop is None and rise is None:
+        return IdeaExitPrices()
+    cell = load_feature_values(ctx, [iid], [CLOSE])[iid][0]
+    if cell.value is None:
+        return IdeaExitPrices(unknown=cell.unknown)
+    close = float(cell.value)
+    return IdeaExitPrices(
+        None if stop is None else stop_price(close, stop),
+        None if rise is None else close * (1.0 + rise),
+    )
+
+
 def load_idea_detail(ctx: ReadContext, key: str, setup_id: str | None = None) -> IdeaDetail | None:
     """The idea page of ``key`` (a ticker or an instrument id) under ``setup_id`` (default: the
     best setup that picked it); None when the name is unknown, no qualifying setup picked it at
@@ -190,6 +228,7 @@ def load_idea_detail(ctx: ReadContext, key: str, setup_id: str | None = None) ->
         setups=found,
         why=_why(ctx, setup, result, pick),
         exit_rule=rule,
+        exit_prices=_exit_prices(ctx, iid, rule),
         evidence=IdeaEvidence(
             s.verdict,
             s.result,

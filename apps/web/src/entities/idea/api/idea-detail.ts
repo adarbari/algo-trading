@@ -61,6 +61,9 @@ const IdeaDetailQuery = graphql(`
         holdSessions
         winners
         inSampleOnly
+        takeProfit
+        takeProfitBasis
+        conditionFields
         stop {
           kind
           fraction
@@ -68,7 +71,27 @@ const IdeaDetailQuery = graphql(`
           multiple
           winners
           beyond
+          basis
         }
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+      }
+      exitPrices {
+        stop
+        target
         unknown {
           code
           kind

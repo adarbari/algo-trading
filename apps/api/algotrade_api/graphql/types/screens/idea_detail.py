@@ -67,6 +67,25 @@ class IdeaWhy:
 
 
 @strawberry.type(
+    description="The exit rule in prices of the name's reference close at the session: "
+    "`stop` (below the close) and `target` (above it), each null when the rule publishes none "
+    "or it is not a move of the entry price; `unknown` when the close could not be read"
+)
+class IdeaExitPrices:
+    stop: float | None
+    target: float | None
+    unknown: Unknown | None
+
+    @classmethod
+    def of(cls, d: detail.IdeaExitPrices) -> Self:
+        return cls(
+            stop=d.stop,
+            target=d.target,
+            unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
+        )
+
+
+@strawberry.type(
     description="The stored verdict headline of the setup: every figure is backtested "
     "(hypothetical), never a forecast. `liftPts`: the out-of-sample lift in points; `oosTrades` "
     "and `trades`: the trades behind it; null: not measured"
@@ -132,6 +151,7 @@ class IdeaDetail:
     setups: list[InstrumentSetup]
     why: IdeaWhy
     exit_rule: ExitRule
+    exit_prices: IdeaExitPrices
     evidence: IdeaEvidence
     risks: IdeaRisks
     learn: str
@@ -148,6 +168,7 @@ class IdeaDetail:
             setups=[InstrumentSetup.of(s) for s in d.setups],
             why=IdeaWhy.of(d.why),
             exit_rule=ExitRule.of(d.exit_rule),
+            exit_prices=IdeaExitPrices.of(d.exit_prices),
             evidence=IdeaEvidence.of(d.evidence),
             risks=IdeaRisks.of(d.risks),
             learn=d.learn,

@@ -31,16 +31,21 @@ import { exitRuleText } from '../model/exit-rule';
 const BASIS = 'Backtested (hypothetical)';
 
 type Exit = IdeaDetail['exitRule'];
+type Prices = IdeaDetail['exitPrices'];
+
+const PERCENT = { kind: 'percent', digits: 1 } as const;
 
 function stopItems(exit: Exit): KeyValueItem[] {
   const stop = exit.stop;
   if (!stop) return [];
   const items: KeyValueItem[] = [];
   if (stop.fraction !== null) {
+    const declared = stop.kind === 'DECLARED';
     items.push({
-      label: 'Stop, below the entry close',
+      label: declared ? 'Declared stop, below the entry close' : 'Stop, below the entry close',
       value: stop.fraction,
-      format: { kind: 'percent', digits: 1 },
+      format: PERCENT,
+      action: declared ? termHelp('exit_stop_declared') : undefined,
     });
   } else if (stop.multiple !== null) {
     items.push({
@@ -60,6 +65,39 @@ function stopItems(exit: Exit): KeyValueItem[] {
   }
   if (stop.winners !== null) {
     items.push({ label: 'Winning trades it rests on', value: stop.winners });
+  }
+  return items;
+}
+
+/** A share setup's declared take profit (a rise of the entry close) and the served prices. */
+function targetItems(exit: Exit, prices: Prices): KeyValueItem[] {
+  const items: KeyValueItem[] = [];
+  if (exit.takeProfit != null && exit.takeProfitBasis === 'ENTRY') {
+    items.push({
+      label: 'Target, above the entry close',
+      value: exit.takeProfit,
+      format: PERCENT,
+      action: termHelp('exit_take_profit_entry'),
+    });
+  }
+  const action = termHelp('exit_prices');
+  if (prices.stop != null) {
+    items.push({ label: 'Stop price', value: prices.stop, format: { kind: 'currency' }, action });
+  }
+  if (prices.target != null) {
+    items.push({
+      label: 'Target price',
+      value: prices.target,
+      format: { kind: 'currency' },
+      action,
+    });
+  }
+  if (exit.conditionFields.length > 0) {
+    items.push({
+      label: 'Exit condition reads',
+      value: exit.conditionFields.join(', '),
+      action: termHelp('exit_condition_declared'),
+    });
   }
   return items;
 }
@@ -92,12 +130,14 @@ export function WhySection({ idea }: { idea: IdeaDetail }) {
 
 export function ExitRuleSection({ idea }: { idea: IdeaDetail }) {
   const exit = idea.exitRule;
-  const items = stopItems(exit);
-  const text = exitRuleText(exit);
+  const prices = idea.exitPrices;
+  const items = [...stopItems(exit), ...targetItems(exit, prices)];
+  const text = exitRuleText(exit, prices);
   return (
     <Panel title="Historical exit rule" description={BASIS} actions={termHelp('idea_exit_rule')}>
       <Stack gap={3}>
         {exit.unknown ? <UnknownNote unknown={exit.unknown} /> : null}
+        {prices.unknown ? <UnknownNote unknown={prices.unknown} /> : null}
         {items.length > 0 || exit.holdSessions !== null ? (
           <KeyValue
             label="Exit rule figures"

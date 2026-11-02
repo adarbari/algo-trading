@@ -9,7 +9,21 @@ const stop = {
   multiple: null,
   winners: 80,
   beyond: 0.2,
+  basis: 'ENTRY',
 } as const;
+
+const rule = {
+  stop: null,
+  edgeId: 'a',
+  holdSessions: 5,
+  winners: 0,
+  inSampleOnly: false,
+  takeProfit: null,
+  takeProfitBasis: 'CREDIT',
+  conditionFields: [] as string[],
+  unknown: null,
+} as const;
+const noPrices = { stop: null, target: null, unknown: null } as const;
 
 describe('exitRuleText', () => {
   it('names the served stop and hold and labels them backtested', () => {
@@ -20,6 +34,9 @@ describe('exitRuleText', () => {
       winners: 80,
       inSampleOnly: false,
       unknown: null,
+      takeProfit: null,
+      takeProfitBasis: 'CREDIT',
+      conditionFields: [],
     });
     expect(text).toBe(
       'Historical exit rule: stop 6.2% below the entry close; hold 5 sessions. Backtested (hypothetical).',
@@ -34,6 +51,9 @@ describe('exitRuleText', () => {
       winners: 3,
       inSampleOnly: false,
       unknown: null,
+      takeProfit: null,
+      takeProfitBasis: 'CREDIT',
+      conditionFields: [],
     });
     expect(text).toContain('stop 2.0 × ATR(14)');
     expect(text).not.toContain('hold');
@@ -48,7 +68,30 @@ describe('exitRuleText', () => {
         winners: 0,
         inSampleOnly: false,
         unknown: null,
+        takeProfit: null,
+        takeProfitBasis: 'CREDIT',
+        conditionFields: [],
       }),
     ).toBeNull();
+  });
+
+  it('names a declared share stop and the target as a rise of the entry close, with the prices', () => {
+    const text = exitRuleText(
+      {
+        ...rule,
+        stop: { ...stop, kind: 'DECLARED', fraction: 0.05, winners: null, beyond: null },
+        takeProfit: 0.1,
+        takeProfitBasis: 'ENTRY',
+      },
+      { stop: 95, target: 110, unknown: null },
+    );
+    expect(text).toBe(
+      'Historical exit rule: declared stop 5.0% below the entry close ($95.00); target 10.0% above the entry close ($110.00); hold 5 sessions. Backtested (hypothetical).',
+    );
+  });
+
+  it("leaves an option setup's take profit (a share of the credit) out of the text", () => {
+    const text = exitRuleText({ ...rule, takeProfit: 0.5, takeProfitBasis: 'CREDIT' }, noPrices);
+    expect(text).not.toContain('target');
   });
 });
