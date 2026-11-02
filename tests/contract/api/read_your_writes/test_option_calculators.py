@@ -30,3 +30,8 @@ def test_roll_stores_nothing(gate: Gate, writer_client: TestClient) -> None:
 def test_calls_stores_nothing(gate: Gate, writer_client: TestClient) -> None:
     body = {"key": "AAA", "shares": 200, "price": 98.0}
     _stores_nothing(gate, writer_client, "/preview/options/calls", body)
+
+
+def test_margin_stores_nothing(gate: Gate, writer_client: TestClient) -> None:
+    body = {"key": "AAA", "strike": 95.0, "expiry": EXPIRY, "contracts": 5}
+    _stores_nothing(gate, writer_client, "/preview/options/margin", body)

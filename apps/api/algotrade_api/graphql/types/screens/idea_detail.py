@@ -14,6 +14,7 @@ from algotrade_api.graphql.types.evaluation.exit_rule import ExitRule
 from algotrade_api.graphql.types.events.instrument_events import AheadEvent
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.instruments.instrument import Instrument
+from algotrade_api.graphql.types.screens.idea_option import IdeaOption
 from algotrade_api.graphql.types.screens.ideas import IdeaMetric
 from algotrade_api.graphql.types.screens.result import CriterionResult
 from algotrade_api.graphql.types.screens.setup_ideas import IdeaTab
@@ -140,7 +141,7 @@ class IdeaRisks:
 @strawberry.type(
     description="One idea's page for the session, shown under `setup` (the best that picked "
     "it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is "
-    "the setup's id, the key of its Guide entry"
+    "the setup's id, the key of its Guide entry; `option`: the option sections of a Premium pick"
 )
 class IdeaDetail:
     session: dt.date
@@ -156,6 +157,7 @@ class IdeaDetail:
     risks: IdeaRisks
     learn: str
     metrics: list[IdeaMetric]
+    option: IdeaOption | None
 
     @classmethod
     def of(cls, d: detail.IdeaDetail, ctx: ReadContext) -> Self:
@@ -173,4 +175,5 @@ class IdeaDetail:
             risks=IdeaRisks.of(d.risks),
             learn=d.learn,
             metrics=[IdeaMetric.of(m) for m in d.metrics],
+            option=IdeaOption.of(d.option) if d.option is not None else None,
         )

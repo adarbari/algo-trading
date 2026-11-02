@@ -14,6 +14,7 @@ export const EXPLORE_TABS = [
   'options',
   'roll',
   'calls',
+  'margin',
   'features',
   'financials',
   'events',

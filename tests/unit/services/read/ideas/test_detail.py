@@ -218,3 +218,25 @@ def test_a_missing_close_leaves_both_prices_unknown_never_filled(
     rule = ExitRule("e", own, 5, take_profit=0.1, take_profit_basis=StopBasis.ENTRY)
     prices = detail._exit_prices(CTX, "EQ:X", rule)
     assert (prices.stop, prices.target) == (None, None) and prices.unknown is not None
+
+
+def test_a_premium_setups_pick_carries_the_option_sections_and_a_stocks_pick_does_not(
+    wired: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[Any] = []
+
+    def option(ctx: Any, edge: Any, iid: str, rule: Any = None) -> str:
+        asked.append((edge.id, iid))
+        return "OPTION"
+
+    monkeypatch.setattr(detail, "load_idea_option", option)
+    assert detail.load_idea_detail(CTX, "X").option is None  # type: ignore[union-attr]
+    assert asked == []
+    premium = _setup("strong", "works")
+    premium = QualifyingSetup(
+        premium.edge, "premium", premium.summary, premium.basis_screener, 5, None
+    )
+    monkeypatch.setattr(detail, "load_session_setups", lambda ctx: SessionSetups((premium, WEAK)))
+    found = detail.load_idea_detail(CTX, "X")
+    assert found is not None and found.option == "OPTION"  # type: ignore[comparison-overlap]
+    assert asked == [("strong", "EQ:X")]

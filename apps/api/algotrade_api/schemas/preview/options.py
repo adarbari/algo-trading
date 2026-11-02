@@ -1,4 +1,4 @@
-"""``POST /preview/options/{roll,calls}``: the option calculators (plan V11) over figures a
+"""``POST /preview/options/{roll,calls,margin}``: the option calculators (plan V11) over figures a
 trader types, priced on the request's session. Derived figures only: no bid, ask, last or size
 field anywhere (``tests/architecture/options/test_trader_option_figures.py``). A gap is served in
 public words (its kind and Guide term); its cause chain is an admin's only (ADR 0056: marked
@@ -10,7 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from algotrade.services.preview.options import calls, roll
+from algotrade.services.preview.options import calls, margin, roll
 from algotrade.services.read.availability.cause import ADMIN_CAUSE
 from algotrade.services.read.values import Unknown
 from algotrade_api.schemas.availability import CauseLink
@@ -206,3 +206,77 @@ def calls_result(found: calls.CallsPreview | Unknown) -> CallsResult:
         dividend_unknown=None if known else gap_of(found.dividend),  # type: ignore[arg-type]
     )
     return CallsResult(preview=preview, gap=None)
+
+
+class MarginBody(BaseModel):
+    key: str = Field(description="the underlying: a ticker or an instrument id")
+    right: Right = Field("put", description="the right of the option")
+    strike: float = Field(gt=0, description="its strike")
+    expiry: date = Field(description="its expiry")
+    contracts: int = Field(gt=0, le=100_000, description="how many contracts")
+
+
+class Stress(Schema):
+    episode: str
+    drop: float
+    in_the_money: float
+
+
+class MarginPreview(Schema):
+    underlying_id: str
+    session: date
+    priced_at: float
+    right: Right
+    strike: float
+    expiry: date
+    contracts: int
+    rule: str = Field(description="the margin rule applied: reg_t, the exchange minimum")
+    days: int
+    premium: float
+    premium_total: float
+    cash_secured: float = Field(
+        description="a put's strike, a call's shares at tonight's price (covered), x 100 x n"
+    )
+    margin_held: float = Field(
+        description="the exchange minimum for an uncovered short option (a call: a naked call)"
+    )
+    premium_over_cash: float
+    premium_over_margin: float = Field(description="the premium over the uncovered minimum")
+    volume_share: float | None
+    open_interest_share: float | None
+    stress: Stress | None
+    stress_unknown: OptionGap | None
+
+
+class MarginResult(Schema):
+    preview: MarginPreview | None = Field(description="what it ties up (None: see gap)")
+    gap: OptionGap | None = Field(description="why there is no preview (None: there is one)")
+
+
+def margin_result(found: margin.MarginPreview | Unknown) -> MarginResult:
+    """The buying-power preview as served."""
+    if isinstance(found, Unknown):
+        return MarginResult(preview=None, gap=gap_of(found))
+    stress = found.stress
+    preview = MarginPreview(
+        underlying_id=found.underlying_id,
+        session=found.session,
+        priced_at=found.priced_at,
+        right=found.contract.right,  # type: ignore[arg-type]
+        strike=found.contract.strike,
+        expiry=found.contract.expiry,
+        contracts=found.contracts,
+        rule=found.rule,
+        days=found.days,
+        premium=found.premium,
+        premium_total=found.premium_total,
+        cash_secured=found.cash_secured,
+        margin_held=found.margin_held,
+        premium_over_cash=found.premium_over_cash,
+        premium_over_margin=found.premium_over_margin,
+        volume_share=found.volume_share,
+        open_interest_share=found.open_interest_share,
+        stress=Stress.model_validate(stress) if isinstance(stress, margin.Stress) else None,
+        stress_unknown=gap_of(stress) if isinstance(stress, Unknown) else None,
+    )
+    return MarginResult(preview=preview, gap=None)

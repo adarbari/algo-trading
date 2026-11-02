@@ -961,6 +961,13 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the [exempt] kinds of `web_filter_bar.toml` (a fixed handful of rows, a drill-down of one thing) fit; wrapping server inputs in the filter bar would misrepresent them (precedent: Explore's Compare table).
+## 2026-11-02 | V11b Buying power: which margin rules | The exchange minimum (Reg-T) only, no named broker
+- Question: the OptMargin mockup has a "Your broker's rules: tastytrade" select; which margin rules does the calculator offer at launch?
+- Options: (a) the Reg-T / Cboe exchange minimum for an uncovered short option only, no broker named; (b) a site-config list of named brokers with their published multipliers, sourced and dated, kept by hand; (c) (a) now, (b) later only as a sourced, dated change.
+- Decision: (c). The select is dropped; its place is an "exchange minimum" label with its Guide entry (a broker may require more; a margin figure is a floor, not a quote). Cash-secured stays exact (strike x 100 x contracts).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the exchange minimum is published, stable and broker-neutral, the one figure the site can state accurately for every trader; a stale multiplier shown as a named broker's rule is a data-quality and liability risk (data tenet), a hand-kept broker list has no ingestion check, and a broker select sits against ADR 0083's no-broker-links and no-account-profile rules.
 ## 2026-11-02 | V10 Describe it (Evening Desk) | Where Describe it lives, and C18's `not_said` status
 - Question: (1) the Describe box sat on Expert; where does the sentence way in live now? (2) the plan gives C18 (`PartCard`) a `not_said` status; does V10 add it?
 - Options: (1) its own page `/test/describe/$id` with the rows it became / a mode of Expert. (2) add `not_said` now, unused / add it with the first draft that has a part the trader did not say.
@@ -975,3 +982,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: one rule for the whole page is what the amendment's "on Ideas it is a filter" says; the pool already filters server side, so it is one more predicate; without the "of M" an empty group would read as "no picks"; a toggle adds page state and a control (owner 2026-10-25: less code).
+
+## 2026-11-02 | Plan O4 | The option idea page's premium floor is not applicable until a setup declares a minimum credit
+- Question: the plan's O4 line is "the setup's rule holds Monday at a premium of $X or more". No stored field gives $X: no setup declares a minimum credit (concepts 2.16 EF-G14, deferred) and no option verdict stores a typical trade to derive a break-even from. What does the page show?
+- Options: derive a floor from the example (credit less a typical trade); derive it from the setup's evidence once stored; show UNKNOWN with its reason.
+- Decision: the section carries `mondayFloor` null and `floorUnknown` NOT_APPLICABLE with the reason, and the Guide entry says so; the figure appears when a setup declares a minimum credit (a `select` rule at entry, EF-G14) or its stored evidence supports a floor, by inverting the premium figures at the example's strike and days. No number is invented in the read.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: ADR 0088's rule that figures are derived or UNKNOWN, never filled; an invented floor would read as the setup's own rule; the architect review of the read agreed.

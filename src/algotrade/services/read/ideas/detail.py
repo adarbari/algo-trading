@@ -17,7 +17,9 @@ A section whose input is missing carries an ``unknown`` with its reason, never a
 setup shown is the one asked for among those that picked the ticker, else the best by the one
 ranking rule (``inverse.load_setups_of_instrument`` lists them strongest first). A ticker no
 qualifying setup picked at the session has no idea page (None): nothing is read for an older
-night. Option picks (O4) add their own sections beside these; ``tab`` says which kind it is."""
+night. A pick of a Premium setup adds ``option`` (``option_detail``: the example position, the
+declared exits as marks, the most you can lose, the position's figures and calendar flags);
+``tab`` says which kind it is."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -35,7 +37,8 @@ from algotrade.services.read.events.ahead import AheadEvent
 from algotrade.services.read.events.instrument_events import load_instrument_events
 from algotrade.services.read.ideas import of_setup
 from algotrade.services.read.ideas.inverse import InstrumentSetup, load_setups_of_instrument
-from algotrade.services.read.ideas.setups import QualifyingSetup, load_session_setups
+from algotrade.services.read.ideas.option_detail import IdeaOption, load_idea_option
+from algotrade.services.read.ideas.setups import PREMIUM, QualifyingSetup, load_session_setups
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments, resolve_id
 from algotrade.services.read.screens.ideas import (
@@ -123,6 +126,7 @@ class IdeaDetail:
     risks: IdeaRisks
     learn: str
     metrics: tuple[IdeaMetric, ...] = ()
+    option: IdeaOption | None = None
 
 
 def _chosen(found: tuple[InstrumentSetup, ...], wanted: str | None) -> InstrumentSetup | None:
@@ -242,4 +246,5 @@ def load_idea_detail(ctx: ReadContext, key: str, setup_id: str | None = None) ->
         risks=_risks(ctx, setup, iid, rule, flags),
         learn=setup.edge.id,
         metrics=() if result is None else display_metrics(result),
+        option=load_idea_option(ctx, setup.edge, iid, rule) if setup.tab == PREMIUM else None,
     )

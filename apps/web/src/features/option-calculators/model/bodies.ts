@@ -6,6 +6,7 @@ import type { components } from '@/shared/api';
 
 export type RollBody = components['schemas']['RollBody'];
 export type CallsBody = components['schemas']['CallsBody'];
+export type MarginBody = components['schemas']['MarginBody'];
 
 /** The roll form as typed; empty fields are null. */
 export interface RollForm {
@@ -46,4 +47,22 @@ export function callsBody(symbol: string, form: CallsForm): CallsBody | null {
     return null;
   if (price === null || price <= 0) return null;
   return { key: symbol, shares, price };
+}
+
+/** The buying-power form as typed. */
+export interface MarginForm {
+  right: 'put' | 'call';
+  strike: number | null;
+  /** The expiry day (`YYYY-MM-DD`) picked from the listed expiries; empty until picked. */
+  expiry: string;
+  contracts: number | null;
+}
+
+/** The buying-power request, or null until a strike, an expiry and whole contracts are given. */
+export function marginBody(symbol: string, form: MarginForm): MarginBody | null {
+  const { strike, contracts } = form;
+  if (strike === null || strike <= 0 || form.expiry === '') return null;
+  if (contracts === null || !Number.isInteger(contracts) || contracts <= 0 || contracts > 100_000)
+    return null;
+  return { key: symbol, right: form.right, strike, expiry: form.expiry, contracts };
 }

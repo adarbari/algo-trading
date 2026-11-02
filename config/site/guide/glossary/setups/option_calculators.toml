@@ -1,5 +1,5 @@
-# L3 site setting: the Guide glossary, the words of the option calculators on a ticker's Roll a put and
-# Calls on shares tabs (plan V11, ADR 0083 amendment, ADR 0051). One [[term]] each: id, term, short (one
+# L3 site setting: the Guide glossary, the words of the option calculators on a ticker's Roll a put, Calls on
+# shares and Buying power tabs (plan V11, ADR 0083 amendment, ADR 0051). One [[term]] each: id, term, short (one
 # sentence), body, next, see_also. Typed by src/algotrade/config/site/guide/glossary.py; fitness tests:
 # tests/unit/config/site/guide/test_glossary.py. Kept apart from ideas.toml, whose words are checked for
 # instruction wording (a calculator names the options a trader sells).
@@ -250,3 +250,88 @@ body = """
 You must own the shares at the close before the ex-date to be paid. A short call is exercised early most often on that day. When no dividend is announced yet, the panel says so rather than showing none.
 """
 see_also = ["calls_ex_dividend", "calls_early_exercise"]
+
+# Buying power (plan V11, screen OptMargin; decision log 2026-11-02: the exchange minimum only, no named broker).
+[[term]]
+id = "margin_buying_power"
+term = "Buying power"
+short = "What one option contract ties up in your account, and what you collect for tying it up."
+body = """
+Type a contract and how many. We show what a cash-secured account would set aside, what a margin account would hold at the exchange minimum, and the premium over each. It shows what a contract ties up; it does not say how much to trade, and nothing you type is saved.
+"""
+next = "Compare it with the cash you could afford to have tied up."
+see_also = ["margin_reg_t", "margin_cash_secured", "margin_account", "margin_held"]
+
+[[term]]
+id = "margin_contracts"
+term = "Contracts"
+short = "How many option contracts you would sell; one contract covers 100 shares."
+body = """
+Type whole contracts. Every figure on the page scales with this number: what is held, the premium and the size against trading. Ten contracts of a put at a $50 strike are 1,000 shares' worth of strike.
+"""
+see_also = ["margin_held", "margin_size"]
+
+[[term]]
+id = "margin_reg_t"
+term = "Exchange minimum (Reg-T)"
+short = "The minimum most US brokers start from for an uncovered short option: a floor, not a quote."
+body = """
+The exchange sets a minimum margin for selling an uncovered option, and most US brokers start from it. Your broker may require more, and may change it with the market, so treat the margin figure as the least it could be. We do not show any broker's own rule. For a call, this is the minimum for an uncovered (naked) call, the riskiest way to sell one.
+"""
+next = "Ask your broker what it requires before you rely on the figure."
+see_also = ["margin_account", "margin_held"]
+
+[[term]]
+id = "margin_cash_secured"
+term = "Cash-secured"
+short = "You set aside the full cost of being assigned: for a put, its strike times 100 times the contracts."
+body = """
+A cash-secured put holds the cash to buy the shares at the strike if you are assigned, so the figure is exact: the strike times 100 times the contracts. For a call, cash-secured means you already hold the shares, and the figure is those shares at tonight's price. That is a covered call, not an uncovered one.
+"""
+see_also = ["margin_account", "margin_held"]
+
+[[term]]
+id = "margin_account"
+term = "Margin account"
+short = "Your broker holds only the exchange minimum as collateral, not the full exposure."
+body = """
+A margin account lets you sell an option while holding less than the cash-secured amount. The figure shown is the exchange minimum for an uncovered short option, a floor your broker may raise. For a call this is the naked-call minimum, not the cost of holding shares. Holding less does not make the position smaller: a margin account is still liable for the full loss.
+"""
+next = "Read the stress below the figures before you count on the lower number."
+see_also = ["margin_reg_t", "margin_cash_secured", "margin_stress"]
+
+[[term]]
+id = "margin_held"
+term = "Cash or margin held"
+short = "What this order sets aside in the account you chose, from the switch beside the panel title."
+body = """
+Cash-secured shows the full amount; Margin account shows the exchange minimum. The other account's figure sits underneath so you can see the gap between them. For a put, cash-secured is its strike times 100 times the contracts. For a call, cash-secured is the shares held at tonight's price, and margin is the naked-call minimum.
+"""
+see_also = ["margin_cash_secured", "margin_account", "margin_premium_collected", "margin_reg_t"]
+
+[[term]]
+id = "margin_premium_collected"
+term = "Premium collected on the contracts"
+short = "What you would be paid now for these contracts, at the middle of tonight's stored bid and ask."
+body = """
+The premium per share times 100 times the contracts. The line beneath it says what share that is of the amount held in the chosen account, over the days to expiry. It changes when you switch between Cash-secured and Margin account. It is a return over that period, not a yearly rate, and real fills are worse than a middle price.
+"""
+see_also = ["margin_held", "margin_account", "grid_mid"]
+
+[[term]]
+id = "margin_size"
+term = "Size against trading"
+short = "Your contracts as a share of today's trading in this contract and of the contracts open at this strike."
+body = """
+A large share means your order is big for this contract: it may move the price against you, and closing it later may be hard. A part we could not state (no volume or no open contracts stored) is left out instead of shown as zero.
+"""
+see_also = ["margin_contracts", "margin_held"]
+
+[[term]]
+id = "margin_stress"
+term = "Worst stored episode stress"
+short = "What a put would be worth in the money if the stock fell as far as in its worst stored market fall."
+body = """
+We take the stock's largest own fall across the market falls we store. The stored falls are the Covid crash of 2020, the rate-hike bear market of 2022 and the tariff shock of 2025. We apply that fall to tonight's price. The sentence says how far in the money the put would be on your contracts. That is before the premium you were paid. It is the stock's past, not a forecast, and it is shown for puts only. Margin multiplies losses as well as returns.
+"""
+see_also = ["margin_account", "margin_held"]

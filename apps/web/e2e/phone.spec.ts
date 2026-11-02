@@ -159,6 +159,21 @@ test('Idea page: the sections stack inside the screen and the exit rule keeps it
   await expect(page.getByRole('button', { name: 'Copy exit rule as text' })).toBeVisible();
 });
 
+test('Option idea page: the plan and the position risks stack inside the screen', async ({
+  page,
+}) => {
+  await mockIdeasApi(page);
+  await page.goto('/ideas/KTLX?setup=rich_puts');
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  await expect(page.getByRole('heading', { name: 'The plan' })).toBeVisible();
+  const box = await page.getByRole('heading', { name: "The position's risks" }).boundingBox();
+  expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    innerWidth,
+  );
+  await expect(page.getByText('Most you can lose')).toBeVisible();
+});
+
 test('Screener results: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({
   page,
 }) => {
@@ -838,10 +853,10 @@ test('Test: the ways in are cards, the steps stay in view, and a template opens 
   await expect(steps.getByRole('link', { name: 'Result' })).toBeVisible();
 });
 
-test('Explore: Roll a put and Calls on shares fit a phone', async ({ page }) => {
-  for (const tab of ['roll', 'calls']) {
+test('Explore: Roll a put, Calls on shares and Buying power fit a phone', async ({ page }) => {
+  for (const tab of ['roll', 'margin', 'calls']) {
     await page.goto(`/explore?focus=AAPL&tab=${tab}`);
-    await expect(page.getByRole('button', { name: /^Show / })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(Show|Calculate)/ })).toBeVisible();
     const { scrollWidth, innerWidth } = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth,
