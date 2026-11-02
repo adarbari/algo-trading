@@ -137,6 +137,10 @@ store; the Cboe chains are stored from 2026-10-02 and the bought history is pers
     field; such a setup is hidden from, and adds no Ideas picks for, a viewer without that licence. The
     gate is a rule, so its fields count too (reading recorded for owner confirmation: it is the proposer's,
     not stated by the owner).
+    *Amendment 2026-11-02 (trial licence for every trial kind):* a schedule places a trial's entries, so
+    the fields it is read from (a market trigger's date and age, an event class's fields) are rule
+    fields too; the rules' licence and the outcome rows' together are the evidence licence, recorded for
+    cross-section, time-series and named-sleeve trials alike (`cross_section/detail/licences.py`).
 21. **Rules reading a fitted score (P2):** owner-only until one scored setup has a forward record, then
     shown as any setup; decided again at slice E14.
 22. **Short picks are shown as "short" (borrow assumed, stop UNKNOWN in P1); books in rank order with the

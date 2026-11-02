@@ -517,6 +517,8 @@ def _time_series(
     one trial per named instrument (``variant`` its symbol, ``horizon`` the window's length or the
     hold; a sleeve's per edge variant and grid point too), its slices and random window sets stored
     as the rows the verdict reads; no per-session series, legs or ledger (no screen to replay)."""
+    if not isinstance(edge.universe, Selection):  # both measure named instruments only
+        raise ConfigurationError(f"edge {edge.id}: a time-series edge names its instruments")
     split, exploratory = effective_split(split_from, edge)
     domains, features = gate_domains(configs, edge), catalogue(configs, user.user_id)
     check_entry(reader, edge, features, start, end, as_of)  # G9-M3, G9-M4 (a sleeve: each trial)
@@ -545,8 +547,6 @@ def _time_series(
     sharpes = [r.measures[0].sharpe for r in run.results if r.measures[0].sharpe is not None]
     spread = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None  # as ``deflate`` reads it
     ran = _as_ran(edge, sleeved)
-    if not isinstance(edge.universe, Selection):  # both measure named instruments only
-        raise ConfigurationError(f"edge {edge.id}: a time-series edge names its instruments")
     results = [
         VariantResult(
             r.symbol, SCREENER, keys[r.identity], r.horizon, (),
