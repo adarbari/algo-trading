@@ -62,6 +62,16 @@ describe('EdgeHeader', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('shows the setup state beside the verdict with the server reason and its own Guide button', () => {
+    header({
+      ...momentum,
+      setupState: { state: 'PAUSED', reason: 'The gate is closed: stand aside', unknown: null },
+    } as typeof momentum);
+    expect(screen.getByText('Paused')).toBeInTheDocument();
+    expect(screen.getByText('The gate is closed: stand aside')).toBeInTheDocument();
+    expect(screen.getByText('help setup_state_paused')).toBeInTheDocument();
+  });
+
   it('says whose edge it is, the official result date, the data it read and the basis', () => {
     header();
     expect(screen.getByText('Site edge · Candidate')).toBeInTheDocument();

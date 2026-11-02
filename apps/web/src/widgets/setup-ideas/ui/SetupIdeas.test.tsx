@@ -10,10 +10,16 @@ import { SetupIdeas } from './SetupIdeas';
 
 const hooks = vi.hoisted(() => ({ useSetupIdeas: vi.fn() }));
 vi.mock('@/entities/idea', () => ({ useSetupIdeas: hooks.useSetupIdeas }));
-vi.mock('@/entities/edge', () => ({
-  verdictLabel: (v: string) => (v === 'works' ? 'Works' : 'Promising'),
-  verdictTone: () => 'positive',
-}));
+vi.mock('@/entities/edge', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    verdictLabel: (v: string) => (v === 'works' ? 'Works' : 'Promising'),
+    verdictTone: () => 'positive',
+    setupStateTerm: (s: string) => `setup_state_${s.toLowerCase()}`,
+    SetupStateChip: ({ state }: { state: { state: string } | null }) =>
+      state ? <Text>{`chip ${state.state}`}</Text> : null,
+  };
+});
 vi.mock('@/features/guide-help', () => ({ termHelp: () => null }));
 
 const idea = (instrumentId: string, symbol: string, rank: number): SetupIdea => ({
@@ -48,6 +54,7 @@ const listed: Data = {
       basisScreener: 'drift_scr',
       state: 'picked',
       unknown: null,
+      setupState: { state: 'PAUSED', reason: 'The gate is closed' },
       picked: 1,
       shown: 1,
       ideas: [a],
@@ -62,6 +69,7 @@ const listed: Data = {
       basisScreener: 'quiet_scr',
       state: 'not_a_decision_day',
       unknown: null,
+      setupState: null,
       picked: 0,
       shown: 0,
       ideas: [],
@@ -94,6 +102,7 @@ describe('SetupIdeas', () => {
     expect(screen.getByText(/Backtested \(hypothetical\) · lift 3\.2 pts · 120/)).toBeVisible();
     expect(screen.getByText('Not a decision day')).toBeVisible();
     expect(screen.getByText('2 no readable verdict')).toBeVisible();
+    expect(screen.getByText('chip PAUSED')).toBeVisible(); // the setup's state beside its verdict
     expect(screen.queryByText('pool here')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

@@ -7,6 +7,7 @@
  * (`Query.edgeResult`: the evidence curve, drawdown, rolling starts, monthly map, decay, costs,
  * capacity, regimes and horizons, one read each). Never reads an exploratory run as a track record.
  */
+export { SetupStateChip, type SetupStateChipProps } from './ui/SetupStateChip';
 export {
   prefetchEdge,
   prefetchEdges,
@@ -36,6 +37,9 @@ export { useScreenerEdges } from './api/screener-edges';
 export { prefetchTrackRecords, useTrackRecords } from './api/track-records';
 export {
   labelText,
+  setupStateLabel,
+  setupStateTerm,
+  setupStateTone,
   sideLabel,
   stateLabel,
   stateOrStatus,
@@ -47,6 +51,7 @@ export {
   VERDICT_ORDER,
   type Edge,
   type EdgeRow,
+  type ServedSetupState,
   type EdgeDocument,
   type EdgeProblem,
   type EdgesResponse,
