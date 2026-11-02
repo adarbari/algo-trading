@@ -1,5 +1,5 @@
-# L3 site setting: the Guide glossary, a setup's position, its template and its verdict profile (the declared
-# exits are in exit_rule.toml) (ADR 0088, design 2.4 to 2.6; ADR 0051). One [[term]] each: id, term, short (one sentence), body,
+# L3 site setting: the Guide glossary, a setup's position, its template, its entry, its gate, its verdict profile
+# and what resampled tails cannot show (the declared exits are in exit_rule.toml) (ADR 0088, design 2.4 to 2.6; ADR 0051). One [[term]] each: id, term, short (one sentence), body,
 # see_also. Typed by src/algotrade/config/site/guide/glossary.py; fitness tests:
 # tests/unit/config/site/guide/test_glossary.py. Templates: config/site/positions/templates.toml;
 # profiles: config/edges/verdict.py `PROFILES`.
@@ -38,4 +38,31 @@ short = "Which tests a setup's verdict uses: return (the average result) or tail
 body = """
 Every setup is judged by one profile, fixed in its document. The return profile asks whether the picks beat the other names on average, with enough trades. The tails profile adds the size of the worst 5% of outcomes and how stable the average is when resampled. Option-selling setups use tails: they win often and lose rarely but large, so an average alone can look good until one bad month. A change of profile is a new test, never a relabel.
 """
-see_also = ["verdict", "verdict_basis", "screener_vs_setup"]
+see_also = ["verdict", "verdict_basis", "screener_vs_setup", "resampled_tails"]
+
+[[term]]
+id = "setup_entry"
+term = "Entry rule"
+short = "When a setup's trade starts: a set number of sessions after the night the name was picked, optionally after a condition holds."
+body = """
+A screen decides on a session's closing data, so no trade can start at that close. Every setup enters at least one session later, at a close. An entry offset of 1 picks on Monday night and enters at Tuesday's close. A setup can also wait for a condition, such as the price closing above its 20-day average, for a set number of sessions. A name whose condition never holds in that wait is not entered, and the test counts it apart. Don't read the reference close on an idea as the entry price: the entry is a later close.
+"""
+see_also = ["exit_hold", "exit_prices", "screener_vs_setup", "setup_gate"]
+
+[[term]]
+id = "setup_gate"
+term = "Gate"
+short = "A rule over the whole market that a setup checks each decision night; if it fails, the setup stands aside."
+body = """
+A gate reads market fields only, never the picked name's. Example: an option-selling setup may require the VIX curve in contango, the 3-month VIX above the 1-month one. When the gate fails, the setup is paused and picks nothing that night. When a field it reads is missing, the state is unknown, never open. The gate is part of the tested rule. Its effect shows as a gated and an ungated variant of the setup, compared on the same sessions. Don't add a gate after seeing results: each try is another variant tried.
+"""
+see_also = ["setup_state_paused", "setup_state_unknown", "variants_tried"]
+
+[[term]]
+id = "resampled_tails"
+term = "Resampled tails"
+short = "The tail figures reshuffle the setup's own tested history, so they cannot show a loss worse than the worst one in it."
+body = """
+The tails profile measures the worst 5% of outcomes and how stable the average is. It does so by resampling stretches of the stored trades thousands of times. Resampling keeps runs of bad days together, but it only reuses what happened. A history without a crash like 1987 cannot produce one. A short-premium setup can lose more in one crash than in its whole tested history. Read the worst stored episode as a floor for the loss, not a ceiling.
+"""
+see_also = ["verdict_profile", "margin_stress", "verdict"]
