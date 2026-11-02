@@ -54,4 +54,11 @@ describe('KeyValue', () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  it('has a grid layout', () => {
+    const { container } = render(
+      <KeyValue layout="grid" items={[{ label: 'Entry', value: 'Mon 26 Oct' }]} />,
+    );
+    expect(container.querySelector('[data-layout="grid"]')).not.toBeNull();
+  });
 });

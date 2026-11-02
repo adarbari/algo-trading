@@ -167,3 +167,35 @@ export function calendarDays(calendar: EventCalendarResponse): {
     .map((d) => d.date);
   return { days, names: marketWide ? [MARKET_NAME, ...named] : named, ruledDays };
 }
+
+/** The sessions the earnings week spans (the next five, the server's `isSession`). */
+const WEEK_SESSIONS = 5;
+
+/**
+ * The names reporting in the next five sessions, in report order, and the first and last day of
+ * the span: the rows of the Earnings week table. Which events are reports (`own_earnings`) and
+ * which days are sessions are the API's; this only picks them.
+ */
+export function earningsWeek(
+  calendar: EventCalendarResponse,
+): { from: string; to: string; symbols: string[] } | null {
+  const days = calendar.days.filter((d) => d.isSession).slice(0, WEEK_SESSIONS);
+  const first = days[0];
+  const last = days[days.length - 1];
+  if (!first || !last) return null;
+  const symbols = days.flatMap((d) =>
+    d.events.flatMap((e) => (e.event.kind === 'own_earnings' && e.symbol ? [e.symbol] : [])),
+  );
+  return { from: first.date, to: last.date, symbols: [...new Set(symbols)] };
+}
+
+/** The market-wide macro releases and option expiries of the window, for the Macro view. */
+export function macroItems(calendar: EventCalendarResponse): EventItem[] {
+  return present(
+    calendar.days.flatMap((d) =>
+      d.events
+        .filter((e) => e.instrumentId === null)
+        .map((e) => eventItem(e.event, calendar.session)),
+    ),
+  );
+}

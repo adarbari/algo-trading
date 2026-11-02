@@ -40,6 +40,7 @@ selected, whatever the quotes then say.
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -144,6 +145,14 @@ def _reports(rows: pd.DataFrame | None, session: date) -> pd.DataFrame:
     return out[~out.index.duplicated(keep="last")]
 
 
+def expiry_covers(expiry: Any, report: Any, pre: Any) -> Any:
+    """Whether an expiry covers a report on ``report``: after it, or on it when the report is
+    ``pre`` (before the open); ``post`` and ``unknown`` need an expiry after. Elementwise on
+    ``datetime64[D]`` arrays or scalars: the one rule
+    ``earnings_moves@v1`` reads past straddles by."""
+    return (expiry > report) | ((expiry == report) & pre)
+
+
 def choose_expiries(
     listed: pd.DataFrame, reports: pd.DataFrame, session: date, p: ImpliedMoveParams
 ) -> pd.DataFrame:
@@ -157,7 +166,7 @@ def choose_expiries(
     pre = reports["pre"].reindex(by_id).fillna(False).to_numpy(dtype=bool)
     expiry = window["expiry"].to_numpy(dtype="datetime64[D]")
     ahead = (report > today) | ((report == today) & ~pre)  # NaT compares False
-    covers = ahead & ((expiry > report) | ((expiry == report) & pre))
+    covers = ahead & expiry_covers(expiry, report, pre)
     earnings = window[covers].sort_values(["underlying_id", "expiry"])
     term = window[window["dte"] >= MIN_TERM_DTE]
     term = term.assign(off=(term["dte"] - p.target_dte).abs())
