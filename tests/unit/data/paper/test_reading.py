@@ -93,3 +93,24 @@ def test_a_row_written_before_the_return_and_licence_columns_reads_with_them_nul
     assert list(out.columns) == [c for c in PAPER_COLUMNS if c != "instrument_id"]
     assert pd.isna(out.loc["EQ:A", "return"]) and pd.isna(out.loc["EQ:A", "licence"])
     assert out.loc["EQ:B", "return"] == 0.04 and out.loc["EQ:B", "licence"] == "personal"
+
+
+def test_a_row_written_before_the_trade_contract_columns_reads_with_them_null() -> None:
+    """E6a (ADR 0088): the exit kind, return on capital and price source of a settled trade; an
+    older row, in the same partition, reads them null, never a default."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    known = datetime(2026, 9, 1, 22, tzinfo=UTC)
+    old = _row("site", "EQ:A", D1, "won") | {"return": 0.02}
+    new = _row("site", "EQ:B", D1, "won") | {
+        "return": 0.04, "exit_kind": "HORIZON", "return_on_capital": 0.039, "price_source": "bars",
+    }  # fmt: skip
+    for run, row in (("r1", old), ("r2", new)):
+        writer.write_table(EDGE_PAPER.name, D1, run, stamped([row], D1, run, known, "edge-signals"))
+    out = read_stored(StoreReader(backend), "site", D1, D1).set_index("instrument_id")
+    for column in ("exit_kind", "return_on_capital", "price_source"):
+        assert pd.isna(out.loc["EQ:A", column]), column
+    assert (
+        out.loc["EQ:B", "exit_kind"] == "HORIZON" and out.loc["EQ:B", "return_on_capital"] == 0.039
+    )
+    assert out.loc["EQ:A", "return"] == 0.02  # the meaning of return is unchanged

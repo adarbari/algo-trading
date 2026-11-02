@@ -366,3 +366,48 @@ def test_the_overlay_figures_of_a_book_round_trip_and_default_to_null() -> None:
     legacy = {k: v for k, v in plain.items() if k not in ("book_vol", "risk_off")}
     assert decode_leg(legacy).stat.book_vol is None
     assert {"book_vol", "risk_off"} <= {c.name for c in EDGE_LEGS.columns}
+
+
+CONTRACT_PICK = Pick(
+    "EQ:K", 1, "", 0.03, True, exit_session=date(2026, 9, 4), exit_kind="TAKE_PROFIT",
+    capital=95.0, roc_gross=0.021, roc=0.019, adverse=0.04, price_source="option_history",
+    outcome_licence="personal",
+)  # fmt: skip
+
+
+def test_a_pick_with_the_contract_fields_round_trips_losslessly_and_a_v4_row_has_none() -> None:
+    """Leg v5 (ADR 0088, E6a): every pick's contract fields as aligned ``pick_*`` lists, an
+    unknown one as null (never 0); a row from before them decodes with None on every pick."""
+    bare = Pick("EQ:L", 2, "no_entry_bar")
+    full = leg(stat=stat(pick_values=(0.03,), pick_hits=1, picks=(CONTRACT_PICK, bare)))
+    row = encode_leg(full, "site", "drift")
+    assert row["pick_exit"] == [date(2026, 9, 4), None] and row["pick_roc"] == [0.019, None]
+    assert row["pick_source"] == ["option_history", None]
+    assert decode_leg(row).stat.picks == (CONTRACT_PICK, bare)
+    v4 = {k: v for k, v in row.items() if k not in CONTRACT_COLUMNS}
+    old = decode_leg(v4).stat.picks
+    assert old[0] == replace(CONTRACT_PICK, **dict.fromkeys(CONTRACT_FIELDS))
+    assert all(getattr(p, f) is None for p in old for f in CONTRACT_FIELDS)
+
+
+def test_the_contract_fields_survive_a_store(backend: Backend) -> None:
+    full = leg(
+        stat=stat(pick_values=(0.03,), pick_hits=1, picks=(CONTRACT_PICK, Pick("EQ:L", 2, "x")))
+    )
+    write = ResultWriter(backend)
+    rows = [encode_leg(full, "site", "drift")]
+    with write.publishing("r1", NOW):
+        write_legs(write, "r1", legs_frame(rows, "r1", NOW))
+    found = read_legs(StoreReader(backend), "site", "drift", D, D)
+    stored = found.legs[full.key, full.edge_variant, full.variant, full.horizon, D]
+    assert stored.stat.picks == full.stat.picks  # dates, strings and floats, nulls as None
+
+
+CONTRACT_FIELDS = (
+    "exit_session", "exit_kind", "capital", "roc_gross", "roc", "adverse", "price_source",
+    "outcome_licence",
+)  # fmt: skip
+CONTRACT_COLUMNS = (
+    "pick_exit", "pick_exit_kind", "pick_source", "pick_licence", "pick_capital",
+    "pick_roc_gross", "pick_roc", "pick_adverse",
+)  # fmt: skip
