@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 05:40 UTC",
+ "generated": "2026-11-02 09:23 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -455,9 +455,6 @@
     "TableView"
    ],
    "uncertain": [
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultRegimes",
     "GuideHelpField",
     "TableView"
    ],
@@ -466,84 +463,6 @@
     "PublishedEdge"
    ],
    "source": "static"
-  },
-  "/edges/:id/edit": {
-   "route": "/edges/:id/edit",
-   "search": {},
-   "clicks": [],
-   "params": {
-    "id": "edge"
-   },
-   "ops": [
-    "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
-   ],
-   "uncertain": [
-    "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
-   "source": "static"
-  },
-  "/edges/:id/edit > expand:More: the rest of the quality bar": {
-   "route": "/edges/:id/edit",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "More: the rest of the quality bar"
-    }
-   ],
-   "params": {
-    "id": "edge"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges/:id/edit"
-  },
-  "/edges/new": {
-   "route": "/edges/new",
-   "search": {},
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
-   ],
-   "uncertain": [
-    "EdgeBuilder",
-    "EdgeDocument",
-    "GuideHelpField"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
-   "source": "static"
-  },
-  "/edges/new > expand:More: the rest of the quality bar": {
-   "route": "/edges/new",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "More: the rest of the quality bar"
-    }
-   ],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges/new"
   },
   "/edges?edge={edge}": {
    "route": "/edges",
@@ -574,10 +493,68 @@
     "TableView"
    ],
    "uncertain": [
+    "GuideHelpField",
     "TableView"
    ],
    "interaction": [],
    "source": "static"
+  },
+  "/edges?edge={edge} > expand:By holding period": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "By holding period"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
+  },
+  "/edges?edge={edge} > expand:Compared against, tested, and why it should last": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Compared against, tested, and why it should last"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
+  },
+  "/edges?edge={edge} > expand:Dig deeper": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Dig deeper"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
   },
   "/explore": {
    "route": "/explore",
@@ -600,6 +577,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -617,6 +595,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -649,6 +628,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -666,6 +646,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -695,6 +676,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -712,6 +694,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -741,6 +724,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -758,6 +742,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -787,6 +772,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -804,6 +790,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -833,6 +820,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -850,6 +838,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -879,6 +868,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -896,6 +886,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -925,6 +916,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -942,6 +934,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1070,18 +1063,12 @@
     }
    ],
    "params": {},
-   "ops": [
-    "OptionChain",
-    "OptionQuotes"
-   ],
-   "uncertain": [
-    "OptionChain",
-    "OptionQuotes"
-   ],
+   "ops": [],
+   "uncertain": [],
    "interaction": [],
    "source": "static",
    "parent": "/explore?sel={instrument}",
-   "target": true
+   "target": false
   },
   "/explore?sel={instrument} > tab:View:Overview": {
    "route": "/explore",
@@ -1172,6 +1159,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1189,6 +1177,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1218,6 +1207,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1235,6 +1225,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1264,6 +1255,7 @@
     "InstrumentPrices",
     "InstrumentScreenerHits",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1281,6 +1273,7 @@
     "InstrumentPickedBy",
     "InstrumentPrices",
     "OptionChain",
+    "OptionGrid",
     "OptionQuotes",
     "RegimeBands"
    ],
@@ -1732,145 +1725,6 @@
    "source": "static",
    "parent": "/regime"
   },
-  "/screeners": {
-   "route": "/screeners",
-   "search": {},
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "MyScreens",
-    "ScreenerConfigs",
-    "ScreenerListPage",
-    "ScreenerRuns",
-    "ScreenerTrackRecords",
-    "TableView"
-   ],
-   "uncertain": [
-    "TableView"
-   ],
-   "interaction": [
-    "GuideEntries",
-    "GuideHelpField"
-   ],
-   "source": "static"
-  },
-  "/screeners/:id": {
-   "route": "/screeners/:id",
-   "search": {},
-   "clicks": [],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [
-    "GuideHelpField",
-    "ScreenerEdges",
-    "ScreenerResults",
-    "TableView"
-   ],
-   "uncertain": [
-    "GuideHelpField",
-    "ScreenerResults",
-    "TableView"
-   ],
-   "interaction": [
-    "GuideEntries",
-    "InstrumentEventStudy",
-    "InstrumentEvents",
-    "InstrumentPrices",
-    "RegimeBands"
-   ],
-   "source": "static"
-  },
-  "/screeners/:id/edit": {
-   "route": "/screeners/:id/edit",
-   "search": {},
-   "clicks": [],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [
-    "GuideHelpField",
-    "ScreenDetail",
-    "ScreenVersions"
-   ],
-   "uncertain": [
-    "GuideHelpField",
-    "ScreenDetail",
-    "ScreenVersions"
-   ],
-   "interaction": [
-    "FeatureDistribution",
-    "GuideEntries"
-   ],
-   "source": "static"
-  },
-  "/screeners/:id/edit > expand:Distribution": {
-   "route": "/screeners/:id/edit",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Distribution"
-    }
-   ],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/screeners/:id/edit"
-  },
-  "/screeners/:id/edit > expand:Missing data": {
-   "route": "/screeners/:id/edit",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Missing data"
-    }
-   ],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/screeners/:id/edit"
-  },
-  "/screeners/:id/edit > expand:Narrow misses": {
-   "route": "/screeners/:id/edit",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Narrow misses"
-    }
-   ],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/screeners/:id/edit"
-  },
-  "/screeners/new": {
-   "route": "/screeners/new",
-   "search": {},
-   "clicks": [],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static"
-  },
   "/settings": {
    "route": "/settings",
    "search": {},
@@ -1892,54 +1746,210 @@
    ],
    "source": "static"
   },
-  "/edges?edge={edge} > expand:By holding period": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "By holding period"
-    }
-   ],
+  "/test": {
+   "route": "/test",
+   "search": {},
+   "clicks": [],
    "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}"
+   "ops": [
+    "GuideHelpField",
+    "MyScreens",
+    "ScreenerConfigs",
+    "ScreenerListPage",
+    "ScreenerRuns",
+    "ScreenerTrackRecords"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
   },
-  "/edges?edge={edge} > expand:Compared against, tested, and why it should last": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Compared against, tested, and why it should last"
-    }
-   ],
+  "/test/describe": {
+   "route": "/test/describe",
+   "search": {},
+   "clicks": [],
    "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}"
+   "ops": [
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
   },
-  "/edges?edge={edge} > expand:Dig deeper": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
+  "/test/expert": {
+   "route": "/test/expert",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/expert/:id": {
+   "route": "/test/expert/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
    },
+   "ops": [
+    "GuideHelpField",
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "interaction": [
+    "FeatureDistribution",
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/expert/:id > expand:Distribution": {
+   "route": "/test/expert/:id",
+   "search": {},
    "clicks": [
     {
      "kind": "expand",
      "group": "",
-     "name": "Dig deeper"
+     "name": "Distribution"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/expert/:id"
+  },
+  "/test/expert/:id > expand:Missing data": {
+   "route": "/test/expert/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Missing data"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/expert/:id"
+  },
+  "/test/expert/:id > expand:Narrow misses": {
+   "route": "/test/expert/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Narrow misses"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/expert/:id"
+  },
+  "/test/guided": {
+   "route": "/test/guided",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/result/:id": {
+   "route": "/test/result/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
+   },
+   "ops": [
+    "GuideHelpField",
+    "ScreenerEdges",
+    "ScreenerResults",
+    "TableView"
+   ],
+   "uncertain": [
+    "GuideHelpField",
+    "ScreenerResults",
+    "TableView"
+   ],
+   "interaction": [
+    "GuideEntries",
+    "InstrumentEventStudy",
+    "InstrumentEvents",
+    "InstrumentPrices",
+    "RegimeBands"
+   ],
+   "source": "static"
+  },
+  "/test/setup": {
+   "route": "/test/setup",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "EdgeBuilder",
+    "EdgeDocument",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeBuilder",
+    "EdgeDocument",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/setup > expand:More: the rest of the quality bar": {
+   "route": "/test/setup",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "More: the rest of the quality bar"
     }
    ],
    "params": {},
@@ -1947,7 +1957,48 @@
    "uncertain": [],
    "interaction": [],
    "source": "static",
-   "parent": "/edges?edge={edge}"
+   "parent": "/test/setup"
+  },
+  "/test/setup/:id": {
+   "route": "/test/setup/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
+   },
+   "ops": [
+    "EdgeBuilder",
+    "EdgeDocument",
+    "GuideHelpField"
+   ],
+   "uncertain": [
+    "EdgeBuilder",
+    "EdgeDocument",
+    "GuideHelpField"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/setup/:id > expand:More: the rest of the quality bar": {
+   "route": "/test/setup/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "More: the rest of the quality bar"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/setup/:id"
   }
  }
 }

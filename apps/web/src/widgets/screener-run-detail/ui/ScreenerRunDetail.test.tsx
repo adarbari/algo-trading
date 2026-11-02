@@ -44,7 +44,7 @@ describe('ScreenerRunDetail', () => {
     expect(within(changes).getByText(/screen-trend-site-0/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: "Open the screener's results" })).toHaveAttribute(
       'href',
-      '/screeners/trend_pullback',
+      '/test/result/trend_pullback',
     );
     await expectNoA11yViolations(container);
   });

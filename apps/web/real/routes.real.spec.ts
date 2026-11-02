@@ -13,8 +13,8 @@ import { WORKSPACES } from '../src/app/workspaces/workspaces';
  * opens one ticker's Overview, read over GraphQL (`POST /graphql`) from the real API.
  */
 const EXTRA_ROUTES = [
-  '/screeners/new',
-  '/screeners/vrp_scanner/edit',
+  '/test/expert',
+  '/test/expert/vrp_scanner',
   '/explore?sel=BULL',
   '/guide',
   '/guide/start',

@@ -102,7 +102,7 @@ purpose = "the Guide's glossary of the edges (ADR 0051, ADR 0064), one <theme>.t
 
 [[config_dir]]
 path = "config/site/guide/glossary/setups"
-purpose = "the Guide's glossary of a setup's parts (ADR 0051, ADR 0088), one <theme>.toml per theme: the rule grammar and the facts of an open position (loaded after the edges subfolder; kind guide_glossary_setups)"
+purpose = "the Guide's glossary of a setup's parts (ADR 0051, ADR 0088), one <theme>.toml per theme: the rule grammar, the facts of an open position and the Test flow (loaded after the edges subfolder; kind guide_glossary_setups)"
 
 [[config_dir]]
 path = "config/site/guide/mechanisms"
