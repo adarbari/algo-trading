@@ -15,6 +15,7 @@ from algotrade.services.evaluation.evidence.measures import (
     TailMeasures,
     bootstrap_seed,
     mean_block,
+    option_measures,
     tail_measures,
 )
 
@@ -134,3 +135,35 @@ def test_the_seed_is_the_trial_and_the_label_and_nothing_that_moves_with_the_cod
     monkeypatch.setattr(key, "LEG_VERSION", key.LEG_VERSION + 1)  # E6a's lesson
     assert bootstrap_seed("abc", "all:all:5:roc") == seed
     assert bootstrap_seed("abc", "all:all:1:roc") != seed and math.isfinite(seed)
+
+
+# --- the option-only values (ADR 0088, E6b-3) ---
+
+
+def test_the_option_values_by_hand() -> None:
+    sessions = [
+        [
+            (0.02, 0.005, 0.03, 0.01, 100.0),
+            (0.04, 0.015, 0.05, 0.03, 200.0),
+        ],  # hedged mean 0.03, wing 0.02
+        [
+            (0.01, None, 0.02, None, 100.0),
+            (None, None, 0.00, None, 100.0),
+        ],  # hedged 0.01, no stock, no wing
+    ]
+    found = option_measures(sessions)
+    assert found["hedged_mean_roc"] == pytest.approx((0.03 + 0.01) / 2)
+    assert found["stock_share"] == pytest.approx(
+        (0.5 + 3.0) / (3.0 + 10.0)
+    )  # dollars, picks with both figures
+    assert found["wing_cost"] == pytest.approx(0.02)
+
+
+def test_an_option_value_with_no_pick_or_no_return_to_share_is_none_never_zero() -> None:
+    empty = {"hedged_mean_roc": None, "stock_share": None, "wing_cost": None}
+    assert option_measures([]) == empty
+    assert option_measures([[(None, None, 0.01, None, 100.0)]]) == empty  # a share setup's picks
+    assert (
+        option_measures([[(0.0, 0.01, 0.0, None, 100.0)]])["stock_share"] is None
+    )  # nothing to share
+    assert option_measures([[(0.0, 0.0, 0.02, None, 100.0)]])["stock_share"] == 0.0  # a real zero

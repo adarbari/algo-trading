@@ -36,7 +36,11 @@ from algotrade.quant.edges.statistics import (
     sharpe_t,
     spread_summary,
 )
-from algotrade.services.evaluation.evidence.measures import TailMeasures, tail_measures
+from algotrade.services.evaluation.evidence.measures import (
+    TailMeasures,
+    option_measures,
+    tail_measures,
+)
 
 BUCKETS = 10
 PBO_SPLITS = 16
@@ -85,6 +89,13 @@ class Pick:
     # An option pick's oriented value at each cost level (``OPTION_LEVELS``: mid, effective, full),
     # from E6b-2; None for a share, an excluded pick and a leg stored before it.
     values_at: tuple[float, ...] | None = None
+    # An option pick's figures over its collateral, all at the mid level (E6b-3; see
+    # ``evidence.values.option_figures``): ``hedged_roc`` after the daily delta hedge,
+    # ``stock_roc`` the share leg's part of the P&L, ``wing_cost`` the bought wing's entry mids.
+    # None for a share, an excluded pick, a figure not known and a leg stored before E6b-3.
+    hedged_roc: float | None = None
+    stock_roc: float | None = None
+    wing_cost: float | None = None
 
 
 @dataclass(frozen=True)
@@ -428,10 +439,19 @@ def _tail_measures(
     sl: Slice, rows: Sequence[SessionStat], horizon: int, spec: TailSpec
 ) -> TailMeasures:
     days, roc, base = session_rocs(rows, spec.base)
-    return tail_measures(
+    found = tail_measures(
         days, roc, base, horizon, spec.seed_key, f"{sl.kind}:{sl.value}:{horizon}",
         spec.tails, spec.bootstrap and sl.kind in BOOTSTRAPPED,
     )  # fmt: skip
+    figures = [
+        [
+            (p.hedged_roc, p.stock_roc, p.roc_gross, p.wing_cost, p.capital)
+            for p in r.picks
+            if not p.reason
+        ]
+        for r in rows
+    ]
+    return replace(found, **option_measures(figures))
 
 
 def _measure(

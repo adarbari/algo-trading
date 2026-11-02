@@ -458,3 +458,20 @@ def test_the_option_columns_survive_a_store(backend: Backend) -> None:
     found = read_legs(StoreReader(backend), "site", "drift", D, D)
     stored = found.legs[full.key, full.edge_variant, full.variant, full.horizon, D]
     assert stored.stat.picks == full.stat.picks and stored.stat.base_roc == (5, 0.011, 0.0004)
+
+
+def test_the_option_figures_of_a_pick_round_trip_and_a_share_leg_stores_none() -> None:
+    """E6b-3: hedged / stock / wing figures flat, three per pick (null where unknown), in one
+    nullable column with no version bump; a share leg stores nothing new and a leg written
+    before it decodes with None."""
+    figured = replace(CONTRACT_PICK, hedged_roc=0.012, stock_roc=None, wing_cost=0.004)
+    held = leg(stat=stat(pick_values=(0.03,), pick_hits=1, picks=(figured, Pick("EQ:L", 2, "x"))))
+    row = encode_leg(held, "site", "drift")
+    assert row["pick_option"] == [0.012, None, 0.004, None, None, None]
+    assert decode_leg(row).stat == held.stat
+    plain = encode_leg(leg(), "site", "drift")
+    assert plain["pick_option"] is None
+    assert all(p.hedged_roc is None for p in decode_leg(plain).stat.picks)
+    legacy = {k: v for k, v in row.items() if k != "pick_option"}
+    assert all(p.wing_cost is None for p in decode_leg(legacy).stat.picks)
+    assert "pick_option" in {c.name for c in EDGE_LEGS.columns}
