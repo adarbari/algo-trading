@@ -297,6 +297,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preview/options/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Calls */
+        post: operations["preview_calls_preview_options_calls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/preview/options/margin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Margin */
+        post: operations["preview_margin_preview_options_margin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/preview/options/roll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Roll */
+        post: operations["preview_roll_preview_options_roll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/regime/explain": {
         parameters: {
             query?: never;
@@ -521,6 +572,80 @@ export interface components {
             /** Schema Hash */
             schema_hash: string;
         };
+        /** CallRow */
+        CallRow: {
+            /** Below Price */
+            below_price: boolean;
+            /** Days */
+            days: number;
+            /** Early Exercise Risk */
+            early_exercise_risk: boolean | null;
+            /** Ex Div Before Expiry */
+            ex_div_before_expiry: boolean | null;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /** If Called */
+            if_called: number | null;
+            /** Premium */
+            premium: number;
+            /** Premium Over Price */
+            premium_over_price: number;
+            /** Premium Total */
+            premium_total: number | null;
+            /** Report Inside */
+            report_inside: boolean | null;
+            report_inside_unknown: components["schemas"]["OptionGap"] | null;
+            /** Strike */
+            strike: number;
+        };
+        /** CallsBody */
+        CallsBody: {
+            /**
+             * Key
+             * @description the underlying: a ticker or an instrument id
+             */
+            key: string;
+            /**
+             * Price
+             * @description the trader's price per share, after premiums
+             */
+            price: number;
+            /**
+             * Shares
+             * @description shares held
+             */
+            shares: number;
+        };
+        /** CallsPreview */
+        CallsPreview: {
+            /** Above Price */
+            above_price: number;
+            /** Contracts */
+            contracts: number;
+            dividend: components["schemas"]["Dividend"] | null;
+            dividend_unknown: components["schemas"]["OptionGap"] | null;
+            /** Priced At */
+            priced_at: number;
+            /** Rows */
+            rows: components["schemas"]["CallRow"][];
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /** Underlying Id */
+            underlying_id: string;
+        };
+        /** CallsResult */
+        CallsResult: {
+            /** @description why there is no preview (None: there is one) */
+            gap: components["schemas"]["OptionGap"] | null;
+            /** @description the calls (None: see gap) */
+            preview: components["schemas"]["CallsPreview"] | null;
+        };
         /** CauseLink */
         CauseLink: {
             /**
@@ -608,6 +733,21 @@ export interface components {
             penalty: number;
             /** Value */
             value: unknown;
+        };
+        /** Dividend */
+        Dividend: {
+            /** Amount */
+            amount: number;
+            /**
+             * Ex Date
+             * Format: date
+             */
+            ex_date: string;
+            /**
+             * Own By
+             * Format: date
+             */
+            own_by: string;
         };
         /** Draft */
         Draft: {
@@ -1191,6 +1331,104 @@ export interface components {
             /** Volume */
             volume: number | null;
         };
+        /** MarginBody */
+        MarginBody: {
+            /**
+             * Contracts
+             * @description how many contracts
+             */
+            contracts: number;
+            /**
+             * Expiry
+             * Format: date
+             * @description its expiry
+             */
+            expiry: string;
+            /**
+             * Key
+             * @description the underlying: a ticker or an instrument id
+             */
+            key: string;
+            /**
+             * Right
+             * @description the right of the option
+             * @default put
+             * @enum {string}
+             */
+            right: "put" | "call";
+            /**
+             * Strike
+             * @description its strike
+             */
+            strike: number;
+        };
+        /** MarginPreview */
+        MarginPreview: {
+            /**
+             * Cash Secured
+             * @description a put's strike, a call's shares at tonight's price (covered), x 100 x n
+             */
+            cash_secured: number;
+            /** Contracts */
+            contracts: number;
+            /** Days */
+            days: number;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /**
+             * Margin Held
+             * @description the exchange minimum for an uncovered short option (a call: a naked call)
+             */
+            margin_held: number;
+            /** Open Interest Share */
+            open_interest_share: number | null;
+            /** Premium */
+            premium: number;
+            /** Premium Over Cash */
+            premium_over_cash: number;
+            /**
+             * Premium Over Margin
+             * @description the premium over the uncovered minimum
+             */
+            premium_over_margin: number;
+            /** Premium Total */
+            premium_total: number;
+            /** Priced At */
+            priced_at: number;
+            /**
+             * Right
+             * @enum {string}
+             */
+            right: "put" | "call";
+            /**
+             * Rule
+             * @description the margin rule applied: reg_t, the exchange minimum
+             */
+            rule: string;
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            stress: components["schemas"]["Stress"] | null;
+            stress_unknown: components["schemas"]["OptionGap"] | null;
+            /** Strike */
+            strike: number;
+            /** Underlying Id */
+            underlying_id: string;
+            /** Volume Share */
+            volume_share: number | null;
+        };
+        /** MarginResult */
+        MarginResult: {
+            /** @description why there is no preview (None: there is one) */
+            gap: components["schemas"]["OptionGap"] | null;
+            /** @description what it ties up (None: see gap) */
+            preview: components["schemas"]["MarginPreview"] | null;
+        };
         /** MissingFeature */
         MissingFeature: {
             /** Closest */
@@ -1239,6 +1477,25 @@ export interface components {
             threshold: number | null;
             /** Value */
             value: unknown;
+        };
+        /**
+         * OptionGap
+         * @description Why a figure or a whole preview is not available, in public words (ADR 0056).
+         */
+        OptionGap: {
+            /**
+             * Cause
+             * @description the chain behind it, root cause first (admins only: null for anyone else)
+             */
+            cause: components["schemas"]["CauseLink"][] | null;
+            /** Code */
+            code: string;
+            /** Guide Term */
+            guide_term: string;
+            /** Kind */
+            kind: string;
+            /** Kind Text */
+            kind_text: string;
         };
         /** Part */
         Part: {
@@ -1554,6 +1811,115 @@ export interface components {
              */
             text: string;
         };
+        /** RollBody */
+        RollBody: {
+            /**
+             * Expiry
+             * Format: date
+             * @description the expiry of the option sold
+             */
+            expiry: string;
+            /**
+             * Include Debits
+             * @description also show rolls that cost money
+             * @default false
+             */
+            include_debits: boolean;
+            /**
+             * Key
+             * @description the underlying: a ticker or an instrument id
+             */
+            key: string;
+            /**
+             * Right
+             * @description the right of the option sold
+             * @default put
+             * @enum {string}
+             */
+            right: "put" | "call";
+            /**
+             * Same Delta
+             * @description per expiry, only the strike nearest its delta
+             * @default false
+             */
+            same_delta: boolean;
+            /**
+             * Sold At
+             * @description the price per share it was sold at (for the new breakeven)
+             */
+            sold_at?: number | null;
+            /**
+             * Strike
+             * @description the strike of the option sold
+             */
+            strike: number;
+        };
+        /** RollPreview */
+        RollPreview: {
+            /** Above Strike */
+            above_strike: number;
+            /** Buy Back */
+            buy_back: number;
+            /** Days Left */
+            days_left: number;
+            /** Delta */
+            delta: number | null;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /** Over Collected */
+            over_collected: number | null;
+            /** Priced At */
+            priced_at: number;
+            /**
+             * Right
+             * @enum {string}
+             */
+            right: "put" | "call";
+            /** Rolls */
+            rolls: components["schemas"]["RollRow"][];
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /** Sold At */
+            sold_at: number | null;
+            /** Strike */
+            strike: number;
+            /** Underlying Id */
+            underlying_id: string;
+        };
+        /** RollResult */
+        RollResult: {
+            /** @description why there is no preview (None: there is one) */
+            gap: components["schemas"]["OptionGap"] | null;
+            /** @description the rolls (None: see gap) */
+            preview: components["schemas"]["RollPreview"] | null;
+        };
+        /** RollRow */
+        RollRow: {
+            /** Credit Per Extra Day */
+            credit_per_extra_day: number | null;
+            /** Delta */
+            delta: number | null;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /** Extra Credit */
+            extra_credit: number;
+            /** New Breakeven */
+            new_breakeven: number | null;
+            /** Report Inside */
+            report_inside: boolean | null;
+            report_inside_unknown: components["schemas"]["OptionGap"] | null;
+            /** Strike */
+            strike: number;
+        };
         /** RunRequest */
         RunRequest: {
             /** Config Id */
@@ -1734,6 +2100,15 @@ export interface components {
              * @description the user's own edge: researching | candidate | live | retired | rejected; none keeps it
              */
             status?: string | null;
+        };
+        /** Stress */
+        Stress: {
+            /** Drop */
+            drop: number;
+            /** Episode */
+            episode: string;
+            /** In The Money */
+            in_the_money: number;
         };
         /** TableView */
         TableView: {
@@ -2530,6 +2905,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Watchlist"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_calls_preview_options_calls_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_margin_preview_options_margin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarginBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarginResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_roll_preview_options_roll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RollBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RollResult"];
                 };
             };
             /** @description Validation Error */

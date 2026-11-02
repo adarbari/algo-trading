@@ -4,9 +4,11 @@ import dataclasses
 from dataclasses import fields, replace
 from datetime import date, timedelta
 
+import pytest
+
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.edges import load_edge
-from algotrade.services.read.evaluation.runs import Draw, EdgeRow, _lost
+from algotrade.services.read.evaluation.runs import Draw, EdgeRow, SeriesRow, _lost, _series_row
 from algotrade.services.read.evaluation.verdict import (
     ALL,
     BOTH,
@@ -23,6 +25,7 @@ from algotrade.services.read.evaluation.verdict import (
     EdgeFacts,
     EdgeVerdict,
     choose_basis,
+    closed_through,
     judge,
     load_edge_verdict,
 )
@@ -673,6 +676,74 @@ def test_a_chain_edge_can_be_promising_but_never_works_without_an_in_sample_basi
     # an ordinary edge with the same rows still waits on its in-sample figures instead
     plain = verdict(rows, draws=draws(100))
     assert plain.verdict == NOT_ENOUGH and "basis_in_sample" not in {c.id for c in plain.criteria}
+
+
+START = date(2026, 10, 26)  # the site's holdout start (ADR 0088 decision D)
+
+
+def optioned(through: date | None, chain: bool = False) -> EdgeFacts:
+    """An option setup's facts whose closed holdout trades reach ``through`` (None: none yet);
+    ``chain=False`` is an ``option_model_pnl`` or ``expires_otm`` setup (not a chain P&L)."""
+    closed = () if through is None else (("scr", 20, through),)
+    return EdgeFacts(chain=chain, option=True, holdout_from=START, holdout_closed=closed)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        result(
+            oos={"decile_t": 3.0, "decile_spread": 0.9},
+            whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
+        ),
+        result(),
+        result(oos={"hit_rate": 0.3, "lift": 0.6, "decile_t": -1.0}),
+    ],
+    ids=["strong", "promising", "not working"],
+)
+@pytest.mark.parametrize("chain", [True, False], ids=["option_pnl", "other option kinds"])
+def test_no_option_verdict_is_given_before_its_unseen_holdout_has_closed_trades(
+    rows: list[EdgeRow], chain: bool
+) -> None:
+    """Fitness (ADR 0088 decision 15): whatever the figures and the option kind, the label is Not
+    enough data, with the reason, until closed trades decided from ``holdout_from`` reach
+    ``holdout_days`` (92) on; a run's own end date is not enough. The one judge decides every
+    label (the stored row and the reader both call it)."""
+    needed = START + timedelta(days=92)
+    for through in (None, START, needed - timedelta(days=1)):
+        v = verdict(
+            rows, draws=draws(100), facts=optioned(through, chain), range_to=date(2027, 6, 1)
+        )
+        assert v.verdict == NOT_ENOUGH and "unseen holdout" in v.result
+        assert str(needed) in v.rationale  # the date closed trades must reach, in words
+    after = verdict(rows, draws=draws(100), facts=optioned(needed, chain))
+    assert "unseen holdout" not in after.result
+    plain = verdict(rows, draws=draws(100))  # a share setup is never held back
+    assert "unseen holdout" not in plain.result
+
+
+def test_closed_trades_are_counted_from_the_holdout_start_on_the_basis_alone() -> None:
+    """``closed_through``: measured windows decided on or after the start, the last exit of each
+    (screen, period); an excluded window or an earlier decision is not counted."""
+
+    def at(decision: date, exit_: date, status: str = "measured", horizon: int = 20) -> SeriesRow:
+        return _series_row(
+            series_row(decision, None, exit_session=exit_, status=status, horizon_sessions=horizon)
+        )
+
+    series = [
+        at(date(2026, 10, 23), date(2026, 11, 20)),  # decided before the start
+        at(date(2026, 10, 26), date(2026, 11, 23)),
+        at(date(2026, 12, 1), date(2027, 1, 4)),
+        at(date(2026, 12, 2), date(2027, 2, 1), status="excluded_coverage"),
+        at(date(2026, 12, 3), date(2027, 3, 1), horizon=5),
+    ]
+    assert closed_through(series, START) == (
+        ("momo", 5, date(2027, 3, 1)),
+        ("momo", 20, date(2027, 1, 4)),
+    )
+    assert closed_through(series, date(2027, 6, 1)) == ()
+    # a window that closes after the run's end is not counted
+    assert closed_through(series, START, date(2027, 1, 4)) == (("momo", 20, date(2027, 1, 4)),)
 
 
 # portfolio_return (ADR 0074): a book beats a blended benchmark, with no base rate over names

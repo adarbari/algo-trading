@@ -6,11 +6,12 @@ excludes it, never counts it a miss; an ``UNMEASURED`` row (a flagged bar in the
 known by then (row by row, not only by run)."""
 
 from collections.abc import Collection, Iterable, Sequence
-from datetime import date, datetime
+from datetime import UTC, date, datetime, time
 
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
+from algotrade.core.time.calendar import close_time, is_session
 from algotrade.data.outcomes.residuals import residual_known, residual_seqs
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
@@ -21,6 +22,71 @@ OUTCOME_FIELDS = (
     "outcome_status", "outcome_reason",
 )  # fmt: skip
 _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "window_end")
+
+
+def window_closed(window_end: pd.Series, as_of: datetime) -> pd.Series:
+    """Whether each row's window had closed by ``as_of`` (the close of ``window_end``'s session,
+    the end of the day for a date that is none): a replay at a past ``as_of`` must not see only the
+    windows that exited early, an upward-biased sample, so a path or trade row counts only once its
+    hold cap's close has passed, as well as its own ``knowledge_ts``."""
+    stamp = pd.Timestamp(as_of)
+
+    def closed(day: date) -> bool:
+        end = close_time(day) if is_session(day) else datetime.combine(day, time.max, UTC)
+        return pd.Timestamp(end) <= stamp
+
+    days = pd.to_datetime(window_end).dt.date
+    return days.map({d: closed(d) for d in days.unique()}).astype(bool)  # once per window end
+
+
+def fold_stamps(
+    frame: pd.DataFrame,
+    day: date,
+    as_of: datetime,
+    wanted_names: Collection[int],
+    latest: dict[tuple[date, int], datetime],
+    names: dict[tuple[date, int], set[str]],
+) -> None:
+    """Fold the rows of one start session ``day`` (a path or trade grain's: ``hold_sessions``,
+    ``instrument_id``, ``knowledge_ts``, ``window_end``) known and closed by ``as_of`` into
+    ``latest`` (the newest ``knowledge_ts`` per (day, hold)) and, for the holds in
+    ``wanted_names``, ``names`` (their instrument ids)."""
+    known = pd.to_datetime(frame["knowledge_ts"], utc=True)
+    keep = (known <= pd.Timestamp(as_of)) & window_closed(frame["window_end"], as_of)
+    for horizon, stamp, name in zip(
+        frame.loc[keep, "hold_sessions"],
+        known[keep].dt.to_pydatetime(),
+        frame.loc[keep, "instrument_id"],
+        strict=True,
+    ):
+        key = (day, int(horizon))
+        if key[1] in wanted_names:
+            names.setdefault(key, set()).add(str(name))
+        if key not in latest or stamp > latest[key]:
+            latest[key] = stamp
+
+
+def held_rows(
+    frame: pd.DataFrame, horizon: int, sessions: Sequence[date], as_of: datetime | None
+) -> pd.DataFrame:
+    """The rows of a path or trade grain's ``frame`` (``hold_sessions`` read as
+    ``horizon_sessions``) for the start ``sessions`` at ``horizon``, known and closed by
+    ``as_of`` (when given), as a copy."""
+    frame = frame.rename(columns={"hold_sessions": "horizon_sessions"})
+    starts = pd.to_datetime(frame["session_date"]).dt.date
+    keep = starts.isin(set(sessions)) & (frame["horizon_sessions"] == horizon)
+    if as_of is not None:
+        keep &= pd.to_datetime(frame["knowledge_ts"], utc=True) <= pd.Timestamp(as_of)
+        keep &= window_closed(frame["window_end"], as_of)  # not only the early exits
+    return frame.loc[keep].copy()
+
+
+def missing_in(table: str, what: str, task: str, sessions: Sequence[date]) -> MissingDataError:
+    """The error of start ``sessions`` none of which has a stored row of ``table``; ``task`` is
+    the ingestion task that writes it."""
+    wanted = sorted(set(sessions))
+    hint = f"run `algotrade-ingest run {task} --from ... --to ...` past {wanted[-1]}"
+    return MissingDataError(table, f"no {what} for {wanted[0]}..{wanted[-1]}", hint)
 
 
 def stored_sessions(reader: StoreReader) -> list[date]:

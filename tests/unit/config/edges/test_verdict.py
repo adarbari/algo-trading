@@ -2,6 +2,7 @@
 
 import dataclasses
 import tomllib
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -222,3 +223,15 @@ def test_the_profile_resolves_to_tails_only_for_option_pnl_unless_declared() -> 
     assert resolve_profile("option_pnl", "return") == "return"
     with pytest.raises(ConfigurationError, match="verdict_profile"):
         resolve_profile("option_pnl", "other")
+
+
+def test_the_option_holdout_is_a_date_and_a_day_count_that_the_file_declares() -> None:
+    """ADR 0088 decision 15 (D): the file carries the default holdout start and 3 months."""
+    doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
+    t = VerdictSettings.from_document(doc).tails
+    assert (t.holdout_from, t.holdout_days) == (date(2026, 10, 26), 92)
+    moved = VerdictSettings.from_document({"tails_verdict": {"holdout_from": date(2026, 11, 2)}})
+    assert moved.tails.holdout_from == date(2026, 11, 2)
+    for bad in ("2026-10-26", 20261026, True):
+        with pytest.raises(ConfigurationError, match="holdout_from"):
+            VerdictSettings.from_document({"tails_verdict": {"holdout_from": bad}})

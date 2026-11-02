@@ -1,0 +1,128 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. vrp_short_put's position on a second implementation
+# (ADR 0088, build row X2): the same short put, gate and variants, entered on the iv_rank_high
+# screen. A separate setup so each implementation has its own basis and trial.
+id = "iv_rank_short_put"
+name = "High IV rank: short put"
+thesis = "Selling a put on liquid names whose implied volatility is in the upper half of its own year's range earns more than the put on any liquid optionable name, because a high rank marks rich premium."
+mechanism = """Holders of stock pay for crash and variance protection; the dealers who sell it ask a
+premium for jump and variance risk they cannot diversify (Carr and Wu 2009; Bakshi and Kapadia
+2003)."""
+persistence = """A risk premium, not a mispricing: the seller is paid for losses that cluster in
+crashes, when capital is scarce, so being known does not remove it."""
+schedule = "every_session"
+universe = "liquid_optionable_floored"
+top_k = 20
+# One implementation and a declared horizon ([implementation]), as vrp_short_put.
+screeners = ["iv_rank_high"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+mechanism_kind = "paid_for_risk"
+frozen_from = 2026-04-01
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
+notes = """The same idea as vrp_short_put, tested again on the iv_rank_high screen (filed 2026-11-02,
+ADR 0088, X2): so it is a second trial of the volatility premium, read beside vrp_short_put, never
+as independent evidence. The position, gate and variants are vrp_short_put's: a 0.30-delta put on
+the expiry nearest 30 days and never before the window's last session, entered at S's close, held
+15 or 21 sessions (the verdict rests on 21, declared), its return on the cash-secured collateral
+net of the site's option cost levels; judged by the tails profile. No entry unless
+market_conditions@v2.short_premium_allowed is true at D. Data: Cboe-era chains only (from
+2026-10-02); the single-name bought history waits on F7 and D6. The 3-month holdout (ADR 0088)
+starts 2026-11-03: no verdict on trades closing before 2027-02-03 (not enforced by code yet; the
+40 out-of-sample trades a verdict needs hold it back today). The no_earnings variant reads
+earnings_expected@v1 at D."""
+
+[implementation]
+horizon = 21
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[outcome]
+kind = "option_pnl"
+position = "short_put"
+strike_delta = 0.30
+tenor_days = 30
+horizon_sessions = [15, 21]
+benchmark = "none"
+start_offset_sessions = 1
+
+[[variants]]
+id = "delta16"
+[variants.outcome]
+strike_delta = 0.16
+
+# Windows with no report expected inside the largest window (read at D, the window ends at
+# D + 1 + 21, so more than 22 sessions to the expected report): the premium is not an earnings
+# premium. A stock whose date is UNKNOWN (null) never passes, never read as "no earnings"
+# (earnings_expected@v1); an ETF has no earnings, so it stays.
+[[variants]]
+id = "no_earnings"
+[variants.universe]
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { any = [
+    { field = "instrument.security_type", op = "eq", value = "ETF" },
+    { all = [
+      { field = "rollup.earnings_expected@v1.expected_basis", op = "ne", value = "UNKNOWN" },
+      { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 22 },
+    ] },
+  ] },
+]
+
+[quality_bar]
+outcome = """The short put's return on its cash-secured collateral (strike x 100) from the entry
+close to the close 15 or 21 sessions later, net of the site's option cost levels
+(verdict.toml [option_costs]); the tails profile weighs the return, its bootstrap t, the
+probabilistic Sharpe ratio and the CVaR of the worst trades."""
+trigger_timing = """The screen's field (IV rank) and the gate's market conditions are
+stored after the close of the decision session D, so the first fill is the next session's close:
+the entry session is S = D + 1 (start_offset_sessions = 1); the contract is chosen on S's chain."""
+replication = """The screen is iv_rank_high v1 (IV rank at least 0.5: the 30-day implied volatility
+in the upper half of its own year's range, IBKR's rank where it has one, else ours), the
+practitioner's "sell premium when IV rank is above 50" gate; the put itself is priced on the
+stored chain. The published setting is index variance (Carr and Wu 2009); single names are a step
+away from it."""
+expected_size = """Implied variance exceeds realised on average for the S&P 500 and most large
+stocks (Carr and Wu 2009); the single-name premium is smaller than the index's (Driessen,
+Maenhout and Vilkov 2009). The put's P&L needs the stored chains, kept from 2026-10-02 only:
+a verdict waits for the 40 out-of-sample trades and the 3-month holdout, and for the single-name
+bought history (F7, D6) before any earlier trade exists."""
+capacity_costs = """The cost is the option bid-ask spread, judged live; vrp_scanner (from v2) scores
+the put's stored spread (under 15% of mid), open interest and volume (over 1,000 each), and v3
+requires $50M of 20-day dollar volume. An individual's size is far below the open interest."""
+failure_modes = """Losses arrive together in volatility spikes (short premium is short the left
+tail), so the tail of the return (CVaR), not the win rate, decides; an earnings date inside the
+window raises implied for a reason. Retire if, in the frozen period, the picks' return on
+collateral after costs is not above the base of every liquid optionable name's same put, or
+their CVaR is worse."""
+decoys = """Implied above realised before every earnings date and after every shock (a known event,
+not a premium), and high-IV names are small: compare with the size and 12-1 momentum baselines on
+the same sessions, and log windows without an earnings date as a variant."""
+
+[[sources]]
+title = "Carr, P. and Wu, L., Variance Risk Premiums, Review of Financial Studies, 2009"
+url = "https://doi.org/10.1093/rfs/hhn038"
+
+[[sources]]
+title = "Bakshi, G. and Kapadia, N., Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies, 2003"
+url = "https://doi.org/10.1093/rfs/hhg002"
+
+[[sources]]
+title = "Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk: Evidence from Equity Options, Journal of Finance, 2009"
+url = "https://doi.org/10.1111/j.1540-6261.2009.01467.x"
+
+[[sources]]
+title = "AQR, Understanding the Volatility Risk Premium (white paper)"
+url = "https://www.aqr.com/Insights/Research/White-Papers/Understanding-the-Volatility-Risk-Premium"
+
+[[sources]]
+title = "Quantpedia, Volatility Risk Premium Effect (strategy page)"
+url = "https://quantpedia.com/strategies/volatility-risk-premium-effect/"

@@ -2,6 +2,8 @@
 
 from datetime import timedelta
 
+import pytest
+
 from algotrade.services.read.edge_evidence.basis import official_basis
 from algotrade.services.read.edge_evidence.drawdown import load_drawdown
 from algotrade.services.read.edge_evidence.rolling import load_monthly, load_rolling_starts
@@ -103,3 +105,36 @@ def test_every_section_of_a_hidden_copy_is_in_sample_only() -> None:
     drawdown = load_drawdown(series)
     assert (drawdown.max_out_of_sample, drawdown.vol_out_of_sample) == (None, None)
     assert len(drawdown.points) == 1
+
+
+def test_an_option_setup_is_valued_on_its_collateral_and_a_share_setup_as_before(
+    backend: MemoryBackend,
+) -> None:
+    # E11: an option setup's windows are its picks' return on collateral (and the base's), never
+    # its value per entry price; a row of it with none stored is a gap
+    option = {"unit": "pnl", "capital_basis": "cash_secured", "pick_mean": 0.004, "base_mean": 0.0}
+    stored_run(
+        backend,
+        [
+            series_row(DAYS[0], FROZEN, **option, pick_roc_mean=0.03, base_roc_mean=0.01),
+            series_row(DAYS[1], FROZEN, **option, pick_roc_mean=-0.05, base_roc_mean=0.0),
+            series_row(DAYS[2], FROZEN, **option),  # an older row: no return on capital
+        ],
+    )
+    s = basis_series(backend)
+    assert (s.unit, s.is_return) == ("return_on_capital", True)
+    assert [(w.value, w.base_value) for w in s.windows] == [(0.03, 0.01), (-0.05, 0.0)]
+    assert [g.decision_session for g in s.gaps] == [DAYS[2]]
+    monthly = load_monthly(s)  # the month map reads the same collateral windows
+    assert monthly.unit == "return_on_capital"
+    assert sum(m.value for m in monthly.months if m.value is not None) == pytest.approx(
+        sum(w.weighted for w in s.windows)
+    )
+
+
+def test_a_share_setup_with_a_notional_basis_keeps_its_value(backend: MemoryBackend) -> None:
+    share = {"capital_basis": "notional", "pick_roc_mean": 0.5, "base_roc_mean": 0.5}
+    stored_run(backend, [series_row(DAYS[0], FROZEN, **share)])
+    s = basis_series(backend)
+    assert s.unit == "excess_return"
+    assert [(w.value, w.base_value) for w in s.windows] == [(0.02, 0.01)]  # unchanged

@@ -1,6 +1,6 @@
 """One router per area: parse parameters, call ONE library function (under ``authoring/``, one
 ``services.authoring`` write, ADR 0029; under ``preview/``, one ``services.preview`` dry run of
-unsaved input; under ``edges/``, one on-request evaluation job or an
+unsaved input or one option calculator; under ``edges/``, one on-request evaluation job or an
 edge's trades file; under ``export/``, the filter bar's file of a surface (ADR 0082); ``jobs``, the
 status of one on-request job; under ``regime/``, one
 ``services.explaining`` call; else a job, the live quotes or the health check), map it to a
@@ -18,6 +18,7 @@ from algotrade_api.routes.edges import evaluate as edge_evaluate
 from algotrade_api.routes.edges import trades as edge_trades
 from algotrade_api.routes.export import surface as surface_file
 from algotrade_api.routes.preview import features as feature_check
+from algotrade_api.routes.preview import options as option_calculators
 from algotrade_api.routes.preview import screeners as screen_preview
 from algotrade_api.routes.regime import explain as regime_explain
 from algotrade_api.routes.screens import run as screen_run
@@ -33,6 +34,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     edge_trades.router,
     surface_file.router,
     screen_preview.router,
+    option_calculators.router,
     screen_drafting.router,
     regime_explain.router,
     screeners.router,

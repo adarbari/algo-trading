@@ -97,6 +97,7 @@ class EdgeSettings:
     # document's ``verdict_profile``, else ``tails`` for an option_pnl outcome and ``return`` for
     # every other kind (``verdict.resolve_profile``).
     verdict_profile: str = "return"
+    tracks: str | None = None  # a named option sleeve's Cboe strategy index (E8b); else None
 
 
 @dataclass(frozen=True)
@@ -146,6 +147,7 @@ class Edge:
     # and horizon (None: not declared; a user's edge never declares one).
     promoted: str | None = None
     basis_horizon: int | None = None
+    holdout_from: date | None = None  # an option setup's unseen-holdout start (ADR 0088 d15)
     # Interim, until the surfaces speak status (ADR 0053 amendment 2026-10-10): the old state
     # words the GraphQL type still serves, derived (``following`` when bookmarked, else
     # ``researching``; ``since`` the bookmark's; ``state_reason`` the status's).
@@ -250,6 +252,7 @@ def _settings(e: document.Edge, own: Mapping[str, Any] | None) -> EdgeSettings:
         factor_neutral=e.outcome.measure in document.EXCESS_MEASURES,
         hold_rank=e.outcome.hold_rank,
         verdict_profile=resolve_profile(e.outcome.kind, e.verdict_profile),
+        tracks=e.outcome.tracks,
         quality_bar=tuple(EdgeAnswer(k, e.quality_bar.get(k, "")) for k in document.QUALITY_BAR),
         own={k: _json(v) for k, v in (own or {}).items() if k not in (FOLLOW, AUDIT, "status")},
     )
@@ -270,6 +273,7 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         baselines=e.baselines,
         variants=(document.MAIN, *(v.id for v in e.variants)),
         frozen_from=e.frozen_from,
+        holdout_from=e.holdout_from,
         evidence=EdgeEvidence(e.evidence.run_id, e.evidence.split_from) if e.evidence else None,
         rejection_reason=e.rejection_reason,
         sources=tuple(EdgeSource(x.title, x.url) for x in e.sources),

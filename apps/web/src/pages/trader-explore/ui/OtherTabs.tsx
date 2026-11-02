@@ -1,5 +1,5 @@
 /**
- * The Explore tabs other than Overview and Chart (Compare, Options, Features, Financials, Events, Screener
+ * The Explore tabs other than Overview and Chart (Compare, Options, Roll a put, Calls on shares, Buying power, Features, Financials, Events, Screener
  * hits, Why it is an idea): one module the detail loads on demand, so Explore's first load
  * carries only the Overview and Chart widgets. A ticker named inside a panel opens in a tab of
  * its own.
@@ -21,8 +21,11 @@ import { lazyPage } from '@/shared/lib/lazy';
 import { exploreState, openTicker } from '../model/state';
 import type { DetailTabsProps } from './DetailTabs';
 
-// The trader's option grid loads on its own: the Options tab is one of seven in this chunk.
+// The trader's option grid and the option calculators load on their own: their tabs are among ten in this chunk.
 const OptionGrid = lazyPage(() => import('@/widgets/option-grid'), 'OptionGrid');
+const RollCalculator = lazyPage(() => import('@/widgets/option-calculators'), 'RollCalculator');
+const CallsCalculator = lazyPage(() => import('@/widgets/option-calculators'), 'CallsCalculator');
+const MarginCalculator = lazyPage(() => import('@/widgets/option-calculators'), 'MarginCalculator');
 
 export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsProps) {
   const state = exploreState(search);
@@ -91,6 +94,30 @@ export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: De
             onSearchChange({ strikes: all ? 'all' : undefined });
           }}
         />
+      );
+    case 'roll':
+      return (
+        <Suspense fallback={<Skeleton />}>
+          <RollCalculator
+            key={symbol}
+            symbol={symbol}
+            onOpenCalls={() => {
+              onSearchChange({ tab: 'calls' });
+            }}
+          />
+        </Suspense>
+      );
+    case 'calls':
+      return (
+        <Suspense fallback={<Skeleton />}>
+          <CallsCalculator key={symbol} symbol={symbol} />
+        </Suspense>
+      );
+    case 'margin':
+      return (
+        <Suspense fallback={<Skeleton />}>
+          <MarginCalculator key={symbol} symbol={symbol} />
+        </Suspense>
       );
     case 'features':
       return (

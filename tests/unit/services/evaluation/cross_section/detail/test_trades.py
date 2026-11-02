@@ -208,6 +208,10 @@ def test_an_option_ledger_has_the_trade_contract_and_a_bought_history_trade_is_p
     assert first["price_source"] == "option_history" and first["exit_kind"] == "HORIZON"
     assert first["exit_session"] == date(2026, 10, 12)  # the stored exit, not S + h sessions
     assert set(frame["value_licence"]) == {"personal"}  # the rows are bought history, per row
+    # E11: the ledger's option columns, the collateral and the return on it before cost
+    assert first["capital"] == 95.0
+    assert first["return_on_capital_gross"] == pytest.approx(9.5 / 95)
+    assert {"capital", "hedged_roc", "stock_roc", "wing_cost"} <= set(frame.columns)
 
 
 def test_a_book_has_no_ledger_rows_and_the_ledger_never_imports_the_book() -> None:

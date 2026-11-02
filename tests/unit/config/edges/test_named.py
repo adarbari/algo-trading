@@ -2,14 +2,20 @@
 short list, and the document rules around ``base = "out_of_window"`` and a named option sleeve's
 ``base = "delta_equivalent"`` (ADR 0088 decision 14)."""
 
+from dataclasses import asdict
 from typing import Any
 
 import pytest
 
 from algotrade.config.edges.document import parse_edge
+from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.named import MAX_NAMED, named_symbols
+from algotrade.config.edges.portfolio import TRACKED_INDEXES, TRACKED_LICENCE
+from algotrade.config.site.settings import load_macro
 from algotrade.config.strategy.schema import Group, Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.configs.files import FileConfigStore
+from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import document
 
 TIMED = {
@@ -142,3 +148,43 @@ def test_only_a_sleeve_has_the_delta_equivalent_base_and_out_of_window_keeps_no_
         parse_edge(document(variants=[{"id": "v2", "base": "delta_equivalent"}]), "drift", "x.toml")
     with pytest.raises(ConfigurationError, match="no variants"):
         timed(variants=[{"id": "v2", "outcome": {"cost_bps": 5}}])
+
+
+def test_only_a_sleeve_tracks_a_cboe_strategy_index() -> None:
+    tracked = {**SLEEVE["outcome"], "tracks": "PUT"}  # type: ignore[dict-item]
+    assert sleeve(outcome=tracked).outcome.tracks == "PUT"
+    assert sleeve().outcome.tracks is None
+    with pytest.raises(ConfigurationError, match="tracks"):
+        sleeve(outcome={**SLEEVE["outcome"], "tracks": "SPX"})  # type: ignore[dict-item]
+    out_of_window = {**TIMED["outcome"], "tracks": "PUT"}
+    with pytest.raises(ConfigurationError, match="only a named option sleeve"):
+        timed(outcome=out_of_window)
+
+
+def test_every_tracked_index_is_a_site_cboe_series() -> None:
+    site = {s.key: s for s in load_macro(FileConfigStore(REPO_ROOT / "config", local=False)).series}
+    assert set(TRACKED_INDEXES) <= set(site)
+    assert {site[k].licence for k in TRACKED_INDEXES} == {TRACKED_LICENCE}  # what a figure carries
+
+
+def test_naming_a_tracked_index_never_changes_the_trials_identity() -> None:
+    tracked = sleeve(outcome={**SLEEVE["outcome"], "tracks": "PUT"})  # type: ignore[dict-item]
+    assert identity_dict(asdict(tracked)) == identity_dict(asdict(sleeve()))
+
+
+def test_a_monthly_sleeve_holds_up_to_the_gap_between_expiries_and_a_variant_has_its_gate() -> None:
+    """X1: entries the session after each monthly expiry, held up to the window gap (17), a
+    variant with its own gate; a hold past the gap, or a gate on a non-sleeve variant, fails."""
+    monthly = {**SLEEVE["outcome"], "horizon_sessions": [17]}  # type: ignore[dict-item]
+    gate = {"all": [{"field": "market.market_conditions@v2.sessions_to_fomc", "op": "gt",
+                     "value": 2}]}  # fmt: skip
+    edge = sleeve(
+        schedule="calendar:after_monthly_expiry", outcome=monthly,
+        variants=[{"id": "no_fomc", "gate": gate}],
+    )  # fmt: skip
+    assert edge.outcome.horizon_sessions == (17,) and edge.variants[0].gate is not None
+    with pytest.raises(ConfigurationError, match="1 to 17 sessions"):
+        sleeve(schedule="calendar:after_monthly_expiry",
+               outcome={**monthly, "horizon_sessions": [18]})  # fmt: skip
+    with pytest.raises(ConfigurationError, match="only a named option sleeve's variant"):
+        parse_edge(document(variants=[{"id": "g", "gate": gate}]), "drift", "x.toml")

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -81,6 +81,31 @@ vi.mock('@/widgets/option-grid', async () => {
   const { Text } = await import('@algotrade/ui');
   return { OptionGrid: ({ symbol }: { symbol: string }) => <Text>{`option grid ${symbol}`}</Text> };
 });
+vi.mock('@/widgets/option-calculators', async () => {
+  const { Button, Text } = await import('@algotrade/ui');
+  const { useState } = await import('react');
+  return {
+    RollCalculator: ({ symbol, onOpenCalls }: { symbol: string; onOpenCalls: () => void }) => (
+      <>
+        <Text>{`roll calculator ${symbol}`}</Text>
+        <Button onClick={onOpenCalls}>Open calls</Button>
+      </>
+    ),
+    // Keeps what it first mounted with, as the real one keeps the typed form and its result.
+    CallsCalculator: function Calls({ symbol }: { symbol: string }) {
+      const [typedFor] = useState(symbol);
+      return (
+        <>
+          <Text>{`calls calculator ${symbol}`}</Text>
+          <Text>{`typed for ${typedFor}`}</Text>
+        </>
+      );
+    },
+    MarginCalculator: ({ symbol }: { symbol: string }) => (
+      <Text>{`margin calculator ${symbol}`}</Text>
+    ),
+  };
+});
 vi.mock('@/widgets/options-panel', async () => {
   const { Text } = await import('@algotrade/ui');
   return {
@@ -158,6 +183,34 @@ describe('ExplorePage', () => {
     viewer.role = 'admin';
     render(page({ sel: 'AAPL', tab: 'options' }));
     expect(await screen.findByText('options panel', {}, { timeout: 5000 })).toBeInTheDocument();
+  });
+
+  it('shows the option calculators to a trader and an admin, and Roll links to Calls', async () => {
+    const user = userEvent.setup();
+    const onSearchChange = vi.fn();
+    for (const role of ['trader', 'admin']) {
+      viewer.role = role;
+      const { unmount } = render(page({ sel: 'AAPL', tab: 'roll' }, onSearchChange));
+      expect(await screen.findByText('roll calculator AAPL', {}, { timeout: 5000 })).toBeVisible();
+      unmount();
+    }
+    render(page({ sel: 'AAPL', tab: 'roll' }, onSearchChange));
+    await user.click(await screen.findByRole('button', { name: 'Open calls' }));
+    expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'calls' });
+    cleanup();
+    render(page({ sel: 'AAPL', tab: 'calls' }));
+    expect(await screen.findByText('calls calculator AAPL', {}, { timeout: 5000 })).toBeVisible();
+    cleanup();
+    render(page({ sel: 'AAPL', tab: 'margin' }));
+    expect(await screen.findByText('margin calculator AAPL', {}, { timeout: 5000 })).toBeVisible();
+  });
+
+  it('starts a calculator afresh when another ticker comes into focus', async () => {
+    const { rerender } = render(page({ sel: 'AAPL,MSFT', focus: 'AAPL', tab: 'calls' }));
+    expect(await screen.findByText('typed for AAPL', {}, { timeout: 5000 })).toBeVisible();
+    rerender(page({ sel: 'AAPL,MSFT', focus: 'MSFT', tab: 'calls' }));
+    expect(await screen.findByText('typed for MSFT')).toBeVisible();
+    expect(screen.queryByText('typed for AAPL')).toBeNull();
   });
 
   it('chooses and closes tabs through the URL', async () => {
@@ -254,6 +307,9 @@ describe('ExplorePage', () => {
       'Compare',
       'Chart',
       'Options',
+      'Roll a put',
+      'Calls on shares',
+      'Buying power',
       'Features',
       'Financials',
       'Events',

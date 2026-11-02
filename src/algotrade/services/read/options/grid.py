@@ -34,24 +34,18 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.core.model.errors import MissingDataError
-from algotrade.data import rates
-from algotrade.data.chains import OPTION_QUOTES, UNDERLYING_QUOTES
-from algotrade.features.rollups.options.iv30 import positive_spots
+from algotrade.data.chains import OPTION_QUOTES
 from algotrade.features.rollups.premium import band_pick
 from algotrade.features.rollups.premium.band_pick import BANDS, CALL, PUT
-from algotrade.quant.rates import YieldCurve
-from algotrade.services.read.availability.cause import feature_cause, table_cause
-from algotrade.services.read.context import ReadContext, partition
-from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
+from algotrade.services.read.context import ReadContext
+from algotrade.services.read.options.session_inputs import (
+    gap,
+    load_session_inputs,
+    report_inside,
+)
 from algotrade.services.read.values import Unknown, UnknownCode
 
 __all__ = ["GridCell", "GridExpiry", "OptionGrid", "load_option_grid"]
-
-NEXT_REPORT = "rollup.earnings@v1.next_earnings_date"
-DIV_YIELD = "feature.div_yield"
-OPTIONABLE = "instrument.optionable"
-_COLUMNS = ["underlying_id", "expiry", "right", "strike", "bid", "ask", "open_interest"]
 _GAPS = {
     band_pick.NO_EXPIRY: "no listed expiry within 30% of {days} days",
     band_pick.DUPLICATE_EXPIRY: "the expiry nearest {days} days is the one a nearer bucket took",
@@ -98,72 +92,6 @@ class OptionGrid:
     calls: tuple[tuple[GridCell | Unknown, ...], ...]
 
 
-def _gap(ctx: ReadContext, code: UnknownCode, status: str, why: str, table: str) -> Unknown:
-    """``code`` with the admin-only cause naming ``table``, ``status`` and ``why``."""
-    cause = table_cause(table, why, status, ctx.session.date)
-    return Unknown(code, cause, None, ctx.kind_of(code, table))
-
-
-def _chain(ctx: ReadContext, underlying_id: str) -> pd.DataFrame | Unknown:
-    """The session's quotes of ``underlying_id`` (expiry as a date). The partition is read once
-    per published state with its columns pruned; the underlying's chain stays in the cache."""
-    key = ("option-grid-chain", ctx.session.date, underlying_id, ctx.reader.version())
-    found = ctx.cache.get(key)
-    if found is None:
-        whole = partition(ctx, OPTION_QUOTES, columns=_COLUMNS)
-        if isinstance(whole, Unknown):
-            return whole
-        chain = whole[whole["underlying_id"].astype(str) == underlying_id]
-        chain = chain.assign(expiry=pd.to_datetime(chain["expiry"]).dt.date)
-        found = chain.drop_duplicates(["instrument_id"]).reset_index(drop=True)
-        ctx.cache.put(key, found)
-    return found
-
-
-def _curve(ctx: ReadContext) -> YieldCurve | Unknown:
-    """The Treasury curve the session sees; a missing one is NO_PARTITION, never r = 0."""
-    day = ctx.session.date.isoformat()
-    try:
-        seen = rates.curve(ctx.reader, ctx.session.date)
-    except MissingDataError:
-        why = f"{rates.TABLE} has no curve on or before {day}"
-        return _gap(ctx, UnknownCode.NO_PARTITION, "NO_PARTITION", why, rates.TABLE)
-    if seen.pre_snapshot:  # the earliest stored curve is after the session: a later one
-        why = f"{rates.TABLE} has no curve on or before {day} (the earliest is later)"
-        return _gap(ctx, UnknownCode.NO_PARTITION, "PRE_SNAPSHOT", why, rates.TABLE)
-    return seen.yield_curve()
-
-
-def _spot(ctx: ReadContext, underlying_id: str) -> float | Unknown:
-    quotes = partition(ctx, UNDERLYING_QUOTES, instruments=[underlying_id])
-    if isinstance(quotes, Unknown):
-        return quotes
-    spots = positive_spots(quotes)
-    if underlying_id in spots.index:
-        return float(spots[underlying_id])
-    why = f"{UNDERLYING_QUOTES} has no positive price of {underlying_id} for {ctx.session.date}"
-    return _gap(ctx, UnknownCode.NO_ROW, "NO_SPOT", why, UNDERLYING_QUOTES)
-
-
-def _no_chain(ctx: ReadContext, underlying_id: str, optionable: FeatureValue) -> Unknown:
-    if optionable.value is False:
-        why = f"{underlying_id} is not optionable"
-        return _gap(ctx, UnknownCode.NOT_APPLICABLE, "NOT_APPLICABLE", why, OPTION_QUOTES)
-    why = f"{OPTION_QUOTES} has no quotes of {underlying_id} for {ctx.session.date}"
-    return _gap(ctx, UnknownCode.NO_ROW, "NO_ROW", why, OPTION_QUOTES)
-
-
-def _report_inside(session: date, expiry: date, report: FeatureValue) -> bool | Unknown:
-    """The next report falls after the session and on or before the expiry; UNKNOWN (never
-    False) when its date is not known."""
-    if report.unknown is not None:
-        return report.unknown
-    if not isinstance(report.value, str):
-        cause = feature_cause(NEXT_REPORT, "no next report date stored", "NULL", session)
-        return Unknown(UnknownCode.NULL, cause)
-    return session < date.fromisoformat(report.value) <= expiry
-
-
 def _cell(
     ctx: ReadContext,
     chain: pd.DataFrame,
@@ -178,14 +106,14 @@ def _cell(
         illiquid = found.reason == band_pick.ILLIQUID
         code = UnknownCode.ILLIQUID if illiquid else UnknownCode.NOT_APPLICABLE
         why = f"{right}s expiring {expiry} at {band:.2f} delta: {found.reason}"
-        return _gap(ctx, code, found.reason, why, OPTION_QUOTES)
+        return gap(ctx, code, found.reason, why, OPTION_QUOTES)
     return GridCell(**asdict(found), band=band)
 
 
 def _no_expiry(ctx: ReadContext, underlying_id: str, bucket: band_pick.ExpiryBucket) -> Unknown:
     reason = bucket.reason or band_pick.NO_EXPIRY
     why = f"{underlying_id}: " + _GAPS[reason].format(days=bucket.target)
-    return _gap(ctx, UnknownCode.NOT_APPLICABLE, reason, why, OPTION_QUOTES)
+    return gap(ctx, UnknownCode.NOT_APPLICABLE, reason, why, OPTION_QUOTES)
 
 
 def load_option_grid(ctx: ReadContext, underlying_id: str) -> OptionGrid | Unknown:
@@ -200,39 +128,25 @@ def load_option_grid(ctx: ReadContext, underlying_id: str) -> OptionGrid | Unkno
 
 
 def _build(ctx: ReadContext, underlying_id: str) -> OptionGrid | Unknown:
-    asked = [OPTIONABLE, NEXT_REPORT, DIV_YIELD]
-    values = load_feature_values(ctx, [underlying_id], asked).get(underlying_id)
-    if values is None:  # not in the session's reference snapshot
-        why = f"{underlying_id} is not in the session's reference snapshot"
-        return _gap(ctx, UnknownCode.NO_ROW, "NO_ROW", why, OPTION_QUOTES)
-    optionable, report, dividend = values
-    chain = _chain(ctx, underlying_id)
-    curve = _curve(ctx)
-    if isinstance(chain, Unknown):
-        return chain
-    if isinstance(curve, Unknown):
-        return curve
-    if chain.empty:
-        return _no_chain(ctx, underlying_id, optionable)
-    spot = _spot(ctx, underlying_id)
-    if isinstance(spot, Unknown):
-        return spot
-    q_known = dividend.unknown is None and isinstance(dividend.value, int | float)
-    q = float(dividend.value) if q_known and dividend.value is not None else 0.0
+    found = load_session_inputs(ctx, underlying_id)
+    if isinstance(found, Unknown):
+        return found
+    inputs, _ = found
+    chain, spot, report, q_known = inputs.chain, inputs.spot, inputs.report, inputs.q_known
     session = ctx.session.date
-    deltas = band_pick.OurDeltas(curve, q)
+    deltas = band_pick.OurDeltas(inputs.curve, inputs.q)
     columns: list[GridExpiry] = []
     puts: list[tuple[GridCell | Unknown, ...]] = []
     calls: list[tuple[GridCell | Unknown, ...]] = []
     for bucket in band_pick.bucket_expiries(sorted(set(chain["expiry"])), session):
         if bucket.expiry is None:
-            gap = _no_expiry(ctx, underlying_id, bucket)
-            columns.append(GridExpiry(bucket.target, None, None, None, gap, gap))
-            puts.append((gap,) * len(BANDS))
-            calls.append((gap,) * len(BANDS))
+            missing = _no_expiry(ctx, underlying_id, bucket)
+            columns.append(GridExpiry(bucket.target, None, None, None, missing, missing))
+            puts.append((missing,) * len(BANDS))
+            calls.append((missing,) * len(BANDS))
             continue
         days = (bucket.expiry - session).days
-        inside = _report_inside(session, bucket.expiry, report)
+        inside = report_inside(session, bucket.expiry, report)
         columns.append(
             GridExpiry(
                 bucket.target,

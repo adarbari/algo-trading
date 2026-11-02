@@ -186,6 +186,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "excluded_coverage": m.excluded_coverage,
         "lost_sessions": dict(r.lost_sessions),  # table with no data -> decision sessions
         "timing": None if r.timing is None else dict(r.timing),  # time-series edge (ADR 0073)
+        "book": None if r.book is None else dict(r.book),  # a named option sleeve's (E8b)
         "report_containment": None
         if r.report_containment is None
         else asdict(r.report_containment),
@@ -331,6 +332,7 @@ def _verdict_headline(
     record: RunRecord,
     frame: pd.DataFrame,
     now: datetime,
+    series_frame: pd.DataFrame,
 ) -> tuple[pd.DataFrame | None, str]:
     """``(row, status)``: ``written``, ``none`` (no ``stores``, or not the canonical kind: no row
     by design) or ``failed`` (framing raised: logged, never re-raised: the row is a
@@ -338,7 +340,9 @@ def _verdict_headline(
     if stores is None:
         return None, "none"
     try:
-        row = verdict.edge_verdict_frame(stores, evaluation.edge_id, record, frame, now)
+        row = verdict.edge_verdict_frame(
+            stores, evaluation.edge_id, record, frame, now, series_frame
+        )
         if row is not None:
             validate_frame(result_table(verdict.RESULT), row)  # a bad row costs the row only
         return row, "none" if row is None else "written"
@@ -399,7 +403,8 @@ def write_edge_eval(
         "bootstrap": dict(evaluation.bootstrap),  # draws, mean block, seed version (ADR 0088 2.6)
     }
     record.finish(now, complete=True, stats=stats)  # what the publish below saves
-    headline, status = _verdict_headline(stores, evaluation, record, frame, now)
+    rows = series.edge_series_frame(evaluation, record.run_id, now)  # this run's series (0064)
+    headline, status = _verdict_headline(stores, evaluation, record, frame, now, rows)
     if stores is not None:
         stats["verdict_row"] = (
             status  # written | none (by design) | failed (the reader judges live)
@@ -408,7 +413,6 @@ def write_edge_eval(
     # without its rows (the deflated Sharpe ratio errs conservative), never rows without a trial.
     with writer.publishing(record.run_id, now):
         writer.write_result(RESULT, evaluation.end, record.run_id, frame, pending=True)
-        rows = series.edge_series_frame(evaluation, record.run_id, now)  # this run's series (0064)
         if not rows.empty:
             writer.write_result(series.RESULT, evaluation.end, record.run_id, rows, pending=True)
         if evaluation.leg_rows:

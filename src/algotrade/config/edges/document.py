@@ -136,13 +136,14 @@ from algotrade.config.edges.portfolio import (
     check_portfolio,
     ensemble_of,
     oos_class_of,
+    tracks_of,
     vol_target_of,
     weighting_of,
 )
 from algotrade.config.edges.positions import chain, grid
 from algotrade.config.edges.positions.cases import EntrySpec, entry_of, split_cases
 from algotrade.config.edges.positions.spec import KEYS as POSITION_KEYS
-from algotrade.config.edges.positions.spec import PositionSpec, gate_of, spec_of
+from algotrade.config.edges.positions.spec import PositionSpec, gate_of, holdout_of, spec_of
 from algotrade.config.edges.positions.templates import POSITION_PREFIX, baseline_template
 from algotrade.config.edges.schedules.events import (
     EVENT_CLASSES,
@@ -167,7 +168,6 @@ from algotrade.core.model.ids import validate_id
 from algotrade.core.time.windows import (
     CALENDAR,
     WINDOW_NAMES,
-    window_length,
     window_name,
 )
 
@@ -218,16 +218,17 @@ KEYS = (
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
     "extends", "follow", "audit", "published", "family", "ensemble", "oos_class", "mechanism_kind",
     "plain_reason",
-    "asset_class", "gate", "variant_grid", "verdict_profile",
+    "asset_class", "gate", "variant_grid", "verdict_profile", "holdout_from",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
     "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field", "pair_field",
-    "vol_target", "vol_window", "vol_return_field", "canary", *POSITION_KEYS, "entry",
+    "vol_target", "vol_window", "vol_return_field", "canary", *POSITION_KEYS, "entry", "tracks",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
-VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
+VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks", "gate")
+VARIANT_SETS = ("universe", "gate")  # the keys ``named.check_variants`` is told a variant sets
 EVIDENCE_KEYS = ("run_id", "split_from")
 IMPLEMENTATION_KEYS = ("promoted", "horizon", "compared")
 COMPARED_KEYS = ("horizon", "screener", "lift", "decile_spread", "sessions", "decile_sessions")
@@ -274,6 +275,7 @@ class Outcome:
     canary: Canary | None = None  # a risk-off gate on the book (ADR 0074 amendment)
     position: PositionSpec | None = None  # a template of config/site/positions (ADR 0088)
     entry: EntrySpec | None = None  # an entry condition (ADR 0088): the same rule for both kinds
+    tracks: str | None = None  # a named sleeve's Cboe strategy index (portfolio.TRACKED_INDEXES)
 
     @property
     def result_side(self) -> str:
@@ -305,6 +307,7 @@ class EdgeVariant:
     universe: str | Selection
     base: str | None = None  # None: the edge's own
     picks: str | None = None  # None: the edge's own
+    gate: Group | None = None  # a sleeve's own gate (ADR 0088 d7; None: the edge's), never picks
 
 
 @dataclass(frozen=True)
@@ -392,6 +395,7 @@ class Edge:
     gate: Group | None = None
     variant_grid: tuple[grid.Grid, ...] = ()
     verdict_profile: str | None = None
+    holdout_from: date | None = None  # ADR 0088 d15: the latest start of its gates' holdouts
     position_baselines: tuple[str, ...] = ()
     # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
     # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
@@ -469,10 +473,10 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
     baselines, position_baselines = _baselines(t)
-    chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
+    chain.check_kinds(where, [outcome, *(v.outcome for v in variants)])
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
         check_base(held.kind, held_base, where)
-        named.check_sleeve(where, held.kind, len(held.horizon_sessions), held_base)
+        named.check_sleeve(where, held.kind, len(held.horizon_sessions), held_base, held.tracks)
         if held.side != LONG and top_k is None:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
@@ -498,6 +502,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         baselines=baselines,
         position_baselines=position_baselines,
         gate=gate_of(t),
+        holdout_from=holdout_of(t),
         variant_grid=grid.parse_grids(t),
         verdict_profile=t.choice("verdict_profile", "", PROFILES)
         if "verdict_profile" in doc
@@ -749,12 +754,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
                 f"{o.where} start_offset_sessions: a calendar window starts at the session after "
                 f"the decision session (D = S - 1), so 1, got {offset}"
             )
-        if horizons != (window_length(window),):
-            raise ConfigurationError(
-                f"{o.where} horizon_sessions: calendar:{window} is {window_length(window)} "
-                f"sessions long, so its one horizon is [{window_length(window)}], "
-                f"got {list(horizons)}"
-            )
+        named.check_window_hold(o.where, window, horizons, base == named.DELTA_EQUIVALENT)
     if event is None and offset < 1:
         raise ConfigurationError(
             f"{o.where} start_offset_sessions: the screen runs after the decision session's "
@@ -805,6 +805,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         vol_window=vol_window,
         vol_return_field=vol_return_field,
         canary=canary_of(o, kind),
+        tracks=tracks_of(o),
         position=spec_of(o, kind, offset, cases),
         entry=entry_of(o),
     )
@@ -862,15 +863,16 @@ def _variants(
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         v_base = _base(v, schedule) if "base" in v.names() else None
-        named.check_variants(v.where, v_base, edge_base, "universe" in v.names())
+        named.check_variants(v.where, v_base, edge_base, *(n in v.names() for n in VARIANT_SETS))
         _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(
                 id=vid,
-                outcome=_outcome_of(merged, schedule),
+                outcome=_outcome_of(merged, schedule, v_base or edge_base),
                 universe=_universe(v, f"{edge_id}-{vid}") if "universe" in v.names() else universe,
                 base=v_base,
                 picks=v.choice("picks", "event", PICKS) if "picks" in v.names() else None,
+                gate=gate_of(v),
             )
         )
     return tuple(found)

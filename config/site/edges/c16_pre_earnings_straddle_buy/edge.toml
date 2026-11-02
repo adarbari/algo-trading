@@ -23,6 +23,7 @@ status = "blocked"
 plain_reason = "Needs a short-term implied volatility history to price a three-day straddle, and we only store a 30-day one."
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout (the latest of its gates' and thresholds'); no verdict until closed trades from it reach 3 months
 rejection_reason = """The position's horizon cannot be priced. The model P&L prices every horizon with one
 30-day implied volatility (IV30, the only history stored), and the document parser refuses a horizon
 outside 10 to 42 sessions for it (ADR 0053 amendment 2026-10-17, tenor_sessions); the trade is held 3

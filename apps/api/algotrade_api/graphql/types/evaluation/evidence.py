@@ -71,7 +71,11 @@ class TradeFlag:
     "in force at the DECISION session (`symbolAsOf`; a delisted pick shows its last known); "
     "`beforeSplit`: the decision session is in-sample; `source`: backtest or live; "
     "`score` is the score at the decision session; `value` is oriented and net of cost "
-    "(null: not stored)"
+    "(null: not stored). The trade contract's columns (ADR 0088): `exitKind` how it closed, "
+    "`capitalBasis` what its return is on (notional for a share, the collateral for an option), "
+    "`returnOnCapital` at the document's cost and `returnOnCapitalGross` before it, `capital` "
+    "per unit, `maxAdverse` its worst loss as a share of capital, and an option's `hedgedRoc`, "
+    "`stockRoc` and `wingCost` over its collateral (null: not stored, or a share)"
 )
 class EdgeTradeRow:
     variant: str
@@ -97,6 +101,15 @@ class EdgeTradeRow:
     adv_usd: TradeNumber
     reference: TradeNumber
     touch: TradeFlag
+    exit_kind: str | None
+    capital_basis: str | None
+    return_on_capital: TradeNumber
+    return_on_capital_gross: TradeNumber
+    capital: TradeNumber
+    max_adverse: TradeNumber
+    hedged_roc: TradeNumber
+    stock_roc: TradeNumber
+    wing_cost: TradeNumber
 
     @classmethod
     def of(cls, d: runs.TradeRow) -> Self:
@@ -124,6 +137,15 @@ class EdgeTradeRow:
             adv_usd=TradeNumber.of(d.adv_usd),
             reference=TradeNumber.of(d.reference),
             touch=TradeFlag.of(d.touch),
+            exit_kind=d.exit_kind,
+            capital_basis=d.capital_basis,
+            return_on_capital=TradeNumber.of(d.return_on_capital),
+            return_on_capital_gross=TradeNumber.of(d.return_on_capital_gross),
+            capital=TradeNumber.of(d.capital),
+            max_adverse=TradeNumber.of(d.max_adverse),
+            hedged_roc=TradeNumber.of(d.hedged_roc),
+            stock_roc=TradeNumber.of(d.stock_roc),
+            wing_cost=TradeNumber.of(d.wing_cost),
         )
 
 

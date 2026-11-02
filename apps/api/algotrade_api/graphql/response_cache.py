@@ -305,6 +305,7 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
         "EdgeCompare",  # the viewer's edge against its parent: evaluation run records
         "EdgeTrades",  # the verdict basis's ledger (a run's rows) and the paper record
         "EdgeVariantGrid",
+        "OptionSetup",  # an option setup: its rules and the canonical run's ledger
         # the sections of an edge's result: the official run's stored series, the verdict's basis
         # and the paper record for the session
         "EdgeResultBasis",

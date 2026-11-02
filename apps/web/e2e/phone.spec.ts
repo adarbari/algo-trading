@@ -15,6 +15,7 @@ import { mockAdminApi } from './admin-api';
 import { mockViewer } from './auth-api';
 import FORMULAS from './fixtures/accepted-formulas.json' with { type: 'json' };
 import REQUESTS from './fixtures/feature-requests.json' with { type: 'json' };
+import { mockEdgesApi } from './edges-api';
 import { mockBuilderApi, mockDescribeApi } from './builder-api';
 import { mockApi } from './mock-api';
 
@@ -157,6 +158,21 @@ test('Idea page: the sections stack inside the screen and the exit rule keeps it
     innerWidth,
   );
   await expect(page.getByRole('button', { name: 'Copy exit rule as text' })).toBeVisible();
+});
+
+test('Option idea page: the plan and the position risks stack inside the screen', async ({
+  page,
+}) => {
+  await mockIdeasApi(page);
+  await page.goto('/ideas/KTLX?setup=rich_puts');
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  await expect(page.getByRole('heading', { name: 'The plan' })).toBeVisible();
+  const box = await page.getByRole('heading', { name: "The position's risks" }).boundingBox();
+  expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    innerWidth,
+  );
+  await expect(page.getByText('Most you can lose')).toBeVisible();
 });
 
 test('Screener results: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({
@@ -836,4 +852,42 @@ test('Test: the ways in are cards, the steps stay in view, and a template opens 
     .tap();
   await expect(page).toHaveURL(/\/test\/expert\/vrp_scanner$/);
   await expect(steps.getByRole('link', { name: 'Result' })).toBeVisible();
+});
+
+test('Explore: Roll a put, Calls on shares and Buying power fit a phone', async ({ page }) => {
+  for (const tab of ['roll', 'margin', 'calls']) {
+    await page.goto(`/explore?focus=AAPL&tab=${tab}`);
+    await expect(page.getByRole('button', { name: /^(Show|Calculate)/ })).toBeVisible();
+    const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+  }
+  await page.getByRole('spinbutton', { name: 'Shares you hold' }).fill('300');
+  await page.getByRole('spinbutton', { name: /Your price/ }).fill('78.5');
+  await page.getByRole('button', { name: 'Show calls' }).tap();
+  await expect(page.getByRole('grid', { name: 'AAPL calls you could sell' })).toBeVisible();
+  const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+});
+
+test("An option setup's page stacks its position, history and years inside the screen", async ({
+  page,
+}) => {
+  const mock = await mockEdgesApi(page);
+  mock.optionEdges.push('momentum_12_1');
+  await page.goto('/edges?edge=momentum_12_1');
+  await page.locator('#setup-rules').scrollIntoViewIfNeeded();
+  await expect(page.getByRole('heading', { level: 3, name: 'The position' })).toBeVisible();
+  await page.locator('#setup-record').scrollIntoViewIfNeeded();
+  await expect(page.getByText('72 of 100 trades')).toBeVisible();
+  await expect(page.getByText('2024')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await expectAccessible(page);
 });

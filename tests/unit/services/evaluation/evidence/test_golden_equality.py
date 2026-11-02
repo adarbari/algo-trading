@@ -170,7 +170,8 @@ def _all_row(ev: EdgeEvaluation) -> pd.Series:
 def test_the_evidence_columns_are_new_and_null_where_nothing_is_measured() -> None:
     """E6b: only new columns appear. A share row has its series; an outcome with no money has
     none (null, never 0); an option position's base is its stored ``base_roc`` (E6b-2); a cost row
-    and a random draw are not tail rows."""
+    and a random draw are not tail rows, but an option position's cost row carries its level's
+    mean return on capital (E11)."""
     evs = _evaluations()
     long, option = _all_row(evs["long"]), _all_row(evs["option_pnl"])
     assert long["roc_sessions"] == 4 and long["mean_roc"] == pytest.approx(0.075)
@@ -186,4 +187,10 @@ def test_the_evidence_columns_are_new_and_null_where_nothing_is_measured() -> No
         other = frame[
             (frame["slice_kind"] == "cost") | frame["role"].astype(str).str.startswith("random")
         ]
-        assert other[list(TAIL_COLUMNS)].isna().all().all()
+        tails = [c for c in TAIL_COLUMNS if c != "mean_roc"]
+        assert other[tails].isna().all().all()
+        levelled = other["slice_value"].astype(str).str.endswith((":mid", ":effective", ":full"))
+        assert other.loc[~levelled, "mean_roc"].isna().all()
+    option_costs = edge_eval_frame(evs["option_pnl"], "r", AS_OF)
+    option_costs = option_costs[option_costs["slice_kind"] == "cost"]
+    assert option_costs["mean_roc"].notna().all()  # each level on the collateral

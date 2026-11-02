@@ -79,6 +79,7 @@ from algotrade_api.graphql.types.evaluation.evidence import (
     EdgeVariants,
 )
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
+from algotrade_api.graphql.types.evaluation.positions.option_setup import OptionSetupQuery
 from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
 from algotrade_api.graphql.types.filtering.filter_set import FilterableFeature, FilterSet
@@ -133,7 +134,7 @@ MAX_REFS = 100  # guideEntries(refs)
 
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
-class Query(IdeasQuery, AdminReads, UserQuery):
+class Query(IdeasQuery, OptionSetupQuery, AdminReads, UserQuery):
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session `date` resolves to; null: nothing stored"
     )

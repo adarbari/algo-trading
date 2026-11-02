@@ -954,6 +954,20 @@ follow-up PR).
 - status: final
 - Reasoning: the owner's decision in chat (2026-11-02); the shared files are mechanical unions, so a conflict there carried no judgement, only a 5-15 minute re-run each time.
 
+## 2026-11-02 | V11a option calculators and the filter bar | Exempt: a drill-down of typed inputs, not a stored list
+- Question: ADR 0082 puts every table, list or feed behind the shared filter bar; do the Roll a put and Calls on shares calculators carry it?
+- Options: exempt them in `architecture/web_filter_bar.toml` / give each the shared bar.
+- Decision: exempt. At most 18 rows computed per request from what the trader typed, nothing stored, no cross-row search; the "same delta" and "include rolls that cost money" toggles are inputs the server re-runs on, not row filters. Guide entries still ship for every column and control.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the [exempt] kinds of `web_filter_bar.toml` (a fixed handful of rows, a drill-down of one thing) fit; wrapping server inputs in the filter bar would misrepresent them (precedent: Explore's Compare table).
+## 2026-11-02 | V11b Buying power: which margin rules | The exchange minimum (Reg-T) only, no named broker
+- Question: the OptMargin mockup has a "Your broker's rules: tastytrade" select; which margin rules does the calculator offer at launch?
+- Options: (a) the Reg-T / Cboe exchange minimum for an uncovered short option only, no broker named; (b) a site-config list of named brokers with their published multipliers, sourced and dated, kept by hand; (c) (a) now, (b) later only as a sourced, dated change.
+- Decision: (c). The select is dropped; its place is an "exchange minimum" label with its Guide entry (a broker may require more; a margin figure is a floor, not a quote). Cash-secured stays exact (strike x 100 x contracts).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the exchange minimum is published, stable and broker-neutral, the one figure the site can state accurately for every trader; a stale multiplier shown as a named broker's rule is a data-quality and liability risk (data tenet), a hand-kept broker list has no ingestion check, and a broker select sits against ADR 0083's no-broker-links and no-account-profile rules.
 ## 2026-11-02 | V10 Describe it (Evening Desk) | Where Describe it lives, and C18's `not_said` status
 - Question: (1) the Describe box sat on Expert; where does the sentence way in live now? (2) the plan gives C18 (`PartCard`) a `not_said` status; does V10 add it?
 - Options: (1) its own page `/test/describe/$id` with the rows it became / a mode of Expert. (2) add `not_said` now, unused / add it with the first draft that has a part the trader did not say.
@@ -968,3 +982,19 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: one rule for the whole page is what the amendment's "on Ideas it is a filter" says; the pool already filters server side, so it is one more predicate; without the "of M" an empty group would read as "no picks"; a toggle adds page state and a control (owner 2026-10-25: less code).
+
+## 2026-11-02 | Plan O4 | The option idea page's premium floor is not applicable until a setup declares a minimum credit
+- Question: the plan's O4 line is "the setup's rule holds Monday at a premium of $X or more". No stored field gives $X: no setup declares a minimum credit (concepts 2.16 EF-G14, deferred) and no option verdict stores a typical trade to derive a break-even from. What does the page show?
+- Options: derive a floor from the example (credit less a typical trade); derive it from the setup's evidence once stored; show UNKNOWN with its reason.
+- Decision: the section carries `mondayFloor` null and `floorUnknown` NOT_APPLICABLE with the reason, and the Guide entry says so; the figure appears when a setup declares a minimum credit (a `select` rule at entry, EF-G14) or its stored evidence supports a floor, by inverting the premium figures at the example's strike and days. No number is invented in the read.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: ADR 0088's rule that figures are derived or UNKNOWN, never filled; an invented floor would read as the setup's own rule; the architect review of the read agreed.
+
+## 2026-11-02 | ADR 0088 decision 15 | Every option outcome kind, including `expires_otm`, waits for its unseen holdout; each setup declares its own `holdout_from`
+- Question: the judge held back only `option_pnl` verdicts; `option_model_pnl` setups (c12 to c18) could be judged Works today. Does `expires_otm` (a short option's not-assigned hit measured on the underlying's bars) count as an option setup for the holdout? One site-wide start, or per setup? Does the run's end date show 3 months of unseen trades?
+- Options: gate `option_pnl` only / all option kinds with or without `expires_otm`; one site-wide start / a start declared per setup; the run's end / closed trades measured from the start.
+- Decision: gate `option_pnl`, `option_model_pnl` and `expires_otm` (a short-premium verdict is an option verdict whether its hit is priced from chains or read from bars; a fitness test puts every outcome kind on one side); a setup declares `holdout_from` in its document (the latest of its gates' and thresholds', never before the site's 2026-10-26; not a run input); the verdict needs measured windows decided from that date whose last exit is 92 days after it, read from the run's own series.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: ADR 0088 decision 15 says "no option verdict before its unseen holdout"; the data source is the measurement, not the claim; the earliest verdict for a `holdout_from` of 2026-10-26 is a window closed on 2027-01-26.

@@ -442,6 +442,22 @@ def test_an_option_legs_cost_levels_and_base_roc_round_trip_and_every_other_leg_
     }
 
 
+def test_a_picks_return_on_capital_at_each_level_round_trips_and_an_older_leg_has_none() -> None:
+    """E11: each option pick's return on capital at (mid, effective, full), flat like the values;
+    a nullable column with no version bump, so a share leg and an older leg carry nothing."""
+    levelled = replace(
+        CONTRACT_PICK, values_at=(0.012, 0.010, 0.008), rocs_at=(0.0126, 0.0105, 0.0084)
+    )
+    held = leg(stat=stat(pick_values=(0.03,), pick_hits=1, picks=(levelled, Pick("EQ:L", 2, "x"))))
+    row = encode_leg(held, "site", "drift")
+    assert row["pick_rocs_at"] == [0.0126, 0.0105, 0.0084, None, None, None]
+    assert decode_leg(row).stat == held.stat
+    assert encode_leg(leg(), "site", "drift")["pick_rocs_at"] is None
+    older = decode_leg({k: v for k, v in row.items() if k != "pick_rocs_at"}).stat
+    assert all(p.rocs_at is None for p in older.picks)
+    assert "pick_rocs_at" in {c.name for c in EDGE_LEGS.columns}
+
+
 def test_the_option_columns_survive_a_store(backend: Backend) -> None:
     levelled = replace(CONTRACT_PICK, values_at=(0.012, 0.010, 0.008))
     full = leg(

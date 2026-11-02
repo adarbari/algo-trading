@@ -16,9 +16,11 @@ The statistics are the stored rows', never recomputed; the sentences are the ser
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from datetime import date
 
 from algotrade.config.edges import loading
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict as load_verdict_settings
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import runs, verdict
@@ -121,6 +123,21 @@ def load_summary(ctx: Stores, edge: Edge) -> verdict.EdgeSummary:
     )
 
 
+def _holdout_start(edge: Edge, settings: VerdictSettings) -> date | None:
+    """An option setup's holdout start: its own date or the site's, the later; None otherwise."""
+    site = settings.tails.holdout_from
+    return max(site, edge.holdout_from or site) if verdict.is_option(edge) else None
+
+
+def _holdout_closed(
+    ctx: Stores, run: runs.EdgeRun, edge: Edge, settings: VerdictSettings
+) -> tuple[tuple[str, int, date], ...]:
+    start = _holdout_start(edge, settings)
+    if start is None:
+        return ()
+    return verdict.closed_through(runs.load_run_series(ctx, run), start, run.range_to)
+
+
 def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.EdgeVerdict:
     """The verdict of ``edge``: a site edge's official result (``verdict.load_edge_verdict``);
     a user's own edge from the user's latest run of it, judged on in-sample figures only while
@@ -156,10 +173,14 @@ def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.Edg
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=verdict.counts_wins(edge),
             chain=verdict.is_chain(edge),
+            option=verdict.is_option(edge),
+            holdout_from=_holdout_start(edge, settings),
+            holdout_closed=_holdout_closed(ctx, run, edge, settings),
             neutral=verdict.is_factor_neutral(edge),
             profile=verdict.profile_of(edge),
             base=edge.base,
         ),
+        range_to=run.range_to,
         headline=headline,
     )
     if not hidden or found.verdict in (verdict.WAITING, verdict.DIAGNOSTIC):

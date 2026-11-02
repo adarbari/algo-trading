@@ -126,6 +126,241 @@
         "title": "BuildStamp",
         "type": "object"
       },
+      "CallRow": {
+        "properties": {
+          "below_price": {
+            "title": "Below Price",
+            "type": "boolean"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "early_exercise_risk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Early Exercise Risk"
+          },
+          "ex_div_before_expiry": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ex Div Before Expiry"
+          },
+          "expiry": {
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "if_called": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "If Called"
+          },
+          "premium": {
+            "title": "Premium",
+            "type": "number"
+          },
+          "premium_over_price": {
+            "title": "Premium Over Price",
+            "type": "number"
+          },
+          "premium_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premium Total"
+          },
+          "report_inside": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Inside"
+          },
+          "report_inside_unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strike": {
+            "title": "Strike",
+            "type": "number"
+          }
+        },
+        "required": [
+          "expiry",
+          "days",
+          "strike",
+          "premium",
+          "premium_over_price",
+          "if_called",
+          "below_price",
+          "report_inside",
+          "report_inside_unknown",
+          "ex_div_before_expiry",
+          "early_exercise_risk",
+          "premium_total"
+        ],
+        "title": "CallRow",
+        "type": "object"
+      },
+      "CallsBody": {
+        "properties": {
+          "key": {
+            "description": "the underlying: a ticker or an instrument id",
+            "title": "Key",
+            "type": "string"
+          },
+          "price": {
+            "description": "the trader's price per share, after premiums",
+            "exclusiveMinimum": 0.0,
+            "title": "Price",
+            "type": "number"
+          },
+          "shares": {
+            "description": "shares held",
+            "exclusiveMinimum": 0.0,
+            "maximum": 10000000.0,
+            "title": "Shares",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "shares",
+          "price"
+        ],
+        "title": "CallsBody",
+        "type": "object"
+      },
+      "CallsPreview": {
+        "properties": {
+          "above_price": {
+            "title": "Above Price",
+            "type": "number"
+          },
+          "contracts": {
+            "title": "Contracts",
+            "type": "integer"
+          },
+          "dividend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Dividend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dividend_unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priced_at": {
+            "title": "Priced At",
+            "type": "number"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CallRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "underlying_id": {
+            "title": "Underlying Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "underlying_id",
+          "session",
+          "priced_at",
+          "contracts",
+          "above_price",
+          "rows",
+          "dividend",
+          "dividend_unknown"
+        ],
+        "title": "CallsPreview",
+        "type": "object"
+      },
+      "CallsResult": {
+        "properties": {
+          "gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why there is no preview (None: there is one)"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallsPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the calls (None: see gap)"
+          }
+        },
+        "required": [
+          "preview",
+          "gap"
+        ],
+        "title": "CallsResult",
+        "type": "object"
+      },
       "CauseLink": {
         "properties": {
           "level": {
@@ -326,6 +561,31 @@
           "penalty"
         ],
         "title": "CriterionValue",
+        "type": "object"
+      },
+      "Dividend": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "ex_date": {
+            "format": "date",
+            "title": "Ex Date",
+            "type": "string"
+          },
+          "own_by": {
+            "format": "date",
+            "title": "Own By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ex_date",
+          "amount",
+          "own_by"
+        ],
+        "title": "Dividend",
         "type": "object"
       },
       "Draft": {
@@ -1711,6 +1971,223 @@
         "title": "LiveOptionQuote",
         "type": "object"
       },
+      "MarginBody": {
+        "properties": {
+          "contracts": {
+            "description": "how many contracts",
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000.0,
+            "title": "Contracts",
+            "type": "integer"
+          },
+          "expiry": {
+            "description": "its expiry",
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "key": {
+            "description": "the underlying: a ticker or an instrument id",
+            "title": "Key",
+            "type": "string"
+          },
+          "right": {
+            "default": "put",
+            "description": "the right of the option",
+            "enum": [
+              "put",
+              "call"
+            ],
+            "title": "Right",
+            "type": "string"
+          },
+          "strike": {
+            "description": "its strike",
+            "exclusiveMinimum": 0.0,
+            "title": "Strike",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "strike",
+          "expiry",
+          "contracts"
+        ],
+        "title": "MarginBody",
+        "type": "object"
+      },
+      "MarginPreview": {
+        "properties": {
+          "cash_secured": {
+            "description": "a put's strike, a call's shares at tonight's price (covered), x 100 x n",
+            "title": "Cash Secured",
+            "type": "number"
+          },
+          "contracts": {
+            "title": "Contracts",
+            "type": "integer"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "expiry": {
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "margin_held": {
+            "description": "the exchange minimum for an uncovered short option (a call: a naked call)",
+            "title": "Margin Held",
+            "type": "number"
+          },
+          "open_interest_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Interest Share"
+          },
+          "premium": {
+            "title": "Premium",
+            "type": "number"
+          },
+          "premium_over_cash": {
+            "title": "Premium Over Cash",
+            "type": "number"
+          },
+          "premium_over_margin": {
+            "description": "the premium over the uncovered minimum",
+            "title": "Premium Over Margin",
+            "type": "number"
+          },
+          "premium_total": {
+            "title": "Premium Total",
+            "type": "number"
+          },
+          "priced_at": {
+            "title": "Priced At",
+            "type": "number"
+          },
+          "right": {
+            "enum": [
+              "put",
+              "call"
+            ],
+            "title": "Right",
+            "type": "string"
+          },
+          "rule": {
+            "description": "the margin rule applied: reg_t, the exchange minimum",
+            "title": "Rule",
+            "type": "string"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "stress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stress_unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strike": {
+            "title": "Strike",
+            "type": "number"
+          },
+          "underlying_id": {
+            "title": "Underlying Id",
+            "type": "string"
+          },
+          "volume_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Share"
+          }
+        },
+        "required": [
+          "underlying_id",
+          "session",
+          "priced_at",
+          "right",
+          "strike",
+          "expiry",
+          "contracts",
+          "rule",
+          "days",
+          "premium",
+          "premium_total",
+          "cash_secured",
+          "margin_held",
+          "premium_over_cash",
+          "premium_over_margin",
+          "volume_share",
+          "open_interest_share",
+          "stress",
+          "stress_unknown"
+        ],
+        "title": "MarginPreview",
+        "type": "object"
+      },
+      "MarginResult": {
+        "properties": {
+          "gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why there is no preview (None: there is one)"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarginPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "what it ties up (None: see gap)"
+          }
+        },
+        "required": [
+          "preview",
+          "gap"
+        ],
+        "title": "MarginResult",
+        "type": "object"
+      },
       "MissingFeature": {
         "properties": {
           "closest": {
@@ -1837,6 +2314,51 @@
           "normalised"
         ],
         "title": "NarrowMiss",
+        "type": "object"
+      },
+      "OptionGap": {
+        "description": "Why a figure or a whole preview is not available, in public words (ADR 0056).",
+        "properties": {
+          "cause": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CauseLink"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the chain behind it, root cause first (admins only: null for anyone else)",
+            "title": "Cause"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "guide_term": {
+            "title": "Guide Term",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "kind_text": {
+            "title": "Kind Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "kind",
+          "guide_term",
+          "kind_text",
+          "cause"
+        ],
+        "title": "OptionGap",
         "type": "object"
       },
       "Part": {
@@ -2383,6 +2905,287 @@
         "title": "RegimeExplanation",
         "type": "object"
       },
+      "RollBody": {
+        "properties": {
+          "expiry": {
+            "description": "the expiry of the option sold",
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "include_debits": {
+            "default": false,
+            "description": "also show rolls that cost money",
+            "title": "Include Debits",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "the underlying: a ticker or an instrument id",
+            "title": "Key",
+            "type": "string"
+          },
+          "right": {
+            "default": "put",
+            "description": "the right of the option sold",
+            "enum": [
+              "put",
+              "call"
+            ],
+            "title": "Right",
+            "type": "string"
+          },
+          "same_delta": {
+            "default": false,
+            "description": "per expiry, only the strike nearest its delta",
+            "title": "Same Delta",
+            "type": "boolean"
+          },
+          "sold_at": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the price per share it was sold at (for the new breakeven)",
+            "title": "Sold At"
+          },
+          "strike": {
+            "description": "the strike of the option sold",
+            "exclusiveMinimum": 0.0,
+            "title": "Strike",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "strike",
+          "expiry"
+        ],
+        "title": "RollBody",
+        "type": "object"
+      },
+      "RollPreview": {
+        "properties": {
+          "above_strike": {
+            "title": "Above Strike",
+            "type": "number"
+          },
+          "buy_back": {
+            "title": "Buy Back",
+            "type": "number"
+          },
+          "days_left": {
+            "title": "Days Left",
+            "type": "integer"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "expiry": {
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "over_collected": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Over Collected"
+          },
+          "priced_at": {
+            "title": "Priced At",
+            "type": "number"
+          },
+          "right": {
+            "enum": [
+              "put",
+              "call"
+            ],
+            "title": "Right",
+            "type": "string"
+          },
+          "rolls": {
+            "items": {
+              "$ref": "#/components/schemas/RollRow"
+            },
+            "title": "Rolls",
+            "type": "array"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "sold_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold At"
+          },
+          "strike": {
+            "title": "Strike",
+            "type": "number"
+          },
+          "underlying_id": {
+            "title": "Underlying Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "underlying_id",
+          "session",
+          "priced_at",
+          "right",
+          "strike",
+          "expiry",
+          "sold_at",
+          "buy_back",
+          "over_collected",
+          "above_strike",
+          "days_left",
+          "delta",
+          "rolls"
+        ],
+        "title": "RollPreview",
+        "type": "object"
+      },
+      "RollResult": {
+        "properties": {
+          "gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why there is no preview (None: there is one)"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RollPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the rolls (None: see gap)"
+          }
+        },
+        "required": [
+          "preview",
+          "gap"
+        ],
+        "title": "RollResult",
+        "type": "object"
+      },
+      "RollRow": {
+        "properties": {
+          "credit_per_extra_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Per Extra Day"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "expiry": {
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "extra_credit": {
+            "title": "Extra Credit",
+            "type": "number"
+          },
+          "new_breakeven": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Breakeven"
+          },
+          "report_inside": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Inside"
+          },
+          "report_inside_unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionGap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strike": {
+            "title": "Strike",
+            "type": "number"
+          }
+        },
+        "required": [
+          "expiry",
+          "strike",
+          "extra_credit",
+          "new_breakeven",
+          "credit_per_extra_day",
+          "delta",
+          "report_inside",
+          "report_inside_unknown"
+        ],
+        "title": "RollRow",
+        "type": "object"
+      },
       "RunRequest": {
         "properties": {
           "config_id": {
@@ -2796,6 +3599,29 @@
           }
         },
         "title": "StateBody",
+        "type": "object"
+      },
+      "Stress": {
+        "properties": {
+          "drop": {
+            "title": "Drop",
+            "type": "number"
+          },
+          "episode": {
+            "title": "Episode",
+            "type": "string"
+          },
+          "in_the_money": {
+            "title": "In The Money",
+            "type": "number"
+          }
+        },
+        "required": [
+          "episode",
+          "drop",
+          "in_the_money"
+        ],
+        "title": "Stress",
         "type": "object"
       },
       "TableView": {
@@ -4356,6 +5182,129 @@
         "summary": "Save Watchlist",
         "tags": [
           "ideas"
+        ]
+      }
+    },
+    "/preview/options/calls": {
+      "post": {
+        "operationId": "preview_calls_preview_options_calls_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallsResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Calls",
+        "tags": [
+          "preview"
+        ]
+      }
+    },
+    "/preview/options/margin": {
+      "post": {
+        "operationId": "preview_margin_preview_options_margin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarginBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarginResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Margin",
+        "tags": [
+          "preview"
+        ]
+      }
+    },
+    "/preview/options/roll": {
+      "post": {
+        "operationId": "preview_roll_preview_options_roll_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Roll",
+        "tags": [
+          "preview"
         ]
       }
     },
