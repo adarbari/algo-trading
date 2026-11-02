@@ -953,3 +953,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's decision in chat (2026-11-02); the shared files are mechanical unions, so a conflict there carried no judgement, only a 5-15 minute re-run each time.
+
+## 2026-11-02 | V11a option calculators and the filter bar | Exempt: a drill-down of typed inputs, not a stored list
+- Question: ADR 0082 puts every table, list or feed behind the shared filter bar; do the Roll a put and Calls on shares calculators carry it?
+- Options: exempt them in `architecture/web_filter_bar.toml` / give each the shared bar.
+- Decision: exempt. At most 18 rows computed per request from what the trader typed, nothing stored, no cross-row search; the "same delta" and "include rolls that cost money" toggles are inputs the server re-runs on, not row filters. Guide entries still ship for every column and control.
+- decided by: Fable on the owner's behalf (owner away)
+- status: pending owner confirmation
+- Reasoning: the [exempt] kinds of `web_filter_bar.toml` (a fixed handful of rows, a drill-down of one thing) fit; wrapping server inputs in the filter bar would misrepresent them (precedent: Explore's Compare table).

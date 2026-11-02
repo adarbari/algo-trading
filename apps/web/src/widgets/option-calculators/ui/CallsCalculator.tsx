@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { termHelp } from '@/features/guide-help';
 import {
   callsBody,
+  type CallsBody,
   closedSentence,
   contractsText,
   dividendLine,
@@ -29,7 +30,8 @@ export interface CallsCalculatorProps {
 
 export function CallsCalculator({ symbol }: CallsCalculatorProps) {
   const [form, setForm] = useState<CallsForm>({ shares: null, price: null });
-  const [sent, setSent] = useState(false);
+  // The body last sent: Retry resends it, whatever the form holds now.
+  const [sent, setSent] = useState<CallsBody | null>(null);
   const [asked, setAsked] = useState(false);
   const mutation = useCallsPreview();
   const body = callsBody(symbol, form);
@@ -103,7 +105,7 @@ export function CallsCalculator({ symbol }: CallsCalculatorProps) {
               onClick={() => {
                 setAsked(true);
                 if (!body) return;
-                setSent(true);
+                setSent(body);
                 mutation.mutate(body);
               }}
             >
@@ -130,7 +132,7 @@ export function CallsCalculator({ symbol }: CallsCalculatorProps) {
             loadingLabel={`Loading ${symbol} calls…`}
             errorMessage={failureMessage(symbol, mutation.error)}
             onRetry={() => {
-              if (body) mutation.mutate(body);
+              if (sent) mutation.mutate(sent);
             }}
             emptyMessage={result?.gap ? <GapLine gap={result.gap} /> : null}
           >

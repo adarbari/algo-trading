@@ -20,7 +20,7 @@ id = "roll_sold_at"
 term = "Price you sold at"
 short = "The premium per share you collected when you sold the put, which the new breakeven needs."
 body = """
-Type the price per share, not per contract: a $1.40 premium is 1.40, not 140. Without it the roll table still shows the extra credit, and the new breakeven reads unknown. If you already rolled this position before, use all the premium you have collected on it so far.
+Type the price per share, not per contract: a $1.40 premium is 1.40, not 140. Without it the roll table still shows the extra credit, and the new breakeven reads unknown. If you already rolled this position before, type the net premium: everything you have collected on it so far, less what you paid to buy back earlier contracts.
 """
 see_also = ["roll_new_breakeven", "roll_buy_back", "roll_extra_credit"]
 
@@ -138,7 +138,7 @@ id = "calls_your_price"
 term = "Your price"
 short = "What the shares cost you per share, after the premiums you have already collected on them."
 body = """
-Take the price you paid for the shares and subtract the premium per share from puts and calls you already sold on them. The calls table measures every figure against this price, not today's.
+Take the price you paid for the shares and subtract the net premium per share from puts and calls you already sold on them: everything collected, less what you paid to buy any back. The calls table measures every figure against this price, not today's.
 """
 see_also = ["calls_premium_over_price", "calls_if_called", "calls_below_price"]
 

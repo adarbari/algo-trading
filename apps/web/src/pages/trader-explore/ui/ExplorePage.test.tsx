@@ -83,6 +83,7 @@ vi.mock('@/widgets/option-grid', async () => {
 });
 vi.mock('@/widgets/option-calculators', async () => {
   const { Button, Text } = await import('@algotrade/ui');
+  const { useState } = await import('react');
   return {
     RollCalculator: ({ symbol, onOpenCalls }: { symbol: string; onOpenCalls: () => void }) => (
       <>
@@ -90,9 +91,16 @@ vi.mock('@/widgets/option-calculators', async () => {
         <Button onClick={onOpenCalls}>Open calls</Button>
       </>
     ),
-    CallsCalculator: ({ symbol }: { symbol: string }) => (
-      <Text>{`calls calculator ${symbol}`}</Text>
-    ),
+    // Keeps what it first mounted with, as the real one keeps the typed form and its result.
+    CallsCalculator: function Calls({ symbol }: { symbol: string }) {
+      const [typedFor] = useState(symbol);
+      return (
+        <>
+          <Text>{`calls calculator ${symbol}`}</Text>
+          <Text>{`typed for ${typedFor}`}</Text>
+        </>
+      );
+    },
   };
 });
 vi.mock('@/widgets/options-panel', async () => {
@@ -189,6 +197,14 @@ describe('ExplorePage', () => {
     cleanup();
     render(page({ sel: 'AAPL', tab: 'calls' }));
     expect(await screen.findByText('calls calculator AAPL', {}, { timeout: 5000 })).toBeVisible();
+  });
+
+  it('starts a calculator afresh when another ticker comes into focus', async () => {
+    const { rerender } = render(page({ sel: 'AAPL,MSFT', focus: 'AAPL', tab: 'calls' }));
+    expect(await screen.findByText('typed for AAPL', {}, { timeout: 5000 })).toBeVisible();
+    rerender(page({ sel: 'AAPL,MSFT', focus: 'MSFT', tab: 'calls' }));
+    expect(await screen.findByText('typed for MSFT')).toBeVisible();
+    expect(screen.queryByText('typed for AAPL')).toBeNull();
   });
 
   it('chooses and closes tabs through the URL', async () => {

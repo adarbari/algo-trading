@@ -98,6 +98,7 @@ export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: De
       return (
         <Suspense fallback={<Skeleton />}>
           <RollCalculator
+            key={symbol}
             symbol={symbol}
             onOpenCalls={() => {
               onSearchChange({ tab: 'calls' });
@@ -108,7 +109,7 @@ export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: De
     case 'calls':
       return (
         <Suspense fallback={<Skeleton />}>
-          <CallsCalculator symbol={symbol} />
+          <CallsCalculator key={symbol} symbol={symbol} />
         </Suspense>
       );
     case 'features':
