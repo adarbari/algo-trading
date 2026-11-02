@@ -220,6 +220,21 @@ forbidden_modules = ["algotrade.data.outcomes"]
 ignore_imports = ["algotrade.services.evaluation.time_series.harness -> algotrade.data.outcomes"]
 
 [[tool.importlinter.contracts]]
+name = "The trade evidence reads only frames: no store, no outcomes reader, no harness internals (ADR 0088)"
+type = "forbidden"
+source_modules = ["algotrade.services.evaluation.evidence"]
+forbidden_modules = [
+    "algotrade.data",
+    "algotrade.storage",
+    "algotrade.services.evaluation.cross_section.measuring",
+    "algotrade.services.evaluation.cross_section.harness",
+    "algotrade.services.evaluation.cross_section.legs",
+    "algotrade.services.evaluation.cross_section.detail",
+    "algotrade.services.evaluation.forward",
+    "algotrade.services.evaluation.time_series",
+]
+
+[[tool.importlinter.contracts]]
 name = "Configs are pure: no storage I/O"
 type = "forbidden"
 source_modules = ["algotrade.config"]

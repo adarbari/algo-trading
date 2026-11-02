@@ -11,7 +11,9 @@ idempotent: an edge that already has rows for the session is not signalled again
 trade is not open any more, so a re-run writes the same rows. An edge's record starts on the first
 night this job sees it recording (``_since``), never backfilled to when its status changed; a due
 signal that could not be made is listed in the run record's ``skipped`` with its reason (never as
-an empty record), and a session between two nights that nobody signalled in ``missed``."""
+an empty record), and a session between two nights that nobody signalled in ``missed``. A settled
+trade also carries the trade contract's ``exit_kind``, ``return_on_capital`` and ``price_source``
+(ADR 0088, 2.5a; null while open, skipped and in older rows); ``return`` keeps its meaning."""
 
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -27,6 +29,7 @@ from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.paper import LOOKBACK_DAYS, job_name, read_stored
+from algotrade.features.framework.feature import strictest
 from algotrade.services.evaluation.forward.settle import (
     GRACE_SESSIONS,
     OPEN,
@@ -121,6 +124,16 @@ def _settlements(
                 excess_return=float("nan") if done.excess_return is None else done.excess_return,
             )  # fmt: skip
             row["return"] = float("nan") if done.raw_return is None else done.raw_return
+            row["exit_kind"], row["price_source"] = done.exit_kind, done.price_source
+            if (
+                done.outcome_licence
+            ):  # the figure's own licence joins the signal's (bought: personal)
+                row["licence"] = strictest(
+                    (str(row.get("licence") or "open"), done.outcome_licence)
+                )
+            row["return_on_capital"] = (
+                float("nan") if done.return_on_capital is None else done.return_on_capital
+            )
             rows.append(row)
             counted[edge.id] += 1
     return rows, dict(counted), failed
@@ -170,7 +183,8 @@ def _signals(
                     "status": OPEN, "reason": "", "buy_session": s.buy_session,
                     "sell_session": s.sell_session, "horizon_sessions": found.horizon,
                     "rank": s.rank, "delisted": False, "excess_return": float("nan"),
-                    "return": float("nan"),
+                    "return": float("nan"), "exit_kind": None, "price_source": None,
+                    "return_on_capital": float("nan"),
                 }
             )  # fmt: skip
         if found.signals:

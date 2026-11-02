@@ -20,7 +20,7 @@ from algotrade.data.outcomes import (
     licence_frames,
     read_chain,
 )
-from algotrade.data.outcomes.chain import FIRST_CBOE_CHAIN_SESSION
+from algotrade.data.outcomes.chain import FIRST_CBOE_CHAIN_SESSION, select_chain
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import STRUCTURE_PNL
@@ -133,3 +133,24 @@ def test_the_cutover_reads_one_source_per_session_on_every_path() -> None:
         (before, "personal"),
         (on, "open"),
     ]
+
+
+def test_the_option_trade_fields_of_the_contract_are_read_with_the_rows() -> None:
+    out = read_chain(_store(), 5, [S1], as_of=datetime(2026, 10, 13, tzinfo=UTC))
+    a = out[out["instrument_id"] == "EQ:A"].iloc[0]
+    assert (a["exit_kind"], a["collateral"], a["price_source"], a["licence"]) == (
+        "HORIZON", 95.0, "cboe", "open",
+    )  # fmt: skip
+    assert a["exit_session"] == date(2026, 10, 12) and pd.isna(
+        a["max_adverse"]
+    )  # the fixture row stores none
+
+
+def test_a_set_of_rows_with_no_exit_still_has_the_exit_columns_as_null() -> None:
+    """A partition set holding only UNMEASURED trades may carry no exit, collateral or adverse
+    column at all: they read as null, never a KeyError (E6a)."""
+    frame = stamped([_row("EQ:B", pnl=None)], S1, "r", EARLY, "option_outcomes")
+    bare = frame.drop(columns=["exit_session", "exit_kind", "collateral"])
+    out = select_chain(bare, 5, [S1])
+    assert set(CHAIN_COLUMNS) <= set(out.columns)
+    assert out[["exit_session", "exit_kind", "collateral", "max_adverse"]].isna().all().all()

@@ -148,8 +148,18 @@ def _ints(value: Any) -> tuple[int, ...]:
     return () if _null(value) else tuple(int(v) for v in value)
 
 
+def _opt_str(value: Any) -> str | None:
+    return None if _null(value) else str(value)
+
+
 def _maybe(value: Any) -> float | None:
     return None if _null(value) else float(value)
+
+
+CONTRACT_LISTS = (
+    "pick_exit", "pick_exit_kind", "pick_source", "pick_licence", "pick_capital", "pick_roc_gross",
+    "pick_roc", "pick_adverse",
+)  # fmt: skip
 
 
 def _flags(pick: Pick) -> int:
@@ -173,6 +183,14 @@ def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any]]:
         "pick_adv": [p.adv for p in picks],
         "pick_refs": [p.reference for p in picks],
         "pick_flags": [_flags(p) for p in picks],
+        "pick_exit": [p.exit_session for p in picks],  # leg v5: the contract's fields
+        "pick_exit_kind": [p.exit_kind for p in picks],
+        "pick_source": [p.price_source for p in picks],
+        "pick_licence": [p.outcome_licence for p in picks],
+        "pick_capital": [p.capital for p in picks],
+        "pick_roc_gross": [p.roc_gross for p in picks],
+        "pick_roc": [p.roc for p in picks],
+        "pick_adverse": [p.adverse for p in picks],
     }
 
 
@@ -189,6 +207,7 @@ def decode_picks(
     scores, gross, mdd = (_list(row.get(c)) for c in ("pick_scores", "pick_gross", "pick_mdd"))
     adv, refs, flags = (_list(row.get(c)) for c in ("pick_adv", "pick_refs", "pick_flags"))
     is_short = [bool(int(f) & SHORT) for f in flags]
+    contract = {c: _list(row.get(c)) or [None] * len(ids) for c in CONTRACT_LISTS}  # null: v4 row
     split = shorts is not None
     kept = [sh for r, sh in zip(reasons, is_short, strict=True) if r == ""]  # counted picks
     short_n = sum(kept) if split else 0
@@ -216,6 +235,14 @@ def decode_picks(
                 reference=ref,
                 touch=None if ref is None else bool(bits & TOUCH),
                 side="short" if is_short[at] else "long",
+                exit_session=_opt_day(contract["pick_exit"][at]),
+                exit_kind=_opt_str(contract["pick_exit_kind"][at]),
+                capital=_maybe(contract["pick_capital"][at]),
+                roc_gross=_maybe(contract["pick_roc_gross"][at]),
+                roc=_maybe(contract["pick_roc"][at]),
+                adverse=_maybe(contract["pick_adverse"][at]),
+                price_source=_opt_str(contract["pick_source"][at]),
+                outcome_licence=_opt_str(contract["pick_licence"][at]),
             )
         )
     return tuple(out)
