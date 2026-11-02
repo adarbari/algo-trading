@@ -8,6 +8,7 @@ the ``pair_spread`` outcome (EB H9): the cheap class against its sibling by hand
 borrow, the sibling read at the decision session, a sibling with no stored row."""
 
 import math
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -17,7 +18,7 @@ import pytest
 
 from algotrade.config.edges.positions.key import position_key
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import MissingDataError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import next_session
 from algotrade.quant.edges.statistics import sharpe
 from algotrade.services.evaluation.cross_section import measuring
@@ -30,10 +31,13 @@ from algotrade.services.evaluation.cross_section.harness import (
     _slice_rows,
     evaluate_edge,
 )
+from algotrade.services.evaluation.cross_section.hit import _gross_field
 from algotrade.services.evaluation.cross_section.legs.key import leg_key
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.schemas import STRUCTURE_PNL
+from tests.conftest import REPO_ROOT
 from tests.helpers.stored_frames import stamped, structure_pnl_row
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
@@ -538,3 +542,92 @@ def test_a_share_edges_picks_carry_the_contract_and_its_result_the_capital_basis
     assert (first.exit_kind, first.price_source, first.outcome_licence) == (
         "HORIZON", "bars", "open",
     )  # fmt: skip
+
+
+def _with_templates(w: World) -> World:
+    """The site's position templates in the world's config store (a baseline names one)."""
+    site = FileConfigStore(REPO_ROOT / "config", local=False)
+    docs = {
+        k: w.configs.load(*k)
+        for k in [("site", "selections", "active"), ("site", "strategies", "momo")]
+    }
+    w.configs = type(w.configs)(
+        {**docs, ("site", "positions", "templates"): site.load("site", "positions", "templates")}
+    )
+    return w
+
+
+def test_a_setup_is_measured_beside_the_stock_alone_on_the_other_grain_and_it_is_no_trial() -> None:
+    """E16 (G19, X3's shape): an option setup with ``position:long_shares`` is shown beside its own
+    picks held as shares, valued on the stock grain (the raw return: no benchmark); the baseline
+    is a row of its own, adds no trial and does not move the setup's trial key."""
+    w = _with_templates(_with_chain_outcomes(build_world()))
+    alone = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), edge(outcome=CHAIN_OUTCOME),
+        DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+    both = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"),
+        edge(outcome=CHAIN_OUTCOME, baselines=["position:long_shares"]),
+        DAYS[0], DAYS[-1], AS_OF, full=True,
+    )  # fmt: skip
+    mine, stock = both.results
+    assert [(r.variant, r.role) for r in both.results] == [
+        ("momo", "screener"),
+        ("position:long_shares", "baseline"),
+    ]
+    assert mine.measures[0].mean_excess_picks == pytest.approx(
+        alone.results[0].measures[0].mean_excess_picks
+    )  # the setup's own row is what it was without the baseline
+    assert stock.measures[0].mean_excess_picks == pytest.approx(
+        0.075
+    )  # names 15..19: (i-9.5)%, no costs
+    assert stock.config_hash != mine.config_hash and stock.side == "long"
+    assert both.trials == alone.trials == 1  # a baseline is not a trial
+    assert both.screener_hashes == alone.screener_hashes  # nor a screener of the run
+    assert both.unclosed_sessions == {2: 0}
+
+
+def test_an_option_position_baseline_of_a_setup_that_is_no_option_is_refused() -> None:
+    w = _with_templates(build_world())
+    with pytest.raises(ConfigurationError, match="option_pnl setup only"):
+        evaluate_edge(
+            w.reader, w.results, w.configs, UserContext("site"),
+            edge(baselines=["position:short_put"]), DAYS[0], DAYS[-1], AS_OF,
+        )  # fmt: skip
+
+
+def test_a_shares_baseline_of_a_stock_setup_is_measured_on_its_grain_and_a_rerun_reuses_it() -> (
+    None
+):
+    w = _with_templates(build_world())
+    e = edge(baselines=["position:long_shares"])
+    args = (w.reader, w.results, w.configs, UserContext("site"), e, DAYS[0], DAYS[-1], AS_OF)
+    first, again = evaluate_edge(*args), evaluate_edge(*args)
+    _, held = first.results
+    assert (held.variant, held.role, held.side) == ("position:long_shares", "baseline", "long")
+    assert held.measures[0].mean_excess_picks == pytest.approx(0.075)  # its own picks, as shares
+    assert first.trials == again.trials == 1
+    assert [r.measures[0].mean_excess_picks for r in again.results] == [
+        r.measures[0].mean_excess_picks for r in first.results
+    ]
+
+
+def test_an_excess_return_edge_with_no_benchmark_still_reads_the_excess_return() -> None:
+    """Only a position baseline's raw-return measure reads ``fwd_return``: a site edge that is
+    ``excess_return`` with ``benchmark = "none"`` keeps its stored values and keys."""
+    base = edge()
+    plain = replace(base, outcome=replace(base.outcome, benchmark="none"))
+    assert _gross_field(plain) == "fwd_excess_return"
+
+
+def test_a_baseline_on_a_grain_with_a_session_missing_leaves_the_setups_own_rows_alone() -> None:
+    w = _with_templates(_with_chain_outcomes(build_world(closed=DAYS[:-2])))
+    e = edge(outcome=CHAIN_OUTCOME, baselines=["position:long_shares"])
+    args = (w.reader, w.results, w.configs, UserContext("site"), e, DAYS[0], DAYS[-1], AS_OF)
+    first, again = evaluate_edge(*args), evaluate_edge(*args)
+    assert [r.measures[0].sessions for r in first.results] == [
+        r.measures[0].sessions for r in again.results
+    ]
+    mine, held = first.results
+    assert held.measures[0].sessions <= mine.measures[0].sessions
