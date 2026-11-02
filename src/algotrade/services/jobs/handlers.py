@@ -15,7 +15,7 @@ from typing import Any
 
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.winners import load_winners
-from algotrade.config.site.settings import load_sources, load_users
+from algotrade.config.site.settings import load_sources, load_users, load_verdict
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
@@ -304,6 +304,7 @@ def edge_score_fit_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[st
         edge_universe(configs, ctx.user, edge),
         date.fromisoformat(params["start"]),
         date.fromisoformat(params["until"]),
+        option_costs=load_verdict(configs).option_costs,
     )
     fit = fit_scorer(training)
     return {

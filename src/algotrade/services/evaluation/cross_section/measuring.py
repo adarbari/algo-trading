@@ -340,6 +340,7 @@ def _stat(
                 leg.entry,
                 window_end(leg.entry, horizon),
                 at_levels,
+                option_costs,
             )
         ),
         base_hits_at=tuple(int(hits.sum()) for hits in levels),
@@ -522,19 +523,23 @@ def _picks(
     entry: date,
     exit_on: date,
     levels: Sequence[pd.DataFrame] = (),
+    option_costs: OptionCosts | None = None,
 ) -> tuple[Pick, ...]:
     """Every pick of a session in rank order (leg v2, ADR 0064): counted or with its reason.
     ``res`` is the scored outcomes of the base names, ``rows`` the stored ones at S (the option
     trade grain's hold every edge's position keys: ``chain_rows`` picks this edge's); a ``short``
     leg's value and hit are the short's. The contract's fields (leg v5, ADR 0088 2.5a) come from
     ``trade_frame`` over the picks only; ``entry`` is S, ``exit_on`` S + h sessions;
-    ``levels``: an option edge's outcomes at each cost level (``values_at``)."""
+    ``levels``: an option edge's outcomes at each cost level (``values_at``); ``option_costs``: the
+    commission its return on capital pays, as the pick value and the base do."""
     if side == SHORT:
         res = short_view(res)
     rows = chain_rows(edge, rows[rows["instrument_id"].isin(set(picks))])
     stored = rows.set_index("instrument_id")
     named = res.loc[[i for i in picks if i in res.index]]
-    trades = trade_frame(edge, rows, named, entry=entry, bars_exit=exit_on, side=side)
+    trades = trade_frame(
+        edge, rows, named, entry=entry, bars_exit=exit_on, side=side, option_costs=option_costs
+    )
     trades = trades.set_index("instrument_id")
     gross = is_return(edge)
     out = []

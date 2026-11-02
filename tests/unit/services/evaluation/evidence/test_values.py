@@ -14,6 +14,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     level_outcomes,
     level_values,
 )
+from algotrade.services.evaluation.cross_section.measuring import _picks
 from algotrade.services.evaluation.evidence import values
 from algotrade.services.evaluation.evidence.shapes import roc_moments, trade_frame
 from tests.unit.services.evaluation.cross_section.conftest import edge
@@ -140,3 +141,17 @@ def test_the_base_return_on_capital_is_the_mean_over_the_counted_names() -> None
     assert n == 3 and mean == pytest.approx(np.mean(rocs))
     assert m2 == pytest.approx(float(np.sum((np.array(rocs) - np.mean(rocs)) ** 2)))
     assert roc_moments(edge(), rows, counted, DAY, COSTS) is None  # a share edge has none
+
+
+def test_a_pick_pays_the_commission_the_pick_value_and_the_base_pay() -> None:
+    """E6b-2 review: ``_picks`` valued the pick's return on capital without the commission while
+    its value and the base paid it, biasing the excess toward picks."""
+    e = edge(outcome=CHAIN)
+    rows = _put()
+    ids = list(rows["instrument_id"])
+    res = apply_outcome(e, rows, option_costs=COSTS).set_index("instrument_id")
+    args = (e, ids, {}, res, rows, {}, "long", DAY, EXIT)
+    paid = _picks(*args, option_costs=COSTS)  # type: ignore[arg-type]
+    bare = _picks(*args)  # type: ignore[arg-type]
+    assert paid[0].roc == pytest.approx((1.00 - 0.15 - 0.013) / 100)
+    assert bare[0].roc == pytest.approx((1.00 - 0.15) / 100)
