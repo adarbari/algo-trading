@@ -6,7 +6,7 @@
 [[term]]
 id = "idea_tab"
 term = "Stocks and Premium"
-short = "Ideas has two tabs: Stocks for setups that trade shares, Premium for setups that sell option premium."
+short = "Ideas has two tabs: Stocks for setups that trade shares, Premium for setups that collect option premium."
 body = """
 A setup belongs to the tab of the position it tests. A position made of shares is Stocks. A position with any option leg is Premium. Each tab is its own list, built the same way, with its own cap of 15 ideas. A tab with no setup that qualifies shows its Unproven section, while the other tab may show its list. Premium stays Unproven until an option setup has a stored verdict of works or promising, which needs a three-month unseen holdout. The tab is part of the address, so a link opens the tab it was copied from.
 """
@@ -128,7 +128,7 @@ id = "return_on_collateral"
 term = "Return on collateral"
 short = "The premium over what backs the position: a put's premium over its strike, a call's over the share price."
 body = """
-A cash-secured put sets aside the strike price to buy the shares if they are assigned, so its premium is measured against that cash. A covered call is backed by the shares, so its premium is measured against the share price. It is a return for the whole period to the expiry, not a year.
+A cash-secured put sets aside the strike price to take the shares if they are assigned, so its premium is measured against that cash. A covered call is backed by the shares, so its premium is measured against the share price. It is a return for the whole period to the expiry, not a year.
 """
 see_also = ["yield_a_year"]
 
