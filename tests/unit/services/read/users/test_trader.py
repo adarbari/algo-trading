@@ -12,6 +12,7 @@ from algotrade.services.read.users.trader import (
     TraderPreferences,
     WatchedInstrument,
     load_trader_preferences,
+    load_watchlist_ids,
 )
 from algotrade.storage.configs.files import MemoryConfigStore
 
@@ -50,3 +51,9 @@ def test_repeats_and_non_strings_are_dropped_and_the_list_is_capped() -> None:
     doc = {"watchlist": {"instruments": ["EQ:0", 7, *ids]}}
     got = load_trader_preferences(ctx_of(doc)).watchlist
     assert [w.instrument_id for w in got] == ids[:MAX_WATCHLIST]
+
+
+def test_the_watchlist_ids_alone_are_what_filters_ideas() -> None:
+    doc = {"watchlist": {"instruments": ["EQ:B", "EQ:A", "EQ:B", 3]}}
+    assert load_watchlist_ids(ctx_of(doc)) == ("EQ:B", "EQ:A")
+    assert load_watchlist_ids(ctx_of(None)) == ()

@@ -968,3 +968,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf (owner away)
 - status: pending owner confirmation
 - Reasoning: the exchange minimum is published, stable and broker-neutral, the one figure the site can state accurately for every trader; a stale multiplier shown as a named broker's rule is a data-quality and liability risk (data tenet), a hand-kept broker list has no ingestion check, and a broker select sits against ADR 0083's no-broker-links and no-account-profile rules.
+## 2026-11-02 | ADR 0083 amendment (c), V7 follow-up | The watchlist filters both Ideas lists; one "Showing N of M on your watchlist" line, no toggle
+- Question: the watchlist filters Ideas after the cap of 15 (plan V3 / V7). Does it also filter the Unproven pool (`Query.ideas(tab)`)? With a watchlist, what do `total` and a setup's `picked` count, and does the page say how many the watchlist hid? Does the page need a Watchlist / All toggle?
+- Options: setup list only / both lists. Counts watched only / unfiltered with a "shown of" line. A toggle / a line with its Guide entry and a link to Settings.
+- Decision: both lists (the pool after the rule ranked it, so each screener's first picks are unchanged); `total` and `picked` stay unfiltered, `shown` and the licence left-out count only watched names, and the page says "Showing N of M ideas: your watchlist" (`watchlist` on `SetupIdeas` and `Ideas`: the count before the filter, null with no watchlist); no toggle, the line's "Edit watchlist" opens Settings.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: one rule for the whole page is what the amendment's "on Ideas it is a filter" says; the pool already filters server side, so it is one more predicate; without the "of M" an empty group would read as "no picks"; a toggle adds page state and a control (owner 2026-10-25: less code).

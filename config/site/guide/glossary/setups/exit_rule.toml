@@ -1,14 +1,15 @@
 # L3 site setting: the Guide glossary, a setup's historical exit rule (ADR 0083 decision 3, ADR 0051). One [[term]]
 # each: id, term, short (one sentence), body, next, see_also. Typed by
 # src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
-# The three stop kinds of the exit rule's `kind` (services/read/evaluation/positions/exit_rule.py).
+# The three stop kinds of the exit rule's `kind`, the three bases of its `basis` and an option
+# setup's other declared exits (services/read/evaluation/positions/exit_rule.py).
 
 [[term]]
 id = "exit_stop_history"
 term = "Historical stop"
 short = "The drawdown that most of the setup's winning trades never went past, taken from its own tested history."
 body = """
-The stop is the 80th percentile of the dip each winning trade took before it won, over the trades the setup's verdict rests on. A stop of 7% below the entry close means 80% of the winners never fell further than that, and 20% did. It is a distance measured on past trades, not a prediction for this pick. It rests on the number of winning trades shown beside it: with few, it is noise, which is why a setup below the minimum shows the fallback instead. Don't read it as the loss a pick will stop at: a pick that falls further can still recover.
+The stop is the 80th percentile of the dip each winning trade took before it won, over the trades the setup's verdict rests on. A stop of 7% below the entry close means 80% of the winners never fell further than that, and 20% did. It is a distance measured on past trades, not a prediction for this pick. It rests on the number of winning trades shown beside it: with few, it is noise. Below the minimum a share setup shows the fallback instead and an option setup shows none. For an option setup the distance is the worst loss on the position's marks as a share of its collateral, not a fall in the share price. Don't read it as the loss a pick will stop at: a pick that falls further can still recover.
 """
 next = "Compare the stop with the setup's losing trades in its ledger before relying on the distance."
 see_also = ["exit_stop_fallback", "exit_hold"]
@@ -38,7 +39,67 @@ id = "exit_hold"
 term = "Hold"
 short = "How many trading sessions the setup holds a pick, the holding period its verdict was judged on."
 body = """
-The hold is the horizon of the setup's verdict basis: a hold of 20 means the tested trade closed on the 20th session after entry. It counts exchange sessions, so a weekend adds nothing. The statistics shown for the setup are for that holding period only. A different hold is a different test. Don't stretch it: the evidence says nothing about trades held longer.
+The hold is the horizon of the setup's verdict basis: a hold of 20 means the tested trade closed on the 20th session after entry. It counts exchange sessions, so a weekend adds nothing. An option position cannot outlive its contract, so an option setup's hold is the earlier of that horizon and the option's expiry. The statistics shown for the setup are for that holding period only. A different hold is a different test. Don't stretch it: the evidence says nothing about trades held longer.
 """
 next = "Open the setup's evidence to see the results at this holding period."
 see_also = ["exit_stop_history", "verdict_basis"]
+
+[[term]]
+id = "exit_basis_entry"
+term = "Stop basis: entry price"
+short = "The stop is a fall in the share price below the entry reference close."
+body = """
+A share setup's stop is a distance below the close the pick is entered from. A stop of 0.07 on this basis means the share price fell 7% below that close. It is a price level you can watch on a chart. It says nothing about an option position's loss, which depends on its legs and time to expiry.
+"""
+next = "Turn the fraction into a price with the reference close shown on the idea."
+see_also = ["exit_stop_history", "exit_basis_credit", "exit_basis_collateral"]
+
+[[term]]
+id = "exit_basis_credit"
+term = "Stop basis: credit"
+short = "The stop is a loss of this many times the credit the option position collected."
+body = """
+An option setup that sells premium declares its stop as a multiple of the credit it receives. A stop of 2 on this basis closes the position when its loss reaches twice the credit, at a close. It is the rule the backtest used, so the setup's results already include its stopped trades. A price gap can carry the loss past the stop before a close that would trigger it.
+"""
+next = "Multiply the credit on the example position by the stop to read it in dollars."
+see_also = ["exit_stop_declared", "exit_basis_collateral", "exit_take_profit"]
+
+[[term]]
+id = "exit_basis_collateral"
+term = "Stop basis: collateral"
+short = "The stop is a loss on the option position's marks of this share of the collateral it ties up."
+body = """
+An option setup that declares no stop gets one from its history. Each winning trade's worst loss on its daily marks is taken as a share of the position's collateral, and the stop is the level 80% of winners never passed. A stop of 0.08 on this basis means a mark loss of 8% of the collateral. Marks are mid prices at the close, so a thin chain can show losses a fill would not have. It is not from a declared rule and the backtest never stopped out at it.
+"""
+next = "Read it against the collateral on the example position, and against the setup's losing trades."
+see_also = ["exit_stop_history", "exit_basis_credit", "position_mark_loss_share"]
+
+[[term]]
+id = "exit_take_profit"
+term = "Take profit (declared)"
+short = "The option setup closes the position once it has captured this share of the credit."
+body = """
+A take profit of 0.5 closes the position at the first close where half the credit collected is kept as profit. It is part of the rule the backtest used, published as declared. It caps the gain of each trade: the setup trades the rest of the credit for a shorter time at risk. Its results are only for this setting; another setting is another test.
+"""
+next = "Check how often the setup's trades closed by take profit in its ledger."
+see_also = ["exit_basis_credit", "exit_dte_declared", "position_profit_share"]
+
+[[term]]
+id = "exit_dte_declared"
+term = "Exit days to expiry (declared)"
+short = "The option setup closes the position at this many calendar days before the option expires."
+body = """
+An exit at 21 days to expiry closes the position at the first close with 21 calendar days or fewer left, whatever its profit. Setups declare it to avoid the last weeks, when a price move changes an option's value fastest. It is part of the tested rule and counts calendar days, unlike the hold, which counts sessions.
+"""
+next = "Read the hold beside it: the earlier of the two ends the trade."
+see_also = ["exit_hold", "exit_take_profit", "position_dte"]
+
+[[term]]
+id = "exit_condition_declared"
+term = "Exit condition (declared)"
+short = "A rule over the position's own fields and market fields that closes the option position at the first close it is true."
+body = """
+Beside its fixed exits an option setup can declare a condition, such as the position's delta passing a level. The page names the fields it reads, each with its own Guide entry. The condition is checked at closes only, and one whose fields are unknown at a close never fires. It is part of the rule the backtest used.
+"""
+next = "Open each field's Guide entry to see what it measures and when it can be missing."
+see_also = ["exit_take_profit", "exit_dte_declared", "position_delta"]

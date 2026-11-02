@@ -41,3 +41,10 @@ def periods(name: str, first: date, last: date) -> list[Period]:
     out = out_of_window_stretches(occupied, window_length(name), last)
     found = [*(period(w, True) for w in placed), *(period(s, False) for s in out)]
     return sorted(found, key=lambda p: p.first)
+
+
+def window_decides(name: str, day: date) -> bool:
+    """Whether ``day`` is the decision session D of a window of kind ``name`` (the calendar's
+    alone: a window is known ahead, so this reads no data; the stored picks, ADR 0088)."""
+    around = windows(name, day - _REACH, day + 2 * _REACH)
+    return any(decision_session(w) == day for w in around)

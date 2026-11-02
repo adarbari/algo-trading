@@ -1,5 +1,5 @@
 """``load_setup_picks``: a tab's list from its qualifying setups (cap, also-in, groups, the
-Unproven state when no setup qualifies, the left-out counts)."""
+Unproven state when no setup qualifies, the left-out counts, the watchlist after the cap)."""
 
 from datetime import date
 from types import SimpleNamespace
@@ -29,13 +29,18 @@ def _set(setup: QualifyingSetup, ids: list[str], state: str = of_setup.PICKED) -
 
 @pytest.fixture
 def wire(monkeypatch: pytest.MonkeyPatch) -> Any:
-    def go(sets: list[Any], left: dict[tuple[str, str], tuple[str, ...]] | None = None) -> None:
+    def go(
+        sets: list[Any],
+        left: dict[tuple[str, str], tuple[str, ...]] | None = None,
+        watched: tuple[str, ...] = (),
+    ) -> None:
         by_id = {s.setup.edge.id: s for s in sets}
         found = SessionSetups(tuple(s.setup for s in sets), left or {})
         monkeypatch.setattr(picks, "load_session_setups", lambda ctx: found)
         monkeypatch.setattr(of_setup, "load_pick_set", lambda ctx, s: by_id[s.edge.id])
         monkeypatch.setattr(picks, "load_results", lambda ctx, wanted, runs: {})
         monkeypatch.setattr(picks, "earnings_first", lambda ctx, ids: set())
+        monkeypatch.setattr(picks, "load_watchlist_ids", lambda ctx: watched)
 
     return go
 
@@ -78,7 +83,30 @@ def test_a_night_that_picks_nothing_is_an_empty_list_never_unproven(wire: Any) -
 def test_licence_dropped_picks_are_counted_not_named(wire: Any) -> None:
     a = _setup("a", "works", 4.0)
     held = _set(a, [])
-    held = of_setup.SetupPickSet(a, of_setup.PICKED, None, held.run, (), 3)
+    held = of_setup.SetupPickSet(a, of_setup.PICKED, None, held.run, (), ("EQ:1", "EQ:2", "EQ:3"))
     wire([held])
     found = picks.load_setup_picks(CTX, "stocks")
     assert [(c.kind, c.count) for c in found.left_out] == [(picks.LICENCE, 3)]
+
+
+def test_the_watchlist_keeps_watched_ideas_under_the_cap_and_never_counts_hidden_ones(
+    wire: Any,
+) -> None:
+    """ADR 0083 amendment (c): the filter applies after the cap of 15; ``total`` and ``picked``
+    are the unfiltered list's, ``shown`` and the licence count only watched names."""
+    a, b = _setup("a", "works", 4.0), _setup("b", "promising", 9.0)
+    held = of_setup.SetupPickSet(b, of_setup.PICKED, None, None, (), ("EQ:L1", "EQ:L2"))
+    ids = [f"EQ:A{n:02d}" for n in range(20)]
+    wire([_set(a, ids), held], watched=("EQ:A03", "EQ:A17", "EQ:L2"))
+    found = picks.load_setup_picks(CTX, "stocks")
+    assert [(i.instrument_id, i.rank) for i in found.ideas] == [("EQ:A03", 4)]  # A17: past the cap
+    assert (found.total, found.watchlist) == (20, picks.CAP)
+    assert [(g.edge_id, g.picked, g.shown) for g in found.groups] == [("a", 20, 1), ("b", 0, 0)]
+    assert [(c.kind, c.count) for c in found.left_out] == [(picks.LICENCE, 1)]
+
+
+def test_no_watchlist_is_no_filter(wire: Any) -> None:
+    a = _setup("a", "works", 4.0)
+    wire([_set(a, ["EQ:X", "EQ:Y"])])
+    found = picks.load_setup_picks(CTX, "stocks")
+    assert ([i.instrument_id for i in found.ideas], found.watchlist) == (["EQ:X", "EQ:Y"], None)

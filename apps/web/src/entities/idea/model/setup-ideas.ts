@@ -49,6 +49,8 @@ export interface SetupIdeas {
   /** `listed`: a setup qualifies; `unproven`: none does. */
   state: 'listed' | 'unproven';
   total: number;
+  /** The ideas under the cap before the viewer's watchlist kept the watched ones (null: none). */
+  watchlist: number | null;
   leftOut: { kind: string; count: number }[];
   groups: SetupGroup[];
   /** Every idea, best first (the same rows the groups hold). */
@@ -82,6 +84,7 @@ export function toSetupIdeas(response: SetupIdeasResponse): SetupIdeas | null {
     session: found.session,
     state: found.state === 'listed' ? 'listed' : 'unproven',
     total: found.total,
+    watchlist: found.watchlist ?? null,
     leftOut: found.leftOut,
     ideas,
     groups: found.groups.map((g) => ({

@@ -31,7 +31,7 @@ function setup() {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  return { wrapper };
+  return { wrapper, client };
 }
 
 describe('the stored choices', () => {
@@ -82,5 +82,23 @@ describe('the stored choices', () => {
     await waitFor(() => {
       expect(read.result.current.data?.watchlist).toHaveLength(1);
     });
+  });
+
+  it('read the Ideas lists again after a watchlist save, since the watchlist filters them', async () => {
+    GQL.mockResolvedValue(answer('stocks'));
+    PUT.mockResolvedValue({ data: { instruments: ['EQ:AAA'] }, response: new Response() });
+    const { wrapper, client } = setup();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const save = renderHook(() => useSaveWatchlist(), { wrapper });
+    await act(async () => {
+      await save.result.current.mutateAsync([{ instrumentId: 'EQ:AAA', symbol: 'AAA' }]);
+    });
+    const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        ['gql', 'SetupIdeas'],
+        ['gql', 'IdeasPage'],
+      ]),
+    );
   });
 });

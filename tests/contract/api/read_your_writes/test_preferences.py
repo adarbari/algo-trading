@@ -2,9 +2,21 @@
 table's saved view shows on the very next ``TableView`` read (cached per user),
 and another user's view is untouched."""
 
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.users import Role
+from algotrade.config.user import UserContext
+from algotrade.storage.configs.writer import FileConfigWriter
+from algotrade_api.deps import ApiSettings, ReadStore
+from algotrade_api.main import create_app
+from tests.apps.api.routes.authoring.conftest import PRESET, USERS
+from tests.conftest import REPO_ROOT
 from tests.contract.api.read_your_writes.conftest import Gate
+from tests.helpers.api_store import as_user
 
 VIEW = """query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) { scope saved columns sort decisions names }
@@ -87,3 +99,62 @@ def test_watchlist_put_shows_the_saved_instruments(
     assert c.put("/preferences/watchlist", json={"instruments": []}).status_code == 200
     assert gate.fresh(c, PREFS)["watchlist"] == []
     assert gate.warm(trader_client, PREFS)["watchlist"] == []  # bob's own
+
+
+POOL = """query IdeasPage($tab: IdeaTab) {
+  ideas(tab: $tab) { total watchlist items { instrumentId rank } }
+}"""
+SETUP_IDEAS = """query SetupIdeas($tab: IdeaTab!) {
+  setupIdeas(tab: $tab) { state total watchlist ideas { instrumentId } }
+}"""
+
+
+@pytest.fixture
+def ideas_clients(
+    api_golden: tuple[ReadStore, dict[str, str]], root: Path
+) -> tuple[TestClient, TestClient]:
+    """local and bob over the golden store's ``vrp_scanner`` run (a site preset here, with the
+    ranking rule), both holding the licences its fields need so its picks are not withheld."""
+    site = root / "site"
+    (site / "presets" / "screeners" / "vrp_scanner").mkdir()
+    preset = PRESET.replace('id = "vrp"', 'id = "vrp_scanner"').replace(
+        "version = 3", "version = 1"
+    )
+    (site / "presets" / "screeners" / "vrp_scanner" / "v1.toml").write_text(preset)
+    (site / "ranking").symlink_to(REPO_ROOT / "config" / "site" / "ranking")
+    held = 'role = "admin"\nlicences = ["personal", "yahoo"]'
+    trader = 'id = "bob"\nrole = "trader"\nlicences = ["personal", "yahoo"]'
+    users = USERS.replace('role = "admin"', held).replace('id = "bob"\nrole = "trader"', trader)
+    (site / "users.toml").write_text(users)
+
+    def client(user: str, role: Role) -> TestClient:
+        writer = FileConfigWriter(root)
+        store = replace(api_golden[0], configs=writer, user=UserContext(user))
+        settings = ApiSettings("memory://", str(root))
+        return TestClient(create_app(settings, store, writer, authenticator=as_user(user, role)))
+
+    return client("local", Role.ADMIN), client("bob", Role.TRADER)
+
+
+def test_watchlist_put_filters_ideas_on_the_next_read(
+    gate: Gate, ideas_clients: tuple[TestClient, TestClient]
+) -> None:
+    """ADR 0083 amendment (c): a watchlist write filters the very next Ideas read (the tab's
+    pool and its setup list), though no publish or run moved; another user's Ideas are not."""
+    c, bob = ideas_clients
+    every = gate.warm(c, POOL, tab="STOCKS")
+    listed = gate.warm(c, SETUP_IDEAS, tab="STOCKS")
+    assert every["watchlist"] is None and listed["watchlist"] is None
+    assert len(every["items"]) > 1, "the fixture's pool lists ideas"
+    second = every["items"][1]
+    gate.warm(bob, POOL, tab="STOCKS")
+    assert (
+        c.put("/preferences/watchlist", json={"instruments": [second["instrumentId"]]}).status_code
+        == 200
+    )
+    mine = gate.fresh(c, POOL, tab="STOCKS")
+    assert (mine["items"], mine["total"], mine["watchlist"]) == ([second], 1, every["total"])
+    assert gate.fresh(c, SETUP_IDEAS, tab="STOCKS")["state"] == listed["state"]
+    assert gate.warm(bob, POOL, tab="STOCKS") == every  # bob's own
+    assert c.put("/preferences/watchlist", json={"instruments": []}).status_code == 200
+    assert gate.fresh(c, POOL, tab="STOCKS") == every
