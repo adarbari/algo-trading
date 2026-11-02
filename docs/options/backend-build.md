@@ -318,7 +318,7 @@ Take the next free number right before the push (`make numbering`): **0088** (#9
 | D1 | `rates/treasury` back to 2002 from the Treasury source (the rates task; not part of the Tiingo session, whose job is `bars-history --since 2002-01-01`) | rates task | `add-data-source` if code | curve stored on 2002-01-02 | none |
 | D7 | (dropped by G16-M1: `events/earnings.time` already exists) | | | | |
 | D8 | (G25) 2002-2009 prerequisites on this store: bars from the running Tiingo `bars-history --since 2002-01-01` session (reference, not redone), bills from D1 (Treasury source); `events/dividend` from #974 (check it ran here); then `run outcomes` and `residual_returns` for 2002-2009 (about 8.5 GB [I], detached per README "Long runs") | owner action; existing tasks | none | coverage check: bars, `forward_returns@v2`, `rates/treasury` and `events/dividend` on 2002-01-02 | the Tiingo session, #974 |
-| D9 | (G25) Cboe chain growth check: 97 MB a session [M], about 24 GB a year [I]; review columns, sort and `cluster_by` of `chains/option_quotes` before a year accrues | `tasks/market/option_chains.py`, `storage/tables/schemas/` | | bytes a session measured before and after ("estimated X, measured Y") | none |
+| D9 | (G25) Cboe chain growth check: 97 MB a session [M], about 24 GB a year [I]; review columns, sort and `cluster_by` of `chains/option_quotes` before a year accrues | `tasks/market/option_chains.py`, `storage/tables/schemas/` | | bytes a session measured before and after ("estimated X, measured Y") | none. **Done (2026-11-02, no schema change):** estimated 97 MB a session [M], measured 47.5 MiB a session of data (one run file, 1,552,486 rows on 2026-10-30, 4,119 underlyings; 41-47 MB on the single-run partitions); the 83-97 MB the store showed was a second, value-identical run file kept as the run's `prev` after a re-pull, so the estimate counted every row twice. About 12 GB a year [I] (252 x 47.5 MiB), not 24. Sorting by `instrument_id` is what the file already is; re-sorting by underlying, expiry, right, strike changes it by +0.02 MB, one row group per 2 M rows saves 2.5%, zstd level 9 saves 8% (all [M] on a copy): not worth a schema, sort or `cluster_by` change. Follow-up: [storage.md](../data/storage.md) "Chain growth" |
 | D2 | Scheduled FOMC dates 2002-2023 with declared `known_from` per year | `config/site/events/releases.toml`, `tasks/macro/calendar.py` (`known_from` override) | config + small code | fitness: 8 scheduled a year, unscheduled excluded, `known_from` <= the year's first meeting | E0 (0050 d3 exception) |
 | D3 | Episodes `aug_2015`, `volmageddon_2018`, `yen_carry_2024` + Guide entries | `config/site/regime/episodes.toml` | `add-guide-content` | guide coverage test | none |
 | D4 | COR1M, COR3M, DSPX, SKEW series (P2) | `macro-ingestion` | `add-data-source` | recorded-CSV parser test | none |
@@ -367,7 +367,7 @@ Screeners as explicit entities (G8) need no code: the entities, the pick rule an
 | X6 | Re-file c12, c13, c14, c16; retire c18 (P2) | E6b, F6, F7 |
 | X7 | The wheel book (P2) | E8b |
 | X8 | Guide: setups, positions and templates, entry and exit rules, states, "why nothing is on today", "why we do not publish put-buying setups", the bootstrap caveat | E10 |
-| X9 | Optional (owner decision 7): a share setup re-filed as a new version with `verdict_profile = "tails"`, judged beside its `return` version | E6b; decision 7 |
+| X9 | Optional (owner decision 7): a share setup re-filed as a new version with `verdict_profile = "tails"`, judged beside its `return` version | E6b; decision 7 **Skipped (2026-11-02, decision log, pending owner confirmation):** the judged long setups with enough trades (`momentum_at_earnings`, `momentum_12_1`) have positive skew, so the tails criteria would not change a `return` verdict, the fat-tailed setups are short and G20 leaves those unjudged, 63 of 66 edges read `not_enough_data`, and a new id is one more deflated-Sharpe trial with no verdict to deflate. Reopen after E6b-1 has deployed and the first share setup reaches `promising`: `momentum_at_earnings_tails` (`verdict_profile = "tails"`, `baselines = ["momentum_at_earnings"]`, the `return` version kept live). |
 
 ### Dependency map and parallel start
 
@@ -632,8 +632,8 @@ measured Y").
 - 2002-2009 share outcomes (D8): about 1.07 GB a year from the measured 18 GB [M basis], so about
   8.5 GB [I]; at about 1.3 s a session (roadmap ED2 [M there]) about 0.7 h for 2,000 sessions [I],
   run detached.
-- Cboe chains: 97 MB a session [M], about 24 GB a year [I]; D9 states bytes per session before and
-  after its change ("estimated X, measured Y").
+- Cboe chains: estimated 97 MB a session [M], about 24 GB a year [I]; D9 measured 47.5 MiB a session
+  [M] (the 97 MB counted a redundant second run file), about 12 GB a year [I]; no change made.
 - Rule evaluation itself (`evaluate_group` per row): microseconds per row [I]; the cost is the reads.
 - Entry condition (E13): per decision session, `within_sessions` extra session reads of the named
   groups for the eligible names, 0.1-0.5 s per session read [I], so 0.5-2.5 s per D at a wait of 5

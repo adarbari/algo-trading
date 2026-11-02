@@ -291,3 +291,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: `scroll` has no home for groups, range editors or the count, so keeping it would be a second, lesser filter model on phones.
+## 2026-11-02 | ADR 0088 X9 | A share setup re-filed with the tails verdict profile: skipped for now
+- Question: build X9 (a share setup as a new version with `verdict_profile = "tails"`, judged beside its `return` version, owner decision 7), and which setup?
+- Options: build now / build after E6b-1 on the fattest-tailed judged setup / skip until a share setup is `promising`.
+- Decision: skip for now. If built later: `momentum_at_earnings` as a new site document `momentum_at_earnings_tails` with `verdict_profile = "tails"` and `baselines = ["momentum_at_earnings"]`, the `return` version kept live; reopen after E6b-1 has deployed and the first share setup reaches `promising`.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the fat left tails (stored `results/edge_trades`: `reverse_split_distress_filter` skew -12.5, `idiosyncratic_volatility_and_max`, `late_filer_nt_drift`) sit on short setups, which G20 leaves unjudged; the judged long setups with enough trades (`momentum_at_earnings` 27k trades, `momentum_12_1` 50k) have positive skew, so PSR and CVaR-ratio criteria would not change a `return` verdict; 63 of 66 edges read `not_enough_data`, and a new id is a new trial log and one more deflated-Sharpe trial with no verdict to deflate; nothing is lost by waiting (no new data).
