@@ -21,7 +21,6 @@ import { mockApi } from './mock-api';
 const ROUTES = [
   ...WORKSPACES.flatMap((w) => w.sections.map((s) => s.path)),
   '/settings',
-  '/onboarding',
   '/guide',
   '/guide/start/how_the_app_thinks',
   '/guide/glossary',

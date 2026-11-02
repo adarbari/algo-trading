@@ -222,7 +222,7 @@ export type AcceptedFormulasQuery = { acceptedFormulas: { today: string, days: n
 export type AppearanceQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AppearanceQuery = { appearance: { theme: string } };
+export type AppearanceQuery = { appearance: { theme: string, startTab: string | null } };
 
 export type OptionChainQueryVariables = Exact<{
   key: string;
@@ -895,6 +895,7 @@ export const AppearanceDocument = new TypedDocumentString(`
     query Appearance {
   appearance {
     theme
+    startTab
   }
 }
     `) as unknown as TypedDocumentString<AppearanceQuery, AppearanceQueryVariables>;

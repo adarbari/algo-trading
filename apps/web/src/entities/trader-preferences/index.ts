@@ -4,7 +4,6 @@
  * (instrument ids only); `useSaveIdeasTab` and `useSaveWatchlist` change them.
  */
 export {
-  ensureTraderPreferences,
   useSaveIdeasTab,
   useSaveWatchlist,
   useTraderPreferences,

@@ -1,25 +1,21 @@
 /**
  * The TRADER workspace's layout route (the default workspace): pathless, so its sections sit
  * at the top level (`/ideas`, `/explore`, ...), behind the workspace guard; a viewer with no
- * stored start tab is sent to `/onboarding` by `OnboardingRedirect` (never blocking the page). It also holds the
- * two routes around the product, not sections of it: `/settings` (from the account menu) and
- * `/onboarding` (the one sign-up question).
+ * stored start tab is sent to `/onboarding` by `OnboardingRedirect` (never blocking the page, no extra request). It also holds
+ * `/settings` (from the account menu; the one sign-up question while it is unanswered), a route
+ * around the product, not a section of it.
  */
 import { createRoute } from '@tanstack/react-router';
-import { lazy, Suspense } from 'react';
 
 import { lazyPage } from '@/shared/lib/lazy';
 
 import { WorkspaceLayout } from '../../layouts';
 import { TRADER, workspaceGuard } from '../../workspaces';
+import { OnboardingRedirect } from '../../workspaces/onboarding-redirect';
 import { pageRoute } from '../page-loader';
 import { rootRoute } from '../root';
 
 const guard = workspaceGuard('trader');
-// Loaded on demand: the entry chunk carries only the import (perf-budgets.json).
-const OnboardingRedirect = lazy(() =>
-  import('../../workspaces/onboarding').then((m) => ({ default: m.OnboardingRedirect })),
-);
 
 export const traderRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -28,26 +24,16 @@ export const traderRoute = createRoute({
   component: () => (
     <>
       <WorkspaceLayout workspace={TRADER} />
-      <Suspense fallback={null}>
-        <OnboardingRedirect />
-      </Suspense>
+      <OnboardingRedirect />
     </>
   ),
 });
 
-const SettingsPage = lazyPage(() => import('@/pages/settings'), 'SettingsPage');
-const OnboardingPage = lazyPage(() => import('../../workspaces/onboarding'), 'OnboardingScreen');
+const SettingsScreen = lazyPage(() => import('../../workspaces/settings-screen'), 'SettingsScreen');
 
 export const settingsRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'settings',
-  ...pageRoute(SettingsPage),
-  component: SettingsPage,
-});
-
-export const onboardingRoute = createRoute({
-  getParentRoute: () => traderRoute,
-  path: 'onboarding',
-  ...pageRoute(OnboardingPage),
-  component: OnboardingPage,
+  ...pageRoute(SettingsScreen),
+  component: SettingsScreen,
 });

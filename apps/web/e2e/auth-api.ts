@@ -48,9 +48,14 @@ export async function mockViewer(page: Page, options: ViewerMockOptions = {}): P
       await route.fulfill({ json: { data: { session: { date: '2026-10-07' } } } });
       return;
     }
-    // The stored theme (entities/appearance): System, so the pinned colour scheme decides.
+    // The stored theme (entities/appearance): System, so the pinned colour scheme decides; and
+    // the sign-up answer, given, so no page is sent to /onboarding.
     if (/query\s+Appearance\b/.test(body?.query ?? '')) {
-      await route.fulfill({ json: { data: { appearance: { theme: 'system' } } } });
+      await route.fulfill({
+        json: {
+          data: { appearance: { theme: 'system', startTab: 'stocks' } },
+        },
+      });
       return;
     }
     // The sign-up answer (entities/trader-preferences): given, so no page is sent to /onboarding.

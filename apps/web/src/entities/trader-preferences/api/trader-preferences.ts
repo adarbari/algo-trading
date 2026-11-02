@@ -5,7 +5,7 @@
  * `PUT /preferences/watchlist` (writes stay REST, ADR 0037). A save shows at once (the cache is
  * set before the request) and is put back when the write fails.
  */
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, gql, graphql, queryKeys, unwrap, type gqlTypes } from '@/shared/api';
 
@@ -24,6 +24,8 @@ const TraderPreferencesQuery = graphql(`
 `);
 
 const preferencesKey = queryKeys.gql('TraderPreferences', {});
+/** The shell's `Appearance` read also carries the start tab (the sign-up check): kept in step. */
+const shellKey = queryKeys.gql('Appearance', {});
 
 /** A name on the watchlist: its id, and its ticker when the session's snapshot has one. */
 export interface WatchedName {
@@ -52,19 +54,6 @@ export function useTraderPreferences(enabled = true) {
   });
 }
 
-/** Reads the choices into the cache for a route guard (the sign-up question decides the route). */
-export async function ensureTraderPreferences(client: QueryClient): Promise<TraderPreferences> {
-  const answer = await client.query({
-    queryKey: preferencesKey,
-    queryFn: ({ queryKey }) => gql(TraderPreferencesQuery, {}, queryKey),
-  });
-  const tab = answer.traderPreferences.defaultTab;
-  return {
-    defaultTab: isIdeasTab(tab) ? tab : null,
-    watchlist: answer.traderPreferences.watchlist,
-  };
-}
-
 type Cached = gqlTypes.TraderPreferencesQuery;
 
 function useOptimistic<T>(change: (cached: Cached, value: T) => Cached) {
@@ -84,9 +73,15 @@ function useOptimistic<T>(change: (cached: Cached, value: T) => Cached) {
 
 /** Saves the default Ideas tab (the sign-up answer, or a change in Settings). */
 export function useSaveIdeasTab() {
+  const client = useQueryClient();
   return useMutation({
     mutationFn: (tab: IdeasTab) =>
       unwrap(api.PUT('/preferences/ideas', { body: { default_tab: tab } })),
+    onSuccess: (_saved, tab) => {
+      client.setQueryData<gqlTypes.AppearanceQuery>(shellKey, (cached) =>
+        cached ? { ...cached, appearance: { ...cached.appearance, startTab: tab } } : cached,
+      );
+    },
     ...useOptimistic<IdeasTab>((cached, tab) => ({
       traderPreferences: { ...cached.traderPreferences, defaultTab: tab },
     })),

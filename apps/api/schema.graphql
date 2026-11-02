@@ -59,6 +59,11 @@ The theme the user chose: `light`, `dark` or `system` (the device decides); `sys
 """
 type Appearance {
   theme: String!
+
+  """
+  The Ideas tab the user opens on (`stocks` or `premium`); null until they answered the sign-up question (ADR 0083)
+  """
+  startTab: String
 }
 
 """

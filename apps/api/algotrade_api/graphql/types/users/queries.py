@@ -7,7 +7,7 @@ from strawberry.types import Info
 from algotrade.services.read.users.appearance import load_appearance
 from algotrade.services.read.users.trader import load_trader_preferences
 from algotrade.services.read.users.viewer import load_viewer
-from algotrade_api.graphql.context import RequestContext
+from algotrade_api.graphql.context import RequestContext, selects
 from algotrade_api.graphql.offload import INLINE
 from algotrade_api.graphql.types.users.appearance import Appearance
 from algotrade_api.graphql.types.users.trader_preferences import TraderPreferences
@@ -43,7 +43,8 @@ class UserQuery:
         "2026-11-01). Per user; the tickers come from the session's reference snapshot"
     )
     def trader_preferences(self, info: Ctx) -> TraderPreferences:
-        ctx = info.context.read(None) or info.context.stores()
+        # tickers need the session's reference: opened only when the watchlist is asked for
+        ctx = (selects(info, "watchlist") and info.context.read(None)) or info.context.stores()
         return (
             TraderPreferences.of(load_trader_preferences(ctx))
             if ctx is not None

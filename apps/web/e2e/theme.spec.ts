@@ -17,7 +17,9 @@ async function storedTheme(page: Page, theme: string): Promise<void> {
       await route.fallback();
       return;
     }
-    await route.fulfill({ json: { data: { appearance: { theme } } } });
+    await route.fulfill({
+      json: { data: { appearance: { theme, startTab: 'stocks' } } },
+    });
   });
 }
 
