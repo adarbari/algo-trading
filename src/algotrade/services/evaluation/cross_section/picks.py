@@ -4,13 +4,16 @@ was known at the session, never an outcome (the harness joins those, ``harness.p
 ``screen_variant`` runs a resolved screener through ``services.screening.run.screen_session``
 and returns its rows best-first: a rule screen by its stored rank (score, tie-break, id), a
 Python screener by (score, id). ``eligible`` is the edge's universe at the session: the base
-rate and the decile spread are taken over it. ``long_picks`` is the long leg's one rule."""
+rate and the decile spread are taken over it. ``long_picks`` is the long leg's one rule and
+``side_picks`` a ``short`` or ``long_short`` outcome's (each leg ranked by the edge's own score, a
+short ascending), shared by the harness and the stored picks (``edge_picks``)."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.identity import LONG, SHORT
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
@@ -25,6 +28,11 @@ from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.run import screen_session
 from algotrade.services.selection import fields_view, select, selection_fields
 from algotrade.strategies.screeners.base import Decision
+
+# A short or long-short leg is ranked by score only when at least this share of the eligible names
+# carries one; the rest are ``unscored`` and never ranked (recent listings lack a year of history,
+# but a session where the signal was not computed at all has no honest bottom).
+MIN_SCORE_COVERAGE = 0.8
 
 
 @dataclass(frozen=True)
@@ -91,6 +99,33 @@ def long_picks(edge: Edge, qualified: Sequence[str], pickable: frozenset[str]) -
     paper record (``forward.signals``) and the stored picks (``edge_picks``, ADR 0081) share."""
     chosen = [i for i in qualified if i in pickable]
     return chosen if edge.top_k is None else chosen[: edge.top_k]
+
+
+def side_picks(
+    edge: Edge,
+    scores: Mapping[str, float],
+    pickable: frozenset[str],
+    adv: Mapping[str, float | None],
+    adv_floor: float | None,
+    hold: int | None = None,
+) -> tuple[list[tuple[str, list[str]]], list[str]]:
+    """The legs of a ``short`` or ``long_short`` outcome at one session (ADR 0053 amendment,
+    outcome sides), each ``(side, ids)`` with rank 1 first: the scored pickable names ranked by
+    score (never by the rule rank; a name with no score is in neither leg, as the deciles
+    leave it out), the long leg the best ``top_k``, the short leg the worst ``top_k`` among the
+    names whose 20-day dollar volume at D is known and at least ``adv_floor`` (the microcap short
+    cannot be done by an individual: ``capacity_adv_floor_usd``; unknown volume is not liquid).
+    Also the ids of a ``short`` outcome's buy/hold band, the shortable names ranked ``top_k + 1``
+    to ``hold`` (none for any other side)."""
+    assert edge.top_k is not None  # the document requires it for a side other than long
+    ranked = sorted((i for i in pickable if i in scores), key=lambda i: (-scores[i], i))
+    floor = adv_floor or 0.0
+    shortable = [i for i in ranked if (volume := adv.get(i)) is not None and volume >= floor]
+    short = shortable[::-1][: edge.top_k]
+    if edge.outcome.side == SHORT:
+        below = shortable[::-1][edge.top_k : hold] if hold is not None else []
+        return [(SHORT, short)], below
+    return [(LONG, ranked[: edge.top_k]), (SHORT, short)], []
 
 
 def _paths(chosen: SelectionResult, ids: Sequence[str]) -> dict[str, int]:

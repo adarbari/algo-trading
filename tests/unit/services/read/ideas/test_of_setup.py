@@ -27,8 +27,10 @@ SETUP = QualifyingSetup(
 CTX: Any = SimpleNamespace(session=SimpleNamespace(date=D))
 
 
-def _edge(code: str, place: int | None = None, who: str = "e1") -> PickEdge:
-    return PickEdge(who, "n", code == pick_edges.COUNTS, code, None, place)
+def _edge(
+    code: str, place: int | None = None, who: str = "e1", why: str = "", by_score: bool = False
+) -> PickEdge:
+    return PickEdge(who, "n", code == pick_edges.COUNTS, code, None, place, None, why, by_score)
 
 
 def _wire(
@@ -79,6 +81,28 @@ def test_not_a_decision_day_and_a_decision_day_that_picked_nothing_are_empty_wit
     assert of_setup.load_pick_set(CTX, SETUP).state == of_setup.NOT_A_DECISION_DAY
     _wire(monkeypatch, [], {of_setup.PROBE: (_edge(pick_edges.NOT_COUNTED),)})
     assert of_setup.load_pick_set(CTX, SETUP).state == of_setup.NOTHING_PICKED
+
+
+def test_a_night_the_setup_gate_closed_is_unknown_with_the_gates_reason_never_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paused = _edge(pick_edges.PAUSED, why="regime=STRESS")
+    _wire(monkeypatch, ["EQ:A"], {of_setup.PROBE: (paused,), "EQ:A": (paused,)})
+    found = of_setup.load_pick_set(CTX, SETUP)
+    assert found.state == of_setup.UNKNOWN and not found.picks
+    assert found.unknown is not None and "regime=STRESS" in str(found.unknown.cause)
+
+
+def test_short_picks_are_unknown_until_the_page_can_say_short_even_off_the_runs_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A short or long-short list is ranked by score, so its names are rarely among the run's
+    picked rows (and a long-short night with an empty short leg holds no short): the edge's
+    outcome decides (``by_score``), never the rows asked."""
+    probe = _edge(pick_edges.NOT_COUNTED, by_score=True)
+    _wire(monkeypatch, ["EQ:A"], {of_setup.PROBE: (probe,), "EQ:A": (probe,)})
+    found = of_setup.load_pick_set(CTX, SETUP)
+    assert found.state == of_setup.UNKNOWN and not found.picks
 
 
 def test_a_basis_screener_with_no_run_is_unknown(monkeypatch: pytest.MonkeyPatch) -> None:

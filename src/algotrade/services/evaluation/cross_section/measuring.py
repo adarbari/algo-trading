@@ -88,7 +88,12 @@ from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     decile_means,
 )
-from algotrade.services.evaluation.cross_section.picks import RankedRun, long_picks
+from algotrade.services.evaluation.cross_section.picks import (
+    MIN_SCORE_COVERAGE,
+    RankedRun,
+    long_picks,
+    side_picks,
+)
 from algotrade.services.evaluation.cross_section.portfolio.overlays import apply_overlays
 from algotrade.services.evaluation.cross_section.portfolio.session import (
     cash_return,
@@ -118,13 +123,8 @@ BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols
 
 
 # A stale universe stays measured (it is flagged pre_snapshot); partial or empty screens are not.
-# A session is measured only when at least this share of the eligible names carries the edge's
-# score; the rest are counted as ``unscored`` and never ranked (recent listings lack a year of
-# history, but a session where the signal was not computed at all is dropped). The screen's own
-# coverage (``DEFAULT_MIN_COVERAGE``) is a different check.
-MIN_SCORE_COVERAGE = 0.8
-
-
+# A session is measured only when at least ``picks.MIN_SCORE_COVERAGE`` of the eligible names
+# carries the edge's score. The screen's own coverage (``DEFAULT_MIN_COVERAGE``) is another check.
 MEASURED_COVERAGE = (RunCoverage.COMPLETE, RunCoverage.UNIVERSE_INCOMPLETE)
 
 
@@ -209,8 +209,8 @@ def _stat(
     ``event_names`` (an event schedule): the picks are the qualified names within them, and the
     base is them (``base = "event"``) or every eligible name. ``costs``: the site's cost grid
     (bp), whose hits a return outcome's leg also counts. ``adv_floor``: the least 20-day dollar
-    volume of a name a short leg may hold (``_side_picks``); ``option_costs``: an ``option_pnl``
-    edge's levels and commission."""
+    volume of a name a short leg may hold (``picks.side_picks``); ``option_costs``: an
+    ``option_pnl`` edge's levels and commission."""
     edge, day = scope.edge, leg.decision
     if variant.members:
         return _ensemble_stat(scope, session, variant, leg, horizon, rows, event_names)
@@ -239,7 +239,7 @@ def _stat(
         if thin:  # fail closed: the session is not measured, as an incomplete screen is not
             return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
         in_universe = []
-        legs, below = _side_picks(edge, run.scores, pickable, adv, adv_floor, hold)
+        legs, below = side_picks(edge, run.scores, pickable, adv, adv_floor, hold)
     picks = [i for _, ids_ in legs for i in ids_]
     pick_set = set(picks)
     unmeasured = set(res.index[res["excluded"] == UNMEASURED])  # a window over a bad bar (ADR 0061)
@@ -440,33 +440,6 @@ def _ensemble_stat(
             return _valued(scope, session, leg, horizon, rows, (), f"{why}:{member.id}")
         books.append(book)
     return _valued(scope, session, leg, horizon, rows, average_books(books), "")
-
-
-def _side_picks(
-    edge: Edge,
-    scores: Mapping[str, float],
-    pickable: frozenset[str],
-    adv: Mapping[str, float | None],
-    adv_floor: float | None,
-    hold: int | None = None,
-) -> tuple[list[tuple[str, list[str]]], list[str]]:
-    """The legs of a ``short`` or ``long_short`` outcome at one session (ADR 0053 amendment,
-    outcome sides), each ``(side, ids)`` with rank 1 first: the scored pickable names ranked by
-    score (never by the rule rank; a name with no score is in neither leg, as the deciles
-    leave it out), the long leg the best ``top_k``, the short leg the worst ``top_k`` among the
-    names whose 20-day dollar volume at D is known and at least ``adv_floor`` (the microcap short
-    cannot be done by an individual: ``capacity_adv_floor_usd``; unknown volume is not liquid).
-    Also the ids of a ``short`` outcome's buy/hold band, the shortable names ranked ``top_k + 1``
-    to ``hold`` (none for any other side)."""
-    assert edge.top_k is not None  # the document requires it for a side other than long
-    ranked = sorted((i for i in pickable if i in scores), key=lambda i: (-scores[i], i))
-    floor = adv_floor or 0.0
-    shortable = [i for i in ranked if (volume := adv.get(i)) is not None and volume >= floor]
-    short = shortable[::-1][: edge.top_k]
-    if edge.outcome.side == SHORT:
-        below = shortable[::-1][edge.top_k : hold] if hold is not None else []
-        return [(SHORT, short)], below
-    return [(LONG, ranked[: edge.top_k]), (SHORT, short)], []
 
 
 def _band(ids: Sequence[str], first: int, view: pd.DataFrame) -> tuple[Pick, ...]:
