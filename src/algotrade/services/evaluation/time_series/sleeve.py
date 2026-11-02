@@ -50,6 +50,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.framework.feature import strictest
+from algotrade.services.evaluation.cross_section.detail.licences import outcome_licence
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, own_rows
 from algotrade.services.evaluation.cross_section.portfolio.ladder import (
     book_figures,
@@ -221,6 +223,12 @@ def _trial(
         obs = [o for o in obs if o.gate == "open"]
     inside = [o for o in obs if o.period.inside]
     kept = [frames[o.period.entry] for o in inside]
+    based = (
+        stock.rows[stock.rows["instrument_id"] == instrument]
+        if instrument is not None and stock.rows is not None
+        else pd.DataFrame()
+    )  # the option rows it read (their price source's licence) and the stock rows of the base
+    licence = strictest((outcome_licence(mine), outcome_licence(based)))
     key = position_key(edge.outcome, horizon)
     spec = edge.outcome.position
     if spec is not None and spec.points:  # a case-valued trial: its rules and its points
@@ -240,6 +248,7 @@ def _trial(
         edge_variant=variant,
         identity=f"{edge.id}|{edge.schedule}|{symbol}|{key}|{edge.outcome.cost_bps}"
         + (f"|gate:{gate_key}" if gate_key else ""),  # a variant's own gate: another trial
+        outcome_licence=licence,
     )
 
 

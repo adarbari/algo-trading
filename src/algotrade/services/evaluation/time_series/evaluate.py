@@ -22,6 +22,7 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.windows import window_length, window_name
 from algotrade.data import StoreReader
+from algotrade.services.evaluation.cross_section.detail.licences import OPEN, outcome_licence
 from algotrade.services.evaluation.cross_section.measures import SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import DEFAULT_DRAWS
 from algotrade.services.evaluation.cross_section.reads.entry import read_entries
@@ -56,6 +57,8 @@ class InstrumentResult:
     identity: str = ""  # what the trial hash is of: edge, window or schedule, symbol (+ position)
     # a named sleeve's book and index tracking (E8b): its edge variant's, alike on each symbol
     book: dict[str, float | int | str | None] = field(default_factory=dict, compare=False)
+    # the strictest licence of the outcome rows the trial read (``detail/licences.outcome_licence``)
+    outcome_licence: str = OPEN
 
 
 @dataclass(frozen=True)
@@ -159,6 +162,11 @@ def _instrument(
         else None
     )
     oos = [o for o in obs if split is not None and o.period.decision >= split]
+    mine = (
+        read.rows[read.rows["instrument_id"] == instrument]
+        if instrument is not None and read.rows is not None
+        else pd.DataFrame()
+    )  # every measured row of the instrument: its windows and the stretches beside them
     return InstrumentResult(
         identity=f"{edge.id}|{window}|{symbol}",
         symbol=symbol,
@@ -172,6 +180,7 @@ def _instrument(
         timing=timing_sharpes(obs, bills),
         lost=dict(lost),
         trades=None if kept is None else series_trades(edge, kept),
+        outcome_licence=outcome_licence(mine),
     )
 
 

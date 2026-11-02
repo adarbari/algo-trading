@@ -1,9 +1,13 @@
 """The licence of a trial and of each per-name column of its ledger (ADR 0064 decision 10, ADR
 0028): the most restrictive catalogue licence of what the trial reads. The trial's (on
 ``edge_eval`` and every ledger row) is that of its implied-vol field (when the outcome reads one),
-its screen's features, its universe's features, its entry and case rules' fields (E13) and its
-setup gate's fields (E1: a gate over the personal VIX statistics makes the trial personal) and a
-book's canary and volatility-target fields (ADR 0074); a ledger
+its screen's features, its universe's features, its entry and case rules' fields (E13), its
+setup gate's fields (E1: a gate over the personal VIX statistics makes the trial personal), a
+book's canary and volatility-target fields (ADR 0074) and the fields its schedule is read from (a
+market trigger's or an event class's); the rules' licence and the outcome rows' together are the
+evidence licence that hides a setup from a viewer without it (ADR 0088 decision 20). One
+computation for every trial kind: a cross-section trial, a time-series window and a named
+sleeve's (edge variant, symbol) alike (``cross_section/harness.py``); a ledger
 column's is that of what it is derived from: the outcome value (with its gross value, reference
 and touch) from the implied-vol field, the score from the screen's features, the ADV from its
 own field. A field the catalogue
@@ -16,10 +20,12 @@ from dataclasses import dataclass
 import pandas as pd
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.schedules.markets import MARKET_TRIGGER_AGE, MARKET_TRIGGERS
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import LICENCES, strictest
+from algotrade.services.evaluation.cross_section.events import event_field
 from algotrade.services.evaluation.cross_section.reads.cases import case_fields
 from algotrade.services.evaluation.cross_section.reads.session import ADV_FIELD
 from algotrade.services.selection import selection_fields
@@ -31,15 +37,22 @@ STRICTEST = LICENCES[-1]
 @dataclass(frozen=True)
 class TrialLicences:
     """``trial``: the trial's own; ``value``, ``score``, ``adv``: the ledger columns'; ``outcome``:
-    the strictest licence of the outcome rows the run joined (ADR 0084 decision 1, ADR 0088
-    decision 20): what gates the setup's verdict and picks, as the screen's and universe's
-    fields keep their per-column redaction (decision B); it is part of ``trial``."""
+    the strictest licence of the outcome rows the run joined (ADR 0084 decision 1); ``rules``:
+    that of the fields its rules read (``rule_fields``, ADR 0088 decision 20). Both are part of
+    ``trial``; together they are ``evidence``, what gates the setup's verdict and picks, as the
+    screen's and universe's fields keep their per-column redaction (decision B)."""
 
     trial: str
     value: str
     score: str
     adv: str
     outcome: str = OPEN
+    rules: str = OPEN
+
+    @property
+    def evidence(self) -> str:
+        """The strictest of the outcome rows' and the rules' licences: the setup's own."""
+        return strictest((self.outcome, self.rules))
 
 
 def outcome_licence(rows: pd.DataFrame) -> str:
@@ -68,6 +81,26 @@ def screen_fields(config: ResolvedConfig, edge: Edge) -> tuple[str, ...]:
     return tuple(sorted(fields))
 
 
+def rule_fields(edge: Edge) -> tuple[str, ...]:
+    """Every field ``edge``'s rules read beside its screen and universe: the entry and case rules
+    (E13), the setup gate (E1), a book's canary and volatility-target fields (ADR 0074) and the
+    fields its schedule is read from (a market trigger's date and age, an event class's); an
+    exit rule's fields are in the outcome rows' own licence (the derivation records it)."""
+    entry, position = edge.outcome.entry, edge.outcome.position
+    ruled = {r.field for r in entry.when.rules()} if entry else set()
+    ruled |= set(case_fields(position.cases)) if position is not None else set()
+    ruled |= {r.field for r in edge.gate.rules()} if edge.gate is not None else set()
+    book = edge.outcome
+    ruled |= {book.canary.field} if book.canary is not None else set()
+    ruled |= {book.vol_return_field} if book.vol_target is not None else set()
+    trigger = edge.market_trigger
+    if trigger is not None and trigger in MARKET_TRIGGERS:
+        ruled |= {MARKET_TRIGGERS[trigger], MARKET_TRIGGER_AGE[trigger]}
+    if edge.event_class is not None:
+        ruled |= set(event_field(edge.event_class, edge.event_subtype).fields())
+    return tuple(sorted(ruled))
+
+
 def trial_licences(
     features: FeatureSet,
     edge: Edge,
@@ -77,25 +110,20 @@ def trial_licences(
     outcome: str = OPEN,
 ) -> TrialLicences:
     """The licences of one trial (a screener or baseline of one edge variant; an ensemble's are
-    those of every screener of its grid, the strictest); ``iv_licence``: its implied-vol field's
-    (None: the outcome reads none); ``outcome``: that of the outcome rows joined."""
+    those of every screener of its grid, the strictest; a time-series or sleeve trial has no
+    screener: ``configs`` empty); ``iv_licence``: its implied-vol field's (None: the outcome
+    reads none); ``outcome``: that of the outcome rows joined."""
     score = strictest(_of(features, screen_fields(c, edge)) for c in configs)
     universe_licence = _of(features, selection_fields(universe))
-    entry, position = edge.outcome.entry, edge.outcome.position  # read by the trial too (E13)
-    ruled = {r.field for r in entry.when.rules()} if entry else set()
-    ruled |= set(case_fields(position.cases)) if position is not None else set()
-    ruled |= {r.field for r in edge.gate.rules()} if edge.gate is not None else set()  # (E1)
-    book = edge.outcome  # a portfolio book's overlays read a field at D too (ADR 0074)
-    ruled |= {book.canary.field} if book.canary is not None else set()
-    ruled |= {book.vol_return_field} if book.vol_target is not None else set()
-    entry_licence = _of(features, sorted(ruled))
+    rules = _of(features, rule_fields(edge))
     value = iv_licence or OPEN
     return TrialLicences(
-        trial=strictest((value, score, universe_licence, outcome, entry_licence)),
+        trial=strictest((value, score, universe_licence, outcome, rules)),
         value=value,
         score=score,
         adv=_of(features, (ADV_FIELD,)),
         outcome=outcome,
+        rules=rules,
     )
 
 

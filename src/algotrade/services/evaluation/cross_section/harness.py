@@ -32,6 +32,7 @@ EXPLORATORY: its rows carry its split in their key and the flag, and the split j
 import hashlib
 from collections import Counter
 from collections.abc import Collection, Mapping, Sequence
+from dataclasses import replace
 from datetime import date, datetime
 from functools import partial
 from typing import Any
@@ -52,7 +53,7 @@ from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
-from algotrade.config.strategy.schema import MODEL_IMPL
+from algotrade.config.strategy.schema import MODEL_IMPL, Selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
@@ -522,11 +523,13 @@ def _time_series(
     session = SessionReads(reader, site_regime(configs.load).label, domains=domains)
     gate = None if edge.gate is None else partial(session.gate, edge.gate)
     gates, gate_keys = variant_gates(edge, session)
+    sleeve = edge.base == DELTA_EQUIVALENT
+    sleeved = sleeve_outcomes(edge, load_templates(configs)) if sleeve else ()
     run = (
-        evaluate_sleeve(reader, edge, sleeve_outcomes(edge, load_templates(configs)), start, end,
+        evaluate_sleeve(reader, edge, sleeved, start, end,
                         as_of, session.label, split, exploratory, gate,
                         load_verdict(configs).option_costs, gates, gate_keys, domains, features)
-        if edge.base == DELTA_EQUIVALENT
+        if sleeve
         else evaluate_time_series(
             reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,
             domains,
@@ -541,6 +544,9 @@ def _time_series(
     pbo = pbo_among({r.identity: dict(r.paired) for r in run.results if r.paired})
     sharpes = [r.measures[0].sharpe for r in run.results if r.measures[0].sharpe is not None]
     spread = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None  # as ``deflate`` reads it
+    ran = _as_ran(edge, sleeved)
+    if not isinstance(edge.universe, Selection):  # both measure named instruments only
+        raise ConfigurationError(f"edge {edge.id}: a time-series edge names its instruments")
     results = [
         VariantResult(
             r.symbol, SCREENER, keys[r.identity], r.horizon, (),
@@ -550,6 +556,9 @@ def _time_series(
             ),
             edge_variant=r.edge_variant, lost_sessions=r.lost, timing=r.timing or None,
             book=r.book or None,
+            licences=trial_licences(
+                features, ran[r.edge_variant], edge.universe, [], None, r.outcome_licence
+            ),
         )
         for r in run.results
     ]  # fmt: skip
@@ -576,6 +585,17 @@ def _time_series(
         exploratory=exploratory,
         random_picks=randoms,
     )
+
+
+def _as_ran(edge: Edge, sleeved: Sequence[tuple[str, Outcome]]) -> dict[str, Edge]:
+    """Each edge variant of a time-series or sleeve run as its trials ran (its outcome, and a
+    variant's own gate in place of the edge's), whose rules its licence is of (``trial_licences``);
+    a time-series edge has only ``main``."""
+    own = {v.id: v.gate for v in edge.variants if v.gate is not None}
+    return {
+        key: replace(edge, outcome=outcome, gate=own.get(key, edge.gate))
+        for key, outcome in (sleeved or ((MAIN, edge.outcome),))
+    }
 
 
 def _details(
