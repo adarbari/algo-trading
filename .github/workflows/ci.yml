@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write # only for `gh run cancel` on the first failure
 
 env:
   HYPOTHESIS_PROFILE: ci
@@ -80,6 +81,15 @@ jobs:
       - run: make numbering
       - run: make datasets-verify
 
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # The strategy scorecard (3 min) beside the lint job instead of after it.
   evaluate:
     name: Strategy evaluation vs the golden baseline
@@ -99,6 +109,15 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: scorecard, path: scorecard.md, if-no-files-found: ignore }
+
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
   # The protected check (its name is the branch-protection context; the two jobs above can change
   # without touching the repo settings). Passes when both passed or were skipped (a web-only or
@@ -210,6 +229,15 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # The protected check "Tests (py3.12)": fails when any shard failed; on a Python change it
   # combines the shards' coverage and applies the 90% gate (Makefile coverage-combine).
   # No job-level `if` beyond !cancelled(): GitHub does not expand the matrix of a skipped
@@ -303,6 +331,15 @@ jobs:
         if: failure()
         with: { name: real-app-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
 
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # ---------------------------------------------------------------------------------- web
   # Five jobs in parallel instead of one serial job (docs/ci.md "Pipeline"): the static checks
   # and unit tests; the production build with the e2e suite; the Storybook build, handed as an
@@ -343,6 +380,15 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
 
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   web-e2e:
     name: Web e2e (production build, Playwright)
     needs: [changes]
@@ -374,6 +420,15 @@ jobs:
         if: failure()
         with: { name: playwright-report-e2e, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
 
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   web-storybook:
     name: Web Storybook build
     needs: [changes]
@@ -398,6 +453,15 @@ jobs:
       - run: npm run storybook:build
       - uses: actions/upload-artifact@v7
         with: { name: storybook-static, path: apps/web/storybook-static, retention-days: 1, if-no-files-found: error }
+
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
   web-screenshots:
     name: Web screenshots + axe (shard ${{ matrix.shard }} of 4)
@@ -438,6 +502,15 @@ jobs:
         if: failure()
         with: { name: "playwright-report-screenshots-${{ matrix.shard }}", path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
 
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # Performance budgets (docs/ci.md "Web performance"): deterministic gates only. The bundle sizes
   # from the Vite manifest, then requests, script bytes and DOM nodes per main route on the phone;
   # LCP and blocking time are reported in the job summary, never gated (shared runners are noisy).
@@ -473,6 +546,15 @@ jobs:
         run: npm run perf:bundle
       - name: Request, script and DOM budgets on the phone (LCP and blocking time reported only)
         run: npm run perf:e2e
+
+      # The first failing job cancels the whole run so the sibling jobs stop spending runner minutes
+      # (the aggregate gates read a cancelled job as a failure; a fork's read-only token just no-ops).
+      - name: Cancel the run (first failure frees the runners)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
   # The one web check branch protection requires (its name is the protected context; the four
   # jobs above can change without touching the repo settings). Passes when every web job
