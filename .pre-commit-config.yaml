@@ -43,10 +43,11 @@ repos:
         pass_filenames: false
         types: [python]
       # What CI fails on most, before the push (`make changed`: mirrored tests, fitness tests,
-      # the web gates over the changed files). Never --no-verify; CI stays the full gate.
+      # the web gates over the changed files). Never --no-verify; CI stays the full gate. Queued
+      # machine-wide by `scripts/ops/push_queue.py` (2 at a time, most dependants first).
       - id: make-changed
         name: make changed (the checks CI fails on, over what changed)
-        entry: make changed
+        entry: .venv/bin/python scripts/ops/push_queue.py
         language: system
         stages: [pre-push]
         pass_filenames: false
