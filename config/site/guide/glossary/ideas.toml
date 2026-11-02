@@ -266,3 +266,143 @@ A higher number means more people hold the contract and it is easier to trade ne
 """
 next = "Treat a thin contract with care even when its yield looks high."
 see_also = ["option_grid", "spread_of_mid"]
+
+[[term]]
+id = "idea_plan"
+term = "The plan"
+short = "The position the setup's rule would open on tonight's option chain, with its exits and the most it can lose."
+body = """
+An option setup is a rule: which contracts to open, how long to hold, when to close. This panel applies that rule to tonight's end-of-day chain for this name, so you see one worked example per contract. Every figure is derived from mid prices, not from quotes you could trade at.
+Monday's chain will differ. The rule picks again then, so the strike, the premium and every figure below can move. The panel is an example of the rule, not an order, and it knows nothing about your account.
+Don't read the example as a price you will get.
+"""
+next = "Open the setup to see how the rule did in the past."
+see_also = ["idea_example_position", "idea_most_you_can_lose", "risk_statement"]
+
+[[term]]
+id = "idea_example_position"
+term = "Example position"
+short = "The contracts the setup's rule picks from tonight's chain, each at its mid price; the premium is what the position collects."
+body = """
+Each row is one contract: short or long, the right (put or call), the strike, the expiry and the mid price, halfway between the bid and the ask. Premium collected is the net of the rows, per share, so a short put at $0.71 collects $0.71 a share, $71 a contract.
+Worked example: "Short 1 put, 55, Fri 27 Nov, $0.71 mid" is one contract that obliges its writer to take 100 shares at 55 if the stock ends below it.
+The mid is a convention. A real fill is usually worse than the mid, and a wide gap between bid and ask makes the example optimistic.
+"""
+next = "Check the cash set aside and the most you can lose below it."
+see_also = ["idea_cash_set_aside", "idea_plan", "return_on_collateral"]
+
+[[term]]
+id = "idea_cash_set_aside"
+term = "Cash set aside"
+short = "The cash that backs one contract of the example if you hold it to the end, per the setup's collateral rule."
+body = """
+For a short put the setup sets aside the strike times 100 shares: a 55 strike sets aside $5,500 a contract. For a covered call it is the shares you already hold. The figure is the position's own backing, not what your broker asks for, which can be smaller.
+Return on collateral, the setup's lead number, divides the profit by this cash. It is not a return on the premium.
+Don't take it as your available cash. The site knows no account.
+"""
+next = "Compare it with the most you can lose."
+see_also = ["return_on_collateral", "idea_most_you_can_lose", "not_a_return"]
+
+[[term]]
+id = "idea_option_exits"
+term = "Declared exits"
+short = "The exits the setup's rule declares, as dollar marks on this example: the profit to close at, the stop and the last day."
+body = """
+Some setups close early: at a share of the premium kept, at a loss multiple of the premium, or a set number of days before expiry. This page turns each declared exit into a price on the example's premium. Take profit at half the premium on a $0.71 credit closes at $0.36.
+A setup that declares no stop shows the loss its history stopped at, per contract, or says it has none. The last day held is the earlier of the expiry and the hold the verdict was judged over.
+Prices can gap through a stop. The exits describe the rule, not an order.
+"""
+next = "Open the setup to see the exits' evidence."
+see_also = ["idea_exit_rule", "idea_plan", "exit_take_profit"]
+
+[[term]]
+id = "idea_chance_in_the_money"
+term = "Chance of ending in the money"
+short = "The chance, from today's option prices, that the stock finishes past the strike; not a backtested figure."
+body = """
+It comes from the option's own implied volatility with no drift: the market's price of the outcome, not a forecast. For a short put it is the chance the stock ends below the strike, which is when you would be assigned the shares. About 1 in 5 reads as 20%.
+It is a pricing figure, so it is not backtested and it moves every day with volatility. Options priced for a quiet stock overstate nothing and understate nothing until the stock moves.
+Don't treat a low chance as safety: the loss when it happens is the most you can lose.
+"""
+next = "Read it beside the most you can lose."
+see_also = ["idea_most_you_can_lose", "idea_one_sigma_loss"]
+
+[[term]]
+id = "idea_most_you_can_lose"
+term = "Most you can lose"
+short = "The worst result of one contract held to expiry: the cash at risk less the premium collected, or no limit."
+body = """
+It is the lowest value of the position at expiry over every price the stock could finish at, from zero up, after the premium. A short put at 55 that collected $0.71 can lose (55 - 0.71) x 100 = $5,429. A spread is capped at its width less the credit. A covered call loses the share cost less the premium.
+A short call with no shares behind it has no limit, and the page says so.
+It ignores fees and early assignment, and an exit rule can cut the loss earlier. It does not ignore a gap: the price can fall below any stop.
+"""
+next = "Compare it with the cash set aside."
+see_also = ["idea_cash_set_aside", "idea_option_exits"]
+
+[[term]]
+id = "idea_monday_floor"
+term = "Monday premium floor"
+short = "The lowest premium at which the setup's rule would still apply on Monday; not stored for any setup yet."
+body = """
+The rule picks its contract again on Monday's chain, and the premium may differ from this example. A floor would say how much less you could collect before the setup's rule no longer holds.
+No setup declares a minimum premium yet. No verdict stores a typical trade to derive one from either, so the page says it is not applicable rather than inventing a number.
+When a setup declares a minimum credit, the floor appears here as a dollar figure.
+"""
+next = "Re-check the premium against Monday's chain before you act."
+see_also = ["idea_plan", "idea_example_position"]
+
+[[term]]
+id = "idea_position_risks"
+term = "The position's risks"
+short = "What the example position does day to day and around its dates: theta, a one-sigma day, reports and ex-dividend."
+body = """
+These are derived from the example's own option prices. Theta is the position's value change from one day passing, in dollars; for a short position it is positive, because time works for the seller. A one-sigma day is the loss if the stock moves by a day's implied move against you at once.
+The flags say whether the name reports earnings, or goes ex-dividend, between the entry and the expiry. A report or an ex-dividend date inside the trade can move the stock or trigger early assignment.
+A figure the chain could not supply says why instead of showing zero.
+"""
+next = "Read each figure's own entry."
+see_also = ["idea_example_position", "idea_theta_day", "idea_one_sigma_loss", "idea_report_in_life", "idea_ex_dividend"]
+
+[[term]]
+id = "idea_theta_day"
+term = "Theta, a day"
+short = "Dollars the example position gains or loses from one day passing, all else equal."
+body = """
+Theta is the feed's own figure for each contract, per share a day, times the contract's 100 shares and its direction. A short put with theta -0.02 a share earns +$2 a day for the seller. The figure grows near expiry and ignores moves in the stock.
+It is a rate at tonight's prices, not a promise: a fall in the stock outweighs weeks of theta.
+"""
+next = "Read it with the one-sigma day loss."
+see_also = ["idea_one_sigma_loss", "idea_position_risks", "idea_example_position"]
+
+[[term]]
+id = "idea_one_sigma_loss"
+term = "A one-sigma day"
+short = "The loss, in dollars, if the stock makes a typical day's implied move against the position."
+body = """
+A day's implied move is the implied volatility over the square root of 252 trading days, of the leg nearest the money, times the price. The page reprices every leg at that move, up and down, and shows the worse one. At 40% volatility a $60 stock moves about $1.51.
+One sigma is a typical day, not a bad one. Roughly one day in three is bigger than this, and a gap can be many times it.
+"""
+next = "Compare it with the most you can lose."
+see_also = ["idea_theta_day", "idea_most_you_can_lose", "idea_position_risks"]
+
+[[term]]
+id = "idea_report_in_life"
+term = "Reports before expiry"
+short = "Whether the name reports earnings between the entry and the expiry; the report date when it does."
+body = """
+Options carry a premium for earnings, and the stock often moves on the report. A Yes means the position is held through a report; a setup that skips reports would not have listed the name. The date is the company's expected or confirmed one, as known tonight.
+Not known means the report date is not stored for the name.
+"""
+next = "Open the name in Explore for its calendar."
+see_also = ["idea_position_risks", "idea_risks"]
+
+[[term]]
+id = "idea_ex_dividend"
+term = "Ex-dividend before expiry"
+short = "Whether the name's next ex-dividend date falls between the entry and the expiry; early assignment risk for sold calls."
+body = """
+A stock trades without its next dividend from the ex-dividend date on. A sold call that is in the money the day before that date can be assigned early, so the holder gets the dividend. A Yes shows the date. A put is rarely affected.
+The date comes from the stored dividend schedule as known tonight; a name that has none stored shows Not known, not No.
+"""
+next = "Check the date against the expiry on the plan."
+see_also = ["idea_position_risks"]

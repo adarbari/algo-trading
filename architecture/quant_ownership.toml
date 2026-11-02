@@ -19,9 +19,20 @@ detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|b
 id = "option-premium-figures"
 description = "The figures of a sold option from its mid premium (quant/options/premium.py, the option grid's maths): return on collateral (a put's mid / strike, a call's mid / spot), yield a year (roc x 365 / days, simple, NaN where days <= 0), breakeven (strike or spot minus the mid) and the risk-neutral chance of ending below the strike (r = q = 0, ADR 0053's convention: a put's 1 - prob_otm, a call's prob_otm). Written once; the grid and short_premium@v1 call it through features/rollups/premium/band_pick.py"
 owner = ["src/algotrade/quant/options/premium.py"]
-allowed = ["src/algotrade/features/rollups/premium/band_pick.py"]  # the one caller: the figures of a picked cell
+allowed = [
+    "src/algotrade/features/rollups/premium/band_pick.py",  # the figures of a picked cell
+    "src/algotrade/quant/options/position.py",  # a leg's chance in the money (plan O4)
+]
 section = "docs/ui/evening-desk-plan.md#4-data-gaps-each-inside-the-slice-that-needs-it"
 detect = [{ call = "return_on_collateral" }, { call = "yield_annualised" }, { call = "p_below" }]
+
+[[responsibility]]
+id = "option-position-figures"
+description = "The figures of an option position (one trade of a setup's template) from its legs, derived only, no bid or ask (quant/options/position.py, the option idea page's maths, plan O4): the most you can lose (the worst expiry payoff over every underlying price from 0 up, on the credit collected; None when unbounded), the position's theta a day (the feed's theta x quantity x 100, NaN when a leg has none), each leg's risk-neutral chance of finishing in the money (r = q = 0, premium.p_below) and the one-sigma-day loss (the worse of a one-day implied move either way, every leg repriced by Black-Scholes at its own IV). Written once; the idea page's option section calls it through services/read/ideas/option_detail.py"
+owner = ["src/algotrade/quant/options/position.py"]
+allowed = ["src/algotrade/services/read/ideas/option_detail.py"]  # the one caller: an option pick's figures
+section = "docs/ui/evening-desk-plan.md#4-data-gaps-each-inside-the-slice-that-needs-it"
+detect = [{ call = "one_sigma_day_loss" }, { call = "position_theta" }, { call = "p_itm" }]
 
 [[responsibility]]
 id = "option-pricing"

@@ -961,3 +961,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: one rule for the whole page is what the amendment's "on Ideas it is a filter" says; the pool already filters server side, so it is one more predicate; without the "of M" an empty group would read as "no picks"; a toggle adds page state and a control (owner 2026-10-25: less code).
+
+## 2026-11-02 | Plan O4 | The option idea page's premium floor is not applicable until a setup declares a minimum credit
+- Question: the plan's O4 line is "the setup's rule holds Monday at a premium of $X or more". No stored field gives $X: no setup declares a minimum credit (concepts 2.16 EF-G14, deferred) and no option verdict stores a typical trade to derive a break-even from. What does the page show?
+- Options: derive a floor from the example (credit less a typical trade); derive it from the setup's evidence once stored; show UNKNOWN with its reason.
+- Decision: the section carries `mondayFloor` null and `floorUnknown` NOT_APPLICABLE with the reason, and the Guide entry says so; the figure appears when a setup declares a minimum credit (a `select` rule at entry, EF-G14) or its stored evidence supports a floor, by inverting the premium figures at the example's strike and days. No number is invented in the read.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: ADR 0088's rule that figures are derived or UNKNOWN, never filled; an invented floor would read as the setup's own rule; the architect review of the read agreed.

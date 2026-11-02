@@ -112,6 +112,60 @@ const IdeaDetailQuery = graphql(`
           kindText
         }
       }
+      option {
+        chainAsof
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+        legs {
+          right
+          strike
+          expiry
+          qty
+          mid
+          delta
+          pItm
+        }
+        spot
+        entrySession
+        exitSession
+        netCredit
+        cashSetAside
+        stopDebit
+        stopLoss
+        takeProfitDebit
+        exitDteDate
+        maxLoss
+        unbounded
+        thetaPerDay
+        oneSigmaLoss
+        riskUnknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+        reportInLife
+        reportDate
+        exDivBeforeExpiry
+        exDivDate
+        calendarUnknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+        mondayFloor
+        floorUnknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+      }
       learn
     }
   }

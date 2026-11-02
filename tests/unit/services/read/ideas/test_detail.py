@@ -165,3 +165,25 @@ def test_an_unreadable_pick_row_and_a_missing_earnings_source_are_unknown_not_em
     monkeypatch.setattr(detail, "load_instrument_events", lambda ctx, ids, days: {})
     none = detail.load_idea_detail(CTX, "X")
     assert none is not None and none.risks.unknown is not None
+
+
+def test_a_premium_setups_pick_carries_the_option_sections_and_a_stocks_pick_does_not(
+    wired: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[Any] = []
+
+    def option(ctx: Any, edge: Any, iid: str, rule: Any = None) -> str:
+        asked.append((edge.id, iid))
+        return "OPTION"
+
+    monkeypatch.setattr(detail, "load_idea_option", option)
+    assert detail.load_idea_detail(CTX, "X").option is None  # type: ignore[union-attr]
+    assert asked == []
+    premium = _setup("strong", "works")
+    premium = QualifyingSetup(
+        premium.edge, "premium", premium.summary, premium.basis_screener, 5, None
+    )
+    monkeypatch.setattr(detail, "load_session_setups", lambda ctx: SessionSetups((premium, WEAK)))
+    found = detail.load_idea_detail(CTX, "X")
+    assert found is not None and found.option == "OPTION"  # type: ignore[comparison-overlap]
+    assert asked == [("strong", "EQ:X")]
