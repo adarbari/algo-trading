@@ -2846,6 +2846,17 @@ type PausedIdea {
 }
 
 """
+One declared user (`config/site/users.toml`): `role` admin or trader, `licences` the data licences held beyond open, `scheduled` the site's own scheduled-screens user (never signs in). No email or subject: identity stays on the server
+"""
+type Person {
+  id: String!
+  name: String!
+  role: String!
+  licences: [String!]!
+  scheduled: Boolean!
+}
+
+"""
 One session of a screener's pick history: how many tickers its latest run of the session picked and how many the regime gate held back (`paused`); both null when it has no run for the session, and `notRun` says why (NOT_RUN)
 """
 type PickCount {
@@ -2985,6 +2996,11 @@ type Query {
     """
     date: Date = null
   ): IdeaDetail
+
+  """
+  The people the site declares (id, name, role, held data licences; never an email), in declaration order, for the Admin Users page
+  """
+  userRegistry: UserRegistry
 
   """
   Who this request is for: the signed-in registry user, their role and workspaces (ADR 0040; not session data)
@@ -4444,6 +4460,11 @@ type UsePass {
   intent: String!
   count: Int!
   bins: [Int!]!
+}
+
+"""The people the site declares, in declaration order. Admin only"""
+type UserRegistry {
+  people: [Person!]!
 }
 
 """How a range shows its stored value"""
