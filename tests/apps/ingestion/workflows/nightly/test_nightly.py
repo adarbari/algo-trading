@@ -859,14 +859,13 @@ def test_failed_screen_jobs_fail_the_step(
     assert step.result["screens"][0]["error"] == "ValueError: no features"
 
 
-@pytest.mark.parametrize(("rest_stale", "status"), [(10, "SUCCEEDED"), (11, "FAILED")])
-def test_stale_chains_within_the_gates_tolerance_do_not_fail_the_screens(
-    monkeypatch: pytest.MonkeyPatch, rest_stale: int, status: str
+@pytest.mark.parametrize("rest_stale", [10, 11])
+def test_stale_chains_never_fail_the_screens_the_chains_gate_does(
+    monkeypatch: pytest.MonkeyPatch, rest_stale: int
 ) -> None:
-    # 2026-10-06: chains passed acceptance with 267 STALE_DATA names, yet the screens went
-    # PARTIAL on them and the critical step FAILED. Names the gate tolerated are excluded from
-    # the screen's coverage (ADR 0054); one more than it tolerates and the gate fails (here:
-    # the screens, as before).
+    # 2026-10-06: 267 STALE_DATA names put the screens PARTIAL. Since ADR 0088 S5 the screen is a
+    # rule screen: a stale chain is a REJECT, the screens step SUCCEEDS, and one name above the
+    # gate's tolerance fails the chains step, which the screens step needs (ADR 0054, 0055).
     configs = FileConfigStore(REPO_ROOT / "config")
     config = resolve_config(configs, "short_premium_liquidity", UserContext(SITE_USER))
     monkeypatch.setattr(screens_module, "nightly_screeners", lambda store: [config])
@@ -877,7 +876,7 @@ def test_stale_chains_within_the_gates_tolerance_do_not_fail_the_screens(
         step = screens_module.screen_jobs(runner, configs, None)(D)
     finally:
         runner.shutdown()
-    assert step.status.value == status
+    assert step.status.value == "SUCCEEDED"
 
 
 # ----------------------------------------------------------------------------- notification

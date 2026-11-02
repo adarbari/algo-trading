@@ -1,0 +1,25 @@
+# L3 site setting: the Guide's screener for the site preset short_premium_liquidity (ADR 0051; docs/ui/guide.md
+# "The screener page"). Keys and tests as in screeners/income/vrp_scanner.toml.
+id = "short_premium_liquidity"
+version = 1  # the preset version this prose was written for
+summary = "Finds optionable stocks and funds whose puts or calls trade tightly enough to sell premium on: the nightly liquidity screen the option setups start from.[^1]"
+hit = "An active optionable stock, ADR or ETF where the short put or the short call at the target expiry reaches tier A or B. The tier asks for a narrow bid-ask spread at the short strike, enough open interest in the strike zone and the chain, and a bid worth collecting."
+not_checked = "It does not check implied volatility, earnings dates or the quote at the time you would trade. A name with no chain or no target expiry has no tier and does not appear."
+before_acting = [
+  "Tiers come from an after-close chain: read rollup.option_liquidity@v1.put_spread_pct and rollup.option_liquidity@v1.call_spread_pct for the spread the tier saw.",
+  "A pass on one side says nothing about the other: compare rollup.option_liquidity@v1.put_tier with rollup.option_liquidity@v1.call_tier.",
+  "A stale or failed chain shows in rollup.option_liquidity@v1.liq_status, and the name then does not pass.",
+]
+related = [
+  { id = "vrp_scanner", reason = "adds the volatility premium on top of the liquid chain" },
+]
+
+[[sources]]
+title = "tastylive, Options liquidity"
+url = "https://www.tastylive.com/concepts-strategies/options-liquidity"
+note = "Explains how volume, open interest and the bid-ask spread show how easily an option trades."
+
+[asks]
+chain_ok = "The option chain was fetched and is current"
+short_put_ok = "The short put is tier A or B"
+short_call_ok = "The short call is tier A or B"
