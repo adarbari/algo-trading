@@ -28,8 +28,8 @@ from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.derived import option_outcomes as outcomes_task
-from algotrade_ingestion.tasks.derived.option_outcomes import (
+from algotrade_ingestion.tasks.derived.paths import option_outcomes as outcomes_task
+from algotrade_ingestion.tasks.derived.paths.option_outcomes import (
     TABLE,
     check_option_outcomes,
     compute_option_outcomes,

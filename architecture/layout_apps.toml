@@ -227,7 +227,12 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/derived"
-purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060) and the forward outcomes tasks (outcomes: price windows from bars; option-outcomes: option trades of position windows from the stored chains, ADR 0053 and its EB H13 amendment, ADR 0088) with their window arithmetic and row shaping (outcome_paths, option_paths) and the catalogue fields an exit rule reads per close (option_fields)"
+purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060) and the forward outcomes tasks (outcomes: price windows from bars, ADR 0053; residual-returns: the factor-neutral sibling) with their window arithmetic and row shaping (outcome_paths, residual_paths); the path outcome writers are in paths/"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/derived/paths"
+purpose = "the path outcome writers (ADR 0088), split from tasks/derived (at its module cap): positions walked close by close to their first exit or hold cap, option-outcomes (option trades from the stored chains, ADR 0053 EB H13 amendment) and share-outcomes (share trades over bars/1d, E3c-2), the positions each stores (wanted), their row shaping (option_rows) and the catalogue fields an exit rule reads per close (close_fields)"
 kind = "task-domain"
 
 [[dir]]
@@ -372,8 +377,12 @@ module = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
 reason = "`check_outcomes` is the outcomes step's acceptance check (ADR 0053 amendment, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
 
 [[shared]]
-module = "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py"
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/option_outcomes.py"
 reason = "`check_option_outcomes` is the option-outcomes step's acceptance check (ADR 0053 amendment, EB H13, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/share_outcomes.py"
+reason = "`check_share_outcomes` is the share-outcomes step's acceptance check (ADR 0088, E3c-2, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
 
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/residual_returns.py"
