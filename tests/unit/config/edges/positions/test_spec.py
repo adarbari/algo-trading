@@ -186,6 +186,7 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
 # X1; X2 (vrp_short_premium's new version and its iv_rank_high twin)
 BORN_WITH_THE_KEYS = (
     "index_put_write", "vrp_short_put", "iv_rank_short_put", "covered_call_strike_tenor",
+    "index_put_ladder",
 )  # fmt: skip
 
 

@@ -32,8 +32,8 @@ and the key.
                       optional ``hold_rank`` (buy/hold band, ADR 0053 amendment 2026-10-18): held
                       while rank <= this (>= ``top_k``, an integer); cost on entries and exits
                       only; see ``_hold_rank`` for where it is allowed
-    schedule          ``every_session`` | ``month_end`` | ``calendar:<window>`` (WINDOW_NAMES: a
-                      stretch the calendar fixes, whose length is the one horizon) |
+    schedule          ``every_session`` | ``month_end`` | ``every_session_ladder`` (a sleeve's) |
+                      ``calendar:<window>`` (WINDOW_NAMES: a fixed stretch, its length the hold) |
                       ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D, of the schedule's own class and subtype; default for an event
@@ -190,7 +190,7 @@ BENCHMARKS = ("SPY", "none")
 # The event vocabulary lives in ``schedules/events.py`` (ADR 0075); re-exported here.
 __all__ = ["EVENT_CLASSES", "EVENT_SUBTYPES", "ON_EVENT", "SUBTYPE_REQUIRED", "event_class",
            "event_subtype"]  # fmt: skip
-SCHEDULES = ("every_session", "month_end")
+SCHEDULES = ("every_session", "month_end", named.LADDER)
 BASES = ("event", "universe", *named.TIME_SERIES, BENCHMARK_BASE)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)

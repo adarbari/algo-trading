@@ -6,6 +6,9 @@ starts at S's close). ``decision_sessions`` gives the D of a schedule, spaced at
 horizon apart so the windows do not overlap and the sessions are independent:
 
 - ``every_session``: the first session, then every ``h``-th session after it
+- ``every_session_ladder`` (a named option sleeve only): every session, so its holds overlap;
+  the sleeve's slots book sizes them (``portfolio/ladder.py``) and its statistics count the
+  independent sessions, never the overlapping entries
 - ``month_end``: the last session of each calendar month, thinned greedily so consecutive
   ones are at least ``h`` sessions apart (a month cut short by the range's end is not one)
 - ``calendar:<window>``: D of each window of ``core/time/windows.py`` (turn of month, expiry
@@ -24,7 +27,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.named import DELTA_EQUIVALENT
+from algotrade.config.edges.named import DELTA_EQUIVALENT, LADDER
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.core.time.windows import (
@@ -72,6 +75,10 @@ def decision_sessions(
     calendar_window = window_name(schedule)
     if calendar_window is not None:
         return _window_decisions(calendar_window, sessions, horizon, sleeve)
+    if schedule == LADDER:
+        if not sleeve:
+            raise ConfigurationError(f"schedule {LADDER!r} places a named option sleeve's entries")
+        return list(sessions)
     if schedule == "every_session":
         return rebalance_sessions(sessions[0], sessions, f"{horizon}d")
     if schedule == "month_end":
