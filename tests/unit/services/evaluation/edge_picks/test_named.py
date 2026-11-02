@@ -3,6 +3,7 @@ session, a decision day by the calendar window, the named symbols the snapshot k
 gate applied as for a screener setup, and a symbol nobody knows said, never dropped silently."""
 
 from datetime import date
+from types import SimpleNamespace
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.edge_picks.named import is_named, named_night
@@ -43,6 +44,7 @@ def test_a_named_setup_picks_its_symbols_under_named_on_its_decision_day() -> No
         NAMED, PICKED, (SPY_ID,), ("long",)
     )  # fmt: skip
     assert is_named(timed_edge()) and not is_named(edge())
+    assert is_named(SimpleNamespace(base="delta_equivalent"))  # type: ignore[arg-type]  # X1
 
 
 def test_a_session_that_is_no_windows_decision_is_not_a_decision_day() -> None:

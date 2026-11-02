@@ -29,9 +29,13 @@ const idea = {
     holdSessions: null,
     winners: 0,
     inSampleOnly: false,
+    takeProfit: null,
+    takeProfitBasis: 'CREDIT',
+    conditionFields: [],
     stop: null,
     unknown: null,
   },
+  exitPrices: { stop: null, target: null, unknown: null },
   evidence: {
     level: 'works',
     result: 'r',
@@ -57,5 +61,6 @@ describe('toIdeaDetail', () => {
     expect(found?.setups.map((s) => s.tab)).toEqual(['stocks', 'premium']);
     expect(found?.learn).toBe('a');
     expect(found?.why.basisScreener).toBe('scr');
+    expect(found?.exitPrices).toEqual({ stop: null, target: null, unknown: null });
   });
 });

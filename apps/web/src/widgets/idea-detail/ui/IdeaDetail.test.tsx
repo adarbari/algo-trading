@@ -52,9 +52,21 @@ const idea: Idea = {
     holdSessions: 5,
     winners: 80,
     inSampleOnly: false,
-    stop: { kind: 'HISTORY', fraction: 0.062, atr: null, multiple: null, winners: 80, beyond: 0.2 },
+    takeProfit: null,
+    takeProfitBasis: 'CREDIT',
+    conditionFields: [],
+    stop: {
+      kind: 'HISTORY',
+      fraction: 0.062,
+      atr: null,
+      multiple: null,
+      winners: 80,
+      beyond: 0.2,
+      basis: 'ENTRY',
+    },
     unknown: null,
   },
+  exitPrices: { stop: null, target: null, unknown: null },
   evidence: {
     level: 'works',
     result: 'Held out: lift 3.2 points on 120 trades.',
@@ -156,6 +168,74 @@ describe('IdeaDetail', () => {
     expect(screen.getByText('Stop, below the entry close')).toBeVisible();
     expect(screen.getByText('AAPL earnings · Wed 7 Oct')).toBeVisible();
     await expectNoA11yViolations(container);
+  });
+
+  it('shows a declared share stop and target with the served prices and condition fields', () => {
+    const declared: Idea = {
+      ...idea,
+      exitRule: {
+        ...idea.exitRule,
+        takeProfit: 0.1,
+        takeProfitBasis: 'ENTRY',
+        conditionFields: ['momentum.rsi_14'],
+        stop: {
+          kind: 'DECLARED',
+          fraction: 0.05,
+          atr: null,
+          multiple: null,
+          winners: null,
+          beyond: null,
+          basis: 'ENTRY',
+        },
+      },
+      exitPrices: { stop: 95, target: 110, unknown: null },
+    };
+    hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(declared));
+    render(<IdeaDetail {...props} />);
+    expect(screen.getByText('Declared stop, below the entry close')).toBeVisible();
+    expect(screen.getByText('Target, above the entry close')).toBeVisible();
+    expect(screen.getByText('Stop price')).toBeVisible();
+    expect(screen.getByText('Target price')).toBeVisible();
+    expect(screen.getByText('$95.00')).toBeVisible();
+    expect(screen.getByText('$110.00')).toBeVisible();
+    expect(screen.getByText('momentum.rsi_14')).toBeVisible();
+  });
+
+  it("words an option setup's stops by their basis, never as a fall below the entry close", () => {
+    const stop = {
+      kind: 'DECLARED',
+      atr: null,
+      multiple: null,
+      winners: null,
+      beyond: null,
+    } as const;
+    const credit: Idea = {
+      ...idea,
+      exitRule: { ...idea.exitRule, stop: { ...stop, fraction: 2, basis: 'CREDIT' } },
+    };
+    hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(credit));
+    const { unmount } = render(<IdeaDetail {...props} />);
+    expect(screen.getByText('Declared stop, multiple of the credit')).toBeVisible();
+    expect(screen.queryByText(/below the entry close/)).toBeNull();
+    unmount();
+    const collateral: Idea = {
+      ...idea,
+      exitRule: {
+        ...idea.exitRule,
+        stop: { ...stop, kind: 'HISTORY', fraction: 0.08, basis: 'COLLATERAL' },
+      },
+    };
+    hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(collateral));
+    render(<IdeaDetail {...props} />);
+    expect(screen.getByText('Stop, share of the collateral')).toBeVisible();
+    expect(screen.queryByText(/below the entry close/)).toBeNull();
+  });
+
+  it('shows no price lines when the server serves none', () => {
+    hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(idea));
+    render(<IdeaDetail {...props} />);
+    expect(screen.queryByText('Stop price')).toBeNull();
+    expect(screen.queryByText('Target, above the entry close')).toBeNull();
   });
 
   it('copies the exit rule as text', async () => {

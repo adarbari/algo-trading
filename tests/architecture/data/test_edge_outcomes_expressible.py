@@ -175,7 +175,8 @@ def test_the_schedule_is_one_the_harness_runs(edge: Edge) -> None:
         return
     if event is None:
         days = sessions_between(date(2026, 1, 2), date(2026, 3, 31))
-        decision_sessions(edge.schedule, days, edge.outcome.horizon_sessions[0])
+        sleeve = edge.base == "delta_equivalent"  # a window places only a sleeve's entry
+        decision_sessions(edge.schedule, days, edge.outcome.horizon_sessions[0], sleeve)
         assert edge.outcome.start_offset_sessions >= 1, f"{edge.id}: S must be after D"
         return
     if event not in ANNOUNCED_AHEAD:

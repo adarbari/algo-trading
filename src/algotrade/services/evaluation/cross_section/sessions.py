@@ -24,9 +24,11 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.named import DELTA_EQUIVALENT
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.core.time.windows import (
+    WINDOW_GAPS,
     WINDOW_NAMES,
     decision_session,
     window_length,
@@ -55,9 +57,12 @@ class Leg:
         return self.entries or (self.entry,)
 
 
-def decision_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> list[date]:
+def decision_sessions(
+    schedule: str, sessions: Sequence[date], horizon: int, sleeve: bool = False
+) -> list[date]:
     """The decision sessions D of a non-event ``schedule`` among ``sessions`` (ascending
-    exchange sessions), for windows of ``horizon`` sessions."""
+    exchange sessions), for windows of ``horizon`` sessions; ``sleeve``: a named option sleeve,
+    whose calendar window places only the entry (its hold up to ``WINDOW_GAPS``)."""
     if horizon < 1:
         raise ConfigurationError(f"horizon must be >= 1 session, got {horizon}")
     if schedule.startswith("on_event:"):
@@ -66,7 +71,7 @@ def decision_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> 
         return []
     calendar_window = window_name(schedule)
     if calendar_window is not None:
-        return _window_decisions(calendar_window, sessions, horizon)
+        return _window_decisions(calendar_window, sessions, horizon, sleeve)
     if schedule == "every_session":
         return rebalance_sessions(sessions[0], sessions, f"{horizon}d")
     if schedule == "month_end":
@@ -74,15 +79,18 @@ def decision_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> 
     raise ConfigurationError(f"unknown schedule {schedule!r}")
 
 
-def _window_decisions(name: str, sessions: Sequence[date], horizon: int) -> list[date]:
+def _window_decisions(
+    name: str, sessions: Sequence[date], horizon: int, sleeve: bool = False
+) -> list[date]:
     """D of every window of kind ``name`` among ``sessions`` (a window cut by the range is not
-    one); the horizon must be the window's length."""
+    one); the horizon must be the window's length, or for a ``sleeve`` from it to the window's
+    declared gap (``WINDOW_GAPS``: its holds never overlap)."""
     if name not in WINDOW_NAMES:
         raise ConfigurationError(f"unknown calendar window {name!r}: one of {list(WINDOW_NAMES)}")
-    if horizon != window_length(name):
+    gap = WINDOW_GAPS.get(name, window_length(name)) if sleeve else window_length(name)
+    if not window_length(name) <= horizon <= gap:
         raise ConfigurationError(
-            f"calendar:{name} is {window_length(name)} sessions long, so its horizon is "
-            f"{window_length(name)}, got {horizon}"
+            f"calendar:{name} holds {window_length(name)} to {gap} sessions, got {horizon}"
         )
     held = set(sessions)
     return [
@@ -176,8 +184,9 @@ def leg_blocks(
                 else decision_sessions(edge.schedule, days, reach)
             )
             return [[entry_leg(d, offset, wait)] for d in spaced]
+        sleeve = edge.base == DELTA_EQUIVALENT
         return [[Leg(d, entry_session(d, offset))] for d in decision_sessions(
-            edge.schedule, days, horizon
+            edge.schedule, days, horizon, sleeve
         )]  # fmt: skip
     if edge.outcome.entry is not None:
         raise ConfigurationError(

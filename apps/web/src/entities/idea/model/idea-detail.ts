@@ -44,6 +44,8 @@ export interface IdeaDetail {
     unknown: ServedUnknown | null;
   };
   exitRule: Served['exitRule'];
+  /** The stop and target as prices of the reference close, served (never derived here). */
+  exitPrices: Served['exitPrices'];
   evidence: Served['evidence'];
   risks: {
     persistence: string;
@@ -92,6 +94,7 @@ export function toIdeaDetail(response: IdeaDetailResponse): IdeaDetail | null {
       unknown: found.why.unknown ?? null,
     },
     exitRule: found.exitRule,
+    exitPrices: found.exitPrices,
     evidence: found.evidence,
     risks: {
       persistence: found.risks.persistence,

@@ -8,7 +8,7 @@ from itertools import pairwise
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.time.calendar import sessions_between
+from algotrade.core.time.calendar import next_session, sessions_between
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
     decision_sessions,
@@ -109,10 +109,24 @@ def test_calendar_decisions_do_not_overlap_and_enter_the_session_after_the_decis
 
 
 def test_a_calendar_horizon_must_equal_the_window_length_and_the_window_must_exist() -> None:
-    with pytest.raises(ConfigurationError, match="4 sessions long"):
+    with pytest.raises(ConfigurationError, match="holds 4 to 4 sessions"):
         decision_sessions("calendar:turn_of_month", DAYS, 5)
     with pytest.raises(ConfigurationError, match="unknown calendar window"):
         decision_sessions("calendar:fomc", DAYS, 1)
+
+
+def test_a_sleeve_on_a_calendar_window_holds_up_to_its_gap_and_a_screen_does_not() -> None:
+    """A named option sleeve's window places only the entry (ADR 0088, X1): monthly entries the
+    first session after each expiry, held up to the window's gap, so holds never overlap."""
+    days = sessions_between(date(2026, 1, 2), date(2026, 12, 31))
+    monthly = decision_sessions("calendar:after_monthly_expiry", days, 17, sleeve=True)
+    assert [d.month for d in monthly] == list(range(1, 13))  # one a month
+    holds = [(entry_session(d, 1), sessions_after(entry_session(d, 1), 17)) for d in monthly]
+    assert all(end <= nxt for (_, end), (nxt, _) in pairwise(holds))  # exit by the next entry
+    with pytest.raises(ConfigurationError, match="holds 1 to 17"):
+        decision_sessions("calendar:after_monthly_expiry", days, 18, sleeve=True)
+    with pytest.raises(ConfigurationError, match="holds 1 to 1"):
+        decision_sessions("calendar:after_monthly_expiry", days, 17)  # not a sleeve
 
 
 def test_an_entry_leg_has_one_s_per_close_of_the_wait_and_ends_at_the_last() -> None:
@@ -123,3 +137,10 @@ def test_an_entry_leg_has_one_s_per_close_of_the_wait_and_ends_at_the_last() -> 
     assert leg.entry == leg.candidates[-1] and Leg(d, date(2026, 9, 4)).candidates == (
         date(2026, 9, 4),
     )
+
+
+def sessions_after(start: date, n: int) -> date:
+    """The session ``n`` after ``start``."""
+    for _ in range(n):
+        start = next_session(start)
+    return start
