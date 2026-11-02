@@ -3,8 +3,11 @@
 
 import json
 import re
+import shlex
 import subprocess
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -71,3 +74,30 @@ def test_a_bare_make_check_refuses_with_rule_9() -> None:
     )
     # Under -n the guard still runs (a shell `if` with the refusal); the sub-make is never reached.
     assert "rule 9" in out.stdout + out.stderr and "check_lock.sh" in out.stdout
+
+
+def _pre_push_entry() -> str:
+    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    hooks = [h for repo in config["repos"] for h in repo["hooks"] if h["id"] == "make-changed"]
+    assert len(hooks) == 1 and hooks[0]["stages"] == ["pre-push"]
+    return str(hooks[0]["entry"])
+
+
+def test_the_pre_push_hook_runs_make_changed_without_the_git_environment() -> None:
+    """Git exports GIT_DIR to a hook; the tests under `make changed` then ran `git init --bare`
+    against the real repository and left core.bare=true in the shared config (2026-11-02)."""
+    words = shlex.split(_pre_push_entry())
+    assert words[-2:] == ["make", "changed"] and words[0] == "env"
+    unset = {words[i + 1] for i, w in enumerate(words) if w == "-u"}
+    assert {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"} <= unset
+    probe = [*words[:-2], "sh", "-c", 'printf "%s" "${GIT_DIR-unset}"']
+    leaked = {"GIT_DIR": "/a/real/repo/.git", "PATH": "/usr/bin:/bin"}
+    out = subprocess.run(probe, env=leaked, capture_output=True, text=True, check=True)
+    assert out.stdout == "unset"
+
+
+def test_the_suite_drops_the_git_repository_from_every_tests_environment() -> None:
+    source = (ROOT / "tests" / "conftest.py").read_text()
+    fixture = source.split("def no_inherited_git_repository", 1)[1].split("@pytest.fixture", 1)[0]
+    assert "GIT_REPOSITORY_ENV" in fixture and "delenv" in fixture
+    assert '"GIT_DIR"' in source.split("GIT_REPOSITORY_ENV = (", 1)[1].split(")", 1)[0]
