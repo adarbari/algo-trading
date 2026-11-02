@@ -3,6 +3,7 @@
  * /api/graphql) answers from the fixture (e2e/fixtures/ideas/ideas-page.json, shaped from the
  * schema's `Ideas`) narrowed by the request's `filters` the way the server does for the two
  * filters it defines (a decision pick and an agreeing-screeners range) and served with `facets`;
+ * the `SetupIdeas` operation answers with no qualifying setup (Unproven) unless a test says `listed`;
  * the `FilterSet` operation answers with those two definitions; the `EdgeDesk` operation (the followed edges' signals) answers with no
  * followed edge unless a test gives it a desk; any other operation falls through to the other
  * areas' mocks.
@@ -165,9 +166,57 @@ const namesOf = (store: Map<string, SavedView>, scope: string) =>
     .map(([, v]) => v.name as string)
     .sort();
 
+/** The `SetupIdeas` answer: `listed` has one qualifying setup on Stocks and none on Premium (so
+ * Premium is its Unproven section); `unproven` has none on either tab. */
+function setupIdeas(tab: string | undefined, mode: 'listed' | 'unproven'): unknown {
+  const listed = mode === 'listed' && tab !== 'PREMIUM';
+  const leftOut = tab === 'PREMIUM' ? [{ kind: 'no_verdict', count: 1 }] : [];
+  const aapl = {
+    rank: 1,
+    instrumentId: 'EQ:AAPL',
+    setupId: 'drift',
+    place: 1,
+    watchOut: [],
+    instrument: { symbol: 'AAPL', name: 'Apple Inc.' },
+    alsoIn: [],
+    metrics: [],
+    result: { decision: 'QUALIFIED', regime: null, sizeMultiplier: null },
+  };
+  return {
+    data: {
+      setupIdeas: {
+        session: '2026-10-02',
+        state: listed ? 'listed' : 'unproven',
+        ruleVersion: 1,
+        total: listed ? 1 : 0,
+        leftOut,
+        groups: listed
+          ? [
+              {
+                edgeId: 'drift',
+                name: 'Post-earnings drift',
+                level: 'works',
+                liftPts: 3.2,
+                oosTrades: 120,
+                basisScreener: 'vrp-scanner',
+                basisHorizon: 20,
+                state: 'picked',
+                picked: 1,
+                shown: 1,
+                unknown: null,
+              },
+            ]
+          : [],
+        ideas: listed ? [aapl] : [],
+      },
+    },
+  };
+}
+
 export async function mockIdeasApi(
   page: Page,
   edgeDesk: unknown = NO_EDGE_DESK,
+  setups: 'listed' | 'unproven' = 'unproven',
 ): Promise<SavedViews> {
   const store = new Map<string, SavedView>();
   await page.route('**/api/preferences/views/**', async (route: Route) => {
@@ -234,6 +283,12 @@ export async function mockIdeasApi(
             },
           },
         },
+      });
+      return;
+    }
+    if (/query\s+SetupIdeas\b/.test(body?.query ?? '')) {
+      await route.fulfill({
+        json: setupIdeas((body?.variables as { tab?: string } | undefined)?.tab, setups),
       });
       return;
     }

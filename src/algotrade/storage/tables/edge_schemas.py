@@ -151,20 +151,24 @@ WINNERS_STUDY = fixed(
 # ``licence`` is the strictest data licence of what the picks were read from (``detail.licences``),
 # recorded at the signal: a reader hides a name from a viewer who does not hold it (ADR 0064
 # decision 10); null in a row written before the column reads as open.
+# ``exit_kind``, ``price_source`` and ``return_on_capital`` are the trade contract's (ADR 0088,
+# 2.5a: ``services/evaluation/evidence``), set when a trade settles, null while open, skipped and
+# in rows written before them; ``return`` keeps its meaning (the underlying's raw ``fwd_return``,
+# null for an option P&L).
 EDGE_PAPER = fixed(
     "results/edge_paper",
     "results",
     ("user_id", "edge_id", "signal_session", "instrument_id"),
     "instrument_id string!",
     *strings("user_id", "edge_id", "config_hash", "outcome_hash", "screener", "status"),
-    *strings("reason", "licence"),
+    *strings("reason", "licence", "exit_kind", "price_source"),
     "signal_session date!",
     "buy_session date",
     "sell_session date",
     "horizon_sessions int64",
     "rank int64",
     "delisted bool",
-    *floats("excess_return", "return"),
+    *floats("excess_return", "return", "return_on_capital"),
     runs="merge",
     key=("user_id", "edge_id", "signal_session", "instrument_id"),
 )  # fmt: skip
@@ -189,6 +193,9 @@ EDGE_PAPER = fixed(
 # session with no value, ``portfolio_reason``; null in every other leg, which no key change moves.
 # Overlays of a book (ADR 0074 amendment): ``book_vol`` (the book's annualised volatility before a
 # vol_target scaling) and ``risk_off`` (the canary's share moved to the defensive asset), nullable.
+# Leg version 5 (``legs/key.LEG_VERSION``, ADR 0088, E6a): each pick's trade-contract fields
+# (``pick_exit`` .. ``pick_adverse``, aligned to ``pick_ids``; ``services/evaluation/evidence``);
+# null in older rows, whose legs are recomputed once, never filled with a default.
 EDGE_LEGS = fixed(
     "results/edge_legs",
     "results",
@@ -213,6 +220,9 @@ EDGE_LEGS = fixed(
     "pick_reference float64[]",
     "event_ids string[]",
     *(f"{n} float64[]" for n in ("pick_scores", "pick_gross", "pick_mdd", "pick_adv", "pick_refs")),
+    "pick_exit date[]",  # the contract's fields of each pick (E6a, see below), aligned to pick_ids
+    *(f"{n} string[]" for n in ("pick_exit_kind", "pick_source", "pick_licence")),
+    *(f"{n} float64[]" for n in ("pick_capital", "pick_roc_gross", "pick_roc", "pick_adverse")),
     *(f"{n} int64[]" for n in ("pick_ranks", "pick_flags", "base_hits_at", "pick_hits_at")),
     *(f"{n} string[]" for n in ("pick_ids", "pick_reasons")),
     *(f"{n} int64" for n in (
@@ -262,6 +272,13 @@ EDGE_LEGS = fixed(
 # columns (``value`` with ``gross_value``, ``reference`` and ``touch``): a reader redacts a
 # per-name value by them, never by column name (ADR 0064 decision 10). Kept 45 days, but for the
 # runs the purge spares (``runs.ledger_keep``).
+# ``exit_kind``, ``capital_basis``, ``return_on_capital`` (at the document's cost) and
+# ``price_source`` are the trade contract's columns, ``max_adverse`` its worst loss as a share of
+# capital (a share long: the window's dip, a short's null; an option's: the stored one), ADR 0088
+# 2.5a (``services/evaluation/evidence``); ``max_drawdown`` stays the share alias until its readers
+# move; rows written before them read null. ``value_licence`` covers these columns too and is per
+# row the strictest of the trial's value licence and the outcome row's (a bought-history option
+# trade is personal).
 EDGE_TRADES = fixed(
     "results/edge_trades",
     "results",
@@ -273,6 +290,7 @@ EDGE_TRADES = fixed(
     *strings("edge_id", "user_id", "edge_variant", "variant", "role", "config_hash"),
     *strings("run_config_hash", "benchmark", "status", "excluded_reason", "side"),
     *strings("licence", "value_licence", "score_licence", "adv_licence"),
+    *strings("exit_kind", "capital_basis", "price_source"),
     "horizon_sessions int64!",
     "range_from date!",
     "range_to date",
@@ -283,6 +301,7 @@ EDGE_TRADES = fixed(
     "rank int64",
     *(f"{n} bool" for n in ("hit", "delisted", "touch", "before_split", "exploratory")),
     *floats("score", "value", "gross_value", "max_drawdown", "adv_usd_20d", "reference"),
+    *floats("return_on_capital", "max_adverse"),
     runs="merge",
     key=(
         "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "range_from",

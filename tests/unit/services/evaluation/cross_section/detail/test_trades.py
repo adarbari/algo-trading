@@ -5,6 +5,7 @@ row count on the run record (all or nothing), and the licences of the trial and 
 
 from dataclasses import replace
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -30,6 +31,11 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     edge,
     outcome_row,
     screen,
+)
+from tests.unit.services.evaluation.cross_section.portfolio.test_book import _book
+from tests.unit.services.evaluation.cross_section.test_harness_trials import (
+    CHAIN_OUTCOME,
+    _with_chain_outcomes,
 )
 
 NOW = datetime(2026, 10, 6, 12, tzinfo=AS_OF.tzinfo)
@@ -174,3 +180,34 @@ def test_an_incremental_runs_ledger_is_a_full_runs(world: World) -> None:
     )  # fmt: skip
     assert again.legs_reused == 4 and again.legs_computed == 0
     pd.testing.assert_frame_equal(trades_frame(again, "r", NOW), trades_frame(full, "r", NOW))
+
+
+def test_a_share_ledger_has_the_trade_contract_columns(world: World) -> None:
+    """E6a (ADR 0088, 2.5a): exit kind, capital basis, return on capital at the document's cost,
+    price source; the exit session is the window's close as before."""
+    ev = evaluate(world, outcome={"kind": "excess_return", "horizon_sessions": [2],
+                                  "benchmark": "SPY", "start_offset_sessions": 1,
+                                  "cost_bps": 20})  # fmt: skip
+    first = trades_frame(ev, "r1", NOW).iloc[0]  # name 19: fwd_return 9.5%
+    assert (first["exit_kind"], first["capital_basis"], first["price_source"]) == (
+        "HORIZON", "notional", "bars",
+    )  # fmt: skip
+    assert first["return_on_capital"] == pytest.approx(0.095 - 0.002)
+    assert first["exit_session"] == next_session(next_session(first["entry_session"]))
+    assert first["max_adverse"] == 0.0 and first["value_licence"] == "open"
+
+
+def test_an_option_ledger_has_the_trade_contract_and_a_bought_history_trade_is_personal() -> None:
+    ev = evaluate(_with_chain_outcomes(build_world()), outcome=CHAIN_OUTCOME)
+    frame = trades_frame(ev, "r1", NOW)
+    first = frame.iloc[0]  # name 19: pnl_mid 9.5 over collateral 95
+    assert first["capital_basis"] == edge(outcome=CHAIN_OUTCOME).outcome.position.collateral
+    assert first["return_on_capital"] == pytest.approx((9.5 - 0.4) / 95)
+    assert first["price_source"] == "option_history" and first["exit_kind"] == "HORIZON"
+    assert first["exit_session"] == date(2026, 10, 12)  # the stored exit, not S + h sessions
+    assert set(frame["value_licence"]) == {"personal"}  # the rows are bought history, per row
+
+
+def test_a_book_has_no_ledger_rows_and_the_ledger_never_imports_the_book() -> None:
+    assert trades_frame(_book(), "r1", NOW).empty
+    assert "book_trades" not in Path(trades.__file__).read_text()

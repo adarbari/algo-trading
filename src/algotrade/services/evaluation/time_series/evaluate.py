@@ -14,6 +14,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
+import pandas as pd
+
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.named import named_symbols
 from algotrade.config.strategy.schema import Selection
@@ -22,6 +24,7 @@ from algotrade.core.time.windows import window_length, window_name
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.cross_section.measures import SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import DEFAULT_DRAWS
+from algotrade.services.evaluation.evidence.shapes import series_trades
 from algotrade.services.evaluation.time_series import harness
 from algotrade.services.evaluation.time_series.measures import (
     Obs,
@@ -46,6 +49,8 @@ class InstrumentResult:
     paired: tuple[tuple[date, float], ...]  # (entry session, window minus the next stretch)
     timing: dict[str, float | int | None] = field(default_factory=dict)
     lost: dict[str, int] = field(default_factory=dict)  # reason -> periods without a value
+    # the windows as trade-contract rows (ADR 0088, 2.5a); no measure reads them yet
+    trades: pd.DataFrame | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
@@ -120,6 +125,15 @@ def _instrument(
             lost[read.reasons.get((instrument, p.entry), harness.NO_OUTCOME)] += 1
     obs = with_pairs(obs, horizon)
     window = edge.market_trigger or window_name(edge.schedule)
+    entries = {o.period.entry for o in obs if o.period.inside}
+    kept = (
+        read.rows[
+            (read.rows["instrument_id"] == instrument)
+            & pd.to_datetime(read.rows["session_date"]).dt.date.isin(entries)
+        ]
+        if instrument is not None and read.rows is not None
+        else None
+    )
     oos = [o for o in obs if split is not None and o.period.decision >= split]
     return InstrumentResult(
         symbol=symbol,
@@ -132,4 +146,5 @@ def _instrument(
         paired=tuple((o.period.entry, o.paired) for o in obs if o.paired is not None),
         timing=timing_sharpes(obs, bills),
         lost=dict(lost),
+        trades=None if kept is None else series_trades(edge, kept),
     )

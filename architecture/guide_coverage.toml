@@ -477,7 +477,7 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 # The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
 max_enums = 32
 max_sections = 4
-max_panels = 65
+max_panels = 63
 enums = [
   "graphql:Adjustment",
   "graphql:AheadEvent.kind",
@@ -530,7 +530,6 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/widgets/describe-screen/ui/DescribeScreen.tsx" = 1
 "src/widgets/draft-bar/ui/DraftBar.tsx" = 2
 "src/widgets/drilldown-panel/ui/DrilldownPanel.tsx" = 1
-"src/widgets/edge-signals/ui/EdgeSignals.tsx" = 2
 "src/widgets/event-calendar-panel/ui/EventCalendarPanel.tsx" = 3
 "src/widgets/event-study-panel/ui/EventStudyPanel.tsx" = 3
 "src/widgets/events-panel/ui/EventsPanel.tsx" = 1
