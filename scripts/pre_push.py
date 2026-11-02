@@ -66,6 +66,8 @@ FAST_TESTS = (
     "tests/architecture/api/test_read_model.py",
     # [2 + local reports] folder caps
     "tests/architecture/test_layout.py",
+    # [1, 2026-11-02 #1109] registry TOML entries out of sorted order (0.1 s)
+    "tests/architecture/pipeline/test_registry_order.py",
     "tests/architecture/test_layout_web.py",
 )
 Step = tuple[str, list[str], dict[str, str]]
