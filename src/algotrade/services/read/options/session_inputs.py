@@ -38,7 +38,9 @@ __all__ = [
 NEXT_REPORT = "rollup.earnings@v1.next_earnings_date"
 DIV_YIELD = "feature.div_yield"
 OPTIONABLE = "instrument.optionable"
-_COLUMNS = ["underlying_id", "expiry", "right", "strike", "bid", "ask", "open_interest"]
+_COLUMNS = [
+    "underlying_id", "expiry", "right", "strike", "bid", "ask", "open_interest", "volume",
+]  # fmt: skip
 
 
 @dataclass(frozen=True)

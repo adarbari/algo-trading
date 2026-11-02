@@ -838,10 +838,10 @@ test('Test: the ways in are cards, the steps stay in view, and a template opens 
   await expect(steps.getByRole('link', { name: 'Result' })).toBeVisible();
 });
 
-test('Explore: Roll a put and Calls on shares fit a phone', async ({ page }) => {
-  for (const tab of ['roll', 'calls']) {
+test('Explore: Roll a put, Calls on shares and Buying power fit a phone', async ({ page }) => {
+  for (const tab of ['roll', 'margin', 'calls']) {
     await page.goto(`/explore?focus=AAPL&tab=${tab}`);
-    await expect(page.getByRole('button', { name: /^Show / })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(Show|Calculate)/ })).toBeVisible();
     const { scrollWidth, innerWidth } = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth,

@@ -688,6 +688,7 @@ function answer(url: URL, body: string | null): Json | Json[] | null {
   // The option calculators' previews (synthetic figures shaped like the real responses).
   if (path === '/preview/options/roll') return fixture('preview-roll.json');
   if (path === '/preview/options/calls') return fixture('preview-calls.json');
+  if (path === '/preview/options/margin') return fixture('preview-margin.json');
   return null;
 }
 

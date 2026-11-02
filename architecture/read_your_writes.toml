@@ -131,6 +131,11 @@ test = "tests/contract/api/read_your_writes/test_option_calculators.py::test_cal
 
 [[route]]
 method = "POST"
+path = "/preview/options/margin"
+test = "tests/contract/api/read_your_writes/test_option_calculators.py::test_margin_stores_nothing"
+
+[[route]]
+method = "POST"
 path = "/screeners/{screener_id}/draft-from-text"
 exempt = "writes feedback events, requests and the text-model usage log (ADR 0066, ADR 0058), none of which a cached read shows: they are read only through never-cached operations or after a publish"
 

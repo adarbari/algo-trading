@@ -961,6 +961,13 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the [exempt] kinds of `web_filter_bar.toml` (a fixed handful of rows, a drill-down of one thing) fit; wrapping server inputs in the filter bar would misrepresent them (precedent: Explore's Compare table).
+## 2026-11-02 | V11b Buying power: which margin rules | The exchange minimum (Reg-T) only, no named broker
+- Question: the OptMargin mockup has a "Your broker's rules: tastytrade" select; which margin rules does the calculator offer at launch?
+- Options: (a) the Reg-T / Cboe exchange minimum for an uncovered short option only, no broker named; (b) a site-config list of named brokers with their published multipliers, sourced and dated, kept by hand; (c) (a) now, (b) later only as a sourced, dated change.
+- Decision: (c). The select is dropped; its place is an "exchange minimum" label with its Guide entry (a broker may require more; a margin figure is a floor, not a quote). Cash-secured stays exact (strike x 100 x contracts).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the exchange minimum is published, stable and broker-neutral, the one figure the site can state accurately for every trader; a stale multiplier shown as a named broker's rule is a data-quality and liability risk (data tenet), a hand-kept broker list has no ingestion check, and a broker select sits against ADR 0083's no-broker-links and no-account-profile rules.
 ## 2026-11-02 | V10 Describe it (Evening Desk) | Where Describe it lives, and C18's `not_said` status
 - Question: (1) the Describe box sat on Expert; where does the sentence way in live now? (2) the plan gives C18 (`PartCard`) a `not_said` status; does V10 add it?
 - Options: (1) its own page `/test/describe/$id` with the rows it became / a mode of Expert. (2) add `not_said` now, unused / add it with the first draft that has a part the trader did not say.

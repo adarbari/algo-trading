@@ -101,6 +101,9 @@ vi.mock('@/widgets/option-calculators', async () => {
         </>
       );
     },
+    MarginCalculator: ({ symbol }: { symbol: string }) => (
+      <Text>{`margin calculator ${symbol}`}</Text>
+    ),
   };
 });
 vi.mock('@/widgets/options-panel', async () => {
@@ -197,6 +200,9 @@ describe('ExplorePage', () => {
     cleanup();
     render(page({ sel: 'AAPL', tab: 'calls' }));
     expect(await screen.findByText('calls calculator AAPL', {}, { timeout: 5000 })).toBeVisible();
+    cleanup();
+    render(page({ sel: 'AAPL', tab: 'margin' }));
+    expect(await screen.findByText('margin calculator AAPL', {}, { timeout: 5000 })).toBeVisible();
   });
 
   it('starts a calculator afresh when another ticker comes into focus', async () => {
@@ -303,6 +309,7 @@ describe('ExplorePage', () => {
       'Options',
       'Roll a put',
       'Calls on shares',
+      'Buying power',
       'Features',
       'Financials',
       'Events',
