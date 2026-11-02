@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import {
+  lazyPageSources,
   measure,
   staticClosure,
   buildEnv,
@@ -10,7 +14,7 @@ import {
   violations,
   type Manifest,
 } from './check-bundle-budgets';
-import { shrunk, withHeadroom, type Budgets } from './perf-budgets';
+import { loadBudgets, shrunk, withHeadroom, type Budgets } from './perf-budgets';
 
 // index.html (entry) -> react; page "a" -> react + shared + its css; the chart engine is lazy.
 const manifest: Manifest = {
@@ -173,5 +177,20 @@ describe('table', () => {
       /entry chunk \(JS \+ CSS\) \| 0.0 kB \(\d+ B\) \| 0.0 kB \(10 B\) \| OVER/,
     );
     expect(text).toMatch(/src\/pages\/b\/index.ts \| 0.0 kB \(\d+ B\) \| 0.0 kB \(\d+ B\) \| ok/);
+  });
+});
+
+describe('a budget for every lazy page', () => {
+  it('lists exactly the lazily imported page modules in perf-budgets.json', () => {
+    // a new `import('@/pages/x')` needs `npm run perf:bundle -- update` for its first budget; a
+    // removed page needs its budget dropped (2026-11-02: CI caught this only after the build)
+    const lazy = lazyPageSources(resolve('src'));
+    const budgeted = Object.keys(
+      loadBudgets(pathToFileURL(resolve('perf-budgets.json'))).bundle.routes,
+    ).sort();
+    expect({
+      withoutBudget: lazy.filter((page) => !budgeted.includes(page)),
+      budgetWithoutPage: budgeted.filter((page) => !lazy.includes(page)),
+    }).toEqual({ withoutBudget: [], budgetWithoutPage: [] });
   });
 });
