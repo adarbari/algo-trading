@@ -15,6 +15,7 @@ description = "Parameters of an outcome chosen by rule (ADR 0088, design 2.4): a
 owner = ["src/algotrade/config/edges/positions/cases.py", "src/algotrade/engines/selection/cases.py", "src/algotrade/engines/selection/entry.py"]
 allowed = [
     "src/algotrade/config/edges/document.py",  # splits the case tables off an outcome before typing it
+    "src/algotrade/services/evaluation/cross_section/reads/entry.py",  # the harness decides each name's entry close through first_entry (E13a)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "resolve_case" }, { call = "split_cases" }, { call = "first_entry" }]

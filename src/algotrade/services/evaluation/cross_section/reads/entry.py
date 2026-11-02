@@ -28,10 +28,10 @@ from algotrade.core.model.fields import (
 from algotrade.core.model.predicates import FieldValue
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
-from algotrade.data.rollups import feature_rows
 from algotrade.engines.selection.entry import ENTRY_UNKNOWN, NOT_TRIGGERED, first_entry
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.cross_section.sessions import entry_session, wait_closes
+from algotrade.services.features import has_rows
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.regime import session_market
 from algotrade.services.selection import fields_view
@@ -165,7 +165,7 @@ def check_entry(
     end = wait_closes(last, spec.within_sessions)[-1]
     for name in sorted({r.field for r in spec.when.rules()}):
         for table in _tables(features, name):
-            if feature_rows(reader, table, (), first, end, as_of) is None:
+            if not has_rows(reader, table, first, end, as_of):
                 raise ConfigurationError(
                     f"{where}: {name} has no rows in {table} over {first}..{end}, so the rule "
                     f"would be UNKNOWN at every close (G9-M4)"
