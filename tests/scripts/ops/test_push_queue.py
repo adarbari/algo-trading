@@ -98,3 +98,21 @@ def test_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pq, "_run", lambda args: "mine\n" if args[0] == "git" else '{"number": 7}')
     monkeypatch.setenv("PUSH_PRIORITY", "5")
     assert pq.compute_priority() == (5, 7, "PUSH_PRIORITY")
+
+
+def test_an_unblocks_line_counts_each_id_once_beside_the_open_dependants() -> None:
+    body = "What\n\nUnblocks: V10, v11, O3, V10, #7\n"
+    assert pq.parse_unblocks(body) == {"V10", "V11", "O3", "#7"}
+    prs = [{"number": 8, "headRefName": "x", "baseRefName": "main", "body": "Depends on #5"}]
+    # one open dependant (#8) + four distinct unblocked ids
+    assert pq.count_dependants(5, prs, own_ref="mine", own_body=body) == 5
+    # a #N that is already an open dependant, or the PR itself, is not counted twice
+    twice = "Unblocks: #8, #5, V1"
+    assert pq.count_dependants(5, prs, own_ref="mine", own_body=twice) == 2
+
+
+def test_unblocks_ignores_prose_and_missing_bodies() -> None:
+    assert pq.parse_unblocks(None) == set()
+    assert pq.parse_unblocks("Unblocks:\nUnblocks: nothing yet, none") == set()
+    assert pq.parse_unblocks("This unblocks V4 maybe") == set()
+    assert pq.count_dependants(None, [], own_body="unblocks: S2, S3") == 2
