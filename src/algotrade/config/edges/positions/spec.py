@@ -28,7 +28,8 @@ from algotrade.config.edges.positions.templates import (
 )
 from algotrade.config.site.fields import Table
 from algotrade.config.strategy.catalog import FieldCatalog
-from algotrade.config.strategy.levels import CASE, ENTRY, EXIT, GATE
+from algotrade.config.strategy.levels import CASE, ENTRY, EXIT
+from algotrade.config.strategy.regime import check_gate
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import is_position_field
 from algotrade.core.model.ids import validate_id
@@ -104,8 +105,7 @@ def spec_of(
 
 
 def gate_of(t: Table) -> Group | None:
-    """The setup's gate as a parsed rule group (structure only; the catalogue check and the
-    decision are E7's, which is when ``check_edge`` stops refusing it)."""
+    """The setup's gate as a parsed rule group (structure only; ``check_gate`` checks it)."""
     raw = t.raw("gate")
     if raw is None:
         return None
@@ -210,11 +210,6 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
                 f"{where} {pending[0][0]}: not applied by any run yet ({pending[0][1]}), so the "
                 f"edge would be measured without it"
             )
-    if edge.gate is not None:
-        raise ConfigurationError(
-            f"{where} gate: not applied by any run yet (E7), so a gated edge would be "
-            f"measured ungated"
-        )
     if not edge.variant_grid:
         return
     if edge.outcome.kind != OPTION_KIND or edge.outcome.position is None:
@@ -273,7 +268,7 @@ def check_rules(edge: Any, where: str, catalog: FieldCatalog, templates: Templat
     ``exit`` (with the ``position.*`` fields that apply to its template's legs); a ``position``
     case chooses among templates of one kind."""
     if edge.gate is not None:
-        catalog.check(edge.gate, f"{where} gate", GATE)
+        check_gate(edge.gate, catalog, where)
     for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
         if outcome.entry is not None:
             catalog.check(outcome.entry.when, f"{where} outcome.entry.when", ENTRY)

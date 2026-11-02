@@ -91,6 +91,7 @@ from algotrade.services.evaluation.evidence.values import at_level, commission_o
 IMPLIED_VOL_FIELD = (
     "rollup.iv30@v1.iv30"  # our IV30 (decimal, like fwd_realised_vol); chains from 2026-10-02
 )
+RAW_RETURN = "raw_return"  # a position baseline's measure on a setup with no benchmark
 MEASURE_FIELDS: Mapping[str, tuple[str, ...]] = {
     "excess_return": ("fwd_excess_return",),
     "realised_to_implied_vol": ("fwd_realised_vol", IMPLIED_VOL_FIELD),
@@ -159,7 +160,11 @@ def needs_residual(edge: Edge) -> bool:
 
 
 def _gross_field(edge: Edge) -> str:
-    """The stored return field a return outcome measures (and its short side is minus)."""
+    """The stored return field a return outcome measures (and its short side is minus); for the
+    raw-return measure (a position baseline of an option setup, ``baselines/outcome.py``) the
+    raw return."""
+    if edge.outcome.measure == RAW_RETURN:
+        return "fwd_return"
     return "fwd_residual_return" if needs_residual(edge) else "fwd_excess_return"
 
 

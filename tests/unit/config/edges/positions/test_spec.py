@@ -126,10 +126,9 @@ def test_a_grid_belongs_to_an_option_position() -> None:
         check_edge(parse_edge(clash, "drift", WHERE), WHERE, TEMPLATES)
 
 
-def test_a_gate_is_parsed_but_refused_until_a_run_applies_it() -> None:
+def test_a_gate_is_parsed_and_applied_so_the_edge_is_no_longer_refused() -> None:
     edge = parse_edge(document(gate=GATE), "drift", WHERE)
-    with pytest.raises(ConfigurationError, match="gate: not applied by any run yet"):
-        check_edge(edge, WHERE, TEMPLATES)
+    check_edge(edge, WHERE, TEMPLATES)
     with pytest.raises(ConfigurationError, match="gate"):
         parse_edge(document(gate={"all": []}), "drift", WHERE)
 

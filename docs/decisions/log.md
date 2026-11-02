@@ -894,6 +894,14 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: reversible; the empty Ideas window is at most one trading day on the pre-launch site and closes itself; decided while the owner was away.
 - Reasoning: the owner-away rule (2026-11-01: PRs merge as built, no `needs-owner`); CLAUDE.md "PRs auto-merge"; the live-store rule in `.claude/skills/review-and-release` section 2 (a dry run is a read; the nightly step is the sanctioned writer); ADR 0083 decision 2 fixes "stored verdict"; ADR 0088 design 2.6 fixes the thresholds as design calls under review-and-release section 2.
+
+## 2026-11-02 | ADR 0088 E16 (position baselines) | What a `position:<template>` baseline is valued as, and which picks it holds
+- Question: G19 says "the setup's own picks valued with another template" and leaves open (1) which screener's picks when a setup has several, (2) what a shares baseline is valued by on an option setup (which has no benchmark), (3) whether a baseline may hold the picks as the other side, and (4) whether a baseline on the other outcome grain (an option setup against the stock alone, X3's shape) is in scope.
+- Options: (1) the first screener / one baseline per screener. (2) the setup's own measure / the raw return over the same window. (3) allow `short_shares` of a long setup / refuse. (4) refuse a mixed grain / read both grains.
+- Decision: (1) the first screener of the edge (the ensemble's first screener for an ensemble); the setup's own picks, never the bottom of the ranking. (2) the raw `fwd_return` when the setup has no benchmark (an option setup's value is a return on the spot; excess over a benchmark would not compare), else the setup's measure. (3) refuse: the picks are the setup's own, so shares are held as its own side (`long_shares` for a long or option setup). (4) read both grains: the baseline's legs are measured on the grain its template needs, the commit sequences of both are summed so a commit to either re-measures the stored legs, and the baseline's rows are keyed apart from the setup's (its leg and trial keys carry the template, so no site edge's stored key moves). A baseline is a `baseline` role row: never a trial, never a PBO peer, never in `screener_hashes`.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the plan's "paired base, not a trial" (G19, 2.7) fixes the role; the raw return is the only stock figure comparable with an option's return on spot (a covered call earns the stock's move plus the premium); refusing the opposite side keeps "own picks" true (a short leg is ranked from the bottom, so it would silently hold other names); reading both grains is what A3 against `position:long_shares` needs, and the summed sequence is the existing staleness rule (ADR 0063) extended, not a new one. Option-template baselines are limited to option_pnl setups (they take the setup's entry, tenor and cycle) and fail with a named error otherwise.
 ## 2026-11-01 | ADR 0088 S2 / S3 / F2 | B2 reuses the two existing presets; S3 already merged; F2 is a coverage test
 - Question: S2 says reuse `low_volatility` and `ivol_high` and add `total_vol_high` only if a run shows the sort differs. Build it now?
 - Options: add `total_vol_high` now / add nothing until a run of the two edges (X4) shows the sort differs.
@@ -908,3 +916,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's decision in chat (2026-11-02); the local hook exists to catch the common CI failures early (architecture and layout tests, bundle budgets, Guide coverage, lint and types), not to repeat CI.
+
+## 2026-11-02 | Harness: shared-file conflict loop, push-queue order | Merge drivers and `Unblocks:`
+- Question: how do five UI PRs stop re-conflicting on `perf-budgets.json` and the two latency files at every merge to main, and how does the push queue favour the push that frees the most work?
+- Options: hand-merge each time / merge drivers (budgets union + max, views union) plus regeneration in `merge_main.sh` / generate the files only in CI. Queue: open dependants only / also an `Unblocks:` PR-body line.
+- Decision: merge drivers in `.gitattributes` (`scripts/ops/merge_budgets.py`), installed by `worktree.sh`, `merge_main.sh` and checked by `make doctor`; the view list regenerated after a merge that changed it; `Unblocks: V10, V11, #N` counted once per id in the queue priority. The route list is read as the budget keys themselves: a route one side removed (the other unchanged) is dropped with its e2e entry and reasons; there is no separate router list to consult.
+- decided by: owner
+- status: final
+- Reasoning: the owner's decision in chat (2026-11-02); the shared files are mechanical unions, so a conflict there carried no judgement, only a 5-15 minute re-run each time.

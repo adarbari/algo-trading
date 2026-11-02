@@ -4,7 +4,7 @@ label, the eligible names per universe, the implied vol, the ADV and the scored 
 chunk of sessions is released; ``implied_at`` reads the implied vol of names at one session, for
 the harness and the paper record alike."""
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import replace
 from datetime import date
@@ -18,6 +18,7 @@ from algotrade.config.edges.verdict import OPTION_LEVELS, OptionCosts
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
+from algotrade.core.model.predicates import Group
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
 from algotrade.data.listings.membership import TABLE as MEMBERSHIP_TABLE
@@ -41,11 +42,11 @@ from algotrade.services.evaluation.cross_section.picks import (
 )
 from algotrade.services.evaluation.cross_section.reads.screens import CachedScreen, ScreenCache
 from algotrade.services.licences import HARNESS_ALL
-from algotrade.services.screening.regime import session_market
+from algotrade.services.screening.regime import edge_gate, session_market
 from algotrade.services.selection import fields_view
 
 if TYPE_CHECKING:
-    from algotrade.services.evaluation.cross_section.measuring import Variant
+    from algotrade.services.evaluation.cross_section.baselines.variant import Variant
 
 UNKNOWN = "UNKNOWN"
 SECTOR_FIELD = "instrument.sector"  # the stratum of a pick's sector-matched random draws (ADR 0053)
@@ -77,13 +78,16 @@ class SessionReads:
         label_field: str,
         screens: ScreenCache | None = None,
         owner: str = "",
+        domains: Mapping[str, Sequence[str]] | None = None,
     ):
         self._reader, self._label_field = reader.recording(), label_field
+        self._domains = domains  # the catalogue's string domains, for a setup gate
         self._screens, self._owner = screens, owner
         self._selections = SelectionReads(self._reader)
         self._runs: dict[tuple[str, date], RankedRun | None] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}  # (universe repr, D)
         self._labels: dict[date, str] = {}
+        self._gates: dict[tuple[Group, date], str] = {}
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
         self._siblings: dict[tuple[str, frozenset[str], date], dict[str, str | None]] = {}
@@ -181,6 +185,7 @@ class SessionReads:
         self._runs.clear()
         self._eligible.clear()
         self._labels.clear()
+        self._gates.clear()
         self._implied.clear()
         self._adv.clear()
         self._siblings.clear()
@@ -198,6 +203,13 @@ class SessionReads:
             value = session_market(self._reader, [name], day).get(name)
             self._labels[day] = UNKNOWN if value is None else str(value)
         return self._labels[day]
+
+    def gate(self, group: Group, day: date) -> str:
+        """The setup gate's state at ``day`` (open / closed / unknown): the rule over that
+        session's market row alone, whatever ``[regime].enabled`` says (ADR 0088)."""
+        if (group, day) not in self._gates:
+            self._gates[group, day] = edge_gate(self._reader, group, day, self._domains).state
+        return self._gates[group, day]
 
     def implied(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
         key = (field_name, ids, day)
