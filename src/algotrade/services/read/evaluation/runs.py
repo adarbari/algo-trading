@@ -642,7 +642,12 @@ def load_run_draws(ctx: Stores, run: EdgeRun) -> tuple[Draw, ...]:
     return draws_of_record(ctx, record)
 
 
-def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
+def series_of_frame(frame: pd.DataFrame) -> tuple[SeriesRow, ...]:
+    """The series rows of an in-memory ``edge_series`` frame (a publish's, before it commits)."""
+    return tuple(_series_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records"))
+
+
+def _read_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
     """The per-session series ``run`` wrote (``results/edge_series``, ADR 0064), oldest decision
     session first; none for a run from before the table (read as not stored) or a run that
     wrote none. A run whose out-of-sample result is hidden serves only the rows whose decision
@@ -656,6 +661,14 @@ def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
     found = [_series_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records")]
     kept = [r for r in found if r.before_split] if run.oos_hidden else found
     return tuple(sorted(kept, key=lambda r: (r.variant, r.horizon_sessions, r.decision_session)))
+
+
+def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
+    """``_read_run_series``, read once per request however many verdicts ask (an option setup's
+    holdout reads it for every stored headline)."""
+    return once_per_request(
+        ctx, ("edge-run-series", run.run_id, run.oos_hidden), lambda: _read_run_series(ctx, run)
+    )
 
 
 def measured_sessions(series: Sequence[SeriesRow]) -> dict[tuple[str, int], int]:

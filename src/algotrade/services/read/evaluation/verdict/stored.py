@@ -70,7 +70,7 @@ def load_stored_summary(ctx: Stores, edge: Edge, bounded: bool = False) -> EdgeS
         return None  # the live path answers "no run" cheaply
     try:  # anything that can raise (the digest, the hash, the read, the decode) is a miss
         settings = load_verdict(ctx.configs)
-        print_ = fingerprint(judge_call(edge, run, True), run, settings)
+        print_ = fingerprint(judge_call(edge, run, True, ctx, settings), run, settings)
         row = run_day_rows(ctx, TABLE, run.range_to, KEY).get(
             (edge.id, SITE_USER, run.run_id, print_)
         )

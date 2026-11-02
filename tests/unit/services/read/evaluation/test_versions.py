@@ -542,15 +542,16 @@ def test_no_run_has_no_provenance(backend: MemoryBackend) -> None:
     assert _provenance(backend, END) is None
 
 
-def test_an_own_edge_is_judged_with_its_runs_end_for_the_option_holdout(
+def test_an_own_option_edge_is_judged_with_its_holdout_facts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The own-edge path hands the judge its run's end (ADR 0088 d15): without it an option copy
-    would read "no session" and stay held back past any date."""
+    """The own-edge path hands the judge an option setup's holdout (ADR 0088 d15): the flag, the
+    start and the closed trades of its run's series; without them a copy would skip the rule."""
+    monkeypatch.setattr(versions.verdict, "is_option", lambda edge: True)
     real, seen = versions.verdict.judge, []
 
     def spy(*args: Any, **kwargs: Any) -> Any:
-        seen.append(kwargs.get("range_to"))
+        seen.append(kwargs["facts"])
         return real(*args, **kwargs)
 
     monkeypatch.setattr(versions.verdict, "judge", spy)
@@ -558,5 +559,6 @@ def test_an_own_edge_is_judged_with_its_runs_end_for_the_option_holdout(
     write_own_run(backend)
     ctx = ctx_for(backend, with_copy({"oos_revealed": True}))
     versions.load_verdict(ctx, mine(ctx))
-    (run,) = runs.load_edge_runs(ctx, mine(ctx))
-    assert seen == [run.range_to] and run.range_to is not None
+    (facts,) = seen
+    assert facts.option and facts.holdout_from == date(2026, 10, 26)
+    assert facts.holdout_closed == ()  # the fixture run stored no series: nothing has closed

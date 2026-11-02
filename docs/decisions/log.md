@@ -990,3 +990,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: ADR 0088's rule that figures are derived or UNKNOWN, never filled; an invented floor would read as the setup's own rule; the architect review of the read agreed.
+
+## 2026-11-02 | ADR 0088 decision 15 | Every option outcome kind, including `expires_otm`, waits for its unseen holdout; each setup declares its own `holdout_from`
+- Question: the judge held back only `option_pnl` verdicts; `option_model_pnl` setups (c12 to c18) could be judged Works today. Does `expires_otm` (a short option's not-assigned hit measured on the underlying's bars) count as an option setup for the holdout? One site-wide start, or per setup? Does the run's end date show 3 months of unseen trades?
+- Options: gate `option_pnl` only / all option kinds with or without `expires_otm`; one site-wide start / a start declared per setup; the run's end / closed trades measured from the start.
+- Decision: gate `option_pnl`, `option_model_pnl` and `expires_otm` (a short-premium verdict is an option verdict whether its hit is priced from chains or read from bars; a fitness test puts every outcome kind on one side); a setup declares `holdout_from` in its document (the latest of its gates' and thresholds', never before the site's 2026-10-26; not a run input); the verdict needs measured windows decided from that date whose last exit is 92 days after it, read from the run's own series.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: ADR 0088 decision 15 says "no option verdict before its unseen holdout"; the data source is the measurement, not the claim; the earliest verdict for a `holdout_from` of 2026-10-26 is a window closed on 2027-01-26.
