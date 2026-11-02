@@ -3,17 +3,22 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EDGES_FIXTURE } from '@/entities/edge';
+import { EDGES_FIXTURE, OPTION_SETUP_FIXTURE, SHARE_SETUP_FIXTURE } from '@/entities/edge';
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { EdgePage } from './EdgePage';
 
-const hooks = vi.hoisted(() => ({ useEdge: vi.fn(), useEdgeLiveStates: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  useEdge: vi.fn(),
+  useEdgeLiveStates: vi.fn(),
+  useOptionSetup: vi.fn(),
+}));
 
 vi.mock('@/entities/edge', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useEdge: hooks.useEdge,
   useEdgeLiveStates: hooks.useEdgeLiveStates,
+  useOptionSetup: hooks.useOptionSetup,
 }));
 const { stub } = vi.hoisted(() => ({
   stub: (name: string, label: string) => async () => {
@@ -36,6 +41,16 @@ vi.mock('@/widgets/setup-head', async () => {
 });
 vi.mock('@/widgets/setup-rules', stub('SetupRules', 'rules'));
 vi.mock('@/widgets/setup-record', stub('SetupRecord', 'record'));
+vi.mock('@/widgets/setup-option-rules', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    SetupOptionRules: ({ name }: { name: string }) => <Text>{`option rules ${name}`}</Text>,
+  };
+});
+vi.mock('@/widgets/setup-option-record', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { SetupOptionRecord: () => <Text>option record</Text> };
+});
 vi.mock('@/widgets/setup-fails', stub('SetupFails', 'fails'));
 vi.mock('@/widgets/setup-checklist', async () => {
   const { Text } = await import('@algotrade/ui');
@@ -62,12 +77,29 @@ beforeEach(() => {
     fakeQuery(EDGES_FIXTURE.edges.find((e) => e.id === id) ?? null),
   );
   hooks.useEdgeLiveStates.mockReturnValue(fakeQuery([live('on_track')]));
+  hooks.useOptionSetup.mockReturnValue(fakeQuery(SHARE_SETUP_FIXTURE));
 });
 
 const page = (id = 'momentum_12_1') =>
   render(<EdgePage id={id} onBack={vi.fn()} onEdit={vi.fn()} />);
 
 describe('EdgePage', () => {
+  it("adds an option setup's position and record, and keeps a share setup's page as it was", async () => {
+    hooks.useOptionSetup.mockReturnValue(fakeQuery(OPTION_SETUP_FIXTURE));
+    page();
+    expect(await screen.findByText('rules momentum_12_1')).toBeInTheDocument();
+    expect(await screen.findByText(/option rules/)).toBeInTheDocument();
+    expect(await screen.findByText('option record')).toBeInTheDocument();
+    expect(screen.queryByText('record momentum_12_1')).not.toBeInTheDocument();
+  });
+
+  it("leaves a share setup's rules and record untouched", async () => {
+    page();
+    expect(await screen.findByText('record momentum_12_1')).toBeInTheDocument();
+    expect(screen.queryByText(/option rules/)).not.toBeInTheDocument();
+    expect(screen.queryByText('option record')).not.toBeInTheDocument();
+  });
+
   it('composes the head and the sections in reading order, with a navigation to each', async () => {
     const { container } = page();
     expect(screen.getByText('header momentum_12_1')).toBeInTheDocument();

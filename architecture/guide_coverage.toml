@@ -281,6 +281,14 @@ values = { measured = "term:decay_bar_state", not_stored = "term:decay_bar_state
 names = { oos_hidden = "hidden", not_given = "not given", not_measured_live = "not measured live" }
 
 [[enum]]
+source = "graphql:OptionSetup.positionKind"
+exempt = "a discriminator the page branches on (shares | options), never shown as a word: the page shows the setup's rules and evidence; the O1 web slice adds a Guide term if it ever names the kind"
+
+[[enum]]
+source = "graphql:OptionLegRule.kind"
+exempt = "a leg's instrument (shares | option), formatted by the page into its sentence ('Sell 1 put'); no status or lifecycle to explain; the O1 web slice adds Guide terms for the rule words it shows"
+
+[[enum]]
 source = "graphql:EdgeCurve.kind"
 values_from = "python:algotrade.services.read.edge_evidence.curve:CURVE_KINDS"
 values = { cumulative_excess = "term:evidence_curve", excess_wins = "term:evidence_curve" }

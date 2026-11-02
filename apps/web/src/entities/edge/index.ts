@@ -31,6 +31,7 @@ export {
   useEdgeVariants,
 } from './api/edge-result';
 export { prefetchEdgeDesk, useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
+export { useOptionSetup } from './api/option-setup';
 export { useScreenerEdges } from './api/screener-edges';
 export { prefetchTrackRecords, useTrackRecords } from './api/track-records';
 export {
@@ -117,6 +118,21 @@ export {
   type PaperRecord,
   type PaperTrade,
 } from './model/paper';
+export {
+  isOptionSetup,
+  type OptionCostLevel,
+  type OptionEvidence,
+  type OptionLeg,
+  type OptionRules,
+  type OptionSetup,
+  type OptionStress,
+  type OptionYear,
+} from './model/option-setup';
+export {
+  OPTION_SETUP_FIXTURE,
+  OPTION_SETUP_HIDDEN_FIXTURE,
+  SHARE_SETUP_FIXTURE,
+} from './model/fixtures-option';
 export { screenerEdges, type ScreenerEdge } from './model/screener-edges';
 export {
   MIN_TRADES,

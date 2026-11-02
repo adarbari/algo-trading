@@ -198,11 +198,11 @@ def costs_of(
     buy/hold band, whose cost is charged on entries and exits only, so the break-even is scaled by
     the turnover (``_trips``)."""
     assumed = assumed_bp or 0.0
+    option = _option_costs(basis, assumed)  # an option_pnl outcome is no return (``cost_applies``)
+    if option is not None:  # but its levels are stored: read them before the outcome says no
+        return option
     if not cost_applies:
         return EdgeCosts(NOT_A_COST_OUTCOME, basis.variant, basis.horizon, assumed, (), ())
-    option = _option_costs(basis, assumed)
-    if option is not None:
-        return option
     plain = [r for r in basis.rows if r.slice_kind != runs.COST]
     cost_rows = [
         (split, r)

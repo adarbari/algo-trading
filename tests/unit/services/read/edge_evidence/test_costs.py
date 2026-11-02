@@ -269,3 +269,17 @@ def test_an_option_setups_costs_are_its_named_levels_on_its_collateral() -> None
     by = {p.period: p for p in found.periods}
     assert by["all"].state == costs.MEASURED and by["all"].break_even_bp is None
     assert by["in_sample"].state == costs.NOT_STORED  # no row of that period
+
+
+def test_an_option_setups_levels_are_served_though_its_outcome_is_no_return() -> None:
+    """The loader passes ``cost_applies`` False for an ``option_pnl`` outcome (``is_return``): its
+    stored levels must still be read, not answered ``not_a_cost_outcome`` (O1 found it)."""
+    rows = [
+        row("momo", "cost", 0.6, FROZEN, slice_value=f"all:{name}", mean_roc=0.04 - 0.01 * i)
+        for i, name in enumerate(("mid", "effective", "full"))
+    ]
+    ctx, edge = site_world(rows)
+    basis = load_basis_rows(ctx, official_basis(ctx, edge))
+    found = costs.costs_of(basis, OWN_BP, cost_applies=False)
+    assert found.state == costs.MEASURED
+    assert [lv.level for lv in found.levels] == ["mid", "effective", "full"]

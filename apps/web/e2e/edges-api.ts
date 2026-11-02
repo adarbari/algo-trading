@@ -370,6 +370,97 @@ function screenerEdges(id: string) {
 export interface EdgesMock {
   /** The documents the builder saved, in order, by edge id. */
   saves: { id: string; document: Record<string, unknown> }[];
+  /** The edges `Query.edgeOptionSetup` answers as option setups (the others hold shares). */
+  optionEdges: string[];
+}
+
+const NO_UNKNOWN = null;
+
+/** What `Query.edgeOptionSetup` serves for an option setup (a put-writing position and its own history). */
+function optionSetup(id: string) {
+  return {
+    edgeId: id,
+    positionKind: 'options',
+    rulesUnknown: NO_UNKNOWN,
+    rules: {
+      template: 'cash_secured_put',
+      collateral: 'cash_secured',
+      schedule: 'every_session',
+      startOffsetSessions: 1,
+      tenorDays: 30,
+      expiryCycle: 'monthly',
+      skipReportInLife: true,
+      takeProfit: 0.5,
+      stopLoss: 2,
+      exitDte: 21,
+      exitConditionFields: [],
+      caseValued: ['strike'],
+      horizons: [21],
+      legs: [
+        {
+          kind: 'option',
+          qty: -1,
+          right: 'P',
+          strike: 'delta',
+          delta: 0.3,
+          otmPct: null,
+          tenorDays: null,
+        },
+      ],
+    },
+    evidence: {
+      unknown: NO_UNKNOWN,
+      basisScreener: 'iv_rich_puts',
+      basisHorizon: 21,
+      trades: 100,
+      typical: 0.012,
+      typicalLo: -0.004,
+      typicalHi: 0.021,
+      badMean: -0.083,
+      badTrades: 5,
+      kept: 72,
+      inSampleOnly: false,
+      costs: {
+        state: 'measured',
+        assumedBp: 10,
+        levels: [
+          { period: 'all', bp: 10, assumed: true, level: 'mid', meanRoc: 0.0102, winRate: 0.72 },
+          {
+            period: 'all',
+            bp: 10,
+            assumed: false,
+            level: 'effective',
+            meanRoc: 0.0071,
+            winRate: 0.7,
+          },
+          { period: 'all', bp: 10, assumed: false, level: 'full', meanRoc: 0.0032, winRate: 0.66 },
+        ],
+      },
+      byYear: [
+        { year: 2024, trades: 48, typical: 0.011, kept: 35 },
+        { year: 2025, trades: 52, typical: 0.013, kept: 37 },
+      ],
+      stress: [
+        {
+          key: 'covid_2020',
+          name: 'Covid crash',
+          start: '2020-02-19',
+          end: '2020-03-23',
+          trades: 0,
+          worst: null,
+        },
+        {
+          key: 'rates_2022',
+          name: 'Rate shock',
+          start: '2022-01-03',
+          end: '2022-10-12',
+          trades: 6,
+          worst: -0.092,
+        },
+      ],
+      stressUnknown: NO_UNKNOWN,
+    },
+  };
 }
 
 /** The definitions of the Edges list's filters (config/site/filters/edges.toml), trimmed. */
@@ -432,7 +523,7 @@ function copyOf(id: string, version: boolean): Record<string, unknown> {
 }
 
 export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
-  const mock: EdgesMock = { saves: [] };
+  const mock: EdgesMock = { saves: [], optionEdges: [] };
   const copies: Record<string, unknown>[] = [];
   let polls = 0;
   await page.route('**/api/edges/*/copy', async (route: Route) => {
@@ -587,6 +678,12 @@ export async function mockEdgesApi(page: Page): Promise<EdgesMock> {
       await route.fulfill({ json: { data: { edgeDesk: null } } });
     } else if (/query\s+EdgePaper\b/.test(query)) {
       await route.fulfill({ json: { data: { edgePaper: null } } });
+    } else if (/query\s+OptionSetup\b/.test(query)) {
+      const id = body?.variables?.id ?? '';
+      const setup = mock.optionEdges.includes(id)
+        ? optionSetup(id)
+        : { edgeId: id, positionKind: 'shares', rules: null, rulesUnknown: null, evidence: null };
+      await route.fulfill({ json: { data: { edgeOptionSetup: setup } } });
     } else if (/query\s+EdgeResultCurve\b/.test(query)) {
       await route.fulfill({ json: { data: { edgeResult: { curve: CURVE } } } });
     } else if (/query\s+EdgeResultDrawdown\b/.test(query)) {
