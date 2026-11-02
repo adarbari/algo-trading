@@ -4091,6 +4091,11 @@ type SetupGroup {
   unknown: Unknown
   picked: Int!
   shown: Int!
+
+  """
+  The setup's state at the served session (ON, OFF, PAUSED or UNKNOWN with its reason; ADR 0088 decision 16): a group is a setup with a good stored verdict, so ON or PAUSED; null: no session is served or the setup is not readable
+  """
+  setupState: SetupState
 }
 
 """

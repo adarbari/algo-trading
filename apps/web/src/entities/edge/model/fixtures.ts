@@ -509,6 +509,12 @@ export function edgeFixture(id: string): Edge {
   return found;
 }
 
+/** The setup state of two fixture edges (test builder): the rest have none served. */
+const SETUP_STATES: Record<string, { state: 'ON' | 'PAUSED'; reason: string }> = {
+  momentum_12_1: { state: 'ON', reason: 'A good verdict and the gate is open' },
+  earnings_drift: { state: 'PAUSED', reason: 'The gate is closed: stand aside' },
+};
+
 /** The list's rows of {@link EDGES_FIXTURE} (test builder): each edge as a row, its verdict only the headline. */
 export const EDGE_ROW_FIXTURES: EdgeRow[] = EDGES_FIXTURE.edges.map((e) => ({
   id: e.id,
@@ -518,6 +524,7 @@ export const EDGE_ROW_FIXTURES: EdgeRow[] = EDGES_FIXTURE.edges.map((e) => ({
   state: e.state,
   mine: e.mine,
   screeners: e.screeners,
+  setupState: SETUP_STATES[e.id] ?? null,
   summary: { verdict: e.verdict.verdict, result: e.verdict.result, trades: e.verdict.trades },
 }));
 

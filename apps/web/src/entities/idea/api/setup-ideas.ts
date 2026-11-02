@@ -36,6 +36,10 @@ const SetupIdeasQuery = graphql(`
         state
         picked
         shown
+        setupState {
+          state
+          reason
+        }
         unknown {
           code
           kind

@@ -9,6 +9,8 @@ import { StatusBadge, Stack, Text, type DataTableColumn } from '@algotrade/ui';
 import {
   recordLabel,
   recordTone,
+  SetupStateChip,
+  setupStateTerm,
   stateOrStatus,
   stateTone,
   statusTone,
@@ -50,6 +52,18 @@ export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColu
         <StatusBadge tone={verdictTone(row.summary.verdict)}>
           {verdictLabel(row.summary.verdict)}
         </StatusBadge>
+      ),
+    },
+    {
+      id: 'tonight',
+      header: 'Tonight',
+      headerAction: termHelp('setup_state'),
+      value: (e) => e.setupState?.state ?? '',
+      cell: ({ row }) => (
+        <SetupStateChip
+          state={row.setupState}
+          help={row.setupState ? termHelp(setupStateTerm(row.setupState.state)) : null}
+        />
       ),
     },
     {

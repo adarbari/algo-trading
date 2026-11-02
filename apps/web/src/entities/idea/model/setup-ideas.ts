@@ -24,6 +24,8 @@ export interface SetupGroup {
   /** `picked`, `nothing_picked`, `not_a_decision_day` or `unknown` (with `unknown`). */
   state: string;
   unknown: ServedUnknown | null;
+  /** The setup's state at the session (On or Paused for a listed setup; null: not served). */
+  setupState: { state: string; reason: string } | null;
   picked: number;
   /** The ideas under the cap that rank under this setup. */
   shown: number;
@@ -97,6 +99,7 @@ export function toSetupIdeas(response: SetupIdeasResponse): SetupIdeas | null {
       basisScreener: g.basisScreener,
       state: g.state,
       unknown: g.unknown ?? null,
+      setupState: g.setupState ?? null,
       picked: g.picked,
       shown: g.shown,
       ideas: ideas.filter((i) => i.setupId === g.edgeId),

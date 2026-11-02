@@ -6,10 +6,15 @@ import datetime as dt
 from typing import Self
 
 import strawberry
+from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.evaluation import edges as edge_reads
+from algotrade.services.read.evaluation.positions import state
 from algotrade.services.read.ideas import picks
 from algotrade.services.read.ideas.setups import Tab
+from algotrade_api.graphql.offload import off_loop
+from algotrade_api.graphql.types.evaluation.verdict import SetupState
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.screens.ideas import IdeaMetric
@@ -111,6 +116,19 @@ class SetupGroup:
             picked=d.picked,
             shown=d.shown,
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The setup's state at the served session (ON, OFF, PAUSED or UNKNOWN with "
+        "its reason; ADR 0088 decision 16): a group is a setup with a good stored verdict, so "
+        "ON or PAUSED; null: no session is served or the setup is not readable"
+    )
+    async def setup_state(self, info: Info) -> SetupState | None:
+        read = await info.context.aread(None)
+        found = edge_reads.load_edge(read, self.edge_id) if read is not None else None
+        if found is None:
+            return None
+        decided = await off_loop(state.load_setup_state, read, found)
+        return SetupState.of(decided) if decided is not None else None
 
 
 @strawberry.type(

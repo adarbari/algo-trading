@@ -129,3 +129,31 @@ export const sideLabel = (side: string): string | null => SIDE_LABELS[side] ?? n
 /** The state the list shows: the user's own, else the site's status for an edge not yet theirs. */
 export const stateOrStatus = (edge: Pick<EdgeRow, 'state' | 'status'>): string =>
   edge.state === 'researching' ? statusLabel(edge.status) : stateLabel(edge.state);
+
+/** The setup state a setup's page, library row and Ideas group show (ADR 0088 decision 16). */
+export interface ServedSetupState {
+  state: string;
+  /** The server's sentence (for PAUSED the gate's); empty for UNKNOWN. */
+  reason: string;
+}
+
+const SETUP_STATE_LABELS: Record<string, string> = {
+  ON: 'On',
+  OFF: 'Off',
+  PAUSED: 'Paused',
+  UNKNOWN: 'Unknown',
+};
+
+const SETUP_STATE_TONES: Record<string, StatusTone> = {
+  ON: 'positive',
+  PAUSED: 'warning',
+  OFF: 'neutral',
+  UNKNOWN: 'neutral',
+};
+
+export const setupStateLabel = (state: string): string => SETUP_STATE_LABELS[state] ?? state;
+
+export const setupStateTone = (state: string): StatusTone => SETUP_STATE_TONES[state] ?? 'neutral';
+
+/** The Guide term of one state value (each state has its own entry). */
+export const setupStateTerm = (state: string): string => `setup_state_${state.toLowerCase()}`;
