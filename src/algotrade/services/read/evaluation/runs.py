@@ -151,6 +151,15 @@ class EdgeRow:
     touch_rate: float | None = None
     side: str = "long"  # the outcome's side (ADR 0053 amendment); a run before sides is long
     licence: str | None = None  # the trial's licence (ADR 0028); None: a run from before it
+    # What the ``tails`` verdict profile reads (ADR 0088, design 2.6), over the return on capital:
+    # the bootstrap t of the paired excess against the base, the probabilistic Sharpe ratio, the
+    # CVaR 5% with the windows in its tail and the base's. None: not measured (a run from before
+    # E6b, an outcome with no money, too few sessions, no base), never 0.
+    excess_roc_t: float | None = None
+    psr: float | None = None
+    cvar_5: float | None = None
+    cvar_5_n: int | None = None
+    base_cvar_5: float | None = None
 
 
 @dataclass(frozen=True)
@@ -455,6 +464,11 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         touch_rate=_float(row.get("touch_rate")),
         side=str(to_scalar(row.get("side")) or "long"),
         licence=_text(row.get("licence")),
+        excess_roc_t=_float(row.get("excess_roc_t")),
+        psr=_float(row.get("psr")),
+        cvar_5=_float(row.get("cvar_5")),
+        cvar_5_n=_int(row.get("cvar_5_n")),
+        base_cvar_5=_float(row.get("base_cvar_5")),
     )
 
 

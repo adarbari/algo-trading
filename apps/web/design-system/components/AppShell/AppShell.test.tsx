@@ -30,6 +30,15 @@ describe('AppShell', () => {
     expect(skip.getAttribute('href')).toBe(`#${screen.getByRole('main').id}`);
   });
 
+  it('renders a footer landmark after the main region when given one', () => {
+    render(
+      <AppShell topBar={<TopBar brand="algotrade" />} footer={<p>Risk line</p>}>
+        <p>Page</p>
+      </AppShell>,
+    );
+    expect(screen.getByRole('contentinfo')).toHaveTextContent('Risk line');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <AppShell topBar={<TopBar brand="algotrade" />}>

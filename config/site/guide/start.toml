@@ -573,3 +573,99 @@ title = "When a run is not complete"
 body = """
 A partial or failed run names the tables it lacked, and an admin sees the chain behind each gap: the source, the step and the table. Fix the cause in the Ingestion tab, then wait for the next nightly run. This page cannot rerun a screener.
 """
+
+# --------------------------------------------------------------------------------------- 11
+[[page]]
+id = "methodology_and_conflicts"
+order = 11
+title = "Methodology and conflicts"
+summary = "How a setup is found, judged and labelled, what the numbers leave out, and what the site does and does not earn from."
+links = [
+  { kind = "term", id = "risk_statement" },
+  { kind = "term", id = "verdict" },
+  { kind = "term", id = "paper_trading" },
+  { kind = "term", id = "not_a_return" },
+  { kind = "term", id = "base_rate" },
+  { kind = "term", id = "variants_tried" },
+  { kind = "term", id = "unknown" },
+  { kind = "start", id = "how_the_app_thinks" },
+]
+
+[[page.section]]
+title = "How a setup is found and judged"
+body = """
+A setup is a written rule with a reason it should last. Its screener picks names from the stored end-of-day data, one session at a time, using only what was known by that session. A fixed test then scores the picks against what happened next. It compares the hit rate with the base rate, and the best-ranked tenth with the worst. The verdict is the test's word, never a person's, and the model never judges a setup.
+"""
+
+[[page.section]]
+title = "How every figure is labelled"
+body = """
+A figure says whether it is backtested (hypothetical) or a forward paper record since a date, and the two are never blended into one number. Next to it the page shows the trades behind it, the base rate, the worst year, the costs assumed and how delisted names were handled. A figure the data does not hold is shown as not available with the reason, never as zero.
+"""
+
+[[page.section]]
+title = "What the numbers leave out"
+body = """
+A backtest cannot know the fills you would have got, the tax you would owe or how the market will treat the setup once more people use it. Trying many variants finds some that look good by luck; the page counts the variants tried so the number can be read with that in mind. The site covers US-listed names and publishes one list a night, the same for everyone.
+"""
+
+[[page.section]]
+title = "Conflicts"
+body = """
+The site is paid for by subscriptions. It has no broker links, no trade buttons and earns no broker commissions, and no name appears on a list because someone paid for it. The list is the same for every subscriber and is made once a night, so nothing is tuned to a person. The site publishes setups and their historical results; it does not tell anyone what to buy or sell.
+"""
+
+# --------------------------------------------------------------------------------------- 12
+[[page]]
+id = "read_the_setups_page"
+order = 12
+title = "Read the Setups page"
+summary = "Setups are written rules with a stored verdict; how to scan the library, tell a proven setup from a thin one and open one."
+links = [
+  { kind = "term", id = "verdict" },
+  { kind = "term", id = "win_rate" },
+  { kind = "term", id = "base_rate" },
+  { kind = "term", id = "year_by_year" },
+  { kind = "term", id = "risk_statement" },
+  { kind = "start", id = "read_an_edge_page" },
+  { kind = "start", id = "methodology_and_conflicts" },
+]
+
+[[page.section]]
+title = "What a setup is"
+body = """
+A setup is a rule that picks names plus the reason it should keep working. The library lists the setups grouped by their verdict, so the ones with the strongest evidence come first and those with too few cases sit lower. Following a setup keeps it in your own view; it changes nothing for anyone else.
+"""
+
+[[page.section]]
+title = "Reading the library"
+body = """
+Each row gives the verdict, the hit rate against the base rate and the number of trades behind it. A high hit rate on few trades is weak evidence, and the row says so. Open a setup to see its rules, how it has done year by year, when it fails and the names it picks tonight.
+"""
+
+# --------------------------------------------------------------------------------------- 13
+[[page]]
+id = "test_a_setup"
+order = 13
+title = "Test your own setup"
+summary = "Turn an idea into rules, run it over the stored history, and read the result as a verdict rather than a promise."
+links = [
+  { kind = "term", id = "verdict" },
+  { kind = "term", id = "risk_statement" },
+  { kind = "term", id = "variants_tried" },
+  { kind = "start", id = "build_a_screen" },
+  { kind = "start", id = "draft_from_a_sentence" },
+  { kind = "start", id = "methodology_and_conflicts" },
+]
+
+[[page.section]]
+title = "Four ways in"
+body = """
+Start from a published setup, build the rules step by step, write them directly or describe the idea in a sentence. The sentence is only translated into rules you then review; nothing is added that you did not say, and nothing runs until you choose to test it.
+"""
+
+[[page.section]]
+title = "Reading the result"
+body = """
+The result is a verdict with its figures, labelled backtested (hypothetical). Changing the rules and testing again until the numbers look good makes a lucky result, which is why every test counts the variants tried. A result that rests on few cases says so and is not a finding.
+"""
