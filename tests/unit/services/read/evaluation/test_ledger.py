@@ -7,9 +7,12 @@ retention purge spares."""
 from datetime import date, timedelta
 from typing import Any
 
+import pytest
+
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import open_stores
+from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import load_edge
 from algotrade.services.read.evaluation.runs import (
     EdgeRun,
@@ -182,3 +185,28 @@ def test_the_purge_spares_the_canonical_latest_and_cited_runs(backend: MemoryBac
     # a run that finished within the retention window is kept, whatever its range end
     assert days[1] in ledger_keep(StoreReader(backend), configs, T.date())
     assert EDGE_TRADES.retention_days == 45
+
+
+def test_the_ledger_is_read_once_per_request_and_again_in_the_next(
+    backend: MemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A page of picks asks for one ledger per pick (an exit rule each): one read a request,
+    never kept across requests (a new context reads it again)."""
+    write_ledger(backend, "r1", ROWS)
+    reads: list[str] = []
+    real = runs.run_partition
+
+    def counted(ctx: Any, table: Any, record: Any) -> Any:
+        reads.append(record.run_id)
+        return real(ctx, table, record)
+
+    monkeypatch.setattr(runs, "run_partition", counted)
+    ctx = viewer(backend, "owner")
+    run = canonical(ctx)
+    first = load_run_trades(ctx, run, horizon=2)
+    assert load_run_trades(ctx, run, horizon=2) is first and reads == ["r1"]
+    load_run_trades(ctx, run, offset=1, limit=1)  # other arguments: another read
+    assert len(reads) == 2
+    later = viewer(backend, "owner")
+    load_run_trades(later, canonical(later), horizon=2)
+    assert len(reads) == 3  # the next request reads it again

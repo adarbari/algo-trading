@@ -838,7 +838,32 @@ def load_run_trades(
     out-of-sample one), sorted by ``sort`` (one of ``SORTABLE``, ties in key order, a missing
     value last) and paged. A run whose out-of-sample result is hidden serves its rows before the
     split only, whatever is asked. A per-name value the viewer may not see sorts as missing: the
-    order never discloses it."""
+    order never discloses it. Read once per request and arguments (``once_per_request``): a page
+    of picks asks for the same ledger once per pick (an exit rule each)."""
+    key = (
+        "run-trades", run.run_id, run.oos_hidden, ctx.user.user_id, variant, horizon,
+        before_split, offset, limit, sort, descending,
+    )  # fmt: skip
+    return once_per_request(
+        ctx,
+        key,
+        lambda: _load_run_trades(
+            ctx, run, variant, horizon, before_split, offset, limit, sort, descending
+        ),
+    )
+
+
+def _load_run_trades(
+    ctx: Stores,
+    run: EdgeRun,
+    variant: str | None,
+    horizon: int | None,
+    before_split: bool | None,
+    offset: int,
+    limit: int | None,
+    sort: str | None,
+    descending: bool,
+) -> RunTrades:
     record = ctx.reader.run(run.run_id)
     count = None if record is None else record.stats.get("ledger_rows")
     if record is None or count is None:
