@@ -59,9 +59,14 @@ def changed_files(base: str) -> list[str]:
 # What the Guide coverage test reads (architecture/guide_coverage.toml is under architecture/).
 GUIDE_SOURCES = ("apps/web/src/", "apps/api/schema.graphql", "config/site/guide/")
 GUIDE_FITNESS = "tests/architecture/guide"
+# The page-latency gate lists every web view and operation (benchmarks/api_latency_views*.json,
+# `make api-latency-views`); it was the most common red CI check on web PRs (2026-11-01).
+VIEWS_SOURCES = ("apps/web/src/", "apps/api/schema.graphql", "benchmarks/api_latency_views")
+VIEWS_FITNESS = "tests/scripts/perf/test_views.py"
 FITNESS_BY_PREFIX = (
     (("apps/web/", "architecture/web_"), WEB_FITNESS),
     (GUIDE_SOURCES, GUIDE_FITNESS),
+    (VIEWS_SOURCES, VIEWS_FITNESS),
 )
 
 

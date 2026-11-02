@@ -27,7 +27,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate((t) => {
       document.documentElement.setAttribute('data-theme', t);
     }, theme);
-    await expect(page.getByRole('heading', { level: 1, name: 'LLM usage & cost' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'AI and requests' })).toBeVisible();
     const strip = page.getByRole('region', { name: 'Spend by window' });
     await expect(strip).toContainText('$0.7527');
     await expect(strip).toContainText('notional (reported)');
@@ -35,6 +35,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('region', { name: 'How attempts ended' })).toContainText(
       'Fell back',
     );
+    await page.getByRole('tab', { name: 'Calls' }).click();
     await expect(page.getByRole('grid', { name: 'Recent text-model calls' })).toContainText(
       'claude_cli',
     );
@@ -50,6 +51,7 @@ test('a call opens its detail and the choice is in the URL', async ({ page }) =>
   await mockNoGuideEntries(page);
   await mockAdminApi(page);
   await page.goto('/admin/llm-usage');
+  await page.getByRole('tab', { name: 'Calls' }).click();
   await page.getByText('2026-10-08 13:00:00 UTC').click();
   await expect(page).toHaveURL(/call=/);
   await expect(page.getByText('Not known: Input tokens, Output tokens')).toBeVisible();
@@ -65,6 +67,7 @@ test('the Failures view lists a rejected answer and its detail shows the raw ans
   await mockNoGuideEntries(page);
   await mockAdminApi(page);
   await page.goto('/admin/llm-usage');
+  await page.getByRole('tab', { name: 'Calls' }).click();
   await page.getByRole('radio', { name: 'Failures' }).click();
   await expect(page.getByRole('grid', { name: 'Failed text-model calls' })).toContainText(
     "the model's answer is not JSON",

@@ -20,17 +20,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+vi.mock('@/widgets/feature-request-list', () => ({ FeatureRequestList: stub('requests') }));
+vi.mock('@/widgets/accepted-formula-list', () => ({ AcceptedFormulaList: stub('formulas') }));
+
 describe('AdminLlmUsagePage', () => {
-  it('lays out every section and passes the chosen call down', async () => {
+  it('shows the overview first, the calls with the chosen call and the requests on their tabs', async () => {
+    render(<AdminLlmUsagePage onSelectCall={vi.fn()} onClearCall={vi.fn()} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'AI and requests' })).toBeInTheDocument();
+    for (const name of ['budget', 'trend', 'breakdown', 'reliability']) {
+      expect(document.body).toHaveTextContent(`[${name}]`);
+    }
+    expect(document.body).not.toHaveTextContent('[calls');
+    await userEvent.click(screen.getByRole('tab', { name: 'Requests' }));
+    await waitFor(() => {
+      expect(document.body).toHaveTextContent('[requests]');
+    });
+    expect(document.body).toHaveTextContent('[formulas]');
+  });
+
+  it('opens the calls view for a chosen call and passes it down', async () => {
     render(<AdminLlmUsagePage selected="c1" onSelectCall={vi.fn()} onClearCall={vi.fn()} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'LLM usage & cost' })).toBeInTheDocument();
-    // the calls section is one lazy chunk
     await waitFor(() => {
       expect(document.body).toHaveTextContent('[calls c1]');
     });
-    for (const name of ['budget', 'trend', 'breakdown', 'reliability', 'calls c1', 'detail']) {
-      expect(document.body).toHaveTextContent(`[${name}]`);
-    }
+    expect(document.body).toHaveTextContent('[detail]');
   });
 
   it('on a phone the call detail opens in a sheet only once a call is chosen, and closing clears it', async () => {
