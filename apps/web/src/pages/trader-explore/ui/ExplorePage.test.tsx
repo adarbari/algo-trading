@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExplorePage } from './ExplorePage';
 
 const widgets = vi.hoisted(() => ({
-  search: vi.fn(),
   side: vi.fn(),
   compare: vi.fn(),
   options: vi.fn(),
@@ -15,15 +14,6 @@ const widgets = vi.hoisted(() => ({
   universe: vi.fn(),
 }));
 
-vi.mock('@/features/ticker-search', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return {
-    TickerSearch: (props: Record<string, unknown>) => {
-      widgets.search(props);
-      return <Text>ticker search</Text>;
-    },
-  };
-});
 vi.mock('./UniverseTable', async () => {
   const { Text } = await import('@algotrade/ui');
   return {
@@ -125,9 +115,6 @@ describe('ExplorePage', () => {
       { timeout: 5000 },
     );
     expect(widgets.overview).not.toHaveBeenCalled();
-    expect(widgets.search).toHaveBeenLastCalledWith(
-      expect.objectContaining({ focusKey: '/', chosen: ['AAPL', 'MSFT'] }),
-    );
   });
 
   it('opens one ticker on its overview, with no Compare tab', async () => {
@@ -147,21 +134,6 @@ describe('ExplorePage', () => {
     );
     await user.click(screen.getByRole('tab', { name: 'Options' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'options' });
-  });
-
-  it('adds a searched ticker as a tab and selects it on its overview', () => {
-    const onSearchChange = vi.fn();
-    render(page({ sel: 'AAPL', tab: 'options' }, onSearchChange));
-    const props = widgets.search.mock.lastCall?.[0] as { onChoose: (s: string) => void };
-    props.onChoose('NVDA');
-    expect(onSearchChange).toHaveBeenLastCalledWith({
-      sel: 'AAPL,NVDA',
-      focus: 'NVDA',
-      tab: undefined,
-      expiry: undefined,
-      feature: undefined,
-      via: undefined,
-    });
   });
 
   it('chooses and closes tabs through the URL', async () => {

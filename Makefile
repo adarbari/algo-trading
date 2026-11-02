@@ -31,7 +31,7 @@ friction:        ## what slowed the last sessions down (SINCE=YYYY-MM-DD, defaul
 
 install: no-shared-venv  ## library + every app + dev tools into .venv, exactly as locked
 	$(UV) sync --all-packages --locked
-	$(BIN)pre-commit install
+	$(BIN)pre-commit install --hook-type pre-commit --hook-type pre-push
 
 # A worktree's .venv links to the main checkout's, which launchd's nightly and the API run:
 # syncing through the link points that venv at this worktree's unmerged code.

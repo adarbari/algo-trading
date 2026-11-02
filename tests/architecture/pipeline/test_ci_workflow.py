@@ -23,6 +23,8 @@ PROTECTED_CHECKS = {
     "Real app smoke (Vite dev + real API, empty and golden stores)",
 }
 WEB_JOBS = {"web-static", "web-e2e", "web-storybook", "web-screenshots", "web-perf"}
+# Stories live only in apps/web/design-system, so a change to app code alone skips these.
+VISUAL_JOBS = {"web-storybook", "web-screenshots"}
 
 
 def _jobs() -> dict[str, dict[str, Any]]:
@@ -39,7 +41,10 @@ def test_web_jobs_run_in_parallel_gated_on_the_changed_areas() -> None:
     jobs = _jobs()
     for name in WEB_JOBS:
         job = jobs[name]
-        assert job["if"] == "needs.changes.outputs.web == 'true'", f"{name} must skip non-web PRs"
+        area = "visual" if name in VISUAL_JOBS else "web"
+        assert job["if"] == f"needs.changes.outputs.{area} == 'true'", (
+            f"{name} must skip PRs outside {area}"
+        )
         upstream = set(job["needs"]) - {"changes"}
         expected = {"web-storybook"} if name == "web-screenshots" else set()
         assert upstream == expected, f"{name} may wait only for {expected or 'nothing'}: {upstream}"
@@ -110,8 +115,8 @@ def test_the_web_gate_waits_for_every_web_job_and_tolerates_skips() -> None:
 
 def test_python_jobs_skip_web_only_and_docs_only_changes() -> None:
     jobs = _jobs()
-    for name in ("lint", "evaluate"):
-        assert jobs[name]["if"] == "needs.changes.outputs.python == 'true'"
+    assert jobs["lint"]["if"] == "needs.changes.outputs.python == 'true'"
+    assert jobs["evaluate"]["if"] == "needs.changes.outputs.evaluate == 'true'"
     assert set(jobs["quality"]["needs"]) == {"lint", "evaluate"}
     assert jobs["quality"]["if"].strip() == "${{ !cancelled() }}"
     assert "make evaluate" not in str(jobs["lint"]["steps"]), "evaluation runs in its own job"
@@ -261,3 +266,15 @@ def test_a_workflow_that_pushes_to_a_pr_branch_dispatches_ci() -> None:
         if "git push" in text and path.name != "ci.yml":
             assert "gh workflow run ci.yml" in text, f"{path.name} pushes but never dispatches CI"
             assert "actions: write" in text, f"{path.name} needs actions: write to dispatch"
+
+
+def test_a_red_test_shard_cancels_the_rest_and_app_only_changes_skip_the_scorecard() -> None:
+    """The queue, not the compute, is the bottleneck (2026-11-01: jobs ran 2-5 min and waited
+    5-26): a red shard frees its runners, and the evaluation / screenshots skip changes that
+    cannot alter them. Everything else, and every push to main, still runs them."""
+    jobs = _jobs()
+    assert jobs["test"]["strategy"]["fail-fast"] is True
+    classify = jobs["changes"]["steps"][-1]["run"]
+    assert "tests/* | apps/api/*) python=true ;;" in classify
+    assert "apps/web/src/* | apps/web/e2e/* | apps/web/real/*) web=true ;;" in classify
+    assert "evaluate=true visual=true; fi" in classify, "a push to main runs everything"

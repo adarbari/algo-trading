@@ -13,7 +13,7 @@ export {
   useFeatureCatalogueDetail,
   useFeatureDistribution,
 } from './api/hooks';
-export { useFeatureTable } from './api/table';
+export { fetchFeatureTable, useFeatureTable } from './api/table';
 export {
   catalogueColumn,
   changeColumn,

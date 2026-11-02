@@ -51,3 +51,10 @@
     padding-inline: var(--space-3);
   }
 }
+
+.footer {
+  width: 100%;
+  max-width: var(--size-page);
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-6);
+}

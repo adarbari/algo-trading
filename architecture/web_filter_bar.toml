@@ -48,6 +48,7 @@
 "src/widgets/known-coverage-panel/ui/KnownCoveragePanel.tsx" = "admin detail panel: the security types of one dataset and the few causes of a gap, fixed rows"
 "src/widgets/options-panel/ui/OptionsPanel.tsx" = "one instrument's option chain tables (strike ladder), not a browsable list"
 "src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx" = "detail panel: the fixed list of quality checks of one run"
+"src/widgets/user-list/ui/UserList.tsx" = "admin: the few declared users of the site (a reviewed config file), a short list"
 "src/widgets/regime-episodes/ui/RegimeEpisodes.tsx" = "a handful of named regime episodes"
 "src/widgets/review-items-panel/ui/ReviewItemsPanel.tsx" = "admin review queue, a short list"
 "src/widgets/setup-ideas/ui/SetupIdeas.tsx" = "one tab's ideas, a list the ranking rule caps at 15 (ADR 0083 decision 2): a fixed handful of picks grouped by setup"
