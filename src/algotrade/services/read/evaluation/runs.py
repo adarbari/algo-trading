@@ -676,9 +676,11 @@ def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], i
 # ---------------------------------------------------------------------------- the trade ledger
 LEDGER = "edge_trades"
 OPEN = "open"
-# The per-name columns each recorded column licence covers (ADR 0064 decision 10).
+# The per-name columns each recorded column licence covers (ADR 0064 decision 10); the trade
+# contract's ``max_adverse`` is under the row's value licence (ADR 0088 2.5a: a bought-history
+# option trade is personal).
 LICENSED: Final = {
-    "value_licence": ("value", "gross_value", "reference", "touch"),
+    "value_licence": ("value", "gross_value", "reference", "touch", "max_adverse"),
     "score_licence": ("score",),
     "adv_licence": ("adv_usd_20d",),
 }
@@ -739,6 +741,9 @@ class TradeRow:
     symbol: TradeText = TradeText()  # filled by the ledger read from the reference snapshot
     company: TradeText = TradeText()
     symbol_as_of: date | None = None  # the reference snapshot the ticker was read from
+    # the trade contract's worst loss as a share of capital (ADR 0088 2.5a; an option's worst
+    # mark loss over its collateral; null in rows written before it)
+    max_adverse: TradeCell = TradeCell()
 
 
 @dataclass(frozen=True)
@@ -793,6 +798,7 @@ def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
         reference=cell("reference"),
         touch=cell("touch", _flag),
         side=str(to_scalar(row.get("side")) or "long"),
+        max_adverse=cell("max_adverse"),
     )
 
 
