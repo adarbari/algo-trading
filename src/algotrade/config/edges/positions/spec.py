@@ -5,7 +5,8 @@
 Parsed here, checked against the site's templates where the edge loads (``check_outcome``); the
 engine that reads it is a later slice. ``when`` of ``[outcome.exit]`` (a rule over position-level
 and catalogue fields), the case values and the three exit settings compiled to position rules
-(``exit_rules``) are here too; the catalogue check of every rule is ``check_rules``."""
+(``exit_rules``; a share position's ``share_exit_rules``) are here too; the catalogue check of every
+rule is ``check_rules``."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -32,7 +33,7 @@ from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.levels import CASE, ENTRY, EXIT
 from algotrade.config.strategy.regime import check_gate
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import is_position_field
+from algotrade.core.model.fields import is_position_field, position_field
 from algotrade.core.model.ids import validate_id
 from algotrade.core.model.predicates import Group, Rule
 
@@ -250,6 +251,30 @@ def exit_rules(exit: ExitSettings | None) -> tuple[ExitRule, ...]:
     if exit.when is not None:
         found.append(ExitRule(KIND_CONDITION, canonical(exit.when)))
     return tuple(found)
+
+
+def share_exit_rules(exit: ExitSettings | None, side: str) -> tuple[ExitRule, ...]:
+    """A share position's ordered exit rules: take profit, stop loss, then ``when`` (the
+    option-only ``exit_dte`` is not for shares). A share has no credit: the fixed settings are rules
+    over ``position.move_since_entry_pct``, a take profit a favourable move of that fraction and a
+    stop loss an adverse one, each in the position's own direction (a short gains when the price
+    falls). ``side`` is ``long`` or ``short``."""
+    if exit is None:
+        return ()
+    sign = 1.0 if side == "long" else -1.0
+    move = position_field("move_since_entry_pct")
+    found: list[ExitRule] = []
+    if exit.take_profit is not None:
+        op = "gte" if sign > 0 else "lte"
+        found.append(
+            ExitRule(KIND_TAKE_PROFIT, Group("all", (Rule(move, op, sign * exit.take_profit),)))
+        )
+    if exit.stop_loss is not None:
+        op = "lte" if sign > 0 else "gte"
+        found.append(
+            ExitRule(KIND_STOP_LOSS, Group("all", (Rule(move, op, -sign * exit.stop_loss),)))
+        )
+    return (*found, *exit_rules(ExitSettings(when=exit.when)))
 
 
 def exit_delay(rule: Group) -> int:

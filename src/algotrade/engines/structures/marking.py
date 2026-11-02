@@ -1,5 +1,5 @@
 """Marking a position of option legs through its window (ADR 0088, design 2.4; moved from the
-option-outcomes task's ``option_paths``): per name, from the entry session S to the exit session T,
+option-outcomes task's ``option_rows``): per name, from the entry session S to the exit session T,
 the underlying's close at each session, the position's value at S (mid, and executable: a long leg
 bought at the ask, a short one sold at the bid), at T (the quoted mid and executable value, or the
 intrinsic value of a leg that expires on T), and its net delta at each close but the last for the

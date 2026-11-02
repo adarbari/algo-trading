@@ -21,8 +21,10 @@ from algotrade.storage.tables.schemas.events import (
 )
 from algotrade.storage.tables.schemas.outcomes import (
     OUTCOME_STATUSES,
+    SHARE_PATH_SPEC,
     STRUCTURE_PNL_SPEC,
     outcome_problems,
+    share_path_problems,
     structure_pnl_problems,
 )
 from algotrade.storage.tables.schemas.registry import spec_for, table_key
@@ -108,4 +110,5 @@ VALUE_CHECKS = {
     ANALYST_VENDOR_ACCESS.name: access_status_problems,
     ANALYST_ESTIMATE_SNAPSHOTS.name: snapshot_kind_problems,
     STRUCTURE_PNL_SPEC.name: structure_pnl_problems,
+    SHARE_PATH_SPEC.name: share_path_problems,
 }

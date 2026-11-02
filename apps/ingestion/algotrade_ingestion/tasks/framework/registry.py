@@ -21,7 +21,6 @@ from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import (
     history_copy,
     market_rollups,
-    option_outcomes,
     outcomes,
     residual_returns,
     rollups,
@@ -667,15 +666,7 @@ TASKS: dict[str, Task] = {
             settings="edges/*.toml (horizons, benchmarks)",
             params=(SESSION, FROM, TO),
         ),
-        Task(
-            "option-outcomes",
-            "chain P&L of the option windows a session closes (ADR 0053 amendment); forward-only",
-            option_outcomes,
-            option_outcomes.TABLES,
-            entries_market.run_option_outcomes,
-            settings="edges/*.toml (option_pnl structures, tenors, horizons)",
-            params=(SESSION, FROM, TO),
-        ),
+        *entries_market.PATH_TASKS,
         Task(
             "residual-returns",
             "factor-neutral forward returns of the windows a session closes (ADR 0053); "

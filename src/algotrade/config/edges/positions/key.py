@@ -8,7 +8,10 @@ own takes the outcome's). ``position_key`` is the canonical sorted JSON of the r
 collateral rule, the selection parameters (``strike_delta``, ``tenor_days``, ``expiry_cycle``,
 ``skip_report_in_life``), the entry offset, the ordered exit rule list and the hold cap; two grid
 points that differ only in ``take_profit`` are two keys. ``parse_position_key`` is its inverse
-(``ParsedKey``), so a stored row round-trips to the spec that wrote it."""
+(``ParsedKey``), so a stored row round-trips to the spec that wrote it. ``share_position_key`` is
+the same string for a share position with declared exits (E3c-2): its legs, the entry offset, its
+side's ordered exit rules (``share_exit_rules``: moves of the entry price, not credit shares) and
+the hold cap, the option parameters empty, so a share and an option trade never share a key."""
 
 import json
 from collections.abc import Sequence
@@ -17,7 +20,12 @@ from datetime import date, datetime
 from itertools import product
 from typing import TYPE_CHECKING, Any
 
-from algotrade.config.edges.positions.spec import ExitRule, ExitSettings, exit_rules
+from algotrade.config.edges.positions.spec import (
+    ExitRule,
+    ExitSettings,
+    exit_rules,
+    share_exit_rules,
+)
 from algotrade.config.edges.positions.templates import OPTION, Leg, Template, Templates
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import Group, Rule
@@ -138,6 +146,22 @@ def parsed_key(outcome: "Outcome", hold: int) -> ParsedKey:
 def position_key(outcome: "Outcome", hold: int) -> str:
     """The stored ``position_key`` of ``outcome`` held at most ``hold`` sessions."""
     return _dump(parsed_key(outcome, hold))
+
+
+def share_position_key(outcome: "Outcome", hold: int) -> str:
+    """The stored ``position_key`` of a share position (a share-only template, legs resolved by the
+    loader) held at most ``hold`` sessions: its exits compiled for its ``side``, no option
+    parameters (``ConfigurationError`` without resolved share legs)."""
+    spec = outcome.position
+    if spec is None or not spec.legs or any(leg.kind == OPTION for leg in spec.legs):
+        raise ConfigurationError("a share position key needs resolved share legs (loader)")
+    return _dump(
+        ParsedKey(
+            legs=spec.legs, collateral=spec.collateral, strike_delta=None, tenor_days=None,
+            expiry_cycle="", skip_report_in_life=False, offset=outcome.start_offset_sessions,
+            exits=share_exit_rules(spec.exit, outcome.side), hold=hold,
+        )
+    )  # fmt: skip
 
 
 def parse_position_key(key: str) -> ParsedKey:
