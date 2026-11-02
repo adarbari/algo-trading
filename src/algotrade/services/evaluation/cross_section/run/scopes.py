@@ -14,16 +14,20 @@ from algotrade.config.edges.identity import LONG
 from algotrade.config.edges.named import TIME_SERIES
 from algotrade.config.edges.portfolio import ENSEMBLE
 from algotrade.config.edges.positions.templates import POSITION_PREFIX, load_templates
+from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
+from algotrade.features.framework.feature import Feature
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.baselines.variant import Variant, _Scope
+from algotrade.services.evaluation.cross_section.detail.licences import edge_fields, exit_fields
 from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
 from algotrade.services.evaluation.cross_section.hit import IMPLIED_VOL_FIELD
 from algotrade.services.evaluation.cross_section.measures import BASELINE, MEMBER, SCREENER
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
+from algotrade.services.evaluation.training.bound import scored
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 
@@ -95,16 +99,25 @@ def edge_scopes(
     """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides. Each
     reads one implied-vol field: its outcome's ``iv_field``, else the run's; ``borrow``: the
     site's default borrow rate (``verdict.toml``), for a short leg without its own."""
+    refuse_fitted_scores(configs, user, edge)
     edge = replace(edge, outcome=_borrowing(edge.outcome, borrow))
     templates = load_templates(configs) if edge.position_baselines else {}
+    features = catalogue(configs, user.user_id)
+    screeners = _screener_configs(configs, user, edge)
+
+    def read(applied: Edge, universe: Selection) -> tuple[Feature, ...]:
+        return scored(features, edge_fields(applied, universe, screeners))
+
+    universe = edge_universe(configs, user, edge)
     scopes = [
         _Scope(
             MAIN,
             edge,
-            edge_universe(configs, user, edge),
+            universe,
             iv_field_of(edge, iv_field),
             (),
             templates,
+            read(edge, universe),
         )
     ]
     for v in edge.variants:
@@ -119,12 +132,47 @@ def edge_scopes(
         )
         field_name = v.outcome.iv_field or iv_field
         marks = (f"base={base}", f"picks={picks}") if v.base or v.picks else ()
+        scoped_universe = edge_universe(configs, user, applied)
         scopes.append(
             _Scope(
-                v.id, applied, edge_universe(configs, user, applied), field_name, marks, templates
+                v.id,
+                applied,
+                scoped_universe,
+                field_name,
+                marks,
+                templates,
+                read(applied, scoped_universe),
             )
         )
     return scopes
+
+
+def _screener_configs(configs: ConfigStore, user: UserContext, edge: Edge) -> list[ResolvedConfig]:
+    """The resolved configs of the edge's screeners and baselines (a time-series edge has none)."""
+    if not (edge.screeners or edge.baselines):
+        return []
+    return [v.config for v in edge_variants(configs, user, edge)]
+
+
+def refuse_fitted_scores(configs: ConfigStore, user: UserContext, edge: Edge) -> None:
+    """Fail closed where a fitted score cannot be judged by its bound yet (E14): a calendar or
+    named-sleeve (time-series) edge has no in-sample slice by decision session, and an exit
+    condition is evaluated when the outcome rows are derived, which keep an earlier fit's values
+    after a refit. Raises ``ConfigurationError``."""
+    features = catalogue(configs, user.user_id)
+    if scored(features, exit_fields(edge)):
+        raise ConfigurationError(
+            f"edge {edge.id}: an exit condition reads a fitted score (edge_score_*): the outcome "
+            "rows keep the values of the fit they were derived under, so it is not judged"
+        )
+    if edge.base in TIME_SERIES:
+        configs_of = _screener_configs(configs, user, edge)
+        universe = edge_universe(configs, user, edge)
+        if scored(features, edge_fields(edge, universe, configs_of)):
+            raise ConfigurationError(
+                f"edge {edge.id}: a time-series edge ({edge.base}) cannot read a fitted score "
+                "yet: it has no in-sample slice by decision session"
+            )
 
 
 def _borrowing(outcome: Outcome, site_default: float) -> Outcome:

@@ -31,7 +31,11 @@ from algotrade.services.evaluation.cross_section.reads.session import ADV_FIELD
 from algotrade.services.selection import selection_fields
 
 OPEN = "open"
+PERSONAL = "personal"
 STRICTEST = LICENCES[-1]
+OWNER_ONLY = (
+    "owner_only"  # ``verdict.toml`` ``fitted_score_setups``: a score-reading setup is personal
+)
 
 
 @dataclass(frozen=True)
@@ -101,6 +105,30 @@ def rule_fields(edge: Edge) -> tuple[str, ...]:
     return tuple(sorted(ruled))
 
 
+def exit_fields(edge: Edge) -> tuple[str, ...]:
+    """The fields the edge's exit condition reads (none without one)."""
+    position = edge.outcome.position
+    when = position.exit.when if position is not None and position.exit is not None else None
+    return tuple(sorted({r.field for r in when.rules()})) if when is not None else ()
+
+
+def edge_fields(
+    edge: Edge, universe: Selection, configs: Sequence[ResolvedConfig]
+) -> tuple[str, ...]:
+    """Every field one trial of ``edge`` reads: its screeners' (``screen_fields``), the
+    universe's, its rules' (``rule_fields``) and its exit condition's."""
+    fields = {f for c in configs for f in screen_fields(c, edge)}
+    fields.update(selection_fields(universe), rule_fields(edge), exit_fields(edge))
+    return tuple(sorted(fields))
+
+
+def fitted_floor(setting: str, scores: Sequence[object]) -> str:
+    """The licence a trial reading fitted ``scores`` is at least (E14, owner decision 10): under
+    ``owner_only`` the personal one, so the licence hide keeps it from a viewer without it; open
+    otherwise (``forward_verdict``: the verdict, which never reads the in-sample slice)."""
+    return PERSONAL if scores and setting == OWNER_ONLY else OPEN
+
+
 def trial_licences(
     features: FeatureSet,
     edge: Edge,
@@ -108,14 +136,16 @@ def trial_licences(
     configs: Sequence[ResolvedConfig],
     iv_licence: str | None,
     outcome: str = OPEN,
+    floor: str = OPEN,
 ) -> TrialLicences:
     """The licences of one trial (a screener or baseline of one edge variant; an ensemble's are
     those of every screener of its grid, the strictest; a time-series or sleeve trial has no
     screener: ``configs`` empty); ``iv_licence``: its implied-vol field's (None: the outcome
-    reads none); ``outcome``: that of the outcome rows joined."""
+    reads none); ``outcome``: that of the outcome rows joined; ``floor``: the least licence of the
+    rules (``fitted_floor``)."""
     score = strictest(_of(features, screen_fields(c, edge)) for c in configs)
     universe_licence = _of(features, selection_fields(universe))
-    rules = _of(features, rule_fields(edge))
+    rules = strictest((_of(features, rule_fields(edge)), floor))
     value = iv_licence or OPEN
     return TrialLicences(
         trial=strictest((value, score, universe_licence, outcome, rules)),
@@ -133,7 +163,8 @@ def picks_licence(
     universe: Selection,
     config: ResolvedConfig,
     iv_licence: str | None,
+    floor: str = OPEN,
 ) -> str:
     """The strictest licence of what a paper pick of ``edge`` through ``config`` is read from
     (the trial's own: ``trial_licences``), recorded on each paper row at the signal."""
-    return trial_licences(features, edge, universe, [config], iv_licence).trial
+    return trial_licences(features, edge, universe, [config], iv_licence, floor=floor).trial
