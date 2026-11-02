@@ -359,6 +359,18 @@ def test_the_default_executor_is_a_spawn_pool_that_ends_with_the_run(
     assert stats["compacted"] == 2 and "stopped" not in stats
 
 
+def test_a_worker_takes_one_sigterm_and_ignores_the_next() -> None:
+    """A second SIGTERM (the parent watch after ``stop_children``) must not interrupt the
+    cleanup of the first: the handler ignores SIGTERM before it raises."""
+    saved = signal.getsignal(signal.SIGTERM)
+    try:
+        with pytest.raises(SystemExit):
+            pool._terminate(signal.SIGTERM, None)
+        assert signal.getsignal(signal.SIGTERM) == signal.SIG_IGN
+    finally:
+        signal.signal(signal.SIGTERM, saved)
+
+
 def test_a_sigtermed_busy_worker_exits_by_itself_with_143(backend: LocalBackend) -> None:
     """The pool's own loop would catch the ``SystemExit`` and wait for more work (then a SIGKILL
     after a grace); the worker ends the process itself."""
