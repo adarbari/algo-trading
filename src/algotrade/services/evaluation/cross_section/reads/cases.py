@@ -4,7 +4,7 @@ resolved by ``engines.selection.cases.resolve_case``; a case UNKNOWN first makes
 unselectable (``CASE_UNKNOWN``, counted, never the default). The option trade grain holds a row
 per concrete point (``config/edges/positions/key.py``: ``case_points`` stores every combination),
 so a resolved name takes the row of its own point's key; the frame is relabelled to the default
-point's key so the one ``hit.chain_rows`` filter reads it, while the row's values stay its own
+point's key so the one ``hit.own_rows`` filter reads it, while the row's values stay its own
 point's. A named market field with no value at D is a gap of the session: the leg is lost."""
 
 from collections.abc import Collection, Mapping, Sequence

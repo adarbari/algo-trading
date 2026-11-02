@@ -150,6 +150,11 @@ def test_only_a_sleeve_has_the_delta_equivalent_base_and_out_of_window_keeps_no_
         timed(variants=[{"id": "v2", "outcome": {"cost_bps": 5}}])
 
 
+def test_a_sleeve_refuses_position_baselines_it_does_not_value() -> None:
+    with pytest.raises(ConfigurationError, match="not valued for it"):
+        sleeve(baselines=["position:long_shares"])
+
+
 def test_only_a_sleeve_tracks_a_cboe_strategy_index() -> None:
     tracked = {**SLEEVE["outcome"], "tracks": "PUT"}  # type: ignore[dict-item]
     assert sleeve(outcome=tracked).outcome.tracks == "PUT"

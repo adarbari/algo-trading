@@ -12,6 +12,10 @@ position (plan O4). Pure numerics over numpy arrays; one row per option leg, ``q
 - **Chance in the money** (``p_itm``): the risk-neutral chance (r = q = 0, ADR 0053's
   convention, ``premium.p_below``) a leg finishes in the money: a put's chance below the strike,
   a call's chance above it.
+- **Chance of assignment** (``assignment_chance``): the chance at least one sold leg finishes in
+  the money, from ``p_itm``: below the highest sold put's strike or above the lowest sold call's,
+  the two disjoint while the put's strike is under the call's (their sum), certain when they
+  overlap (a straddle: one of them always finishes in the money); long legs are never assigned.
 - **One-sigma-day loss** (``one_sigma_day_loss``): the loss, in dollars, if the underlying moves
   by one day's implied move (the nearest-to-the-money leg's IV / sqrt(252)) in the worse
   direction at once, every leg repriced by Black-Scholes at its own IV (r = q = 0) and the shares
@@ -76,6 +80,24 @@ def p_itm(spot: float, strike: Array, iv: Array, days: Array, is_call: Array) ->
     below_put = p_below(spot, strike, iv, t_years, "put")
     below_call = p_below(spot, strike, iv, t_years, "call")
     return np.asarray(np.where(is_call, 1.0 - below_call, below_put), dtype=np.float64)
+
+
+def assignment_chance(
+    spot: float, strike: Array, iv: Array, days: Array, is_call: Array, qty: Array
+) -> float:
+    """The chance at least one sold leg (``qty < 0``) finishes in the money; 0 with no sold leg,
+    NaN where a sold leg's IV or days are not positive. In [0, 1]."""
+    sold = np.asarray(qty) < 0
+    calls, puts = sold & np.asarray(is_call, dtype=bool), sold & ~np.asarray(is_call, dtype=bool)
+    k = np.asarray(strike, dtype=np.float64)
+    chance = p_itm(spot, k, iv, days, is_call)
+    if not np.all(np.isfinite(chance[sold])):
+        return float("nan")
+    if puts.any() and calls.any() and k[puts].max() >= k[calls].min():
+        return 1.0
+    below = float(chance[puts][np.argmax(k[puts])]) if puts.any() else 0.0
+    above = float(chance[calls][np.argmin(k[calls])]) if calls.any() else 0.0
+    return min(below + above, 1.0)
 
 
 def one_sigma_day_loss(

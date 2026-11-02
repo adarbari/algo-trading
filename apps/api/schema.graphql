@@ -3090,6 +3090,32 @@ type PickingSetup {
 }
 
 """
+One leg of a Premium idea's example position: `right` P or C, `qty` signed (negative: sold), `mid` our mid of the session's stored close quote, per share
+"""
+type PremiumLeg {
+  right: String!
+  strike: Float!
+  expiry: Date!
+  qty: Int!
+  mid: Float!
+}
+
+"""
+The option row of a Premium idea: the example position its setup's rule would open at the session (derived figures only, never a bid or ask). `credit` and `collateral` per contract, `returnOnCollateral` their ratio, `assignmentChance` the model chance at least one sold leg finishes in the money (0 to 1), `expiry` the nearest leg's. `unknown`: why there is no example (every figure null); a single null figure says why in `chanceUnknown` / `collateralUnknown`
+"""
+type PremiumOption {
+  legs: [PremiumLeg!]!
+  expiry: Date
+  credit: Float
+  collateral: Float
+  returnOnCollateral: Float
+  assignmentChance: Float
+  unknown: Unknown
+  chanceUnknown: Unknown
+  collateralUnknown: Unknown
+}
+
+"""
 The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
 """
 type PresetPin {
@@ -4282,6 +4308,9 @@ type SetupIdea {
   result: ScreenResult
   metrics: [IdeaMetric!]!
   watchOut: [String!]!
+
+  """The Premium tab's option row (null on Stocks)"""
+  option: PremiumOption
 }
 
 """

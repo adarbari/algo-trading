@@ -67,13 +67,14 @@ def world(
     skip: frozenset[tuple[str, date]] = frozenset(),
     changes: dict[tuple[str, date], dict[str, Any]] | None = None,
     no_stock: frozenset[date] = frozenset(),
+    backend: MemoryBackend | None = None,
     tracked: bool = False,
     pnl: dict[str, tuple[float, float]] | None = None,
 ) -> StoreReader:
     """SPY in the reference, its stock return and one trade per trial at each S; ``skip``: the
     (trial, S) with no trade row; ``changes``: fields of a trade row; ``no_stock``: S with no
-    stock row."""
-    backend = MemoryBackend()
+    stock row; ``backend``: a store to write into (a test adding its own rows)."""
+    backend = backend or MemoryBackend()
     writer = StoreWriter(backend)
     snapshot = FIRST - timedelta(days=5)
     universe = universe_rows(["SPY"])
@@ -282,3 +283,67 @@ def test_a_book_of_two_slots_tracks_each_cohort_on_its_own_collateral() -> None:
         for _, s in entries(edge)
     ]
     assert spy.book["tracking_mean_difference"] == pytest.approx(sum(diffs) / len(diffs))
+
+
+SIGNAL_TABLE = "rollups/instrument/price_stats@v2"
+SIGNAL = "rollup.price_stats@v2.adv_usd_20d"
+
+
+def test_a_case_valued_sleeve_takes_each_ds_resolved_point_and_never_the_default_on_unknown(
+) -> None:  # fmt: skip
+    """E13b in the sleeve: at each D the symbol's tenor case is read from D's partition; a TRUE
+    case trades the 45-day point's row, a FALSE one the 30-day default's, an UNKNOWN one is lost
+    (CASE_UNKNOWN), never the default."""
+    tenor = {"cases": [{"when": {"all": [{"field": SIGNAL, "op": "gt", "value": 0}]},
+                        "value": 45}], "default": 30}  # fmt: skip
+    edge = sleeve_edge(outcome={**SLEEVE["outcome"], "tenor_days": tenor}, variant_grid=[])
+    position = edge.outcome.position
+    assert position is not None
+    long_key = next(k for v, _, k in position.points if v == (45,))
+    backend = MemoryBackend()
+    reader = world(edge, backend=backend)  # the 30-day default's rows (its own key) at every S
+    writer = StoreWriter(backend)
+    legs = entries(edge)
+    for k, (d, s) in enumerate(legs):  # D: TRUE, FALSE, then no value, in turn
+        value = None if k % 3 == 2 else (1.0 if k % 3 == 0 else -1.0)
+        rows = [{"instrument_id": SPY_ID, "adv_usd_20d": float("nan") if value is None else value}]
+        writer.write_table(SIGNAL_TABLE, d, f"s-{d}", stamped(rows, d, f"s-{d}", KNOWN))
+        if k % 3 == 0:  # the 45-day point's trade at S earns 2.0 on the mid
+            trade = structure_pnl_row(
+                SPY_ID, long_key, s, hold=H, ts=datetime.combine(s, datetime.min.time(), UTC),
+                window_end=s + timedelta(days=3), price_source="option_history",
+                licence="personal", entry_spot=100.0, collateral=COLLATERAL, pnl_mid=2.0,
+                position_delta=0.25,
+            )  # fmt: skip
+            writer.write_table(STRUCTURE_PNL, s, f"l-{s}", stamped([trade], s, f"l-{s}", KNOWN))
+    (main,) = run(reader, edge).results
+    true_n = sum(1 for k in range(len(legs)) if k % 3 == 0)
+    unknown_n = sum(1 for k in range(len(legs)) if k % 3 == 2)
+    assert main.lost == {"CASE_UNKNOWN": unknown_n}
+    values = sorted(v for _, v in main.in_window)
+    long_value, default_value = (2.0 - SPREAD) / COLLATERAL, (1.0 - SPREAD) / COLLATERAL
+    assert values.count(pytest.approx(long_value)) == true_n
+    assert len(values) == len(legs) - unknown_n and default_value == pytest.approx(min(values))
+
+
+def test_a_variant_s_case_rule_is_part_of_its_trial_identity() -> None:
+    """Editing a case threshold is another trial (the trial count the deflated Sharpe reads)."""
+
+    def edge_at(threshold: float) -> Edge:
+        tenor = {"cases": [{"when": {"all": [{"field": SIGNAL, "op": "gte", "value": threshold}]},
+                            "value": 45}], "default": 30}  # fmt: skip
+        variants = [{"id": "by_rank", "outcome": {"tenor_days": tenor}}]
+        return sleeve_edge(variant_grid=None, variants=variants)  # type: ignore[arg-type]
+
+    def identities(edge: Edge) -> dict[str, str]:
+        backend = MemoryBackend()
+        reader = world(edge, backend=backend)
+        writer = StoreWriter(backend)
+        for d, _ in entries(edge):  # the rule's field is stored (a field with none is refused)
+            rows = [{"instrument_id": SPY_ID, "adv_usd_20d": 1.0}]
+            writer.write_table(SIGNAL_TABLE, d, f"s-{d}", stamped(rows, d, f"s-{d}", KNOWN))
+        out = run(reader, edge).results
+        return {r.edge_variant: r.identity for r in out}
+
+    low, high = identities(edge_at(0.5)), identities(edge_at(0.7))
+    assert low["main"] == high["main"] and low["by_rank"] != high["by_rank"]

@@ -44,6 +44,35 @@ export interface SetupIdea {
   watchOut: string[];
   metrics: { name: string; value: number | string }[];
   regime: string | null;
+  /** The Premium tab's option row (null on Stocks). */
+  option: PremiumOption | null;
+}
+
+/** One leg of a Premium idea's example position (the server's figures, per share). */
+export interface PremiumLeg {
+  right: string;
+  strike: number;
+  expiry: string;
+  /** Signed: negative is sold. */
+  qty: number;
+  mid: number;
+}
+
+/** A Premium idea's option row: the example position its setup would open tonight. */
+export interface PremiumOption {
+  legs: PremiumLeg[];
+  expiry: string | null;
+  /** Per contract, positive when received. */
+  credit: number | null;
+  /** Per contract. */
+  collateral: number | null;
+  returnOnCollateral: number | null;
+  /** The model chance at least one sold leg finishes in the money, 0 to 1. */
+  assignmentChance: number | null;
+  /** Why there is no example (every figure null). */
+  unknown: ServedUnknown | null;
+  chanceUnknown: ServedUnknown | null;
+  collateralUnknown: ServedUnknown | null;
 }
 
 export interface SetupIdeas {
@@ -75,6 +104,19 @@ function idea(i: Served['ideas'][number]): SetupIdea {
         : [],
     ),
     regime: i.result?.regime ?? null,
+    option: i.option
+      ? {
+          legs: i.option.legs,
+          expiry: i.option.expiry ?? null,
+          credit: i.option.credit ?? null,
+          collateral: i.option.collateral ?? null,
+          returnOnCollateral: i.option.returnOnCollateral ?? null,
+          assignmentChance: i.option.assignmentChance ?? null,
+          unknown: i.option.unknown ?? null,
+          chanceUnknown: i.option.chanceUnknown ?? null,
+          collateralUnknown: i.option.collateralUnknown ?? null,
+        }
+      : null,
   };
 }
 

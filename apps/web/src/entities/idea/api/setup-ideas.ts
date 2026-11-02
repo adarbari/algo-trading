@@ -71,6 +71,38 @@ const SetupIdeasQuery = graphql(`
           regime
           sizeMultiplier
         }
+        option {
+          expiry
+          credit
+          collateral
+          returnOnCollateral
+          assignmentChance
+          legs {
+            right
+            strike
+            expiry
+            qty
+            mid
+          }
+          unknown {
+            code
+            kind
+            guideTerm
+            kindText
+          }
+          chanceUnknown {
+            code
+            kind
+            guideTerm
+            kindText
+          }
+          collateralUnknown {
+            code
+            kind
+            guideTerm
+            kindText
+          }
+        }
       }
     }
   }

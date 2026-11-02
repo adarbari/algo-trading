@@ -598,7 +598,7 @@ export type SetupIdeasQueryVariables = Exact<{
 }>;
 
 
-export type SetupIdeasQuery = { setupIdeas: { session: string, state: string, ruleVersion: number, total: number, watchlist: number | null, leftOut: Array<{ kind: string, count: number }>, groups: Array<{ edgeId: string, name: string, level: string, liftPts: number | null, oosTrades: number | null, basisScreener: string, basisHorizon: number | null, state: string, picked: number, shown: number, setupState: { state: SetupStateCode, reason: string } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, ideas: Array<{ rank: number, instrumentId: string, setupId: string, place: number, watchOut: Array<string>, instrument: { symbol: string, name: string } | null, alsoIn: Array<{ edgeId: string, edgeName: string, place: number }>, metrics: Array<{ name: string, value: unknown }>, result: { decision: string, regime: string | null, sizeMultiplier: number | null } | null }> } | null };
+export type SetupIdeasQuery = { setupIdeas: { session: string, state: string, ruleVersion: number, total: number, watchlist: number | null, leftOut: Array<{ kind: string, count: number }>, groups: Array<{ edgeId: string, name: string, level: string, liftPts: number | null, oosTrades: number | null, basisScreener: string, basisHorizon: number | null, state: string, picked: number, shown: number, setupState: { state: SetupStateCode, reason: string } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }>, ideas: Array<{ rank: number, instrumentId: string, setupId: string, place: number, watchOut: Array<string>, instrument: { symbol: string, name: string } | null, alsoIn: Array<{ edgeId: string, edgeName: string, place: number }>, metrics: Array<{ name: string, value: unknown }>, result: { decision: string, regime: string | null, sizeMultiplier: number | null } | null, option: { expiry: string | null, credit: number | null, collateral: number | null, returnOnCollateral: number | null, assignmentChance: number | null, legs: Array<{ right: string, strike: number, expiry: string, qty: number, mid: number }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, chanceUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, collateralUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null }> } | null };
 
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
@@ -3556,6 +3556,38 @@ export const SetupIdeasDocument = new TypedDocumentString(`
         decision
         regime
         sizeMultiplier
+      }
+      option {
+        expiry
+        credit
+        collateral
+        returnOnCollateral
+        assignmentChance
+        legs {
+          right
+          strike
+          expiry
+          qty
+          mid
+        }
+        unknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+        chanceUnknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
+        collateralUnknown {
+          code
+          kind
+          guideTerm
+          kindText
+        }
       }
     }
   }

@@ -406,3 +406,31 @@ The date comes from the stored dividend schedule as known tonight; a name that h
 """
 next = "Check the date against the expiry on the plan."
 see_also = ["idea_position_risks"]
+
+[[term]]
+id = "premium_example_option"
+term = "Example option"
+short = "The contracts the setup's rule would open on this name tonight, chosen from the session's stored option chain."
+body = """
+Each line is one leg: its signed quantity, put (P) or call (C), and strike, with the nearest expiry under it. A negative quantity is sold, a positive one bought. The legs come from the same rule the backtest used, applied to tonight's closing quotes. Example: "-1 P 95" with 4 Dec under it is one put sold at the 95 strike. It is an example of the tested trade, not an order: quotes move by the next open. When no chain or no legs fit the rule, the row says why instead.
+"""
+next = "Open the idea to see the setup's exit rule for this position."
+see_also = ["premium_credit", "setup_collateral", "premium_assignment_chance"]
+
+[[term]]
+id = "premium_credit"
+term = "Credit (per contract)"
+short = "The premium the example position would collect at tonight's mid prices, for one contract of 100 shares."
+body = """
+It is the sold legs' mid prices less the bought legs', times 100. A put sold at a mid of $1.20 collects $120. The mid sits between the stored bid and ask, so a real fill is often worse, more so on a wide spread. It is the most the position can keep; it is not a forecast of profit.
+"""
+see_also = ["premium_example_option", "idea_example_position", "return_on_collateral", "spread_of_mid"]
+
+[[term]]
+id = "premium_assignment_chance"
+term = "Chance of assignment"
+short = "The model's chance that at least one sold leg finishes in the money at the expiry, so it could be assigned."
+body = """
+It uses each sold leg's implied volatility with no drift and no interest, the convention the setups use. For one sold put it is the chance the stock ends below the strike. With a sold put and a sold call it adds the two sides, and a straddle's is 100%. A 25% chance means about one expiry in four ends in the money if the market priced the risk right. It ignores early assignment, which can come sooner around a dividend. Don't read it as the chance of a loss: the credit cushions a small move.
+"""
+see_also = ["chance_below_strike", "premium_example_option", "premium_credit"]

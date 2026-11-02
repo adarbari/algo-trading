@@ -41,6 +41,17 @@ const response: SetupIdeasResponse = {
           { name: 'flag', value: true },
         ],
         result: { decision: 'QUALIFIED', regime: 'CALM', sizeMultiplier: 1 },
+        option: {
+          expiry: '2026-12-04',
+          credit: 120,
+          collateral: 9500,
+          returnOnCollateral: 0.0126,
+          assignmentChance: 0.22,
+          legs: [{ right: 'P', strike: 95, expiry: '2026-12-04', qty: -1, mid: 1.2 }],
+          unknown: null,
+          chanceUnknown: null,
+          collateralUnknown: null,
+        },
       },
       {
         rank: 2,
@@ -52,6 +63,7 @@ const response: SetupIdeasResponse = {
         alsoIn: [],
         metrics: [],
         result: null,
+        option: null,
       },
     ],
   },
@@ -74,6 +86,13 @@ describe('toSetupIdeas', () => {
     const first = toSetupIdeas(response)?.ideas[0];
     expect(first?.metrics).toEqual([{ name: 'hv30', value: 0.4 }]);
     expect(first?.regime).toBe('CALM');
+  });
+
+  it("passes a Premium idea's option row through and a Stocks idea's as null", () => {
+    const [first, second] = toSetupIdeas(response)?.ideas ?? [];
+    expect(first?.option?.credit).toBe(120);
+    expect(first?.option?.legs[0]?.strike).toBe(95);
+    expect(second?.option).toBeNull();
   });
 
   it('reads any state but listed as unproven', () => {

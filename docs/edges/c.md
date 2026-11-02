@@ -10,6 +10,7 @@ Back to the [index of every edge](../edges.md).
 | Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | candidate | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an delta hedged atm short (basis model, not a quote), costs 35 bps | `ivol_high` |
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
+| Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`) | candidate | every session | option pnl, over 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 45-day tenor, forward-only from 2026-10-02), costs 35 bps | none yet |
 | Index put write (`index_put_write`) | candidate | calendar:after monthly expiry | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 100% SVXY, entered 1 session after the decision session, costs 10 bps | `etf_priced` |
@@ -182,6 +183,37 @@ Back to the [index of every edge](../edges.md).
 - Byun, S.-J. and Kim, D.-H. (2016), Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html>
 - Barberis, N. and Huang, M. (2007), Stocks as Lotteries: The Implications of Probability Weighting for Security Prices, NBER working paper 12936 (American Economic Review 2008) <https://www.nber.org/papers/w12936>
 - Kumar, A. (2009), Who Gambles in the Stock Market?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v64y2009i4p1889-1933.html>
+
+## Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Holding 100 shares of a liquid ETF and selling a 0.30-delta call against them earns more on the collateral than holding the same delta of the ETF alone, and a 30-day call when the ETF's implied volatility rank is high beats the 45-day one.
+
+- **Outcome:** option pnl, over 21 sessions, entered 1 session after the decision session, P&L of a covered call from the stored chains (basis chain, quoted prices, 45-day tenor, forward-only from 2026-10-02), costs 35 bps
+- **Schedule:** every session
+- **Universe:** `instrument.symbol in ('SPY', 'QQQ', 'IWM', 'DIA', 'XLE', 'GLD', 'TLT')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** A named option sleeve: one covered call (100 shares and one short call at 0.30 delta, the covered_call template) on each of seven ETFs, entered at S = D + 1 and held 21 sessions (about 30 calendar days); the expiry is never before the hold's end, so every trade is closed at 21 sessions. The variant's 30-day call is the first monthly expiry at least 30 days out (up to about 60 days), and on about half the sessions it is the same expiry as the main edge's 45-day one. Decisions every 21 sessions, so no two trades of a symbol overlap. Each trade's return on its collateral is read against the delta-equivalent stock at the same S (base delta_equivalent: the sleeve's reading of "against the stock"; a position:long_shares baseline is not valued for a sleeve, so it is not declared). The main edge sells the 45-day call; the variant tenor_by_iv_rank sells the 30-day call when the ETF's own IV rank (ours, iv_history@v2, open licence) is at least 0.5 at D and the 45-day one otherwise; a name whose rank is unknown at D is not traded (CASE_UNKNOWN), never the default. skip_report_in_life skips an expiry with an earnings report inside it: a no-op on these ETFs, kept for the single-name follow-up on liquid_optionable_floored (after D6). The option P&L is the chain's mid less the quoted half-spreads at entry and exit; history before the Cboe record is bought history (personal licence), so the evidence is owner-only, and no option verdict is given before the three-month unseen holdout (ADR 0088). Pending owner confirmation: the symbols, the delta, the cycle, the threshold.
+
+**Quality bar**
+
+1. **Mechanism:** Index and ETF calls are priced above the volatility that follows (the index variance premium), so the seller of a covered call is paid for giving up the upside; most of the position's return is the ETF's own move scaled down (Israelov and Nielsen 2014, 2015). A high implied volatility rank means more premium for the same delta, and a shorter tenor collects it faster.
+2. **Persistence:** The premium is paid by investors who buy protection and upside they cannot hold otherwise; it has persisted for decades in index options (Driessen, Maenhout and Vilkov 2009), but a covered call lags the ETF in strong rallies, which is why many sellers stop. The IV-rank tenor rule is practitioner doctrine with no peer-reviewed evidence (not verified).
+3. **Outcome:** The covered call's return on its collateral over the trade (21 sessions), net of the quoted half-spreads, the commission and 35 bps, read against the return of the trade's entry delta in shares of the same ETF held over the same sessions (the delta-equivalent stock).
+4. **Trigger timing:** Every input is known after the decision session D's close: the chain the call is chosen from and filled at is S = D + 1's (start_offset_sessions = 1), and the variant's IV rank is read from D's partition only, so the tenor is fixed before the entry close.
+5. **Faithful replication:** Buy 100 shares of the ETF at S's close and sell one call whose delta is closest to 0.30 in the first monthly expiry at least 45 calendar days out (30 for the variant when the rank is at least 0.5), hold 21 sessions. The Cboe BXM index is the monthly at-the-money version on the S&P 500.
+6. **Expected size and sample:** Israelov and Nielsen (2015) find the covered call's return is mostly equity beta, with a short-volatility component of Sharpe around 1 that is about a tenth of its risk; against the delta-equivalent stock the expected excess is that premium, a few percent a year before costs (not verified for these ETFs). About 12 trades a year per symbol; seven symbols give about 84 a year.
+7. **Capacity and costs:** ETF option spreads on these names are a few cents on a premium of one to three dollars; the quoted half-spreads are charged on both sides, and 35 bps covers the shares. One contract per 100 shares is far below the open interest of every symbol.
+8. **Failure modes and retirement:** A strong rally takes the shares away at the strike and the trade earns only the premium; a sharp fall loses nearly as much as the shares. Retire if, after the holdout, the trades' mean return on collateral is not above the delta-equivalent stock's. The variant is a separate trial with its own reading against the stock; whether it beats the main edge is read by comparing the two trials (no paired figure is computed between them).
+9. **Decoys:** The delta-equivalent stock (the base): the covered call must add more than its scaled-down beta. The IV-rank variant, read beside the main edge, shows whether the tenor rule adds anything over always selling 45 days (a comparison of the two trials, not a paired statistic).
+
+**Sources**
+
+- Israelov, R. and Nielsen, L. N. (2015), Covered Calls Uncovered, Financial Analysts Journal <https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered>
+- Israelov, R. and Nielsen, L. N. (2014), Covered Call Strategies: One Fact and Eight Myths, Financial Analysts Journal <https://www.aqr.com/-/media/AQR/Documents/Insights/Journal-Article/FAJ-Covered-Call-Strategies-One-Fact-and-Eight-Myths.pdf>
+- Driessen, J., Maenhout, P. and Vilkov, G. (2009), The Price of Correlation Risk, Journal of Finance
 
 ## Index put write (`index_put_write`)
 
