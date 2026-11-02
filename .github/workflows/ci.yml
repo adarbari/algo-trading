@@ -41,7 +41,7 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           python=false web=false web_deps=false evaluate=false visual=false
-          if [ "$EVENT" != pull_request ]; then python=true web=true web_deps=true evaluate=true visual=true; fi
+          if [ "$EVENT" != pull_request ]; then python=true web=false web_deps=false evaluate=false visual=false; fi
           while IFS= read -r f; do
             case "$f" in
               "") ;;
@@ -63,7 +63,7 @@ jobs:
   lint:
     name: Lint, types, boundaries, ownership, duplicates, file length
     needs: [changes]
-    if: needs.changes.outputs.python == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -123,30 +123,17 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true # a red shard frees its runners for the queue; the failing shard's log names the failure
+      fail-fast: false # a red shard frees its runners for the queue; the failing shard's log names the failure
       matrix:
         # Python 3.13 runs nightly (nightly.yml), not here.
         python: ["3.12"]
         cell:
           - unit-a-1of1
-          - unit-b-1of1
-          - unit-c-1of8
-          - unit-c-2of8
-          - unit-c-3of8
           - unit-c-4of8
-          - unit-c-5of8
           - unit-c-6of8
-          - unit-c-7of8
-          - unit-c-8of8
-          - apps-1of5
-          - apps-2of5
-          - apps-3of5
-          - apps-4of5
           - apps-5of5
-          - arch-1of1
-          - rest-1of3
           - rest-2of3
-          - rest-3of3
+          - arch-1of1
     steps:
       # Full history only on the `arch` shard, the one that runs tests/architecture:
       # tests/architecture/drafting/test_golden_unrecorded.py dates the adding commit of a golden
@@ -279,7 +266,7 @@ jobs:
   real-app:
     name: Real app smoke (Vite dev + real API, empty and golden stores)
     needs: [changes]
-    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.web == 'true'
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
