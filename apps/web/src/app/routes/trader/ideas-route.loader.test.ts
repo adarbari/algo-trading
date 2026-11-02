@@ -12,12 +12,12 @@ vi.mock('@/shared/api', async (importOriginal) => {
 });
 
 describe('ideas route loader', () => {
-  it('starts the regime, ideas, filter definitions and edge desk reads before the page renders', async () => {
+  it('starts the regime, setup ideas and filter definitions reads before the page renders', async () => {
     const queryClient = new QueryClient();
     const load = ideasRoute.options.loader as (a: unknown) => Promise<void>;
-    await load({ context: { queryClient } });
-    // three reads in flight, none awaited: the loader never waits for data
-    expect(vi.mocked(gql)).toHaveBeenCalledTimes(4);
-    expect(queryClient.isFetching()).toBe(4);
+    await load({ context: { queryClient }, deps: { tab: undefined } });
+    // these reads in flight, none awaited: the loader never waits for data
+    expect(vi.mocked(gql)).toHaveBeenCalledTimes(3);
+    expect(queryClient.isFetching()).toBe(3);
   });
 });
