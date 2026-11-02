@@ -173,6 +173,22 @@ def holds_options(outcome: Any, configs: Documents) -> bool:
     return any(t in templates and templates[t].has_option for t in named)
 
 
+def sleeve_baseline_id(template: str, symbol: str) -> str:
+    """The variant id of a named sleeve's ``position:<template>`` baseline on one ``symbol``
+    (``position:<template>:<symbol>``): the cross-section's own ids (``position:<template>``)
+    carry no symbol, and a sleeve's trials are per symbol (ADR 0088 G19)."""
+    return f"{POSITION_PREFIX}{template}:{symbol}"
+
+
+def paired_symbol(variant: str) -> str | None:
+    """The symbol a sleeve baseline's ``variant`` id is for (``sleeve_baseline_id``), None for
+    any other id: a cross-section baseline (``position:<template>``) pairs with every pick."""
+    if not variant.startswith(POSITION_PREFIX):
+        return None
+    _, _, symbol = variant.removeprefix(POSITION_PREFIX).partition(":")
+    return symbol or None
+
+
 def baseline_template(entry: str) -> str:
     """The template id of a ``position:<id>`` baselines entry."""
     return validate_id("position", entry.removeprefix(POSITION_PREFIX))

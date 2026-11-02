@@ -33,6 +33,8 @@ READER_MODULES = ("stored.py",)
 # and requires it here or in its own ``NOT_JUDGED`` with a reason.
 JUDGED_CODE: tuple[str, ...] = (
     "algotrade.config.edges.named:DELTA_EQUIVALENT",
+    "algotrade.config.edges.positions.templates:POSITION_PREFIX",
+    "algotrade.config.edges.positions.templates:paired_symbol",
     "algotrade.config.edges.named:OUT_OF_WINDOW",
     "algotrade.config.edges.named:TIME_SERIES",
     "algotrade.config.edges.verdict:MAIN_OPTION_LEVEL",

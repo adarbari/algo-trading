@@ -38,8 +38,6 @@ from datetime import date, datetime
 from functools import partial
 from typing import Any
 
-import numpy as np
-
 from algotrade.config.edges.document import (
     LEGACY_SITE_CUTOFF,
     LEGACY_SITE_OWNERS,
@@ -171,8 +169,10 @@ from algotrade.services.evaluation.cross_section.sessions import (
 )
 from algotrade.services.evaluation.evidence.contract import capital_basis_of
 from algotrade.services.evaluation.evidence.measures import BOOTSTRAP_SEED_VERSION
-from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
-from algotrade.services.evaluation.time_series.measures import deflate_trial, pbo_among
+from algotrade.services.evaluation.time_series.evaluate import (
+    deflated_measures,
+    evaluate_time_series,
+)
 from algotrade.services.evaluation.time_series.sleeve import evaluate_sleeve, sleeve_outcomes
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
@@ -765,7 +765,8 @@ def _time_series(
     run = (
         evaluate_sleeve(reader, edge, sleeve_outcomes(edge, load_templates(configs)), start, end,
                         as_of, session.label, split, exploratory, gate,
-                        load_verdict(configs).option_costs, gates, gate_keys, domains, features)
+                        load_verdict(configs).option_costs, gates, gate_keys, domains, features,
+                        edge.position_baselines)
         if edge.base == DELTA_EQUIVALENT
         else evaluate_time_series(
             reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,
@@ -776,18 +777,13 @@ def _time_series(
         r.identity: hashlib.sha256(f"{r.identity}|{HARNESS_VERSION}".encode()).hexdigest()
         for r in run.results
     }
-    tried = {(r.edge_variant, r.symbol, keys[r.identity], r.horizon) for r in run.results}
+    trial_rows = [r for r in run.results if r.role == SCREENER]  # baselines are never trials
+    tried = {(r.edge_variant, r.symbol, keys[r.identity], r.horizon) for r in trial_rows}
     trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
-    pbo = pbo_among({r.identity: dict(r.paired) for r in run.results if r.paired})
-    sharpes = [r.measures[0].sharpe for r in run.results if r.measures[0].sharpe is not None]
-    spread = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None  # as ``deflate`` reads it
+    measured = deflated_measures(run.results, trials)
     results = [
         VariantResult(
-            r.symbol, SCREENER, keys[r.identity], r.horizon, (),
-            (
-                deflate_trial(r.measures[0], [v for _, v in r.paired], trials, pbo, spread),
-                *r.measures[1:],
-            ),
+            r.symbol, r.role, keys[r.identity], r.horizon, (), measured[r.identity],
             edge_variant=r.edge_variant, lost_sessions=r.lost, timing=r.timing or None,
             book=r.book or None,
         )

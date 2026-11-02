@@ -99,19 +99,6 @@ def check_sleeve(
         )
 
 
-def check_sleeve_baselines(
-    where: str, base: str | None, position_baselines: tuple[str, ...]
-) -> None:
-    """A named option sleeve is read against its delta-equivalent stock (its base); the
-    ``position:<template>`` baselines are the cross-section harness's (E16) and the sleeve does
-    not value them, so they are refused rather than silently left out."""
-    if base == DELTA_EQUIVALENT and position_baselines:
-        raise ConfigurationError(
-            f"{where} baselines: a named option sleeve is read against its delta-equivalent stock; "
-            f"position baselines {list(position_baselines)} are not valued for it"
-        )
-
-
 def check_time_series(
     base: str,
     calendar: bool,

@@ -150,7 +150,7 @@ def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.Edg
         return verdict.judge(edge.id, None, edge.frozen_from, settings)
     hidden = edge.oos_hidden
     served = runs.load_run_rows(ctx, run)
-    decoys = bool(edge.baselines)
+    decoys = bool(edge.baselines or edge.position_baselines)
     found = verdict.judge(
         edge.id,
         _official(served, hidden),
@@ -242,7 +242,7 @@ def basis_of(ctx: Stores, edge: Edge, rows: Sequence[EdgeRow]) -> verdict.BasisC
         _own(rows),
         settings,
         _declared(edge),
-        bool(edge.baselines),
+        bool(edge.baselines or edge.position_baselines),
         _is_book(edge),
         verdict.profile_of(edge),
     )

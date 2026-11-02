@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Final
 
+from algotrade.config.edges.positions.templates import paired_symbol
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.decay import EdgeDecay
 from algotrade.services.read.evaluation.evidence import (
@@ -190,6 +191,22 @@ def _by_year(row: EdgeRow) -> str:
     return row.slice_value
 
 
+def baselines_for(
+    main: Sequence[EdgeRow], variant: str, horizon: int, slice_kind: str
+) -> tuple[EdgeRow, ...]:
+    """The baseline rows of ``main`` a candidate ``variant`` is compared with at ``horizon``: a
+    cross-section baseline (any screener or ``position:<template>``) is for every candidate; a
+    named sleeve's (``position:<template>:<symbol>``) only for its own symbol's."""
+    return tuple(
+        r
+        for r in main
+        if r.role == "baseline"
+        and r.horizon_sessions == horizon
+        and r.slice_kind == slice_kind
+        and paired_symbol(r.variant) in (None, variant)
+    )
+
+
 def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
     main = [r for r in rows if r.edge_variant == runs.MAIN and not r.exploratory]
     found = []
@@ -202,11 +219,7 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
         before = [r for r in mine if r.slice_kind == "in_sample"]  # absent in older runs
         if len(oos) != 1 or len(whole) != 1:
             continue
-        base = tuple(
-            r
-            for r in main
-            if r.role == "baseline" and r.horizon_sessions == horizon and r.slice_kind == "frozen"
-        )
+        base = baselines_for(main, variant, horizon, "frozen")
         years = tuple(sorted((r for r in mine if r.slice_kind == "year"), key=_by_year))
         parts = tuple(sorted((r for r in mine if r.slice_kind == "year_part"), key=_by_year))
         trials = {

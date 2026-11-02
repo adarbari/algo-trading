@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
+import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import MAIN, Edge
@@ -22,14 +23,16 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.windows import window_length, window_name
 from algotrade.data import StoreReader
-from algotrade.services.evaluation.cross_section.measures import SliceMeasure
+from algotrade.services.evaluation.cross_section.measures import BASELINE, SCREENER, SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import DEFAULT_DRAWS
 from algotrade.services.evaluation.cross_section.reads.entry import read_entries
 from algotrade.services.evaluation.evidence.shapes import series_trades
 from algotrade.services.evaluation.time_series import harness
 from algotrade.services.evaluation.time_series.measures import (
     Obs,
+    deflate_trial,
     measures,
+    pbo_among,
     timing_sharpes,
     with_pairs,
 )
@@ -52,6 +55,7 @@ class InstrumentResult:
     lost: dict[str, int] = field(default_factory=dict)  # reason -> periods without a value
     # the windows as trade-contract rows (ADR 0088, 2.5a); no measure reads them yet
     trades: pd.DataFrame | None = field(default=None, compare=False)
+    role: str = SCREENER  # "baseline": a sleeve's position:<template> comparison, never a trial
     edge_variant: str = MAIN  # a named sleeve's ``[[variants]]`` or grid point id (sleeve.py)
     identity: str = ""  # what the trial hash is of: edge, window or schedule, symbol (+ position)
     # a named sleeve's book and index tracking (E8b): its edge variant's, alike on each symbol
@@ -65,6 +69,28 @@ class TimeSeriesRun:
     scheduled: int  # the windows the calendar places in the range
     unclosed: int  # of those, windows with a value for no instrument
     results: tuple[InstrumentResult, ...]
+
+
+def deflated_measures(
+    results: Sequence[InstrumentResult], trials: int
+) -> dict[str, tuple[SliceMeasure, ...]]:
+    """Each result's measures by identity, its ``all`` row deflated over ``trials``, the PBO and
+    the Sharpe spread of the trials (the screener-role results) alone: a baseline (a sleeve's
+    ``position:<template>``) is a comparison, never a trial, so it is neither deflated nor a
+    peer in the PBO or the spread."""
+    peers = [r for r in results if r.role == SCREENER]
+    pbo = pbo_among({r.identity: dict(r.paired) for r in peers if r.paired})
+    sharpes = [r.measures[0].sharpe for r in peers if r.measures[0].sharpe is not None]
+    spread = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None  # as ``deflate`` reads it
+    return {
+        r.identity: r.measures
+        if r.role == BASELINE
+        else (
+            deflate_trial(r.measures[0], [v for _, v in r.paired], trials, pbo, spread),
+            *r.measures[1:],
+        )
+        for r in results
+    }
 
 
 def evaluate_time_series(

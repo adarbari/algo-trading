@@ -16,7 +16,7 @@ from datetime import date
 from math import prod
 from typing import TYPE_CHECKING, Any
 
-from algotrade.config.edges.identity import LONG_SHORT
+from algotrade.config.edges.identity import LONG, LONG_SHORT
 from algotrade.config.edges.positions import grid
 from algotrade.config.edges.positions.cases import (
     EXIT_CASE_NAMES,
@@ -283,6 +283,16 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
                 f"the case would override the grid point"
             )
     check_known(where, "baselines", edge.position_baselines, templates)
+    if edge.base == SLEEVE_BASE:  # a sleeve values the long shares beside its trades, no option
+        refused = [
+            t for t in edge.position_baselines if t not in SIDE_TEMPLATES[LONG]
+            or templates[t].has_option
+        ]  # fmt: skip
+        if refused:
+            raise ConfigurationError(
+                f"{where} baselines: a named option sleeve values {list(SIDE_TEMPLATES[LONG])} "
+                f"beside its trades (an option template is not valued for it yet), got {refused}"
+            )
     _check_share_path_edge(edge, where)
     if not edge.variant_grid:
         return

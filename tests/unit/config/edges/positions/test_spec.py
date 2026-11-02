@@ -26,6 +26,7 @@ from algotrade.services.evaluation.forward.settle import outcome_hash
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import WHERE, document
+from tests.unit.config.edges.test_named import SLEEVE
 
 TEMPLATES = load_templates(FileConfigStore(REPO_ROOT / "config"))
 GATE = {"all": [{"field": "market.vix_close", "op": "lt", "value": 30}]}
@@ -305,3 +306,16 @@ def test_a_case_value_beside_a_share_exit_is_refused_until_its_points_are_read()
     exit = {"take_profit": {"cases": [{"when": high_iv, "value": 0.2}], "default": 0.1}}
     with pytest.raises(ConfigurationError, match="case values"):
         check_edge(parse_edge(shares(exit=exit), "drift", WHERE), WHERE, TEMPLATES)
+
+
+def test_a_sleeve_values_long_shares_beside_its_trades_and_no_option_template() -> None:
+    def sleeve(*baselines: str) -> Any:
+        return parse_edge(
+            document(**{**SLEEVE, "baselines": [f"position:{t}" for t in baselines]}),
+            "drift", WHERE,
+        )  # fmt: skip
+
+    check_edge(sleeve("long_shares"), WHERE, TEMPLATES)
+    for refused in ("short_put", "short_shares"):
+        with pytest.raises(ConfigurationError, match="named option sleeve values"):
+            check_edge(sleeve(refused), WHERE, TEMPLATES)

@@ -200,11 +200,23 @@ def changed(**edits: Any) -> dict[tuple[str, str, str], dict[str, Any]]:
     "docs",
     [
         changed(baselines=["momo"]),
+        {
+            **changed(baselines=["position:long_shares"]),  # a position baseline is a decoy too
+            ("site", "positions", "templates"): {
+                "template": [
+                    {
+                        "id": "long_shares",
+                        "legs": [{"kind": "shares", "qty": 100}],
+                        "collateral": "notional",
+                    }
+                ]
+            },
+        },
         changed(implementation={"promoted": "momo"}),
         {**DOCS, ("site", "settings", "verdict"): {"min_oos_trades": 3}},
         {**DOCS, ("site", "settings", "verdict"): {"promising_t": 9.0}},
     ],
-    ids=["decoys", "declared basis", "min_oos_trades", "promising_t"],
+    ids=["decoys", "position decoys", "declared basis", "min_oos_trades", "promising_t"],
 )
 def test_a_changed_document_or_setting_judges_live_and_gives_the_live_answer(docs: Any) -> None:
     backend = MemoryBackend()
