@@ -107,7 +107,9 @@ DIGESTS: dict[
     "long_short": ("de0571f44206c520", "5625c55ec76c7220"),
     "hit_target": ("4fa2a61dac328851", "ab73369e4bc0aff1"),
     "expires_otm": ("22d2faaee8d62085", "d92e6cd61083351c"),
-    "option_pnl": ("3fbfc5c8a5dc6315", "5bceadef7c7c768b"),
+    # E6b-2: the option value pays the commission and the cost rows are the levels, so this pair
+    # moved (pinned again here); every share kind above is unchanged
+    "option_pnl": ("e54610f569589f2f", "82af9d789f23a17a"),
     "pair_spread": ("8d8b92b65a0090dc", "1ace53a0cd9957fb"),
     "portfolio_return": ("320e2349658aa2b8", "empty"),  # a book has no ledger rows
 }
@@ -167,13 +169,13 @@ def _all_row(ev: EdgeEvaluation) -> pd.Series:
 
 def test_the_evidence_columns_are_new_and_null_where_nothing_is_measured() -> None:
     """E6b: only new columns appear. A share row has its series; an outcome with no money has
-    none (null, never 0); an option position has no base yet (E6b-2); a cost row and a random draw
-    are not tail rows."""
+    none (null, never 0); an option position's base is its stored ``base_roc`` (E6b-2); a cost row
+    and a random draw are not tail rows."""
     evs = _evaluations()
     long, option = _all_row(evs["long"]), _all_row(evs["option_pnl"])
     assert long["roc_sessions"] == 4 and long["mean_roc"] == pytest.approx(0.075)
     assert long["cvar_5_n"] == 1 and long["excess_roc"] == pytest.approx(0.075)
-    assert option["roc_sessions"] == 4 and pd.isna(option["excess_roc"])
+    assert option["roc_sessions"] == 4 and not pd.isna(option["excess_roc"])
     assert pd.isna(option["base_cvar_5"]) and not pd.isna(option["cvar_5"])
     for name in ("hit_target", "expires_otm"):
         assert _all_row(evs[name])[list(TAIL_COLUMNS)].isna().all(), name

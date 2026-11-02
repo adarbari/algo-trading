@@ -31,6 +31,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.data import ReadRecord
 from algotrade.data.listings.identity import PROXY, TODAY_FLAG
 from algotrade.services.evaluation.cross_section.measures import UNCOUNTED_BAND, Pick, SessionStat
@@ -148,6 +149,13 @@ def _ints(value: Any) -> tuple[int, ...]:
     return () if _null(value) else tuple(int(v) for v in value)
 
 
+def _base_roc(row: Mapping[str, Any]) -> tuple[int, float, float] | None:
+    """``base_roc`` of a leg row; None for a leg stored before E6b-2 and every non-option leg."""
+    n = _opt(row.get("base_roc_n"))
+    mean, m2 = _opt(row.get("base_roc_mean")), _opt(row.get("base_roc_m2"))
+    return None if n is None or mean is None or m2 is None else (int(n), float(mean), float(m2))
+
+
 def _opt_str(value: Any) -> str | None:
     return None if _null(value) else str(value)
 
@@ -171,7 +179,28 @@ def _flags(pick: Pick) -> int:
     )
 
 
-def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any]]:
+def _flat_levels(picks: Sequence[Pick]) -> list[float | None] | None:
+    """The picks' ``values_at`` flattened, ``len(OPTION_LEVELS)`` per pick (null where a pick has
+    none); None when no pick has any, so a leg of a share edge stores nothing new."""
+    if not any(p.values_at for p in picks):
+        return None
+    width = len(OPTION_LEVELS)
+    out: list[float | None] = []
+    for p in picks:
+        out.extend(p.values_at if p.values_at and len(p.values_at) == width else [None] * width)
+    return out
+
+
+def _levels_of(flat: Sequence[Any], at: int) -> tuple[float, ...] | None:
+    """Pick ``at``'s ``values_at`` out of the flat list; None when absent or any level is null."""
+    width = len(OPTION_LEVELS)
+    mine = [_maybe(v) for v in flat[at * width : (at + 1) * width]]
+    if len(mine) != width or None in mine:
+        return None
+    return tuple(v for v in mine if v is not None)
+
+
+def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any] | None]:
     """A leg's picks as the ``pick_*`` list columns, aligned to ``pick_ids``."""
     return {
         "pick_ids": [p.instrument_id for p in picks],
@@ -191,6 +220,7 @@ def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any]]:
         "pick_roc_gross": [p.roc_gross for p in picks],
         "pick_roc": [p.roc for p in picks],
         "pick_adverse": [p.adverse for p in picks],
+        "pick_values_at": _flat_levels(picks),
     }
 
 
@@ -208,6 +238,7 @@ def decode_picks(
     adv, refs, flags = (_list(row.get(c)) for c in ("pick_adv", "pick_refs", "pick_flags"))
     is_short = [bool(int(f) & SHORT) for f in flags]
     contract = {c: _list(row.get(c)) or [None] * len(ids) for c in CONTRACT_LISTS}  # null: v4 row
+    levels = _list(row.get("pick_values_at"))  # E6b-2: the option cost levels, flat
     split = shorts is not None
     kept = [sh for r, sh in zip(reasons, is_short, strict=True) if r == ""]  # counted picks
     short_n = sum(kept) if split else 0
@@ -243,6 +274,7 @@ def decode_picks(
                 adverse=_maybe(contract["pick_adverse"][at]),
                 price_source=_opt_str(contract["pick_source"][at]),
                 outcome_licence=_opt_str(contract["pick_licence"][at]),
+                values_at=_levels_of(levels, at),
             )
         )
     return tuple(out)
@@ -336,6 +368,9 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         weight_values=[w for _, w in s.weights] if s.weights else None,
         book_vol=s.book_vol,
         risk_off=s.risk_off,
+        base_roc_n=None if s.base_roc is None else s.base_roc[0],
+        base_roc_mean=None if s.base_roc is None else s.base_roc[1],
+        base_roc_m2=None if s.base_roc is None else s.base_roc[2],
         **encode_picks(s.picks),
         **encode_band(s.band),
     )
@@ -409,6 +444,7 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         portfolio_reason=_opt_text(row.get("portfolio_reason")),
         book_vol=_opt(row.get("book_vol")),
         risk_off=_opt(row.get("risk_off")),
+        base_roc=_base_roc(row),
     )
     drawn = None
     if rand is not None:

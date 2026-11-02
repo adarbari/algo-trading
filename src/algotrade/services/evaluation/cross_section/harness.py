@@ -52,6 +52,8 @@ from algotrade.config.edges.document import (
 from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -521,6 +523,7 @@ def evaluate_edge(
         edge.id,
         verdict.cost_levels_bps,  # every leg counts hits at the site's cost grid
         verdict.capacity_adv_floor_usd,  # a short leg's liquidity floor (key of such legs only)
+        verdict.option_costs,  # an option_pnl leg's cost levels and commission (its key only)
     )
     stored = read_legs(reader, user.user_id, edge.id, start, end)
     needs = _needs(plans, variants, schedules, spec)
@@ -597,7 +600,9 @@ def evaluate_edge(
                 exploratory,
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
-                CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
+                CostGrid(None, (), scope.edge.outcome.sign, OPTION_LEVELS)
+                if scope.edge.outcome.kind == CHAIN_KIND
+                else CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
                 if is_return(scope.edge)
                 and scope.edge.outcome.side != LONG_SHORT
                 and scope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
@@ -609,7 +614,7 @@ def evaluate_edge(
                     _trial_hash(scope, variant),  # config identity, never a code version (the seed)
                     verdict.tails,
                     bootstrap=variant.role == SCREENER,  # the verdict reads the screener's only
-                    base=not _chain([plan]) and scope.edge.outcome.sign > 0,
+                    base=scope.edge.outcome.sign > 0,  # an option's: its stored base_roc
                 ),
             )
             results.append(

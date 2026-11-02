@@ -10,6 +10,7 @@ Python that changes a leg bumps ``LEG_VERSION`` (ADR 0063 amendment 9)."""
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
@@ -68,6 +69,7 @@ def leg_key(
     event_subtype: str | None = None,
     hold_rank: int | None = None,
     leg_version: int | None = None,
+    option_costs: Mapping[str, Any] | None = None,
 ) -> str:
     """The key of a leg (``top_k``, ``base`` and ``picks`` of the scope's edge cut its picks and
     names and are not in the trial hash for ``main``): ``universe`` is ``universe_hash``,
@@ -77,8 +79,14 @@ def leg_key(
     join the digest only when set, so the keys of every long edge, of every schedule without a
     subtype and of every edge without a band are unchanged but for ``LEG_VERSION``;
     ``leg_version`` (default ``LEG_VERSION``) is passed as ``DRAW_LEG_VERSION`` to key the
-    random draws."""
-    extra = {} if short_adv_floor is None else {"short_adv_floor": float(short_adv_floor)}
+    random draws. ``option_costs`` (the canonical form of ``[option_costs]``, an ``option_pnl``
+    edge's legs only, never the draws' key) joins the digest only when set, so no other kind's key
+    moves: an option leg's values pay the commission, so a changed one is a new leg."""
+    extra: dict[str, Any] = (
+        {} if short_adv_floor is None else {"short_adv_floor": float(short_adv_floor)}
+    )
+    if option_costs is not None:
+        extra["option_costs"] = option_costs
     subtype = {"event_subtype": event_subtype} if event_subtype else {}
     band = {} if hold_rank is None else {"hold_rank": hold_rank}
     return _digest(

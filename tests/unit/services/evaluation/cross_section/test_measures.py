@@ -714,3 +714,70 @@ def test_the_bootstrap_runs_for_the_judged_slice_kinds_only_and_a_cost_row_is_no
     )  # the cheap measures run everywhere
     costed = cost_measures(stats, [ALL], [all_], CostGrid(None, (0.0, 15.0)))
     assert costed and all(c.tail == TailMeasures() for c in costed)
+
+
+# --- option cost levels and the stored base return on capital (ADR 0088, E6b-2) ---
+
+LEVELS = ("mid", "effective", "full")
+
+
+def level_stat(day: date, **kw: object) -> SessionStat:
+    """Two counted option picks whose values at (mid, effective, full) are by hand, among five
+    names: the hits per level are 3, 2, 1 of all names and 2, 1, 1 of the picks."""
+    picks = (
+        Pick("A", 1, value=0.010, values_at=(0.0120, 0.0100, 0.0080)),
+        Pick("B", 2, value=-0.002, values_at=(0.0000, -0.0010, -0.0020)),
+        Pick("C", 3, "no_entry_bar"),  # excluded: no value at any level
+    )
+    return SessionStat(
+        session=day, regime="BULL", pick_values=(0.010, -0.002), pick_hits=1,
+        rest=moments((0.0, 0.01, -0.02)), base_hits=1, base_hits_at=(3, 2, 1),
+        pick_hits_at=(2, 1, 1), picks=picks, **kw,
+    )  # type: ignore[arg-type]  # fmt: skip
+
+
+def test_an_option_cost_row_per_level_has_its_own_hits_and_the_mean_of_its_own_values() -> None:
+    stats = [level_stat(date(2026, 1, 5)), level_stat(date(2026, 1, 6))]
+    sl = [Slice("all", "all", lambda _: True), Slice("year", "2026", lambda _: True)]
+    found = slice_measures(stats, sl)
+    rows = {
+        m.slice_value: m for m in cost_measures(stats, sl, found, CostGrid(None, (), 1.0, LEVELS))
+    }
+    assert list(rows) == ["all:mid", "all:effective", "all:full"]  # a year is not a cost period
+    assert [rows[f"all:{n}"].mean_excess_picks for n in LEVELS] == pytest.approx(
+        [
+            0.0060,
+            0.0045,
+            0.0030,
+        ]  # (0.0120 + 0.0000) / 2, (0.0100 - 0.0010) / 2, (0.0080 - 0.0020) / 2
+    )
+    assert [rows[f"all:{n}"].hits for n in LEVELS] == [4, 2, 2]
+    assert [rows[f"all:{n}"].base_hits for n in LEVELS] == [6, 4, 2]
+    assert rows["all:mid"].hit_rate == 1.0 and rows["all:mid"].base_rate == pytest.approx(0.6)
+    assert rows["all:full"].tail == TailMeasures() and rows["all:full"].bh_mean is None
+    assert {r.slice_kind for r in rows.values()} == {"cost"}
+
+
+def test_a_level_a_leg_did_not_count_or_a_pick_without_values_is_not_measured() -> None:
+    blind = replace(level_stat(date(2026, 1, 5)), base_hits_at=(), pick_hits_at=())
+    sl = [Slice("all", "all", lambda _: True)]
+    found = slice_measures([blind], sl)
+    assert cost_measures([blind], sl, found, CostGrid(None, (), 1.0, LEVELS)) == []
+    bare = replace(level_stat(date(2026, 1, 5)), picks=(Pick("A", 1, value=0.01),))
+    rows = cost_measures([bare], sl, slice_measures([bare], sl), CostGrid(None, (), 1.0, LEVELS))
+    assert [r.mean_excess_picks for r in rows] == [None, None, None]  # never 0
+
+
+def test_a_stored_base_roc_is_the_sessions_base_and_it_pools_by_the_names_counted() -> None:
+    picks = (roc_pick("A", 0.05, 0.04), roc_pick("B", 0.01, -0.01))
+    s = roc_stat(date(2026, 1, 5), picks, (0.0,), base_roc=(4, 0.02, 0.001))
+    days, roc, base = session_rocs([s], True)
+    assert roc == [pytest.approx(0.03)] and base == [0.02] and days == [date(2026, 1, 5)]
+    empty = roc_stat(date(2026, 1, 5), picks, (0.0,), base_roc=(0, 0.0, 0.0))
+    assert np.isnan(session_rocs([empty], True)[2][0])  # no name with a roc: no base, never 0
+    a = replace(s, base_roc=(2, 0.01, 0.0))
+    b = replace(s, base_roc=(2, 0.03, 0.0))
+    pooled = pool_stats([a, b])
+    assert pooled.base_roc is not None and pooled.base_roc[:2] == (4, pytest.approx(0.02))
+    assert pooled.base_roc[2] == pytest.approx(2 * 0.01**2 * 2)  # between-leg spread of the means
+    assert pool_stats([a, replace(s, base_roc=None)]).base_roc is None

@@ -9,7 +9,7 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from typing import Any
 
@@ -19,6 +19,7 @@ from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import LONG, LONG_SHORT, SHORT, identity_dict
 from algotrade.config.edges.portfolio import CASH, ENSEMBLE, PORTFOLIO_KIND, blend
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
@@ -52,6 +53,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     apply_outcome,
     chain_rows,
     is_return,
+    level_values,
     needs_implied_vol,
     needs_pairs,
     needs_residual,
@@ -106,7 +108,7 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
 )
-from algotrade.services.evaluation.evidence.shapes import trade_frame
+from algotrade.services.evaluation.evidence.shapes import roc_moments, trade_frame
 
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
 
@@ -190,6 +192,7 @@ def _outcomes(
     rows: pd.DataFrame,
     eligible: frozenset[str],
     ids: frozenset[str],
+    option_costs: OptionCosts | None = None,
 ) -> pd.DataFrame:
     """The stored outcomes of ``ids`` scored by the edge's outcome (``apply_outcome``), indexed
     by instrument; ``excluded`` is non-empty for a name that does not count. It depends only on
@@ -210,7 +213,9 @@ def _outcomes(
             if needs_pairs(scope.edge)
             else None
         )
-        return apply_outcome(scope.edge, inside, implied, pairs).set_index("instrument_id")
+        return apply_outcome(scope.edge, inside, implied, pairs, option_costs).set_index(
+            "instrument_id"
+        )
 
     return session.outcomes(scope.key, horizon, day, score)
 
@@ -225,13 +230,15 @@ def _stat(
     event_names: frozenset[str] | None,
     costs: Sequence[float],
     adv_floor: float | None = None,
+    option_costs: OptionCosts | None = None,
 ) -> SessionStat:
     """One variant at one decision session: ``rows`` are the stored outcomes at the entry
     session. The eligible names, the screen, the implied vol and the picks' ADV are read at D.
     ``event_names`` (an event schedule): the picks are the qualified names within them, and the
     base is them (``base = "event"``) or every eligible name. ``costs``: the site's cost grid
     (bp), whose hits a return outcome's leg also counts. ``adv_floor``: the least 20-day dollar
-    volume of a name a short leg may hold (``_side_picks``)."""
+    volume of a name a short leg may hold (``_side_picks``); ``option_costs``: an ``option_pnl``
+    edge's levels and commission."""
     edge, day = scope.edge, leg.decision
     if variant.members:
         return _ensemble_stat(scope, session, variant, leg, horizon, rows, event_names)
@@ -246,7 +253,7 @@ def _stat(
     pickable, ids = names.pickable, names.ids
     scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
-    res = _outcomes(scope, session, leg, horizon, rows, eligible, ids)
+    res = _outcomes(scope, session, leg, horizon, rows, eligible, ids, option_costs)
     counted = res[res["excluded"] == ""]
     adv = session.adv(eligible, day)
     side = edge.outcome.side
@@ -285,7 +292,12 @@ def _stat(
         else sorted((i for i in scored if i in counted.index), key=lambda i: (-scored[i], i))
     )
     deciles = decile_means(counted.loc[ranked, "oriented"].to_list()) if ranked else ()
-    levels = _hits_at(scope, session, leg, horizon, rows, ids, costs)
+    frames = session.level_frames(
+        scope.key, scope.edge, horizon, leg.decision, rows, ids, costs, option_costs
+    )
+    column = "short_hit" if side == SHORT else "hit"
+    levels = [frame[column] for frame in frames]
+    at_levels = frames if option_costs is not None and edge.outcome.kind == CHAIN_KIND else ()
     all_got = got + short_got
     return SessionStat(
         session=day,
@@ -327,11 +339,13 @@ def _stat(
                 side_,
                 leg.entry,
                 window_end(leg.entry, horizon),
+                at_levels,
             )
         ),
         base_hits_at=tuple(int(hits.sum()) for hits in levels),
         pick_hits_at=tuple(int(hits.loc[got].sum()) for hits in levels),
         band=_band(below, (edge.top_k or 0) + 1, base),
+        base_roc=roc_moments(edge, rows, counted, leg.entry, option_costs),
         short_values=(
             tuple(float(v) for v in views[SHORT].loc[short_got, "oriented"])
             if side == LONG_SHORT
@@ -507,12 +521,14 @@ def _picks(
     side: str,
     entry: date,
     exit_on: date,
+    levels: Sequence[pd.DataFrame] = (),
 ) -> tuple[Pick, ...]:
     """Every pick of a session in rank order (leg v2, ADR 0064): counted or with its reason.
     ``res`` is the scored outcomes of the base names, ``rows`` the stored ones at S (the option
     trade grain's hold every edge's position keys: ``chain_rows`` picks this edge's); a ``short``
     leg's value and hit are the short's. The contract's fields (leg v5, ADR 0088 2.5a) come from
-    ``trade_frame`` over the picks only; ``entry`` is S, ``exit_on`` S + h sessions."""
+    ``trade_frame`` over the picks only; ``entry`` is S, ``exit_on`` S + h sessions;
+    ``levels``: an option edge's outcomes at each cost level (``values_at``)."""
     if side == SHORT:
         res = short_view(res)
     rows = chain_rows(edge, rows[rows["instrument_id"].isin(set(picks))])
@@ -551,6 +567,7 @@ def _picks(
                 adverse=_finite(trades.at[i, "max_adverse"]),
                 price_source=str(trades.at[i, "price_source"]),
                 outcome_licence=str(trades.at[i, "outcome_licence"]),
+                values_at=level_values(levels, i) if counted else None,
             )
         )
     return tuple(out)
@@ -563,34 +580,6 @@ def _none_if_null(value: Any) -> Any:
 def _finite(value: object) -> float | None:
     number = None if value is None else float(value)  # type: ignore[arg-type]
     return number if number is not None and math.isfinite(number) else None
-
-
-def _hits_at(
-    scope: _Scope,
-    session: SessionReads,
-    leg: Leg,
-    horizon: int,
-    rows: pd.DataFrame,
-    ids: frozenset[str],
-    costs: Sequence[float],
-) -> list[pd.Series]:
-    """Per level of the cost grid, the ``hit`` of each base name were the round trip to cost
-    that many bp instead of the document's ``cost_bps`` (``apply_outcome``'s own rule; ADR 0064
-    decision 5); none for an outcome that is not a return. Exclusions do not depend on the cost,
-    so the counted names are the session's own."""
-    if not is_return(scope.edge):
-        return []
-    column = "short_hit" if scope.edge.outcome.side == SHORT else "hit"
-    found = []
-    for level in costs:
-        costed = replace(scope.edge, outcome=replace(scope.edge.outcome, cost_bps=level))
-
-        def score(edge: Edge = costed) -> pd.DataFrame:
-            inside = rows[rows["instrument_id"].isin(ids)]
-            return apply_outcome(edge, inside).set_index("instrument_id")
-
-        found.append(session.outcomes(f"{scope.key}@{level:g}bp", horizon, leg.decision, score))
-    return [frame[column] for frame in found]
 
 
 def _drawing(spec: "_RandomSpec", variant: Variant, block: Sequence[Leg], edge: Edge) -> bool:
@@ -670,6 +659,7 @@ class _RandomSpec:
     edge_id: str
     costs: tuple[float, ...]
     adv_floor: float | None = None  # a short leg's least dollar volume (in the key of its legs)
+    option_costs: OptionCosts | None = None  # an option_pnl leg's levels (in the key of its legs)
     keys: dict[tuple[str, str], str] = field(default_factory=dict)  # (scope, variant) -> leg key
     draw_keys: dict[tuple[str, str], str] = field(default_factory=dict)  # same, for the draws
 
@@ -685,12 +675,18 @@ class _RandomSpec:
         found = self.draw_keys.get((scope.key, variant.id))
         if found is None:
             found = self.draw_keys[scope.key, variant.id] = self._key(
-                scope, variant, DRAW_LEG_VERSION
+                scope,
+                variant,
+                DRAW_LEG_VERSION,
+                costed=False,  # a seed never moves with costs
             )
         return found
 
-    def _key(self, scope: "_Scope", variant: "Variant", leg_version: int) -> str:
-        """One leg key at ``leg_version``."""
+    def _key(
+        self, scope: "_Scope", variant: "Variant", leg_version: int, costed: bool = True
+    ) -> str:
+        """One leg key at ``leg_version``; ``costed``: an option leg's key holds the costs."""
+        priced = costed and scope.edge.outcome.kind == CHAIN_KIND and self.option_costs is not None
         key = leg_key(
             _trial_hash(scope, variant),
             universe_hash(scope.universe),
@@ -707,6 +703,7 @@ class _RandomSpec:
             scope.edge.event_subtype,
             scope.edge.outcome.hold_rank,
             leg_version,
+            asdict(self.option_costs) if priced and self.option_costs else None,
         )
         return key
 
@@ -859,7 +856,7 @@ def _measure_plan(
             with session.attribute(leg.decision):
                 stat = _stat(
                     p.scope, session, variant, leg, p.horizon, rows, names, spec.costs,
-                    spec.adv_floor,
+                    spec.adv_floor, spec.option_costs,
                 )  # fmt: skip
                 drawn = (
                     _measure_random(p, variant, leg, stat, session, names, rows, spec)
@@ -911,7 +908,7 @@ def _measure_random(
         return None
     eligible = session.eligible(p.scope.universe, leg.decision)
     names = names_for(p.scope.edge, eligible, event_names)
-    res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
+    res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids, spec.option_costs)
     counted = res[res["excluded"] == ""]
     key, label = spec.draw_key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
     rng = generator(key, label, p.horizon, leg.decision)

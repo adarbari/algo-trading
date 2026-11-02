@@ -1,14 +1,18 @@
 """``leg_key``: every input moves it, and nothing but the inputs does."""
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 from types import SimpleNamespace
 
 import pytest
 
+from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.site.features.definitions import FeatureDefinition
-from algotrade.config.strategy.schema import Group, Selection
+from algotrade.config.strategy.schema import Group, Selection, parse_selection
 from algotrade.services.evaluation.cross_section.legs import key
 from algotrade.services.evaluation.cross_section.legs.key import leg_key, universe_hash
+from algotrade.services.evaluation.cross_section.measuring import _RandomSpec, _Scope
+from tests.unit.services.evaluation.cross_section.conftest import ACTIVE, edge
+from tests.unit.services.evaluation.evidence.test_shapes import CHAIN
 
 BASE = {
     "trial_hash": "t",
@@ -111,3 +115,33 @@ def test_the_expression_hash_ignores_prose_and_follows_the_formula() -> None:
     assert hashed(prose) == hashed(base)
     assert hashed(replace(base, expr="a - b")) != hashed(base)
     assert hashed(replace(base, valid_range=(0.0, 1.0))) != hashed(base)
+
+
+def _spec(costs: OptionCosts | None) -> _RandomSpec:
+    return _RandomSpec(None, 1000, "e", "site", "edge", (0.0, 15.0), None, costs)
+
+
+def test_option_costs_move_the_key_only_when_set_so_no_other_kinds_key_moves() -> None:
+    """E6b-2: an option leg's values pay the commission, so its key holds ``[option_costs]``; an
+    edge of every other kind passes none and hashes as it did."""
+    plain = leg_key(**BASE)  # type: ignore[arg-type]
+    costs = asdict(OptionCosts())
+    assert leg_key(**BASE, option_costs=None) == plain  # type: ignore[arg-type]
+    priced = leg_key(**BASE, option_costs=costs)  # type: ignore[arg-type]
+    assert priced != plain
+    assert priced == leg_key(**BASE, option_costs=dict(costs))  # type: ignore[arg-type]
+    other = asdict(replace(OptionCosts(), commission_usd=1.0))
+    assert leg_key(**BASE, option_costs=other) != priced  # type: ignore[arg-type]
+
+
+def test_the_draw_key_ignores_the_option_costs_so_a_seed_never_moves_with_them() -> None:
+    """A changed commission re-keys an option leg, never its random draws: the seed is the key at
+    ``DRAW_LEG_VERSION`` without the costs (``_RandomSpec.draw_key_for``)."""
+    spec = _spec(OptionCosts())
+    scope = _Scope("main", edge(outcome=CHAIN), parse_selection(ACTIVE, "active"), "feature.x")
+    variant = SimpleNamespace(id="v", hash="h", members=(), config=SimpleNamespace(hash="h"))
+    cheaper = _spec(replace(OptionCosts(), commission_usd=0.0))
+    assert spec.draw_key_for(scope, variant) == cheaper.draw_key_for(scope, variant)  # type: ignore[arg-type]
+    assert spec.key_for(scope, variant) != cheaper.key_for(scope, variant)  # type: ignore[arg-type]
+    share = _Scope("main", edge(), parse_selection(ACTIVE, "active"), "feature.x")
+    assert _spec(OptionCosts()).key_for(share, variant) == _spec(None).key_for(share, variant)  # type: ignore[arg-type]
