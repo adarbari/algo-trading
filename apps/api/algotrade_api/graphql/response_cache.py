@@ -285,6 +285,7 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
     {
         "IdeasPage",
         "SetupIdeas",
+        "IdeaDetail",
         "StatusStrip",
         "DataStatus",
         "ScreenerConfigs",

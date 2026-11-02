@@ -158,6 +158,12 @@ export type SignalState =
   | 'NEVER_FIRED'
   | 'UNKNOWN';
 
+/** Where a published stop comes from */
+export type StopKind =
+  | 'DECLARED'
+  | 'FALLBACK'
+  | 'HISTORY';
+
 /** Which trades: IN_SAMPLE and OUT_OF_SAMPLE sides of the backtest, ALL of the backtest, or LIVE (the paper record) */
 export type TradePeriod =
   | 'ALL'
@@ -558,6 +564,14 @@ export type IdeasPageQueryVariables = Exact<{
 
 
 export type IdeasPageQuery = { ideas: { session: string, total: number, hasMore: boolean, nextCursor: string | null, pausedTotal: number, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, withheld: boolean, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number, coverage: string | null, unavailable: Array<{ kind: UnavailableKind, guideTerm: string, kindText: string }> } | null, notRun: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, score: number, regime: string | null, sizeMultiplier: number | null, watchOut: Array<string>, instrument: { symbol: string, name: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, best: { configId: string, decision: string, score: number | null, reasons: string, criteria: Array<{ id: string, outcome: string }> }, pickedBy: Array<{ configId: string, own: boolean, position: number, score: number, decision: string }>, metrics: Array<{ name: string, value: unknown }> }> } | null };
+
+export type IdeaDetailQueryVariables = Exact<{
+  symbol: string;
+  setup?: string | null | undefined;
+}>;
+
+
+export type IdeaDetailQuery = { idea: { session: string, instrumentId: string, tab: IdeaTab, learn: string, instrument: { symbol: string, name: string } | null, setup: { edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }, setups: Array<{ edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }>, why: { thesis: string, mechanism: string, basisScreener: string, decision: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, exitRule: { edgeId: string, holdSessions: number | null, winners: number, inSampleOnly: boolean, stop: { kind: StopKind, fraction: number | null, atr: number | null, multiple: number | null, winners: number | null, beyond: number | null } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, evidence: { level: string, result: string, basis: string | null, basisHorizon: number | null, liftPts: number | null, lift: number | null, trades: number | null, oosTrades: number | null }, risks: { persistence: string, holdEnds: string | null, watchOut: Array<string>, events: Array<{ date: string, kind: string, label: string, name: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
 
 export type SetupIdeasQueryVariables = Exact<{
   tab: IdeaTab;
@@ -3154,6 +3168,110 @@ export const IdeasPageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<IdeasPageQuery, IdeasPageQueryVariables>;
+export const IdeaDetailDocument = new TypedDocumentString(`
+    query IdeaDetail($symbol: String!, $setup: String) {
+  idea(symbol: $symbol, setup: $setup) {
+    session
+    instrumentId
+    tab
+    instrument {
+      symbol
+      name
+    }
+    setup {
+      edgeId
+      edgeName
+      tab
+      level
+      place
+    }
+    setups {
+      edgeId
+      edgeName
+      tab
+      level
+      place
+    }
+    why {
+      thesis
+      mechanism
+      basisScreener
+      decision
+      criteria {
+        id
+        field
+        mode
+        outcome
+        value
+        distance
+      }
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+    }
+    exitRule {
+      edgeId
+      holdSessions
+      winners
+      inSampleOnly
+      stop {
+        kind
+        fraction
+        atr
+        multiple
+        winners
+        beyond
+      }
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+    }
+    evidence {
+      level
+      result
+      basis
+      basisHorizon
+      liftPts
+      lift
+      trades
+      oosTrades
+    }
+    risks {
+      persistence
+      holdEnds
+      watchOut
+      events {
+        date
+        kind
+        label
+        name
+      }
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+    }
+    learn
+  }
+}
+    `) as unknown as TypedDocumentString<IdeaDetailQuery, IdeaDetailQueryVariables>;
 export const SetupIdeasDocument = new TypedDocumentString(`
     query SetupIdeas($tab: IdeaTab!) {
   setupIdeas(tab: $tab) {

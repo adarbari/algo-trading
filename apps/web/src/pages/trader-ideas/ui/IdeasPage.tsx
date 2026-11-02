@@ -26,6 +26,8 @@ export interface IdeasPageProps {
   onOpenRegime: () => void;
   /** Open a setup's page. */
   onOpenEdge: (edgeId: string) => void;
+  /** Open a name's idea page under the setup that ranks it. */
+  onOpenIdea: (symbol: string, setupId: string) => void;
 }
 
 export function IdeasPage({
@@ -37,6 +39,7 @@ export function IdeasPage({
   onOpenScreener,
   onOpenRegime,
   onOpenEdge,
+  onOpenIdea,
 }: IdeasPageProps) {
   const tab = search.tab ?? 'stocks';
   return (
@@ -52,6 +55,7 @@ export function IdeasPage({
         tab={tab}
         onOpen={onOpen}
         onOpenEdge={onOpenEdge}
+        onOpenIdea={onOpenIdea}
         unproven={
           <Stack gap={3}>
             <PausedIdeas tab={tab} onOpen={onOpen} onOpenScreener={onOpenScreener} />
