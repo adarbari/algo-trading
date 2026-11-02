@@ -1,10 +1,12 @@
 """Plan and run the web checks for the `apps/web` files changed on this branch (`make changed`).
 
-First the seconds-long static gates CI fails on most: Prettier and Stylelint over the changed
-files, and the design-system check. A changed slice or design-system folder maps to its vitest
-folder; a changed page or route to the e2e spec named after it (unknown: `smoke`); a changed
+First the static gates CI fails on most: Prettier and Stylelint over the changed files, the
+design-system check, and ESLint over the changed scripts (about 45 s: it loads the project).
+A changed slice or design-system folder maps to its vitest folder; a changed page or route to
+the e2e spec named after it (unknown: `smoke`); a changed
 story or CSS module to that component's screenshots (Docker only, so printed, not run, off
-Linux); any changed `.ts` / `.tsx` adds `npm run typecheck` (`tsc -b`, the only type gate).
+Linux); any changed `.ts` / `.tsx` adds `npm run typecheck` (`tsc -b`, the only type gate); a
+changed file under `src/` or `design-system/` adds the production build and the bundle budgets.
 This narrows the first check; `make check` still gates every change.
 """
 
@@ -42,6 +44,22 @@ SPEC_ALIASES = {
     "ingestion": "admin-ingestion",
 }
 Step = tuple[str, list[str]]  # (what it covers, argv run from apps/web)
+LINTED = (".ts", ".tsx", ".js", ".mjs")
+# The build the CI web-perf job runs (its Supabase placeholders), then the bundle budgets.
+BUNDLE_STEPS: list[Step] = [
+    (
+        "bundle build",
+        [
+            "env",
+            "VITE_SUPABASE_URL=http://127.0.0.1:54321",
+            "VITE_SUPABASE_ANON_KEY=e2e-anon-key",
+            "npx",
+            "vite",
+            "build",
+        ],
+    ),
+    ("bundle budgets", ["npm", "run", "perf:bundle"]),
+]
 
 
 def spec_for(name: str) -> str:
@@ -63,6 +81,7 @@ def plan(
     specs: set[str] = set()
     visual: set[str] = set()
     typed = False
+    bundled = False
     present: list[str] = []
     for name in files:
         if not name.startswith(WEB):
@@ -72,6 +91,7 @@ def plan(
         if root is None or (root / rel).is_file():
             present.append(str(rel))
         typed = typed or rel.suffix in (".ts", ".tsx")
+        bundled = bundled or parts[0] in ("src", "design-system")
         if parts[0] == "src" and len(parts) > 3:
             vitest.add("/".join(parts[:3]))
             if parts[1] == "pages":
@@ -84,13 +104,16 @@ def plan(
                 visual.add(parts[2])
     if root is not None:
         vitest = {folder for folder in vitest if (root / folder).is_dir()}
-    return _static_steps(present) + _steps(typed, vitest, specs, visual, on_linux)
+    steps = _static_steps(present) + _steps(typed, vitest, specs, visual, on_linux)
+    return steps + (BUNDLE_STEPS if bundled else [])
 
 
 def _static_steps(present: list[str]) -> list[Step]:
     """The seconds-long gates CI's web-static job runs, over the changed files that still exist:
     Prettier and Stylelint on those files only, then the design-system check (about 1 s whole).
-    ESLint stays in CI: its type-aware rules load the whole project (66-215 s cold here)."""
+    ESLint runs over the changed scripts only (about 45 s cold for two files, against 66-215 s
+    for the whole project): "no raw HTML outside the design system" (ADR 0025 rule 3) was a top
+    CI failure that only ESLint sees."""
     if not present:
         return []
     steps: list[Step] = [
@@ -100,6 +123,9 @@ def _static_steps(present: list[str]) -> list[Step]:
     if css:
         steps.append(("stylelint", ["npx", "stylelint", *css]))
     steps.append(("design system", ["npm", "run", "ds:check"]))
+    linted = sorted(f for f in present if f.endswith(LINTED))
+    if linted:
+        steps.append(("eslint", ["npx", "eslint", "--max-warnings=0", *linted]))
     return steps
 
 

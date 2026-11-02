@@ -48,6 +48,12 @@ runs everything. Not done, on purpose: skipping CI on drafts (review loops read 
 path-selected pytest shards (the 90% coverage gate needs every shard). Raising the cap
 (plan or larger runners) is the owner's call; self-hosted runners stay forbidden.
 
+Before the push (same day): `make changed` also runs ESLint over the changed web scripts (~45 s)
+and, for a change under `src/` or `design-system/`, the production build and bundle budgets;
+a `pre-push` hook (`make-changed` in `.pre-commit-config.yaml`, installed by `make install` or
+`pre-commit install --hook-type pre-push` in the main checkout) runs it. Still CI-only: the
+screenshot shards (Docker) and the dependency audit (network).
+
 ## Pipeline
 
 What the pipeline looked like on 2026-10-07 (30 PRs merged that day) and what each change

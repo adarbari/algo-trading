@@ -42,3 +42,13 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+      # What CI fails on most, before the push (`make changed`: mirrored tests, fitness tests,
+      # the web gates over the changed files). Never --no-verify; CI stays the full gate.
+      - id: make-changed
+        name: make changed (the checks CI fails on, over what changed)
+        entry: make changed
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+        verbose: true
