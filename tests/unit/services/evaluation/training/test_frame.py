@@ -88,6 +88,19 @@ def test_the_label_is_the_edges_hit() -> None:
                     "horizon_sessions": [2],
                     "benchmark": "SPY",
                     "start_offset_sessions": 1,
+                    "position": "long_shares",
+                    "exit": {"take_profit": 0.1},
+                }
+            },
+            "an \\[outcome.exit\\] on shares is not fitted yet",
+        ),
+        (
+            {
+                "outcome": {
+                    "kind": "excess_return",
+                    "horizon_sessions": [2],
+                    "benchmark": "SPY",
+                    "start_offset_sessions": 1,
                     "entry": {"when": {"all": [{"field": PRICE, "op": "gt", "value": 0}]}},
                 }
             },

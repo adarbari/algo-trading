@@ -299,3 +299,24 @@ def structure_pnl_row(
         **overrides,
     }  # fmt: skip
     return row
+
+
+def share_path_row(
+    instrument: str = "EQ:A",
+    key: str = "k",
+    session: date = date(2026, 10, 5),
+    hold: int = 3,
+    **overrides: object,
+) -> dict[str, object]:
+    """One COMPLETE ``share_path@v1`` row (a take profit on the second close, 6% over a 1%
+    benchmark) with every required column; ``overrides`` replace any column."""
+    row: dict[str, object] = {
+        "instrument_id": instrument, "ts": pd.Timestamp(session, tz="UTC"), "position_key": key,
+        "licence": "open", "window_end": date(2026, 10, 8), "hold_sessions": hold,
+        "benchmark": "SPY", "entry_close": 100.0, "exit_session": date(2026, 10, 7),
+        "exit_index": 2, "exit_kind": "TAKE_PROFIT", "gross_return": 0.06,
+        "underlying_return": 0.06, "benchmark_return": 0.01, "max_adverse": 0.0,
+        "exit_unknown_closes": 0, "outcome_status": "COMPLETE", "outcome_reason": None,
+        **overrides,
+    }  # fmt: skip
+    return row

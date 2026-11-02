@@ -158,6 +158,12 @@ export type SignalState =
   | 'NEVER_FIRED'
   | 'UNKNOWN';
 
+/** What a published stop's `fraction` is of */
+export type StopBasis =
+  | 'COLLATERAL'
+  | 'CREDIT'
+  | 'ENTRY';
+
 /** Where a published stop comes from */
 export type StopKind =
   | 'DECLARED'
@@ -371,6 +377,13 @@ export type EdgeTradesQueryVariables = Exact<{
 
 export type EdgeTradesQuery = { edgeTrades: { period: TradePeriod, page: number, pageSize: number, total: number, basis: string | null, licence: string | null, oosHidden: boolean, symbolsSnapshot: string | null, facets: { total: number, matched: number, items: Array<{ id: string, active: boolean, removes: number | null, unknown: number, options: Array<{ value: string, count: number }>, bins: Array<{ lo: number, hi: number, count: number }> }> } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rows: Array<{ variant: string, horizonSessions: number, decisionSession: string, entrySession: string | null, exitSession: string | null, instrumentId: string, symbolAsOf: string | null, rank: number | null, status: string, excludedReason: string | null, hit: boolean | null, delisted: boolean, beforeSplit: boolean, source: string, maxDrawdown: number | null, symbol: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, company: { value: string | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, score: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, value: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, grossValue: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, advUsd: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, reference: { value: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, touch: { value: boolean | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } }> } | null };
 
+export type OptionSetupQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type OptionSetupQuery = { edgeOptionSetup: { edgeId: string, positionKind: string, rulesUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, rules: { template: string, collateral: string, schedule: string, startOffsetSessions: number, tenorDays: number | null, expiryCycle: string, skipReportInLife: boolean, takeProfit: number | null, stopLoss: number | null, exitDte: number | null, exitConditionFields: Array<string>, caseValued: Array<string>, legs: Array<{ kind: string, qty: number, right: string | null, strike: string | null, delta: number | null, otmPct: number | null, tenorDays: number | null }> } | null, evidence: { basisScreener: string | null, trades: number, typical: number | null, typicalLo: number | null, typicalHi: number | null, badMean: number | null, badTrades: number, kept: number, inSampleOnly: boolean, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, costs: { state: string, assumedBp: number, levels: Array<{ period: string, bp: number, assumed: boolean, level: string | null, meanRoc: number | null, winRate: number | null }> } | null, byYear: Array<{ year: number, trades: number, typical: number | null, kept: number }>, stress: Array<{ key: string, name: string, start: string, end: string, trades: number, worst: number | null }>, stressUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null } | null };
+
 export type ScreenerEdgesQueryVariables = Exact<{
   id: string;
 }>;
@@ -571,7 +584,7 @@ export type IdeaDetailQueryVariables = Exact<{
 }>;
 
 
-export type IdeaDetailQuery = { idea: { session: string, instrumentId: string, tab: IdeaTab, learn: string, instrument: { symbol: string, name: string } | null, setup: { edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }, setups: Array<{ edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }>, why: { thesis: string, mechanism: string, basisScreener: string, decision: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, exitRule: { edgeId: string, holdSessions: number | null, winners: number, inSampleOnly: boolean, stop: { kind: StopKind, fraction: number | null, atr: number | null, multiple: number | null, winners: number | null, beyond: number | null } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, evidence: { level: string, result: string, basis: string | null, basisHorizon: number | null, liftPts: number | null, lift: number | null, trades: number | null, oosTrades: number | null }, risks: { persistence: string, holdEnds: string | null, watchOut: Array<string>, events: Array<{ date: string, kind: string, label: string, name: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } } | null };
+export type IdeaDetailQuery = { idea: { session: string, instrumentId: string, tab: IdeaTab, learn: string, instrument: { symbol: string, name: string } | null, setup: { edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }, setups: Array<{ edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }>, why: { thesis: string, mechanism: string, basisScreener: string, decision: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, exitRule: { edgeId: string, holdSessions: number | null, winners: number, inSampleOnly: boolean, takeProfit: number | null, takeProfitBasis: StopBasis | null, conditionFields: Array<string>, stop: { kind: StopKind, fraction: number | null, atr: number | null, multiple: number | null, winners: number | null, beyond: number | null, basis: StopBasis } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, exitPrices: { stop: number | null, target: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, evidence: { level: string, result: string, basis: string | null, basisHorizon: number | null, liftPts: number | null, lift: number | null, trades: number | null, oosTrades: number | null }, risks: { persistence: string, holdEnds: string | null, watchOut: Array<string>, events: Array<{ date: string, kind: string, label: string, name: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, option: { chainDate: string, chainClose: number | null, entrySession: string | null, exitSession: string | null, netCredit: number | null, cashSetAside: number | null, stopDebit: number | null, stopLoss: number | null, takeProfitDebit: number | null, exitDteDate: string | null, maxLoss: number | null, unbounded: boolean, thetaPerDay: number | null, oneSigmaLoss: number | null, reportInLife: boolean | null, reportDate: string | null, exDividendInLife: boolean | null, exDivDate: string | null, mondayFloor: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, legs: Array<{ right: string, strike: number, expiry: string, qty: number, mid: number, delta: number | null, pItm: number | null }>, riskUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, calendarUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, floorUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null } | null };
 
 export type SetupIdeasQueryVariables = Exact<{
   tab: IdeaTab;
@@ -1828,6 +1841,92 @@ export const EdgeTradesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EdgeTradesQuery, EdgeTradesQueryVariables>;
+export const OptionSetupDocument = new TypedDocumentString(`
+    query OptionSetup($id: String!) {
+  edgeOptionSetup(id: $id) {
+    edgeId
+    positionKind
+    rulesUnknown {
+      code
+      kind
+      guideTerm
+      kindText
+    }
+    rules {
+      template
+      collateral
+      schedule
+      startOffsetSessions
+      tenorDays
+      expiryCycle
+      skipReportInLife
+      takeProfit
+      stopLoss
+      exitDte
+      exitConditionFields
+      caseValued
+      legs {
+        kind
+        qty
+        right
+        strike
+        delta
+        otmPct
+        tenorDays
+      }
+    }
+    evidence {
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+      basisScreener
+      trades
+      typical
+      typicalLo
+      typicalHi
+      badMean
+      badTrades
+      kept
+      inSampleOnly
+      costs {
+        state
+        assumedBp
+        levels {
+          period
+          bp
+          assumed
+          level
+          meanRoc
+          winRate
+        }
+      }
+      byYear {
+        year
+        trades
+        typical
+        kept
+      }
+      stress {
+        key
+        name
+        start
+        end
+        trades
+        worst
+      }
+      stressUnknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<OptionSetupQuery, OptionSetupQueryVariables>;
 export const ScreenerEdgesDocument = new TypedDocumentString(`
     query ScreenerEdges($id: String!) {
   edges {
@@ -3253,6 +3352,9 @@ export const IdeaDetailDocument = new TypedDocumentString(`
       holdSessions
       winners
       inSampleOnly
+      takeProfit
+      takeProfitBasis
+      conditionFields
       stop {
         kind
         fraction
@@ -3260,7 +3362,27 @@ export const IdeaDetailDocument = new TypedDocumentString(`
         multiple
         winners
         beyond
+        basis
       }
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+    }
+    exitPrices {
+      stop
+      target
       unknown {
         code
         kind
@@ -3298,6 +3420,60 @@ export const IdeaDetailDocument = new TypedDocumentString(`
         name
       }
       unknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+    }
+    option {
+      chainDate
+      unknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+      legs {
+        right
+        strike
+        expiry
+        qty
+        mid
+        delta
+        pItm
+      }
+      chainClose
+      entrySession
+      exitSession
+      netCredit
+      cashSetAside
+      stopDebit
+      stopLoss
+      takeProfitDebit
+      exitDteDate
+      maxLoss
+      unbounded
+      thetaPerDay
+      oneSigmaLoss
+      riskUnknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+      reportInLife
+      reportDate
+      exDividendInLife
+      exDivDate
+      calendarUnknown {
+        code
+        kind
+        guideTerm
+        kindText
+      }
+      mondayFloor
+      floorUnknown {
         code
         kind
         guideTerm

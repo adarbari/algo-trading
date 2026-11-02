@@ -54,6 +54,8 @@ class InstrumentResult:
     trades: pd.DataFrame | None = field(default=None, compare=False)
     edge_variant: str = MAIN  # a named sleeve's ``[[variants]]`` or grid point id (sleeve.py)
     identity: str = ""  # what the trial hash is of: edge, window or schedule, symbol (+ position)
+    # a named sleeve's book and index tracking (E8b): its edge variant's, alike on each symbol
+    book: dict[str, float | int | str | None] = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True)

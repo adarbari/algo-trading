@@ -215,3 +215,34 @@ def test_an_interpolated_fragment_that_reads_a_raw_quote_is_seen(schema: GraphQL
     reads = _ReadsType(info)
     visit(parse(text), TypeInfoVisitor(info, reads))
     assert reads.parents & RAW_QUOTE_TYPES
+
+
+OPENAPI = REPO_ROOT / "apps" / "api" / "openapi.json"
+CALCULATORS = "/preview/options/"  # the option calculators (plan V11): REST preview POSTs
+
+
+def _properties(spec: dict[str, object], node: object, seen: set[str]) -> set[str]:
+    """Every property name reachable from ``node`` in the OpenAPI document ``spec``."""
+    if isinstance(node, list):
+        return set().union(*(_properties(spec, n, seen) for n in node))
+    if not isinstance(node, dict):
+        return set()
+    ref = node.get("$ref")
+    if isinstance(ref, str):
+        name = ref.rsplit("/", 1)[-1]
+        if name in seen:
+            return set()
+        seen.add(name)
+        return _properties(spec, spec["components"]["schemas"][name], seen)  # type: ignore[index]
+    names = set(node.get("properties", {}))
+    return names.union(*(_properties(spec, v, seen) for v in node.values()))
+
+
+def test_the_option_calculators_serve_no_raw_quote_field() -> None:
+    spec = json.loads(OPENAPI.read_text())
+    paths = {p: v for p, v in spec["paths"].items() if p.startswith(CALCULATORS)}
+    assert paths, "the option calculators are not in the OpenAPI document"
+    for path, ops in paths.items():
+        names = _properties(spec, ops["post"]["responses"], set())
+        snake = {n for n in FORBIDDEN if n.islower()} | {"bid_size", "ask_size", "last_price"}
+        assert not names & (FORBIDDEN | snake), (path, names & (FORBIDDEN | snake))

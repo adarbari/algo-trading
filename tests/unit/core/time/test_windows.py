@@ -2,12 +2,19 @@
 windows of one kind never overlap; D and S sit before the window."""
 
 from datetime import date
+from itertools import pairwise
 
 import pytest
 
 from algotrade.config.edges.document import SCHEDULES
-from algotrade.core.time.calendar import is_session, next_session, previous_session
+from algotrade.core.time.calendar import (
+    is_session,
+    next_session,
+    previous_session,
+    sessions_between,
+)
 from algotrade.core.time.windows import (
+    WINDOW_GAPS,
     WINDOW_LENGTHS,
     WINDOW_NAMES,
     decision_session,
@@ -317,3 +324,12 @@ def test_after_monthly_expiry_is_known_before_the_range_ends() -> None:
     short = windows("after_monthly_expiry", date(2026, 1, 1), date(2026, 3, 31))
     full = windows("after_monthly_expiry", date(2026, 1, 1), date(2026, 12, 31))
     assert full[: len(short)] == short
+
+
+def test_the_declared_window_gaps_are_the_shortest_over_the_calendar() -> None:
+    """``WINDOW_GAPS``: the fewest sessions from one window's first session to the next's over
+    2000-2040, so a sleeve held that long never overlaps its next entry."""
+    for name, gap in WINDOW_GAPS.items():
+        placed = windows(name, date(2000, 1, 1), date(2040, 12, 31))
+        shortest = min(len(sessions_between(a[0], b[0])) - 1 for a, b in pairwise(placed))
+        assert gap == shortest, name

@@ -201,17 +201,33 @@ class UnderwaterPoint:
 
 @strawberry.type(
     description="One drop of the curve: from the high at `peak` down `depth` (positive) to "
-    "`trough` and back to `recovered` (null: not yet)"
+    "`trough` and back to `recovered` (null: not yet). An option setup's only (empty / null "
+    "for any other): `market` the market episodes (Guide `episode:<key>`) the drop overlaps that "
+    "the session already knows; `indexChange` the move of the Cboe strategy `index` it tracks "
+    "over the same dates (null: `indexUnknown` says why, LICENCE to a viewer without the "
+    "index's licence); `regtExceeded` whether the positions' Reg-T margin exceeded their "
+    "collateral (null: `regtUnknown` says why)"
 )
 class DrawdownEpisode:
     peak: dt.date
     trough: dt.date
     recovered: dt.date | None
     depth: float
+    market: list[str]
+    index: str | None
+    index_change: float | None
+    index_unknown: Unknown | None
+    regt_exceeded: bool | None
+    regt_unknown: Unknown | None
 
     @classmethod
     def of(cls, d: drawdown.DrawdownEpisode) -> Self:
-        return cls(peak=d.peak, trough=d.trough, recovered=d.recovered, depth=d.depth)
+        return cls(
+            peak=d.peak, trough=d.trough, recovered=d.recovered, depth=d.depth,
+            market=list(d.market), index=d.index, index_change=d.index_change,
+            index_unknown=_unknown(d.index_unknown), regt_exceeded=d.regt_exceeded,
+            regt_unknown=_unknown(d.regt_unknown),
+        )  # fmt: skip
 
 
 @strawberry.type(
@@ -392,7 +408,10 @@ class EdgeResult:
         description="The drawdown and the volatility of the windows"
     )
     async def drawdown(self, info: Info) -> EdgeDrawdown:
-        return EdgeDrawdown.of(drawdown.load_drawdown(await self._series()))
+        found = drawdown.load_drawdown(await self._series())
+        return EdgeDrawdown.of(
+            await off_loop(drawdown.with_option_extras, self.ctx, self.edge, found)
+        )
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The lift from each year's start forward"

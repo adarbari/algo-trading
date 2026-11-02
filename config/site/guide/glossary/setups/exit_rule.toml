@@ -2,7 +2,7 @@
 # each: id, term, short (one sentence), body, next, see_also. Typed by
 # src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
 # The three stop kinds of the exit rule's `kind`, the three bases of its `basis` and an option
-# setup's other declared exits (services/read/evaluation/positions/exit_rule.py).
+# setup's other declared exits, an option's and a share setup's (services/read/evaluation/positions/exit_rule.py).
 
 [[term]]
 id = "exit_stop_history"
@@ -29,7 +29,7 @@ id = "exit_stop_declared"
 term = "Declared stop"
 short = "The stop the setup's own document declares, published as written because the backtest used it."
 body = """
-Some setups declare their own exit as part of the rule that was tested. The page shows that rule as written, so the trader sees what the backtest did rather than a distance measured afterwards. A declared stop replaces the historical one for that setup. It is exactly as good as the test that used it: check the setup's verdict and sample size.
+Some setups declare their own exit as part of the rule that was tested. The page shows that rule as written, so the trader sees what the backtest did rather than a distance measured afterwards. A declared stop replaces the historical one for that setup. A share setup declares it as a fall of the entry price: a stop of 0.05 is a close 5% below the entry close. An option setup declares it as a multiple of the credit. It is exactly as good as the test that used it, so check the setup's verdict and sample size.
 """
 next = "Read the setup's evidence to see how often the declared stop was reached."
 see_also = ["exit_stop_history", "exit_hold"]
@@ -79,10 +79,30 @@ id = "exit_take_profit"
 term = "Take profit (declared)"
 short = "The option setup closes the position once it has captured this share of the credit."
 body = """
-A take profit of 0.5 closes the position at the first close where half the credit collected is kept as profit. It is part of the rule the backtest used, published as declared. It caps the gain of each trade: the setup trades the rest of the credit for a shorter time at risk. Its results are only for this setting; another setting is another test.
+A take profit of 0.5 on an option setup closes the position at the first close where half the credit collected is kept as profit. A share setup's take profit is another meaning: see take profit on shares. It is part of the rule the backtest used, published as declared. It caps the gain of each trade: the setup trades the rest of the credit for a shorter time at risk. Its results are only for this setting; another setting is another test.
 """
 next = "Check how often the setup's trades closed by take profit in its ledger."
-see_also = ["exit_basis_credit", "exit_dte_declared", "position_profit_share"]
+see_also = ["exit_basis_credit", "exit_dte_declared", "position_profit_share", "exit_take_profit_entry"]
+
+[[term]]
+id = "exit_take_profit_entry"
+term = "Take profit on shares (declared)"
+short = "The share setup closes the position once the price has risen this fraction above the entry close."
+body = """
+A take profit of 0.10 on a share setup closes the position at the first close 10% above the entry close. It is a rise of the price, not a share of any credit. It is part of the rule the backtest used, published as declared. It caps the gain of each trade at that close, so a price that gaps past it is still closed at the close, not at the level. The setup's results are for this setting only. Another setting is another test. The target price on the idea is that rise applied to the reference close.
+"""
+next = "Read the target price beside the stop price to see the range the rule allows."
+see_also = ["exit_basis_entry", "exit_stop_declared", "exit_prices", "exit_take_profit"]
+
+[[term]]
+id = "exit_prices"
+term = "Stop and target prices"
+short = "The stop and the take profit as prices: the reference close moved by the setup's declared or measured distances."
+body = """
+The stop price is the reference close at the session less the stop's distance. That distance is a fraction of the close, declared or from the winners' history, or for the fallback a multiple of the name's average true range. The target price is the close plus the declared take profit, see take profit. They are levels to watch, computed from the close the pick was read at, not from tomorrow's open. The entry may fill at another price, and a gap can carry a close past either level. A missing close leaves both blank with the reason, never an older price.
+"""
+next = "Re-compute both from your own fill price if you enter away from the reference close."
+see_also = ["exit_take_profit_entry", "exit_basis_entry", "exit_stop_history", "exit_take_profit"]
 
 [[term]]
 id = "exit_dte_declared"
@@ -103,3 +123,46 @@ Beside its fixed exits an option setup can declare a condition, such as the posi
 """
 next = "Open each field's Guide entry to see what it measures and when it can be missing."
 see_also = ["exit_take_profit", "exit_dte_declared", "position_delta"]
+
+# How a trade in a setup's ledger closed (the trade contract's `exit_kind`, ADR 0088 2.5a): the
+# declared exits above, plus the ways an option or share position ends on its own.
+
+[[term]]
+id = "exit_expired"
+term = "Expired"
+short = "The option position was held to its expiry and closed at the value it had then."
+body = """
+The trade ran to the option's expiry with no exit rule closing it first. An option out of the money at expiry is worth nothing, so a sold option keeps its whole credit. One in the money is worth what it is in the money, and that is what was paid to close it. The return is on the collateral the position set aside for its whole life.
+"""
+next = "Compare expired trades with those closed early in the ledger to see what the exit rules changed."
+see_also = ["exit_hold", "exit_take_profit", "exit_assigned"]
+
+[[term]]
+id = "exit_assigned"
+term = "Assigned"
+short = "A sold option was exercised against the position at expiry, so the trade ended with shares bought or sold at the strike."
+body = """
+A sold put in the money at expiry is assigned: the seller buys the shares at the strike. A sold call in the money is assigned the other way. The trade is closed at that point and its return counts the shares at the expiry close against the strike. A setup that keeps the shares to sell calls against them is a different setup, tested on its own.
+"""
+next = "Check how often the setup's trades were assigned before you sell puts on names you don't want to own."
+see_also = ["exit_expired", "exit_early_assigned_dividend"]
+
+[[term]]
+id = "exit_early_assigned_dividend"
+term = "Assigned early before a dividend"
+short = "A sold call in the money was exercised before expiry, on the day before the shares went ex-dividend."
+body = """
+An owner of a call in the money can exercise it the day before the shares go ex-dividend, to collect the dividend. When the dividend is worth more than the call's remaining time value, the backtest treats the sold call as exercised then. The trade ends early with the shares delivered at the strike. A covered call over a dividend date carries this risk.
+"""
+next = "Look at the ex-dividend dates inside a covered call's life before relying on its full credit."
+see_also = ["exit_assigned", "calls_early_exercise"]
+
+[[term]]
+id = "exit_delisted"
+term = "Delisted"
+short = "The shares stopped trading during the trade, so it ended at the last close that was stored."
+body = """
+A name can be delisted after a merger, a buyout or a failure. The trade is ended at its last stored close and counted, never dropped: leaving it out would make the setup look better than it was. A takeover usually ends with a gain, a failure with a large loss.
+"""
+next = "Read a delisted trade's return and the news behind it before treating it as typical."
+see_also = ["exit_hold"]

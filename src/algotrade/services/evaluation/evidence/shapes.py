@@ -5,6 +5,10 @@ frames, called right after ``hit.apply_outcome`` (which it never edits, so ``val
 - ``excess_return`` (shares): capital basis ``notional``, price source ``bars``; the return on
   capital is the name's raw ``fwd_return`` less the document's ``cost_bps`` (a short pick: minus
   it, less the borrow); ``max_adverse`` is the window's dip for a long and null for a short.
+- ``excess_return`` of a shares position with an ``[outcome.exit]`` (``share_path_trades``, and
+  ``trade_frame`` over the stored share path rows): the same, but the side's own ``gross_return``
+  to the stored exit session and kind, the dip to the exit, the borrow over the sessions held
+  (``exit_index``) and the row's ``licence``.
 - ``option_pnl``: the template's collateral rule; ``capital`` the stored collateral per unit; the
   return on capital is the mid P&L over it before cost, and net of the half-spreads, the
   commission and ``cost_bps`` of the entry spot at the document's level; the stored exit
@@ -27,10 +31,10 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND, reads_share_path
 from algotrade.config.edges.verdict import OptionCosts
 from algotrade.quant.edges.statistics import moments
-from algotrade.services.evaluation.cross_section.hit import borrow_cost, chain_rows
+from algotrade.services.evaluation.cross_section.hit import borrow_cost, own_rows
 from algotrade.services.evaluation.evidence.contract import (
     BARS,
     BOOK_ID,
@@ -105,6 +109,25 @@ def _bars(stored: pd.DataFrame, *, short: bool, cost: float, borrow: np.ndarray)
     }
 
 
+def _share_figures(
+    stored: pd.DataFrame, *, short: bool, cost: float, borrow: np.ndarray
+) -> dict[str, Any]:
+    """The share figures of rows over stored share paths (``select_share_path``'s rows, or the
+    walker's own frame): the side's return to the exit before and after cost (a short also the
+    borrow, over the sessions held), the dip to the exit, the underlying's return, the exit kind.
+    A stored row's ``fwd_return`` is the underlying's; the walker's frame names it."""
+    gross = _column(stored, "gross_return")
+    underlying = _column(stored, "underlying_return" if "underlying_return" in stored.columns
+                         else "fwd_return")  # fmt: skip
+    return {
+        "return_on_capital_gross": gross,
+        "return_on_capital": gross - cost - (borrow if short else 0.0),
+        "max_adverse": _column(stored, "max_adverse"),
+        "underlying_return": underlying,
+        "exit_kind": _strings(stored, "exit_kind", HORIZON),
+    }
+
+
 def _no_capital(n: int) -> dict[str, Any]:
     nan = np.full(n, np.nan)
     return {
@@ -156,7 +179,7 @@ def trade_frame(
     res = res.reset_index(drop=True)
     basis = capital_basis_of(edge)  # raises for a book: it has no name-by-name trades
     stored = (
-        chain_rows(edge, rows)
+        own_rows(edge, rows)
         .drop_duplicates("instrument_id")
         .set_index("instrument_id")
         .reindex(res["instrument_id"])
@@ -164,7 +187,10 @@ def trade_frame(
     )
     n = len(res)
     cost = (o.cost_bps or 0.0) / 1e4
-    borrow = borrow_cost(o.borrow_bps_annual, _column(stored, "horizon_sessions"))
+    path = reads_share_path(o)  # a share path's borrow runs over the sessions it was held
+    borrow = borrow_cost(
+        o.borrow_bps_annual, _column(stored, "exit_index" if path else "horizon_sessions")
+    )
     short = side == "short"
     source, licence = BARS, np.full(n, OPEN, dtype=object)
     ids = res["instrument_id"].tolist()
@@ -176,6 +202,12 @@ def trade_frame(
     if o.kind == CHAIN_KIND:
         figures = _options(stored, cost, option_costs)
         source = _strings(stored, "price_source", "cboe")  # type: ignore[assignment]
+        licence = _strings(stored, "licence", OPEN)
+        exits = _dates(stored["exit_session"]) if "exit_session" in stored.columns else [None] * n
+    elif path:  # the stored path: its exit, kind and licence, the side's return to the exit
+        figures = {"capital": np.full(n, np.nan), **_share_figures(
+            stored, short=short, cost=cost, borrow=borrow
+        )}  # fmt: skip
         licence = _strings(stored, "licence", OPEN)
         exits = _dates(stored["exit_session"]) if "exit_session" in stored.columns else [None] * n
     elif o.kind == "excess_return":
@@ -213,28 +245,29 @@ def share_path_trades(
     ``underlying_return``, ``max_adverse``;
     a name the walker could not measure is not in it). Basis ``notional``, price source ``bars``;
     the return on capital is the side's gross return less ``cost_bps`` (and, for a short, the
-    borrow over ``exit_index`` sessions at ``borrow_bps_annual``, as ``trade_frame`` has it), the
-    value and the hit
-    setup with no exit: this shape is for one with an ``[outcome.exit]`` only."""
+    borrow over ``exit_index`` sessions at ``borrow_bps_annual``, as ``trade_frame`` has it); the
+    value is that net return and a hit is a positive one. A setup with no exit uses
+    ``trade_frame``: this shape is for one with an ``[outcome.exit]`` only. ``licence``: the
+    walk's own column (the strictest of its bars and exit-rule fields), open when absent."""
     n = len(walks)
     if not n:
         return empty_trades()
-    gross = _column(walks, "gross_return")
-    held = _column(walks, "exit_index")
-    borrow = borrow_cost(borrow_bps_annual, held) if side == "short" else 0.0
-    net = gross - cost_bps / 1e4 - borrow
+    short = side == "short"
+    figures = _share_figures(
+        walks, short=short, cost=cost_bps / 1e4,
+        borrow=borrow_cost(borrow_bps_annual, _column(walks, "exit_index")),
+    )  # fmt: skip
+    net = figures["return_on_capital"]
     with np.errstate(invalid="ignore"):
         hit = net > 0
     return _assemble(
         instrument_id=walks["instrument_id"].to_numpy(dtype=object), side=side,
-        entry_session=entry, exit_session=_dates(walks["exit_session"]),
-        exit_kind=walks["exit_kind"].to_numpy(dtype=object), value=net, higher_is_better=True,
-        hit=hit, excluded=np.where(np.isfinite(net), "", "missing_value").astype(object),
+        entry_session=entry, exit_session=_dates(walks["exit_session"]), value=net,
+        higher_is_better=True, hit=hit,
+        excluded=np.where(np.isfinite(net), "", "missing_value").astype(object),
         delisted=(walks["exit_kind"] == DELISTED).to_numpy(dtype=bool), capital_basis="notional",
-        capital=np.full(n, np.nan), return_on_capital_gross=gross, return_on_capital=net,
-        max_adverse=_column(walks, "max_adverse"),
-        underlying_return=_column(walks, "underlying_return"),
-        price_source=BARS, outcome_licence=OPEN,
+        capital=np.full(n, np.nan), price_source=BARS,
+        outcome_licence=_strings(walks, "licence", OPEN), **figures,
     )  # fmt: skip
 
 

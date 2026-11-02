@@ -1,0 +1,28 @@
+{
+  "gap": null,
+  "preview": {
+    "underlying_id": "EQ:AAPL",
+    "session": "2026-10-23",
+    "priced_at": 84.2,
+    "right": "put",
+    "strike": 80,
+    "expiry": "2026-11-20",
+    "contracts": 2,
+    "rule": "reg_t",
+    "days": 28,
+    "premium": 1.4,
+    "premium_total": 280,
+    "cash_secured": 16000,
+    "margin_held": 3600,
+    "premium_over_cash": 0.0175,
+    "premium_over_margin": 0.0778,
+    "volume_share": 0.042,
+    "open_interest_share": 0.0085,
+    "stress": {
+      "episode": "covid_2020",
+      "drop": -0.34,
+      "in_the_money": 1200
+    },
+    "stress_unknown": null
+  }
+}

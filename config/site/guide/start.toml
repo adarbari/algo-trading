@@ -671,3 +671,58 @@ title = "Reading the result"
 body = """
 The result is a verdict with its figures, labelled backtested (hypothetical). Changing the rules and testing again until the numbers look good makes a lucky result, which is why every test counts the variants tried. A result that rests on few cases says so and is not a finding.
 """
+
+# --------------------------------------------------------------------------------------- 14
+[[page]]
+id = "setups_as_positions"
+order = 14
+title = "How a setup trades"
+summary = "A setup is a position with rules: what it holds, when it enters and exits, what its state means, and what its numbers cannot show."
+links = [
+  { kind = "term", id = "position" },
+  { kind = "term", id = "setup_template" },
+  { kind = "term", id = "setup_entry" },
+  { kind = "term", id = "setup_gate" },
+  { kind = "term", id = "setup_state" },
+  { kind = "term", id = "exit_take_profit" },
+  { kind = "term", id = "exit_hold" },
+  { kind = "term", id = "resampled_tails" },
+  { kind = "start", id = "read_the_setups_page" },
+  { kind = "start", id = "methodology_and_conflicts" },
+]
+
+[[page.section]]
+title = "The parts of a setup"
+body = """
+A setup is one written rule with seven parts. A screener finds the names, inside a universe of instruments. A gate over the market decides whether to trade tonight at all. A position template says what is held for each name. An entry rule says when the trade starts and an exit rule when it ends. The hold caps how long it lasts. The whole rule is what gets tested, and the verdict belongs to the whole rule, not to the screener alone.
+"""
+
+[[page.section]]
+title = "What a position holds"
+body = """
+Each pick becomes a position built from one of the site's templates. Option legs are chosen by delta from that night's chain, never by a target yield. Every return is a share of the position's collateral, so compare setups only on the same template.
+"""
+
+[[page.section]]
+title = "Entries and exits: fixed values and rules"
+body = """
+The trade starts at a close at least one session after the pick, sometimes after waiting for a condition. It ends at the first exit that fires, checked at closes only. Fixed exits are values: a take profit, a stop loss, days before expiry and the hold. A rule exit is a condition over the position's own fields or the market, such as the position's delta passing a level. The published exits are the ones the backtest used. A setup that declares no stop gets one measured from its winners.
+"""
+
+[[page.section]]
+title = "Why nothing is on today"
+body = """
+An empty Ideas tab is a normal night, not an error. Each setup shows a state. Paused means its gate failed, for example an option-selling setup while the VIX curve is inverted. Off means its verdict is no longer works or promising. Unknown means a fact was not stored. An on setup can still pick nothing when no name passes its screener, or when tonight is not one of its decision days. The site never fills the list with weaker setups to look busy.
+"""
+
+[[page.section]]
+title = "Why there are no put-buying setups"
+body = """
+Buying puts, as a bet or as insurance, pays the premium that option sellers earn. On average an index put costs more than it later pays, because implied volatility usually exceeds the volatility that follows. Published studies find that tail hedges, protective puts and risk reversals lose money as standing strategies. A put can still suit a holder who wants insurance. That is a choice about your own risk, not a setup with evidence, so the site does not publish one.
+"""
+
+[[page.section]]
+title = "What the tail figures cannot show"
+body = """
+Option-selling setups win often and lose rarely but large, so their verdict also weighs the worst outcomes. Those figures resample the setup's own history. They cannot invent a crash the history does not hold. Treat the worst stored episode as the least a crash could cost, not the most.
+"""

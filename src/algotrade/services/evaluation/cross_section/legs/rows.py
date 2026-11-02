@@ -184,15 +184,17 @@ def _flags(pick: Pick) -> int:
     )
 
 
-def _flat_levels(picks: Sequence[Pick]) -> list[float | None] | None:
-    """The picks' ``values_at`` flattened, ``len(OPTION_LEVELS)`` per pick (null where a pick has
-    none); None when no pick has any, so a leg of a share edge stores nothing new."""
-    if not any(p.values_at for p in picks):
+def _flat_levels(picks: Sequence[Pick], field: str = "values_at") -> list[float | None] | None:
+    """The picks' ``values_at`` (or ``rocs_at``, E11) flattened, ``len(OPTION_LEVELS)`` per pick
+    (null where a pick has none); None when no pick has any, so a leg of a share edge stores
+    nothing new."""
+    found = [getattr(p, field) for p in picks]
+    if not any(found):
         return None
     width = len(OPTION_LEVELS)
     out: list[float | None] = []
-    for p in picks:
-        out.extend(p.values_at if p.values_at and len(p.values_at) == width else [None] * width)
+    for mine in found:
+        out.extend(mine if mine and len(mine) == width else [None] * width)
     return out
 
 
@@ -244,6 +246,7 @@ def encode_picks(picks: Sequence[Pick]) -> dict[str, list[Any] | None]:
         "pick_roc": [p.roc for p in picks],
         "pick_adverse": [p.adverse for p in picks],
         "pick_values_at": _flat_levels(picks),
+        "pick_rocs_at": _flat_levels(picks, "rocs_at"),
         "pick_option": _flat_option(picks),
         "pick_entry": _entries(picks),
     }
@@ -272,6 +275,7 @@ def decode_picks(
     is_short = [bool(int(f) & SHORT) for f in flags]
     contract = {c: _list(row.get(c)) or [None] * len(ids) for c in CONTRACT_LISTS}  # null: v4 row
     levels = _list(row.get("pick_values_at"))  # E6b-2: the option cost levels, flat
+    rocs = _list(row.get("pick_rocs_at"))  # E11: the return on capital at each, flat
     option = _list(row.get("pick_option"))  # E6b-3: the hedged / stock / wing figures, flat
     entries = _list(row.get("pick_entry")) or [None] * len(ids)  # E13: each pick's own S
     split = shorts is not None
@@ -310,6 +314,7 @@ def decode_picks(
                 price_source=_opt_str(contract["pick_source"][at]),
                 outcome_licence=_opt_str(contract["pick_licence"][at]),
                 values_at=_levels_of(levels, at),
+                rocs_at=_levels_of(rocs, at),
                 entry_session=_opt_day(entries[at]),
                 **_option_of(option, at),
             )

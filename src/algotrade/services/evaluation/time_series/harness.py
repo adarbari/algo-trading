@@ -8,7 +8,8 @@ turns the edge's symbols into ids through ``SymbolResolver`` (ADR 0018) and read
 rate known at a decision session D, for the "long in the window, bills otherwise" Sharpe ratio.
 ``Returns.rows`` keeps the measured stored rows (the trade contract's windows, ADR 0088). For a
 named option sleeve (``sleeve.py``, ADR 0088 decision 14) it reads the stored option trades at
-each S the same way (``read_trades``), beside the stock's raw return over the same hold."""
+each S the same way (``read_trades``), beside the stock's raw return over the same hold, and the
+level of the Cboe strategy index it tracks (``index_levels``)."""
 
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field, replace
@@ -17,7 +18,10 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
+from algotrade.core.model.instruments import index_id
+from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
+from algotrade.data.macro.series import series_as_of
 from algotrade.data.outcomes import (
     CHAIN_COLUMNS,
     read_chain_stored,
@@ -127,3 +131,17 @@ def bill_returns(
         near = frame.iloc[(frame["tenor_days"] - BILL_DAYS).abs().argmin()]
         out[day] = float(near["rate_par"]) * horizon / TRADING_DAYS
     return out
+
+
+def index_levels(
+    reader: StoreReader, key: str, start: date, end: date, as_of: datetime
+) -> dict[date, float]:
+    """The levels of the index ``key`` (``IDX:<key>``) observed in ``start..end``, each as the
+    series knew it by ``as_of``'s session (its latest vintage then, never a later revision)."""
+    session = as_of.date()
+    lookback = len(sessions_between(start, session))
+    frame = series_as_of(reader, [index_id(key)], session, lookback, as_of)
+    if frame.empty:
+        return {}
+    kept = frame[(frame["obs_date"] >= start) & (frame["obs_date"] <= end)]
+    return {d: float(v) for d, v in zip(kept["obs_date"], kept["value"], strict=True)}

@@ -14,7 +14,10 @@ from algotrade.services.read.edge_evidence import capacity, costs
     "`baseRate`, `liftPts` (win rate less base rate, in points) and `meanExcess` (the picks' mean "
     "return over the benchmark, a fraction, net of `bp`) over `sessions` independent sessions "
     "and `picks` picks; `assumed`: this is the edge document's own cost, the one every other "
-    "figure of the page is net of"
+    "figure of the page is net of. An option setup's rows are its cost `level` (mid: no spread "
+    "or commission; effective: a share of the spreads; full: all of them; null for a share "
+    "setup) at the document's `bp`, with `meanRoc` the picks' mean return on the collateral at "
+    "that level and `assumed` on the level its verdict reads"
 )
 class CostLevel:
     period: str
@@ -26,13 +29,15 @@ class CostLevel:
     base_rate: float | None
     lift_pts: float | None
     mean_excess: float | None
+    level: str | None
+    mean_roc: float | None
 
     @classmethod
     def of(cls, d: costs.CostLevel) -> Self:
         return cls(
             period=d.period, bp=d.bp, assumed=d.assumed, sessions=d.sessions, picks=d.picks,
             win_rate=d.win_rate, base_rate=d.base_rate, lift_pts=d.lift_pts,
-            mean_excess=d.mean_excess,
+            mean_excess=d.mean_excess, level=d.level, mean_roc=d.mean_roc,
         )  # fmt: skip
 
 

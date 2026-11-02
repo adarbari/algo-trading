@@ -84,3 +84,12 @@ def test_an_ensemble_averages_its_members_books_name_by_name() -> None:
     assert average_books([a, b]) == average_books([b, a])  # never depends on the members' order
     assert [i for i, _ in average_books([a, b])] == ["X", "Y", "CASH", "Z"]  # best weight, then id
     assert average_books([]) == ()
+
+
+def test_a_slots_book_gives_each_pick_one_slot_and_never_levers() -> None:
+    weights, why = book_weights(["A", "B"], "slots", {}, {}, 4)
+    assert why == "" and dict(weights) == {"A": 0.25, "B": 0.25, "CASH": 0.5}
+    with pytest.raises(ValueError, match="fixed slots"):
+        book_weights(["A", "B", "C"], "slots", {}, {}, 2)  # more picks than slots: levered
+    with pytest.raises(ValueError, match="fixed slots"):
+        book_weights(["A"], "slots", {}, {})  # a slots book names its slots

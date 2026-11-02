@@ -44,6 +44,8 @@ export interface IdeaDetail {
     unknown: ServedUnknown | null;
   };
   exitRule: Served['exitRule'];
+  /** The stop and target as prices of the reference close, served (never derived here). */
+  exitPrices: Served['exitPrices'];
   evidence: Served['evidence'];
   risks: {
     persistence: string;
@@ -52,6 +54,8 @@ export interface IdeaDetail {
     events: { date: string; label: string; name: string }[];
     unknown: ServedUnknown | null;
   };
+  /** The option pick's own sections (a Premium setup's pick); null for a stock pick. */
+  option: Served['option'] | null;
   /** The setup's id: the key of its Guide entry. */
   learn: string;
 }
@@ -90,6 +94,7 @@ export function toIdeaDetail(response: IdeaDetailResponse): IdeaDetail | null {
       unknown: found.why.unknown ?? null,
     },
     exitRule: found.exitRule,
+    exitPrices: found.exitPrices,
     evidence: found.evidence,
     risks: {
       persistence: found.risks.persistence,
@@ -98,6 +103,7 @@ export function toIdeaDetail(response: IdeaDetailResponse): IdeaDetail | null {
       events: found.risks.events.map((e) => ({ date: e.date, label: e.label, name: e.name })),
       unknown: found.risks.unknown ?? null,
     },
+    option: found.option ?? null,
     learn: found.learn,
   };
 }

@@ -8,6 +8,7 @@ the ``pair_spread`` outcome (EB H9): the cheap class against its sibling by hand
 borrow, the sibling read at the decision session, a sibling with no stored row."""
 
 import math
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -16,13 +17,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from algotrade.config.edges.positions.key import position_key
+from algotrade.config.edges.positions.key import position_key, share_position_key
 from algotrade.config.edges.positions.spec import exits_digest
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import next_session
+from algotrade.data.outcomes import grains
 from algotrade.quant.edges.statistics import sharpe
-from algotrade.services.evaluation.cross_section import measuring
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.detail.windows import SeriesFacts
 from algotrade.services.evaluation.cross_section.harness import (
@@ -37,9 +38,9 @@ from algotrade.services.evaluation.cross_section.legs.key import leg_key
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
 from algotrade.storage.configs.files import FileConfigStore
-from algotrade.storage.tables.schemas import STRUCTURE_PNL
+from algotrade.storage.tables.schemas import SHARE_PATH, STRUCTURE_PNL
 from tests.conftest import REPO_ROOT
-from tests.helpers.stored_frames import stamped, structure_pnl_row
+from tests.helpers.stored_frames import share_path_row, stamped, structure_pnl_row
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
@@ -465,6 +466,11 @@ def test_an_option_pnl_edge_has_a_cost_row_per_level_a_stored_base_and_picks_at_
     assert first.base_roc is not None and first.base_roc[0] == 20
     assert first.base_roc[1] == pytest.approx(-0.413 / 95)  # every name, at the full level
     assert r.measures[0].tail.excess_roc is not None  # the paired excess now has its base
+    # E11: each level's return on the collateral, the value times spot 100 over collateral 95
+    assert top.rocs_at == pytest.approx(tuple(v * 100 / 95 for v in top.values_at))
+    assert [levels[k].tail.mean_roc for k in levels] == pytest.approx(
+        [m.mean_excess_picks * 100 / 95 for m in levels.values()]
+    )
 
 
 def test_an_option_pnl_edge_with_no_chain_outcome_stored_is_missing_data() -> None:
@@ -495,7 +501,7 @@ def test_outcome_rows_recording_a_personal_licence_make_the_trial_personal(
         w.reader, w.results, w.configs, UserContext("site"), edge(), DAYS[0], DAYS[-1], AS_OF
     )
     assert {r.licence for r in plain.results} == {"open"}
-    monkeypatch.setattr(measuring, "licence_frames", tagged)
+    monkeypatch.setattr(grains, "licence_frames", tagged)
     personal = evaluate_edge(
         w.reader, w.results, w.configs, UserContext("site"), edge(), DAYS[0], DAYS[-1], AS_OF
     )
@@ -634,3 +640,130 @@ def test_a_baseline_on_a_grain_with_a_session_missing_leaves_the_setups_own_rows
     ]
     mine, held = first.results
     assert held.measures[0].sessions <= mine.measures[0].sessions
+
+
+SHARE_EXIT_OUTCOME = {
+    "kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+    "start_offset_sessions": 1, "position": "long_shares", "cost_bps": 20,
+    "exit": {"take_profit": 0.1, "stop_loss": 0.05},
+}  # fmt: skip
+
+
+def _share_row(iid: str, i: int, day: date, key: str, **changes: Any) -> dict[str, Any]:
+    """Name i earns (i - 9.5)% + 3% to its take profit one close after S, over a benchmark that
+    earned 1%: its excess is (i - 9.5)% + 2%, two points above the price grain's rows (so a read
+    of the wrong grain shows)."""
+    return share_path_row(
+        iid, key, day, hold=2, window_end=day + timedelta(days=2), exit_session=day + timedelta(1),
+        exit_index=1, gross_return=(i - 9.5) / 100 + 0.03, underlying_return=(i - 9.5) / 100 + 0.03,
+        benchmark_return=0.01, **changes,
+    )  # fmt: skip
+
+
+def _with_share_paths(
+    w: World,
+    key: str | None = None,
+    days: Sequence[date] | None = None,
+    run: str = "sp",
+    **changes: Any,
+) -> World:
+    """Every name's row of ``key`` (the setup's own by default) on ``days`` (all entry sessions)."""
+    key = key or share_position_key(edge(outcome=SHARE_EXIT_OUTCOME).outcome, 2)
+    for day in days or [*DAYS, next_session(DAYS[-1])]:
+        rows = [_share_row(iid, i, day, key, **changes) for i, iid in enumerate(IDS)]
+        w.writer.write_table(SHARE_PATH, day, f"{run}-{day}", stamped(rows, day, f"{run}-{day}"))
+    return w
+
+
+def _share_run(w: World, **changes: Any) -> EdgeEvaluation:
+    return evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"),
+        edge(outcome={**SHARE_EXIT_OUTCOME, **changes}), DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+
+
+def test_a_share_setup_with_an_exit_is_scored_at_its_exit_from_its_own_rows() -> None:
+    """E3c-2b, by hand: names 15..19 are the picks and earn (i - 9.5)% + 2% over the benchmark at
+    their take profit, less 20 bp (a round trip, once): the price grain's rows (the same names
+    without the two points) are never read for this setup."""
+    ev = _share_run(_with_share_paths(build_world()))
+    (r,) = ev.results
+    m = r.measures[0]
+    assert m.mean_excess_picks == pytest.approx(0.075 + 0.02 - 0.002)
+    assert (m.sessions, m.picks, m.hits) == (4, 20, 20) and ev.unclosed_sessions == {2: 0}
+    first = r.stats[0].picks[0]  # name 19, taken at the first close after S
+    assert (first.exit_kind, first.price_source) == ("TAKE_PROFIT", "bars")
+    # the contract's return on capital is the stored gross return to the exit (not the excess)
+    assert first.exit_session == DAYS[0] + timedelta(2) and first.roc_gross == pytest.approx(0.125)
+    assert first.roc == pytest.approx(0.125 - 0.002) and first.value == pytest.approx(0.113)
+    assert r.capital_basis == "notional" and r.licence == "open"
+
+
+def test_another_setups_share_path_row_never_stands_in_for_a_missing_own_one() -> None:
+    """A partition holds every setup's keys at the same hold: a session with another key's rows
+    only is not closed for this setup (its picks wait, excluded, never read from the horizon
+    rows of ``forward_returns``), and with none of its own anywhere the run is missing data."""
+    w = _with_share_paths(build_world(), key="another")
+    with pytest.raises(MissingDataError, match="share-outcomes"):
+        _share_run(w)
+    last = next_session(DAYS[-1])  # the entry session of the last decision session
+    w = _with_share_paths(build_world(), days=[*DAYS])  # the setup's own rows, but not at ``last``
+    _with_share_paths(w, key="another", days=[last], run="other")  # only another key's there
+    ev = _share_run(w)
+    (r,) = ev.results
+    assert ev.unclosed_sessions == {2: 1} and r.measures[0].sessions == 3
+    assert r.measures[0].mean_excess_picks == pytest.approx(0.075 + 0.02 - 0.002)
+
+
+def test_a_personal_licence_on_a_share_path_row_makes_the_trial_personal() -> None:
+    plain = _share_run(_with_share_paths(build_world()))
+    assert {r.licence for r in plain.results} == {"open"}
+    personal = _share_run(_with_share_paths(build_world(), licence="personal"))
+    (r,) = personal.results
+    assert (r.licence, r.licences.outcome) == ("personal", "personal")  # type: ignore[union-attr]
+    frame = edge_eval_frame(personal, "r", AS_OF)
+    assert set(frame["evidence_licence"].dropna()) == {"personal"}
+
+
+def test_a_rerun_reads_the_stored_legs_and_a_new_exit_is_another_trial() -> None:
+    w = _with_share_paths(build_world())
+    first, again = _share_run(w), _share_run(w)
+    assert [r.measures[0].mean_excess_picks for r in again.results] == [
+        r.measures[0].mean_excess_picks for r in first.results
+    ]
+    tighter = {"take_profit": 0.1, "stop_loss": 0.02}
+    other = share_position_key(edge(outcome={**SHARE_EXIT_OUTCOME, "exit": tighter}).outcome, 2)
+    assert other != share_position_key(edge(outcome=SHARE_EXIT_OUTCOME).outcome, 2)
+    with pytest.raises(MissingDataError, match="share-outcomes"):  # no rows stored for that exit
+        _share_run(w, exit=tighter)
+    assert first.results[0].config_hash == again.results[0].config_hash
+
+
+TIGHTER = {"take_profit": 0.1, "stop_loss": 0.02}
+
+
+def _variant_run(w: World) -> EdgeEvaluation:
+    tighter = {"id": "tighter", "outcome": {"exit": TIGHTER}}
+    return evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"),
+        edge(outcome=SHARE_EXIT_OUTCOME, variants=[tighter]),
+        DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+
+
+def test_a_variant_with_no_rows_of_its_own_key_is_missing_data_not_uncovered() -> None:
+    """Two exits are two keys on one horizon: rows stored for the setup's key only close no S for
+    the variant (its picks are never counted ``excluded_coverage`` for rows that are not its)."""
+    with pytest.raises(MissingDataError, match="share-outcomes"):
+        _variant_run(_with_share_paths(build_world()))
+
+
+def test_a_session_closed_for_one_key_and_not_the_other_is_unclosed_for_the_other() -> None:
+    other = share_position_key(edge(outcome={**SHARE_EXIT_OUTCOME, "exit": TIGHTER}).outcome, 2)
+    w = _with_share_paths(build_world())
+    last = next_session(DAYS[-1])  # the entry session of the last decision session
+    _with_share_paths(w, key=other, days=[d for d in [*DAYS, last] if d != last], run="v")
+    ev = _variant_run(w)
+    main, tighter = ev.results
+    assert main.measures[0].sessions == 4 and tighter.measures[0].sessions == 3
+    assert tighter.measures[0].picks == 15  # three sessions of five: the fourth is unclosed

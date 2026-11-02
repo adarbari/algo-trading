@@ -44,9 +44,10 @@ class Stop:
     "(never filled from an older value; none of it is read from a run that ends after the "
     "served session). `winners`: the basis's winning long trades read; `inSampleOnly`: the "
     "run hides its out-of-sample trades, so only in-sample winners were read. An option "
-    "setup's declared `takeProfit` (a share of the credit), `exitDte` (calendar days to "
-    "expiry) and the `conditionFields` of its exit condition; its hold is the earlier of the "
-    "basis horizon and the `expiry` when one was given"
+    "setup's declared `takeProfit` (a share of the credit; for a share setup a rise of the "
+    "entry price: see `takeProfitBasis`), `exitDte` (calendar days to expiry) and the "
+    "`conditionFields` of its exit condition; its hold is the earlier of the basis horizon "
+    "and the `expiry` when one was given"
 )
 class ExitRule:
     edge_id: str
@@ -56,6 +57,7 @@ class ExitRule:
     winners: int
     in_sample_only: bool
     take_profit: float | None
+    take_profit_basis: exit_rule.StopBasis | None
     exit_dte: int | None
     condition_fields: list[str]
     expiry: date | None
@@ -70,6 +72,7 @@ class ExitRule:
             winners=d.winners,
             in_sample_only=d.in_sample_only,
             take_profit=d.take_profit,
+            take_profit_basis=d.take_profit_basis,
             exit_dte=d.exit_dte,
             condition_fields=list(d.condition_fields),
             expiry=d.expiry,
