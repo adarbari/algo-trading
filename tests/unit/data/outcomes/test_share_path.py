@@ -126,3 +126,17 @@ def test_sessions_seqs_and_licences_follow_the_partitions_and_the_keys() -> None
     assert set(mine["licence"]) == {"personal"}  # S1's row, the span read
     assert share_path_licences(reader, [S2], [("nobody", "SPY")]) == []
     assert share_path_licences(reader, [], KEYS) == []
+
+
+def test_a_past_as_of_sees_only_windows_that_had_closed_not_just_the_early_exits() -> None:
+    """A replay at ``as_of`` must not keep a row whose exit came early (known by ``as_of``) while
+    its hold cap's window was still open: only early exits would show, an upward-biased sample."""
+    backend = MemoryBackend()
+    known = datetime(2026, 10, 5, 22, tzinfo=UTC)  # the row says it was known at S's own close
+    _write(StoreWriter(backend), S1, "r1", known, [share_path_row("EQ:A", "mine", S1)])
+    reader = StoreReader(backend)  # window_end 2026-10-08
+    before, after = datetime(2026, 10, 7, 23, tzinfo=UTC), datetime(2026, 10, 8, 21, tzinfo=UTC)
+    assert read_share_path(reader, 3, [S1], KEYS, as_of=before).empty
+    assert share_path_stamps(reader, [S1], before, KEYS) == ({}, {})
+    assert len(read_share_path(reader, 3, [S1], KEYS, as_of=after)) == 1
+    assert (S1, 3) in share_path_stamps(reader, [S1], after, KEYS)[0]

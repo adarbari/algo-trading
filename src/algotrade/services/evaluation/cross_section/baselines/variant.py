@@ -17,6 +17,7 @@ from algotrade.config.edges.positions.templates import Templates
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.services.evaluation.cross_section.baselines.outcome import position_outcome
+from algotrade.services.evaluation.cross_section.hit import own_keys
 
 
 @dataclass(frozen=True)
@@ -86,3 +87,18 @@ def beside(plans: Sequence[Any], variants: Sequence[Variant]) -> str | None:
         and (grain := grain_of(variant_scope(p.scope, v))) != grain_of(p.scope)
     }
     return next(iter(other), None)
+
+
+def run_keys(plans: Sequence[Any]) -> frozenset[tuple[str, str]]:
+    """The (``position_key``, benchmark) of the plans' share path and option trade outcomes, the
+    rows their reads keep (empty for the price grain)."""
+    return frozenset().union(*(own_keys(p.scope.edge, p.horizon) for p in plans))
+
+
+def split_keys(plans: Sequence[Any]) -> bool:
+    """Whether plans of one horizon hold different position keys: a stored leg's reuse is judged
+    per horizon, so such a run recomputes (never one setup's rows closing another's window)."""
+    held: dict[int, set[frozenset[tuple[str, str]]]] = {}
+    for p in plans:
+        held.setdefault(p.horizon, set()).add(own_keys(p.scope.edge, p.horizon))
+    return any(len(keys) > 1 for keys in held.values())

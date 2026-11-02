@@ -40,6 +40,7 @@ from algotrade.services.evaluation.cross_section.baselines.variant import (
     _Scope,
     beside,
     grain_of,
+    run_keys,
     variant_scope,
 )
 from algotrade.services.evaluation.cross_section.detail.licences import outcome_licence
@@ -55,7 +56,6 @@ from algotrade.services.evaluation.cross_section.hit import (
     needs_implied_vol,
     needs_pairs,
     needs_residual,
-    own_keys,
     own_rows,
     short_view,
 )
@@ -571,6 +571,9 @@ class _Measured:
     seqs: Mapping[date, int] = field(default_factory=dict)  # entry session -> outcome partition seq
     outcome_licence: str = "open"  # the strictest licence of the outcome rows read (E1)
     closed_other: dict[int, set[date]] = field(default_factory=dict)  # a position baseline's grain
+    # per plan (scope key, horizon): the entry sessions with a row of ITS position key; ``closed``
+    # is per horizon, over every key of the run (one setup's rows never close another's S)
+    plan_closed: dict[tuple[str, int], set[date]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -667,6 +670,7 @@ def _measure(
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
     out.closed_other.update({h: set(c) for h, c in out.closed.items()})
+    out.plan_closed.update({p.key: set(reuse.closed.get(p.horizon, ())) for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):
         chunk = set(days[at : at + CHUNK_SESSIONS])
         closed = _read_closed(reader, plans, chunk, as_of, out, failed, reads)
@@ -694,6 +698,7 @@ def _measure(
     for horizon, missing in failed.items():
         if not out.closed[horizon]:  # nothing stored for any session of the range
             raise missing
+    _refuse_unowned(out, plans, reads, bool(legs), entries)
     for (_, variant_id), lost in out.lost.items():  # a variant measured nowhere is a failure
         if lost and len(lost) == len(out.legs[_, variant_id]):
             raise lost_error(lost)
@@ -742,21 +747,25 @@ def _grain(plans: Sequence[_Plan]) -> str:
     return next(iter(grains), STOCK)
 
 
-def _keys(plans: Sequence[_Plan]) -> frozenset[tuple[str, str]]:
-    """The (``position_key``, benchmark) of the plans' share path outcomes, the rows a share path
-    read keeps (empty for another grain)."""
-    return frozenset().union(*(own_keys(p.scope.edge, p.horizon) for p in plans))
+def _refuse_unowned(
+    out: _Measured, plans: Sequence[_Plan], reads: GrainReads, measured: bool, entries: set[date]
+) -> None:
+    """A plan of a keyed grain with no row of its own key at any entry session is missing data,
+    never an uncovered session (the horizon's closed sessions are every key's)."""
+    for p in plans:
+        if measured and reads.grain != STOCK and not out.plan_closed[p.key]:
+            raise reads.missing(sorted(entries))
 
 
 def _reads(plans: Sequence[_Plan]) -> GrainReads:
     """The reads of the grain the plans' outcomes are on."""
-    return reads_of(_grain(plans), _keys(plans))
+    return reads_of(_grain(plans), run_keys(plans))
 
 
 def _beside(plans: Sequence[_Plan], variants: Sequence[Variant]) -> GrainReads | None:
     """The reads of the other grain a position baseline is valued on, if any."""
     other = beside(plans, variants)
-    return None if other is None else reads_of(other, _keys(plans))
+    return None if other is None else reads_of(other, run_keys(plans))
 
 
 def _read_closed(
@@ -809,6 +818,13 @@ def _read_closed(
             seen[horizon] |= set(closed[horizon])
             continue
         out.closed[horizon] |= set(closed[horizon])
+        for p in (q for q in plans if q.horizon == horizon):
+            owned = (
+                {e for e, r in closed[horizon].items() if not own_rows(p.scope.edge, r).empty}
+                if reads.grain != STOCK
+                else set(closed[horizon])
+            )
+            out.plan_closed.setdefault(p.key, set()).update(owned)
         for entry, rows in closed[horizon].items():
             out.stored[horizon, entry] = frozenset(rows["instrument_id"])
     return closed
@@ -837,6 +853,8 @@ def _measure_plan(
         for leg in block:
             if leg.decision not in chunk or leg.entry not in closed[p.horizon]:
                 continue
+            if not other and leg.entry not in out.plan_closed[p.key]:
+                continue  # rows of another setup's key only: not closed for this one
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
             drawing = _drawing(spec, variant, block, scope.edge)

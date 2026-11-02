@@ -27,7 +27,12 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.outcomes.reading import OUTCOME_FIELDS
+from algotrade.data.outcomes.reading import (
+    OUTCOME_FIELDS,
+    fold_stamps,
+    held_rows,
+    missing_in,
+)
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import SHARE_PATH
 
@@ -67,7 +72,8 @@ def share_path_seqs(reader: StoreReader, sessions: Iterable[date]) -> dict[date,
     if not wanted:
         return {}
     found = reader.partition_seq(SHARE_PATH, wanted[0], wanted[-1])
-    return {d: s for d, s in found.items() if d in set(wanted)}
+    held = set(wanted)
+    return {d: s for d, s in found.items() if d in held}
 
 
 def share_path_stamps(
@@ -86,34 +92,18 @@ def share_path_stamps(
     for day in sorted(set(sessions)):
         frame = reader.table_range(
             SHARE_PATH, day, day, as_of,
-            columns=("instrument_id", "hold_sessions", "position_key", "benchmark"),
+            columns=("instrument_id", "hold_sessions", "position_key", "benchmark", "window_end"),
         )  # fmt: skip
         if frame is None:
             continue
         frame = own_rows(frame, keys)
-        known = pd.to_datetime(frame["knowledge_ts"], utc=True)
-        keep = known <= pd.Timestamp(as_of)
-        for horizon, stamp, name in zip(
-            frame.loc[keep, "hold_sessions"],
-            known[keep].dt.to_pydatetime(),
-            frame.loc[keep, "instrument_id"],
-            strict=True,
-        ):
-            key = (day, int(horizon))
-            if key[1] in wanted_names:
-                names.setdefault(key, set()).add(str(name))
-            if key not in latest or stamp > latest[key]:
-                latest[key] = stamp
+        fold_stamps(frame, day, as_of, wanted_names, latest, names)
     return latest, {k: frozenset(v) for k, v in names.items()}
 
 
 def missing_share_path(sessions: Sequence[date]) -> MissingDataError:
     """The error of start ``sessions`` none of which has a stored share path outcome."""
-    wanted = sorted(set(sessions))
-    hint = f"run `algotrade-ingest run share-outcomes --from ... --to ...` past {wanted[-1]}"
-    return MissingDataError(
-        SHARE_PATH, f"no share path outcomes for {wanted[0]}..{wanted[-1]}", hint
-    )
+    return missing_in(SHARE_PATH, "share path outcomes", "share-outcomes", sessions)
 
 
 def read_share_path_stored(
@@ -134,12 +124,7 @@ def select_share_path(
 ) -> pd.DataFrame:
     """The ``horizon`` rows of ``frame`` for the start ``sessions`` in the shape of the price
     outcomes (``SHARE_COLUMNS`` and the keys), the return fields mapped as the module doc says."""
-    frame = frame.rename(columns={"hold_sessions": "horizon_sessions"})
-    starts = pd.to_datetime(frame["session_date"]).dt.date
-    keep = starts.isin(set(sessions)) & (frame["horizon_sessions"] == horizon)
-    if as_of is not None:
-        keep &= pd.to_datetime(frame["knowledge_ts"], utc=True) <= pd.Timestamp(as_of)
-    out = frame.loc[keep].copy()
+    out = held_rows(frame, horizon, sessions, as_of)
     for column in _NULLABLE:
         if column not in out.columns:
             out[column] = np.nan if column.endswith(("return", "adverse", "index")) else None

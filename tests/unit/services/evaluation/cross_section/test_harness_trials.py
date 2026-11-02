@@ -729,3 +729,33 @@ def test_a_rerun_reads_the_stored_legs_and_a_new_exit_is_another_trial() -> None
     with pytest.raises(MissingDataError, match="share-outcomes"):  # no rows stored for that exit
         _share_run(w, exit=tighter)
     assert first.results[0].config_hash == again.results[0].config_hash
+
+
+TIGHTER = {"take_profit": 0.1, "stop_loss": 0.02}
+
+
+def _variant_run(w: World) -> EdgeEvaluation:
+    tighter = {"id": "tighter", "outcome": {"exit": TIGHTER}}
+    return evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"),
+        edge(outcome=SHARE_EXIT_OUTCOME, variants=[tighter]),
+        DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+
+
+def test_a_variant_with_no_rows_of_its_own_key_is_missing_data_not_uncovered() -> None:
+    """Two exits are two keys on one horizon: rows stored for the setup's key only close no S for
+    the variant (its picks are never counted ``excluded_coverage`` for rows that are not its)."""
+    with pytest.raises(MissingDataError, match="share-outcomes"):
+        _variant_run(_with_share_paths(build_world()))
+
+
+def test_a_session_closed_for_one_key_and_not_the_other_is_unclosed_for_the_other() -> None:
+    other = share_position_key(edge(outcome={**SHARE_EXIT_OUTCOME, "exit": TIGHTER}).outcome, 2)
+    w = _with_share_paths(build_world())
+    last = next_session(DAYS[-1])  # the entry session of the last decision session
+    _with_share_paths(w, key=other, days=[d for d in [*DAYS, last] if d != last], run="v")
+    ev = _variant_run(w)
+    main, tighter = ev.results
+    assert main.measures[0].sessions == 4 and tighter.measures[0].sessions == 3
+    assert tighter.measures[0].picks == 15  # three sessions of five: the fourth is unclosed

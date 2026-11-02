@@ -68,6 +68,7 @@ from algotrade.services.evaluation.cross_section.baselines.variant import (
     Variant,
     _Scope,
     grain_of,
+    split_keys,
     variant_scope,
 )
 from algotrade.services.evaluation.cross_section.detail.gating import (
@@ -558,7 +559,15 @@ def evaluate_edge(
             _beside(plans, variants),  # a baseline the setup cannot be valued as fails here
         ),
         # an entry condition is refused here (G9-M3, G9-M4) or its legs are never reused
-        check_entries(reader, [c.edge for c in scopes], features, start, end, as_of, full),
+        check_entries(
+            reader,
+            [c.edge for c in scopes],
+            features,
+            start,
+            end,
+            as_of,
+            full or split_keys(plans),
+        ),
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
@@ -568,7 +577,7 @@ def evaluate_edge(
     for plan in plans:
         scope, horizon = plan.scope, plan.horizon
         needs_iv = needs_implied_vol(scope.edge)
-        closed = stats.closed[horizon]
+        closed = stats.plan_closed[plan.key]  # the sessions with a row of this setup's own key
         starts.setdefault(horizon, len(plan.blocks))  # the edge's own count, then its variants'
         unclosed.setdefault(
             horizon, sum(all(leg.entry not in closed for leg in b) for b in plan.blocks)

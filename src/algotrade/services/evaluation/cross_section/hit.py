@@ -333,28 +333,29 @@ def _pair_outcome(
 def own_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
     """The rows of ``outcomes`` the edge's outcome names when the grain holds every setup's: for
     an ``option_pnl`` the ``position_key`` of its resolved legs, parameters, exits and each of its
-    horizons (one row per instrument); for a share outcome with an ``[outcome.exit]`` that key
-    (``share_position_key``) and its benchmark; any other outcome's rows unchanged."""
+    horizons (one row per instrument); for a share outcome with an ``[outcome.exit]`` its keys
+    (``own_keys``) and benchmark; any other outcome's rows unchanged."""
     o = edge.outcome
     if o.kind == CHAIN_KIND:
-        keys = {position_key(o, h) for h in o.horizon_sessions}
-        return outcomes[outcomes["position_key"].isin(keys)]
+        chain = {position_key(o, h) for h in o.horizon_sessions}
+        return outcomes[outcomes["position_key"].isin(chain)]
     if reads_share_path(o):
-        keys = {share_position_key(o, h) for h in o.horizon_sessions}
-        own = outcomes["position_key"].isin(keys) & (outcomes["benchmark"] == o.benchmark)
-        return outcomes[own]
+        keys: set[tuple[str, str]] = set().union(*(own_keys(edge, h) for h in o.horizon_sessions))
+        return outcomes[
+            [k in keys for k in zip(outcomes["position_key"], outcomes["benchmark"], strict=True)]
+        ]
     return outcomes
 
 
 def own_keys(edge: Edge, horizon: int) -> frozenset[tuple[str, str]]:
-    """The (``position_key``, benchmark) the share path reader holds ``edge``'s outcome to at
-    ``horizon``; empty for an outcome on another grain."""
+    """The (``position_key``, benchmark) the option trade and share path readers hold ``edge``'s
+    outcome to at ``horizon``; empty for an outcome on the price grain."""
     o = edge.outcome
-    return (
-        frozenset({(share_position_key(o, horizon), o.benchmark)})
-        if reads_share_path(o)
-        else frozenset()
-    )
+    if o.kind == CHAIN_KIND:
+        return frozenset({(position_key(o, horizon), o.benchmark)})
+    if reads_share_path(o):
+        return frozenset({(share_position_key(o, horizon), o.benchmark)})
+    return frozenset()
 
 
 def _chain_pnl(
