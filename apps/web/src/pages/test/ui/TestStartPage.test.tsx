@@ -2,8 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ScreenersPage } from './ScreenersPage';
+import { TestStartPage } from './TestStartPage';
 
+vi.mock('@/features/guide-help', () => ({ termHelp: () => null }));
 vi.mock('@/widgets/screener-list', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
@@ -34,24 +35,26 @@ vi.mock('@/widgets/screener-list', async () => {
   };
 });
 
-describe('ScreenersPage', () => {
-  it('shows the list with "+ New screener" and passes navigation through', async () => {
+describe('TestStartPage', () => {
+  it('offers the ways in as cards, shows the list and passes navigation through', async () => {
     const onOpen = vi.fn();
     const onEdit = vi.fn();
-    const onNew = vi.fn();
+    const onChoose = vi.fn();
     render(
-      <ScreenersPage
+      <TestStartPage
         onOpen={onOpen}
         onEdit={onEdit}
         onOpenEdge={vi.fn()}
-        onNew={onNew}
+        onChoose={onChoose}
         search={{}}
         onSearchChange={vi.fn()}
       />,
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Screeners' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '+ New screener' }));
-    expect(onNew).toHaveBeenCalled();
+    expect(screen.getByRole('heading', { level: 1, name: 'Test' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Guided/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Expert/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Describe it/ }));
+    expect(onChoose.mock.calls).toEqual([['guided'], ['expert'], ['describe']]);
     await userEvent.click(screen.getByRole('button', { name: 'open' }));
     expect(onOpen).toHaveBeenCalledWith('my-vrp');
     await userEvent.click(screen.getByRole('button', { name: 'edit' }));

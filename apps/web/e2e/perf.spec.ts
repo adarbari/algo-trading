@@ -27,7 +27,7 @@ import { mockApi } from './mock-api';
 /** `ready`: what shows the route has rendered (default: its heading; a ticker opens a sheet). */
 const ROUTES: { name: string; url: string; ready?: (page: Page) => Locator }[] = [
   { name: 'Ideas', url: '/ideas' },
-  { name: 'Screeners', url: '/screeners' },
+  { name: 'Test', url: '/test' },
   {
     name: 'Explore with a ticker (chart tab)',
     url: '/explore?focus=AAPL&tab=chart',
@@ -39,7 +39,7 @@ const ROUTES: { name: string; url: string; ready?: (page: Page) => Locator }[] =
     ready: (page) => page.getByRole('grid', { name: 'AAPL features' }),
   },
   { name: 'Regime', url: '/regime' },
-  { name: 'Screener results', url: '/screeners/vrp_scanner' },
+  { name: 'Screener results', url: '/test/result/vrp_scanner' },
   { name: 'Admin ingestion', url: '/admin/ingestion' },
 ];
 const CPU_THROTTLE = 4;

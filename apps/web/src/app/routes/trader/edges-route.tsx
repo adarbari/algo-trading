@@ -1,8 +1,7 @@
 /**
  * Trader > Edges: the edges list, or the chosen edge's page (`/edges?edge=momentum_12_1`, so it
- * can be shared and a phone's sheet can be dismissed), and the builder: a new edge
- * (`/edges/new`) or one of the user's own (`/edges/$id/edit`, a copy, a new version or an edge of
- * theirs). The builder loads lazily.
+ * can be shared and a phone's sheet can be dismissed). The builder is part of the Test flow
+ * (`/test/setup`); `/edges/new` and `/edges/$id/edit` redirect there (`redirects.ts`).
  */
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
@@ -12,7 +11,6 @@ import { filterSearch } from '@/features/filter-bar';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const EdgesPage = lazyPage(() => import('@/pages/trader-edges'), 'EdgesPage');
-const BuilderRoute = lazyPage(() => import('./edge-builder-route'), 'BuilderRoute');
 
 /**
  * The list's old views (`?view=`) as the filter bar's `f` says them, so a saved link still opens
@@ -63,7 +61,7 @@ function EdgesIndex() {
       }
       onSelect={(id) => void navigate({ to: '/edges', search: { edge: id }, replace: true })}
       onBuild={(id) =>
-        void navigate(id ? { to: '/edges/$id/edit', params: { id } } : { to: '/edges/new' })
+        void navigate(id ? { to: '/test/setup/$id', params: { id } } : { to: '/test/setup' })
       }
       onClear={() => void navigate({ to: '/edges', search: {}, replace: true })}
     />
@@ -83,19 +81,3 @@ export const edgesRoute = createRoute({
   ),
   component: EdgesIndex,
 });
-
-// The builder: siblings of the list, so `/edges` itself stays one route.
-export const edgesBuilderRoutes = [
-  createRoute({
-    getParentRoute: () => traderRoute,
-    path: 'edges/new',
-    ...pageRoute(BuilderRoute),
-    component: BuilderRoute,
-  }),
-  createRoute({
-    getParentRoute: () => traderRoute,
-    path: 'edges/$id/edit',
-    ...pageRoute(BuilderRoute),
-    component: BuilderRoute,
-  }),
-];

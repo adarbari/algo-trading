@@ -222,7 +222,7 @@ test('a user clones an edge, edits a screen in the Screen Builder, returns, save
     .getByRole('dialog', { name: 'Clone edge' })
     .getByRole('button', { name: 'Clone', exact: true })
     .click();
-  await expect(page).toHaveURL(/\/edges\/my-momentum_12_1\/edit$/);
+  await expect(page).toHaveURL(/\/test\/setup\/my-momentum_12_1$/);
   await expect(page.getByText('Your copy of an edge')).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Edge builder steps' });
   for (const step of [
@@ -238,9 +238,9 @@ test('a user clones an edge, edits a screen in the Screen Builder, returns, save
   // Edit the draft, then a screen in the Screen Builder: the draft is kept while away.
   await page.getByRole('textbox', { name: /^Thesis/ }).fill('My own thesis');
   await page.getByRole('button', { name: 'Edit vrp_scanner in Screen Builder' }).click();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit\?returnTo=my-momentum_12_1$/);
+  await expect(page).toHaveURL(/\/test\/expert\/vrp_scanner\?returnTo=my-momentum_12_1$/);
   await page.getByRole('button', { name: 'Save and return to edge' }).click();
-  await expect(page).toHaveURL(/\/edges\/my-momentum_12_1\/edit$/);
+  await expect(page).toHaveURL(/\/test\/setup\/my-momentum_12_1$/);
   await expect(page.getByRole('textbox', { name: /^Thesis/ })).toHaveValue('My own thesis');
   await expectAccessible(page);
   await page.getByRole('button', { name: 'Save and run backtest' }).click();
@@ -266,11 +266,11 @@ test('New edge opens the empty builder and Cancel goes back to the list', async 
   const errors = collectErrors(page);
   await page.goto('/edges');
   await page.getByRole('button', { name: 'New edge' }).click();
-  await expect(page).toHaveURL(/\/edges\/new$/);
+  await expect(page).toHaveURL(/\/test\/setup$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Untitled edge' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save and run backtest' })).toBeDisabled();
   await page.getByRole('button', { name: '+ New screen' }).click();
-  await expect(page).toHaveURL(/\/screeners\/new\?returnTo=\.new$/);
+  await expect(page).toHaveURL(/\/test\/expert\?returnTo=\.new$/);
   await page.goBack();
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page).toHaveURL(/\/edges$/);

@@ -63,7 +63,7 @@ function screenerIssues(states: ScreenerStates): SystemIssue[] {
         id: `screens:${states.session}:${missing.map((s) => s.screener.id).join(',')}`,
         severity: 'warning',
         title: `${missing.length} screeners have no run for ${states.session}`,
-        links: [{ label: 'Open screeners', href: '/screeners' }],
+        links: [{ label: 'Open screeners', href: '/test' }],
       },
     ];
   }
@@ -72,7 +72,7 @@ function screenerIssues(states: ScreenerStates): SystemIssue[] {
     severity: 'warning',
     title: `Screener "${screener.name}" has no run for ${states.session}`,
     ...(notRun ? { detail: notRun.kindText } : {}),
-    links: [{ label: 'Open screener', href: `/screeners/${screener.id}` }],
+    links: [{ label: 'Open screener', href: `/test/result/${screener.id}` }],
   }));
 }
 

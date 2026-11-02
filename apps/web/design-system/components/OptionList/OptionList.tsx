@@ -7,6 +7,8 @@
  * placeholders, an empty list shows the empty message. For a choice made once and closed use
  * Select; for many choices to filter use Combobox. With `values` it is a multi-select: each
  * option is a toggle (`aria-pressed`, a check mark) and `count` shows how many rows hold it.
+ * `variant="card"` lays the choices out as bordered cards in a responsive grid (a way in, an
+ * onboarding choice): the same buttons, the title larger, the description under it.
  */
 import type { ReactNode } from 'react';
 
@@ -44,6 +46,8 @@ export interface OptionListProps {
   loading?: boolean;
   /** Shown when there are no items. */
   emptyMessage?: ReactNode;
+  /** `list` (default): rows; `card`: bordered cards in a grid that wraps to the width. */
+  variant?: 'list' | 'card';
 }
 
 export function OptionList({
@@ -56,11 +60,17 @@ export function OptionList({
   maxHeight,
   loading = false,
   emptyMessage = 'Nothing to choose.',
+  variant = 'list',
 }: OptionListProps) {
   if (loading) return <Skeleton lines={5} label={`Loading ${label}`} />;
   if (items.length === 0) return <EmptyState compact title={emptyMessage} />;
   return (
-    <ul className={styles.list} aria-label={label} data-max-height={maxHeight}>
+    <ul
+      className={styles.list}
+      aria-label={label}
+      data-max-height={maxHeight}
+      data-variant={variant}
+    >
       {items.map((item) => {
         const multi = values !== undefined;
         const on = multi ? values.includes(item.id) : item.id === value;

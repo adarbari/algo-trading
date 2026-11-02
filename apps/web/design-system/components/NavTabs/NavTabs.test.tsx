@@ -51,6 +51,18 @@ describe('NavTabs', () => {
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
 
+  it('numbers the links as steps on request', () => {
+    render(<NavTabs items={ITEMS} activeHref="/ideas" aria-label="Steps" variant="steps" />);
+    expect(screen.getByRole('navigation', { name: 'Steps' })).toHaveAttribute(
+      'data-variant',
+      'steps',
+    );
+    expect(screen.getByRole('link', { name: ITEMS[0]?.label ?? '' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <NavTabs items={ITEMS} activeHref="/ideas" aria-label="Sections" />,

@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 00:19 UTC",
+ "generated": "2026-11-02 02:17 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -374,80 +374,6 @@
     "PublishedEdge"
    ],
    "source": "static"
-  },
-  "/edges/:id/edit": {
-   "route": "/edges/:id/edit",
-   "search": {},
-   "clicks": [],
-   "params": {
-    "id": "edge"
-   },
-   "ops": [
-    "EdgeBuilder",
-    "EdgeDocument"
-   ],
-   "uncertain": [
-    "EdgeBuilder",
-    "EdgeDocument"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
-   "source": "static"
-  },
-  "/edges/:id/edit > expand:More: the rest of the quality bar": {
-   "route": "/edges/:id/edit",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "More: the rest of the quality bar"
-    }
-   ],
-   "params": {
-    "id": "edge"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges/:id/edit"
-  },
-  "/edges/new": {
-   "route": "/edges/new",
-   "search": {},
-   "clicks": [],
-   "params": {},
-   "ops": [
-    "EdgeBuilder",
-    "EdgeDocument"
-   ],
-   "uncertain": [
-    "EdgeBuilder",
-    "EdgeDocument"
-   ],
-   "interaction": [
-    "GuideEntries"
-   ],
-   "source": "static"
-  },
-  "/edges/new > expand:More: the rest of the quality bar": {
-   "route": "/edges/new",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "More: the rest of the quality bar"
-    }
-   ],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges/new"
   },
   "/edges?edge={edge}": {
    "route": "/edges",
@@ -1669,8 +1595,8 @@
    "source": "static",
    "parent": "/regime"
   },
-  "/screeners": {
-   "route": "/screeners",
+  "/test": {
+   "route": "/test",
    "search": {},
    "clicks": [],
    "params": {},
@@ -1679,23 +1605,134 @@
     "ScreenerConfigs",
     "ScreenerListPage",
     "ScreenerRuns",
-    "ScreenerTrackRecords",
-    "TableView"
+    "ScreenerTrackRecords"
    ],
-   "uncertain": [
-    "TableView"
-   ],
+   "uncertain": [],
    "interaction": [
     "GuideEntries"
    ],
    "source": "static"
   },
-  "/screeners/:id": {
-   "route": "/screeners/:id",
+  "/test/describe": {
+   "route": "/test/describe",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/expert": {
+   "route": "/test/expert",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/expert/:id": {
+   "route": "/test/expert/:id",
    "search": {},
    "clicks": [],
    "params": {
-    "id": "screener"
+    "id": "link"
+   },
+   "ops": [
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "uncertain": [
+    "ScreenDetail",
+    "ScreenVersions"
+   ],
+   "interaction": [
+    "FeatureDistribution",
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/expert/:id > expand:Distribution": {
+   "route": "/test/expert/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Distribution"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/expert/:id"
+  },
+  "/test/expert/:id > expand:Missing data": {
+   "route": "/test/expert/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Missing data"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/expert/:id"
+  },
+  "/test/expert/:id > expand:Narrow misses": {
+   "route": "/test/expert/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Narrow misses"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/expert/:id"
+  },
+  "/test/guided": {
+   "route": "/test/guided",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/test/result/:id": {
+   "route": "/test/result/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
    },
    "ops": [
     "ScreenerEdges",
@@ -1715,93 +1752,79 @@
    ],
    "source": "static"
   },
-  "/screeners/:id/edit": {
-   "route": "/screeners/:id/edit",
+  "/test/setup": {
+   "route": "/test/setup",
    "search": {},
    "clicks": [],
-   "params": {
-    "id": "screener"
-   },
+   "params": {},
    "ops": [
-    "ScreenDetail",
-    "ScreenVersions"
+    "EdgeBuilder",
+    "EdgeDocument"
    ],
    "uncertain": [
-    "ScreenDetail",
-    "ScreenVersions"
+    "EdgeBuilder",
+    "EdgeDocument"
    ],
    "interaction": [
-    "FeatureDistribution",
     "GuideEntries"
    ],
    "source": "static"
   },
-  "/screeners/:id/edit > expand:Distribution": {
-   "route": "/screeners/:id/edit",
+  "/test/setup > expand:More: the rest of the quality bar": {
+   "route": "/test/setup",
    "search": {},
    "clicks": [
     {
      "kind": "expand",
      "group": "",
-     "name": "Distribution"
+     "name": "More: the rest of the quality bar"
     }
    ],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/screeners/:id/edit"
-  },
-  "/screeners/:id/edit > expand:Missing data": {
-   "route": "/screeners/:id/edit",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Missing data"
-    }
-   ],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/screeners/:id/edit"
-  },
-  "/screeners/:id/edit > expand:Narrow misses": {
-   "route": "/screeners/:id/edit",
-   "search": {},
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Narrow misses"
-    }
-   ],
-   "params": {
-    "id": "screener"
-   },
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/screeners/:id/edit"
-  },
-  "/screeners/new": {
-   "route": "/screeners/new",
-   "search": {},
-   "clicks": [],
    "params": {},
    "ops": [],
    "uncertain": [],
    "interaction": [],
+   "source": "static",
+   "parent": "/test/setup"
+  },
+  "/test/setup/:id": {
+   "route": "/test/setup/:id",
+   "search": {},
+   "clicks": [],
+   "params": {
+    "id": "link"
+   },
+   "ops": [
+    "EdgeBuilder",
+    "EdgeDocument"
+   ],
+   "uncertain": [
+    "EdgeBuilder",
+    "EdgeDocument"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
    "source": "static"
+  },
+  "/test/setup/:id > expand:More: the rest of the quality bar": {
+   "route": "/test/setup/:id",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "More: the rest of the quality bar"
+    }
+   ],
+   "params": {
+    "id": "link"
+   },
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/test/setup/:id"
   }
  }
 }
