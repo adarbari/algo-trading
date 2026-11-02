@@ -426,10 +426,38 @@ def test_an_option_pnl_edge_is_scored_on_the_chain_grain_net_of_the_quoted_sprea
     )  # fmt: skip
     (r,) = ev.results
     m = r.measures[0]
-    # the value is the P&L over the entry spot less the half-spreads (0.2 + 0.2 over 100)
-    assert m.mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004)
+    # the value is the P&L over the entry spot less the half-spreads (0.2 + 0.2) and the
+    # commission (0.65 a contract, one short put, entry and exit: 0.013), over 100 (E6b-2)
+    assert m.mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004 - 0.00013)
     assert (m.sessions, m.picks, m.hits) == (4, 20, 20) and ev.unclosed_sessions == {2: 0}
     assert r.licence == "personal"  # the trade rows are bought history: their licence is read
+
+
+def test_an_option_pnl_edge_has_a_cost_row_per_level_a_stored_base_and_picks_at_each_level() -> (
+    None
+):
+    """E6b-2, by hand over the fixture (names earn i - 9.5 on the mid, spreads 0.2 + 0.2, spot 100,
+    collateral 95, one short put: commission 0.013): the picks' mean value at each level is
+    0.075 less nothing, 0.75 of the spreads, all of them, and the commission at the last two; the
+    base's return on capital is every name's mean, which is the cost alone (the mids average 0)."""
+    w = _with_chain_outcomes(build_world())
+    ev = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), edge(outcome=CHAIN_OUTCOME),
+        DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+    (r,) = ev.results
+    levels = {m.slice_value: m for m in r.costs if m.slice_value.startswith("all:")}
+    assert list(levels) == ["all:mid", "all:effective", "all:full"]
+    assert [levels[k].mean_excess_picks for k in levels] == pytest.approx(
+        [0.075, 0.075 - (0.75 * 0.4 + 0.013) / 100, 0.075 - (0.4 + 0.013) / 100]
+    )
+    assert [levels[k].hits for k in levels] == [20, 20, 20]
+    first = r.stats[0]
+    top = next(p for p in first.picks if not p.reason)
+    assert top.values_at == pytest.approx((0.095, 0.095 - 0.00313, 0.095 - 0.00413))  # name 19
+    assert first.base_roc is not None and first.base_roc[0] == 20
+    assert first.base_roc[1] == pytest.approx(-0.413 / 95)  # every name, at the full level
+    assert r.measures[0].tail.excess_roc is not None  # the paired excess now has its base
 
 
 def test_an_option_pnl_edge_with_no_chain_outcome_stored_is_missing_data() -> None:
@@ -485,7 +513,7 @@ def test_an_option_pnl_edge_over_a_partition_with_several_position_keys_scores_i
         DAYS[0], DAYS[-1], AS_OF,
     )  # fmt: skip
     (r,) = ev.results
-    assert r.measures[0].mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004)
+    assert r.measures[0].mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004 - 0.00013)
     first = r.stats[0].picks[
         0
     ]  # name 19: pnl_mid 9.5, half-spreads 0.4, collateral 95 (its own key)

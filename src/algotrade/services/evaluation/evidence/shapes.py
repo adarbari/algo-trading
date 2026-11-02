@@ -6,10 +6,11 @@ frames, called right after ``hit.apply_outcome`` (which it never edits, so ``val
   capital is the name's raw ``fwd_return`` less the document's ``cost_bps`` (a short pick: minus
   it, less the borrow); ``max_adverse`` is the window's dip for a long and null for a short.
 - ``option_pnl``: the template's collateral rule; ``capital`` the stored collateral per unit; the
-  return on capital is the mid P&L over it before cost, and net of the half-spreads and
-  ``cost_bps`` of the entry spot at the document's level; the stored exit session, exit kind,
-  ``max_adverse``, price source and licence. No collateral stored (a ``regt`` template) or not
-  positive: no return on capital, the row still counts for value and hit.
+  return on capital is the mid P&L over it before cost, and net of the half-spreads, the
+  commission and ``cost_bps`` of the entry spot at the document's level; the stored exit
+  session, exit kind, ``max_adverse``, price source and licence. No collateral stored (a
+  ``regt`` template) or not positive: no return on capital, the row still counts for value and
+  hit.
 - ``expires_otm`` and ``hit_target``: a hit rate with no money: basis ``none``, no return on
   capital. ``option_model_pnl``: notional, price source ``model``. ``pair_spread``: its two legs
   as one row (the spread is the return on capital).
@@ -27,6 +28,8 @@ import pandas as pd
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.verdict import OptionCosts
+from algotrade.quant.edges.statistics import moments
 from algotrade.services.evaluation.cross_section.hit import borrow_cost, chain_rows
 from algotrade.services.evaluation.evidence.contract import (
     BARS,
@@ -39,6 +42,7 @@ from algotrade.services.evaluation.evidence.contract import (
     capital_basis_of,
     empty_trades,
 )
+from algotrade.services.evaluation.evidence.values import commission_of
 
 OPEN = "open"
 BOOK = "book"
@@ -109,8 +113,11 @@ def _no_capital(n: int) -> dict[str, Any]:
     }  # fmt: skip
 
 
-def _options(stored: pd.DataFrame, cost: float) -> dict[str, Any]:
-    """The option figures of rows of the option trade grain."""
+def _options(
+    stored: pd.DataFrame, cost: float, option_costs: OptionCosts | None = None
+) -> dict[str, Any]:
+    """The option figures of rows of the option trade grain; the commission is paid as in
+    ``hit._chain_pnl`` (the frame's own column at a cost level, else ``option_costs``')."""
     collateral = _column(stored, "collateral")
     with np.errstate(invalid="ignore", divide="ignore"):
         has = np.isfinite(collateral) & (collateral > 0)
@@ -118,7 +125,8 @@ def _options(stored: pd.DataFrame, cost: float) -> dict[str, Any]:
         mid = _column(stored, "pnl_mid")
         spot = _column(stored, "entry_spot")
         gross = np.where(has, mid / collateral, np.nan)
-        net = np.where(has, (mid - spread - cost * spot) / collateral, np.nan)
+        fee = commission_of(stored, option_costs)
+        net = np.where(has, (mid - spread - fee - cost * spot) / collateral, np.nan)
     kinds = (
         stored["exit_kind"] if "exit_kind" in stored.columns else pd.Series([None] * len(stored))
     )
@@ -134,13 +142,14 @@ def _options(stored: pd.DataFrame, cost: float) -> dict[str, Any]:
 
 def trade_frame(
     edge: Edge, rows: pd.DataFrame, result: pd.DataFrame, *, entry: date,
-    bars_exit: date | None, side: str,
+    bars_exit: date | None, side: str, option_costs: OptionCosts | None = None,
 ) -> pd.DataFrame:  # fmt: skip
     """The contract's rows for ``result`` (``apply_outcome``'s frame, or ``hit.short_view`` of it
     for a short leg; ``instrument_id`` a column or the index): one row per name of it, from the
     stored outcome ``rows`` it was scored over (the first row of each name, the edge's own
     position key for an option trade). ``entry``: S; ``bars_exit``: S + h sessions, the exit of a
-    row over stored prices."""
+    row over stored prices; ``option_costs``: the commission an option row pays (none: no
+    commission)."""
     o = edge.outcome
     res = result if "instrument_id" in result.columns else result.reset_index()
     res = res.reset_index(drop=True)
@@ -160,7 +169,7 @@ def trade_frame(
     exits: Sequence[date | None] = [bars_exit] * n
     figures: dict[str, Any]
     if o.kind == CHAIN_KIND:
-        figures = _options(stored, cost)
+        figures = _options(stored, cost, option_costs)
         source = _strings(stored, "price_source", "cboe")  # type: ignore[assignment]
         licence = _strings(stored, "licence", OPEN)
         exits = _dates(stored["exit_session"]) if "exit_session" in stored.columns else [None] * n
@@ -187,6 +196,23 @@ def trade_frame(
         delisted=res["delisted"].to_numpy(dtype=bool),
         capital_basis=basis, price_source=source, outcome_licence=licence, **figures,
     )  # fmt: skip
+
+
+def roc_moments(
+    edge: Edge, rows: pd.DataFrame, counted: pd.DataFrame, entry: date,
+    option_costs: OptionCosts | None,
+) -> tuple[int, float, float] | None:  # fmt: skip
+    """An option position's base return on capital at one session: ``(n, mean, m2)`` of the
+    contract's return on capital over ``counted`` (the counted eligible names, indexed by
+    instrument; the picks included), a name with no collateral left out; None for every other
+    outcome."""
+    if edge.outcome.kind != CHAIN_KIND:
+        return None
+    inside = rows[rows["instrument_id"].isin(set(counted.index))]
+    trades = trade_frame(edge, inside, counted, entry=entry, bars_exit=None, side="long",
+                         option_costs=option_costs)  # fmt: skip
+    roc = pd.to_numeric(trades["return_on_capital"], errors="coerce").to_numpy(dtype=float)
+    return moments(roc[np.isfinite(roc)])
 
 
 def series_trades(edge: Edge, rows: pd.DataFrame) -> pd.DataFrame:
@@ -238,4 +264,4 @@ def book_trades(series: pd.DataFrame) -> pd.DataFrame:
     )  # fmt: skip
 
 
-__all__ = ["book_trades", "series_trades", "trade_frame"]
+__all__ = ["book_trades", "roc_moments", "series_trades", "trade_frame"]
