@@ -48,6 +48,7 @@ from algotrade.services.read.values import Unknown, UnknownCode
 CLOSE = "rollup.price_stats@v2.close"  # the reference close's catalogue field (usd per share)
 LONG, SHORT = "long", "short"
 EVERY_SESSION, MONTH_END = "every_session", "month_end"  # a book's schedules
+ATR_GAPS = (UnknownCode.NO_PARTITION, UnknownCode.NO_ROW, UnknownCode.NULL)  # no ATR stored
 
 
 class Shape(StrEnum):
@@ -143,15 +144,15 @@ def _stop(
 
 
 def _falls_back(rule: ExitRule) -> bool:
-    """Whether ``rule`` is the ATR fallback: its stop, or no stop for want of the name's ATR (a
-    feature gap; not a missing run, licence or basis)."""
+    """Whether ``rule`` is the ATR fallback: its stop, or no stop because the name's ATR is not
+    stored (a feature gap: ``ATR_GAPS``). Any other unknown (a missing, pruned or hidden ledger, a
+    licence, no basis) is not a fallback: the stop stays UNKNOWN (fail closed)."""
     if rule.stop is not None:
         return rule.stop.kind is StopKind.FALLBACK
-    gaps = (UnknownCode.NOT_RUN, UnknownCode.LICENCE, UnknownCode.NOT_APPLICABLE)
     return (
         rule.hold_sessions is not None
         and rule.unknown is not None
-        and rule.unknown.code not in gaps
+        and (rule.unknown.code in ATR_GAPS)
     )
 
 

@@ -120,6 +120,15 @@ def test_a_first_long_without_atr_still_falls_back_for_the_others(
     assert a.stop_price == pytest.approx(45.0) and b.stop_price == pytest.approx(15.0)
 
 
+def test_a_gone_ledger_is_no_fallback_and_its_stop_stays_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pruned = Unknown(UnknownCode.NOT_STORED, None)  # type: ignore[arg-type]
+    _wire(monkeypatch, {"EQ:A": 50.0}, ExitRule("drift", None, 20, pruned))
+    (pos,) = load_example_positions(CTX, EDGE, [PickInput("EQ:A")])
+    assert pos.stop_price is None and pos.stop_unknown is pruned
+
+
 def test_a_setup_with_an_entry_condition_has_no_entry_or_exit_from_s(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
