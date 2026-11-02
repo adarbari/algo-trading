@@ -65,6 +65,12 @@ export function MarginCalculator({ symbol }: MarginCalculatorProps) {
   const [asked, setAsked] = useState(false);
   const mutation = useMarginPreview();
   const body = marginBody(symbol, form);
+  // An edit clears the last result: figures for another contract never stand under this one.
+  const edit = (next: MarginForm) => {
+    setForm(next);
+    setSent(false);
+    mutation.reset();
+  };
 
   const result = mutation.data;
   const preview = result?.preview ?? null;
@@ -85,10 +91,7 @@ export function MarginCalculator({ symbol }: MarginCalculatorProps) {
         title="Your contract"
         actions={termHelp('margin_buying_power')}
         footer={
-          <Stack gap={1}>
-            <Text size="sm">Nothing you enter is saved.</Text>
-            <Text size="sm">It shows what a contract ties up, not how much to trade.</Text>
-          </Stack>
+          <Text size="sm">Nothing you enter is saved.</Text>
         }
       >
         <Stack gap={3}>
@@ -102,7 +105,7 @@ export function MarginCalculator({ symbol }: MarginCalculatorProps) {
                 ]}
                 value={form.right}
                 onValueChange={(right) => {
-                  setForm({ ...form, right });
+                  edit({ ...form, right });
                 }}
               />
             </Field>
@@ -119,7 +122,7 @@ export function MarginCalculator({ symbol }: MarginCalculatorProps) {
                 min={0}
                 value={form.strike}
                 onValueChange={(strike) => {
-                  setForm({ ...form, strike });
+                  edit({ ...form, strike });
                 }}
               />
             </Field>
@@ -132,7 +135,7 @@ export function MarginCalculator({ symbol }: MarginCalculatorProps) {
                 placeholder="Choose an expiry"
                 value={form.expiry}
                 onValueChange={(expiry) => {
-                  setForm({ ...form, expiry });
+                  edit({ ...form, expiry });
                 }}
               />
             </Field>
@@ -153,7 +156,7 @@ export function MarginCalculator({ symbol }: MarginCalculatorProps) {
                   step={1}
                   value={form.contracts}
                   onValueChange={(contracts) => {
-                    setForm({ ...form, contracts });
+                    edit({ ...form, contracts });
                   }}
                 />
               </Field>

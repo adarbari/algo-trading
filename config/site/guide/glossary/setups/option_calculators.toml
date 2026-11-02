@@ -293,7 +293,7 @@ see_also = ["margin_account", "margin_held"]
 [[term]]
 id = "margin_account"
 term = "Margin account"
-short = "Your broker holds only part of the exposure, at the exchange minimum, and lends you the rest."
+short = "Your broker holds only the exchange minimum as collateral, not the full exposure."
 body = """
 A margin account lets you sell an option while holding less than the cash-secured amount. The figure shown is the exchange minimum for an uncovered short option, a floor your broker may raise. For a call this is the naked-call minimum, not the cost of holding shares. Holding less does not make the position smaller: a margin account is still liable for the full loss.
 """
@@ -332,6 +332,6 @@ id = "margin_stress"
 term = "Worst stored episode stress"
 short = "What a put would be worth in the money if the stock fell as far as in its worst stored market fall."
 body = """
-We take the stock's own fall in the worst market fall we store. The stored falls are the Covid crash of 2020, the rate-hike bear market of 2022 and the tariff shock of 2025. We apply that fall to tonight's price. The sentence says how far in the money the put would be on your contracts. That is before the premium you were paid. It is the stock's past, not a forecast, and it is shown for puts only. Margin multiplies losses as well as returns.
+We take the stock's largest own fall across the market falls we store. The stored falls are the Covid crash of 2020, the rate-hike bear market of 2022 and the tariff shock of 2025. We apply that fall to tonight's price. The sentence says how far in the money the put would be on your contracts. That is before the premium you were paid. It is the stock's past, not a forecast, and it is shown for puts only. Margin multiplies losses as well as returns.
 """
 see_also = ["margin_account", "margin_held"]
