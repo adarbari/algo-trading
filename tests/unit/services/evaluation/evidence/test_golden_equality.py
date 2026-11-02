@@ -8,8 +8,10 @@ from datetime import date
 from typing import Any
 
 import pandas as pd
+import pytest
 
 from algotrade.config.user import UserContext
+from algotrade.services.evaluation.cross_section import harness
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
@@ -77,6 +79,14 @@ def _vrp_world() -> World:
     return w
 
 
+@pytest.fixture(autouse=True)
+def _frozen_catalogue_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The draws are keyed by the site catalogue's expression hash (a changed formula re-keys
+    a leg, on purpose), so any new site feature moved these digests (main red after #1027).
+    The pins hold the harness, not the catalogue: freeze that one input."""
+    monkeypatch.setattr(harness, "expression_hash", lambda _features: "frozen")
+
+
 def _evaluations() -> dict[str, EdgeEvaluation]:
     return {
         "long": _run(build_world(), edge(top_k=5)),
@@ -90,10 +100,12 @@ def _evaluations() -> dict[str, EdgeEvaluation]:
     }
 
 
-DIGESTS: dict[str, tuple[str, str]] = {  # (edge_eval, ledger), computed on origin/main
+DIGESTS: dict[
+    str, tuple[str, str]
+] = {  # (edge_eval, ledger), computed with the catalogue hash frozen
     "long": ("30495083693dc0dd", "5ec1257fbe0a795f"),
-    "short": ("8a5be54b65cf7448", "60c7f37dd4cdaa30"),
-    "long_short": ("2f02dfade59107a7", "5625c55ec76c7220"),
+    "short": ("53ce892a7b10c4e7", "60c7f37dd4cdaa30"),
+    "long_short": ("66727e2c3b96ff5f", "5625c55ec76c7220"),
     "hit_target": ("4fa2a61dac328851", "ab73369e4bc0aff1"),
     "expires_otm": ("22d2faaee8d62085", "d92e6cd61083351c"),
     "option_pnl": ("3fbfc5c8a5dc6315", "5bceadef7c7c768b"),
