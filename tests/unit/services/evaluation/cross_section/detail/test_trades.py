@@ -202,7 +202,9 @@ def test_an_option_ledger_has_the_trade_contract_and_a_bought_history_trade_is_p
     frame = trades_frame(ev, "r1", NOW)
     first = frame.iloc[0]  # name 19: pnl_mid 9.5 over collateral 95
     assert first["capital_basis"] == edge(outcome=CHAIN_OUTCOME).outcome.position.collateral
-    assert first["return_on_capital"] == pytest.approx((9.5 - 0.4) / 95)
+    assert first["return_on_capital"] == pytest.approx(
+        (9.5 - 0.4 - 0.013) / 95
+    )  # spread and the 2 x 0.65 commission
     assert first["price_source"] == "option_history" and first["exit_kind"] == "HORIZON"
     assert first["exit_session"] == date(2026, 10, 12)  # the stored exit, not S + h sessions
     assert set(frame["value_licence"]) == {"personal"}  # the rows are bought history, per row
