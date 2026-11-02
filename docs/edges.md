@@ -42,6 +42,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | [family C](edges/c.md) |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | [family C](edges/c.md) |
 | Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`) | candidate | [family C](edges/c.md) |
+| Index put write, every-session ladder (`index_put_ladder`) | candidate | [family C](edges/c.md) |
 | Index put write (`index_put_write`) | candidate | [family C](edges/c.md) |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | [family C](edges/c.md) |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | [family C](edges/c.md) |

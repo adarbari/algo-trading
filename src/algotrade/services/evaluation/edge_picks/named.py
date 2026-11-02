@@ -9,11 +9,17 @@ from dataclasses import replace
 from datetime import date
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.named import DELTA_EQUIVALENT, OUT_OF_WINDOW, named_symbols
+from algotrade.config.edges.named import (
+    DELTA_EQUIVALENT,
+    LADDER,
+    OUT_OF_WINDOW,
+    named_symbols,
+)
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.windows import window_name
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.edge_picks.night import (
+    EVERY_SESSION,
     LONG,
     NOT_DECISION_DAY,
     PICKED,
@@ -36,11 +42,14 @@ def is_named(edge: Edge) -> bool:
 
 def decides(reader: StoreReader, edge: Edge, day: date) -> bool:
     """Whether ``edge`` opens a window decided at ``day``: a market trigger by its readings up to
-    D, a calendar window by the calendar."""
+    D, a calendar window by the calendar, a plain sleeve schedule (``every_session``, the ladder)
+    every session (``night.fires``: the stored picks are what the setup takes that session)."""
     trigger = edge.market_trigger
     if trigger is not None:
         return trigger_decides(reader, trigger, day, edge.outcome.horizon_sessions[0], None)
     name = window_name(edge.schedule)
+    if name is None and edge.base == DELTA_EQUIVALENT and edge.schedule in (EVERY_SESSION, LADDER):
+        return True
     if name is None:
         raise ConfigurationError(f"edge {edge.id}: not a time-series edge")
     return window_decides(name, day)

@@ -193,3 +193,11 @@ def test_a_monthly_sleeve_holds_up_to_the_gap_between_expiries_and_a_variant_has
                outcome={**monthly, "horizon_sessions": [18]})  # fmt: skip
     with pytest.raises(ConfigurationError, match="only a named option sleeve's variant"):
         parse_edge(document(variants=[{"id": "g", "gate": gate}]), "drift", "x.toml")
+
+
+def test_only_a_named_option_sleeve_may_ladder_every_session() -> None:
+    """index_put_ladder: the every-session ladder is a sleeve's schedule (its slots book sizes
+    the overlapping holds); a time-series or cross-section edge with it is refused."""
+    assert sleeve(schedule="every_session_ladder").schedule == "every_session_ladder"
+    with pytest.raises(ConfigurationError, match="every_session_ladder"):
+        parse_edge(document(schedule="every_session_ladder"), "drift", "x.toml")

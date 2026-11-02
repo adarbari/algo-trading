@@ -150,3 +150,23 @@ body = """
 A year with few trades says little. Look for years that differ from the rest: a setup that earned in only one year relied on that year.
 """
 see_also = ["option_typical", "option_kept"]
+
+[[term]]
+id = "option_ladder"
+term = "Ladder"
+short = "A setup that opens a new position on every session and holds each for the same number of sessions, so several overlap at once."
+body = """
+Each position gets an equal share of the cash set aside: the cash is split into as many slots as positions can be open together. A slot no position fills stays in cash. So the setup never borrows to hold more than its cash, and one bad day's entry is a small part of the whole.
+Overlapping positions share most of their days, so they are not separate tests: the figures count them as fewer, longer samples.
+"""
+see_also = ["option_rule_decides", "setup_tested_again", "idea_cash_set_aside"]
+
+[[term]]
+id = "setup_tested_again"
+term = "Tested again"
+short = "A setup testing another setup's idea with a different rule, read beside it and never as separate proof."
+body = """
+Trying an idea several ways and keeping the best way makes a lucky result look real. Each way is counted as one more try, and the more tries an idea has, the stronger its evidence must be.
+Two such setups agreeing is one result, not two.
+"""
+see_also = ["deflated_sharpe", "option_ladder"]
