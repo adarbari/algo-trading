@@ -270,6 +270,13 @@ section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"
 detect = [{ call = "OnDemandScreens" }]
 
 [[responsibility]]
+id = "option-calculators"
+description = "The option calculators (services/preview/options/, plan V11; screens OptRoll, OptCalls, OptMargin): from figures a trader types (a sold contract and its price, shares held and their price, a contract and a count), never stored or logged, the rolls of a sold option to later expiries (extra credit, new breakeven, credit per extra day, our delta), the calls they could sell on shares (premium over their price, the return if called away, the ex-dividend date and early-exercise risk) and the buying power a contract ties up under a broker's published rule (Reg-T); priced from exactly the session's chain through session_inputs (an Unknown when it cannot be), derived figures only (the vendor quote stops in pool.py); the API serves them as body-only POSTs"
+owner = ["src/algotrade/services/preview/options/*"]
+section = "docs/ui/evening-desk-plan.md#5-vertical-slices"
+detect = [{ call = "preview_roll" }, { call = "preview_calls" }, { call = "priced_pool" }]
+
+[[responsibility]]
 id = "option-structures"
 description = "Marking a position of option legs through its window (ADR 0088, design 2.4): engines/structures takes each session's chain from the caller and gives per name the underlying's closes, the position's mid and executable value at entry and exit (a long leg bought at the ask and sold at the bid, a short leg the reverse), the intrinsic value of a leg that expires on the exit, the exit fallback for a zero-bid quote, the net delta at each close for the daily hedge, the reasons a name is unmeasured (a missing or stale chain, no exit quote, no delta), the one ordered exit rule list scanned over closes (pure over field rows, independent of option pricing, so share walkers reuse it: first in declared order wins, a catalogue-field rule acts at t + 1 and a position-only one at t, an UNKNOWN rule never fires), the position-level fields per close with the running max_adverse, assignment at expiry, early assignment before an ex-date and the report skip, and a window's trades (trades.py: the legs chosen from the entry chain, each name held to its first exit and valued at it from the closes to it only, the collateral by rule, Greeks and the P&L parts); never fills a session from an earlier one; pure: features, config and quant only, the callers load the chains"
 owner = ["src/algotrade/engines/structures/*"]
@@ -373,7 +380,11 @@ detect = [{ call = "run_screener" }, { call = "tolerated_stale" }]
 [[responsibility]]
 id = "screen-preview"
 description = "The Builder's dry runs (ADR 0029), over the request's ReadContext: an unsaved rule-screen draft resolved for a user and evaluated by the nightly evaluate_screen on the context's session (summary, funnel, coverage, top rows; the field frame cached per session, fields, user features and visible_seq), and a formula type checked and sampled on that session; never writes; REST POSTs by design"
-owner = ["src/algotrade/services/preview/*"]
+owner = [
+    "src/algotrade/services/preview/expressions.py",
+    "src/algotrade/services/preview/frame.py",
+    "src/algotrade/services/preview/screens.py",
+]
 section = "docs/adr/0029-rule-screener.md#preview--nightly"
 detect = [{ call = "field_frame" }]
 
