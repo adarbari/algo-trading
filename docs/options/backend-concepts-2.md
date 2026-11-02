@@ -9,7 +9,7 @@ positions never write here: their trades come from `forward_returns@v2` (2.5a).
 **Table** `outcomes/option/structure_pnl@v2` (supersedes the empty v1, removed in E4). Partition =
 S, runs merge per key. Owner `option-outcomes`; read only through `data/outcomes/chain.py`, importable
 only from `services/evaluation`. **One publisher (G24):** `frame_and_publish`, a new function extracted in E4
-from `tasks/derived/option_outcomes.py` (today `compute_option_outcomes` and `_one`), is the only function that writes the table; the history task
+from `tasks/derived/paths/option_outcomes.py` (today `compute_option_outcomes` and `_one`), is the only function that writes the table; the history task
 (`tasks/options_history/outcomes.py`) computes frames and calls it, so `tables.toml` keeps one
 owner. **`position_key` from resolved legs (G24):** the key is built from each leg's resolved spec
 (kind, right, qty, strike rule, delta, tenor) plus collateral, selection parameters, entry offset,
@@ -34,7 +34,7 @@ source (contract test). The same constant drives the history-feature splice (2.1
 exist only for the owner's one-off comparison.
 
 **Writers.**
-- **Cboe, nightly:** `tasks/derived/option_outcomes.py` calls the selector and the engine and
+- **Cboe, nightly:** `tasks/derived/paths/option_outcomes.py` calls the selector and the engine and
   writes `price_source = cboe`, `licence = open`; `knowledge_ts` = the latest chain partition read.
 - **History, owner-run (H5):** `tasks/options_history/outcomes.py`
   (`option-history-outcomes --from --to [--structure]`), in the one package allowed to import

@@ -1,6 +1,7 @@
 """Outcome table schemas (ADR 0053): the one schema of ``outcomes/instrument/<name>@v<N>`` and its
-row checks, and the option trade grain ``outcomes/option/structure_pnl@v2`` (ADR 0053 amendment,
-EB H13; ADR 0088, design 2.5).
+row checks, the share path grain ``outcomes/instrument/share_path@v1`` (ADR 0088, E3c-2) and the
+option trade grain ``outcomes/option/structure_pnl@v2`` (ADR 0053 amendment, EB H13; ADR 0088,
+design 2.5).
 """
 
 import pandas as pd
@@ -229,4 +230,84 @@ def structure_pnl_problems(frame: pd.DataFrame) -> list[str]:
     known = lengths.where(lengths >= 0)
     if (known.nunique(axis=1) > 1).any():
         problems.append("the leg_* lists of a row must be as long as each other")
+    return problems
+
+
+# Share paths (ADR 0088, E3c-2): what one share position with declared exits (``[outcome.exit]``),
+# bought at the close of a start session S, earned when walked over the closes of ``bars/1d`` to
+# the first exit its ordered rules give (take profit, stop loss, ``when``) or to its hold cap
+# (``engines/structures/share_walk``). One row per (name, ``position_key``, benchmark): the universe
+# at S with a bar at S, each key's (``share_position_key``: legs, entry offset, the side's exit
+# rules, hold cap; two holds are two keys) and benchmark's (the outcome's ticker, ``none`` for none:
+# its return over S..exit beside the name's, so an excess outcome is scored at the exit); the
+# partition is S; each night writes the windows it closes and rechecks the ones before, so runs
+# merge (the latest wins). Returns are at closes, split-adjusted as of the
+# window end, before cost: ``gross_return`` the side's, ``underlying_return`` the name's own,
+# ``max_adverse`` the worst close below the entry up to the exit (a long; null for a short).
+# ``knowledge_ts`` is the latest of the bars and the exit rule's field partitions read up to the
+# row's own exit (not the window's close); a DELISTED or UNMEASURED row, and a stored row a recheck
+# changes (a cleared flag, a late split), is known when written.
+# UNMEASURED: a reason and no exit (BAD_BAR: a flagged bar before the exit was known; NO_BAR: a
+# close missing before it, with no delisting; NO_BENCHMARK_BAR: the benchmark has no close at S or
+# the exit), never a return over a gap; a measured row of a benchmark has its benchmark_return.
+SHARE_PATH = f"{OUTCOMES_PREFIX}share_path@v1"
+SHARE_PATH_REASONS = ("BAD_BAR", "NO_BAR", "NO_BENCHMARK_BAR")
+SHARE_EXIT_KINDS = frozenset({"TAKE_PROFIT", "STOP_LOSS", "CONDITION", "HORIZON", "DELISTED"})
+
+_SHARE_PATH_TYPES = (
+    "instrument_id string!",
+    "ts timestamp_utc!",  # the close of S
+    "position_key string!",  # canonical, round-trips to the spec (positions/key.py)
+    "licence string!",  # the strictest of the bars' and the exit rules' fields (G9)
+    "window_end date!",  # T: the hold cap's session (the h-th exchange session after S)
+    "hold_sessions int64!",  # the hold cap h (the reader's ``horizon_sessions``)
+    "benchmark string!",  # the outcome's benchmark ticker, ``none`` for none
+    "entry_close float64",  # close(S) split-adjusted as of window_end (a price level, not a return)
+    "exit_session date",
+    "exit_index int64",  # sessions held: 1 is the first close after S
+    "exit_kind string",  # SHARE_EXIT_KINDS
+    "gross_return float64",  # the side's return to the exit close, before cost
+    "underlying_return float64",  # close(exit) / close(S) - 1
+    "benchmark_return float64",  # the benchmark's over S..exit; null: none, or no bar at either
+    "max_adverse float64",  # 1 - min close over (S, exit] / close(S), >= 0; null for a short
+    "exit_unknown_closes int64!",  # closes up to the exit on which an exit rule was UNKNOWN
+    "outcome_status string!",  # OUTCOME_STATUSES; DELISTED: walked to the last close
+    "outcome_reason string",  # UNMEASURED only: SHARE_PATH_REASONS
+)
+
+SHARE_PATH_SPEC = fixed(
+    SHARE_PATH, "outcome", ("instrument_id", "ts", "position_key", "window_end", "benchmark"),
+    *_SHARE_PATH_TYPES, runs="merge", key=("instrument_id", "position_key", "benchmark"),
+)  # fmt: skip
+
+_MEASURED_SHARE = ("entry_close", "exit_session", "exit_index", "exit_kind", "gross_return")
+
+
+def share_path_problems(frame: pd.DataFrame) -> list[str]:
+    """A measured share path has its entry, exit and return and a known exit kind (DELISTED
+    exactly when its status is); an UNMEASURED one has a known reason and no exit or return."""
+    status = frame["outcome_status"].astype(str)
+    unmeasured = (status == UNMEASURED).to_numpy()
+    problems = []
+    for column in _MEASURED_SHARE:
+        if frame[column][~unmeasured].isna().any():
+            problems.append(f"{column} is null on a measured share path")
+    for column in (
+        "exit_session", "exit_index", "exit_kind", "gross_return", "underlying_return",
+        "benchmark_return",
+    ):  # fmt: skip
+        if frame[column][unmeasured].notna().any():
+            problems.append(f"{column} must be null when UNMEASURED")
+    kinds = frame.loc[~unmeasured, "exit_kind"].dropna().astype(str)
+    found = set(kinds) - SHARE_EXIT_KINDS
+    if found:
+        problems.append(f"exit_kind must be one of {sorted(SHARE_EXIT_KINDS)}: {sorted(found)}")
+    if ((kinds == "DELISTED") != (status[~unmeasured][kinds.index] == "DELISTED")).any():
+        problems.append("exit_kind DELISTED goes with outcome_status DELISTED")
+    benched = (frame["benchmark"].astype(str) != "none").to_numpy() & ~unmeasured
+    if frame["benchmark_return"][benched].isna().any():
+        problems.append("benchmark_return is null on a measured row of a benchmark")
+    reasons = set(frame.loc[unmeasured, "outcome_reason"].dropna().astype(str))
+    if reasons - set(SHARE_PATH_REASONS):
+        problems.append(f"outcome_reason must be one of {list(SHARE_PATH_REASONS)}")
     return problems

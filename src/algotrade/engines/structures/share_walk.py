@@ -4,10 +4,9 @@ engine's evaluator fed from bars: ``position.*`` fields come from ``walk_fields`
 as the mark, catalogue fields of a close are passed in by the caller (None where not stored: the
 rule is UNKNOWN there and never fires).
 
-``share_exit_rules`` compiles the fixed settings to rules over ``position.move_since_entry_pct``
-(a share has no credit): a take profit is a favourable move of that fraction, a stop loss an
-adverse one, each in the position's own direction (a short gains when the price falls). Exits are
-at closes only, so a gap through the level exits at that close's price, never at the level.
+Its rules are ``share_exit_rules`` (``config/edges/positions/spec.py``: the fixed settings as
+rules over ``position.move_since_entry_pct``, a share has no credit). Exits are at closes only, so
+a gap through the level exits at that close's price, never at the level.
 
 The trade is priced from closes S..k only, the exit close ``k``: the ``move`` of a long is
 ``close(k) / close(S) - 1`` and of a short its negation. ``max_adverse`` is the worst close below
@@ -19,20 +18,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from algotrade.config.edges.positions.spec import (
-    KIND_STOP_LOSS,
-    KIND_TAKE_PROFIT,
-    ExitRule,
-    ExitSettings,
-    exit_rules,
-)
-from algotrade.core.model.fields import position_field
-from algotrade.core.model.predicates import FieldValue, Group, Rule
+from algotrade.config.edges.positions.spec import ExitRule
+from algotrade.core.model.predicates import FieldValue
 from algotrade.engines.structures.exits import scan_exits
 from algotrade.engines.structures.position_fields import CloseFacts, EntryFacts, walk_fields
 
 HORIZON, DELISTED = "HORIZON", "DELISTED"
-MOVE = position_field("move_since_entry_pct")
 
 
 @dataclass(frozen=True)
@@ -59,26 +50,6 @@ class ShareWalk:
     underlying_return: float
     max_adverse: float | None
     unknown_closes: int
-
-
-def share_exit_rules(exit: ExitSettings | None, side: str) -> tuple[ExitRule, ...]:
-    """The share position's ordered exit rules: take profit, stop loss, then ``when`` (the
-    option-only ``exit_dte`` is not for shares). ``side`` is ``long`` or ``short``."""
-    if exit is None:
-        return ()
-    sign = 1.0 if side == "long" else -1.0
-    found: list[ExitRule] = []
-    if exit.take_profit is not None:
-        op = "gte" if sign > 0 else "lte"
-        found.append(
-            ExitRule(KIND_TAKE_PROFIT, Group("all", (Rule(MOVE, op, sign * exit.take_profit),)))
-        )
-    if exit.stop_loss is not None:
-        op = "lte" if sign > 0 else "gte"
-        found.append(
-            ExitRule(KIND_STOP_LOSS, Group("all", (Rule(MOVE, op, -sign * exit.stop_loss),)))
-        )
-    return (*found, *(r for r in exit_rules(ExitSettings(when=exit.when))))
 
 
 def walk_share(

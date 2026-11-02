@@ -214,23 +214,25 @@ def _one(
     return run.record
 
 
-def changed_rows(stored: pd.DataFrame | None, out: pd.DataFrame) -> pd.DataFrame:
-    """The rows of ``out`` that are new, or differ in any column from the stored merged view of
-    the partition (ADR 0078 decision 6): the stamps (``knowledge_ts``, ``run_id``) are not
-    compared, NaN equals NaN, and dates compare as instants. A recheck that changes nothing then
-    writes no run; the stored row keeps its first-known stamp."""
+def changed_rows(
+    stored: pd.DataFrame | None, out: pd.DataFrame, key: Sequence[str] = KEY
+) -> pd.DataFrame:
+    """The rows of ``out`` that are new, or differ in any column from the stored merged view of the
+    partition (ADR 0078 decision 6; ``key``: a row's identity in it): the stamps (``knowledge_ts``,
+    ``run_id``) are not compared, NaN equals NaN, and dates compare as instants. A recheck that
+    changes nothing then writes no run; the stored row keeps its first-known stamp."""
     if stored is None or stored.empty or out.empty:
         return out
     cols = [c for c in out.columns if c in stored.columns and c not in STAMPS]
-    if not set(KEY) <= set(cols):
+    if not set(key) <= set(cols):
         return out
-    old = stored[cols].drop_duplicates(KEY, keep="last")
+    old = stored[cols].drop_duplicates(list(key), keep="last")
     both = out.reset_index(drop=True).merge(
-        old, on=KEY, how="left", suffixes=("", "_old"), indicator=True
+        old, on=list(key), how="left", suffixes=("", "_old"), indicator=True
     )
     same = both["_merge"].eq("both")
     for col in cols:
-        if col in KEY:
+        if col in key:
             continue
         new, was = _comparable(both[col], both[f"{col}_old"])
         same &= (new == was) | (new.isna() & was.isna())
@@ -301,7 +303,7 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
         if not (key.startswith("h") and isinstance(value, dict)):
             continue
         start = date.fromisoformat(value["start"])
-        unaccounted = len(_eligible(reader, start)) - value["rows"] - value["reasons"]
+        unaccounted = len(eligible_at(reader, start)) - value["rows"] - value["reasons"]
         stored = reader.table(TABLE, start)
         horizon = int(key[1:])
         ours = (
@@ -343,7 +345,7 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
     return [Check("outcomes", "PASS", detail)]
 
 
-def _eligible(reader: StoreReader, start: date) -> set[str]:
+def eligible_at(reader: StoreReader, start: date) -> set[str]:
     """The names in the universe at ``start`` with a bar at ``start`` (a flagged bar included:
     that name has an UNMEASURED row)."""
     universe = universe_ids(reader, start)[0]
