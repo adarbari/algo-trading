@@ -29,6 +29,14 @@ legs = [
 collateral = "max_loss"
 
 [[template]]
+id = "call_spread"
+legs = [
+  { kind = "option", right = "C", qty = -1, strike = "delta", delta = 0.30 },
+  { kind = "option", right = "C", qty = 1, strike = "delta", delta = 0.10 },
+]
+collateral = "max_loss"
+
+[[template]]
 id = "covered_call"
 legs = [
   { kind = "shares", qty = 100 },

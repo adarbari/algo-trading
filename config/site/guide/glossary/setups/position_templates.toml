@@ -18,7 +18,7 @@ id = "setup_template"
 term = "Position template"
 short = "A named shape of legs a setup can hold, such as long shares, a short put or an iron fly."
 body = """
-The site keeps a short list of templates. Long shares and short shares hold 100 shares. Short put sells one put near 0.30 delta. Put spread also buys a 0.10-delta put below it. Covered call holds 100 shares and sells one 0.30-delta call. Short straddle sells an at-the-money put and call. Iron fly adds two wings 5% out of the money. A setup names one template and may change its numbers, such as the delta. The shape decides the tab: any option leg puts a setup's picks on Premium.
+The site keeps a short list of templates. Long shares and short shares hold 100 shares. Short put sells one put near 0.30 delta. Put spread also buys a 0.10-delta put below it. Covered call holds 100 shares and sells one 0.30-delta call. Call spread sells that call without the shares and buys a 0.10-delta call above it. Short straddle sells an at-the-money put and call. Iron fly adds two wings 5% out of the money. A setup names one template and may change its numbers, such as the delta. The shape decides the tab: any option leg puts a setup's picks on Premium.
 """
 see_also = ["position", "setup_collateral", "exit_take_profit", "example_long_shares", "example_short_shares"]
 
