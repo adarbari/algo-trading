@@ -86,9 +86,11 @@ Each edge's full section is on its family page (docs/edges/).
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | candidate | [family I](edges/i.md) |
 | Target-date fund contrarian flows (`tdf_contrarian_flows`) | blocked | [family I](edges/i.md) |
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | [no family](edges/other.md) |
+| High IV rank: short put (`iv_rank_short_put`) | candidate | [no family](edges/other.md) |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | candidate | [no family](edges/other.md) |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | [no family](edges/other.md) |
-| Volatility risk premium (`vrp_short_premium`) | candidate | [no family](edges/other.md) |
+| Volatility risk premium: short put (`vrp_short_put`) | candidate | [no family](edges/other.md) |
+| Volatility risk premium (`vrp_short_premium`) | retired | [no family](edges/other.md) |
 | Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | rejected | [no family](edges/other.md) |
 | S&P 500 index changes (`sp500_index_changes`) | rejected | [no family](edges/other.md) |
 | Russell reconstitution (`russell_reconstitution`) | blocked | [no family](edges/other.md) |
