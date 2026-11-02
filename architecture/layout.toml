@@ -482,6 +482,10 @@ path = "src/algotrade/services/evaluation/forward"
 purpose = "the forward paper record (ADR 0053 amendment 2026-10-09): a followed edge's tonight picks by the harness's own picker (signals.py), the open trades a stored outcome closes (settle.py, with the harness and the training frame an importer of outcomes) and one night's rows and run record published atomically into results/edge_paper (results.py)"
 
 [[dir]]
+path = "src/algotrade/services/evaluation/portfolio_level"
+purpose = "the portfolio level's provider (ADR 0088, G15; the `portfolio` row of LEVELS): the setup's own book at a decision session as `portfolio.<name>` values from its trades (book.py, pure, fail closed), the in-order walk of decision sessions a setup that reads the level needs (walk.py) and the paper record's book of one edge for its record owner (paper.py); reads only the setup's own trades, never a user store or another setup's picks"
+
+[[dir]]
 path = "src/algotrade/services/evaluation/time_series"
 purpose = "the time-series base of the edge evaluation (ADR 0073): an edge timed by a calendar window and judged against the same instrument's returns outside every window; the windows and their tiled out-of-window stretches from the calendar alone (periods.py), the one reader of outcomes, symbol ids and the bill rate (harness.py), the in-window against out-of-window measures as the rows the verdict reads (measures.py), the seeded random window sets (random_windows.py) and one edge's evaluation (evaluate.py)"
 contracts = ["Time-series evaluation reads outcomes only through its harness seam (ADR 0073)"]

@@ -52,7 +52,7 @@ LEVELS: tuple[Level, ...] = (
         "close t's quotes and the entry facts", "self", (EXIT,), "the trade's price source",
     ),
     Level(
-        "portfolio", ("portfolio",), "computed", "services.evaluation.portfolio",
+        "portfolio", ("portfolio",), "computed", "services.evaluation.portfolio_level",
         "(setup, decision session)", "trades with S <= D still open after D's close",
         "broadcast", (GATE, ENTRY, CASE), "the strictest price source of the trades it reads",
     ),

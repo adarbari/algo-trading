@@ -1,0 +1,61 @@
+# L3 site setting: the Guide glossary, the facts of a setup's own book of open trades (ADR 0088,
+# ADR 0051). One [[term]] each: id, term, short (one sentence), body, see_also. Fitness test:
+# tests/unit/config/strategy/test_portfolio_fields.py (every PORTFOLIO_FIELDS entry names one of
+# these). These are the fields a gate, entry or case rule may name, as portfolio.<name>; they
+# describe the setup's own trades at a decision session and never a real account.
+
+[[term]]
+id = "portfolio_open_positions"
+term = "portfolio.open_positions"
+short = "How many of the setup's own trades are open at the decision session."
+body = """
+A trade counts from its entry session up to, but not including, its exit session, so a trade that
+exits at a session is no longer open at that session. A rule such as portfolio.open_positions lt 5
+stops a setup from stacking more trades while five are still open. It counts the setup's own
+trades only, never other setups and never a real account. An empty book is 0, a known state.
+"""
+see_also = ["portfolio_effective_bets"]
+
+[[term]]
+id = "portfolio_effective_bets"
+term = "portfolio.effective_bets"
+short = "How many independent bets the open trades amount to, counting a name held twice once."
+body = """
+Each open trade counts equally. The figure is one divided by the sum of each name's squared share.
+Four trades in four names are 4 bets; four trades in one name are 1. Use it to stop a
+setup piling into one name. It is only the count of names when the trades are equal in size; no
+size is stored. An empty book is 0.
+"""
+see_also = ["portfolio_open_positions", "portfolio_max_name_share"]
+
+[[term]]
+id = "portfolio_max_sector_share"
+term = "portfolio.max_sector_share"
+short = "The share of the open trades in the single largest sector."
+body = """
+A value of 0.5 means half the open trades sit in one sector. It is missing, so a rule reading it
+does not pass, when any open trade's sector is not known. A rule such as
+portfolio.max_sector_share lt 0.4 keeps a setup from concentrating in one sector.
+"""
+see_also = ["portfolio_max_name_share"]
+
+[[term]]
+id = "portfolio_max_name_share"
+term = "portfolio.max_name_share"
+short = "The share of the open trades in the single largest name."
+body = """
+A value of 0.25 means a quarter of the open trades are in one name. It is the simplest measure of
+concentration; read effective bets beside it. An empty book is 0.
+"""
+see_also = ["portfolio_effective_bets", "portfolio_max_sector_share"]
+
+[[term]]
+id = "portfolio_open_collateral"
+term = "portfolio.open_collateral"
+short = "The collateral the setup's open option trades tie up, one contract each, in dollars."
+body = """
+The sum of the collateral of each open option trade as it was sized at its entry. It applies to
+option setups only. It is missing, so a rule reading it does not pass, when any open trade's
+collateral is not known, as for a paper trade that stores none.
+"""
+see_also = ["portfolio_open_positions"]
