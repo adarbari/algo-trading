@@ -437,6 +437,10 @@ path = "src/algotrade/services/evaluation/cross_section"
 purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run planning its legs and assembling the evaluation (harness.py), the measuring of those legs over chunks of sessions, the one reader of outcomes with the harness (measuring.py), what it reads once per session (reads/), a portfolio_return book's weights and value (portfolio/), the key of a reusable leg (legs/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
 
 [[dir]]
+path = "src/algotrade/services/evaluation/cross_section/baselines"
+purpose = "the position baselines of the edge harness (ADR 0088, G19): the setup's own picks valued as another position template (`position:<template>` in `baselines`), stored as a baseline row beside the decoys and never a trial: the outcome of a template (outcome.py: shares are the stock alone on the stock grain, an option template the setup's option_pnl with that template's legs) and the variant and scope that carry it (variant.py)"
+
+[[dir]]
 path = "src/algotrade/services/evaluation/cross_section/detail"
 purpose = "the framing of what an edge evaluation publishes beside its measures (ADR 0064): the per-session series and the trade-ledger rows of each leg, from the stored legs, never recomputed, and the licence of a trial and of each per-name ledger column (licences.py)"
 
