@@ -893,9 +893,13 @@ test("An option setup's page stacks its position, history and years inside the s
   await expectAccessible(page);
 });
 
-test('Screener results: the run line and the edge record fold, and the first pick row starts within a screen and a quarter', async ({ page }) => {
+test('Screener results: the run line and the edge record fold, and the first pick row starts within a screen and a quarter', async ({
+  page,
+}) => {
   await page.goto('/screeners/vrp_scanner');
-  const row = page.getByRole('grid', { name: 'Screener results' }).getByRole('row', { name: /AAPL/ });
+  const row = page
+    .getByRole('grid', { name: 'Screener results' })
+    .getByRole('row', { name: /AAPL/ });
   await expect(row).toBeVisible();
   await expect(page.getByRole('button', { name: /^Run details/ })).toBeVisible();
   const top = (await row.boundingBox())?.y ?? Infinity;

@@ -20,7 +20,10 @@ describe('PhoneFold', () => {
   it('narrow: folds the content behind its summary button', async () => {
     vi.stubGlobal('innerWidth', 375);
     const { container } = render(<PhoneFold label="Record">58% win rate</PhoneFold>);
-    expect(screen.getByRole('button', { name: /Record/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /Record/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
     await expectNoA11yViolations(container);
   });
 });
