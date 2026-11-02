@@ -174,3 +174,36 @@ def test_changed_files_diff_from_the_merge_base(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(changed_tests, "_git", git)
     changed_tests.changed_files("origin/main")
     assert seen[:2] == [("merge-base", "origin/main", "HEAD"), ("diff", "--name-only", "abc123")]
+
+
+def test_a_guide_entry_maps_to_the_guide_readers_not_the_whole_graph() -> None:
+    # a glossary entry ran tests/apps/api/graphql and tests/unit/services/read whole (V2, V5)
+    readers = set(changed_tests.SITE_CONFIG_READERS["config/site/guide/"])
+    got = changed_tests.covering_tests(
+        ["config/site/guide/glossary/results.toml"],
+        (readers | {"tests/apps/api/graphql"}).__contains__,
+    )
+    assert set(got) == readers
+
+
+def test_step_one_leaves_out_what_step_two_runs_in_full() -> None:
+    paths = [
+        "tests/architecture",
+        "tests/architecture/guide",
+        "tests/unit/config/site/guide",
+        "tests/unit/configs/test_x.py",
+        "tests/unit/services/read/guide",
+    ]
+    assert changed_tests.without_full_runs(paths) == [
+        "tests/unit/configs/test_x.py",
+        "tests/unit/services/read/guide",
+    ]
+
+
+def test_main_prints_no_full_run_paths(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(changed_tests, "refresh", lambda base: None)
+    monkeypatch.setattr(changed_tests, "changed_files", lambda base: ["architecture/layout.toml"])
+    changed_tests.main(["changed_tests.py"])
+    assert capsys.readouterr().out.strip() == ""

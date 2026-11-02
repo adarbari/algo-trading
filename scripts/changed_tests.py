@@ -40,6 +40,20 @@ WEB_FITNESS = "tests/architecture/test_layout_web.py"
 # Tests that read config/site/ as shipped (the API graph, the read model, the config fitness
 # tests): a site config change has no mirrored test, so these cover it.
 SITE_CONFIG_TESTS = ("tests/architecture", "tests/apps/api/graphql", "tests/unit/services/read")
+# A site config folder whose readers are known maps to them alone: a Guide entry (the most
+# common UI-branch config change) ran the whole graph and read-model suites, thousands of tests
+# (V2, V5, 2026-11-02). The Guide fitness and config tests run in full in step 2 anyway.
+SITE_CONFIG_READERS = {
+    "config/site/guide/": (
+        "tests/architecture/guide",
+        "tests/unit/config/site/guide",
+        "tests/unit/services/read/guide",
+        "tests/apps/api/graphql/types/guide",
+    ),
+}
+# `make changed` runs these in full after the mirrored tests (its step 2), so step 1 leaves
+# them out instead of running them twice.
+FULL_RUNS = ("tests/architecture", "tests/unit/config")
 
 # The feature catalogue is exported to the web (`make features-doc` runs
 # scripts/export_catalogue.py): a new feature or expression feature changes it (#330).
@@ -105,7 +119,11 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
         if name.startswith("architecture/"):
             paths.add("tests/architecture")
         if name.startswith("config/site/"):
-            paths.update(p for p in SITE_CONFIG_TESTS if present(p))
+            readers = next(
+                (t for prefix, t in SITE_CONFIG_READERS.items() if name.startswith(prefix)),
+                SITE_CONFIG_TESTS,
+            )
+            paths.update(p for p in readers if present(p))
         if name.startswith(CATALOGUE_SOURCES):
             paths.update(p for p in CATALOGUE_TESTS if present(p))
         paths.update(test for prefixes, test in FITNESS_BY_PREFIX if name.startswith(prefixes))
@@ -130,6 +148,11 @@ def covering_tests(files: list[str], present: Callable[[str], bool] = _on_disk) 
 
 BOTH_AREAS = (".github/workflows/ci.yml", "apps/api/openapi.json", "apps/api/schema.graphql")
 DOCS_PREFIXES = ("docs/", ".claude/")
+
+
+def without_full_runs(paths: list[str]) -> list[str]:
+    """`paths` less what `make changed` step 2 runs in full (`FULL_RUNS`)."""
+    return [p for p in paths if not any(p == f or p.startswith(f"{f}/") for f in FULL_RUNS)]
 
 
 def changed_areas(files: list[str]) -> list[str]:
@@ -160,7 +183,7 @@ def main(argv: list[str]) -> int:
             files = []
         print(" ".join(changed_areas(files)))
     else:
-        print("\n".join(covering_tests(changed_files(base))))
+        print("\n".join(without_full_runs(covering_tests(changed_files(base)))))
     return 0
 
 
