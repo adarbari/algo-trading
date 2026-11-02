@@ -1,0 +1,68 @@
+"""``walk_in_order``: deterministic, no lookahead, a decision at D sees only earlier decisions'
+trades, and unordered sessions are refused (ADR 0088, G15)."""
+
+from datetime import date, timedelta
+
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
+from algotrade.services.evaluation.portfolio_level.book import OpenTrade, PortfolioRow
+from algotrade.services.evaluation.portfolio_level.walk import walk_in_order
+
+START = date(2026, 1, 5)
+DAYS = st.lists(st.integers(0, 60), min_size=1, max_size=15, unique=True).map(
+    lambda xs: [START + timedelta(days=x) for x in sorted(xs)]
+)
+HOLD = st.integers(1, 10)
+
+
+def _decide(hold: int, seen: list[tuple[date, int]]):
+    def decide(day: date, row: PortfolioRow) -> list[OpenTrade]:
+        opened = row.values["portfolio.open_positions"]
+        seen.append((day, opened))  # type: ignore[arg-type]
+        if opened >= 3:  # a portfolio rule: no new trade while three are open
+            return []
+        end = day + timedelta(days=hold)
+        return [OpenTrade(f"N{day.toordinal()}", day, end, end, None, "open")]
+
+    return decide
+
+
+def _sectors(_day: date, ids):  # type: ignore[no-untyped-def]
+    return dict.fromkeys(ids, "s")
+
+
+@given(DAYS, HOLD)
+def test_the_same_inputs_give_the_same_rows(days: list[date], hold: int) -> None:
+    a = walk_in_order(days, _decide(hold, []), _sectors)
+    b = walk_in_order(days, _decide(hold, []), _sectors)
+    assert a == b
+
+
+@given(DAYS, HOLD)
+def test_a_decision_sees_only_trades_of_earlier_sessions(days: list[date], hold: int) -> None:
+    seen: list[tuple[date, int]] = []
+    rows = walk_in_order(days, _decide(hold, seen), _sectors)
+    assert list(rows) == days
+    assert rows[days[0]].values["portfolio.open_positions"] == 0
+    for (_day, opened), earlier in zip(
+        seen, [[], *(days[:i] for i in range(1, len(days)))], strict=True
+    ):
+        assert opened <= len(earlier)  # never more open than decided before it
+
+
+@given(DAYS, HOLD)
+def test_a_prefix_of_the_sessions_gives_the_same_rows_as_the_whole(
+    days: list[date], hold: int
+) -> None:
+    whole = walk_in_order(days, _decide(hold, []), _sectors)
+    cut = days[: max(1, len(days) // 2)]
+    assert {d: whole[d] for d in cut} == walk_in_order(cut, _decide(hold, []), _sectors)
+
+
+def test_unsorted_or_repeated_sessions_are_refused() -> None:
+    with pytest.raises(ValueError, match="ascending"):
+        walk_in_order([START + timedelta(days=1), START], _decide(1, []), _sectors)
+    with pytest.raises(ValueError, match="ascending"):
+        walk_in_order([START, START], _decide(1, []), _sectors)

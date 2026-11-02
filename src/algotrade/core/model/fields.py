@@ -26,6 +26,7 @@ MARKET_ROLLUP_PREFIX = "rollups/market/"  # market-entity feature groups (ADR 00
 GROUP_TABLE_PREFIXES = {"instrument": ROLLUP_TABLE_PREFIX, "market": MARKET_ROLLUP_PREFIX}
 GROUP_FIELD_HEADS = {"instrument": "rollup", "market": "market"}
 FEATURE_FIELD_PREFIX = "feature."
+PORTFOLIO_FIELD_HEAD = "portfolio"  # ``portfolio.<name>``: the setup's own book at D
 POSITION_FIELD_HEAD = "position"  # ``position.<name>``: computed while a trade is open
 # The value types a field (an instrument column or a declared rollup column) may have.
 # ``float32``: a 32-bit float stored to halve the bytes (feature groups from ADR 0023 step 3).
@@ -96,6 +97,10 @@ def table_field(table: str, column: str) -> str:
 
 def position_field(name: str) -> str:
     return f"{POSITION_FIELD_HEAD}.{name}"
+
+
+def portfolio_field(name: str) -> str:
+    return f"{PORTFOLIO_FIELD_HEAD}.{name}"
 
 
 def is_position_field(field_name: str) -> bool:
