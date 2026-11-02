@@ -116,7 +116,7 @@ export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: De
     case 'margin':
       return (
         <Suspense fallback={<Skeleton />}>
-          <MarginCalculator symbol={symbol} />
+          <MarginCalculator key={symbol} symbol={symbol} />
         </Suspense>
       );
     case 'features':

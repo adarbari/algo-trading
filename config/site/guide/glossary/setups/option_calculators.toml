@@ -276,10 +276,10 @@ id = "margin_reg_t"
 term = "Exchange minimum (Reg-T)"
 short = "The minimum most US brokers start from for an uncovered short option: a floor, not a quote."
 body = """
-The exchange sets a minimum margin for selling an option you have not covered, and most US brokers start from it. Your broker may require more, and may change it with the market, so treat the margin figure as the least it could be. We do not show any broker's own rule. For a call, this is the minimum for an uncovered (naked) call, the riskiest way to sell one.
+The exchange sets a minimum margin for selling an uncovered option, and most US brokers start from it. Your broker may require more, and may change it with the market, so treat the margin figure as the least it could be. We do not show any broker's own rule. For a call, this is the minimum for an uncovered (naked) call, the riskiest way to sell one.
 """
 next = "Ask your broker what it requires before you rely on the figure."
-see_also = ["margin_account", "margin_held", "describe_not_covered"]
+see_also = ["margin_account", "margin_held"]
 
 [[term]]
 id = "margin_cash_secured"

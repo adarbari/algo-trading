@@ -155,10 +155,10 @@ term = "VIX curve slopes up"
 short = "On when the VIX is below 95% of the 3-month VIX: options price calm now and more movement later."
 body = """
 This is the normal state of the market. Selling volatility has historically paid best here, because
-the premium collected is larger than the movement that follows. It is off when the curve is flat or
+the premium taken in is larger than the movement that follows. It is off when the curve is flat or
 inverted, and unknown when the 3-month VIX has no close on the shared date.
 """
-see_also = ["backwardation_run", "short_premium_allowed", "margin_premium_collected"]
+see_also = ["backwardation_run", "short_premium_allowed"]
 
 [[term]]
 id = "vix_front_kink_on"
