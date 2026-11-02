@@ -3,7 +3,7 @@ tagged with the gate's state at D (open / closed / unknown); the slices read eve
 edge's own series, ledger and random draws only the open ones. An ungated edge passes through
 unchanged."""
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import replace
 from datetime import date
 
@@ -67,3 +67,13 @@ def gate_domains(configs: ConfigStore, edge: Edge) -> dict[str, tuple[str, ...]]
     """The catalogue's string domains, read only for a gated edge: a label the gate never saw is
     read as missing (UNKNOWN), never open."""
     return None if edge.gate is None else dict(field_catalog(configs).domains)
+
+
+type Series = tuple[SessionStat, ...]
+
+
+def turned(every: Series, own: Series, turn: Callable[[Series], Series]) -> tuple[Series, Series]:
+    """``every`` and ``own`` (its open part) through ``turn`` (the turnover cost of a band or a
+    book); an ungated edge, whose two are the one series, turns it once."""
+    turned_own = turn(own)
+    return (turned_own if own == every else turn(every)), turned_own

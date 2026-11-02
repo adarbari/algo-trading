@@ -82,6 +82,7 @@ from algotrade.services.evaluation.cross_section.detail.gating import (
     open_blocks,
     pooled_blocks,
     tagged,
+    turned,
 )
 from algotrade.services.evaluation.cross_section.detail.licences import (
     TrialLicences,
@@ -614,7 +615,9 @@ def evaluate_edge(
                 pooled,
                 vscope.edge.outcome.result_side,
             )
-            block_stats = _turned_over(vscope.edge.outcome, block_stats)
+            every, block_stats = turned(
+                every, block_stats, partial(_turned_over, vscope.edge.outcome)
+            )
             measures, costed = _slice_rows(
                 every,
                 split,

@@ -8,6 +8,7 @@ from algotrade.services.evaluation.cross_section.detail.gating import (
     open_blocks,
     open_only,
     pooled_blocks,
+    turned,
 )
 from algotrade.services.evaluation.cross_section.sessions import Leg
 from tests.unit.services.evaluation.cross_section.conftest import edge
@@ -36,3 +37,19 @@ def test_an_ungated_edge_is_passed_through_whole() -> None:
     assert blocks == BLOCKS and stats == every and len(every) == 3
     assert open_blocks(edge(), BLOCKS, seen) == BLOCKS
     assert open_only(edge(), BLOCKS, every) == (BLOCKS, every)
+
+
+def test_the_slices_read_the_turned_over_series_of_an_ungated_edge_too() -> None:
+    seen = found("", "", "")
+    every = tuple(seen.values())
+    calls: list[int] = []
+
+    def turn(series):  # type: ignore[no-untyped-def]
+        calls.append(len(series))
+        return tuple(replace(s, pick_hits=9) for s in series)
+
+    out_every, out_own = turned(every, every, turn)
+    assert out_every == out_own and all(s.pick_hits == 9 for s in out_every) and calls == [3]
+    own = every[:1]  # a gated edge turns both series, apart
+    out_every, out_own = turned(every, own, turn)
+    assert len(out_every) == 3 and len(out_own) == 1 and all(s.pick_hits == 9 for s in out_every)
