@@ -1,8 +1,9 @@
-"""One expiry and right of an underlying's session chain priced at the mid (ownership
-``option-calculators``): each listed strike with a two-sided quote, its mid and our delta (the
-grid's convention, ``band_pick.OurDeltas``: BSM with the session's rate and dividend yield, NaN
-where no vol inverts) and open interest. The vendor bid and ask stop here: nothing downstream
-sees them.
+"""The underlying a calculator prices (a ticker or id resolved in the session's reference
+snapshot, ``NotFoundError`` when it names none) and one expiry and right of its session chain
+priced at the mid (ownership ``option-calculators``): each listed strike with a two-sided
+quote, its mid and our delta (the grid's convention, ``band_pick.OurDeltas``: BSM with the
+session's rate and dividend yield, NaN where no vol inverts) and open interest. The vendor
+bid and ask stop here: nothing downstream sees them.
 """
 
 from datetime import date
@@ -13,11 +14,22 @@ import pandas as pd
 from algotrade.features.rollups.positioning.chain_inputs import two_sided_mid
 from algotrade.features.rollups.premium.band_pick import OurDeltas
 from algotrade.quant.rates import DAYS_PER_YEAR
+from algotrade.services.read.context import ReadContext
+from algotrade.services.read.instruments.identity import resolve_id
 from algotrade.services.read.options.session_inputs import SessionInputs
+from algotrade.services.read.session import NotFoundError
 
 PUT, CALL = "put", "call"
 RIGHT_CODE = {PUT: "P", CALL: "C"}  # the chain's ``right`` values
 COLUMNS = ["strike", "mid", "delta", "open_interest"]
+
+
+def underlying(ctx: ReadContext, key: str) -> str:
+    """The ``instrument_id`` ``key`` (an id or a ticker) names for ``ctx.session``."""
+    found = resolve_id(ctx, key)
+    if found is None:
+        raise NotFoundError(f"no instrument {key!r} in the session's reference snapshot")
+    return found
 
 
 def listed_expiries(inputs: SessionInputs, right: str, session: date) -> list[date]:

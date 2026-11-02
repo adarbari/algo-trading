@@ -29,7 +29,13 @@ import pandas as pd
 from algotrade.core.time.calendar import previous_session
 from algotrade.features.rollups.premium.band_pick import OurDeltas, bucket_expiries
 from algotrade.quant.options import payoff
-from algotrade.services.preview.options.pool import CALL, figures, listed_expiries, priced_pool
+from algotrade.services.preview.options.pool import (
+    CALL,
+    figures,
+    listed_expiries,
+    priced_pool,
+    underlying,
+)
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.features import FeatureValue
 from algotrade.services.read.options.session_inputs import (
@@ -125,11 +131,10 @@ def _early(
     return before, risk
 
 
-def preview_calls(
-    ctx: ReadContext, underlying_id: str, shares: int, price: float
-) -> CallsPreview | Unknown:
-    """The calls ``shares`` of ``underlying_id`` held at ``price`` could be sold against, for
-    ``ctx.session``, or why there are none to show."""
+def preview_calls(ctx: ReadContext, key: str, shares: int, price: float) -> CallsPreview | Unknown:
+    """The calls ``shares`` held at ``price`` of the instrument ``key`` names could be sold
+    against, for ``ctx.session``, or why there are none to show."""
+    underlying_id = underlying(ctx, key)
     found = load_session_inputs(ctx, underlying_id, (NEXT_EX_DATE, NEXT_DIV_AMOUNT))
     if isinstance(found, Unknown):
         return found

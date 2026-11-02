@@ -15,6 +15,7 @@ from algotrade.services.preview.options.roll import (
     RollPreview,
     preview_roll,
 )
+from algotrade.services.read.session import NotFoundError
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import chain_rows, quote_row, write_chains, write_curve, write_rows
@@ -149,3 +150,10 @@ def test_only_the_sessions_chain_is_read_never_an_older_one() -> None:
 
 def test_session_is_the_contexts() -> None:
     assert good(roll(chain)).session == date(2026, 10, 1) == D1
+
+
+def test_a_ticker_names_the_underlying_and_an_unknown_key_is_not_found() -> None:
+    reader = store_with(chain)
+    assert good(preview_roll(context(reader), "AAA", SOLD)).underlying_id == AAA
+    with pytest.raises(NotFoundError):
+        preview_roll(context(reader), "NOPE", SOLD)

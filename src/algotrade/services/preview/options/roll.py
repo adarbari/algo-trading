@@ -31,6 +31,7 @@ from algotrade.services.preview.options.pool import (
     figures,
     listed_expiries,
     priced_pool,
+    underlying,
 )
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.options.session_inputs import (
@@ -159,14 +160,15 @@ def _rolls(
 
 def preview_roll(
     ctx: ReadContext,
-    underlying_id: str,
+    key: str,
     contract: Contract,
     sold_at: float | None = None,
     include_debits: bool = False,
     same_delta: bool = False,
 ) -> RollPreview | Unknown:
-    """The rolls of ``contract`` on ``underlying_id`` for ``ctx.session``, or why there are none
-    to show."""
+    """The rolls of ``contract`` on the instrument ``key`` names for ``ctx.session``, or why
+    there are none to show."""
+    underlying_id = underlying(ctx, key)
     found = load_session_inputs(ctx, underlying_id)
     if isinstance(found, Unknown):
         return found
