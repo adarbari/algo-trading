@@ -23,10 +23,6 @@ from algotrade.config.edges.document import MAIN, job_name
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.framework.feature import strictest
 from algotrade.services.evaluation.cross_section.detail import series, trades, verdict
-from algotrade.services.evaluation.cross_section.harness import (
-    EdgeEvaluation,
-    VariantResult,
-)
 from algotrade.services.evaluation.cross_section.legs.store import legs_frame, write_legs
 from algotrade.services.evaluation.cross_section.measures import (
     BUCKETS,
@@ -35,6 +31,7 @@ from algotrade.services.evaluation.cross_section.measures import (
 )
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation, VariantResult
 from algotrade.services.evaluation.evidence.measures import TailMeasures
 from algotrade.services.read.context import Stores
 from algotrade.storage.runs import RunRecord, start_run

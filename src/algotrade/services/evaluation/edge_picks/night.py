@@ -33,7 +33,6 @@ from algotrade.data import StoreReader
 from algotrade.engines.screening.gate import UNDECIDED, UNKNOWN
 from algotrade.services.configs import field_catalog, resolve_config
 from algotrade.services.evaluation.cross_section.events import EventDayMissingError
-from algotrade.services.evaluation.cross_section.harness import edge_universe
 from algotrade.services.evaluation.cross_section.measuring import (
     MEASURED_COVERAGE,
     Names,
@@ -54,6 +53,7 @@ from algotrade.services.evaluation.cross_section.reads.session import (
     SessionReads,
     numbers_at,
 )
+from algotrade.services.evaluation.cross_section.run.scopes import edge_universe
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.services.evaluation.forward.signals import legs_between
 from algotrade.services.screening.regime import edge_gate

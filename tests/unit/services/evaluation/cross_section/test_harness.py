@@ -16,14 +16,7 @@ from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section import harness, measuring
-from algotrade.services.evaluation.cross_section.harness import (
-    BOOKKEEPING,
-    RUN_INPUTS,
-    EdgeEvaluation,
-    _prior_trials,
-    evaluate_edge,
-    run_hash,
-)
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.measures import pbo
 from algotrade.services.evaluation.cross_section.picks import screen_variant
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
@@ -33,6 +26,13 @@ from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     lost_sessions,
     write_edge_eval,
+)
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
+from algotrade.services.evaluation.cross_section.run.identity import (
+    BOOKKEEPING,
+    RUN_INPUTS,
+    prior_trials,
+    run_hash,
 )
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.helpers.stored_frames import stamped
@@ -650,7 +650,7 @@ def test_a_trial_logged_before_edge_variants_is_the_edges_own() -> None:
         def runs_for(self, job: str) -> list[Record]:
             return [Record()]
 
-    assert _prior_trials(Writer(), "drift", "site") == {("main", "momo", "h", 2)}  # type: ignore[arg-type]
+    assert prior_trials(Writer(), "drift", "site") == {("main", "momo", "h", 2)}  # type: ignore[arg-type]
 
 
 def test_changing_a_variants_override_changes_its_trial_key_and_adds_a_trial() -> None:

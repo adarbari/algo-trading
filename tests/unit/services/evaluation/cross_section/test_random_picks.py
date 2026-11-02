@@ -11,11 +11,7 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section import measuring
-from algotrade.services.evaluation.cross_section.harness import (
-    EdgeEvaluation,
-    RandomPicks,
-    evaluate_edge,
-)
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.random_picks import (
     DRAW,
     UNKNOWN_SECTOR,
@@ -29,6 +25,7 @@ from algotrade.services.evaluation.cross_section.random_picks import (
 )
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation, RandomPicks
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,

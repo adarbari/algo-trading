@@ -11,7 +11,8 @@ import pandas as pd
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (

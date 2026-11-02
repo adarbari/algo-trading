@@ -16,7 +16,7 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import next_session
 from algotrade.data import ReadRecord, dates_digest
 from algotrade.services.evaluation.cross_section.detail.series import edge_series_frame
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.legs.reuse import (
     FULL,
     INCREMENTAL,
@@ -31,6 +31,7 @@ from algotrade.services.evaluation.cross_section.legs.store import TABLE, read_l
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.schemas import FORWARD_RETURNS, RESIDUAL_RETURNS
 from tests.helpers.stored_frames import stamped, universe_rows

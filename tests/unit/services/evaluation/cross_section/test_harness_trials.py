@@ -26,17 +26,13 @@ from algotrade.data.outcomes import grains
 from algotrade.quant.edges.statistics import sharpe
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.detail.windows import SeriesFacts
-from algotrade.services.evaluation.cross_section.harness import (
-    EdgeEvaluation,
-    VariantResult,
-    _prior_trials,
-    _slice_rows,
-    evaluate_edge,
-)
+from algotrade.services.evaluation.cross_section.harness import _slice_rows, evaluate_edge
 from algotrade.services.evaluation.cross_section.hit import _gross_field
 from algotrade.services.evaluation.cross_section.legs.key import leg_key
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation, VariantResult
+from algotrade.services.evaluation.cross_section.run.identity import prior_trials
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.schemas import SHARE_PATH, STRUCTURE_PNL
 from tests.conftest import REPO_ROOT
@@ -64,9 +60,9 @@ def test_the_sites_trial_log_includes_the_legacy_local_runs() -> None:
             known = {"edge-eval:drift:site": "a", "edge-eval:drift:local": "b"}
             return [Record(known[job])] if job in known else []
 
-    seen = _prior_trials(Writer(), "drift", "site")  # type: ignore[arg-type]
+    seen = prior_trials(Writer(), "drift", "site")  # type: ignore[arg-type]
     assert seen == {("main", "momo", "a", 2), ("main", "momo", "b", 2)}
-    assert _prior_trials(Writer(), "drift", "alice") == set()  # a user's log is their own
+    assert prior_trials(Writer(), "drift", "alice") == set()  # a user's log is their own
 
 
 def test_the_legacy_log_counts_a_trial_once_and_only_before_the_cutoff() -> None:
@@ -82,13 +78,13 @@ def test_the_legacy_log_counts_a_trial_once_and_only_before_the_cutoff() -> None
         def runs_for(self, job: str) -> list[Record]:
             return [Record(before)] if job.endswith(":site") else [Record(before), Record(after)]
 
-    assert _prior_trials(Writer(), "drift", "site") == {("main", "momo", "h", 2)}  # once
+    assert prior_trials(Writer(), "drift", "site") == {("main", "momo", "h", 2)}  # once
 
     class Later:
         def runs_for(self, job: str) -> list[Record]:
             return [] if job.endswith(":site") else [Record(after)]
 
-    assert _prior_trials(Later(), "drift", "site") == set()  # a local run after the cutoff
+    assert prior_trials(Later(), "drift", "site") == set()  # a local run after the cutoff
 
 
 def test_a_cushion_or_ratio_result_reads_the_excess_wins_and_a_return_its_mean() -> None:
@@ -125,7 +121,7 @@ def test_a_logged_baseline_is_not_a_trial_and_a_record_without_roles_still_count
         def runs_for(self, job: str) -> list[Record]:
             return [Record(logged)] if job == "edge-eval:drift:alice" else []
 
-    seen = _prior_trials(Writer(), "drift", "alice")  # type: ignore[arg-type]
+    seen = prior_trials(Writer(), "drift", "alice")  # type: ignore[arg-type]
     assert seen == {("main", "momo", "a", 2), ("main", "old", "c", 2)}
 
 

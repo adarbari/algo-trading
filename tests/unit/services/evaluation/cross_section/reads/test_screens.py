@@ -9,11 +9,7 @@ from typing import Any
 from algotrade.config.user import UserContext
 from algotrade.data import CapturedReads
 from algotrade.services.evaluation.cross_section import picks
-from algotrade.services.evaluation.cross_section.harness import (
-    _variants,
-    evaluate_edge,
-    screen_uses,
-)
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.measuring import Variant as MeasuringVariant
 from algotrade.services.evaluation.cross_section.reads.screens import (
     CachedScreen,
@@ -21,6 +17,7 @@ from algotrade.services.evaluation.cross_section.reads.screens import (
     shared_screens,
 )
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
+from algotrade.services.evaluation.cross_section.run.scopes import edge_variants, screen_uses
 from tests.unit.services.evaluation.cross_section.conftest import DAYS, World, edge
 from tests.unit.services.evaluation.cross_section.legs.test_reuse import SPLIT, T1, same
 
@@ -28,7 +25,7 @@ OWNER = "site"
 
 
 def _first_variant(world: World) -> MeasuringVariant:
-    return _variants(world.configs, UserContext(OWNER), edge())[0]
+    return edge_variants(world.configs, UserContext(OWNER), edge())[0]
 
 
 def test_shared_screens_keeps_the_pairs_more_than_one_use_names() -> None:
