@@ -198,6 +198,41 @@ def trade_frame(
     )  # fmt: skip
 
 
+def share_path_trades(
+    walks: pd.DataFrame, *, entry: date, side: str, cost_bps: float,
+    borrow_bps_annual: float | None = None,
+) -> pd.DataFrame:  # fmt: skip
+    """The contract's rows for share trades walked over ``bars/1d`` to a declared exit
+    (``engines.structures.share_walk``, E3c): one row per name of ``walks`` (``instrument_id``,
+    ``exit_session``, ``exit_index`` (sessions held), ``exit_kind``, ``gross_return``,
+    ``underlying_return``, ``max_adverse``;
+    a name the walker could not measure is not in it). Basis ``notional``, price source ``bars``;
+    the return on capital is the side's gross return less ``cost_bps`` (and, for a short, the
+    borrow over ``exit_index`` sessions at ``borrow_bps_annual``, as ``trade_frame`` has it), the
+    value and the hit
+    setup with no exit: this shape is for one with an ``[outcome.exit]`` only."""
+    n = len(walks)
+    if not n:
+        return empty_trades()
+    gross = _column(walks, "gross_return")
+    held = _column(walks, "exit_index")
+    borrow = borrow_cost(borrow_bps_annual, held) if side == "short" else 0.0
+    net = gross - cost_bps / 1e4 - borrow
+    with np.errstate(invalid="ignore"):
+        hit = net > 0
+    return _assemble(
+        instrument_id=walks["instrument_id"].to_numpy(dtype=object), side=side,
+        entry_session=entry, exit_session=_dates(walks["exit_session"]),
+        exit_kind=walks["exit_kind"].to_numpy(dtype=object), value=net, higher_is_better=True,
+        hit=hit, excluded=np.where(np.isfinite(net), "", "missing_value").astype(object),
+        delisted=(walks["exit_kind"] == DELISTED).to_numpy(dtype=bool), capital_basis="notional",
+        capital=np.full(n, np.nan), return_on_capital_gross=gross, return_on_capital=net,
+        max_adverse=_column(walks, "max_adverse"),
+        underlying_return=_column(walks, "underlying_return"),
+        price_source=BARS, outcome_licence=OPEN,
+    )  # fmt: skip
+
+
 def roc_moments(
     edge: Edge, rows: pd.DataFrame, counted: pd.DataFrame, entry: date,
     option_costs: OptionCosts | None,
@@ -264,4 +299,4 @@ def book_trades(series: pd.DataFrame) -> pd.DataFrame:
     )  # fmt: skip
 
 
-__all__ = ["book_trades", "roc_moments", "series_trades", "trade_frame"]
+__all__ = ["book_trades", "roc_moments", "series_trades", "share_path_trades", "trade_frame"]
