@@ -87,7 +87,10 @@ limited, and `ci.yml`'s `concurrency` cancels a branch's superseded run). Target
 at `-n 2`, whatever changed) and web (Prettier and Stylelint over the changed files, `ds:check`,
 `visual:missing` for a changed story; for a change under `src/` or `design-system/` the
 production build, `perf:bundle` and the DOM / request budgets `perf:e2e` on a free preview
-port). A push whose new commits are all clean merges of main runs the python lane alone. A
+port). A push whose new commits are all clean merges of main runs the python lane alone, except the
+budget for every lazy page (one vitest file, seconds), which runs on every push whose branch
+touches `src/` or `perf-budgets.json`: the budgets merge driver keeps a budget main raised for a
+page the branch removed (2026-11-02, #1035). A
 fast test that stops failing leaves the list; one that starts failing often joins it, if it
 is seconds (`make perf` checks the python lane against the budget on an idle machine). The
 table understates what the old hook already stopped (mirrored pytest, `tsc`, vitest, ESLint,
