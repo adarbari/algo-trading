@@ -2278,7 +2278,7 @@ type Idea {
 }
 
 """
-One idea's page for the session, shown under `setup` (the best that picked it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is the setup's id, the key of its Guide entry
+One idea's page for the session, shown under `setup` (the best that picked it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is the setup's id, the key of its Guide entry; `option`: the option sections of a Premium pick
 """
 type IdeaDetail {
   session: Date!
@@ -2293,6 +2293,7 @@ type IdeaDetail {
   risks: IdeaRisks!
   learn: String!
   metrics: [IdeaMetric!]!
+  option: IdeaOption
 }
 
 """
@@ -2315,6 +2316,37 @@ A stored display value of an idea's best pick: a screener column or a criterion'
 type IdeaMetric {
   name: String!
   value: JSON!
+}
+
+"""
+An option pick's sections, amounts in dollars per contract and prices per share: the example `legs`, `netCredit` and `cashSetAside`, the setup's `exitRule` with the marks on the credit, `maxLoss` (null and `unbounded` when a naked call has no limit), `thetaPerDay`, `oneSigmaLoss`, the report and ex-dividend flags and `mondayFloor`; each group's `unknown` says why a part is missing
+"""
+type IdeaOption {
+  chainDate: Date!
+  unknown: Unknown
+  legs: [OptionLegView!]!
+  chainClose: Float
+  entrySession: Date
+  exitSession: Date
+  netCredit: Float
+  cashSetAside: Float
+  exitRule: ExitRule
+  stopDebit: Float
+  stopLoss: Float
+  takeProfitDebit: Float
+  exitDteDate: Date
+  maxLoss: Float
+  unbounded: Boolean!
+  thetaPerDay: Float
+  oneSigmaLoss: Float
+  riskUnknown: Unknown
+  reportInLife: Boolean
+  reportDate: Date
+  exDividendInLife: Boolean
+  exDivDate: Date
+  calendarUnknown: Unknown
+  mondayFloor: Float
+  floorUnknown: Unknown
 }
 
 """
@@ -2815,6 +2847,19 @@ union OptionGridCell = GridCell | Unknown
 
 """The grid, or why there is none"""
 union OptionGridResult = OptionGrid | Unknown
+
+"""
+One leg of the example position: `qty` signed (negative: sold), `mid` and our `delta` per share, `pItm` the quoted chance it finishes in the money (not backtested)
+"""
+type OptionLegView {
+  right: String!
+  strike: Float!
+  expiry: Date!
+  qty: Int!
+  mid: Float!
+  delta: Float
+  pItm: Float
+}
 
 """
 One contract's stored quote; IV (a decimal) and Greeks as the feed computes them

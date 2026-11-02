@@ -31,7 +31,7 @@
       "src/pages/trader-edges/ui/EdgeSections.tsx": 98100,
       "src/pages/admin-screener-runs/index.ts": 41100,
       "src/pages/trader-explore/ui/UniverseTable.tsx": 95500,
-      "src/pages/trader-idea/index.ts": 12600
+      "src/pages/trader-idea/index.ts": 14000
     }
   },
   "e2e": {
@@ -119,7 +119,8 @@
     "e2e./explore?focus=AAPL&tab=features.requests": "2026-11-02 #1031 V4 merged main: the pre-push run measured 101 requests here (CI measured 99 on the earlier head; the count varies by up to 2 between runs); to be reclaimed in the post-milestone-A budget pass; then, before it: 2026-11-02 #1030 Where a ticker stands: its chunk and the picked-by read (measured locally 99); then, before it: 2026-10-25 #973 the theme switch: the signed-in shell reads the stored theme (one `Appearance` GraphQL request, entities/appearance) and ships the account-menu control (CI measured: one request over; vrp_scanner +246 B of script); then, before it: 2026-10-25 #971 Evening Desk fonts: the headings use a second display face (Sora 600) beside Figtree and DM Mono, one more font file on every page (measured in CI: one request over); then, before it: 2026-10-24 #939 Explore features: shared filter-bar chunks add preloaded chunks (measured locally); owner pre-approved raises caused only by shared filter-bar code",
     "network./explore.wire_gzip_bytes": "2026-10-24 #957 the filter bar's Views menu code in the Explore universe table's chunks (CI measured 412785 B against 412700 B, +915 B margin; owner pre-approved raises from the filter bar's shared code); then, before it: 2026-10-24 #939 Explore with no ticker open is now the universe table: its lazy chunk (86.5 kB gzip) loads with the page, +23 kB wire (409.7 kB measured locally, +3 kB margin); the table is the feature, not a shared-code move",
     "network./calendar.wire_gzip_bytes": "2026-11-01 #1027 the Earnings week table is the Calendar's default view: FeatureTable, its column factories and the picker load with the page (CI 357013 B + 5 %); the table is the feature, not a shared-code move",
-    "e2e./explore?focus=AAPL&tab=features.dom_nodes": "2026-11-02 #1030 Where a ticker stands: three panels, their rows and four help buttons (about 499 nodes measured), +3 margin"
+    "e2e./explore?focus=AAPL&tab=features.dom_nodes": "2026-11-02 #1030 Where a ticker stands: three panels, their rows and four help buttons (about 499 nodes measured), +3 margin",
+    "bundle.routes.src/pages/trader-idea/index.ts": "2026-11-02 #1082 the option idea page: the plan and the position's risks sections join the page chunk (measured 13305 B, +5 % per the route budget rule, #909)"
   },
   "waivers": {
     "bundle.entry_closure_gzip_bytes": {

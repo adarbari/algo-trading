@@ -72,7 +72,55 @@ const idea: Idea = {
     events: [{ date: '2026-10-07', label: 'Own earnings', name: 'AAPL earnings' }],
     unknown: null,
   },
+  option: null,
   learn: 'drift',
+};
+
+const optionIdea: Idea = {
+  ...idea,
+  tab: 'premium',
+  setup: { ...setup, tab: 'premium' },
+  option: {
+    chainDate: '2026-10-30',
+    unknown: null,
+    legs: [
+      {
+        right: 'put',
+        strike: 55,
+        expiry: '2026-12-04',
+        qty: -1,
+        mid: 0.71,
+        delta: -0.2,
+        pItm: 0.19,
+      },
+    ],
+    chainClose: 58.9,
+    entrySession: '2026-11-02',
+    exitSession: '2026-12-04',
+    netCredit: 0.71,
+    cashSetAside: 5500,
+    stopDebit: null,
+    stopLoss: null,
+    takeProfitDebit: 0.355,
+    exitDteDate: null,
+    maxLoss: 5429,
+    unbounded: false,
+    thetaPerDay: 2,
+    oneSigmaLoss: 210,
+    riskUnknown: null,
+    reportInLife: true,
+    reportDate: '2026-12-03',
+    exDividendInLife: false,
+    exDivDate: null,
+    calendarUnknown: null,
+    mondayFloor: null,
+    floorUnknown: {
+      code: 'NOT_STORED',
+      kind: 'NOT_STORED',
+      guideTerm: 'unavailable_not_stored',
+      kindText: 'Not stored',
+    },
+  },
 };
 
 const props = {
@@ -138,5 +186,29 @@ describe('IdeaDetail', () => {
     render(<IdeaDetail {...props} />);
     await userEvent.click(screen.getByRole('button', { name: 'Back to Ideas' }));
     expect(props.onBack).toHaveBeenCalledWith('stocks');
+  });
+  it('shows an option pick its plan and the position risks instead of the share exit rule', async () => {
+    hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(optionIdea));
+    const { container } = render(<IdeaDetail {...props} />);
+    for (const title of ['The plan', "The position's risks", 'Evidence']) {
+      expect(screen.getByRole('heading', { name: title })).toBeVisible();
+    }
+    expect(screen.queryByRole('heading', { name: 'Historical exit rule' })).toBeNull();
+    expect(screen.getByText('Short 1 put')).toBeVisible();
+    expect(screen.getByText('$5,500')).toBeVisible();
+    expect(screen.getByText('$5,429')).toBeVisible();
+    expect(screen.getByText('Yes · Thu 3 Dec')).toBeVisible();
+    expect(screen.getByText('Monday premium floor')).toBeVisible();
+    expect(screen.queryByText(/bid|ask/i)).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('says there is no limit when the position can lose without one', () => {
+    const open = { ...optionIdea.option, unbounded: true, maxLoss: null };
+    hooks.useIdeaDetail.mockReturnValue(
+      fakeQuery<Idea>({ ...optionIdea, option: open as Idea['option'] }),
+    );
+    render(<IdeaDetail {...props} />);
+    expect(screen.getByText('No limit')).toBeVisible();
   });
 });

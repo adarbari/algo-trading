@@ -215,6 +215,7 @@ function setupIdeas(tab: string | undefined, mode: 'listed' | 'unproven'): unkno
 
 /** The `IdeaDetail` answer: AAPL under the one qualifying setup (null for any other name). */
 function ideaDetail(symbol: string | undefined): unknown {
+  if (symbol === 'KTLX') return optionIdeaDetail();
   if (symbol !== 'AAPL') return { data: { idea: null } };
   const setup = {
     edgeId: 'drift',
@@ -272,7 +273,68 @@ function ideaDetail(symbol: string | undefined): unknown {
           events: [],
           unknown: null,
         },
+        option: null,
         learn: 'drift',
+      },
+    },
+  };
+}
+
+/** KTLX under a Premium setup: a short put, its exits as marks, a premium floor not stored. */
+function optionIdeaDetail(): unknown {
+  const base = (ideaDetail('AAPL') as { data: { idea: Record<string, unknown> } }).data.idea;
+  const setup = { edgeId: 'rich_puts', edgeName: 'Puts when options are rich', tab: 'PREMIUM' };
+  return {
+    data: {
+      idea: {
+        ...base,
+        instrumentId: 'EQ:KTLX',
+        tab: 'PREMIUM',
+        instrument: { symbol: 'KTLX', name: 'Kestrel Logic' },
+        setup: { ...setup, level: 'promising', place: 1 },
+        setups: [{ ...setup, level: 'promising', place: 1 }],
+        learn: 'rich_puts',
+        option: {
+          chainDate: '2026-10-02',
+          unknown: null,
+          legs: [
+            {
+              right: 'put',
+              strike: 55,
+              expiry: '2026-11-27',
+              qty: -1,
+              mid: 0.71,
+              delta: -0.2,
+              pItm: 0.19,
+            },
+          ],
+          chainClose: 58.9,
+          entrySession: '2026-10-05',
+          exitSession: '2026-11-27',
+          netCredit: 0.71,
+          cashSetAside: 5500,
+          stopDebit: null,
+          stopLoss: null,
+          takeProfitDebit: 0.355,
+          exitDteDate: null,
+          maxLoss: 5429,
+          unbounded: false,
+          thetaPerDay: 2,
+          oneSigmaLoss: 210,
+          riskUnknown: null,
+          reportInLife: false,
+          reportDate: null,
+          exDividendInLife: false,
+          exDivDate: null,
+          calendarUnknown: null,
+          mondayFloor: null,
+          floorUnknown: {
+            code: 'NOT_APPLICABLE',
+            kind: 'NOT_APPLICABLE',
+            guideTerm: 'unavailable_not_applicable',
+            kindText: 'Not applicable',
+          },
+        },
       },
     },
   };
