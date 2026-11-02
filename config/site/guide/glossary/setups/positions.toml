@@ -40,7 +40,7 @@ The take profit and stop loss settings of an option setup compile to rules on th
 is measured from the closing quotes of the day, so it can differ from what a trader could close
 at. It is missing when a leg has no usable quote that day.
 """
-see_also = ["position_mark_loss_share", "position_dte"]
+see_also = ["position_mark_loss_share", "position_dte", "exit_take_profit"]
 
 [[term]]
 id = "position_mark_loss_share"

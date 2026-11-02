@@ -22,6 +22,7 @@ import { useState, type ReactNode } from 'react';
 import { verdictLabel, verdictTone } from '@/entities/edge';
 import { useSetupIdeas, type IdeaTab, type SetupGroup, type SetupIdea } from '@/entities/idea';
 import { termHelp } from '@/features/guide-help';
+import { WatchlistShowing } from '@/features/watchlist';
 
 import { pickColumns } from '../model/columns';
 import { LEFT_OUT_TERMS, STATE_TERMS } from '../model/terms';
@@ -36,6 +37,8 @@ export interface SetupIdeasProps {
   onOpenEdge: (edgeId: string) => void;
   /** Open a name's idea page under the setup that ranks it. */
   onOpenIdea: (symbol: string, setupId: string) => void;
+  /** Open Settings (where the watchlist that filters the list is edited). */
+  onOpenSettings: () => void;
 }
 
 function GroupHeader({
@@ -151,7 +154,14 @@ function Detail({
   );
 }
 
-export function SetupIdeas({ tab, unproven, onOpen, onOpenEdge, onOpenIdea }: SetupIdeasProps) {
+export function SetupIdeas({
+  tab,
+  unproven,
+  onOpen,
+  onOpenEdge,
+  onOpenIdea,
+  onOpenSettings,
+}: SetupIdeasProps) {
   const found = useSetupIdeas(tab);
   const [chosen, setChosen] = useState<string | null>(null);
   const data = found.data;
@@ -198,6 +208,14 @@ export function SetupIdeas({ tab, unproven, onOpen, onOpenEdge, onOpenIdea }: Se
   const idea = data.ideas.find((i) => i.instrumentId === chosen) ?? null;
   return (
     <Stack gap={3}>
+      {data.watchlist !== null && (
+        <WatchlistShowing
+          shown={data.ideas.length}
+          of={data.watchlist}
+          help={termHelp('ideas_watchlist')}
+          onEdit={onOpenSettings}
+        />
+      )}
       {counts}
       <MasterDetail
         master={

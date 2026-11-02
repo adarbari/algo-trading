@@ -78,6 +78,7 @@ def test_rows_and_a_run_record_with_the_trial_log(world: World) -> None:
     saved = world.results.load_run(record.run_id)
     assert saved is not None and saved.job == "edge-eval:drift:site"
     assert all_row["user_id"] == "site" and saved.stats["trials"][0]["excluded_coverage"] == 0
+    assert saved.stats["exits_digest"] is None  # a share setup: no declared option exits
     (trial,) = saved.stats["trials"]
     assert (trial["variant"], trial["horizon"], trial["lift"], trial["ranked_share"]) == (
         "momo",
