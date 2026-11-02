@@ -31,6 +31,8 @@ jobs:
       python: ${{ steps.areas.outputs.python }}
       web: ${{ steps.areas.outputs.web }}
       web_deps: ${{ steps.areas.outputs.web_deps }}
+      evaluate: ${{ steps.areas.outputs.evaluate }}
+      visual: ${{ steps.areas.outputs.visual }}
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 2 } # a PR checks out its merge commit: parent 1 is the base
@@ -38,16 +40,19 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
         run: |
-          python=false web=false web_deps=false
-          if [ "$EVENT" != pull_request ]; then python=true web=true web_deps=true; fi
+          python=false web=false web_deps=false evaluate=false visual=false
+          if [ "$EVENT" != pull_request ]; then python=true web=true web_deps=true evaluate=true visual=true; fi
           while IFS= read -r f; do
             case "$f" in
               "") ;;
-              .github/workflows/ci.yml | apps/api/openapi.json | apps/api/schema.graphql) python=true web=true ;;
-              apps/web/package-lock.json | apps/web/package.json | apps/web/design-system/package.json | apps/web/audit-allowlist.json) web=true web_deps=true ;;
-              apps/web/*) web=true ;;
+              .github/workflows/ci.yml) python=true web=true evaluate=true visual=true ;;
+              apps/api/openapi.json | apps/api/schema.graphql) python=true web=true ;;
+              apps/web/package-lock.json | apps/web/package.json | apps/web/design-system/package.json | apps/web/audit-allowlist.json) web=true web_deps=true visual=true ;;
+              apps/web/src/* | apps/web/e2e/* | apps/web/real/*) web=true ;; # app code: no story, no screenshot (stories live in design-system only)
+              apps/web/*) web=true visual=true ;;
               docs/* | .claude/* | *.md | LICENSE) ;; # docs only: the architecture tests cover them
-              *) python=true ;;
+              tests/* | apps/api/*) python=true ;; # the scorecard runs the backtest and ingestion apps over the golden store, not tests or the API
+              *) python=true evaluate=true ;;
             esac
           done < <(git diff --name-only HEAD^1 HEAD)
           echo "python=$python web=$web web_deps=$web_deps"
@@ -79,7 +84,7 @@ jobs:
   evaluate:
     name: Strategy evaluation vs the golden baseline
     needs: [changes]
-    if: needs.changes.outputs.python == 'true'
+    if: needs.changes.outputs.evaluate == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -118,7 +123,7 @@ jobs:
     needs: [changes]
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true # a red shard frees its runners for the queue; the failing shard's log names the failure
       matrix:
         # Python 3.13 runs nightly (nightly.yml), not here.
         python: ["3.12"]
@@ -372,7 +377,7 @@ jobs:
   web-storybook:
     name: Web Storybook build
     needs: [changes]
-    if: needs.changes.outputs.web == 'true'
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -397,7 +402,7 @@ jobs:
   web-screenshots:
     name: Web screenshots + axe (shard ${{ matrix.shard }} of 4)
     needs: [changes, web-storybook]
-    if: needs.changes.outputs.web == 'true'
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble

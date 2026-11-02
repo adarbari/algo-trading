@@ -37,6 +37,23 @@ real-app smoke). They are repo settings only the owner changes, so the web jobs 
 one gate job with the protected name; `tests/architecture/pipeline/test_ci_workflow.py` fails a
 rename.
 
+## Queue time, not compute (2026-11-01)
+
+Jobs ran 2-5 min but waited 5-26 min for a runner: a full PR run is ~33 jobs / ~100 job-minutes
+against the account's concurrent-runner cap, with many PRs open. So the lever is runner-minutes
+per push. `changes` also outputs `evaluate` (skipped for a change only under `tests/` or
+`apps/api/`) and `visual` (Storybook + screenshots, skipped when only `apps/web/{src,e2e,real}`
+changed: stories live in `design-system`); the `test` matrix is `fail-fast`. A push to main
+runs everything. Not done, on purpose: skipping CI on drafts (review loops read it) and
+path-selected pytest shards (the 90% coverage gate needs every shard). Raising the cap
+(plan or larger runners) is the owner's call; self-hosted runners stay forbidden.
+
+Before the push (same day): `make changed` also runs ESLint over the changed web scripts (~45 s)
+and, for a change under `src/` or `design-system/`, the production build and bundle budgets;
+a `pre-push` hook (`make-changed` in `.pre-commit-config.yaml`, installed by `make install` or
+`pre-commit install --hook-type pre-push` in the main checkout) runs it. Still CI-only: the
+screenshot shards (Docker) and the dependency audit (network).
+
 ## Pipeline
 
 What the pipeline looked like on 2026-10-07 (30 PRs merged that day) and what each change
