@@ -7,6 +7,7 @@ from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.runs import EdgeRow
 from algotrade.services.read.evaluation.verdict.criteria import (
+    TAILS,
     _first,
     _words,
 )
@@ -25,8 +26,14 @@ from algotrade.services.read.evaluation.verdict.model import (
 )
 
 
-def _level(c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings) -> tuple[str, str]:
+def _level(
+    c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings, profile: str = "return"
+) -> tuple[str, str]:
+    """The level and its reason from ``crit``. ``profile``: the decile t's slot holds the
+    bootstrap t of the return on capital under ``tails`` (``criteria._tails_criteria``), and the
+    Not-working floor reads that t, the one the criterion shows."""
     oos, whole = c.oos, c.whole
+    slot_t = oos.excess_roc_t if profile == TAILS else oos.decile_t
     by = {x.id: x for x in crit}
     trades = oos.sessions
     if trades is None or trades < t.min_oos_trades:
@@ -41,7 +48,7 @@ def _level(c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings) 
     below_median = oos.lift is not None and bool(lifts) and oos.lift < statistics.median(lifts)
     hard = [
         (pts is not None and pts <= 0, "win_rate"),
-        (oos.decile_t is not None and oos.decile_t < t.not_working_t, "decile_t"),
+        (slot_t is not None and slot_t < t.not_working_t, "decile_t"),
         (  # a portfolio book's picks-series t, as the decile t is for a ranking
             "promising_picks_t" in by and oos.picks_t is not None and oos.picks_t < t.not_working_t,
             "promising_picks_t",

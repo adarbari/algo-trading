@@ -29,7 +29,7 @@ CBOE = "cboe"
 CHAIN_FIELDS = (
     "position_key", "entry_spot", "entry_half_spread", "exit_half_spread", "pnl_mid",
     "exit_unknown_closes", "exit_session", "exit_kind", "collateral", "max_adverse",
-    "price_source", "licence",
+    "price_source", "licence", "exit_basis", "leg_kinds", "leg_qty",
 )  # fmt: skip
 CHAIN_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS, *CHAIN_FIELDS)
 _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "window_end")

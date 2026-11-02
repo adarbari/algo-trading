@@ -4,6 +4,7 @@ from itertools import pairwise
 
 import numpy as np
 import numpy.typing as npt
+import pytest
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
@@ -12,6 +13,8 @@ from algotrade.quant import covariance as cv
 from algotrade.quant import realized_vol as rv
 from algotrade.quant import turning_points as tp
 from algotrade.quant.cross_section import cohort_percentile
+from algotrade.quant.edges import tails
+from algotrade.quant.edges.tails import stationary_bootstrap
 from algotrade.quant.implied_vol import IVStatus, implied_vol
 from algotrade.quant.rates import YieldCurve, par_to_continuous
 
@@ -214,3 +217,31 @@ def test_cohort_percentile_is_monotone_and_blind_to_other_cohorts(
     more = cohort_percentile(np.append(values, extra), np.append(codes, 7), 2)
     keep = codes >= 0
     assert np.array_equal(more[:-1][keep], out[keep], equal_nan=True)
+
+
+# The block bootstrap of the evidence measures (ADR 0088, design 2.6): a pure function of
+# (values, mean block, draws, seed): no global random state, no dependence on the chunk size.
+SERIES = st.lists(st.floats(-0.5, 0.5, allow_nan=False), min_size=2, max_size=40)
+
+
+@settings(max_examples=40, deadline=None)
+@given(SERIES, st.floats(1.0, 12.0), st.integers(100, 400), st.integers(0, 2**63 - 1))
+def test_the_bootstrap_is_a_pure_function_of_its_inputs(
+    values: list[float], block: float, draws: int, seed: int
+) -> None:
+    np.random.seed(1)
+    first = stationary_bootstrap(values, block, draws, seed)
+    np.random.seed(2)
+    np.random.random(17)  # the global state moves between the calls
+    assert stationary_bootstrap(values, block, draws, seed) == first
+
+
+@settings(max_examples=15, deadline=None)
+@given(SERIES, st.integers(1, 300))
+def test_the_bootstrap_does_not_depend_on_the_chunk_constant(
+    values: list[float], chunk: int
+) -> None:
+    want = stationary_bootstrap(values, 3.0, 300, 4)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(tails, "CHUNK", chunk)
+        assert stationary_bootstrap(values, 3.0, 300, 4) == want

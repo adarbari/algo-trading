@@ -13,6 +13,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section import measuring
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -149,14 +150,15 @@ def test_an_outcome_that_is_not_a_return_counts_no_cost_levels() -> None:
             kind="hit_target", measure="realised_to_implied_vol", is_return=False
         )
     )
-    scope = SimpleNamespace(edge=otm, key="main")
-    found = measuring._hits_at(
-        scope,
-        None,
-        None,
+    found = SessionReads.level_frames(
+        None,  # type: ignore[arg-type]  # nothing of the session is read
+        "main",
+        otm,  # type: ignore[arg-type]
         2,
+        date(2026, 9, 1),
         pd.DataFrame(),
         frozenset(),
-        (0.0, 15.0),  # type: ignore[arg-type]
+        (0.0, 15.0),
+        None,
     )
     assert found == []

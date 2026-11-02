@@ -24,6 +24,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
@@ -64,9 +65,11 @@ def training_frame(
     start: date,
     until: date,
     horizon: int | None = None,
+    option_costs: OptionCosts | None = None,
 ) -> TrainingFrame:
     """Training rows of ``edge`` over the decision sessions in ``start``..``until`` for the first
-    horizon (or ``horizon``). Raises ``ConfigurationError`` for an edge with no ``[scorer]``
+    horizon (or ``horizon``); ``option_costs``: the commission an option P&L label pays.
+    Raises ``ConfigurationError`` for an edge with no ``[scorer]``
     features, a scorer feature computed from a ``no_ml`` table or one the site catalogue does not
     resolve (``no_ml.py``), no ``frozen_from``, an event schedule or an outcome that
     needs an implied vol (not fitted by ED7a), and ``MissingDataError`` when no outcome is
@@ -91,7 +94,9 @@ def training_frame(
         if s not in by_entry:
             continue
         ids = sorted(eligible(reader, universe, d).ids)
-        counted = apply_outcome(edge, by_entry[s][by_entry[s]["instrument_id"].isin(ids)])
+        counted = apply_outcome(
+            edge, by_entry[s][by_entry[s]["instrument_id"].isin(ids)], option_costs=option_costs
+        )
         counted = counted[counted["excluded"] == ""]
         view, _ = fields_view(
             reader,

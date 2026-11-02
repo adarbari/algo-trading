@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
@@ -578,7 +579,30 @@ def test_a_settled_option_trade_has_its_return_on_capital_and_no_underlying_retu
     assert len(settled) and set(settled["status"]) == {"won"}
     top = settled.set_index("instrument_id").loc["EQ:N19"]
     assert pd.isna(top["return"])  # the chain grain's return is the option's, never the name's
-    assert top["return_on_capital"] == pytest.approx((9.5 - 0.4) / 95)
+    assert top["return_on_capital"] == pytest.approx(
+        (9.5 - 0.4 - 0.013) / 95
+    )  # spread and the 2 x 0.65 commission
     assert (top["exit_kind"], top["price_source"]) == ("HORIZON", "option_history")
     # the figure is read from bought history: the row is personal, whatever the signal's licence
     assert set(settled["licence"]) == {"personal"}
+
+
+def test_the_night_settles_option_trades_with_the_verdicts_option_costs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """E6b-2 review: paper settled an option P&L without the commission the backtest pays."""
+    seen: list[object] = []
+
+    def spy(reader, edge, group, session, now, option_costs=None):  # type: ignore[no-untyped-def]
+        seen.append(option_costs)
+        return []
+
+    monkeypatch.setattr(results, "settle_group", spy)
+    book = pd.DataFrame(
+        {"edge_id": ["e"], "signal_session": [date(2026, 1, 5)], "buy_session": [date(2026, 1, 6)],
+         "horizon_sessions": [2], "status": ["open"], "sell_session": [date(2026, 1, 8)],
+         "instrument_id": ["EQ:A"]}
+    )  # fmt: skip
+    costs = OptionCosts(commission_usd=1.5)
+    results._settlements(None, {"e": object()}, book, date(2026, 1, 9), datetime.now(UTC), costs)  # type: ignore[arg-type]
+    assert seen == [costs]

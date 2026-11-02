@@ -66,7 +66,8 @@ is the value with higher = better, so a ``below`` edge's ranks and effect sizes 
 as an ``above`` one's.
 """
 
-from collections.abc import Mapping
+import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -75,6 +76,7 @@ import pandas as pd
 from algotrade.config.edges.document import EXCESS_MEASURES, Edge
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.positions.key import position_key
+from algotrade.config.edges.verdict import OptionCosts
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant.black_scholes import (
     atm_straddle_price,
@@ -84,6 +86,7 @@ from algotrade.quant.black_scholes import (
     prob_otm,
     strike_from_delta,
 )
+from algotrade.services.evaluation.evidence.values import at_level, commission_of
 
 IMPLIED_VOL_FIELD = (
     "rollup.iv30@v1.iv30"  # our IV30 (decimal, like fwd_realised_vol); chains from 2026-10-02
@@ -327,17 +330,22 @@ def chain_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
     return outcomes[outcomes["position_key"].isin(keys)]
 
 
-def _chain_pnl(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
+def _chain_pnl(
+    edge: Edge, outcomes: pd.DataFrame, option_costs: OptionCosts | None = None
+) -> np.ndarray:
     """The ``option_pnl`` value per row of ``chain_rows`` (NaN where a price is missing): the
     position's mid P&L less the half-spreads paid at entry and at exit, over the entry underlying
     price, less ``cost_bps``. A short position's sign is already in ``pnl_mid`` (quantities are
-    signed). No hedge cost and no financing."""
+    signed). The commission per contract is paid too (``evidence.values``: the frame's own
+    ``commission`` column at a cost level, else ``option_costs``' at the main level, which is the
+    ``full`` one; none when neither is given). No hedge cost and no financing."""
     o = edge.outcome
     gross = _numbers(outcomes, "pnl_mid")
     spot = _numbers(outcomes, "entry_spot")
     spread = _numbers(outcomes, "entry_half_spread") + _numbers(outcomes, "exit_half_spread")
+    fee = commission_of(outcomes, option_costs)
     with np.errstate(divide="ignore", invalid="ignore"):
-        value = (gross - spread) / spot - (o.cost_bps or 0.0) / 1e4
+        value = (gross - spread - fee) / spot - (o.cost_bps or 0.0) / 1e4
     return np.where(spot > 0, value, np.nan)
 
 
@@ -401,6 +409,22 @@ def _unmeasured(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
     return mask
 
 
+def level_outcomes(
+    edge: Edge, outcomes: pd.DataFrame, names: Sequence[str], costs: OptionCosts
+) -> list[pd.DataFrame]:
+    """``apply_outcome`` of an ``option_pnl`` edge's ``outcomes`` at each cost level in ``names``
+    (``evidence.values.at_level``): the same formula over the leveled copy, so a level's counted
+    names are the main level's. One frame per level, in order."""
+    return [apply_outcome(edge, at_level(outcomes, n, costs), option_costs=costs) for n in names]
+
+
+def level_values(levels: Sequence[pd.DataFrame], name: str) -> tuple[float, ...] | None:
+    """The oriented value of ``name`` at each cost level of ``levels`` (``level_outcomes`` indexed
+    by instrument); None when there is no level or a level has no finite value for it."""
+    found = [float(f["oriented"].get(name, math.nan)) for f in levels]
+    return tuple(found) if found and all(math.isfinite(v) for v in found) else None
+
+
 def _refuse_book(edge: Edge) -> None:
     """A ``portfolio_return`` is valued as a book (``cross_section/portfolio``), never by name."""
     if edge.outcome.kind == "portfolio_return":
@@ -410,9 +434,11 @@ def _refuse_book(edge: Edge) -> None:
         )
 
 
-def _chain_outcome(edge: Edge, outcomes: pd.DataFrame, excluded: np.ndarray) -> np.ndarray:
+def _chain_outcome(
+    edge: Edge, outcomes: pd.DataFrame, excluded: np.ndarray, option_costs: OptionCosts | None
+) -> np.ndarray:
     """``_chain_pnl`` per row; ``excluded`` gets the reason of each row that has no value."""
-    value = _chain_pnl(edge, outcomes)
+    value = _chain_pnl(edge, outcomes, option_costs)
     excluded[~np.isfinite(value)] = MISSING_VALUE
     # a close on which an exit rule was UNKNOWN: the strictest stand-in until verdict.toml names
     # an exit_unknown_share (a named follow-up of E4)
@@ -425,11 +451,14 @@ def apply_outcome(
     outcomes: pd.DataFrame,
     implied: Mapping[str, float | None] | None = None,
     pairs: Pairs | None = None,
+    option_costs: OptionCosts | None = None,
 ) -> pd.DataFrame:
     """``outcomes`` (the rows of one horizon at one session) as ``RESULT_COLUMNS``: the value,
     its higher-is-better orientation, whether it hit, why it was excluded (``""`` when counted)
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
-    ``needs_implied_vol``); ``pairs``: the siblings (needed when ``needs_pairs``)."""
+    ``needs_implied_vol``); ``pairs``: the siblings (needed when ``needs_pairs``);
+    ``option_costs``: the commission an ``option_pnl`` value pays (no other kind reads it; none:
+    no commission)."""
     o = edge.outcome
     outcomes = chain_rows(edge, outcomes)
     _refuse_book(edge)
@@ -443,7 +472,7 @@ def apply_outcome(
     elif o.kind == "option_model_pnl":
         value = _model_outcome(edge, outcomes, implied, excluded)
     elif o.kind == CHAIN_KIND:
-        value = _chain_outcome(edge, outcomes, excluded)
+        value = _chain_outcome(edge, outcomes, excluded, option_costs)
     elif o.kind == "pair_spread":
         value = _pair_outcome(edge, outcomes, pairs, excluded)
     elif is_return(edge):

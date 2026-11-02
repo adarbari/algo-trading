@@ -11,11 +11,12 @@ from datetime import date
 from typing import Any
 
 import pandas as pd
+import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
-from algotrade.services.evaluation.cross_section.results import edge_eval_frame
+from algotrade.services.evaluation.cross_section.results import TAIL_COLUMNS, edge_eval_frame
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -64,6 +65,11 @@ def _digest(frame: pd.DataFrame, columns: list[str] | None = None) -> str:
     return hashlib.sha256(text.to_csv().encode()).hexdigest()[:16]
 
 
+def _before_e6b(frame: pd.DataFrame) -> pd.DataFrame:
+    """``edge_eval`` as it was before E6b: the evidence columns are new, every other one pinned."""
+    return frame.drop(columns=list(TAIL_COLUMNS))
+
+
 def _run(w: World, e: Any) -> EdgeEvaluation:
     return evaluate_edge(
         w.reader, w.results, w.configs, UserContext("site"), e, DAYS[0], DAYS[-1], AS_OF
@@ -101,7 +107,9 @@ DIGESTS: dict[
     "long_short": ("de0571f44206c520", "5625c55ec76c7220"),
     "hit_target": ("4fa2a61dac328851", "ab73369e4bc0aff1"),
     "expires_otm": ("22d2faaee8d62085", "d92e6cd61083351c"),
-    "option_pnl": ("3fbfc5c8a5dc6315", "5bceadef7c7c768b"),
+    # E6b-2: the option value pays the commission and the cost rows are the levels, so this pair
+    # moved (pinned again here); every share kind above is unchanged
+    "option_pnl": ("e54610f569589f2f", "82af9d789f23a17a"),
     "pair_spread": ("8d8b92b65a0090dc", "1ace53a0cd9957fb"),
     "portfolio_return": ("320e2349658aa2b8", "empty"),  # a book has no ledger rows
 }
@@ -128,7 +136,7 @@ def _scored(evaluations: dict[str, EdgeEvaluation]) -> dict[str, str]:
     """Every row of ``edge_eval`` but the random draws': the screeners', baselines' and costs'."""
     out = {}
     for name, ev in evaluations.items():
-        frame = edge_eval_frame(ev, "r", AS_OF)
+        frame = _before_e6b(edge_eval_frame(ev, "r", AS_OF))
         out[name] = _digest(frame[~frame["role"].astype(str).str.startswith("random")])
     return out
 
@@ -152,3 +160,30 @@ def test_the_time_series_measures_and_windows_are_pinned() -> None:
 
 
 TS_DIGEST = "0cf9a38f445537be"
+
+
+def _all_row(ev: EdgeEvaluation) -> pd.Series:
+    frame = edge_eval_frame(ev, "r", AS_OF)
+    return frame[(frame["role"] == "screener") & (frame["slice_kind"] == "all")].iloc[0]
+
+
+def test_the_evidence_columns_are_new_and_null_where_nothing_is_measured() -> None:
+    """E6b: only new columns appear. A share row has its series; an outcome with no money has
+    none (null, never 0); an option position's base is its stored ``base_roc`` (E6b-2); a cost row
+    and a random draw are not tail rows."""
+    evs = _evaluations()
+    long, option = _all_row(evs["long"]), _all_row(evs["option_pnl"])
+    assert long["roc_sessions"] == 4 and long["mean_roc"] == pytest.approx(0.075)
+    assert long["cvar_5_n"] == 1 and long["excess_roc"] == pytest.approx(0.075)
+    assert option["roc_sessions"] == 4 and not pd.isna(option["excess_roc"])
+    assert pd.isna(option["base_cvar_5"]) and not pd.isna(option["cvar_5"])
+    for name in ("hit_target", "expires_otm"):
+        assert _all_row(evs[name])[list(TAIL_COLUMNS)].isna().all(), name
+    assert _all_row(evs["long_short"])["roc_sessions"] == 4  # its spread's own series
+    assert pd.isna(_all_row(evs["long_short"])["excess_roc"])  # a spread has no base
+    for ev in evs.values():
+        frame = edge_eval_frame(ev, "r", AS_OF)
+        other = frame[
+            (frame["slice_kind"] == "cost") | frame["role"].astype(str).str.startswith("random")
+        ]
+        assert other[list(TAIL_COLUMNS)].isna().all().all()

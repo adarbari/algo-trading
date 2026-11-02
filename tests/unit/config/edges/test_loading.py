@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.config.edges.document import CLOSED
 from algotrade.config.edges.loading import edge_problems, load_all_edges, load_edges
-from algotrade.config.edges.verdict import DECOYS_STANDARD
+from algotrade.config.edges.verdict import DECOYS_STANDARD, resolve_profile
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import field_catalog
@@ -434,3 +434,26 @@ def test_without_a_verdict_file_the_default_decoys_expand() -> None:
     docs = {("site", "edges", "drift"): document(baselines=["@standard"])}
     (edge,) = load_edges(MemoryConfigStore({**presets, **docs}))
     assert edge.baselines == DECOYS_STANDARD
+
+
+# The share setups allowed the ``tails`` profile (a new edge version's id and why; X9 adds them).
+SHARE_TAILS_ALLOWED: frozenset[str] = frozenset()
+OLDER_OPTION_KINDS = {  # expires_otm / option_model_pnl: the older option kinds keep `return`
+    "vrp_short_premium", "c12_vrp_cross_section_iv_hv", "c13_iv_term_structure_straddles",
+    "c14_delta_hedged_characteristics", "c16_pre_earnings_straddle_buy",
+    "c17_earnings_iv_crush_sell", "c18_iv_rank_conditional_selling",
+}  # fmt: skip
+
+
+def test_every_shipped_edge_judges_on_the_return_profile_unless_it_is_an_option_pnl() -> None:
+    """ADR 0088 design 2.6, risk 16: a stock verdict never moves silently. The profile of every
+    site edge resolves to ``return`` unless its outcome kind is ``option_pnl`` (``tails``); the
+    seven older option kinds are named, so a re-kind of one is seen here first."""
+    edges = load_edges(SHIPPED)
+    older = {e.id for e in edges if e.outcome.kind in ("expires_otm", "option_model_pnl")}
+    assert older == OLDER_OPTION_KINDS
+    for e in edges:
+        want = "tails" if e.outcome.kind == "option_pnl" else "return"
+        got = resolve_profile(e.outcome.kind, e.verdict_profile)
+        assert got == want or e.id in SHARE_TAILS_ALLOWED, (e.id, e.outcome.kind, got)
+    assert not SHARE_TAILS_ALLOWED  # until a new edge version needs it, with its reason

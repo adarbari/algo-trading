@@ -52,6 +52,8 @@ from algotrade.config.edges.document import (
 from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
+from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -113,6 +115,7 @@ from algotrade.services.evaluation.cross_section.measures import (
     CostGrid,
     SessionStat,
     SliceMeasure,
+    TailSpec,
     cost_measures,
     deflate,
     edge_slices,
@@ -156,6 +159,7 @@ from algotrade.services.evaluation.cross_section.sessions import (
     leg_blocks,
 )
 from algotrade.services.evaluation.evidence.contract import capital_basis_of
+from algotrade.services.evaluation.evidence.measures import BOOTSTRAP_SEED_VERSION
 from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
 from algotrade.services.evaluation.time_series.measures import deflate_trial, pbo_among
 from algotrade.services.features import catalogue
@@ -244,13 +248,14 @@ def _slice_rows(
     adv_floor: float,
     wins: bool = False,
     horizon: int = 1,
+    tail: TailSpec | None = None,
 ) -> tuple[tuple[SliceMeasure, ...], tuple[SliceMeasure, ...]]:
     """One variant's slice rows and, for a return outcome (``costs``), its cost rows (ADR 0064
     decision 5: none for an outcome that is not a return). ``wins``: the Sharpe ratio is of the
     excess wins (``measures.trial_value``); ``horizon``: the holding period, for the overlap of
-    the windows the t-ratios count."""
+    the windows the t-ratios count; ``tail``: the evidence measures' inputs (``TailSpec``)."""
     slices = edge_slices(stats, split, exploratory)
-    measures = slice_measures(stats, slices, model, frozen_from, adv_floor, wins, horizon)
+    measures = slice_measures(stats, slices, model, frozen_from, adv_floor, wins, horizon, tail)
     costed = cost_measures(stats, slices, measures, costs) if costs is not None else []
     return tuple(measures), tuple(costed)
 
@@ -305,6 +310,9 @@ class EdgeEvaluation:
     # Each screener's config hash as the run resolved it (``Variant.hash``), recorded in the run
     # record's stats so the provenance line can tell a screener changed since (empty: none).
     screener_hashes: Mapping[str, str] = field(default_factory=dict)
+    # The bootstrap's draws, mean block and seed version, recorded in the run record's stats
+    # (the evidence measures' audit, ADR 0088 2.6); empty: no tail measures (a time-series run).
+    bootstrap: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _random_sets(
@@ -515,6 +523,7 @@ def evaluate_edge(
         edge.id,
         verdict.cost_levels_bps,  # every leg counts hits at the site's cost grid
         verdict.capacity_adv_floor_usd,  # a short leg's liquidity floor (key of such legs only)
+        verdict.option_costs,  # an option_pnl leg's cost levels and commission (its key only)
     )
     stored = read_legs(reader, user.user_id, edge.id, start, end)
     needs = _needs(plans, variants, schedules, spec)
@@ -591,7 +600,9 @@ def evaluate_edge(
                 exploratory,
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
-                CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
+                CostGrid(None, (), scope.edge.outcome.sign, OPTION_LEVELS)
+                if scope.edge.outcome.kind == CHAIN_KIND
+                else CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
                 if is_return(scope.edge)
                 and scope.edge.outcome.side != LONG_SHORT
                 and scope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
@@ -599,6 +610,12 @@ def evaluate_edge(
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
                 counts_wins(unit_of(scope.edge)),
                 horizon,
+                TailSpec(
+                    _trial_hash(scope, variant),  # config identity, never a code version (the seed)
+                    verdict.tails,
+                    bootstrap=variant.role == SCREENER,  # the verdict reads the screener's only
+                    base=scope.edge.outcome.sign > 0,  # an option's: its stored base_roc
+                ),
             )
             results.append(
                 VariantResult(
@@ -676,6 +693,11 @@ def evaluate_edge(
         legs_computed=len(stats.rows),
         legs_invalidated=dict(reuse.invalidated),
         oos_haircut=None if edge.oos_class is None else verdict.oos_haircut(edge.oos_class),
+        bootstrap={
+            "draws": verdict.tails.bootstrap_draws,
+            "mean_block": verdict.tails.bootstrap_mean_block,
+            "seed_version": BOOTSTRAP_SEED_VERSION,
+        },
     )
 
 

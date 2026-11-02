@@ -6,11 +6,15 @@ the harness and the paper record alike."""
 
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import AbstractContextManager
+from dataclasses import replace
 from datetime import date
 from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from algotrade.config.edges.document import Edge
+from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.verdict import OPTION_LEVELS, OptionCosts
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
@@ -23,6 +27,11 @@ from algotrade.data.reference import UNIVERSE_TABLE, resolver
 from algotrade.services.evaluation.cross_section.historical import (
     HistoricalCaveat,
     IdentityTally,
+)
+from algotrade.services.evaluation.cross_section.hit import (
+    apply_outcome,
+    is_return,
+    level_outcomes,
 )
 from algotrade.services.evaluation.cross_section.legs.rows import DayReads
 from algotrade.services.evaluation.cross_section.picks import (
@@ -84,6 +93,7 @@ class SessionReads:
         self._history: dict[tuple[date, str, frozenset[str], date], dict[str, float | None]] = {}
         self._tickers: dict[tuple[tuple[str, ...], date], dict[str, str | None]] = {}
         self._outcomes: dict[tuple[str, int, date], pd.DataFrame] = {}
+        self._levels: dict[tuple[str, int, date], list[pd.DataFrame]] = {}
         self._snapshots: set[date] = set()
         self._identity = IdentityTally()
         self.errors: dict[str, MissingDataError] = {}  # variant -> its first lost session's error
@@ -180,6 +190,7 @@ class SessionReads:
         self._bills.clear()
         self._tickers.clear()
         self._outcomes.clear()
+        self._levels.clear()
 
     def label(self, day: date) -> str:
         if day not in self._labels:
@@ -279,6 +290,44 @@ class SessionReads:
         if key not in self._outcomes:
             self._outcomes[key] = score()
         return self._outcomes[key]
+
+    def level_frames(
+        self,
+        scope: str,
+        edge: Edge,
+        horizon: int,
+        day: date,
+        rows: pd.DataFrame,
+        ids: frozenset[str],
+        costs: Sequence[float],
+        option_costs: OptionCosts | None,
+    ) -> list[pd.DataFrame]:
+        """The outcomes of each base name at each level of the cost grid (the round trip at that
+        many bp instead of ``cost_bps``; ADR 0064 decision 5) or, for an ``option_pnl`` edge, at
+        each ``OPTION_LEVELS`` one (``hit.level_outcomes``); none for any other outcome.
+        Exclusions do not depend on the cost, so the counted names are the session's own. Kept
+        like ``outcomes``, once per (scope, horizon, D) in a chunk."""
+        if edge.outcome.kind == CHAIN_KIND:
+            if option_costs is None:
+                return []
+            key = (scope, horizon, day)
+            if key not in self._levels:
+                inside = rows[rows["instrument_id"].isin(ids)]
+                done = level_outcomes(edge, inside, OPTION_LEVELS, option_costs)
+                self._levels[key] = [f.set_index("instrument_id") for f in done]
+            return self._levels[key]
+        if not is_return(edge):
+            return []
+        found = []
+        for level in costs:
+            costed = replace(edge, outcome=replace(edge.outcome, cost_bps=level))
+
+            def score(e: Edge = costed) -> pd.DataFrame:
+                inside = rows[rows["instrument_id"].isin(ids)]
+                return apply_outcome(e, inside).set_index("instrument_id")
+
+            found.append(self.outcomes(f"{scope}@{level:g}bp", horizon, day, score))
+        return found
 
 
 def implied_at(
