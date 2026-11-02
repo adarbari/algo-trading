@@ -150,6 +150,7 @@ def load_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> verdict.Edg
             wins=verdict.counts_wins(edge),
             chain=verdict.is_chain(edge),
             neutral=verdict.is_factor_neutral(edge),
+            profile=verdict.profile_of(edge),
             base=edge.base,
         ),
         headline=headline,

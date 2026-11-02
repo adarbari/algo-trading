@@ -61,3 +61,24 @@ standard = [               # the decoy battery every edge is compared with on th
 min_winners = 30           # from the evidence (never a judge input, never in settings_hash): the fewest winning
 stop_percentile = 0.80     # trades the stop rests on (below it: the ATR fallback; 30 leaves six past the
 atr_multiple = 2.0         # stop), the share of winners whose adverse move the stop clears, the fallback's ATR multiple
+
+[tails_verdict]            # ADR 0088, design 2.6: the `tails` profile (option_pnl setups; a share setup only by a new
+option_cost_level = "full" # version); an option setup is judged at this cost level (share setups: the document's cost_bps)
+promising_psr = 0.90       # probabilistic Sharpe ratio: Promising needs at least this ...
+works_psr = 0.95           # ... Works this
+max_cvar_ratio = 1.25      # Promising: the setup's CVaR 5% may be at most this multiple of the base's
+min_tail_windows = 5       # the ratio is read only when the 5% tail holds at least this many windows
+bootstrap_draws = 2000     # stationary block bootstrap (Politis-Romano): draws per interval ...
+bootstrap_mean_block = 3   # ... and the mean block, in decision sessions (raised to the horizon's overlap)
+
+[option_costs]             # design 2.4: the option cost levels, `mid` (no spread), `effective`, `full` (all of it)
+levels = ["mid", "effective", "full"] # fixed names, in this order
+commission_usd = 0.65      # per contract on each side (none at expiry)
+effective_share_by_legs = { 1 = 0.75, 2 = 0.65, 4 = 0.53 } # the share of the half spread paid, by the number
+                           # of option legs (the largest key at or below the structure's count)
+
+[option_quotes]            # design 2.4: the quote filters of the option selector; they set the outcome rows, so
+two_sided = true           # this section is typed apart and never enters settings_hash
+not_crossed = true
+max_spread_share = 0.15    # bid-ask spread at most this share of the mid
+min_volume_or_oi = 1       # volume or open interest of at least this

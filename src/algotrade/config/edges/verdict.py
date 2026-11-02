@@ -5,6 +5,7 @@ here, and each default is the owner's decision of 2026-10-09."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any
 
 from algotrade.config.edges.portfolio import OOS_CLASSES
@@ -38,7 +39,22 @@ KEYS = (
     "capacity_adv_floor_usd",
     "capacity_position_usd",
     "exit_rule",  # typed apart (positions/exit_rule.py); never a judge input
+    "tails_verdict",  # TailsVerdict: the ``tails`` profile (ADR 0088, design 2.6)
+    "option_costs",  # OptionCosts: the option cost levels (E6b-2 reads them)
+    "option_quotes",  # typed apart (positions/quotes.py); sets outcome rows, never a judge input
 )
+TAILS_KEYS = (
+    "option_cost_level",
+    "promising_psr",
+    "works_psr",
+    "max_cvar_ratio",
+    "min_tail_windows",
+    "bootstrap_draws",
+    "bootstrap_mean_block",
+)
+OPTION_COSTS_KEYS = ("levels", "effective_share_by_legs", "commission_usd")
+OPTION_LEVELS = ("mid", "effective", "full")  # the contract's option ``cost_level`` names, in order
+PROFILES = ("return", "tails")  # ``verdict_profile`` (design 2.6)
 EDGE_COSTS_KEYS = ("levels_bps", "borrow_bps_annual")
 LEGS = ("long", "short", "long_short")  # ``[published] leg`` (ADR 0065; outcome sides)
 HAIRCUT_KEYS = LEGS  # ``[published_haircut]``: the share of a published figure lost, by leg
@@ -46,6 +62,89 @@ DECOYS_STANDARD = (
     "size_small", "momentum_12_1", "ivol_high", "max_ret_high", "amihud_illiquid", "beta_low",
 )  # fmt: skip
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
+
+
+@dataclass(frozen=True)
+class TailsVerdict:
+    """The ``tails`` profile (``[tails_verdict]``): PSR bounds, the largest CVaR ratio a setup may
+    show against its base (and the fewest windows in the tail that make the ratio worth reading),
+    and the stationary block bootstrap's size. Part of ``settings_hash``: a tune re-stores the
+    headlines once."""
+
+    option_cost_level: str = "full"
+    promising_psr: float = 0.90
+    works_psr: float = 0.95
+    max_cvar_ratio: float = 1.25
+    min_tail_windows: int = 5
+    bootstrap_draws: int = 2000
+    bootstrap_mean_block: float = 3.0
+
+    def __post_init__(self) -> None:
+        if self.option_cost_level not in OPTION_LEVELS:
+            raise ConfigurationError(f"option_cost_level: expected one of {list(OPTION_LEVELS)}")
+        if self.promising_psr > self.works_psr:
+            raise ConfigurationError("tails_verdict: promising_psr is above works_psr")
+
+    @classmethod
+    def from_table(cls, t: Table) -> "TailsVerdict":
+        d = cls()
+        return cls(
+            option_cost_level=t.choice("option_cost_level", d.option_cost_level, OPTION_LEVELS),
+            promising_psr=t.fraction("promising_psr", d.promising_psr),
+            works_psr=t.fraction("works_psr", d.works_psr),
+            max_cvar_ratio=t.number("max_cvar_ratio", d.max_cvar_ratio, 1e-9),
+            min_tail_windows=t.integer("min_tail_windows", d.min_tail_windows, 1),
+            bootstrap_draws=t.integer("bootstrap_draws", d.bootstrap_draws, 100),
+            bootstrap_mean_block=t.number("bootstrap_mean_block", d.bootstrap_mean_block, 1),
+        )
+
+
+@dataclass(frozen=True)
+class OptionCosts:
+    """The option cost levels (``[option_costs]``, design 2.4): ``mid`` pays no spread,
+    ``effective`` the share of the half spread by the number of option legs (a tuple of pairs,
+    so the canonical JSON has one form), ``full`` all of it; the commission per contract on each
+    side. In ``settings_hash``; E6b-2 puts it in the option leg key."""
+
+    levels: tuple[str, ...] = OPTION_LEVELS
+    effective_share_by_legs: tuple[tuple[int, float], ...] = ((1, 0.75), (2, 0.65), (4, 0.53))
+    commission_usd: float = 0.65
+
+    def __post_init__(self) -> None:
+        if self.levels != OPTION_LEVELS:
+            raise ConfigurationError(f"option_costs levels: expected {list(OPTION_LEVELS)}")
+        legs = [n for n, _ in self.effective_share_by_legs]
+        shares = [s for _, s in self.effective_share_by_legs]
+        ok = bool(legs) and legs[0] == 1 and all(a < b for a, b in pairwise(legs))
+        ok = ok and all(0 < s <= 1 for s in shares)
+        ok = ok and all(a >= b for a, b in pairwise(shares))
+        if not ok:
+            raise ConfigurationError(
+                "option_costs effective_share_by_legs: expected ascending leg counts starting "
+                f"at 1, shares in (0, 1] that do not rise, got {list(self.effective_share_by_legs)}"
+            )
+        if self.commission_usd < 0:
+            raise ConfigurationError("option_costs commission_usd: expected >= 0")
+
+    @classmethod
+    def from_table(cls, t: Table) -> "OptionCosts":
+        d = cls()
+        return cls(
+            levels=tuple(t.strings("levels", d.levels)),
+            effective_share_by_legs=_shares_by_legs(t, d.effective_share_by_legs),
+            commission_usd=t.number("commission_usd", d.commission_usd, 0),
+        )
+
+
+def resolve_profile(kind: str, declared: str | None) -> str:
+    """The verdict profile of an edge: the document's ``verdict_profile``, else ``tails`` for an
+    ``option_pnl`` outcome and ``return`` for every other kind (design 2.6; G-M2)."""
+    found = declared or ("tails" if kind == "option_pnl" else "return")
+    if found not in PROFILES:
+        raise ConfigurationError(
+            f"verdict_profile: expected one of {list(PROFILES)}, got {found!r}"
+        )
+    return found
 
 
 @dataclass(frozen=True)
@@ -113,6 +212,8 @@ class VerdictSettings:
     # report, never a verdict input.
     oos_haircut_trend: float = 0.45
     haircut_short: float = 0.5  # as the spread: a short leg is harder to hold (ADR 0065)
+    tails: TailsVerdict = TailsVerdict()  # ``[tails_verdict]``: the ``tails`` profile
+    option_costs: OptionCosts = OptionCosts()  # ``[option_costs]``
 
     def oos_haircut(self, oos_class: str) -> float:
         """The share of an in-sample Sharpe ratio expected lost, for an ``OOS_CLASSES`` class."""
@@ -135,7 +236,11 @@ class VerdictSettings:
         cut = t.table("published_haircut", HAIRCUT_KEYS)
         decoys = t.table("decoys", ("standard",))
         oos = t.table("oos_haircut", OOS_CLASSES)
+        tails = TailsVerdict.from_table(t.table("tails_verdict", TAILS_KEYS))
+        costs = OptionCosts.from_table(t.table("option_costs", OPTION_COSTS_KEYS))
         return cls(
+            tails=tails,
+            option_costs=costs,
             min_oos_trades=t.integer("min_oos_trades", d.min_oos_trades, 1),
             works_trades=t.integer("works_trades", d.works_trades, 1),
             works_oos_trades=t.integer("works_oos_trades", d.works_oos_trades, 1),
@@ -181,6 +286,25 @@ def _cost_levels(t: Table, d: VerdictSettings) -> tuple[float, ...]:
             f"{t.where} levels_bps: expected distinct non-negative numbers ascending, got {raw!r}"
         )
     return tuple(float(v) for v in raw)
+
+
+def _shares_by_legs(
+    t: Table, default: tuple[tuple[int, float], ...]
+) -> tuple[tuple[int, float], ...]:
+    """``effective_share_by_legs``: a table of leg count -> share (``{ 1 = 0.75, 2 = 0.65 }``)."""
+    raw = t.raw("effective_share_by_legs")
+    if raw is None:
+        return default
+    try:
+        pairs = [(int(k), float(v)) for k, v in dict(raw).items()]
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in raw.values()):
+            raise ValueError
+    except (ValueError, TypeError, AttributeError):
+        raise ConfigurationError(
+            f"{t.where} effective_share_by_legs: expected a table of leg count to share, "
+            f"got {raw!r}"
+        ) from None
+    return tuple(sorted(pairs))
 
 
 def _decoys(t: Table, default: tuple[str, ...]) -> tuple[str, ...]:

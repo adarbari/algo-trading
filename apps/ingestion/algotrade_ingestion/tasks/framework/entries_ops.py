@@ -122,8 +122,9 @@ def run_edge_verdicts(ctx: TaskContext, p: Params) -> RunRecord:
     if p.get("session") and not (start or end or p.get("all_edges")):
         start = end = p["session"]
     options = edge_verdicts.Options(
-        start, end, p.get("limit"), bool(p.get("dry_run")), bool(p.get("verify"))
-    )
+        start, end, p.get("limit"), bool(p.get("dry_run")), bool(p.get("verify")),
+        bool(p.get("expect_same")),
+    )  # fmt: skip
     return edge_verdicts.rejudge_edges(ctx, options, p.get("edge"))
 
 

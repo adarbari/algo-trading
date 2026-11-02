@@ -12,6 +12,12 @@ user's edge, a hidden copy, an exploratory run or an older run (the list reads n
   by running it again); rows are keyed by (edge, judged run, fingerprint), so two runs write equal
   rows. A skipped row is only checked against the live judge with ``--verify``: a difference is
   listed as a mismatch in the run's stats, never overwritten.
+- ``--expect-same-headlines`` (ADR 0088 design 2.6, risk 16: the deploy of a judge change): each
+  canonical run's row under the CURRENT fingerprint (newly framed, or already stored) is compared,
+  every ``EdgeSummary`` field, with the NEWEST row of the same (edge, judged run) under any other
+  fingerprint, by ``knowledge_ts``. Any difference FAILS the run and nothing is written (the one
+  publish is skipped); a run with no earlier row is counted ``no_prior``, never a failure. It
+  works with ``--dry-run``, and must run before the next nightly (a new canonical run has no prior).
 - The row is framed by the one framer the edge-eval publish uses
   (``services/evaluation/cross_section/detail/verdict.py``), from the run's committed rows through
   the reader's own judge call, so the stored headline is the live one.
@@ -27,7 +33,7 @@ user's edge, a hidden copy, an exploratory run or an older run (the list reads n
 
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date, datetime
 
 import pandas as pd
@@ -43,21 +49,26 @@ from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 
 TASK = "edge_verdicts"
-COUNTS = ("written", "would_write", "skipped", "none", "outside_window", "not_reached", "failed")
+COUNTS = (
+    "written", "would_write", "skipped", "none", "outside_window", "not_reached", "failed",
+    "compared", "no_prior", "withheld",
+)  # fmt: skip
 SHOWN = 20  # mismatches and failures listed in the run's stats
 
 
 @dataclass(frozen=True)
 class Options:
     """What one run was asked: the window on a run's range end, ``limit`` (rows written at most),
-    ``dry_run`` (count only) and ``verify`` (a read-only check: judge the current
-    rows too, list those that differ, write nothing)."""
+    ``dry_run`` (count only), ``verify`` (a read-only check: judge the current
+    rows too, list those that differ, write nothing) and ``expect_same`` (compare each new row
+    with the newest earlier row of its run, fail and write nothing on any difference)."""
 
     start: date | None = None
     end: date | None = None
     limit: int | None = None
     dry_run: bool = False
     verify: bool = False
+    expect_same: bool = False  # ``--expect-same-headlines``: fail, writing nothing, on any change
 
 
 class _Pass:
@@ -72,7 +83,9 @@ class _Pass:
         self.mismatches: list[str] = []
         self.failed: list[str] = []
         self.new: dict[date, list[pd.DataFrame]] = {}
+        self.changed: list[str] = []  # ``--expect-same-headlines``: a headline that moved
         self._stored: dict[date, dict[tuple[str, str, str], EdgeSummary]] = {}
+        self._headlines: dict[date, dict[tuple[str, str], list[framer.Headline]]] = {}
 
     def _note(self, key: str, status: str, count: str) -> None:
         self.run.record_item(key, status)
@@ -82,6 +95,11 @@ class _Pass:
         if day not in self._stored:
             self._stored[day] = framer.stored_summaries(self.stores, day)
         return self._stored[day]
+
+    def _earlier(self, day: date) -> dict[tuple[str, str], list[framer.Headline]]:
+        if day not in self._headlines:
+            self._headlines[day] = framer.stored_headlines(self.stores, day)
+        return self._headlines[day]
 
     def edge(self, edge: Edge) -> None:
         """Judge one edge's canonical run (or note why not); a failure is counted, never raised."""
@@ -108,7 +126,7 @@ class _Pass:
         day, opt = found.range_to, self.opt
         wanted = framer.run_fingerprint(self.stores, edge, found)
         current = self._have(day).get((edge.id, found.run_id, wanted))
-        if current is not None and not opt.verify:
+        if current is not None and not (opt.verify or opt.expect_same):
             return self._note(edge.id, "CURRENT", "skipped")
         if current is None and opt.limit is not None and self.counts["written"] >= opt.limit:
             return self._note(edge.id, "NOT_REACHED", "not_reached")
@@ -116,12 +134,39 @@ class _Pass:
         frame = framer.rejudged_frame(self.stores, edge, found, run_id=run_id, now=self.clock())
         if frame is None:  # filtered above by the same test: a bug if it happens
             raise ConfigurationError(f"{edge.id}: the canonical run was not judged")
+        if opt.expect_same:  # the row this edge has (or gets) under the current fingerprint
+            now = current or next(iter(framer.summaries_of(frame).values()))
+            self._compared(edge.id, found, wanted, now)
+        if current is not None and not opt.verify:  # compared above, nothing to write
+            return self._note(edge.id, "CURRENT", "skipped")
         if current is not None:  # --verify: the stored row against the live judge
             return self._verified(edge.id, current, frame)
         if opt.dry_run or opt.verify:  # a check never writes
             return self._note(edge.id, "DRY_RUN", "would_write")
         self._note(edge.id, "WRITTEN", "written")
         self.new.setdefault(day, []).append(frame)
+
+    def _compared(self, key: str, found: runs.EdgeRun, wanted: str, now: EdgeSummary) -> None:
+        """``--expect-same-headlines``: ``now`` (the headline under the current fingerprint)
+        against the newest row of the same run under another fingerprint, field by field. No
+        earlier row is counted, never a failure."""
+        day = found.range_to
+        assert day is not None  # a run in the window has a range end
+        others = [
+            h for h in self._earlier(day).get((key, found.run_id), []) if h.fingerprint != wanted
+        ]
+        if not others:
+            self.counts["no_prior"] += 1
+            return
+        before = max(others, key=lambda h: h.knowledge_ts).summary
+        self.counts["compared"] += 1
+        moved = [
+            f"{f.name}: {getattr(before, f.name)!r} -> {getattr(now, f.name)!r}"
+            for f in fields(EdgeSummary)
+            if getattr(before, f.name) != getattr(now, f.name)
+        ]
+        if moved:
+            self.changed.append(f"{key}: {'; '.join(moved)}")
 
     def _verified(self, key: str, stored: EdgeSummary, frame: pd.DataFrame) -> None:
         live = next(iter(framer.summaries_of(frame).values()))
@@ -132,7 +177,7 @@ class _Pass:
 
     def publish(self) -> None:
         """Every new row, all partitions, in one commit (or none)."""
-        if not self.new or self.opt.dry_run or self.opt.verify:
+        if not self.new or self.opt.dry_run or self.opt.verify or self.changed:
             return
         with self.run.writer.publishing(self.run.run_id, self.clock()):
             for day, frames in sorted(self.new.items()):
@@ -143,6 +188,9 @@ class _Pass:
 
     def finish(self, edges_seen: int) -> None:
         run, opt = self.run, self.opt
+        if self.changed:  # nothing was written: the rows queued are withheld
+            self.counts["withheld"] = self.counts["written"]
+            self.counts["written"] = 0
         run.stats.update(self.counts)
         run.stats.update(
             edges=edges_seen,
@@ -150,6 +198,9 @@ class _Pass:
             limit=opt.limit,
             dry_run=opt.dry_run,
             verify=opt.verify,
+            expect_same=opt.expect_same,
+            changed=self.changed[:SHOWN],
+            changed_count=len(self.changed),
             mismatches=self.mismatches[:SHOWN],
             mismatch_count=len(self.mismatches),
             failures=self.failed[:SHOWN],
@@ -158,6 +209,10 @@ class _Pass:
             run.failed(f"every edge failed ({edges_seen}): {self.failed[0]}")
         if self.counts["not_reached"]:
             run.partial(f"{self.counts['not_reached']} edges left by --limit: run it again")
+        if self.changed:
+            run.failed(
+                f"{len(self.changed)} headlines differ from the earlier rows: {self.changed[0]}"
+            )
         if self.mismatches:
             run.partial(f"{len(self.mismatches)} stored rows differ from the live judge")
 

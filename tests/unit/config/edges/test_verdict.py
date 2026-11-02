@@ -1,12 +1,22 @@
 """The verdict thresholds: defaults are the owner's, a bad value names the file and key."""
 
+import dataclasses
 import tomllib
 from pathlib import Path
 
 import pytest
 
 from algotrade.config.edges.portfolio import OOS_CLASSES
-from algotrade.config.edges.verdict import KEYS, LEGS, VerdictSettings
+from algotrade.config.edges.verdict import (
+    KEYS,
+    LEGS,
+    OPTION_COSTS_KEYS,
+    TAILS_KEYS,
+    OptionCosts,
+    TailsVerdict,
+    VerdictSettings,
+    resolve_profile,
+)
 from algotrade.core.model.errors import ConfigurationError
 
 
@@ -138,3 +148,77 @@ def test_the_out_of_sample_haircut_has_a_share_per_class_and_is_read_and_bounded
         VerdictSettings.from_document({"oos_haircut": {"momentum": 0.5}})
     doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
     assert set(doc["oos_haircut"]) == set(OOS_CLASSES)  # a class has its share in the file
+
+
+def test_the_tails_and_option_cost_sections_default_to_the_design_values_and_the_file() -> None:
+    d = VerdictSettings.from_document(None)
+    assert d.tails == TailsVerdict("full", 0.90, 0.95, 1.25, 5, 2000, 3.0)
+    assert d.option_costs == OptionCosts(
+        ("mid", "effective", "full"), ((1, 0.75), (2, 0.65), (4, 0.53)), 0.65
+    )
+    doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
+    assert set(doc["tails_verdict"]) == set(TAILS_KEYS)
+    assert set(doc["option_costs"]) == set(OPTION_COSTS_KEYS)
+    assert VerdictSettings.from_document(doc).tails == d.tails
+
+
+def test_the_tails_section_round_trips_and_each_bad_value_is_refused() -> None:
+    read = VerdictSettings.from_document(
+        {"tails_verdict": {"promising_psr": 0.8, "bootstrap_draws": 500, "bootstrap_mean_block": 5}}
+    )
+    assert (read.tails.promising_psr, read.tails.bootstrap_draws) == (0.8, 500)
+    assert read.tails.bootstrap_mean_block == 5.0 and read.tails.works_psr == 0.95
+    bad: list[tuple[dict[str, object], str]] = [
+        ({"promising_psr": 1.5}, "promising_psr"),
+        ({"works_psr": -0.1}, "works_psr"),
+        ({"promising_psr": 0.99}, "promising_psr is above"),
+        ({"max_cvar_ratio": 0}, "max_cvar_ratio"),
+        ({"min_tail_windows": 0}, "min_tail_windows"),
+        ({"bootstrap_draws": 99}, "bootstrap_draws"),
+        ({"bootstrap_mean_block": 0.5}, "bootstrap_mean_block"),
+        ({"option_cost_level": "bid"}, "option_cost_level"),
+        ({"typo": 1}, "unknown keys"),
+    ]
+    for section, match in bad:
+        with pytest.raises(ConfigurationError, match=match):
+            VerdictSettings.from_document({"tails_verdict": section})
+
+
+def test_the_option_costs_section_round_trips_and_each_bad_value_is_refused() -> None:
+    read = VerdictSettings.from_document(
+        {"option_costs": {"effective_share_by_legs": {"2": 0.6, "1": 0.7}, "commission_usd": 0}}
+    )
+    assert read.option_costs.effective_share_by_legs == ((1, 0.7), (2, 0.6))
+    assert read.option_costs.commission_usd == 0.0
+    bad: list[tuple[dict[str, object], str]] = [
+        ({"levels": ["full", "mid", "effective"]}, "levels"),
+        ({"levels": ["mid"]}, "levels"),
+        ({"commission_usd": -1}, "commission_usd"),
+        ({"effective_share_by_legs": {"2": 0.6}}, "effective_share_by_legs"),  # no 1-leg key
+        ({"effective_share_by_legs": {"1": 0.5, "2": 0.6}}, "effective_share_by_legs"),  # rises
+        ({"effective_share_by_legs": {"1": 1.5}}, "effective_share_by_legs"),
+        ({"effective_share_by_legs": {"1": 0}}, "effective_share_by_legs"),
+        ({"effective_share_by_legs": {"x": 0.5}}, "effective_share_by_legs"),
+        ({"effective_share_by_legs": {"1": "a"}}, "effective_share_by_legs"),
+        ({"effective_share_by_legs": [1, 2]}, "effective_share_by_legs"),
+        ({"typo": 1}, "unknown keys"),
+    ]
+    for section, match in bad:
+        with pytest.raises(ConfigurationError, match=match):
+            VerdictSettings.from_document({"option_costs": section})
+
+
+def test_option_quotes_is_typed_apart_and_never_a_verdict_setting() -> None:
+    assert "option_quotes" not in {f.name for f in dataclasses.fields(VerdictSettings)}
+    doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
+    assert VerdictSettings.from_document(doc) == VerdictSettings()  # the section is skipped
+
+
+def test_the_profile_resolves_to_tails_only_for_option_pnl_unless_declared() -> None:
+    assert resolve_profile("option_pnl", None) == "tails"
+    for kind in ("excess_return", "expires_otm", "option_model_pnl", "hit_target", "pair_spread"):
+        assert resolve_profile(kind, None) == "return"
+    assert resolve_profile("excess_return", "tails") == "tails"
+    assert resolve_profile("option_pnl", "return") == "return"
+    with pytest.raises(ConfigurationError, match="verdict_profile"):
+        resolve_profile("option_pnl", "other")

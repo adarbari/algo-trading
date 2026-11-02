@@ -94,6 +94,9 @@ class EdgeFacts:
     # edge, read when the haircut is (None: not counted)
     chain: bool = False  # an option_pnl edge: the basis cannot have been fixed in-sample
     neutral: bool = False  # the outcome is a residual return: market, size, momentum, value gone
+    # The judge's criteria (ADR 0088, 2.6): ``return`` (every edge today) or ``tails``. In the
+    # call, so a change of profile is a change of fingerprint.
+    profile: str = "return"
 
 
 def is_factor_neutral(edge: Edge) -> bool:
@@ -113,6 +116,12 @@ def counts_wins(edge: Edge) -> bool:
 def is_chain(edge: Edge) -> bool:
     """Whether the edge's outcome is a chain P&L (``option_pnl``): no in-sample history."""
     return edge.settings is not None and edge.settings.kind == "option_pnl"
+
+
+def profile_of(edge: Edge) -> str:
+    """The verdict profile of the edge (``EdgeSettings.verdict_profile``); ``return`` without
+    resolved settings."""
+    return edge.settings.verdict_profile if edge.settings is not None else "return"
 
 
 def projection_of(whole: EdgeRow) -> Projection:
@@ -161,8 +170,8 @@ def _at_target(
         there = replace(
             c, oos=met, whole=replace(whole, sessions=max(whole.sessions or 0, t.works_trades))
         )
-    crit = _criteria(there, t, draws, decoys)
-    level, _ = _level(there, crit, t)
+    crit = _criteria(there, t, draws, decoys, profile=facts.profile)
+    level, _ = _level(there, crit, t, facts.profile)
     failing = [_words(x) for x in crit if x.level == PROMISING and x.status == FAIL]
     next_gap = _next_gap(crit)
     reasons = tuple(failing or ([_words(next_gap)] if next_gap and level != WORKS else []))
@@ -184,8 +193,8 @@ def _judge_one(
     and outlook are pieces the verdict carries beside them, never inputs to them), so they are
     the same as the full verdict's."""
     c = replace(c, timed=facts.base == OUT_OF_WINDOW)
-    crit = _criteria(c, t, draws, decoys, facts.portfolio)
-    level, reason = _level(c, crit, t)
+    crit = _criteria(c, t, draws, decoys, facts.portfolio, facts.profile)
+    level, reason = _level(c, crit, t, facts.profile)
     gap = _next_gap(crit)
     outlook = (
         None
@@ -446,6 +455,7 @@ def judge_call(
             portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
             benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
             neutral=is_factor_neutral(edge),
+            profile=profile_of(edge),
             base=edge.base,
             site_trials=(lambda: runs.load_site_trials(ctx))
             if full and ctx and not edge.mine

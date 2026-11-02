@@ -306,3 +306,126 @@ def test_verify_is_read_only_even_for_a_missing_row(evaluated: World) -> None:
     record = run(evaluated, configs(), verify=True)
     assert record.stats["written"] == 0 and record.stats["would_write"] == 2
     assert rows(evaluated).empty
+
+
+# ---- --expect-same-headlines (ADR 0088 design 2.6, risk 16: the deploy of a judge change) ----
+
+
+def tuned(**tails: Any) -> MemoryConfigStore:
+    """A settings change that moves the fingerprint and no label: a ``[tails_verdict]`` tune."""
+    return configs({("site", "settings", "verdict"): {"tails_verdict": tails}})
+
+
+def lying() -> MemoryConfigStore:
+    """A settings change that moves the result line: no run has 10,000 out-of-sample trades."""
+    return configs({("site", "settings", "verdict"): {"min_oos_trades": 10_000}})
+
+
+def test_an_equal_prior_passes_and_the_new_rows_are_written(evaluated: World) -> None:
+    run(evaluated, configs())
+    record = run(evaluated, tuned(bootstrap_draws=3000), expect_same=True)
+    assert record.status is RunStatus.COMPLETE
+    assert (record.stats["compared"], record.stats["written"]) == (2, 2)
+    assert record.stats["changed_count"] == 0 and record.stats["no_prior"] == 0
+    assert len(rows(evaluated)) == 4 and rows(evaluated).groupby("edge_id").size().eq(2).all()
+
+
+def test_a_differing_prior_fails_the_run_and_writes_nothing(evaluated: World) -> None:
+    run(evaluated, configs())
+    before = rows(evaluated)
+    record = run(evaluated, lying(), expect_same=True)
+    assert record.status is RunStatus.FAILED
+    assert record.stats["written"] == 0 and record.stats["withheld"] == 2
+    assert record.stats["changed_count"] == 2 and "result:" in record.stats["changed"][0]
+    pd.testing.assert_frame_equal(rows(evaluated), before)  # not one row, the equal edge's neither
+
+
+def test_one_changed_edge_withholds_the_unchanged_ones_too(evaluated: World) -> None:
+    run(evaluated, configs())
+    moved = configs(
+        {("site", "settings", "verdict"): {"min_oos_trades": 10_000}},
+        implementation={"promoted": "momo"},
+    )
+    only = run(evaluated, moved, expect_same=True, edge_id="drift")
+    assert only.status is RunStatus.FAILED and len(rows(evaluated)) == 2
+
+
+def test_a_run_with_no_earlier_row_is_counted_and_is_no_failure(evaluated: World) -> None:
+    record = run(evaluated, configs(), expect_same=True)
+    assert record.status is RunStatus.COMPLETE
+    assert (record.stats["no_prior"], record.stats["compared"], record.stats["written"]) == (
+        2,
+        0,
+        2,
+    )
+
+
+def test_the_newest_earlier_row_is_the_one_compared(evaluated: World) -> None:
+    run(evaluated, configs())  # A: the real headline
+    run(evaluated, lying())  # C: a different one, written without the check
+    run(evaluated, tuned(bootstrap_draws=3000))  # B: the real headline again, the newest
+    ok = run(evaluated, tuned(bootstrap_draws=4000), expect_same=True)  # newest prior is B
+    assert ok.status is RunStatus.COMPLETE and ok.stats["compared"] == 2
+    assert len(rows(evaluated)) == 8
+    bad = run(
+        evaluated,
+        configs({("site", "settings", "verdict"): {"min_oos_trades": 20_000}}),
+        expect_same=True,
+    )  # newest prior is D (the real headline): the new one differs
+    assert bad.status is RunStatus.FAILED and len(rows(evaluated)) == 8
+
+
+def test_an_already_current_row_is_still_compared(evaluated: World) -> None:
+    run(evaluated, configs())
+    run(evaluated, tuned(bootstrap_draws=3000))  # the current row exists now
+    again = run(evaluated, tuned(bootstrap_draws=3000), expect_same=True)
+    assert again.status is RunStatus.COMPLETE
+    assert (
+        again.stats["compared"] == 2 and again.stats["skipped"] == 2 and again.stats["written"] == 0
+    )
+    assert len(rows(evaluated)) == 4
+    # a current row that differs from the earlier one fails the check (nothing to write either way)
+    run(evaluated, lying())  # the current row of ``lying`` differs from its earlier ones
+    again = run(evaluated, lying(), expect_same=True)
+    assert again.status is RunStatus.FAILED and again.stats["changed_count"] == 2
+
+
+def test_dry_run_compares_without_writing(evaluated: World) -> None:
+    run(evaluated, configs())
+    same = run(evaluated, tuned(bootstrap_draws=3000), expect_same=True, dry_run=True)
+    assert same.status is RunStatus.COMPLETE and same.stats["compared"] == 2
+    assert same.stats["would_write"] == 2 and len(rows(evaluated)) == 2
+    bad = run(evaluated, lying(), expect_same=True, dry_run=True)
+    assert bad.status is RunStatus.FAILED and len(rows(evaluated)) == 2
+
+
+def test_every_summary_field_is_compared_not_only_the_label(evaluated: World) -> None:
+    """A moved lift with the same label and result line is still a difference."""
+    run(evaluated, configs())
+    ctx = stores(evaluated, configs())
+    found = edges.load_edge(ctx, "drift")
+    assert found is not None
+    canonical = runs.load_canonical_run(ctx, found).run
+    assert canonical is not None
+    prior = framer.stored_headlines(ctx, DAYS[-1])[("drift", canonical.run_id)][0]
+    nudged = replace(prior.summary, lift=(prior.summary.lift or 1.0) + 0.5)
+    frame = framer.verdict_frame(
+        nudged, canonical, fingerprint="older-fingerprint", settings=load_verdict(configs()),
+        licence=None, run_id="x", source="test", now=NOW + timedelta(days=30),
+    )  # fmt: skip
+    evaluated.results.write_result("edge_verdict", DAYS[-1], "x", frame)  # the newest earlier row
+    record = run(evaluated, configs(), expect_same=True, edge_id="drift")
+    assert record.status is RunStatus.FAILED and "lift" in record.stats["changed"][0]
+    assert "verdict:" not in record.stats["changed"][0]  # the label itself did not move
+
+
+def test_the_cli_flag_reaches_the_options(evaluated: World) -> None:
+    from algotrade_ingestion.tasks.framework.registry import TASKS  # noqa: PLC0415
+
+    flags = {f for p in TASKS["edge-verdicts"].params for f in p.flags}
+    assert "--expect-same-headlines" in flags
+    ctx = replace(task_ctx(evaluated.writer, evaluated.reader, clock=lambda: next(CLOCK)),
+                  configs=lying())  # fmt: skip
+    entries_ops.run_edge_verdicts(replace(ctx, configs=configs()), {"all_edges": True})
+    record = entries_ops.run_edge_verdicts(ctx, {"all_edges": True, "expect_same": True})
+    assert record.status is RunStatus.FAILED and record.stats["expect_same"] is True
