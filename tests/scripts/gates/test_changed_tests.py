@@ -1,6 +1,7 @@
 """`scripts/changed_tests.py`: changed files map to their mirrored tests and their areas."""
 
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -114,3 +115,95 @@ def test_a_web_source_change_maps_to_the_page_latency_views_test() -> None:
     assert views in covering("apps/web/src/pages/calendar/index.ts")
     assert views in covering("apps/api/schema.graphql")
     assert views not in covering("apps/web/design-system/index.ts")
+
+
+def _fake_git(monkeypatch: pytest.MonkeyPatch, fetch_fails: bool = False) -> list[list[str]]:
+    """Record the git commands run; `git remote` answers `origin`."""
+    ran: list[list[str]] = []
+    monkeypatch.setattr(changed_tests, "_git", lambda *a: ["origin"] if a == ("remote",) else [])
+
+    def run(cmd: list[str], **_: object) -> None:
+        ran.append(cmd)
+        if fetch_fails:
+            raise subprocess.CalledProcessError(128, cmd)
+
+    monkeypatch.setattr(changed_tests.subprocess, "run", run)
+    return ran
+
+
+def test_a_remote_base_is_fetched_before_the_diff(monkeypatch: pytest.MonkeyPatch) -> None:
+    # a stale origin/main counted merged work as changed: V2 and V5 ran 10+ min of step 1
+    ran = _fake_git(monkeypatch)
+    changed_tests.refresh("origin/main")
+    assert ran == [["git", "fetch", "--quiet", "origin", "main"]]
+
+
+def test_a_local_base_is_not_fetched(monkeypatch: pytest.MonkeyPatch) -> None:
+    ran = _fake_git(monkeypatch)
+    changed_tests.refresh("3558f7f60")
+    changed_tests.refresh("feature/x")  # no remote named `feature`
+    assert ran == []
+
+
+def test_a_failed_fetch_keeps_the_ref(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _fake_git(monkeypatch, fetch_fails=True)
+    changed_tests.refresh("origin/main")
+    assert "could not fetch origin/main" in capsys.readouterr().err
+
+
+def test_main_fetches_then_diffs_from_the_merge_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(changed_tests, "refresh", lambda base: calls.append(f"fetch {base}"))
+    monkeypatch.setattr(
+        changed_tests, "changed_files", lambda base: calls.append(f"diff {base}") or []
+    )
+    changed_tests.main(["changed_tests.py"])
+    changed_tests.main(["changed_tests.py", "--no-fetch", "origin/main"])
+    assert calls == ["fetch origin/main", "diff origin/main", "diff origin/main"]
+
+
+def test_changed_files_diff_from_the_merge_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[tuple[str, ...]] = []
+
+    def git(*args: str) -> list[str]:
+        seen.append(args)
+        return ["abc123"] if args[0] == "merge-base" else []
+
+    monkeypatch.setattr(changed_tests, "_git", git)
+    changed_tests.changed_files("origin/main")
+    assert seen[:2] == [("merge-base", "origin/main", "HEAD"), ("diff", "--name-only", "abc123")]
+
+
+def test_a_guide_entry_maps_to_the_guide_readers_not_the_whole_graph() -> None:
+    # a glossary entry ran tests/apps/api/graphql and tests/unit/services/read whole (V2, V5)
+    readers = set(changed_tests.SITE_CONFIG_READERS["config/site/guide/"])
+    got = changed_tests.covering_tests(
+        ["config/site/guide/glossary/results.toml"],
+        (readers | {"tests/apps/api/graphql"}).__contains__,
+    )
+    assert set(got) == readers
+
+
+def test_step_one_leaves_out_what_step_two_runs_in_full() -> None:
+    paths = [
+        "tests/architecture",
+        "tests/architecture/guide",
+        "tests/unit/config/site/guide",
+        "tests/unit/configs/test_x.py",
+        "tests/unit/services/read/guide",
+    ]
+    assert changed_tests.without_full_runs(paths) == [
+        "tests/unit/configs/test_x.py",
+        "tests/unit/services/read/guide",
+    ]
+
+
+def test_main_prints_no_full_run_paths(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(changed_tests, "refresh", lambda base: None)
+    monkeypatch.setattr(changed_tests, "changed_files", lambda base: ["architecture/layout.toml"])
+    changed_tests.main(["changed_tests.py"])
+    assert capsys.readouterr().out.strip() == ""
