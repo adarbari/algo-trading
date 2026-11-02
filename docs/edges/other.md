@@ -186,7 +186,7 @@ Back to the [index of every edge](../edges.md).
 
 **Status:** retired. **Thesis:** Option implied volatility on liquid names tends to exceed the volatility that follows, so selling premium where implied is richest earns the gap.
 
-**Why retired:** Re-filed 2026-11-02 as vrp_short_put (ADR 0088, build row X2): the put's own P&L on the stored chains (option_pnl short_put), gated, with iv_rank_high beside vrp_iv_hv. This version's modelled not-assigned rate stays on file with its runs and trials.
+**Why retired:** Re-filed 2026-11-02 as vrp_short_put (ADR 0088, build row X2): the put's own P&L on the stored chains (option_pnl short_put), gated, on vrp_iv_hv; the iv_rank_high screen became its own setup, iv_rank_short_put. This version's modelled not-assigned rate stays on file with its runs and trials.
 
 - **Outcome:** expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon
 - **Schedule:** every session

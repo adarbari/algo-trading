@@ -19,8 +19,9 @@ screeners = ["vrp_iv_hv"]
 baselines = ["momentum_12_1", "size_small"]
 status = "retired"
 rejection_reason = """Re-filed 2026-11-02 as vrp_short_put (ADR 0088, build row X2): the put's own P&L
-on the stored chains (option_pnl short_put), gated, with iv_rank_high beside vrp_iv_hv. This
-version's modelled not-assigned rate stays on file with its runs and trials."""
+on the stored chains (option_pnl short_put), gated, on vrp_iv_hv; the iv_rank_high screen became
+its own setup, iv_rank_short_put. This version's modelled not-assigned rate stays on file with
+its runs and trials."""
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 notes = """The one-IV rule (ADR 0053) governs the outcome (iv_field, the IBKR IV30), not the screener's selection, which reads feature.vrp_iv30.
