@@ -849,6 +849,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner's instruction of 2026-11-01 ("new screens are available and work end to end, incrementally"); the architect review (file-disjointness, ownership, licence, cache key) and the simplicity review (cut two components, merge slices).
 
+## 2026-11-01 | Evening Desk V2 | Setups library and setup page: what ships now, what waits
+- Question: (1) the verdict words (the mockup's "Too few cases to tell", "No better than chance", "Baseline" against the read model's `not_enough_data`, `not_working`, `diagnostic_only`); (2) "Start here" without a curated list; (3) "Ideas tonight" before V3's inverse read; (4) the forward-record label without a `since` date; (5) the "Before you act" items.
+- Options: (1) relabel now / keep the served words and map only the tone; (2) a curated list in config / the first three of the best verdict group; (3) the followed-setups desk only / leave the section out until V3; (4) derive the date in the browser / label it "Forward paper record" until the read serves `since`; (5) setup-specific / three checks that hold for any setup.
+- Decision: (1) keep the served words (they are Guide terms and filter labels) and map each code onto the design system's verdict tones; the relabel is a follow-up with the Guide terms and filter definitions. (2) The first three of the best verdict group, shown while the list is not narrowed. (3) Left out; a follow-up PR adds it from V3's setup-to-picks read (the desk covers followed setups only and "none tonight" would mislead for the rest). (4) "Forward paper record" without a date on the live-record strip; `PaperRecord.since` is a read change for a later PR (the browser derives nothing from rows). (5) Three generic checks (report date, the stop is history, hypothetical and at risk); the Guide entry holds the explanation.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: each keeps the fixed rules (labelled statistics, publisher wording, nothing derived in the browser) without a read change in this slice.
 ## 2026-11-01 | V7 onboarding | The sign-up question has two answers and the skip button starts with shares
 - Question: the mockup offers Stocks / Options / Both plus an optional watchlist; the amendment stores one `[ideas] default_tab` of `stocks` or `premium`. What does the question offer, and what does the skip store?
 - Options: three answers with Both = stocks / two answers (mostly shares, mostly options), Skip stores shares / Skip stores nothing and asks again.
@@ -917,6 +924,13 @@ follow-up PR).
 - status: final
 - Reasoning: the owner's decision in chat (2026-11-02); the local hook exists to catch the common CI failures early (architecture and layout tests, bundle budgets, Guide coverage, lint and types), not to repeat CI.
 
+## 2026-11-02 | Pre-push hook (`make pre-push`) | A 90 s fast lane of the checks that fail most; the rest CI's (replaces the testmon plan of PR B)
+- Question: after #1051 the hook (`make changed`) still took 5-12 min a push on the shared Mac while GitHub CI idled; what should run locally?
+- Options: affected-only tests with pytest-testmon (the earlier PR B plan) / a fast lane chosen by measured failure frequency per second of local cost, the rest in CI / no local hook.
+- Decision: the fast lane. The hook runs `make pre-push` (`scripts/pre_push.py`, target 90 s warm): `make numbering` and a fixed list of fast file- and TOML-only tests that failed most in the last 100 red CI runs, and for web changes Prettier, Stylelint, `ds:check` and the bundle and DOM budgets; a merge-only push runs the python lane alone. ESLint, `tsc`, vitest, the mirrored pytest, e2e and screenshots are CI's. `make changed` stays as the full local check; CI's per-branch `cancel-in-progress` stays (now tested).
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in chat (2026-11-02): "things which often fail (in make changed locally or in CI previously) we do locally through a hook, but minimize the runtime on local load; the rest we push to GitHub CI." The table and timings are in `docs/ci.md` "Pre-push fast lane".
 ## 2026-11-02 | Harness: shared-file conflict loop, push-queue order | Merge drivers and `Unblocks:`
 - Question: how do five UI PRs stop re-conflicting on `perf-budgets.json` and the two latency files at every merge to main, and how does the push queue favour the push that frees the most work?
 - Options: hand-merge each time / merge drivers (budgets union + max, views union) plus regeneration in `merge_main.sh` / generate the files only in CI. Queue: open dependants only / also an `Unblocks:` PR-body line.

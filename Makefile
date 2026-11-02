@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: web-perf test-shard coverage-combine check-gates check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
+.PHONY: web-perf test-shard coverage-combine check-gates check-scope fitness web-generated web-ds web-lint web-typecheck web-unit web-storybook web-e2e changed pre-push install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen numbering unit property integration e2e test \
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
@@ -113,6 +113,9 @@ changed:         ## narrow first check: mirrored tests of files changed vs a fre
 	@$(PY) -m pytest -q -x --no-header --tb=short -n $(WORKERS) tests/architecture tests/unit/config
 	@$(PY) scripts/changed_web.py $(BASE)
 	@$(MAKE) --no-print-directory arch layout ownership
+
+pre-push:        ## the pre-push hook's fast lane: the checks that fail most per second (scripts/pre_push.py, about 90 s); `make changed` is the full local check
+	@$(PY) scripts/pre_push.py $(BASE)
 
 test:            ## everything, with the coverage gate, one worker per CPU (WORKERS=0 runs serially)
 	$(PY) -m pytest -n $(WORKERS) --cov --cov-report=term --cov-report=xml

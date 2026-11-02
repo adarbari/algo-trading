@@ -22,7 +22,8 @@ def test_a_slice_file_maps_to_its_folder_and_the_type_gate() -> None:
         "npm run ds:check",
         "npx eslint --max-warnings=0 --no-warn-ignored src/entities/feature/columns.tsx",
         "npm run typecheck",
-        "npx vitest related --run src/entities/feature/columns.tsx",
+        "npx vitest related --run --testTimeout=30000 --hookTimeout=30000"
+        " src/entities/feature/columns.tsx",
         "env VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key"
         " npx vite build",
         "npm run perf:bundle",
@@ -37,7 +38,8 @@ def test_the_changed_code_files_go_to_one_related_vitest_run() -> None:
     )
     unit = [c for c in got if "vitest" in c]
     assert unit == [
-        "npx vitest related --run scripts/check-bundle-budgets.ts"
+        "npx vitest related --run --testTimeout=30000 --hookTimeout=30000"
+        " scripts/check-bundle-budgets.ts"
         " src/pages/trader-ideas/IdeasPage.tsx src/widgets/watchlist-editor/ui/Editor.tsx"
     ]
 
@@ -67,7 +69,10 @@ def test_no_e2e_spec_runs_locally_but_the_bundle_budgets_do() -> None:
 def test_a_story_or_css_module_maps_to_the_component_screenshots() -> None:
     got = cmds("apps/web/design-system/components/Banner/Banner.module.css")
     assert "npm run visual -- --grep Banner" in got
-    assert "npx vitest related --run design-system/components/Banner/Banner.module.css" in got
+    assert (
+        "npx vitest related --run --testTimeout=30000 --hookTimeout=30000"
+        " design-system/components/Banner/Banner.module.css" in got
+    )
     off = cmds("apps/web/design-system/components/Banner/Banner.stories.tsx", linux=False)
     assert "npm run visual:docker -- --grep Banner" in off
 
@@ -118,7 +123,10 @@ def test_a_deleted_file_has_no_related_tests(tmp_path: Path) -> None:
             tmp_path,
         )
     ]
-    assert "npx vitest related --run src/widgets/kept/ui/Kept.tsx" in got
+    assert (
+        "npx vitest related --run --testTimeout=30000 --hookTimeout=30000"
+        " src/widgets/kept/ui/Kept.tsx" in got
+    )
 
 
 def test_type_checking_stays_incremental_between_runs() -> None:
@@ -156,3 +164,11 @@ def test_only_a_changed_story_file_can_need_new_baselines() -> None:
     assert "npm run visual:missing" in cmds(
         "apps/web/design-system/components/Banner/Banner.stories.tsx"
     )
+
+
+def test_the_local_vitest_run_waits_longer_than_the_ci_default() -> None:
+    # under the shared Mac's load unrelated tests ran past the 5 s default and failed pushes
+    unit = next(c for c in cmds("apps/web/src/entities/feature/columns.tsx") if "vitest" in c)
+    assert "--testTimeout=30000" in unit and "--hookTimeout=30000" in unit
+    package = (SCRIPTS.parent / "apps" / "web" / "package.json").read_text()
+    assert "testTimeout" not in package  # CI's `npm run test` keeps the default

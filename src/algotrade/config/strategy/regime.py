@@ -7,7 +7,9 @@ CALM, CAUTION, STRESS, CRISIS; null is unknown). ``multipliers`` size positions 
 ``unknown_multiplier`` is the size when the label is unknown (fail closed: 0 by default).
 ``pause_in`` lists the labels in which a screener's QUALIFIED / WATCH rows are PAUSED;
 ``[regime.screeners.<config id>] pause_in`` replaces it for one screener (the VRP scanner's
-short volatility pauses in STRESS and CRISIS).
+short volatility pauses in STRESS and CRISIS). A setup's own gate (ADR 0088) is a rule group over
+market fields, checked here at the ``gate`` site (``check_gate``); it applies whatever
+``enabled`` says.
 """
 
 from collections.abc import Mapping
@@ -17,8 +19,11 @@ from typing import Any
 
 from algotrade.config.site.fields import Table
 from algotrade.config.site.settings import DocumentLoader, site_defaults
+from algotrade.config.strategy.catalog import FieldCatalog
+from algotrade.config.strategy.levels import GATE
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import field_source, group_of_table
+from algotrade.core.model.predicates import Group
 
 REGIME_LABELS = ("CALM", "CAUTION", "STRESS", "CRISIS")  # calmest first
 REGIME_LABEL = "market.regime@v3.label"
@@ -99,3 +104,14 @@ def site_regime(load: DocumentLoader) -> RegimeSettings:
     """The site's ``[regime]`` (``config/site/defaults.toml``), for runs outside a config (the
     with-versus-without evaluation)."""
     return RegimeSettings.parse(site_defaults(load).get("regime"), "defaults.toml [regime]")
+
+
+def check_gate(group: Group, catalog: FieldCatalog, where: str) -> None:
+    """A setup's gate against ``catalog`` at the ``gate`` site: market fields only, no null test,
+    a string field over its declared domain (so a missing value stays UNKNOWN)."""
+    catalog.check(group, f"{where} gate", GATE)
+
+
+def gate_fields(group: Group) -> tuple[str, ...]:
+    """The market fields a gate names, sorted: what ``session_market`` reads for it."""
+    return tuple(sorted({rule.field for rule in group.rules()}))
