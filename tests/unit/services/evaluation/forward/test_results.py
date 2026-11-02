@@ -3,6 +3,7 @@ by the edge's own hit (never a loss for a missing result), the night is idempote
 and a read as of an earlier night shows the book as it was."""
 
 import contextlib
+import tomllib
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -21,6 +22,7 @@ from algotrade.services.evaluation.forward.signals import advance
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.edge_schemas import EDGE_PAPER
 from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
+from tests.conftest import REPO_ROOT
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
@@ -35,6 +37,10 @@ from tests.unit.services.evaluation.cross_section.test_harness import (
     OTM_OUTCOME,
     otm_world,
 )
+from tests.unit.services.evaluation.cross_section.test_harness_trials import (
+    CHAIN_OUTCOME,
+    _with_chain_outcomes,
+)
 from tests.unit.services.evaluation.forward.conftest import (
     NOW,
     USER,
@@ -45,6 +51,7 @@ from tests.unit.services.evaluation.forward.conftest import (
     site_desk,
 )
 
+TEMPLATES_DOC = tomllib.loads((REPO_ROOT / "config/site/positions/templates.toml").read_text())
 BUY = next_session(DAYS[0])  # the first signal's entry session
 SELL = DAYS[3]  # two sessions after it
 
@@ -541,3 +548,37 @@ def test_an_outcome_that_cannot_be_settled_leaves_its_trades_open_and_never_stop
     assert [s["edge"] for s in result.skipped] == ["drift"]
     assert "pair_spread" in result.skipped[0]["reason"]
     assert set(shared(d)["status"]) == {"open"}
+
+
+def test_a_settled_share_trade_carries_the_trade_contract_and_the_same_return(
+    following: Desk,
+) -> None:
+    """E6a (ADR 0088, 2.5a): exit kind, return on capital, price source; ``return`` is the
+    name's own ``fwd_return`` as before; an open row has the three null."""
+    night(following, DAYS[0])
+    opened = book(following)
+    assert opened[["exit_kind", "price_source", "return_on_capital"]].isna().all().all()
+    night(following, SELL)
+    top = (
+        book(following).query("signal_session == @DAYS[0]").set_index("instrument_id").loc["EQ:N19"]
+    )
+    assert top["return"] == 0.095 and top["excess_return"] == 0.095  # as before the contract
+    assert (top["exit_kind"], top["price_source"]) == ("HORIZON", "bars")
+    assert top["return_on_capital"] == 0.095  # the raw return less no cost: the edge has none
+
+
+def test_a_settled_option_trade_has_its_return_on_capital_and_no_underlying_return() -> None:
+    d = desk(_with_chain_outcomes(build_world()), outcome=CHAIN_OUTCOME)
+    d.configs = MemoryConfigStore(
+        {**d.configs._docs, ("site", "positions", "templates"): TEMPLATES_DOC}  # type: ignore[attr-defined]
+    )
+    night(d, DAYS[0])
+    night(d, SELL)
+    settled = book(d).query("signal_session == @DAYS[0] and status != 'skipped'")
+    assert len(settled) and set(settled["status"]) == {"won"}
+    top = settled.set_index("instrument_id").loc["EQ:N19"]
+    assert pd.isna(top["return"])  # the chain grain's return is the option's, never the name's
+    assert top["return_on_capital"] == pytest.approx((9.5 - 0.4) / 95)
+    assert (top["exit_kind"], top["price_source"]) == ("HORIZON", "option_history")
+    # the figure is read from bought history: the row is personal, whatever the signal's licence
+    assert set(settled["licence"]) == {"personal"}
