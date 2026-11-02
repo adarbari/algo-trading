@@ -184,7 +184,7 @@ Source: `design-system/components/ActionGroup`
 
 ### AppShell
 
-AppShell: the frame of every screen: a skip link, the TopBar, an optional status strip under it (a StatusStrip) and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
+AppShell: the frame of every screen: a skip link, the TopBar, an optional status strip under it (a StatusStrip), the main content region and an optional footer (data status, risk line). `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
 
 Source: `design-system/components/AppShell`
 
@@ -192,6 +192,7 @@ Source: `design-system/components/AppShell`
 |---|---|---|---|
 | `topBar` | `ReactNode` | yes | The bar across the top (TopBar). |
 | `strip` | `ReactNode` | no | A slim strip under the bar, on every page (a StatusStrip); absent: nothing. |
+| `footer` | `ReactNode` | no | The line under the content on every page (data status and the risk statement); absent: nothing. |
 | `layout` | `'page' \| 'full'` | no | `page` (centred, max page width, padded; default) or `full` (edge to edge). |
 | `skipLabel` | `string` | no | Text of the skip link that jumps past the top bar to the content. |
 | `children` | `ReactNode` | yes | The page. |

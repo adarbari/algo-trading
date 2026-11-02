@@ -1,5 +1,5 @@
 /**
- * Trader > Explore: the ticker is the page. A search box adds a ticker (press / to jump to it);
+ * Trader > Explore: the ticker is the page. ⌘K, the app's search, opens a ticker here;
  * open tickers are closable tabs, and the selected one's detail (overview, chart, options,
  * features, events, screener hits, and why Ideas surfaced it) takes the full width. Which
  * tickers are open, which is selected and what each tab shows live in the URL's search params
@@ -8,7 +8,6 @@
 import { Heading, Skeleton, Stack, TabStrip } from '@algotrade/ui';
 import { Suspense } from 'react';
 
-import { TickerSearch } from '@/features/ticker-search';
 import { lazyPage } from '@/shared/lib/lazy';
 
 import type { ExploreSearch } from '@/entities/explore';
@@ -41,13 +40,6 @@ export function ExplorePage({ search, onSearchChange, onOpenScreener }: ExploreP
   return (
     <Stack gap={3}>
       <Heading level={1}>Explore</Heading>
-      <TickerSearch
-        focusKey="/"
-        chosen={state.open}
-        onChoose={(symbol) => {
-          onSearchChange(openTicker(state, symbol));
-        }}
-      />
       {state.focused ? (
         <TabStrip
           label="Open tickers"
