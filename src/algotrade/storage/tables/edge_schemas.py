@@ -60,11 +60,16 @@ EDGE_EVAL = fixed(
         "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
         "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
         "pre_snapshot_sessions", "pick_adv_known", "pick_adv_low",
+        # The evidence measures (ADR 0088 2.6): null in a row written before E6b, on cost rows and
+        # random draws, for a setup with no return on capital and where a slice has no series.
+        "roc_sessions", "cvar_5_n", "cvar_1_n",
     )),
     *floats(
         "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
         "decile_spread", "decile_t", "effect_size", "sharpe", "picks_t", "deflated_sharpe", "pbo",
         "reference_rate", "touch_rate", "pick_adv_median",
+        "mean_roc", "mean_roc_lo", "mean_roc_hi", "excess_roc", "excess_roc_t", "cvar_5", "cvar_1",
+        "base_cvar_5", "worst_window", "psr",
         *(f"decile_mean_{i:02d}" for i in range(1, 11)),
     ),
     runs="merge",
@@ -223,6 +228,9 @@ EDGE_LEGS = fixed(
     "pick_exit date[]",  # the contract's fields of each pick (E6a, see below), aligned to pick_ids
     *(f"{n} string[]" for n in ("pick_exit_kind", "pick_source", "pick_licence")),
     *(f"{n} float64[]" for n in ("pick_capital", "pick_roc_gross", "pick_roc", "pick_adverse")),
+    # E6b-2 (nullable, no version bump): an option pick's value at each cost level (``mid``,
+    # ``effective``, ``full``), flat, three per pick, aligned to ``pick_ids``.
+    "pick_values_at float64[]",
     *(f"{n} int64[]" for n in ("pick_ranks", "pick_flags", "base_hits_at", "pick_hits_at")),
     *(f"{n} string[]" for n in ("pick_ids", "pick_reasons")),
     *(f"{n} int64" for n in (
@@ -234,6 +242,10 @@ EDGE_LEGS = fixed(
         "id_screened_proxy",
     )),
     *floats("rest_mean", "rest_m2", "top_decile", "spread", "book_vol", "risk_off"),
+    # E6b-2 (nullable, no version bump): an option position's base return on capital as moments
+    # over the counted eligible names; null for every other outcome and in older legs.
+    "base_roc_n int64",
+    *floats("base_roc_mean", "base_roc_m2"),
     "pre_snapshot bool",
     "implied_stored bool",
     "siblings_stored bool",  # pair_spread: the pair field had a value for some name; null: n/a

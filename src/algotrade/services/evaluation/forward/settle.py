@@ -31,6 +31,7 @@ from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.verdict import OptionCosts
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
@@ -109,9 +110,11 @@ def settle_group(
     trades: pd.DataFrame,
     session: date,
     now: datetime,
+    option_costs: OptionCosts | None = None,
 ) -> list[Settled]:
     """The trades of one (edge, buy session, horizon) group (open rows of the book) that
-    ``now`` settles; a trade still waiting is not returned."""
+    ``now`` settles; a trade still waiting is not returned. ``option_costs``: the commission an
+    option P&L pays, as the backtest does (the verdict's ``[option_costs]``)."""
     first = trades.iloc[0]
     buy, horizon = first["buy_session"], int(first["horizon_sessions"])
     names = [str(i) for i in trades["instrument_id"]]
@@ -155,13 +158,21 @@ def settle_group(
         )
     except MissingDataError:
         return out + [_skipped(i, "no implied vol stored at the signal session") for i in names]
-    scored = apply_outcome(edge, mine, implied) if len(mine) else None
+    scored = (
+        apply_outcome(edge, mine, option_costs=option_costs, implied=implied) if len(mine) else None
+    )
     result = None if scored is None else scored.set_index("instrument_id")
     contract = (  # the trade contract's columns of each scored name (ADR 0088, 2.5a); paper is long
         None
         if scored is None
         else trade_frame(
-            edge, mine, scored, entry=buy, bars_exit=first["sell_session"], side="long"
+            edge,
+            mine,
+            scored,
+            entry=buy,
+            bars_exit=first["sell_session"],
+            side="long",
+            option_costs=option_costs,
         ).set_index("instrument_id")
     )
     for name in names:

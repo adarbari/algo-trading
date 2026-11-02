@@ -76,6 +76,11 @@ NOT_JUDGED = {
     "algotrade.config.edges.verdict:EDGE_COSTS_KEYS": "settings parse: in settings_hash",
     "algotrade.config.edges.verdict:HAIRCUT_KEYS": "settings parse: in settings_hash",
     "algotrade.config.edges.verdict:KEYS": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:OPTION_COSTS_KEYS": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:OPTION_LEVELS": "settings parse: in settings_hash",
+    "algotrade.core.model.errors:ConfigurationError": "a type: what a settings parse raises",
+    "algotrade.config.edges.verdict:TAILS_KEYS": "settings parse: in settings_hash",
+    "algotrade.config.edges.verdict:_shares_by_legs": "settings parse: in settings_hash",
     "algotrade.config.edges.verdict:_cost_levels": "settings parse: in settings_hash",
     "algotrade.config.edges.verdict:_decoys": "settings parse: in settings_hash",
     "algotrade.config.site.fields:Table": "settings parse: in settings_hash",
@@ -545,3 +550,21 @@ def test_no_judging_module_imports_a_reader_module() -> None:
             elif isinstance(node, ast.Import):
                 names = [a.name for a in node.names]
             assert not [n for n in names if n.split(".")[-1] in readers], file.name
+
+
+def test_a_profile_change_changes_the_fingerprint_and_a_tune_changes_the_settings_hash() -> None:
+    """E6b: the profile is in the call (hashed whole), the new sections are in ``settings_hash``
+    (one re-store per tune, documented), and ``[option_quotes]`` is in neither."""
+    call, run = judge_call(_edge(), _run(), True), _run()
+    assert call.facts.profile == "return"  # a return edge
+    base = fingerprint(call, run, VerdictSettings())
+    tails = fingerprint(
+        replace(call, facts=replace(call.facts, profile="tails")), run, VerdictSettings()
+    )
+    assert tails != base
+    tuned = VerdictSettings.from_document({"tails_verdict": {"bootstrap_draws": 3000}})
+    assert settings_hash(tuned) != settings_hash(VerdictSettings())
+    costed = VerdictSettings.from_document({"option_costs": {"commission_usd": 1.0}})
+    assert settings_hash(costed) != settings_hash(VerdictSettings())
+    quoted = VerdictSettings.from_document({"option_quotes": {"max_spread_share": 0.3}})
+    assert settings_hash(quoted) == settings_hash(VerdictSettings())

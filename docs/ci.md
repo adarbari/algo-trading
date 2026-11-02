@@ -83,6 +83,8 @@ fast gates. Then push: CI is the full gate (owner decision 2026-10-08: the machi
 runs the full `make check`); after a CI failure rerun only the failed gate locally. The vitest pool is `vmThreads`: jsdom is created once per
 worker instead of once per file. The Makefile's `WORKERS` is `scripts/ops/xdist_workers.py`'s answer: `auto`, or 2 while the machine's 1-minute load average is above 12 (it caps the worker count only, no gate; `make doctor` shows the load; `WORKERS=N` overrides).
 
+The pre-push hook runs `make changed` through `scripts/ops/push_queue.py`, a machine-wide queue (owner decision 2026-11-02: eight sessions pushing at once ran five checks at load 42, 12+ min each; two at a time is what the Mac carries). Waiters keep a ticket and take one of `PUSH_QUEUE_SLOTS` (default 2) slots when one is free and they are first by priority, then arrival; each poll prints the position. Priority is the number of open PRs that depend on the pushed branch: stacked on it (their head contains our head commit, or their base is our branch) or naming its PR in the body (`Stacked on #N`, `Depends on #N`, `waits on #N`, `needs #N`); `PUSH_PRIORITY=N` overrides, and a `gh` failure gives 0 with the reason printed, never a blocked push. The run uses `WORKERS=${PUSH_QUEUE_WORKERS:-4}` (also the vitest workers). The queue lives in the main checkout's `var/locks/push-queue/`; dead or 2 h old tickets and slots are dropped at every poll.
+
 ### Scope-aware `make check` (the release, and a deliberate full run)
 
 A bare `make check` refuses and prints rule 9 (the mechanical side of "CI is the gate": an

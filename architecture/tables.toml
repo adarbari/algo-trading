@@ -696,7 +696,7 @@ note = "ScreenPick (ADR 0077 amendment (c)): the picked and PAUSED rows of resul
 name = "results/edge_eval"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py; slice_kind cost rows (a return outcome, ADR 0064) and the pick_adv_* capacity columns"
+note = "the edge harness's rows per (edge, variant, horizon, slice) (ADR 0053), framed and written by services/evaluation/cross_section/results.py; slice_kind cost rows (a return outcome, ADR 0064), the pick_adv_* capacity columns and (ADR 0088 design 2.6, E6b) the evidence columns over the return on capital: mean_roc with its bootstrap interval, excess_roc and its bootstrap t, cvar_5 / cvar_1 with the windows in the tail, base_cvar_5, worst_window, psr, roc_sessions; null in rows from before E6b, on cost rows and random draws, and where a setup has no return on capital"
 
 [[table]]
 name = "results/edge_series"
@@ -708,7 +708,7 @@ note = "the edge harness's per-session series (ADR 0064): one row per (main edge
 name = "results/edge_legs"
 owner = "src/algotrade/storage/tables/result_writer.py"
 per_session = false
-note = "the edge harness's stored legs (ADR 0063): per decision session, each screener's statistic, the partitions the session read and the outcome partition it joined; session_date = the decision session, runs merge per key; framed, written and read only by services/evaluation/cross_section/legs/ (a fitness test) ; leg version 5 (ADR 0088, E6a): each pick's trade-contract fields as aligned pick_exit .. pick_adverse lists, null in older rows"
+note = "the edge harness's stored legs (ADR 0063): per decision session, each screener's statistic, the partitions the session read and the outcome partition it joined; session_date = the decision session, runs merge per key; framed, written and read only by services/evaluation/cross_section/legs/ (a fitness test) ; leg version 5 (ADR 0088, E6a): each pick's trade-contract fields as aligned pick_exit .. pick_adverse lists, null in older rows; E6b-2 (nullable, no version bump): pick_values_at (an option pick's value at each cost level, flat, three per pick) and base_roc_n / base_roc_mean / base_roc_m2 (an option position's base return on capital)"
 
 [[table]]
 name = "results/edge_trades"
