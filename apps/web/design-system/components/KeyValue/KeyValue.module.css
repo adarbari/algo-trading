@@ -107,3 +107,19 @@
   font-size: var(--font-size-sm);
   line-height: var(--line-height-sm);
 }
+
+/* Grid: a fixed label column, roomy lines, no row rules (rules and plan lines in a card). */
+.list[data-layout='grid'] {
+  grid-template-columns: minmax(0, var(--size-label)) minmax(0, 1fr);
+}
+
+.list[data-layout='grid'] .row {
+  padding: var(--space-1) 0;
+  border-bottom: 0;
+  column-gap: var(--space-4);
+}
+
+.list[data-layout='grid'] .term {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+}

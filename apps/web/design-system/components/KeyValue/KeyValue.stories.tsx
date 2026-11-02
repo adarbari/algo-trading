@@ -64,6 +64,20 @@ export const Stacked: Story = {
   },
 };
 
+/** Grid: a setup's rules or a pick's plan, a fixed label column and no row rules. */
+export const Grid: Story = {
+  args: {
+    layout: 'grid',
+    items: [
+      { label: 'Entry', value: 'Mon 26 Oct, at the close' },
+      { label: 'Stop', value: 'About $296.16, 5.2% under entry' },
+      { label: 'Exit', value: 'At the close on Mon 23 Nov, 20 sessions later' },
+    ],
+  },
+};
+
+export const GridNarrow: Story = { ...Grid, decorators: [narrow] };
+
 export const Dense: Story = {
   args: {
     items: ticker.slice(0, 4).map(({ hint: _hint, ...item }) => item),

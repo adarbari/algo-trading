@@ -228,7 +228,13 @@ export {
 } from './PartCard';
 export { PartJoin, type PartJoinLogic, type PartJoinProps } from './PartJoin';
 export { PartList, type PartListProps } from './PartList';
-export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge';
+export {
+  StatusBadge,
+  verdictTone,
+  type StatusBadgeProps,
+  type StatusTone,
+  type VerdictKey,
+} from './StatusBadge';
 export { TabStrip, type TabStripItem, type TabStripProps } from './TabStrip';
 export {
   StatusStrip,

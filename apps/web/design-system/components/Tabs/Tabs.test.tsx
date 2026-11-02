@@ -67,4 +67,12 @@ describe('Tabs', () => {
     const { container } = render(<Harness />);
     await expectNoA11yViolations(container);
   });
+
+  it('draws the segmented variant as the same tablist', () => {
+    render(
+      <Tabs items={items} value="a" label="Views" variant="segmented" onChange={() => undefined} />,
+    );
+    expect(screen.getByRole('tablist')).toHaveAttribute('data-variant', 'segmented');
+    expect(screen.getAllByRole('tab')).toHaveLength(3);
+  });
 });
