@@ -1,8 +1,12 @@
 """The licence of a trial and of its ledger columns (ADR 0064 decision 10): the strictest
 catalogue licence of what each is derived from; a field the catalogue does not know is open."""
 
+from dataclasses import replace
+
+from algotrade.config.edges.portfolio import Canary
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.config.user import UserContext
+from algotrade.core.model.predicates import Group, Rule
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.detail.licences import (
     screen_fields,
@@ -13,6 +17,8 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.evaluation.cross_section.conftest import ACTIVE, PRICE, edge, screen
 
 IBKR = "rollup.ibkr_iv@v1.iv30_ibkr"  # a personal-licence feature (ADR 0028)
+VIX_PCT = "market.market_conditions@v2.vix_pct_252"  # personal: VIX-derived (ADR 0028)
+OPEN_GATE = "market.market_conditions@v2.sessions_to_fomc"  # open
 USER = UserContext("site")
 
 
@@ -85,3 +91,42 @@ def test_a_case_rule_over_a_personal_feature_makes_the_trial_personal() -> None:
     })  # fmt: skip
     found = trial_licences(catalogue(store, "site"), cased, universe, [resolved], None)
     assert (found.trial, found.score) == ("personal", "open")
+
+
+def test_a_gate_reading_a_personal_field_makes_the_trial_personal_and_nothing_else() -> None:
+    """X1 review: the setup gate's fields are read by the trial (E1), so a gate over the
+    personal VIX statistics in ``market_conditions`` makes the trial personal; an open gate
+    field leaves it open, and the ledger columns keep their own licences."""
+    store = configs(PRICE)
+    resolved = resolve_config(store, "momo", USER)
+    universe = parse_selection(ACTIVE, "active")
+    features = catalogue(store, "site")
+
+    def gated(field: str):  # type: ignore[no-untyped-def]
+        gate = Group("all", (Rule(field, "lt", 0.5),))
+        return trial_licences(features, replace(edge(), gate=gate), universe, [resolved], None)
+
+    found = gated(VIX_PCT)
+    assert features.feature(VIX_PCT).licence == "personal"  # type: ignore[union-attr]
+    assert found.trial == "personal"
+    assert (found.value, found.score, found.adv, found.outcome) == ("open",) * 4
+    assert gated(OPEN_GATE).trial == "open"
+
+
+def test_a_book_overlay_reading_a_personal_field_makes_the_trial_personal() -> None:
+    """The canary and the volatility target read a field at D (ADR 0074): a personal one makes
+    the trial personal, as a gate's does."""
+    store = configs(PRICE)
+    resolved = resolve_config(store, "momo", USER)
+    universe = parse_selection(ACTIVE, "active")
+    features = catalogue(store, "site")
+    base = edge()
+
+    def with_outcome(**kw: object):  # type: ignore[no-untyped-def]
+        moved = replace(base, outcome=replace(base.outcome, **kw))  # type: ignore[arg-type]
+        return trial_licences(features, moved, universe, [resolved], None).trial
+
+    canary = Canary(("SPY",), IBKR, 1, ("CASH",))
+    assert with_outcome(canary=canary) == "personal"
+    assert with_outcome(vol_target=0.1, vol_return_field=IBKR) == "personal"
+    assert with_outcome(vol_return_field=IBKR) == "open"  # read only with a target
