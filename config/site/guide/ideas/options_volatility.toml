@@ -70,9 +70,7 @@ why_not_built = "Weak after costs, and our option history is too short for the l
 id = "c19_index_put_write"
 title = "Selling index puts for the premium"
 mechanism_kind = "paid_for_risk"
-verdict = "promising"
-feasibility = "data_ready"
-why_not_built = "Queued in the build plan; it runs on stored index chains and waits its turn behind the ideas already filed."
+filed_as = "index_put_write"
 
 [[idea]]
 id = "c20_short_vix_roll_yield"

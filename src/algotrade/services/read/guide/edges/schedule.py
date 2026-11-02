@@ -58,6 +58,7 @@ def trigger_text(schedule: str) -> str:
         return f"{head} ({SUBTYPE_WORDS.get(sub) or _subtype(event, sub)})"
     return {
         "every_session": "Every trading day",
+        "every_session_ladder": "Every trading day, positions overlapping",
         "month_end": "Once a month, at the month end",
     }.get(schedule, schedule.replace("_", " ").capitalize())
 
@@ -71,7 +72,9 @@ def trigger_term(schedule: str, terms: Container[str]) -> str | None:
     window = window_name(schedule)
     market = market_trigger(schedule)
     event = event_class(schedule)
-    if window is not None:
+    if schedule == "every_session_ladder":
+        candidates = ["option_ladder"]
+    elif window is not None:
         candidates = [f"calendar_{window}"]
     elif market is not None:
         candidates = [f"market_trigger_{market}", "schedule_on_market"]

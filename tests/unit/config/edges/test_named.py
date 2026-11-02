@@ -150,9 +150,8 @@ def test_only_a_sleeve_has_the_delta_equivalent_base_and_out_of_window_keeps_no_
         timed(variants=[{"id": "v2", "outcome": {"cost_bps": 5}}])
 
 
-def test_a_sleeve_refuses_position_baselines_it_does_not_value() -> None:
-    with pytest.raises(ConfigurationError, match="not valued for it"):
-        sleeve(baselines=["position:long_shares"])
+def test_a_sleeve_declares_a_position_baseline_for_the_harness_to_value() -> None:
+    assert sleeve(baselines=["position:long_shares"]).position_baselines == ("long_shares",)
 
 
 def test_only_a_sleeve_tracks_a_cboe_strategy_index() -> None:
@@ -193,3 +192,11 @@ def test_a_monthly_sleeve_holds_up_to_the_gap_between_expiries_and_a_variant_has
                outcome={**monthly, "horizon_sessions": [18]})  # fmt: skip
     with pytest.raises(ConfigurationError, match="only a named option sleeve's variant"):
         parse_edge(document(variants=[{"id": "g", "gate": gate}]), "drift", "x.toml")
+
+
+def test_only_a_named_option_sleeve_may_ladder_every_session() -> None:
+    """index_put_ladder: the every-session ladder is a sleeve's schedule (its slots book sizes
+    the overlapping holds); a time-series or cross-section edge with it is refused."""
+    assert sleeve(schedule="every_session_ladder").schedule == "every_session_ladder"
+    with pytest.raises(ConfigurationError, match="every_session_ladder"):
+        parse_edge(document(schedule="every_session_ladder"), "drift", "x.toml")

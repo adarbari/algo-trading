@@ -148,6 +148,7 @@ class Edge:
     promoted: str | None = None
     basis_horizon: int | None = None
     holdout_from: date | None = None  # an option setup's unseen-holdout start (ADR 0088 d15)
+    position_baselines: tuple[str, ...] = ()  # the ``position:<template>`` baselines' templates
     # Interim, until the surfaces speak status (ADR 0053 amendment 2026-10-10): the old state
     # words the GraphQL type still serves, derived (``following`` when bookmarked, else
     # ``researching``; ``since`` the bookmark's; ``state_reason`` the status's).
@@ -179,9 +180,11 @@ def _picks(e: document.Edge) -> str:
         if market
         else f"every {window.replace('_', ' ')}"
         if window
-        else {"every_session": "every session", "month_end": "every month end"}.get(
-            e.schedule, e.schedule
-        )
+        else {
+            "every_session": "every session",
+            "every_session_ladder": "every session, overlapping",
+            "month_end": "every month end",
+        }.get(e.schedule, e.schedule)
     )
     top = "all that qualify" if e.top_k is None else f"top {e.top_k} of the screen"
     return f"{when.capitalize()} · {top}"
@@ -271,6 +274,7 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         horizons=e.outcome.horizon_sessions,
         screeners=e.screeners,
         baselines=e.baselines,
+        position_baselines=e.position_baselines,
         variants=(document.MAIN, *(v.id for v in e.variants)),
         frozen_from=e.frozen_from,
         holdout_from=e.holdout_from,

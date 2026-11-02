@@ -230,7 +230,12 @@ def deflate_trial(
     """``measure_all`` (the ``all`` row) with the trial count, the deflated Sharpe ratio of the
     ``paired`` series and the PBO among the edge's instruments. ``variance``: that of the
     instruments' Sharpe ratios when there are several (as ``cross_section.measures.deflate``
-    reads its peers'), else the null's for one trial's estimate, ``1 / (T - 1)``."""
+    reads its peers'), else the null's for one trial's estimate, ``1 / (T - 1)``. Overlapping
+    windows (a sleeve's ladder: ``picks`` trades over fewer independent ``sessions``) are thinned
+    to every k-th, k = picks / sessions rounded, so T counts independent windows, as the t-ratios
+    do (``overlap_t``); non-overlapping windows keep every value (k = 1)."""
+    step = round(measure_all.picks / measure_all.sessions) if measure_all.sessions else 1
+    paired = list(paired)[:: max(step, 1)]
     n = len(paired)
     if variance is None and n > 1:
         variance = 1.0 / (n - 1)
