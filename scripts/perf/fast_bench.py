@@ -411,6 +411,17 @@ VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object
     "AdminScreenerRun": {
         "runId": ("AdminScreenerRuns", {"limit": 1}, lambda d: d["screenerRuns"][0]["runId"])
     },
+    # an idea page needs a name a qualifying setup picked tonight; with none (an Unproven tab) the
+    # page answers null for any ticker, so the gate times that answer with a fixed ticker
+    "IdeaDetail": {
+        "symbol": (
+            "SetupIdeas",
+            {"tab": "STOCKS"},
+            lambda d: (d["setupIdeas"]["ideas"] or [{"instrument": {"symbol": "AAPL"}}])[0][
+                "instrument"
+            ]["symbol"],
+        )
+    },
     "GuideField": {"name": _FEATURE},
     "GuideHelpField": {"name": _FEATURE},
     "GuideSituation": {

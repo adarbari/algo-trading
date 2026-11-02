@@ -6,7 +6,7 @@
 import { calendarRoute } from './calendar-route';
 import { edgesBuilderRoutes, edgesRoute } from './edges-route';
 import { exploreRoute } from './explore-route';
-import { ideasRoute } from './ideas-route';
+import { ideaRoute, ideasRoute } from './ideas-route';
 import { settingsRoute, traderRoute } from './layout-route';
 import { regimeRoute } from './regime-route';
 import { screenersRoutes } from './screeners-route';
@@ -15,6 +15,7 @@ export { traderRoute } from './layout-route';
 
 export const traderRoutes = traderRoute.addChildren([
   ideasRoute,
+  ideaRoute,
   screenersRoutes,
   edgesRoute,
   ...edgesBuilderRoutes,

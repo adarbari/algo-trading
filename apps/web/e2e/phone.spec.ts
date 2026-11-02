@@ -137,8 +137,26 @@ test('Ideas: a setup group fits the screen and a tapped pick opens its detail in
   expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
   await page.getByRole('row', { name: /AAPL/ }).tap();
   await expect(page.getByRole('dialog', { name: 'AAPL' })).toBeVisible();
-  await page.getByRole('dialog', { name: 'AAPL' }).getByRole('button', { name: 'Open AAPL' }).tap();
+  await page
+    .getByRole('dialog', { name: 'AAPL' })
+    .getByRole('button', { name: 'Open AAPL in Explore' })
+    .tap();
   await expect(page).toHaveURL(/\/explore/);
+});
+
+test('Idea page: the sections stack inside the screen and the exit rule keeps its label', async ({
+  page,
+}) => {
+  await mockIdeasApi(page, undefined, 'listed');
+  await page.goto('/ideas/AAPL?setup=drift');
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  await expect(page.getByRole('heading', { name: 'Historical exit rule' })).toBeVisible();
+  const box = await page.getByRole('heading', { name: 'Evidence' }).boundingBox();
+  expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    innerWidth,
+  );
+  await expect(page.getByRole('button', { name: 'Copy exit rule as text' })).toBeVisible();
 });
 
 test('Screener results: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({
