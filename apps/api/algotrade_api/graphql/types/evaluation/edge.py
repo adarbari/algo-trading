@@ -12,9 +12,8 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, provenance, runs, versions
-from algotrade.services.read.evaluation.positions import exit_rule
+from algotrade.services.read.evaluation.positions import exit_rule, state
 from algotrade.services.read.evaluation.verdict import model as verdict_model
-from algotrade.services.read.evaluation.verdict import state
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.permissions import AdminCause
 from algotrade_api.graphql.types.evaluation.compare import EdgeCompare

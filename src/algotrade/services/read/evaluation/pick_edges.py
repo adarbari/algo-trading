@@ -19,7 +19,7 @@ whose evidence the viewer lacks the licence of is not listed at all, so it adds 
 decision 1: ``evidence_licence``). It reads no
 outcome: it says what the edge would take, not what it has already earned. ``load_edge_night`` is
 the same table's answer for a whole edge at the served session (the stored status and reason), read
-by the setup state (``verdict/state.py``, ADR 0088 decision 16)."""
+by the setup state (``positions/state.py``, ADR 0088 decision 16)."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass

@@ -11,7 +11,12 @@ import pytest
 
 from algotrade.services.read.evaluation import pick_edges
 from algotrade.services.read.evaluation.pick_edges import EdgeNight
-from algotrade.services.read.evaluation.verdict import state as module
+from algotrade.services.read.evaluation.positions import state as module
+from algotrade.services.read.evaluation.positions.state import (
+    SetupStateCode,
+    decide_state,
+    load_setup_state,
+)
 from algotrade.services.read.evaluation.verdict.model import (
     DIAGNOSTIC,
     NOT_ENOUGH,
@@ -19,11 +24,6 @@ from algotrade.services.read.evaluation.verdict.model import (
     PROMISING,
     WAITING,
     WORKS,
-)
-from algotrade.services.read.evaluation.verdict.state import (
-    SetupStateCode,
-    decide_state,
-    load_setup_state,
 )
 from algotrade.services.read.values import UnknownCode
 

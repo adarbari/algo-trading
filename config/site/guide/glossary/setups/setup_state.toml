@@ -2,7 +2,7 @@
 # (ADR 0088 decision 16, design 2.3; ADR 0051). One [[term]] each: id, term, short (one sentence), body, next,
 # see_also. Typed by src/algotrade/config/site/guide/glossary.py; fitness tests:
 # tests/unit/config/site/guide/test_glossary.py. The four values of the state chip
-# (services/read/evaluation/verdict/state.py, `SetupStateCode`).
+# (services/read/evaluation/positions/state.py, `SetupStateCode`).
 
 [[term]]
 id = "setup_state"

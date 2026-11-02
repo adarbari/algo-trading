@@ -10,7 +10,7 @@ from strawberry.scalars import JSON
 
 from algotrade.services.read.evaluation import decay, edges, evidence, robustness
 from algotrade.services.read.evaluation import verdict as read
-from algotrade.services.read.evaluation.verdict import state as setup_state
+from algotrade.services.read.evaluation.positions import state as setup_state
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
 strawberry.enum(setup_state.SetupStateCode, description="A setup's state at the served session")

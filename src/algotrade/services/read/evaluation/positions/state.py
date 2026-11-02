@@ -25,8 +25,12 @@ from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.evaluation import pick_edges
 from algotrade.services.read.evaluation.edges import Edge, parsed_edges
-from algotrade.services.read.evaluation.verdict.model import PROMISING, WAITING, WORKS
-from algotrade.services.read.evaluation.verdict.stored import load_stored_summary
+from algotrade.services.read.evaluation.verdict import (
+    PROMISING,
+    WAITING,
+    WORKS,
+    load_stored_summary,
+)
 from algotrade.services.read.values import Unknown, UnknownCode
 
 STATE_VERSION = 1  # bump on any change to ``decide_state``
