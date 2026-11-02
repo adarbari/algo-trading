@@ -34,7 +34,6 @@ import json
 import os
 import secrets
 import shutil
-import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -67,15 +66,22 @@ SWAP_GRACE_S = 30.0  # a file a compaction swap superseded is swept no sooner th
 
 
 def atomic_write(path: Path, data: bytes) -> None:
-    """Write via a unique temp file in the same directory, then rename into place."""
+    """Write via a unique temp file in the same directory, then rename into place.
+
+    The temp file is named before it is created, so an exception raised at any point after
+    its creation still removes it: a compaction worker's SIGTERM raises ``SystemExit`` at the
+    next bytecode, which ``mkstemp`` (it creates the file before returning its name) lost."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temp = path.parent / f".{path.name}.{secrets.token_hex(8)}.tmp"
     try:
-        with os.fdopen(fd, "wb") as fh:
+        # the builtin, not ``Path.open``: no Python frame between the file's creation and ``with``
+        with open(temp, "xb") as fh:  # noqa: PTH123
             fh.write(data)
-        Path(name).replace(path)
+        temp.replace(path)
+    except FileExistsError:
+        raise  # another writer's temp file of the same name: not ours to remove
     except BaseException:
-        Path(name).unlink(missing_ok=True)
+        temp.unlink(missing_ok=True)
         raise
 
 

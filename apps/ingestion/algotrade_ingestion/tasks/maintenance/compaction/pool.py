@@ -130,6 +130,9 @@ def init_worker(plan: Plan, parent_pid: int, process: bool = True) -> None:
 
 
 def _terminate(signum: int, frame: FrameType | None) -> None:
+    # One SIGTERM: a second (the parent watch after ``stop_children``) would raise inside the
+    # cleanup and leave its temp file; SIGKILL after the grace stays the backstop.
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
     raise SystemExit(f"terminated by signal {signum}")  # the partition in flight discards
 
 

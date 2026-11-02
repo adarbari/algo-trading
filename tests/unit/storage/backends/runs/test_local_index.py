@@ -5,8 +5,10 @@ publishes an index naming a file that is not there, and a killed writer's temp f
 import dataclasses
 import json
 import os
+import sys
 from datetime import date, timedelta
 from pathlib import Path
+from types import FrameType
 from typing import Any
 
 import pandas as pd
@@ -150,3 +152,54 @@ def test_an_unchanged_index_is_parsed_once_and_a_replaced_one_again(
     put(backend, "r2", DAY, commit=True)
     assert set(read_index(directory)) == {"r1", "r2"}
     assert len(parsed) == 2
+
+
+class Interrupted(BaseException):
+    """What a compaction worker's SIGTERM handler raises (``SystemExit``) at a bytecode boundary."""
+
+
+class InterruptAt:
+    """A trace function raising ``Interrupted`` at its ``point``-th event (in any frame)."""
+
+    def __init__(self, point: int) -> None:
+        self.point, self.seen = point, 0
+
+    def __call__(self, frame: FrameType, event: str, arg: object) -> "InterruptAt":
+        self.seen += 1
+        if self.seen == self.point:
+            raise Interrupted
+        return self
+
+
+# Tracing can raise at the line event of a ``with`` block's normal exit, before ``__exit__``
+# (a signal cannot: the eval breaker runs after that call); the file object is then closed by
+# its collection, with a ResourceWarning, and the temp file is still removed.
+@pytest.mark.filterwarnings("ignore::ResourceWarning")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
+def test_a_signal_at_any_line_of_an_atomic_write_leaves_no_temp_file(tmp_path: Path) -> None:
+    """The first test of the fix for the flaky ``test_sigterm_leaves_no_worker_and_no_temp_file``
+    (CI, 2026-11-02): a worker's SIGTERM raises at the next bytecode check, which on 3.12 is
+    right after ``os.open`` returns inside ``mkstemp``, before the caller knows the temp name.
+    Raise at every traced line, call and return in turn (frames below ``atomic_write`` too):
+    the target holds the old or the new bytes and no temp file is ever left."""
+    target = tmp_path / "_runs.json"
+    target.write_bytes(b"old")
+    saved = sys.gettrace()
+    point = 0
+    while True:
+        point += 1
+        trace = InterruptAt(point)
+        sys.settrace(trace)
+        try:
+            local_index.atomic_write(target, b"new")
+        except Interrupted:
+            pass
+        finally:
+            sys.settrace(saved)
+        assert [p.name for p in tmp_path.iterdir()] == ["_runs.json"], f"at trace event {point}"
+        assert target.read_bytes() in (b"old", b"new")
+        if trace.seen < point:  # the write ran to the end uninterrupted: every point was tried
+            break
+        target.write_bytes(b"old")
+    assert target.read_bytes() == b"new"
+    assert point > 10  # the trace reached inside the write
