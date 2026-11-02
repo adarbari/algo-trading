@@ -4,15 +4,17 @@ session's partition of the market feature groups (``data.rollups.group_view``; a
 no row or no partition reads as ``None``, unknown, never an older session), and the
 ``RegimeGate`` the screening engine applies from the resolved ``[regime]`` settings."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 
+from algotrade.config.strategy.regime import gate_fields
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.instruments import market_id
+from algotrade.core.model.predicates import Group
 from algotrade.core.views.feature_view import FeatureValue
 from algotrade.data import StoreReader
 from algotrade.data.rollups import group_view
-from algotrade.engines.screening.gate import RegimeGate
+from algotrade.engines.screening.gate import GateDecision, RegimeGate, decide_gate
 from algotrade.services.views import to_value
 
 MARKET = market_id("US")  # the market whose row the gate reads (ADR 0047)
@@ -47,3 +49,16 @@ def regime_gate(config: ResolvedConfig, market: dict[str, FeatureValue]) -> Regi
         pause_in=config.gate_pauses,
         unknown_multiplier=regime.unknown_multiplier,
     )
+
+
+def edge_gate(
+    reader: StoreReader,
+    group: Group,
+    session: date,
+    domains: Mapping[str, Sequence[str]] | None = None,
+    as_of: datetime | None = None,
+) -> GateDecision:
+    """A setup's gate at ``session`` (ADR 0088): the rule over the session's market row, every
+    field it names read from that session only (``session_market``). Never reads
+    ``[regime].enabled``: the gate applies whatever the overlay says."""
+    return decide_gate(group, session_market(reader, gate_fields(group), session, as_of), domains)

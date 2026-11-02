@@ -7,11 +7,12 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.user import SITE_USER, UserContext
+from algotrade.core.model.predicates import Group, Rule
 from algotrade.data import StoreReader
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.configs import resolve_config
 from algotrade.services.licences import HARNESS_ALL
-from algotrade.services.screening.regime import MARKET, session_market
+from algotrade.services.screening.regime import MARKET, edge_gate, session_market
 from algotrade.services.screening.run import ScreenOutcome, run_screener
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
@@ -102,3 +103,19 @@ def test_the_gate_is_off_by_default() -> None:
     assert "regime" not in outcome.audit
     saved = rows(reader)
     assert saved["regime"].isna().all() and set(saved["size_multiplier"]) == {1.0}
+
+
+def test_an_edge_gate_reads_that_session_whatever_the_regime_overlay_says() -> None:
+    gate = Group("all", (Rule(LABEL, "not_in", ("STRESS", "CRISIS")),))
+    domains = {LABEL: ("CALM", "CAUTION", "STRESS", "CRISIS")}
+    for stored, state in (
+        ("CALM", "open"),
+        ("STRESS", "closed"),
+        ("FOO", "unknown"),
+        (None, "unknown"),
+    ):
+        reader, writer = seeded()  # no [regime] anywhere: the gate does not depend on it
+        store_label(writer, stored)
+        assert edge_gate(reader, gate, DAY, domains).state == state
+    reader, _ = seeded()  # nothing stored for the session: unknown, never open
+    assert edge_gate(reader, gate, DAY, domains).state == "unknown"

@@ -48,11 +48,12 @@ runs everything. Not done, on purpose: skipping CI on drafts (review loops read 
 path-selected pytest shards (the 90% coverage gate needs every shard). Raising the cap
 (plan or larger runners) is the owner's call; self-hosted runners stay forbidden.
 
-Before the push (same day): `make changed` also runs ESLint over the changed web scripts (~45 s)
-and, for a change under `src/` or `design-system/`, the production build and bundle budgets;
-a `pre-push` hook (`make-changed` in `.pre-commit-config.yaml`, installed by `make install` or
-`pre-commit install --hook-type pre-push` in the main checkout) runs it. Still CI-only: the Playwright e2e specs (2026-11-02), the
-screenshot shards (Docker) and the dependency audit (network).
+Before the push: the `pre-push` hook (`pre-push-fast` in `.pre-commit-config.yaml`, installed by
+`make install` or `pre-commit install --hook-type pre-push` in the main checkout) runs `make
+pre-push`, the fast lane below (about 90 s): only the checks that fail most per second they cost.
+`make changed` stays the full local check for anyone who wants it. CI-only: ESLint, `tsc`,
+vitest, the mirrored pytest, the Playwright e2e specs, the screenshot shards (Docker) and the
+dependency audit (network).
 
 ## Pipeline
 
@@ -73,9 +74,51 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 
 ### Local fast path
 
-`make changed` first fetches `origin/main` (`scripts/changed_tests.py`; a failed fetch keeps the ref) and diffs from the merge base with it: a worktree's stale `origin/main` counted work merged since as changed, and V2 and V5 spent 10+ min in step 1 on other PRs' tests (2026-11-02). Then, all at `-n $(WORKERS)`: the mirrored Python tests of the changed files (a Guide config change maps to the Guide readers only, not the whole graph and read-model suites; less what step 2 runs in full), then `tests/architecture` and `tests/unit/config` in full (layout caps, registries, docs and harness tests that CI otherwise catches a push late), then the web checks `scripts/changed_web.py` maps from the changed `apps/web` files: first the static gates CI's web-static job fails on most (Prettier and Stylelint over the changed files, `ds:check`, ESLint over the changed scripts, about 45 s: its type-aware rules load the project); any `.ts` / `.tsx` -> `npm run typecheck` (`tsc -b`, incremental: its build info stays in `node_modules/.tmp`); the changed code files -> one `vitest related --run` (the tests that import them, one start-up; the generated API client is left out, every test imports it); story or CSS module -> that component's screenshots, printed as a Docker command off Linux; a file under `src/` or `design-system/` -> the production build and the bundle budgets (`perf:bundle`, the web CI failure seen most). The Playwright e2e specs are not run locally (owner decision 2026-11-02, `docs/decisions/log.md`): minutes each on the shared Mac and rarely the first red check; CI runs them. Then the fast gates. Then push: CI is the full gate (owner decision 2026-10-08: the machine never runs the full `make check`); after a CI failure rerun only the failed gate locally. The vitest pool is `vmThreads`: jsdom is created once per worker instead of once per file. Caches: npm's is `~/.npm`, already one for every worktree (`scripts/worktree.sh` runs `npm ci` with the default); pytest's cache is per worktree on purpose (nothing in `make changed` reads it). The Makefile's `WORKERS` is `scripts/ops/xdist_workers.py`'s answer: `auto`, or 2 while the machine's 1-minute load average is above 12 (it caps the worker count only, no gate; `make doctor` shows the load; `WORKERS=N` overrides).
+`make changed` first fetches `origin/main` (`scripts/changed_tests.py`; a failed fetch keeps the ref) and diffs from the merge base with it: a worktree's stale `origin/main` counted work merged since as changed, and V2 and V5 spent 10+ min in step 1 on other PRs' tests (2026-11-02). Then, all at `-n $(WORKERS)`: the mirrored Python tests of the changed files (a Guide config change maps to the Guide readers only, not the whole graph and read-model suites; less what step 2 runs in full), then `tests/architecture` and `tests/unit/config` in full (layout caps, registries, docs and harness tests that CI otherwise catches a push late), then the web checks `scripts/changed_web.py` maps from the changed `apps/web` files: first the static gates CI's web-static job fails on most (Prettier and Stylelint over the changed files, `ds:check`, ESLint over the changed scripts, about 45 s: its type-aware rules load the project); any `.ts` / `.tsx` -> `npm run typecheck` (`tsc -b`, incremental: its build info stays in `node_modules/.tmp`); the changed code files -> one `vitest related --run` with 30 s test and hook timeouts (locally only: under load, unrelated tests ran past the 5 s default and failed pushes, 2026-11-02; slow tests worth fixing: design-system `CalendarGrid.test.tsx` 14 s, `MoreFilters` 8.5 s, `DataStatusPill` 7.6 s, `PickDetail` 5.3 s at 2 workers) (the tests that import them, one start-up; the generated API client is left out, every test imports it); story or CSS module -> that component's screenshots, printed as a Docker command off Linux; a file under `src/` or `design-system/` -> the production build and the bundle budgets (`perf:bundle`, the web CI failure seen most). The Playwright e2e specs are not run locally (owner decision 2026-11-02, `docs/decisions/log.md`): minutes each on the shared Mac and rarely the first red check; CI runs them. Then the fast gates. Then push: CI is the full gate (owner decision 2026-10-08: the machine never runs the full `make check`); after a CI failure rerun only the failed gate locally. The vitest pool is `vmThreads`: jsdom is created once per worker instead of once per file. Caches: npm's is `~/.npm`, already one for every worktree (`scripts/worktree.sh` runs `npm ci` with the default); pytest's cache is per worktree on purpose (nothing in `make changed` reads it). The Makefile's `WORKERS` is `scripts/ops/xdist_workers.py`'s answer: `auto`, or 2 while the machine's 1-minute load average is above 12 (it caps the worker count only, no gate; `make doctor` shows the load; `WORKERS=N` overrides).
 
-The pre-push hook runs `make changed` through `scripts/ops/push_queue.py`, a machine-wide queue (owner decision 2026-11-02: eight sessions pushing at once ran five checks at load 42, 12+ min each; two at a time is what the Mac carries). Waiters keep a ticket and take one of `PUSH_QUEUE_SLOTS` (default 2) slots when one is free and they are first by priority, then arrival; each poll prints the position. Priority is the number of open PRs that depend on the pushed branch: stacked on it (their head contains our head commit, or their base is our branch) or naming its PR in the body (`Stacked on #N`, `Depends on #N`, `waits on #N`, `needs #N`); a line `Unblocks: V10, V11, O3` (slice ids or `#N`, comma-separated) in the PR body adds each distinct id, once, for planned work that has no PR yet (a `#N` already an open dependant is not counted twice); `PUSH_PRIORITY=N` overrides, and a `gh` failure gives 0 with the reason printed, never a blocked push. The run uses `WORKERS=${PUSH_QUEUE_WORKERS:-4}` (also the vitest workers). The queue lives in the main checkout's `var/locks/push-queue/`; dead or 2 h old tickets and slots are dropped at every poll.
+The pre-push hook runs `make pre-push` (the fast lane below) through `scripts/ops/push_queue.py`, a machine-wide queue (owner decision 2026-11-02: eight sessions pushing at once ran five checks at load 42, 12+ min each; two at a time is what the Mac carries). Waiters keep a ticket and take one of `PUSH_QUEUE_SLOTS` (default 2) slots when one is free and they are first by priority, then arrival; each poll prints the position. Priority is the number of open PRs that depend on the pushed branch: stacked on it (their head contains our head commit, or their base is our branch) or naming its PR in the body (`Stacked on #N`, `Depends on #N`, `waits on #N`, `needs #N`); a line `Unblocks: V10, V11, O3` (slice ids or `#N`, comma-separated) in the PR body adds each distinct id, once, for planned work that has no PR yet (a `#N` already an open dependant is not counted twice); `PUSH_PRIORITY=N` overrides, and a `gh` failure gives 0 with the reason printed, never a blocked push. The run uses `WORKERS=${PUSH_QUEUE_WORKERS:-4}` (also the vitest workers). The queue lives in the main checkout's `var/locks/push-queue/`; dead or 2 h old tickets and slots are dropped at every poll.
+
+### Pre-push fast lane (`make pre-push`)
+
+Owner decision 2026-11-02: the hook runs locally only what fails often and costs little on the
+shared Mac; the rest is GitHub CI's (a public repo: hosted minutes are free, only concurrency is
+limited, and `ci.yml`'s `concurrency` cancels a branch's superseded run). Target: 90 s warm.
+`scripts/pre_push.py` runs two lanes side by side: python (`make numbering`, then `FAST_TESTS`
+at `-n 2`, whatever changed) and web (Prettier and Stylelint over the changed files, `ds:check`,
+`visual:missing` for a changed story; for a change under `src/` or `design-system/` the
+production build, `perf:bundle` and the DOM / request budgets `perf:e2e` on a free preview
+port). A push whose new commits are all clean merges of main runs the python lane alone. A
+fast test that stops failing leaves the list; one that starts failing often joins it, if it
+is seconds (`make perf` checks the python lane against the budget on an idle machine). The
+table understates what the old hook already stopped (mirrored pytest, `tsc`, vitest, ESLint,
+ownership ran locally for part of the sample), so those checks are re-measured after about 50
+CI runs on the fast lane and join it if they start failing (architect review, 2026-11-02).
+Known gaps, CI's: a clean merge of main that pushes the combined bundle over budget (the web lane
+skips merge-only pushes); `import-linter`, `mypy`, ruff and file length run at commit.
+
+Measured over the last 100 failed CI runs (2026-10-24 to 2026-11-02), the failing step per job
+(a run can fail several), and its local cost on this Mac (load 10-45):
+
+| Check | CI failures | Local cost | Hook |
+|---|---|---|---|
+| Dependency audit (`npm audit`) | 28 | network | CI (an advisory fails every PR alike) |
+| Screenshots + axe | 22 | Docker, minutes | CI; `visual:missing` only for a changed story |
+| Bundle budgets (with raise reasons) | 20 | build 8-24 s + 6-38 s | **in** |
+| DOM / request budgets (`perf:e2e`) | 19 | 31-45 s | **in** |
+| `test_views` (view coverage) | 14 | 9-25 s | **in** |
+| Web e2e specs | 13 | minutes | CI |
+| `test_docs` (ADR index) | 12 | under 1 s | **in**, with `make numbering` (5 s) |
+| `ds:check` | 9 | 3-7 s | **in** |
+| Golden equality (evidence) | 5 | a shard | CI |
+| `test_page_docs`, `test_fast_bench` capture, response-cache groups | 4, 3, 2 | under 2 s each | **in** |
+| CI workflow shape, Guide coverage and style, layout caps | 3, 2, 3 | 2-10 s | **in** |
+| ESLint (`npm run lint`) | 4 | 25-55 s | CI |
+| `generated:check` | 1 | 45 s | CI |
+| vitest, `tsc -b` | 1, 0 | 30-55 s each | CI |
+| `make dupes`, `filelen` | 3, 1 | the commit hook runs file length | CI |
+
+On the V7 diff (#1019, 63 files) the hook took 57 s (python 57 s, web 42 s, side by side)
+against 31 min for `make changed` before #1051 and 12.6 min after it.
 
 ### Scope-aware `make check` (the release, and a deliberate full run)
 
@@ -310,12 +353,12 @@ screenshot baselines, and a lazy page without a budget. What catches each before
 
 | Failure | Caught by | Where it runs |
 |---|---|---|
-| Route over budget | `make changed`: the production build and `perf:bundle` for a change under `src/` or `design-system/` | the `pre-push` hook |
+| Route over budget | `make pre-push` (and `make changed`): the production build and `perf:bundle` for a change under `src/` or `design-system/` | the `pre-push` hook |
 | Lazy page without a budget (or a budget for a removed page) | the unit test `a budget for every lazy page` (`scripts/check-bundle-budgets.test.ts`, no build) | `npm run test`, CI `web-static` |
-| New story without light and dark baselines | `npm run visual:missing` makes only the missing PNGs in the CI Playwright image (Docker off Linux), then `ds:check` verifies them | `make changed`, only when a `*.stories.tsx` changed (nothing to do, nothing run, when no baseline is missing) |
+| New story without light and dark baselines | `npm run visual:missing` makes only the missing PNGs in the CI Playwright image (Docker off Linux), then `ds:check` verifies them | `make pre-push` and `make changed`, only when a `*.stories.tsx` changed (nothing to do, nothing run, when no baseline is missing) |
 | Anything the above skip | CI, the full gate | every PR |
 
-The hook is `make-changed` in `.pre-commit-config.yaml`. Hooks live in the main checkout's
+The hook is `pre-push-fast` in `.pre-commit-config.yaml` (`make pre-push`, below). Hooks live in the main checkout's
 `.git`, shared by every worktree: `scripts/worktree.sh` installs it when missing, and `make
 doctor` fails until it is installed (`pre-commit install --hook-type pre-push` in the main
 checkout). Route budgets sit at measured + 5 % (`docs/decisions/log.md`, 2026-10-23); the shared

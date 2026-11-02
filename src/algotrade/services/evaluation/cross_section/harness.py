@@ -77,6 +77,13 @@ from algotrade.services.evaluation.cross_section.baselines.variant import (
     on_chain,
     variant_scope,
 )
+from algotrade.services.evaluation.cross_section.detail.gating import (
+    gate_domains,
+    open_blocks,
+    pooled_blocks,
+    tagged,
+    turned,
+)
 from algotrade.services.evaluation.cross_section.detail.licences import (
     TrialLicences,
     trial_licences,
@@ -127,7 +134,6 @@ from algotrade.services.evaluation.cross_section.measures import (
     cost_measures,
     deflate,
     edge_slices,
-    pool_stats,
     slice_measures,
 )
 from algotrade.services.evaluation.cross_section.measuring import (
@@ -508,7 +514,7 @@ def evaluate_edge(
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
-    session = SessionReads(reader, label, screens, user.user_id)
+    session = SessionReads(reader, label, screens, user.user_id, gate_domains(configs, edge))
     days = sessions_between(start, end)
     scopes = _scopes(configs, user, edge, iv_field)
     licences: dict[str, str | None] = {}
@@ -594,9 +600,11 @@ def evaluate_edge(
                 plan, variant, stats, (closed, kept, exits), start, projected
             )
             legs = stats.randoms.get((plan.key, variant.id), {})
+            found = tagged(stats.legs.get((plan.key, variant.id), {}), scope.edge, session)
+            every, blocks_open, block_stats = pooled_blocks(scope.edge, found, vkept, vclosed)
             pooled = [
                 pool_random([legs[leg.decision] for leg in block if leg.decision in legs])
-                for block in plan.blocks
+                for block in open_blocks(scope.edge, plan.blocks, found)
                 if _drawn(block, legs, closed)
             ]
             randoms += _random_sets(
@@ -607,20 +615,11 @@ def evaluate_edge(
                 pooled,
                 vscope.edge.outcome.result_side,
             )
-            found = stats.legs.get((plan.key, variant.id), {})
-            block_stats = tuple(
-                pool_stats(
-                    [
-                        found[leg.decision]
-                        for leg in block
-                        if leg.entry in vclosed and leg.decision in found
-                    ]
-                )
-                for block in vkept
+            every, block_stats = turned(
+                every, block_stats, partial(_turned_over, vscope.edge.outcome)
             )
-            block_stats = _turned_over(vscope.edge.outcome, block_stats)
             measures, costed = _slice_rows(
-                block_stats,
+                every,
                 split,
                 exploratory,
                 variant.config.config.impl == MODEL_IMPL,
@@ -667,11 +666,13 @@ def evaluate_edge(
                         licences[scope.key],
                         stats.outcome_licence,
                     ),
-                    legs=_details(vkept, block_stats, found, vclosed) if scope.key == MAIN else (),
+                    legs=_details(blocks_open, block_stats, found, vclosed)
+                    if scope.key == MAIN
+                    else (),
                     report_containment=diagnostic,
                     series=series_facts(
                         vscope.edge,
-                        vkept,
+                        blocks_open,
                         vclosed,
                         horizon,
                         block_stats,
@@ -745,9 +746,12 @@ def _time_series(
     stored as the rows the verdict reads; no per-session series, legs or ledger (there is no
     screen to replay)."""
     split, exploratory = effective_split(split_from, edge)
-    session = SessionReads(reader, site_regime(configs.load).label)
+    session = SessionReads(
+        reader, site_regime(configs.load).label, domains=gate_domains(configs, edge)
+    )
+    gate = None if edge.gate is None else partial(session.gate, edge.gate)
     run = evaluate_time_series(
-        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws
+        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate
     )
     keys = {
         r.symbol: hashlib.sha256(

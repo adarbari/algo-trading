@@ -328,7 +328,7 @@ detect = [{ string = "<date>" }, { string = "<url>" }]
 
 [[responsibility]]
 id = "run-overlays"
-description = "Run overlays and the regime gate (ADR 0049): the Overlay protocol and ScaleByLabel (engines/overlays), applied by the backtest engine after on_bar and before the risk limits; MarketFeatures on the bar timeline (session t's values at bar t, no lookahead) and the market features a run reads (services/backtests/market.py, services/screening/regime.py); the typed [regime] settings (config/strategy/regime.py); the screening engine's gate that PAUSES a screener's picks in the regimes it pauses in, and every pick of a gated screener (a non-empty pause_in) when the label is unknown (fail closed)"
+description = "Run overlays and the regime gate (ADR 0049): the Overlay protocol and ScaleByLabel (engines/overlays), applied by the backtest engine after on_bar and before the risk limits; MarketFeatures on the bar timeline (session t's values at bar t, no lookahead) and the market features a run reads (services/backtests/market.py, services/screening/regime.py); the typed [regime] settings (config/strategy/regime.py); the screening engine's gate that PAUSES a screener's picks in the regimes it pauses in, and every pick of a gated screener (a non-empty pause_in) when the label is unknown (fail closed); and a setup's own gate (ADR 0088: a rule group over the session's market row, checked at the `gate` site by `check_gate`, decided open / closed / unknown by one pure function `decide_gate` that also reads a screener's `pause_in`; unknown, never open; applied whatever `[regime].enabled` says, `edge_gate`)"
 owner = [
     "src/algotrade/engines/overlays/*",
     "src/algotrade/engines/screening/gate.py",
