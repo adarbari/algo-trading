@@ -105,6 +105,7 @@ EDGE_SERIES = fixed(
         "block_days", "picks", "pick_hits", "eligible", "base_hits", "excluded_missing",
         "excluded_unmeasured", "excluded_score_coverage", "no_entry_bar", "no_implied_vol",
         "outside_universe", "delisted", "unscored",
+        "not_triggered", "entry_unknown",  # E13: an entry condition's (nullable in older rows)
     )),
     *floats("pick_mean", "base_mean", *(f"decile_mean_{i:02d}" for i in range(1, 11))),
     runs="merge",

@@ -124,12 +124,16 @@ def check_entries(
     first: date,
     last: date,
     as_of: datetime,
-) -> bool:
-    """``check_entry`` of each of ``edges`` (a run's scopes); whether any has an entry condition
-    (its legs are then never reused: each depends on every partition of its wait, ADR 0063)."""
+    full: bool = False,
+) -> str | None:
+    """``check_entry`` of each of ``edges`` (a run's scopes), whatever the run, then why the run
+    reuses no stored leg: ``requested`` (``full``), ``entry_condition`` (an entry leg depends on
+    every partition of its wait, ADR 0063), else None."""
     for edge in edges:
         check_entry(reader, edge, features, first, last, as_of)
-    return any(edge.outcome.entry is not None for edge in edges)
+    if full:
+        return "requested"
+    return "entry_condition" if any(edge.outcome.entry for edge in edges) else None
 
 
 def check_entry(
@@ -156,6 +160,8 @@ def check_entry(
         )
     if edge.outcome.kind == PORTFOLIO_KIND or edge.ensemble:
         raise ConfigurationError(f"{where}: a book or an ensemble has no names to enter")
+    if edge.outcome.kind == "pair_spread":  # a name and its sibling would enter apart
+        raise ConfigurationError(f"{where}: a pair_spread pair would be measured over two windows")
     end = wait_closes(last, spec.within_sessions)[-1]
     for name in sorted({r.field for r in spec.when.rules()}):
         for table in _tables(features, name):

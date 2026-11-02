@@ -142,3 +142,12 @@ def test_an_entry_on_an_option_pnl_outcome_is_refused_until_the_writers_cover_th
     )  # fmt: skip
     with pytest.raises(ConfigurationError, match=r"G9-M3"):
         check_entry(w.reader, option, site_features(), DAYS[0], DAYS[-1], AS_OF)
+
+
+def test_a_pair_spread_with_an_entry_condition_is_refused() -> None:
+    w = signal_world(lambda day, i: 1.0, closes(1))
+    pair = _entry_edge(
+        kind="pair_spread", benchmark="none", pair_field="rollup.share_classes@v1.sibling_id"
+    )
+    with pytest.raises(ConfigurationError, match=r"pair_spread"):
+        check_entry(w.reader, pair, site_features(), DAYS[0], DAYS[0], AS_OF)

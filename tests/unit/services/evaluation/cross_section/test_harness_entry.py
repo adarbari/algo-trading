@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.user import UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.engines.selection.entry import ENTRY_UNKNOWN, NOT_TRIGGERED
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
@@ -28,7 +29,8 @@ from tests.unit.services.evaluation.cross_section.conftest import (
 USER = UserContext("site")
 SIGNAL_TABLE = "rollups/instrument/price_stats@v2"
 SIGNAL = "rollup.price_stats@v2.adv_usd_20d"
-STARTS = [DAYS[0], DAYS[2], DAYS[4], DAYS[6]]  # every 2nd session (horizon 2)
+STARTS = [DAYS[0], DAYS[2], DAYS[4], DAYS[6]]  # every 2nd session (horizon 2, a wait of 1)
+SPACED = [DAYS[0], DAYS[3], DAYS[6]]  # a wait of 2: h + wait - 1 = 3 sessions apart
 AFTER = [next_session(DAYS[-1]), next_session(next_session(DAYS[-1]))]  # Sept 11, Sept 14
 PICKS = IDS[15:]  # the screen's top 5 (dearest names)
 
@@ -66,20 +68,21 @@ def _rows(day: date) -> list[dict[str, Any]]:
     return [outcome_row(iid, i, day) for i, iid in enumerate(IDS)]
 
 
-def run(w: World, wait: int) -> EdgeEvaluation:
+def run(w: World, wait: int, full: bool = False) -> EdgeEvaluation:
     return evaluate_edge(
-        w.reader, w.results, w.configs, USER, entry_edge(wait), DAYS[0], DAYS[-1], AS_OF
-    )
+        w.reader, w.results, w.configs, USER, entry_edge(wait), DAYS[0], DAYS[-1], AS_OF,
+        full=full,
+    )  # fmt: skip
 
 
 def odd_waits(day: date, i: int) -> float:
     """Even names hold at every close; odd ones only off the decision sessions (one close later)."""
-    return 1.0 if i % 2 == 0 or day not in STARTS else -1.0
+    return 1.0 if i % 2 == 0 or day not in SPACED else -1.0
 
 
 def test_each_name_enters_at_its_own_s_after_the_close_its_rule_held() -> None:
     (r,) = run(world(odd_waits), wait=2).results
-    assert [s.session for s in r.stats] == STARTS  # the cohort is D
+    assert [s.session for s in r.stats] == SPACED  # the cohort is D; windows never overlap
     for s in r.stats:
         d1 = next_session(s.session)
         got = {p.instrument_id: p.entry_session for p in s.picks}
@@ -89,7 +92,7 @@ def test_each_name_enters_at_its_own_s_after_the_close_its_rule_held() -> None:
 
 
 def test_what_a_name_reads_after_its_entering_close_changes_nothing() -> None:
-    later = world(lambda d, i: odd_waits(d, i) if d in STARTS or i % 2 else -5.0)
+    later = world(lambda d, i: odd_waits(d, i) if d in SPACED or i % 2 else -5.0)
     assert run(later, 2).results[0].stats == run(world(odd_waits), 2).results[0].stats
 
 
@@ -136,3 +139,9 @@ def test_the_leg_is_measured_only_once_its_whole_wait_can_be_read(wait: int) -> 
     closed = [d for d in [*DAYS, *AFTER] if d != AFTER[1]]  # no Sept 14 partition
     ev = run(world(odd_waits, closed=closed), wait)
     assert ev.unclosed_sessions == {2: 0 if wait == 1 else 1}
+
+
+def test_a_full_run_still_refuses_what_an_entry_condition_cannot_measure() -> None:
+    w = build_world()  # no signal stored: the rule would be UNKNOWN everywhere (G9-M4)
+    with pytest.raises(ConfigurationError, match=r"G9-M4"):
+        run(w, 2, full=True)

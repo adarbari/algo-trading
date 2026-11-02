@@ -184,6 +184,10 @@ def _entries(
     spec = edge.outcome.entry
     if spec is None:
         return {}
+    if spec.within_sessions > 1:  # a shifted window would run into the stretch beside it
+        raise ConfigurationError(
+            f"edge {edge.id} outcome.entry: a time-series edge takes within_sessions = 1"
+        )
     out: dict[tuple[str, date], date | str] = {}
     for p in ps:
         found = read_entries(reader, spec, 1, ids, p.decision, domains)

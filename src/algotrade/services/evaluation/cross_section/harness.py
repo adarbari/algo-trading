@@ -564,11 +564,7 @@ def evaluate_edge(
             crosses(plans, variants),  # a baseline the setup cannot be valued as fails here
         ),
         # an entry condition is refused here (G9-M3, G9-M4) or its legs are never reused
-        "requested"
-        if full
-        else "entry_condition"
-        if check_entries(reader, [c.edge for c in scopes], features, start, end, as_of)
-        else None,
+        check_entries(reader, [c.edge for c in scopes], features, start, end, as_of, full),
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)

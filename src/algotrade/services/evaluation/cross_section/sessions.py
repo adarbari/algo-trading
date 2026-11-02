@@ -167,10 +167,18 @@ def leg_blocks(
     harness and the paper record both build their legs here: a paper trade is the backtest's leg."""
     if events is None:
         offset = edge.outcome.start_offset_sessions
-        decisions = decision_sessions(edge.schedule, days, horizon)
-        if edge.outcome.entry is not None:
-            return [[entry_leg(d, offset, edge.outcome.entry.within_sessions)] for d in decisions]
-        return [[Leg(d, entry_session(d, offset))] for d in decisions]
+        if edge.outcome.entry is not None:  # a late entrant's window ends wait - 1 later
+            wait = edge.outcome.entry.within_sessions
+            reach = horizon + wait - 1  # D far enough apart that no two windows overlap
+            spaced = (
+                _spaced(decision_sessions(edge.schedule, days, horizon), days, reach)
+                if window_name(edge.schedule) is not None  # a calendar window's length is fixed
+                else decision_sessions(edge.schedule, days, reach)
+            )
+            return [[entry_leg(d, offset, wait)] for d in spaced]
+        return [[Leg(d, entry_session(d, offset))] for d in decision_sessions(
+            edge.schedule, days, horizon
+        )]  # fmt: skip
     if edge.outcome.entry is not None:
         raise ConfigurationError(
             f"edge {edge.id}: an entry condition with an on_event schedule is not evaluated "

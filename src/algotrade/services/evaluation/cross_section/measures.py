@@ -271,6 +271,8 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         pre_snapshot=any(leg.pre_snapshot for leg in legs),
         outside_universe=sum(leg.outside_universe for leg in legs),
         no_entry_bar=sum(leg.no_entry_bar for leg in legs),
+        not_triggered=sum(leg.not_triggered for leg in legs),
+        entry_unknown=sum(leg.entry_unknown for leg in legs),
         pick_reference=tuple(v for leg in legs for v in leg.pick_reference),
         pick_touches=sum(leg.pick_touches for leg in legs),
         no_implied_vol=sum(leg.no_implied_vol for leg in legs),

@@ -7,7 +7,7 @@ import pytest
 
 from algotrade.config.edges.document import MAIN, QUALITY_BAR
 from algotrade.config.user import UserContext
-from algotrade.core.time.calendar import next_session
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.engines.selection.entry import NOT_TRIGGERED
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
@@ -221,14 +221,14 @@ UNTIL = date(2024, 3, 31)  # a quarter: the entry tests read a few periods, not 
 ENTRY = {
     "kind": "excess_return", "horizon_sessions": [H], "benchmark": "none",
     "start_offset_sessions": 1,
-    "entry": {"when": {"all": [{"field": SIGNAL, "op": "gt", "value": 0}]}, "within_sessions": 2},
+    "entry": {"when": {"all": [{"field": SIGNAL, "op": "gt", "value": 0}]}, "within_sessions": 1},
 }  # fmt: skip
 
 
 def with_signal(w: World, value) -> World:  # type: ignore[no-untyped-def]
-    """SPY's signal ``value(day)`` at each close a period's wait reads (D and the next one)."""
+    """SPY's signal ``value(day)`` at each close a period's wait reads (its D)."""
     for p in w.periods:
-        for day in (p.decision, next_session(p.decision)):
+        for day in (p.decision,):
             rows = [{"instrument_id": "EQ:SPY", "adv_usd_20d": value(day)}]
             w.writer.write_table(SIGNAL_TABLE, day, f"s-{day}", stamped(rows, day, f"s-{day}"))
     return w
@@ -251,11 +251,8 @@ def test_a_period_whose_entry_condition_never_held_is_lost_with_its_reason() -> 
     assert not spy.in_window
 
 
-def test_each_period_starts_after_the_first_close_its_rule_held() -> None:
+def test_a_time_series_entry_condition_waits_one_close_only() -> None:
     w = build_world()
-    decisions = {p.decision for p in w.periods}
-    with_signal(w, lambda day: -1.0 if day in decisions else 1.0)  # holds one close after D
-    ps = [p for p in w.periods if p.first <= UNTIL]
-    starts = _entries(w.reader, timed_edge(outcome=ENTRY), ["EQ:SPY"], ps, None)
-    for p in ps:  # t = D + 1, S = t + 1: one session after the period's own S
-        assert starts["EQ:SPY", p.first] == next_session(p.entry) > next_session(p.decision)
+    waits = timed_edge(outcome={**ENTRY, "entry": {**ENTRY["entry"], "within_sessions": 2}})
+    with pytest.raises(ConfigurationError, match=r"within_sessions = 1"):
+        _entries(w.reader, waits, ["EQ:SPY"], w.periods[:1], None)
