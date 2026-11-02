@@ -15,47 +15,45 @@ vi.mock('@/entities/edge', async (importOriginal) => ({
   useEdge: hooks.useEdge,
   useEdgeLiveStates: hooks.useEdgeLiveStates,
 }));
-vi.mock('@/widgets/edge-detail', async () => {
-  const { Button, Text } = await import('@algotrade/ui');
+const { stub } = vi.hoisted(() => ({
+  stub: (name: string, label: string) => async () => {
+    const { Text } = await import('@algotrade/ui');
+    return {
+      [name]: ({ edgeId, edge }: { edgeId?: string; edge?: { id: string } }) => (
+        <Text>{`${label} ${edgeId ?? edge?.id ?? ''}`}</Text>
+      ),
+    };
+  },
+}));
+
+vi.mock('@/widgets/setup-head', async () => {
+  const { Button } = await import('@algotrade/ui');
   return {
     EdgeHeader: ({ edge, onBack }: { edge: { id: string }; onBack: () => void }) => (
       <Button onClick={onBack}>{`header ${edge.id}`}</Button>
     ),
-    EdgeCompare: ({ edgeId }: { edgeId: string }) => <Text>{`compare ${edgeId}`}</Text>,
-    EdgeDefinition: ({ edge }: { edge: { id: string } }) => <Text>{`definition ${edge.id}`}</Text>,
-    EdgeDetails: ({ edge, children }: { edge: { id: string }; children?: ReactNode }) => (
+  };
+});
+vi.mock('@/widgets/setup-rules', stub('SetupRules', 'rules'));
+vi.mock('@/widgets/setup-record', stub('SetupRecord', 'record'));
+vi.mock('@/widgets/setup-fails', stub('SetupFails', 'fails'));
+vi.mock('@/widgets/setup-checklist', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { BeforeYouAct: () => <Text>before</Text> };
+});
+vi.mock('@/widgets/setup-deeper', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    SetupDeeper: ({ edge, children }: { edge: { id: string }; children?: ReactNode }) => (
       <>
-        <Text>{`details ${edge.id}`}</Text>
+        <Text>{`deeper ${edge.id}`}</Text>
         {children}
       </>
     ),
-    EdgeLive: ({ edgeId }: { edgeId: string }) => <Text>{`live ${edgeId}`}</Text>,
   };
 });
-vi.mock('@/widgets/edge-evidence', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return { EdgeEvidence: ({ edgeId }: { edgeId: string }) => <Text>{`evidence ${edgeId}`}</Text> };
-});
-vi.mock('@/widgets/edge-sureness', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return { EdgeSureness: ({ edgeId }: { edgeId: string }) => <Text>{`sureness ${edgeId}`}</Text> };
-});
-vi.mock('@/widgets/edge-diagnostics', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return {
-    EdgeDiagnostics: ({ edgeId }: { edgeId: string }) => <Text>{`diagnostics ${edgeId}`}</Text>,
-  };
-});
-vi.mock('@/widgets/edge-trades', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return { EdgeTrades: ({ edgeId }: { edgeId: string }) => <Text>{`trades ${edgeId}`}</Text> };
-});
-vi.mock('@/widgets/edge-performance', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return {
-    EdgePerformance: ({ edgeId }: { edgeId: string }) => <Text>{`performance ${edgeId}`}</Text>,
-  };
-});
+vi.mock('@/widgets/edge-diagnostics', stub('EdgeDiagnostics', 'diagnostics'));
+vi.mock('@/widgets/edge-trades', stub('EdgeTrades', 'trades'));
 
 const live = (state: string, edgeId = 'momentum_12_1') => ({ edgeId, state });
 
@@ -73,52 +71,34 @@ describe('EdgePage', () => {
   it('composes the head and the sections in reading order, with a navigation to each', async () => {
     const { container } = page();
     expect(screen.getByText('header momentum_12_1')).toBeInTheDocument();
-    const nav = screen.getByRole('navigation', { name: 'Sections of this edge' });
+    const nav = screen.getByRole('navigation', { name: 'Sections of this setup' });
     expect(Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)).toEqual([
-      'Evidence',
-      'How sure',
-      'Where it worked',
-      'Live record',
-      'Trades',
-      'Definition',
-      'Details',
+      'The rules',
+      'How it has done',
+      'When it fails',
+      'Before you act',
+      'Dig deeper',
     ]);
     const order = [
-      'evidence momentum_12_1',
-      'sureness momentum_12_1',
-      'performance momentum_12_1',
-      'live momentum_12_1',
+      'rules momentum_12_1',
+      'record momentum_12_1',
+      'fails momentum_12_1',
+      'before',
+      'deeper momentum_12_1',
       'trades momentum_12_1',
-      'definition momentum_12_1',
-      'details momentum_12_1',
       'diagnostics momentum_12_1',
     ];
     const found = await Promise.all(order.map((text) => screen.findByText(text)));
     found.slice(1).forEach((node, i) => {
       const before = found.at(i);
-      expect(before?.compareDocumentPosition(node)).toBeTruthy();
       expect((before?.compareDocumentPosition(node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
     });
-    for (const id of ['evidence', 'sure', 'where', 'live', 'trades', 'definition', 'details']) {
-      expect(container.querySelector(`#edge-${id}`)).toBeInTheDocument(); // what the navigation scrolls to
+    for (const id of ['rules', 'record', 'fails', 'before', 'deeper']) {
+      expect(container.querySelector(`#setup-${id}`)).toBeInTheDocument(); // what the navigation scrolls to
     }
     await expectNoA11yViolations(container);
-  });
-
-  it('keeps the live record section for an edge that records nothing, and the comparison out of a site edge', async () => {
-    hooks.useEdgeLiveStates.mockReturnValue(fakeQuery([live('not_recording')]));
-    page();
-    await screen.findByText('details momentum_12_1');
-    expect(screen.getByRole('link', { name: 'Live record' })).toBeInTheDocument();
-    expect(await screen.findByText('live momentum_12_1')).toBeInTheDocument();
-    expect(screen.queryByText(/^compare /)).not.toBeInTheDocument();
-  });
-
-  it("shows a copy's comparison", async () => {
-    page('my_momentum');
-    expect(await screen.findByText('compare my_momentum')).toBeInTheDocument();
   });
 
   it('offers the way back from the head', async () => {
@@ -135,10 +115,10 @@ describe('EdgePage', () => {
 
   it('says when the chosen edge does not exist, and shows loading and error with a retry', async () => {
     const { rerender } = page('nope');
-    expect(screen.getByText('No edge nope')).toBeInTheDocument();
+    expect(screen.getByText('No setup nope')).toBeInTheDocument();
     hooks.useEdge.mockReturnValue(fakeQuery(undefined));
     rerender(<EdgePage id="momentum_12_1" onBack={vi.fn()} onEdit={vi.fn()} />);
-    expect(screen.getByText('Loading edge')).toBeInTheDocument();
+    expect(screen.getByText('Loading setup')).toBeInTheDocument();
     const failed = fakeQuery(undefined, { isError: true });
     hooks.useEdge.mockReturnValue(failed);
     rerender(<EdgePage id="momentum_12_1" onBack={vi.fn()} onEdit={vi.fn()} />);

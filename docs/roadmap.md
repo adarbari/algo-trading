@@ -112,7 +112,7 @@ lands. The target state of every item is described in [architecture.md](architec
 **Follow-ups (not built):**
 - Split `config/edges/document.py` by responsibility if it grows again (973 lines).
 - H4: `ex_dividend` (needs `dividend_schedule@v2`), `macro_release` (ADR for a market-entity read), `lockup_expiry` (waits for D8 #652).
-- H5b: the web evidence panel still labels time-series values "Top vs bottom decile" (`apps/web/src/widgets/edge-evidence/model/figures.tsx` ~52, 59), and the last in-sample window before the split pairs with a frozen-period stretch.
+- H5b: the web evidence panel still labels time-series values "Top vs bottom decile" (`apps/web/src/widgets/setup-record/model/figures.tsx` ~52, 59), and the last in-sample window before the split pairs with a frozen-period stretch.
 - H8: short-put structure and a stored `basis` column.
 - H9: per-reason excluded counts, an ADV floor on the sibling leg, the "no sibling data" gap shown only in the job result and text report.
 - H13: Works unreachable for `option_pnl` until an ADR 0065 amendment.

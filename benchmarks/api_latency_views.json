@@ -477,118 +477,10 @@
     "TableView"
    ],
    "uncertain": [
-    "EdgeResultDrawdown",
-    "EdgeResultHorizons",
-    "EdgeResultRegimes",
     "TableView"
    ],
    "interaction": [],
    "source": "static"
-  },
-  "/edges?edge={edge} > expand:Details": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "expand",
-     "group": "",
-     "name": "Details"
-    }
-   ],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}"
-  },
-  "/edges?edge={edge} > tab:Where it worked views:Drawdown": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "tab",
-     "group": "Where it worked views",
-     "name": "Drawdown"
-    }
-   ],
-   "params": {},
-   "ops": [
-    "EdgeResultDrawdown"
-   ],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}",
-   "target": true
-  },
-  "/edges?edge={edge} > tab:Where it worked views:Holding period": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "tab",
-     "group": "Where it worked views",
-     "name": "Holding period"
-    }
-   ],
-   "params": {},
-   "ops": [
-    "EdgeResultHorizons"
-   ],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}",
-   "target": true
-  },
-  "/edges?edge={edge} > tab:Where it worked views:Regime": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "tab",
-     "group": "Where it worked views",
-     "name": "Regime"
-    }
-   ],
-   "params": {},
-   "ops": [
-    "EdgeResultRegimes"
-   ],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}",
-   "target": true
-  },
-  "/edges?edge={edge} > tab:Where it worked views:Year by year": {
-   "route": "/edges",
-   "search": {
-    "edge": "{edge}"
-   },
-   "clicks": [
-    {
-     "kind": "tab",
-     "group": "Where it worked views",
-     "name": "Year by year"
-    }
-   ],
-   "params": {},
-   "ops": [],
-   "uncertain": [],
-   "interaction": [],
-   "source": "static",
-   "parent": "/edges?edge={edge}",
-   "target": true
   },
   "/explore": {
    "route": "/explore",
@@ -1802,6 +1694,63 @@
    "uncertain": [],
    "interaction": [],
    "source": "static"
+  },
+  "/edges?edge={edge} > expand:By holding period": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "By holding period"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
+  },
+  "/edges?edge={edge} > expand:Compared against, tested, and why it should last": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Compared against, tested, and why it should last"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
+  },
+  "/edges?edge={edge} > expand:Dig deeper": {
+   "route": "/edges",
+   "search": {
+    "edge": "{edge}"
+   },
+   "clicks": [
+    {
+     "kind": "expand",
+     "group": "",
+     "name": "Dig deeper"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/edges?edge={edge}"
   }
  }
 }

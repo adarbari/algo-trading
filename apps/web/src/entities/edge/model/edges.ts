@@ -3,7 +3,7 @@
  * them. Each edge keeps what the server sent, verdict included: the verdict, its reason, every figure and sentence are
  * the read model's, so this only names the labels and tones of the served codes and their order.
  */
-import type { StatusTone } from '@algotrade/ui';
+import { verdictTone as verdictBadgeTone, type StatusTone } from '@algotrade/ui';
 
 import type { gqlTypes } from '@/shared/api';
 
@@ -40,18 +40,20 @@ const VERDICT_LABELS: Record<string, string> = {
   diagnostic_only: 'Diagnostic only',
 };
 
-const VERDICT_TONES: Record<string, StatusTone> = {
-  works: 'positive',
-  promising: 'warning',
-  not_working: 'negative',
-  not_enough_data: 'info',
-  waiting_on_data: 'neutral',
-  diagnostic_only: 'neutral',
+/** The design system's verdict key of each served verdict code (its words stay the read model's). */
+const VERDICT_KEYS: Record<string, string> = {
+  works: 'works',
+  promising: 'promising',
+  not_working: 'no_better_than_chance',
+  not_enough_data: 'too_few_cases',
+  waiting_on_data: 'baseline',
+  diagnostic_only: 'baseline',
 };
 
 export const verdictLabel = (verdict: string): string => VERDICT_LABELS[verdict] ?? verdict;
 
-export const verdictTone = (verdict: string): StatusTone => VERDICT_TONES[verdict] ?? 'neutral';
+export const verdictTone = (verdict: string): StatusTone =>
+  verdictBadgeTone(VERDICT_KEYS[verdict] ?? verdict);
 
 /** The statuses an edge has (ADR 0053 amendment 2026-10-10), in the order of its life. */
 export const STATUSES = [

@@ -39,6 +39,7 @@ const EdgesPage = graphql(`
       items {
         id
         name
+        thesis
         status
         state
         mine

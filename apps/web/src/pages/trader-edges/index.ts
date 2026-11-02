@@ -1,4 +1,4 @@
-/** Page: Trader > Edges (the Edges Lab: the edges by verdict, and the chosen edge's page). */
+/** Page: Trader > Setups (the Edges page: the setups library by verdict, and the chosen setup's page). */
 import { decodeFilters } from '@/features/filter-bar';
 import { prefetchEdge, prefetchEdgeDesk, prefetchEdges } from '@/entities/edge';
 

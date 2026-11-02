@@ -1,11 +1,15 @@
 /**
- * Trader > Edges, the Edges Lab (read-only): the edges grouped by verdict, and the chosen edge's
- * page in place of the list (a back button returns). The chosen edge comes from the route
+ * Trader > Setups (the Edges page; the UI says setup, the code edge): the library (Start here, the
+ * setups grouped by verdict) and the chosen setup's page in place of it (a back link returns). The chosen edge comes from the route
  * (shareable).
  */
 import { Button, Heading, Stack, Text } from '@algotrade/ui';
 
-import { EdgeList, type EdgeListSearch, type EdgeListSearchPatch } from '@/widgets/edge-list';
+import {
+  SetupLibrary,
+  type SetupLibrarySearch,
+  type SetupLibrarySearchPatch,
+} from '@/widgets/setup-library';
 
 import { EdgePage } from './EdgePage';
 
@@ -18,8 +22,8 @@ export interface EdgesPageProps {
   /** Back to the list: the route clears the choice. */
   onClear: () => void;
   /** The list's filters and search (from the URL) and their change. */
-  search: EdgeListSearch;
-  onSearchChange: (patch: EdgeListSearchPatch) => void;
+  search: SetupLibrarySearch;
+  onSearchChange: (patch: SetupLibrarySearchPatch) => void;
 }
 
 export function EdgesPage({
@@ -35,9 +39,9 @@ export function EdgesPage({
     <Stack gap={3}>
       <Stack direction="row" gap={3} align="center" justify="between" wrap>
         <Stack gap={1}>
-          <Heading level={1}>Edges</Heading>
+          <Heading level={1}>Setups</Heading>
           <Text size="sm" tone="secondary">
-            Strategy ideas, each backtested for an edge
+            Published setups: a written idea, the rules that find it, and its evidence
           </Text>
         </Stack>
         <Button
@@ -46,10 +50,10 @@ export function EdgesPage({
             onBuild(null);
           }}
         >
-          New edge
+          Test your own idea
         </Button>
       </Stack>
-      <EdgeList onSelect={onSelect} search={search} onSearchChange={onSearchChange} />
+      <SetupLibrary onSelect={onSelect} search={search} onSearchChange={onSearchChange} />
     </Stack>
   );
 }

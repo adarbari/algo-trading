@@ -421,7 +421,9 @@ test('Edges: the filter bar is one Filters button and a sheet, and an old ?view=
   page,
 }) => {
   await page.goto('/edges?view=rejected');
-  await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+  await expect(
+    page.getByRole('group', { name: 'Filters' }).getByRole('button', { name: 'Setup' }),
+  ).toHaveCount(0);
   await expect(page.getByRole('row', { name: /S&P 500 index changes/ })).toBeVisible();
   await expect(page.getByRole('row', { name: /Momentum 12-1/ })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
@@ -431,8 +433,14 @@ test('Edges: the filter bar is one Filters button and a sheet, and an old ?view=
   await expect(page.getByRole('dialog', { name: 'Filters' })).toBeVisible();
 });
 
-test('Edges: a tapped edge opens its page', async ({ page }) => {
+test('Setups: Start here and the library fit a phone, and a tapped setup opens its page', async ({
+  page,
+}) => {
   await page.goto('/edges');
+  await expect(page.getByRole('heading', { level: 2, name: 'Start here' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await page.getByRole('row', { name: /Momentum 12-1/ }).tap();
   await expect(page.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeVisible();
   // The evaluation line wraps inside the screen like the rest of the head.
@@ -446,30 +454,24 @@ test('Edges: a tapped edge opens its page', async ({ page }) => {
     );
   };
   await fits();
-  // The sections stack in one column and none widens the page: the curve, the three cards of
-  // How sure, the years and the drawdown view.
+  // The sections stack in one column and none widens the page: the strip, the curve, the years
+  // and the drawdown behind their disclosures, the regimes, and Dig deeper with its three cards.
+  await expect(page.getByText(/^Backtested \(hypothetical\)/).first()).toBeVisible();
   await expect(page.getByRole('img', { name: /^Evidence curve of the picks/ })).toBeVisible();
   await fits();
-  await page
-    .getByRole('navigation', { name: 'Sections of this edge' })
-    .getByRole('link', { name: 'How sure' })
-    .tap();
-  await expect(page.getByRole('list', { name: 'Decay by stage' })).toBeVisible();
-  await fits();
-  await page
-    .getByRole('navigation', { name: 'Sections of this edge' })
-    .getByRole('link', { name: 'Where it worked' })
-    .tap();
-  await page.getByRole('tab', { name: 'Drawdown' }).tap();
+  const nav = page.getByRole('navigation', { name: 'Sections of this setup' });
+  await page.getByRole('button', { name: 'Drawdown and costs' }).tap();
   await expect(page.getByRole('grid', { name: 'Deepest drawdowns' })).toBeVisible();
   await fits();
-  await page.getByRole('tab', { name: 'Holding period' }).tap();
+  await nav.getByRole('link', { name: 'When it fails' }).tap();
+  await expect(page.getByRole('grid', { name: 'By regime' })).toBeVisible();
+  await page.getByRole('button', { name: 'By holding period' }).tap();
   await expect(page.getByRole('grid', { name: 'By holding period' })).toBeVisible();
   await fits();
-  await page
-    .getByRole('navigation', { name: 'Sections of this edge' })
-    .getByRole('link', { name: 'Trades' })
-    .tap();
+  await nav.getByRole('link', { name: 'Dig deeper' }).tap();
+  await page.getByRole('button', { name: /^Dig deeper/ }).tap();
+  await expect(page.getByRole('list', { name: 'Decay by stage' })).toBeVisible();
+  await fits();
   await expect(page.getByRole('grid', { name: 'Trade ledger' })).toBeVisible();
   await fits(); // the ledger scrolls sideways inside its own box, never the page
   // The ledger's filter bar is the one Filters button and a sheet; "Show N results" narrows it.
