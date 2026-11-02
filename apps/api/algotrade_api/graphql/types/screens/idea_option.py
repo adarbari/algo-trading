@@ -9,6 +9,7 @@ from typing import Self
 
 import strawberry
 
+from algotrade.services.read import values
 from algotrade.services.read.ideas import option_detail
 from algotrade_api.graphql.types.evaluation.exit_rule import ExitRule
 from algotrade_api.graphql.types.instruments.feature import Unknown
@@ -48,10 +49,10 @@ class OptionLegView:
     "group's `unknown` says why a part is missing"
 )
 class IdeaOption:
-    chain_asof: dt.date
+    chain_date: dt.date
     unknown: Unknown | None
     legs: list[OptionLegView]
-    spot: float | None
+    chain_close: float | None
     entry_session: dt.date | None
     exit_session: dt.date | None
     net_credit: float | None
@@ -68,7 +69,7 @@ class IdeaOption:
     risk_unknown: Unknown | None
     report_in_life: bool | None
     report_date: dt.date | None
-    ex_div_before_expiry: bool | None
+    ex_dividend_in_life: bool | None
     ex_div_date: dt.date | None
     calendar_unknown: Unknown | None
     monday_floor: float | None
@@ -76,14 +77,14 @@ class IdeaOption:
 
     @classmethod
     def of(cls, d: option_detail.IdeaOption) -> Self:
-        def one(u: object) -> Unknown | None:
-            return Unknown.of(u) if u is not None else None  # type: ignore[arg-type]
+        def one(u: values.Unknown | None) -> Unknown | None:
+            return Unknown.of(u) if u is not None else None
 
         return cls(
-            chain_asof=d.chain_asof,
+            chain_date=d.chain_date,
             unknown=one(d.unknown),
             legs=[OptionLegView.of(leg) for leg in d.legs],
-            spot=d.spot,
+            chain_close=d.chain_close,
             entry_session=d.entry_session,
             exit_session=d.exit_session,
             net_credit=d.net_credit,
@@ -100,7 +101,7 @@ class IdeaOption:
             risk_unknown=one(d.risk_unknown),
             report_in_life=d.report_in_life,
             report_date=d.report_date,
-            ex_div_before_expiry=d.ex_div_before_expiry,
+            ex_dividend_in_life=d.ex_dividend_in_life,
             ex_div_date=d.ex_div_date,
             calendar_unknown=one(d.calendar_unknown),
             monday_floor=d.monday_floor,

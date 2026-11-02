@@ -398,7 +398,7 @@ see_also = ["idea_position_risks", "idea_risks"]
 
 [[term]]
 id = "idea_ex_dividend"
-term = "Ex-dividend before expiry"
+term = "Ex-dividend in the trade"
 short = "Whether the name's next ex-dividend date falls between the entry and the expiry; early assignment risk for sold calls."
 body = """
 A stock trades without its next dividend from the ex-dividend date on. A sold call that is in the money the day before that date can be assigned early, so the holder gets the dividend. A Yes shows the date. A put is rarely affected.

@@ -113,7 +113,7 @@ const IdeaDetailQuery = graphql(`
         }
       }
       option {
-        chainAsof
+        chainDate
         unknown {
           code
           kind
@@ -129,7 +129,7 @@ const IdeaDetailQuery = graphql(`
           delta
           pItm
         }
-        spot
+        chainClose
         entrySession
         exitSession
         netCredit
@@ -150,7 +150,7 @@ const IdeaDetailQuery = graphql(`
         }
         reportInLife
         reportDate
-        exDivBeforeExpiry
+        exDividendInLife
         exDivDate
         calendarUnknown {
           code

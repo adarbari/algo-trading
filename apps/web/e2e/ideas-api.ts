@@ -295,7 +295,7 @@ function optionIdeaDetail(): unknown {
         setups: [{ ...setup, level: 'promising', place: 1 }],
         learn: 'rich_puts',
         option: {
-          chainAsof: '2026-10-02',
+          chainDate: '2026-10-02',
           unknown: null,
           legs: [
             {
@@ -308,7 +308,7 @@ function optionIdeaDetail(): unknown {
               pItm: 0.19,
             },
           ],
-          spot: 58.9,
+          chainClose: 58.9,
           entrySession: '2026-10-05',
           exitSession: '2026-11-27',
           netCredit: 0.71,
@@ -324,7 +324,7 @@ function optionIdeaDetail(): unknown {
           riskUnknown: null,
           reportInLife: false,
           reportDate: null,
-          exDivBeforeExpiry: false,
+          exDividendInLife: false,
           exDivDate: null,
           calendarUnknown: null,
           mondayFloor: null,

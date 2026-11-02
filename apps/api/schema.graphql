@@ -2322,10 +2322,10 @@ type IdeaMetric {
 An option pick's sections, amounts in dollars per contract and prices per share: the example `legs`, `netCredit` and `cashSetAside`, the setup's `exitRule` with the marks on the credit, `maxLoss` (null and `unbounded` when a naked call has no limit), `thetaPerDay`, `oneSigmaLoss`, the report and ex-dividend flags and `mondayFloor`; each group's `unknown` says why a part is missing
 """
 type IdeaOption {
-  chainAsof: Date!
+  chainDate: Date!
   unknown: Unknown
   legs: [OptionLegView!]!
-  spot: Float
+  chainClose: Float
   entrySession: Date
   exitSession: Date
   netCredit: Float
@@ -2342,7 +2342,7 @@ type IdeaOption {
   riskUnknown: Unknown
   reportInLife: Boolean
   reportDate: Date
-  exDivBeforeExpiry: Boolean
+  exDividendInLife: Boolean
   exDivDate: Date
   calendarUnknown: Unknown
   mondayFloor: Float

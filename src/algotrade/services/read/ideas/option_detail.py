@@ -10,7 +10,7 @@ session, derived figures only (no bid or ask leaves the read model):
 * the figures E9 deferred to here, computed in ``quant.options.position`` from the example's own
   legs: the position's theta a day, each leg's chance of finishing in the money, the one-sigma
   day loss; and the calendar flags, ``report_in_life`` (the name's own report between the entry
-  and the expiry) and ``ex_div_before_expiry`` (``dividend_schedule.next_ex_date`` read as a
+  and the expiry) and ``ex_dividend_in_life`` (``dividend_schedule.next_ex_date`` read as a
   catalogue field, never the table);
 * ``monday_floor``: the premium below which the setup's rule would no longer hold on Monday. No
   setup declares a minimum credit yet (concepts 2.16 EF-G14) and no option verdict stores a
@@ -66,10 +66,10 @@ class IdeaOption:
     setup's exits (its own ``unknown`` says which part is missing), with the marks of the
     example beside it. ``max_loss`` None: ``unbounded`` says whether it is unlimited."""
 
-    chain_asof: date
+    chain_date: date
     unknown: Unknown | None = None
     legs: tuple[OptionLegView, ...] = ()
-    spot: float | None = None
+    chain_close: float | None = None
     entry_session: date | None = None
     exit_session: date | None = None
     net_credit: float | None = None
@@ -86,7 +86,7 @@ class IdeaOption:
     risk_unknown: Unknown | None = None
     report_in_life: bool | None = None
     report_date: date | None = None
-    ex_div_before_expiry: bool | None = None
+    ex_dividend_in_life: bool | None = None
     ex_div_date: date | None = None
     calendar_unknown: Unknown | None = None
     monday_floor: float | None = None
@@ -214,9 +214,9 @@ def load_idea_option(
     )
     credit = example.net_credit
     return IdeaOption(
-        chain_asof=example.chain_asof,
+        chain_date=example.chain_asof,
         legs=_views(example),
-        spot=example.spot,
+        chain_close=example.spot,
         entry_session=example.entry_session,
         exit_session=example.exit_session,
         net_credit=credit,
@@ -235,7 +235,7 @@ def load_idea_option(
         risk_unknown=risk_unknown,
         report_in_life=report,
         report_date=report_date,
-        ex_div_before_expiry=ex,
+        ex_dividend_in_life=ex,
         ex_div_date=ex_on,
         calendar_unknown=cal_unknown,
         floor_unknown=Unknown(UnknownCode.NOT_APPLICABLE, run_cause(edge.id, floor_text, day)),

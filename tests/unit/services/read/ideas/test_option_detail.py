@@ -91,10 +91,10 @@ def test_the_calendar_flags_say_when_the_name_reports_or_goes_ex_dividend_before
     _wire(monkeypatch, _example(), next_ex=date(2026, 11, 20), report=date(2026, 12, 3))
     out = load_idea_option(CTX, EDGE, IID)
     assert (out.report_in_life, out.report_date) == (True, date(2026, 12, 3))
-    assert (out.ex_div_before_expiry, out.ex_div_date) == (True, date(2026, 11, 20))
+    assert (out.ex_dividend_in_life, out.ex_div_date) == (True, date(2026, 11, 20))
     _wire(monkeypatch, _example(), next_ex=date(2027, 1, 20), report=None)
     clear = load_idea_option(CTX, EDGE, IID)
-    assert (clear.report_in_life, clear.ex_div_before_expiry) == (False, False)
+    assert (clear.report_in_life, clear.ex_dividend_in_life) == (False, False)
 
 
 def test_an_ex_dividend_date_not_stored_is_unknown_not_false(
@@ -102,7 +102,7 @@ def test_an_ex_dividend_date_not_stored_is_unknown_not_false(
 ) -> None:
     _wire(monkeypatch, _example(), next_ex=None)
     out = load_idea_option(CTX, EDGE, IID)
-    assert out.ex_div_before_expiry is None and out.calendar_unknown is not None
+    assert out.ex_dividend_in_life is None and out.calendar_unknown is not None
 
 
 def test_a_naked_call_is_unbounded_and_has_no_max_loss(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -175,4 +175,4 @@ def test_an_ex_dividend_before_the_entry_or_a_report_before_it_is_not_in_life(
 ) -> None:
     _wire(monkeypatch, _example(), next_ex=date(2026, 10, 30), report=date(2026, 10, 30))
     out = load_idea_option(CTX, EDGE, IID)
-    assert out.ex_div_before_expiry is False and out.report_in_life is False
+    assert out.ex_dividend_in_life is False and out.report_in_life is False

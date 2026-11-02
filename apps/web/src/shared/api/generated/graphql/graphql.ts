@@ -571,7 +571,7 @@ export type IdeaDetailQueryVariables = Exact<{
 }>;
 
 
-export type IdeaDetailQuery = { idea: { session: string, instrumentId: string, tab: IdeaTab, learn: string, instrument: { symbol: string, name: string } | null, setup: { edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }, setups: Array<{ edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }>, why: { thesis: string, mechanism: string, basisScreener: string, decision: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, exitRule: { edgeId: string, holdSessions: number | null, winners: number, inSampleOnly: boolean, stop: { kind: StopKind, fraction: number | null, atr: number | null, multiple: number | null, winners: number | null, beyond: number | null } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, evidence: { level: string, result: string, basis: string | null, basisHorizon: number | null, liftPts: number | null, lift: number | null, trades: number | null, oosTrades: number | null }, risks: { persistence: string, holdEnds: string | null, watchOut: Array<string>, events: Array<{ date: string, kind: string, label: string, name: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, option: { chainAsof: string, spot: number | null, entrySession: string | null, exitSession: string | null, netCredit: number | null, cashSetAside: number | null, stopDebit: number | null, stopLoss: number | null, takeProfitDebit: number | null, exitDteDate: string | null, maxLoss: number | null, unbounded: boolean, thetaPerDay: number | null, oneSigmaLoss: number | null, reportInLife: boolean | null, reportDate: string | null, exDivBeforeExpiry: boolean | null, exDivDate: string | null, mondayFloor: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, legs: Array<{ right: string, strike: number, expiry: string, qty: number, mid: number, delta: number | null, pItm: number | null }>, riskUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, calendarUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, floorUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null } | null };
+export type IdeaDetailQuery = { idea: { session: string, instrumentId: string, tab: IdeaTab, learn: string, instrument: { symbol: string, name: string } | null, setup: { edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }, setups: Array<{ edgeId: string, edgeName: string, tab: IdeaTab, level: string, place: number }>, why: { thesis: string, mechanism: string, basisScreener: string, decision: string | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, exitRule: { edgeId: string, holdSessions: number | null, winners: number, inSampleOnly: boolean, stop: { kind: StopKind, fraction: number | null, atr: number | null, multiple: number | null, winners: number | null, beyond: number | null } | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null }, evidence: { level: string, result: string, basis: string | null, basisHorizon: number | null, liftPts: number | null, lift: number | null, trades: number | null, oosTrades: number | null }, risks: { persistence: string, holdEnds: string | null, watchOut: Array<string>, events: Array<{ date: string, kind: string, label: string, name: string }>, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null }, option: { chainDate: string, chainClose: number | null, entrySession: string | null, exitSession: string | null, netCredit: number | null, cashSetAside: number | null, stopDebit: number | null, stopLoss: number | null, takeProfitDebit: number | null, exitDteDate: string | null, maxLoss: number | null, unbounded: boolean, thetaPerDay: number | null, oneSigmaLoss: number | null, reportInLife: boolean | null, reportDate: string | null, exDividendInLife: boolean | null, exDivDate: string | null, mondayFloor: number | null, unknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, legs: Array<{ right: string, strike: number, expiry: string, qty: number, mid: number, delta: number | null, pItm: number | null }>, riskUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, calendarUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null, floorUnknown: { code: UnknownCode, kind: UnavailableKind, guideTerm: string, kindText: string } | null } | null } | null };
 
 export type SetupIdeasQueryVariables = Exact<{
   tab: IdeaTab;
@@ -3305,7 +3305,7 @@ export const IdeaDetailDocument = new TypedDocumentString(`
       }
     }
     option {
-      chainAsof
+      chainDate
       unknown {
         code
         kind
@@ -3321,7 +3321,7 @@ export const IdeaDetailDocument = new TypedDocumentString(`
         delta
         pItm
       }
-      spot
+      chainClose
       entrySession
       exitSession
       netCredit
@@ -3342,7 +3342,7 @@ export const IdeaDetailDocument = new TypedDocumentString(`
       }
       reportInLife
       reportDate
-      exDivBeforeExpiry
+      exDividendInLife
       exDivDate
       calendarUnknown {
         code

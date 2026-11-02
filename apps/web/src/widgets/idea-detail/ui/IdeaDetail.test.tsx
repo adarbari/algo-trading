@@ -81,7 +81,7 @@ const optionIdea: Idea = {
   tab: 'premium',
   setup: { ...setup, tab: 'premium' },
   option: {
-    chainAsof: '2026-10-30',
+    chainDate: '2026-10-30',
     unknown: null,
     legs: [
       {
@@ -94,7 +94,7 @@ const optionIdea: Idea = {
         pItm: 0.19,
       },
     ],
-    spot: 58.9,
+    chainClose: 58.9,
     entrySession: '2026-11-02',
     exitSession: '2026-12-04',
     netCredit: 0.71,
@@ -110,7 +110,7 @@ const optionIdea: Idea = {
     riskUnknown: null,
     reportInLife: true,
     reportDate: '2026-12-03',
-    exDivBeforeExpiry: false,
+    exDividendInLife: false,
     exDivDate: null,
     calendarUnknown: null,
     mondayFloor: null,

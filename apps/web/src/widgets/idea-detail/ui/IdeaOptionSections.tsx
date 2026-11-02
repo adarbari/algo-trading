@@ -178,7 +178,7 @@ export function OptionRisksSection({ option }: { option: Option }) {
       action: termHelp('idea_report_in_life'),
     },
     {
-      ...flag('Ex-dividend before expiry', option.exDivBeforeExpiry, option.exDivDate),
+      ...flag('Ex-dividend in the trade', option.exDividendInLife, option.exDivDate),
       action: termHelp('idea_ex_dividend'),
     },
   ];
