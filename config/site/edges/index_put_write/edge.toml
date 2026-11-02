@@ -27,11 +27,16 @@ option history (build row E5) is not purchased, so no earlier trades exist, and 
 from it would be owner-only (personal). Entry: the first session after each monthly expiry (the
 date the Cboe PUT index rolls; owner decision 2026-11-01 (c)), a 20-delta put on the next monthly
 expiry (tenor_days 21 always selects it), held 17 sessions (the shortest gap between two such
-entries, so holds never overlap; the put is closed two to four sessions before its expiry, where
-the PUT index holds to expiry). The every-session ladder (overlapping puts) is a separate setup to
+entries, so holds never overlap; the put is closed 0 to 7 sessions before its expiry, where the
+PUT index holds it to expiry; in the rare month whose next expiry falls inside the hold, the
+expiry floor takes the following monthly, a two-month put). The every-session ladder (overlapping puts) is a separate setup to
 build, not a variant here: a schedule is not a variant key (backend-plan G18); it must name this
-edge in its notes, since it is the same idea tested again. Each named symbol, the no-FOMC variant
-and every grid point is one trial of the deflated Sharpe ratio. Tracking: each window's return on
+edge in its notes, since it is the same idea tested again. The fomc_clear variant only skips an
+entry with 2 or fewer sessions to the next FOMC decision known at D; most 17-session holds still
+contain a decision. Each named symbol, the fomc_clear variant and every grid point is one trial of
+the deflated Sharpe ratio. Not paper traded (the record refuses a setup with no screener), and the
+holdout is not enforced by code yet: a verdict before 2027-02-03 is prevented only by the 40
+out-of-sample trades a verdict needs (at most 12 a year per trial). Tracking: each window's return on
 collateral beside the Cboe PUT index's (personal licence); the SPX index itself is not traded."""
 
 [universe.where]
@@ -55,7 +60,7 @@ tenor_days = 21
 tracks = "PUT"
 
 [[variants]]
-id = "no_fomc"
+id = "fomc_clear"
 gate = { all = [
   { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
   { field = "market.market_conditions@v2.sessions_to_fomc", op = "gt", value = 2 },
@@ -75,7 +80,7 @@ against the delta-equivalent stock held over the same sessions on the same colla
 trigger_timing = """The monthly expiry is fixed by the exchange calendar ahead of time; D is the
 monthly expiry session and S the session after it, so nothing beyond D is read to place an entry.
 The gate reads market_conditions@v2 at D (the VIX curve, implied against realised volatility,
-trend); the no-FOMC variant also needs more than 2 sessions to the next FOMC decision known at D."""
+trend); the fomc_clear variant also needs more than 2 sessions to the next FOMC decision known at D."""
 replication = """The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and
 holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the next
 monthly expiry, entered the session after the roll, held 17 sessions, a setup gate on top. A 16 and

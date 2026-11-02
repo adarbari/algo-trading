@@ -3,9 +3,11 @@ tagged with the gate's state at D (open / closed / unknown); the slices read eve
 edge's own series, ledger and random draws only the open ones. An ungated edge passes through
 unchanged."""
 
+import hashlib
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import replace
 from datetime import date
+from functools import partial
 
 from algotrade.config.edges.document import Edge
 from algotrade.engines.screening.gate import OPEN
@@ -14,6 +16,21 @@ from algotrade.services.evaluation.cross_section.measures import SessionStat, po
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.sessions import Leg
 from algotrade.storage.configs.store import ConfigStore
+
+
+def variant_gates(
+    edge: Edge, session: SessionReads
+) -> tuple[dict[str, Callable[[date], str]], dict[str, str]]:
+    """A named option sleeve's variants with their own gate (ADR 0088 decision 7): each one's
+    state at a decision session, and a digest of the gate, part of its trials' identity (a
+    different gate is another trial of the overfitting probability)."""
+    gates: dict[str, Callable[[date], str]] = {}
+    keys: dict[str, str] = {}
+    for v in edge.variants:
+        if v.gate is not None:
+            gates[v.id] = partial(session.gate, v.gate)
+            keys[v.id] = hashlib.sha256(repr(v.gate).encode()).hexdigest()[:16]
+    return gates, keys
 
 
 def tagged(

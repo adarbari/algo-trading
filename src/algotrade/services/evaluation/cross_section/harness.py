@@ -78,6 +78,7 @@ from algotrade.services.evaluation.cross_section.detail.gating import (
     pooled_blocks,
     tagged,
     turned,
+    variant_gates,
 )
 from algotrade.services.evaluation.cross_section.detail.licences import (
     TrialLicences,
@@ -761,11 +762,11 @@ def _time_series(
     check_entry(reader, edge, catalogue(configs, user.user_id), start, end, as_of)
     session = SessionReads(reader, site_regime(configs.load).label, domains=domains)
     gate = None if edge.gate is None else partial(session.gate, edge.gate)
-    gates = {v.id: partial(session.gate, v.gate) for v in edge.variants if v.gate is not None}
+    gates, gate_keys = variant_gates(edge, session)
     run = (
         evaluate_sleeve(reader, edge, sleeve_outcomes(edge, load_templates(configs)), start, end,
                         as_of, session.label, split, exploratory, gate,
-                        load_verdict(configs).option_costs, gates)  # check_entry refused an entry
+                        load_verdict(configs).option_costs, gates, gate_keys)  # check_entry: ok
         if edge.base == DELTA_EQUIVALENT
         else evaluate_time_series(
             reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,

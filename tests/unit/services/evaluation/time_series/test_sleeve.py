@@ -201,6 +201,9 @@ def test_a_variant_gate_narrows_only_its_own_trials_on_the_same_legs() -> None:
     assert len(by["main"].in_window) == len(before["main"].in_window) == len(every)
     assert len(by["strict"].in_window) == sum(d.day < 16 for d, _ in every)
     assert edge.variants[0].gate is not None
+    keyed = run(reader, edge, gates={"strict": lambda d: "open"}, gate_keys={"strict": "abc"})
+    ids = {r.edge_variant: r.identity for r in keyed.results if r.symbol == "SPY"}
+    assert ids["strict"] == ids["main"] + "|gate:abc"  # its own trial: PBO keeps main's series
 
 
 def test_evaluate_edge_gives_one_trial_per_grid_point_and_variant_of_the_sleeve() -> None:
