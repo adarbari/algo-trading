@@ -183,6 +183,8 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
 def test_every_site_edge_hashes_without_the_new_keys() -> None:
     new = ("position", "gate", "verdict_profile", "variant_grid", "position_baselines")
     for edge in load_edges(FileConfigStore(REPO_ROOT / "config")):
+        if edge.outcome.position is not None:  # a position edge (X3 on) hashes with its keys
+            continue
         assert not set(new) & set(identity_dict(asdict(edge))), edge.id
         assert "position" not in identity_dict(asdict(edge.outcome)), edge.id
 

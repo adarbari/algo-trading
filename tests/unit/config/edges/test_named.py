@@ -142,3 +142,8 @@ def test_only_a_sleeve_has_the_delta_equivalent_base_and_out_of_window_keeps_no_
         parse_edge(document(variants=[{"id": "v2", "base": "delta_equivalent"}]), "drift", "x.toml")
     with pytest.raises(ConfigurationError, match="no variants"):
         timed(variants=[{"id": "v2", "outcome": {"cost_bps": 5}}])
+
+
+def test_a_sleeve_refuses_position_baselines_it_does_not_value() -> None:
+    with pytest.raises(ConfigurationError, match="not valued for it"):
+        sleeve(baselines=["position:long_shares"])
