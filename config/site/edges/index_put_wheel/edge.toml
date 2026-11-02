@@ -1,0 +1,122 @@
+# Edge document (ADR 0053, ADR 0088; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Build row X7 of docs/options/backend-build.md (the wheel,
+# backend-concepts-2 §2.11, EF-G13). A named option sleeve (base delta_equivalent, ADR 0088
+# decision 14) whose book is a cycle over stored rows: a cash-secured put, on assignment covered
+# calls on the delivered shares, until they are called away.
+id = "index_put_wheel"
+name = "Index wheel: cash-secured puts, then covered calls"
+family = "C"
+thesis = "Selling a cash-secured put on SPY, QQQ or IWM each month and, if assigned, selling covered calls on the shares until they are called away earns more on its collateral than holding the same share delta, because index options are priced above the moves that follow."
+mechanism = """Investors pay for index protection and dealers who sell it charge for carrying the
+short-gamma risk, so index implied volatility sits above the realised volatility that follows
+(Driessen, Maenhout and Vilkov: 24.7% against 20.8%, 1996-2003). The wheel collects that premium
+in both phases: the put's, and after assignment the covered call's, which keeps selling the same
+premium against the shares the put delivered."""
+persistence = """The demand for protection is structural and the seller is paid for a tail few hold
+through, but most of a wheel's return is equity beta (the shares are held for much of the cycle),
+so the claim tested here is the part beyond the delta-equivalent stock on the same collateral and
+cost. Whether the stock leg or the option legs earned the return is reported beside it."""
+schedule = "calendar:after_monthly_expiry"
+top_k = "all"
+screeners = []
+base = "delta_equivalent"
+status = "candidate"
+mechanism_kind = "paid_for_risk"
+asset_class = "options"
+frozen_from = 2026-04-01
+holdout_from = 2026-11-03  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
+notes = """The wheel as a book over stored option rows, not a new grain (backend-plan 2.11). Each
+placement S is the monthly expiry session (the Cboe PUT roll); a phase after an assignment enters
+the session after it. Put phase: a 20-delta put on the next monthly
+expiry, held to that expiry, so it is EXPIRED (another put) or ASSIGNED (the shares are the
+holder's from the expiry's close). Call phase, entered the session after the assignment (it is
+learned after the close; the shares are held overnight and that gap is booked): a 30-delta
+covered call on the next monthly expiry, EXPIRED (another call) or ASSIGNED (called away: back to a
+put). The stored rows hold every gap to the next monthly expiry as a hold (horizon_sessions: the
+calendar's gaps, checked by tests/architecture/options/test_wheel_holds.py), and the book takes the
+one row held to its own expiry, chosen from its legs and window, never from how it ended.
+A cycle's capital is the opening put's collateral (strike x 100). The shares' move between the put's
+last close and the call's entry is booked once, to the call phase; the put's own loss to the strike is in its option
+leg, so a cycle sums to premium - strike + the last share price. A phase with no row, an UNMEASURED
+one or a missing spot ends the cycle: the slot is cash and a fresh put starts at the next
+placement, never a filled value. Book (E8b slots, X7 cycle): one slot per symbol, no overlap, never
+levered; the figures are its drawdown over realised exits, worst month, the cycles' count, the
+stock and option parts of the return and `lost`.
+Not measured, and said so on the page: dividends (the shares' dividends and an early assignment
+before one are not stored: the share leg is understated), splits (a missing spot breaks the cycle),
+single names, rolls (refused), and a verdict trial or baseline (this edge is a candidate whose book
+is the evidence; the per-symbol trial rows beside it are the first put phase only and are not the
+wheel's evidence). NO VERDICT before a 3-month unseen holdout (ADR 0088): the holdout starts at
+2026-11-03, so the earliest verdict is on cycles closed after 2027-02-03, and the judge enforces it.
+Built on the Cboe-era store only (chains from 2026-10-02): the history range waits on the
+HistoricalOptionData purchase (build rows E5, F7), and evidence from it would be owner-only
+(personal). Not paper traded (the record refuses a setup with no screener)."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "QQQ", "IWM"] },
+]
+
+[gate]
+all = [
+  { field = "market.market_conditions@v2.short_premium_allowed", op = "eq", value = true },
+]
+
+[outcome]
+kind = "option_pnl"
+# one hold per way the calendar can put an entry (the expiry session, or the session after it) before
+# the next monthly expiry: the gaps between expiries and one less (checked against the calendar by
+# tests/architecture/options/test_wheel_holds.py); the book reads the one held to its own expiry
+horizon_sessions = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+benchmark = "none"
+start_offset_sessions = 1
+position = "short_put"
+book = true  # the rows store their spot path: the shares' move between a put and its call
+strike_delta = 0.20
+tenor_days = 14
+
+[outcome.wheel]
+position = "covered_call"
+strike_delta = 0.30
+tenor_days = 14
+
+[quality_bar]
+outcome = """The option position's return on its cash-secured collateral (strike x 100) from the entry
+close to the close 17 sessions later (or its declared exit), net of the site's option cost levels,
+against the delta-equivalent stock held over the same sessions on the same collateral and cost
+(base delta_equivalent); the T-bill on the collateral is set beside it."""
+trigger_timing = """Every session is a decision session D and S the session after it; the gate reads
+market_conditions@v2 at D (the VIX curve, implied against realised volatility, trend), and the
+expiry is chosen from S's chain by the exchange calendar, so nothing beyond D is read to place an
+entry."""
+replication = """The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and
+holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the first
+monthly expiry 21 or more days out, a new one every session, each held 17 sessions, a setup gate on
+top. index_put_write is the same position entered once a month after the roll."""
+expected_size = """PUT has matched the S&P 500 total return over 1986-2024 with about two thirds of its
+volatility (Cboe-commissioned study; not a harness figure); against beta-matched equity the excess
+is about 1 to 2% a year before costs (practitioner estimates, not verified). Expect about
+index_put_write's excess with a smoother book, and losses in sharp sell-offs (2008, 2020, 2022)."""
+capacity_costs = """SPY, QQQ and IWM options are among the most liquid listed; a cash-secured put
+needs the strike x 100 in cash, split over 17 open puts per symbol. About 250 entries a year per
+symbol, so 17 times index_put_write's round trips; each pays the option cost levels and commission
+in verdict.toml [option_costs]."""
+failure_modes = """A crash inside the hold hits every open put at once (the ladder spreads the entry
+date, not the market risk); a regime where implied volatility no longer exceeds realised; the gate
+keeping the sleeve out of the best-paid sessions; the extra round trips eating the premium. Retire
+if the frozen-period return on collateral over the delta-equivalent stock is not above zero after
+costs, or its tail (CVaR) is worse than the stock's on the same collateral."""
+decoys = """Equity beta (the delta-equivalent stock on the same collateral is the base), the T-bill
+on the collateral, the Cboe PUT index's own return over each window (the tracking figure), and
+index_put_write, the same position entered monthly."""
+
+[[sources]]
+title = "Israelov, R. and Nielsen, L., Covered Calls Uncovered, Financial Analysts Journal, 2015"
+url = "https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered"
+
+[[sources]]
+title = "Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk, Journal of Finance, 2009"
+
+[[sources]]
+title = "Cboe S&P 500 PutWrite Index (PUT) methodology"
+url = "https://www.cboe.com/us/indices/dashboard/put/"

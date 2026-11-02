@@ -200,3 +200,62 @@ def test_only_a_named_option_sleeve_may_ladder_every_session() -> None:
     assert sleeve(schedule="every_session_ladder").schedule == "every_session_ladder"
     with pytest.raises(ConfigurationError, match="every_session_ladder"):
         parse_edge(document(schedule="every_session_ladder"), "drift", "x.toml")
+
+
+WHEEL = {
+    "schedule": "calendar:after_monthly_expiry",
+    "outcome": {
+        **SLEEVE["outcome"],  # type: ignore[dict-item]
+        "horizon_sessions": [18, 19, 24], "tenor_days": 14, "strike_delta": 0.2, "book": True,
+        "wheel": {"position": "covered_call", "strike_delta": 0.3, "tenor_days": 28},
+    },
+    "variant_grid": None,
+}  # fmt: skip
+
+
+def wheel(outcome: dict[str, Any] | None = None, **changes: Any) -> Any:
+    return sleeve(**{**WHEEL, **({"outcome": {**WHEEL["outcome"], **outcome}} if outcome else {}),
+                     **changes})  # type: ignore[dict-item]  # fmt: skip
+
+
+def test_a_wheel_is_a_sleeve_with_a_call_phase_and_one_hold_per_expiry_gap() -> None:
+    edge = wheel()
+    assert edge.outcome.horizon_sessions == (18, 19, 24)
+    assert (edge.outcome.wheel.position, edge.outcome.wheel.strike_delta) == ("covered_call", 0.3)
+    assert edge.outcome.wheel.tenor_days == 28
+    assert sleeve().outcome.wheel is None
+
+
+def test_a_wheel_changes_the_trials_identity_and_no_wheel_never_does() -> None:
+    assert "wheel" not in identity_dict(asdict(sleeve().outcome))
+    assert "wheel" in identity_dict(asdict(wheel().outcome))
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"outcome": {"horizon_sessions": [15, 18]}}, "one value per gap"),
+        ({"outcome": {"book": False}}, "book = true"),
+        ({"outcome": {"horizon_sessions": [18, 26]}}, "one value per gap"),
+        ({"outcome": {"wheel": {"position": "covered_call", "tenor_days": 28}}}, "strike_delta"),
+        ({"outcome": {"wheel": {"strike_delta": 1.2, "tenor_days": 28}}}, "strike_delta"),
+        ({"outcome": {"wheel": {"strike_delta": 0.3}}}, "tenor_days"),
+        ({"outcome": {"wheel": {"position": "short_put", "strike_delta": 0.3, "tenor_days": 9}}},
+         "position"),
+        ({"outcome": {"position": "put_spread"}}, "put phase is position = 'short_put'"),
+        ({"outcome": {"exit": {"exit_dte": 5}}}, "no \\[outcome.exit\\]"),
+        ({"schedule": "every_session"}, "after_monthly_expiry"),
+        ({"base": "universe", "variants": None}, "wheel"),
+    ],
+)  # fmt: skip
+def test_a_wheel_fails_closed(changes: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        wheel(
+            outcome=changes.get("outcome"), **{k: v for k, v in changes.items() if k != "outcome"}
+        )
+
+
+def test_only_a_wheel_holds_more_than_one_horizon() -> None:
+    monthly = {**SLEEVE["outcome"], "horizon_sessions": [17, 18]}  # type: ignore[dict-item]
+    with pytest.raises(ConfigurationError, match="1 to 17 sessions"):
+        sleeve(schedule="calendar:after_monthly_expiry", outcome=monthly)

@@ -208,6 +208,20 @@ def with_template(outcome: "Outcome", template_id: str, templates: Templates) ->
     return _apply(outcome, "position", template_id, templates)
 
 
+def wheel_call(outcome: "Outcome", templates: Templates) -> "Outcome | None":
+    """The call phase of a wheel (``outcome.wheel``; None: not a wheel) as an outcome of its own:
+    the call template at the wheel's delta and tenor, its legs resolved, with the put phase's
+    holds and entry (the assigned shares enter the call the session the put expires)."""
+    wheel, spec = outcome.wheel, outcome.position
+    if wheel is None or spec is None:
+        return None
+    call = replace(
+        outcome, wheel=None, strike_delta=wheel.strike_delta, tenor_days=wheel.tenor_days,
+        position=replace(spec, template=wheel.position),
+    )  # fmt: skip
+    return _outcome_with_legs(call, templates)
+
+
 def _apply(outcome: "Outcome", name: str, value: Any, templates: Templates) -> "Outcome":
     """``outcome`` with the case-valued parameter ``name`` set to ``value``, its legs resolved
     again from the (possibly other) template."""

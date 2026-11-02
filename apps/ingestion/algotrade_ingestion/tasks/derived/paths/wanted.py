@@ -3,7 +3,8 @@ open edge documents (their outcome, each ``[[variants]]``' and each case point o
 parameter, for each hold of its ``horizon_sessions``), by stored key. ``OPTION``: the
 ``option_pnl`` positions (option-outcomes); ``SHARES``: the share positions of a return outcome
 that declare an ``[outcome.exit]`` (share-outcomes; one without keeps its fixed-horizon outcome).
-A new edge needs no code change; two setups that resolve to one key (and, for shares, one
+A wheel (``[outcome.wheel]``, ADR 0088 EF-G13) also stores its call phase's position at every
+hold. A new edge needs no code change; two setups that resolve to one key (and, for shares, one
 benchmark) share its rows. ``window_ends`` are the window ends a run of either writer computes and
 ``run_windows`` the position windows (and refusals) a run recorded, which its check holds it to."""
 
@@ -19,6 +20,7 @@ from algotrade.config.edges.positions.key import (
     grid_outcomes,
     position_key,
     share_position_key,
+    wheel_call,
 )
 from algotrade.config.edges.positions.spec import ExitRule, exit_rules, share_exit_rules
 from algotrade.config.edges.positions.templates import (
@@ -73,7 +75,10 @@ def positions_wanted(
     ]
     found: dict[tuple[str, str | None], Wanted] = {}
     for outcome in (o for o in outcomes if _stored(o, kind)):
-        for point in case_points(outcome, templates):
+        phases = [*case_points(outcome, templates)]
+        if (call := wheel_call(outcome, templates)) is not None:
+            phases.append(call)  # a wheel's call phase: the same holds, its own key
+        for point in phases:
             exit = point.position.exit if point.position else None
             rules = exit_rules(exit) if kind == OPTION else share_exit_rules(exit, point.side)
             names = {

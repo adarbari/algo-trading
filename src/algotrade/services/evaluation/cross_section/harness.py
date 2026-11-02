@@ -563,7 +563,7 @@ def _time_series(
         evaluate_sleeve(reader, edge, sleeved, start, end,
                         as_of, session.label, split, exploratory, gate,
                         load_verdict(configs).option_costs, gates, gate_keys, domains, features,
-                        edge.position_baselines)
+                        edge.position_baselines, load_templates(configs))
         if sleeve
         else evaluate_time_series(
             reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,
