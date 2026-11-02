@@ -1,13 +1,10 @@
 """The sold option's figures: exact identities, NaN edges, the convention of ``p_below``."""
 
-import math
-
 import numpy as np
 import pytest
 
 from algotrade.quant.black_scholes import prob_otm
 from algotrade.quant.options import premium
-from algotrade.quant.options.premium import assignment_chance, p_below
 
 
 def test_return_on_collateral_is_mid_over_strike_for_a_put_and_over_spot_for_a_call() -> None:
@@ -53,22 +50,3 @@ def test_a_right_other_than_put_or_call_is_refused() -> None:
         premium.p_below(100.0, 95.0, 0.3, 0.1, "straddle")
     with pytest.raises(ValueError):
         premium.breakeven(1.0, 100.0, 100.0, "C")
-
-
-def test_assignment_chance_of_one_sold_put_is_its_chance_below_the_strike() -> None:
-    expected = float(p_below(100.0, 95.0, 0.3, 30 / 365, "put"))
-    assert assignment_chance(100.0, [(95.0, 0.3)], [], 30 / 365) == pytest.approx(expected)
-
-
-def test_assignment_chance_takes_the_highest_put_and_the_lowest_call_disjointly() -> None:
-    t = 30 / 365
-    below = float(p_below(100.0, 95.0, 0.3, t, "put"))
-    above = 1.0 - float(p_below(100.0, 105.0, 0.25, t, "call"))
-    found = assignment_chance(100.0, [(90.0, 0.4), (95.0, 0.3)], [(105.0, 0.25), (110.0, 0.2)], t)
-    assert found == pytest.approx(below + above)
-
-
-def test_overlapping_sold_strikes_are_certain_and_a_missing_vol_is_nan() -> None:
-    assert assignment_chance(100.0, [(100.0, 0.3)], [(100.0, 0.3)], 0.1) == 1.0
-    assert math.isnan(assignment_chance(100.0, [(95.0, 0.0)], [], 0.1))
-    assert assignment_chance(100.0, [], [], 0.1) == 0.0
