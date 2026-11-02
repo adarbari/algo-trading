@@ -311,7 +311,7 @@ see_also = ["margin_cash_secured", "margin_account", "margin_premium_collected",
 
 [[term]]
 id = "margin_premium_collected"
-term = "Premium collected"
+term = "Premium collected on the contracts"
 short = "What you would be paid now for these contracts, at the middle of tonight's stored bid and ask."
 body = """
 The premium per share times 100 times the contracts. The line beneath it says what share that is of the amount held in the chosen account, over the days to expiry. It changes when you switch between Cash-secured and Margin account. It is a return over that period, not a yearly rate, and real fills are worse than a middle price.
