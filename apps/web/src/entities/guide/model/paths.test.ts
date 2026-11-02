@@ -28,8 +28,8 @@ describe('guide paths', () => {
     expect(screenerPath('breakout')).toBe('/guide/screeners/breakout');
     expect(screenerCategoryPath('options_signals')).toBe('/guide/screeners/c/options_signals');
     expect(situationPath('earnings-gap')).toBe('/guide/situations/earnings-gap');
-    expect(screenerResultsPath('my screen')).toBe('/screeners/my%20screen');
-    expect(screenerBuilderPath('breakout')).toBe('/screeners/breakout/edit');
+    expect(screenerResultsPath('my screen')).toBe('/test/result/my%20screen');
+    expect(screenerBuilderPath('breakout')).toBe('/test/expert/breakout');
   });
 
   it('builds the regime indicator and market fall paths', () => {

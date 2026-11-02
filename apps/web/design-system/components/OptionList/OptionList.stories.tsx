@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
+import { narrow } from '../../testing';
 import { OptionList, type OptionListItem, type OptionListProps } from './OptionList';
 
 const fields: OptionListItem[] = [
@@ -98,3 +99,17 @@ export const MultiWithCounts: Story = {
     ],
   },
 };
+
+const ways: OptionListItem[] = [
+  { id: 'guided', title: 'Guided', description: 'Start from a template and change what you like.' },
+  { id: 'expert', title: 'Expert', description: 'Write the rules yourself, field by field.' },
+  { id: 'describe', title: 'Describe it', description: 'Say it in a sentence; check the rules.' },
+];
+
+/** Choice cards: a way in, in a grid that wraps. */
+export const Cards: Story = {
+  args: { variant: 'card', mono: false, items: ways, value: null, label: 'Ways in' },
+};
+
+/** Cards in a phone frame: one column. */
+export const CardsNarrow: Story = { ...Cards, decorators: [narrow] };

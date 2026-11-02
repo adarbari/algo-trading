@@ -41,11 +41,11 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(aapl).toContainText('Apple Inc. · XLK');
     await expect(aapl.getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
       'href',
-      '/screeners/vrp-scanner',
+      '/test/result/vrp-scanner',
     );
     await expect(aapl.getByRole('link', { name: 'Short premium liquidity' })).toHaveAttribute(
       'href',
-      /^\/screeners\/[\w-]+$/,
+      /^\/test\/result\/[\w-]+$/,
     );
     await expect(aapl).not.toContainText('more');
     await expect(aapl).toContainText('226.80');

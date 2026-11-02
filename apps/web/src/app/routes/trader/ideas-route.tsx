@@ -49,13 +49,13 @@ function IdeasRoute() {
         void navigate({ search: (previous) => patched(previous, patch), replace: true })
       }
       onCompare={(compare) => void navigate({ to: '/explore', search: compare })}
-      onScreeners={() => void navigate({ to: '/screeners' })}
+      onScreeners={() => void navigate({ to: '/test' })}
       onOpenRegime={() => void navigate({ to: '/regime' })}
       onOpenEdge={(edge) => void navigate({ to: '/edges', search: { edge } })}
       onOpenIdea={(symbol, setup) =>
         void navigate({ to: '/ideas/$symbol', params: { symbol }, search: { setup } })
       }
-      onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
+      onOpenScreener={(id) => void navigate({ to: '/test/result/$id', params: { id } })}
       onOpen={(symbol, via) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol, via } })
       }
