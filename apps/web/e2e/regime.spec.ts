@@ -142,7 +142,7 @@ test('the top-bar chip says not computed and opens the Regime page; Ideas shows 
   await expect(page.getByText('New positions at full size (the regime gate is off)')).toBeVisible();
   await page.getByRole('button', { name: 'Regime: not computed' }).first().click();
   await expect(page).toHaveURL(/\/regime$/);
-  await expect(page.getByRole('link', { name: 'Regime' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading', { level: 1, name: 'Regime' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

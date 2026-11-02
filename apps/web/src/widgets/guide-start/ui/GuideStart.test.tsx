@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
-import { GuideStart } from './GuideStart';
+import { GuideStart, StartOutline } from './GuideStart';
 import { GuideStartIndex } from './GuideStartIndex';
 
 const hooks = vi.hoisted(() => ({ useGuideIndex: vi.fn(), useGuideStartPage: vi.fn() }));
@@ -100,6 +100,21 @@ describe('GuideStart', () => {
       within(screen.getByRole('navigation', { name: 'Next page' })).getByRole('link'),
     ).toHaveAttribute('href', '/guide/start/build_a_screen');
     await expectNoA11yViolations(container);
+  });
+
+  it('links back to the index and outlines its sections with anchors', () => {
+    render(
+      <>
+        <GuideStart id="read_a_result" />
+        <StartOutline id="read_a_result" />
+      </>,
+    );
+    expect(screen.getByRole('link', { name: 'Start here' })).toHaveAttribute(
+      'href',
+      '/guide/start',
+    );
+    const outline = within(screen.getByRole('navigation', { name: 'On this page' }));
+    expect(outline.getByRole('link', { name: 'A hit' })).toHaveAttribute('href', '#section-1');
   });
 
   it('has no next link on the last page', () => {
