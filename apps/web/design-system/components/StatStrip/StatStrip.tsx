@@ -24,7 +24,14 @@ export interface StatItem {
   tone?: 'default' | 'positive' | 'warning' | 'negative' | 'info' | 'up' | 'down' | 'muted';
 }
 
-export interface StatStripProps {
+/** Where an evidence strip's figures come from: a backtest (hypothetical) or the forward paper record. */
+export interface EvidenceBasis {
+  kind: 'backtested' | 'forward';
+  /** The basis in words ("Backtested (hypothetical) · out of sample 2023 to 2026, 260 trades"). */
+  label: ReactNode;
+}
+
+interface StatStripBase {
   items: readonly StatItem[];
   /** Accessible name of the strip, e.g. "Summary". */
   label: string;
@@ -35,6 +42,13 @@ export interface StatStripProps {
   /** Shown when there are no items. */
   emptyMessage?: ReactNode;
 }
+
+/**
+ * `default`: a summary row. `evidence`: a setup's headline figures; larger values and a
+ * required `basis` line under them, so a statistic never appears without saying what it rests on.
+ */
+export type StatStripProps = StatStripBase &
+  ({ variant?: 'default'; basis?: undefined } | { variant: 'evidence'; basis: EvidenceBasis });
 
 /** More stats than this and the strip is dense (`data-many`: StatStrip.module.css). */
 const MANY = 6;
@@ -57,10 +71,17 @@ export function StatStrip({
   loading = false,
   error,
   emptyMessage = 'No figures yet',
+  variant = 'default',
+  basis,
 }: StatStripProps) {
   const failed = error !== undefined && error !== null && error !== false;
   return (
-    <section className={styles.strip} aria-label={label} aria-busy={loading || undefined}>
+    <section
+      className={styles.strip}
+      aria-label={label}
+      aria-busy={loading || undefined}
+      data-variant={variant}
+    >
       {failed ? (
         <p className={styles.message} data-tone="negative" role="alert">
           {error}
@@ -95,6 +116,11 @@ export function StatStrip({
             );
           })}
         </dl>
+      )}
+      {basis !== undefined && !failed && (
+        <p className={styles.basis} data-basis={basis.kind}>
+          {basis.label}
+        </p>
       )}
     </section>
   );

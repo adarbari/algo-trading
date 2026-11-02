@@ -22,7 +22,7 @@ merged_bases=()
 try_merge() {
   local number=$1 pr sha ci bad mergeable base
   pr=$(gh pr view "$number" --repo "$REPO" \
-         --json state,isDraft,isCrossRepository,labels,headRefOid,mergeable,baseRefName)
+         --json state,isDraft,isCrossRepository,labels,headRefOid,mergeable,baseRefName,headRefName)
   if [ "$(jq -r .state <<<"$pr")" != "OPEN" ]; then echo "#$number: not open"; return; fi
   if [ "$(jq -r .isCrossRepository <<<"$pr")" = "true" ]; then echo "#$number: from a fork, skipped"; return; fi
   if [ "$(jq -r .isDraft <<<"$pr")" = "true" ]; then echo "#$number: draft, skipped"; return; fi
@@ -47,6 +47,17 @@ try_merge() {
                    and .triggering_actor.login == "github-actions[bot]")]
                 | sort_by(.created_at)')
     ci=$(jq -r 'last | if . == null then "missing" else (.conclusion // .status) end' <<<"$dispatched")
+    if [ "$ci" = "missing" ] && [ "$(jq 'length' <<<"$runs")" = "0" ]; then
+      # Safety net: a head with no CI run of any kind (a bot push that nothing dispatched on). One
+      # dispatch; the next sweep sees that run, so this never repeats for the same sha.
+      branch=$(jq -r '.headRefName // empty' <<<"$pr")
+      if [ -n "$branch" ] && [ "$DRY_RUN" != "1" ]; then
+        gh workflow run ci.yml --repo "$REPO" --ref "$branch"
+        echo "#$number: no CI run on ${sha:0:7}, dispatched ci.yml on $branch"
+      elif [ -n "$branch" ]; then
+        echo "#$number: no CI run on ${sha:0:7}, WOULD DISPATCH ci.yml on $branch"
+      fi
+    fi
     runs=$(jq -c --argjson d "$dispatched" '. + $d' <<<"$runs")  # held runs stay, as superseded
     decided=$(jq -r 'last.id' <<<"$dispatched")
   else
