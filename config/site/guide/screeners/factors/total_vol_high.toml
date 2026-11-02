@@ -1,0 +1,28 @@
+# L3 site setting: the Guide's screener for the site preset total_vol_high (ADR 0051; docs/ui/guide.md
+# "The screener page"). A decoy of the option setup high_vol_call_write (ADR 0088 build row S2):
+# a yardstick, not a trade idea. Keys as ivol_high.toml.
+id = "total_vol_high"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable stock by its recent realised volatility, the most volatile first. It is the total-volatility twin of the idiosyncratic ranking, so a setup built on the idiosyncratic part can show it adds something.[^1]"
+hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, with a 60-session realised volatility. Every such name qualifies; the most volatile ranks first."
+not_checked = "It does not take out the market, size, momentum, value or sector effects, nor check trend or quality. It is a yardstick, not a trade signal."
+before_acting = [
+  "The most volatile names are often small, thin or near an event: compare rollup.price_stats@v2.adv_usd_20d before reading a return.",
+  "Over 2025 and 2026 its top 20 shared about half its names with the idiosyncratic ranking: compare rollup.factor_betas@v1.ivol_252d.",
+]
+related = [
+  { id = "ivol_high", reason = "the same ranking after factor effects are taken out" },
+  { id = "low_volatility", reason = "the calmest names first, on a wider universe" },
+]
+
+[[sources]]
+title = "Ang, Hodrick, Xing and Zhang, The Cross-Section of Volatility and Expected Returns (2006)"
+url = "https://www.nber.org/papers/w10852"
+note = "Ranks stocks by total and by idiosyncratic volatility and finds the most volatile earned low average returns on both."
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $3"
+adv = "Trades at least $2M a day"
+hv60 = "Has a 60-session realised volatility"

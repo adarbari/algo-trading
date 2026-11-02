@@ -261,3 +261,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: ADR 0088 decision 15 says "no option verdict before its unseen holdout"; the data source is the measurement, not the claim; the earliest verdict for a `holdout_from` of 2026-10-26 is a window closed on 2027-01-26.
+## 2026-11-02 | ADR 0088 S2 | `total_vol_high` added: its top 20 differs from `ivol_high`'s
+- Question: the 2026-11-01 entry held `total_vol_high` back until a run showed the total-volatility sort differs from `ivol_high`'s. Does it?
+- Options: add the preset / keep reusing `ivol_high` alone.
+- Decision: add `total_vol_high` v1 (hv60, high first, `ivol_high`'s base gates). Measured on the stored rollups, 22 monthly sessions 2025-01-08 to 2026-10-13, on the liquid optionable stocks (`liquid_optionable_floored` without ETFs): the two ranks correlate 0.89 (Spearman, 0.81 to 0.91) but their top 20 share 53% of names on average (35% to 75%), and the harness holds the top 20. `low_volatility` (hv60, calmest first) stays the put sleeve's screener; its bottom-20 overlap with the lowest idiosyncratic volatility is 31%. The preset is used as a decoy of `high_vol_call_write` (X4), not as a setup.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the build row's own condition ("add only if the run shows the sort differs") is met at the depth the harness trades; reference snapshots start 2026-10-02, so the earlier sessions used the first snapshot's security type and optionable flag (a measurement caveat, not a point-in-time read by any setup).

@@ -346,7 +346,7 @@ Take the next free number right before the push (`make numbering`): **0088** (#9
 | id | slice | owner | skill | needs |
 |---|---|---|---|---|
 | S1 | None for named sleeves (A1, A2, A3 on ETFs): the named symbols are the picks (E9) | | | E9 |
-| S2 | B2: reuse `low_volatility` (puts) and `ivol_high` (calls); add `total_vol_high` only if the run shows the sort differs | presets | `add-screener` | none |
+| S2 | B2: reuse `low_volatility` (puts) and `ivol_high` (calls); add `total_vol_high` only if the run shows the sort differs. **Built 2026-11-02:** the top 20 differs (53% overlap on average, 22 monthly sessions; decision log), so `total_vol_high` v1 is added as a decoy of `high_vol_call_write` | presets | `add-screener` | none |
 | S3 | `earnings_move_rich` (S&P 500, put / call tier A-B, ratio >= 1.3); `earnings_move_cheap` (P2, attention exclusion) | presets | `add-screener` | F4 |
 | S4 | B4 characteristic sorts (P2) | presets | `add-screener` | F6, F7 |
 | S5 | (G14) Port `short_premium_liquidity` from Python to a feature group plus a rule preset with the same id; `legacy_liquidity_csv` and the `algotrade-ingest screen --config` default read the preset's run; delete `strategies/screeners/short_premium_liquidity.py` and its registry entry; acceptance: the rule run's picked names equal the Python run's on recorded sessions | `features/rollups/options/` (the group), `config/site/presets/`, `strategies/screeners/registry.py`, `services/screening/exports.py` | `add-feature`, `add-screener` | none (architect review: the export's consumers) |

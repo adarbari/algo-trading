@@ -149,7 +149,7 @@ intro = "A factor is a measure that has ranked future returns across many market
 presets = [
   "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
   "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta",
-  "low_volatility", "ivol_avoid",
+  "low_volatility", "ivol_avoid", "total_vol_high",
 ]
 
 [[family]]

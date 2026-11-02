@@ -1,0 +1,51 @@
+# Total volatility (high first): every tradeable common stock or ADR with a 60-session realised
+# volatility, ranked by it, the most volatile first. The total-volatility twin of ivol_high on the
+# same base gates, so the two compare on one universe (ADR 0088 build row S2): over 22 monthly
+# sessions (2025-01 to 2026-10) on the liquid optionable stocks the two ranks correlate 0.89 but
+# share only 53% of their top 20 (35% to 75%), so the idiosyncratic part is tested apart, as a
+# decoy of high_vol_call_write. A missing value never passes (ADR 0030). What it does not check:
+# factor exposures, trend, quality.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "total_vol_high"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Total volatility (high first)"
+description = "Stocks ranked by their recent price swings, the most volatile first."
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as ivol_high, so the two compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 3
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 2_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.hv60]
+field = "rollup.vol_stats@v1.hv60"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+hv60 = "rollup.vol_stats@v1.hv60"
+ivol_252d = "rollup.factor_betas@v1.ivol_252d"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.vol_stats@v1.hv60"

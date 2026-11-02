@@ -33,7 +33,7 @@ def test_config_list(graph: Graph) -> None:
           "residual_momentum",
           "volatility_scaled_momentum", "frog_in_the_pan", "momentum_x_quality_interaction",
           "fifty_two_week_high", "industry_momentum", "residual_reversal", "sector_reversal",
-          "low_beta", "low_volatility",
+          "low_beta", "low_volatility", "total_vol_high",
           "cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth",
           "distress_ohlson", "bdc_price_to_nav", "cef_discount_zscore",
           "vrp_cross_section", "iv_rank_high", "etf_flow_pressure",
