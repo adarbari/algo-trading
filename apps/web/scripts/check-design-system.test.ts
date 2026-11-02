@@ -1,5 +1,5 @@
 /** The responsive part of the design-system check: a Narrow story where the CSS has container rules. */
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,10 +8,15 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('./component-folders', () => ({
   componentFolders: () => [],
   storyFileStem: (s: string) => s,
-  THEMES: [],
+  THEMES: ['light', 'dark'],
 }));
 
-import { noScreenshotStories, problems, unsettledClickStories } from './check-design-system';
+import {
+  missingScreenshots,
+  noScreenshotStories,
+  problems,
+  unsettledClickStories,
+} from './check-design-system';
 
 function folder(css: string, stories: string): Parameters<typeof problems>[0] {
   const dir = mkdtempSync(join(tmpdir(), 'ds-'));
@@ -63,5 +68,18 @@ describe('play-with-click requirement', () => {
   it('is part of the component check', () => {
     const found = problems(folder('', `${STATES}\n${story('Open', click)}`));
     expect(found.some((p) => p.includes("story 'Open' clicks in play"))).toBe(true);
+  });
+});
+
+describe('missing screenshot baselines', () => {
+  it('lists each story and theme without a PNG, and skips no-screenshot stories', () => {
+    const dir = folder('', `${STATES}\nexport const Hidden: Story = { tags: ['no-screenshot'] };`);
+    mkdirSync(join(dir.dir, '__screenshots__'));
+    writeFileSync(join(dir.dir, '__screenshots__', 'Default.light.png'), '');
+    const missing = missingScreenshots(dir);
+    expect(missing).toContain('Default.dark.png');
+    expect(missing).toContain('Dense.light.png');
+    expect(missing).not.toContain('Default.light.png');
+    expect(missing.some((file) => file.startsWith('Hidden'))).toBe(false);
   });
 });

@@ -290,3 +290,22 @@ Not enforced, by owner decision 2026-10-23 (rare; adds CI time to every push). T
 
 `make check` runs every CI step (tests in parallel, one worker per CPU; `make test
 WORKERS=0` runs them serially). The web screenshots need Docker: `make web-visual`.
+
+## Web checks before the push (2026-11-02)
+
+The most common red web checks in the sample of 40 failed runs were a route over its bundle
+budget (by tens of bytes, after parallel PRs ate the 5 % headroom), a new story without its
+screenshot baselines, and a lazy page without a budget. What catches each before the push:
+
+| Failure | Caught by | Where it runs |
+|---|---|---|
+| Route over budget | `make changed`: the production build and `perf:bundle` for a change under `src/` or `design-system/` | the `pre-push` hook |
+| Lazy page without a budget (or a budget for a removed page) | the unit test `a budget for every lazy page` (`scripts/check-bundle-budgets.test.ts`, no build) | `npm run test`, CI `web-static` |
+| New story without light and dark baselines | `npm run visual:missing` makes only the missing PNGs in the CI Playwright image (Docker off Linux), then `ds:check` verifies them | `make changed` for a `design-system/` change |
+| Anything the above skip | CI, the full gate | every PR |
+
+The hook is `make-changed` in `.pre-commit-config.yaml`. Hooks live in the main checkout's
+`.git`, shared by every worktree: `scripts/worktree.sh` installs it when missing, and `make
+doctor` fails until it is installed (`pre-commit install --hook-type pre-push` in the main
+checkout). Route budgets sit at measured + 5 % (`docs/decisions/log.md`, 2026-10-23); the shared
+entry budgets stay shrink-only.

@@ -172,6 +172,8 @@ run git -C "$main" worktree add -b "$branch" "$wt" "origin/$base"
 # a reused stale resolution dropped two changes on 2026-10-07: never replay recorded conflicts
 run git -C "$wt" config rerere.enabled false
 run ln -s "$main/.venv" "$wt/.venv"
+# the pre-push hook (make changed) lives in the shared .git/hooks: install it once, from main
+[ -e "$main/.git/hooks/pre-push" ] || run bash -c "cd '$main' && .venv/bin/pre-commit install --hook-type pre-push"
 
 pp="$wt/src:$wt/libs/sources:$wt/apps/ingestion:$wt/apps/api:$wt/apps/backtest"
 port_base=$((10000 + $(printf %s "$wt" | cksum | cut -d' ' -f1) % 500 * 10))

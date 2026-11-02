@@ -99,6 +99,10 @@ def _static_steps(present: list[str]) -> list[Step]:
     css = sorted(f for f in present if f.startswith("design-system/") and f.endswith(".css"))
     if css:
         steps.append(("stylelint", ["npx", "stylelint", *css]))
+    if any(f.startswith("design-system/") for f in present):
+        # a new story without its light and dark baseline fails CI's screenshot shard (5 runs in
+        # the 2026-11-02 sample); makes only the missing ones, in the CI image (Docker off Linux)
+        steps.append(("screenshot baselines (missing ones)", ["npm", "run", "visual:missing"]))
     steps.append(("design system", ["npm", "run", "ds:check"]))
     return steps
 
