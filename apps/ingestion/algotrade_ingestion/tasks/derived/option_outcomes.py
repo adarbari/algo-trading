@@ -37,7 +37,7 @@ import pandas as pd
 from algotrade.config.edges.document import CLOSED, Edge, Outcome
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.positions.chain import CHAIN_KIND
-from algotrade.config.edges.positions.key import case_points, position_key
+from algotrade.config.edges.positions.key import case_points, grid_outcomes, position_key
 from algotrade.config.edges.positions.spec import ExitRule, exit_rules
 from algotrade.config.edges.positions.templates import Templates, load_templates
 from algotrade.config.env import config_dir
@@ -98,14 +98,19 @@ class Wanted:
 
 
 def positions_wanted(edges: Collection[Edge], templates: Templates) -> list[Wanted]:
-    """Every position of the open edge documents' (and ``[[variants]]``') ``option_pnl`` outcomes
-    and their case points, for each hold of its ``horizon_sessions``, by key (a new edge needs no
-    code change; two setups that resolve to one key share its rows)."""
+    """Every position of the open edge documents' (``[[variants]]``' and ``[[variant_grid]]``
+    points') ``option_pnl`` outcomes and their case points, for each hold of its
+    ``horizon_sessions``, by key (a new edge needs no code change; two setups that resolve to one
+    key share its rows)."""
     outcomes = [
         o
         for e in edges
         if e.status not in CLOSED
-        for o in (e.outcome, *(v.outcome for v in e.variants))
+        for o in (
+            e.outcome,
+            *(v.outcome for v in e.variants),
+            *(o for _, o in grid_outcomes(e, templates)),
+        )
     ]
     found: dict[str, Wanted] = {}
     for outcome in outcomes:

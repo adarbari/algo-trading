@@ -16,7 +16,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.config.edges.document import Edge
+from algotrade.config.edges.document import MAIN, Edge
 from algotrade.config.edges.named import named_symbols
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
@@ -51,6 +51,8 @@ class InstrumentResult:
     lost: dict[str, int] = field(default_factory=dict)  # reason -> periods without a value
     # the windows as trade-contract rows (ADR 0088, 2.5a); no measure reads them yet
     trades: pd.DataFrame | None = field(default=None, compare=False)
+    edge_variant: str = MAIN  # a named sleeve's ``[[variants]]`` or grid point id (sleeve.py)
+    identity: str = ""  # what the trial hash is of: edge, window or schedule, symbol (+ position)
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,7 @@ def _instrument(
     )
     oos = [o for o in obs if split is not None and o.period.decision >= split]
     return InstrumentResult(
+        identity=f"{edge.id}|{window}|{symbol}",
         symbol=symbol,
         horizon=horizon,
         measures=measures(every, horizon, split, exploratory),

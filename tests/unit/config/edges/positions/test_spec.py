@@ -11,7 +11,13 @@ import pytest
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.edges.positions.spec import ExitSettings, PositionSpec, check_edge
+from algotrade.config.edges.named import DELTA_EQUIVALENT
+from algotrade.config.edges.positions.spec import (
+    SLEEVE_BASE,
+    ExitSettings,
+    PositionSpec,
+    check_edge,
+)
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import FileConfigStore
@@ -26,6 +32,9 @@ PUT = {
     "expiry_cycle": "weekly", "skip_report_in_life": True, "book": True,
     "exit": {"take_profit": 0.5, "stop_loss": 2.0, "exit_dte": 21},
 }  # fmt: skip
+
+
+NAMED = {"where": {"all": [{"field": "instrument.symbol", "op": "in", "value": ["SPY"]}]}}
 
 
 def put(**changes: Any) -> dict[str, Any]:
@@ -115,13 +124,21 @@ def test_the_new_edge_keys_parse_and_a_document_without_them_hashes_as_before() 
     assert "position" not in identity_dict(asdict(plain.outcome))
 
 
-def test_a_grid_belongs_to_an_option_position() -> None:
+def test_the_sleeve_base_spec_checks_is_the_named_one() -> None:
+    assert SLEEVE_BASE == DELTA_EQUIVALENT  # spec.py cannot import named.py (a cycle)
+
+
+def test_a_grid_belongs_to_an_option_position_of_a_named_sleeve() -> None:
     grid = [{"prefix": "g", "strike_delta": [0.16, 0.2]}]
-    check_edge(parse_edge({**put(), "variant_grid": grid}, "drift", WHERE), WHERE, TEMPLATES)
+    sleeve = {**put(), "base": "delta_equivalent", "universe": NAMED, "variant_grid": grid}
+    check_edge(parse_edge(sleeve, "drift", WHERE), WHERE, TEMPLATES)
     shares = document(variant_grid=grid)
     with pytest.raises(ConfigurationError, match="only an option_pnl position has a grid"):
         check_edge(parse_edge(shares, "drift", WHERE), WHERE, TEMPLATES)
-    clash = {**put(), "variant_grid": grid, "variants": [{"id": "g_d16"}]}
+    # a screened (cross-section) option setup: its harness does not read grid points yet
+    with pytest.raises(ConfigurationError, match="only a named option sleeve"):
+        check_edge(parse_edge({**put(), "variant_grid": grid}, "drift", WHERE), WHERE, TEMPLATES)
+    clash = {**sleeve, "variants": [{"id": "g_d16"}]}
     with pytest.raises(ConfigurationError, match="clash with a variant"):
         check_edge(parse_edge(clash, "drift", WHERE), WHERE, TEMPLATES)
 

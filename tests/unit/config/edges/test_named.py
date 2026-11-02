@@ -1,5 +1,6 @@
 """The named instruments of a time-series edge (ADR 0073): one ``instrument.symbol`` rule over a
-short list, and the document rules around ``base = "out_of_window"``."""
+short list, and the document rules around ``base = "out_of_window"`` and a named option sleeve's
+``base = "delta_equivalent"`` (ADR 0088 decision 14)."""
 
 from typing import Any
 
@@ -83,3 +84,61 @@ def test_a_raw_return_outcome_needs_the_time_series_base() -> None:
     with pytest.raises(ConfigurationError, match="needs SPY"):
         document_without_base = {**TIMED, "base": "universe"}
         parse_edge(document(**document_without_base), "drift", "x.toml")
+
+
+SLEEVE = {
+    "schedule": "every_session",
+    "base": "delta_equivalent",
+    "outcome": {
+        "kind": "option_pnl", "horizon_sessions": [2], "benchmark": "none", "tenor_days": 30,
+        "position": "short_put", "strike_delta": 0.25, "start_offset_sessions": 1,
+    },
+    "universe": TIMED["universe"],
+    "variant_grid": [{"prefix": "g", "strike_delta": [0.2, 0.3]}],
+}  # fmt: skip
+
+
+def sleeve(**changes: Any) -> Any:
+    return parse_edge(document(**{**SLEEVE, **changes}), "drift", "x.toml")
+
+
+def test_a_named_option_sleeve_has_variants_a_grid_and_any_plain_or_calendar_schedule() -> None:
+    edge = sleeve(variants=[{"id": "wide", "outcome": {"strike_delta": 0.15}}])
+    assert edge.base == "delta_equivalent" and [v.id for v in edge.variants] == ["wide"]
+    assert len(edge.variant_grid) == 1
+    assert sleeve(schedule="month_end").schedule == "month_end"
+    # a calendar window still fixes the hold at its own length (ADR 0073 decision 2)
+    calendar = {**SLEEVE["outcome"], "horizon_sessions": [4]}  # type: ignore[dict-item]
+    assert sleeve(schedule="calendar:turn_of_month", outcome=calendar).base == "delta_equivalent"
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        (
+            {"outcome": {**TIMED["outcome"], "benchmark": "SPY"}, "variant_grid": None},  # type: ignore[dict-item]
+            "pairs an option position with its delta-equivalent",
+        ),
+        (
+            {"outcome": {**SLEEVE["outcome"], "horizon_sessions": [2, 5]}},  # type: ignore[dict-item]
+            "one horizon_sessions value",
+        ),
+        ({"variants": [{"id": "v2", "base": "universe"}]}, "variants keep base"),
+        (
+            {"variants": [{"id": "v2", "universe": TIMED["universe"]}]},
+            "variants hold the edge's own names",
+        ),
+        ({"universe": "liquid_optionable"}, "base 'delta_equivalent' names its instruments"),
+        ({"schedule": "on_event:earnings_reaction"}, "enters at the sessions its schedule"),
+    ],
+)
+def test_a_named_option_sleeve_fails_closed(changes: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        sleeve(**changes)
+
+
+def test_only_a_sleeve_has_the_delta_equivalent_base_and_out_of_window_keeps_no_variants() -> None:
+    with pytest.raises(ConfigurationError, match="variants keep base"):
+        parse_edge(document(variants=[{"id": "v2", "base": "delta_equivalent"}]), "drift", "x.toml")
+    with pytest.raises(ConfigurationError, match="no variants"):
+        timed(variants=[{"id": "v2", "outcome": {"cost_bps": 5}}])

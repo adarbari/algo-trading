@@ -8,13 +8,15 @@ own takes the outcome's). ``position_key`` is the canonical sorted JSON of the r
 collateral rule, the selection parameters (``strike_delta``, ``tenor_days``, ``expiry_cycle``,
 ``skip_report_in_life``), the entry offset, the ordered exit rule list and the hold cap; two grid
 points that differ only in ``take_profit`` are two keys. ``parse_position_key`` is its inverse
-(``ParsedKey``), so a stored row round-trips to the spec that wrote it."""
+(``ParsedKey``), so a stored row round-trips to the spec that wrote it. ``grid_outcomes`` gives
+the outcome of each ``[[variant_grid]]`` point (the writer stores them, the harness reads them)."""
 
 import json
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
+from algotrade.config.edges.positions.grid import points
 from algotrade.config.edges.positions.spec import ExitRule, ExitSettings, exit_rules
 from algotrade.config.edges.positions.templates import OPTION, Leg, Template, Templates
 from algotrade.core.model.errors import ConfigurationError
@@ -208,6 +210,25 @@ def case_points(outcome: "Outcome", templates: Templates) -> tuple["Outcome", ..
         values = [case.default, *(c.value for c in case.cases)]
         found += [_apply(base, case.name, v, templates) for v in dict.fromkeys(values)]
     return tuple(found)
+
+
+def grid_outcomes(edge: Any, templates: Templates) -> tuple[tuple[str, "Outcome"], ...]:
+    """``(point id, outcome)`` of every point of ``edge``'s ``[[variant_grid]]`` tables, in their
+    fixed order: the edge's own outcome with the point's parameters set and its legs resolved
+    again (``points``; none: ``()``)."""
+    return tuple(
+        (p.id, _with_values(edge.outcome, p.values, templates))
+        for g in edge.variant_grid
+        for p in points(g)
+    )
+
+
+def _with_values(
+    outcome: "Outcome", values: tuple[tuple[str, float], ...], templates: Templates
+) -> "Outcome":
+    for name, value in values:
+        outcome = _apply(outcome, name, value, templates)
+    return outcome
 
 
 def with_legs(edge: Any, templates: Templates) -> Any:
