@@ -111,7 +111,8 @@ term = "VIX 5-day change"
 short = "The VIX close over its close five closes earlier, minus 1."
 body = """
 A value of 0.25 means the VIX rose 25% in five closes. The stand-aside verdict uses its sign: a
-rising VIX in the stress band under a falling market is a reason not to sell premium. It is unknown
+rising VIX in the stress band under a falling market is one of the three conditions that turn the
+verdict off. It is unknown
 until six closes are known.
 """
 see_also = ["short_premium_allowed"]
@@ -350,7 +351,7 @@ id = "weekday"
 term = "Weekday"
 short = "The day of the week of the session: 0 is Monday and 4 is Friday."
 body = """
-A setup can gate on the weekday to avoid or choose days, such as skipping Fridays before a weekend.
+A setup can gate on the weekday, for example to leave out the Fridays before a weekend.
 It comes from the calendar, so it is never unknown.
 """
 see_also = ["last_before_weekend"]
