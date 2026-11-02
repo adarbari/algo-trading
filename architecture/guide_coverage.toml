@@ -31,7 +31,9 @@
 # fails until its line is removed. `enums` are sources, `sections` are paths, `panels` are the
 # uncovered titled containers per file.
 
-non_sections = ["/explore", "/regime"]  # off the bar (ADR 0083 amendment 2026-11-01): reached by search, the regime chip and links
+# /settings (reached from the account menu; the one sign-up question while it is unanswered):
+# a page around the product, not a section of it; every control on it has its Guide term.
+non_sections = ["/explore", "/regime", "/settings"]  # off the bar (ADR 0083 amendment 2026-11-01): reached by search, the regime chip and links
 
 [panels]
 tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]
