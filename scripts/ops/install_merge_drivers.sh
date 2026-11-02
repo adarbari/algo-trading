@@ -6,8 +6,7 @@
 # `git config merge.<name>.driver` is local config, so a fresh clone has none. The config is the
 # clone's common one (.git/config), shared by the main checkout and every worktree, so one run
 # covers them all. Run by scripts/worktree.sh and scripts/merge_main.sh; `make doctor` checks it
-# (--check: exit 1 when a driver is missing or differs). Drivers: scripts/ops/merge_budgets.py,
-# and `keepours` (`true`: our side, no conflict) for generated files merge_main.sh regenerates.
+# (--check: exit 1 when a driver is missing or differs). Drivers: scripts/ops/merge_budgets.py.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
@@ -25,5 +24,4 @@ CHECK=0
 [ "${1:-}" = "--check" ] && CHECK=1
 set_driver perfbudgets "$want_budgets"
 set_driver latencyviews "$want_views"
-set_driver keepours true "generated file: ours, then scripts/merge_main.sh regenerates"
 exit "$bad"

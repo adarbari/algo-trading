@@ -1,6 +1,8 @@
 """The coverage report of the views file: every operation the web can send against the views that
-trigger it, `docs/perf/view-coverage.md`. Pure: takes the parsed views file, the operation names
-of the source and the old per-route capture; no server, no store."""
+trigger it, `var/perf/view-coverage.md` (git-ignored: a generated report every UI PR changed,
+so it conflicted on every merge of main, and GitHub ignores merge drivers; 2026-11-02). Pure:
+takes the parsed views file, the operation names of the source and the old per-route capture;
+no server, no store."""
 
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ REPO = Path(__file__).resolve().parents[2]
 WEB_SRC = REPO / "apps/web/src"
 PAGES_FILE = REPO / "benchmarks/api_latency_pages.json"
 NOWHERE = "nowhere (reached through a prop or registry the walk cannot see, or dead code)"
-DOC_OUT = REPO / "docs/perf/view-coverage.md"
+DOC_OUT = REPO / "var/perf/view-coverage.md"
 CAPTURED_FILE = REPO / "benchmarks/api_latency_views.captured.json"
 GAPS_FILE = REPO / "architecture/perf_view_coverage.toml"
 FIX = (
