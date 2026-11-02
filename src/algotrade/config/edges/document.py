@@ -136,6 +136,7 @@ from algotrade.config.edges.portfolio import (
     check_portfolio,
     ensemble_of,
     oos_class_of,
+    tracks_of,
     vol_target_of,
     weighting_of,
 )
@@ -224,7 +225,7 @@ OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
     "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field", "pair_field",
-    "vol_target", "vol_window", "vol_return_field", "canary", *POSITION_KEYS, "entry",
+    "vol_target", "vol_window", "vol_return_field", "canary", *POSITION_KEYS, "entry", "tracks",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -274,6 +275,7 @@ class Outcome:
     canary: Canary | None = None  # a risk-off gate on the book (ADR 0074 amendment)
     position: PositionSpec | None = None  # a template of config/site/positions (ADR 0088)
     entry: EntrySpec | None = None  # an entry condition (ADR 0088): the same rule for both kinds
+    tracks: str | None = None  # a named sleeve's Cboe strategy index (portfolio.TRACKED_INDEXES)
 
     @property
     def result_side(self) -> str:
@@ -472,7 +474,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
         check_base(held.kind, held_base, where)
-        named.check_sleeve(where, held.kind, len(held.horizon_sessions), held_base)
+        named.check_sleeve(where, held.kind, len(held.horizon_sessions), held_base, held.tracks)
         if held.side != LONG and top_k is None:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
@@ -805,6 +807,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         vol_window=vol_window,
         vol_return_field=vol_return_field,
         canary=canary_of(o, kind),
+        tracks=tracks_of(o),
         position=spec_of(o, kind, offset, cases),
         entry=entry_of(o),
     )

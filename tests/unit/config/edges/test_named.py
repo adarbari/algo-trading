@@ -8,8 +8,12 @@ import pytest
 
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.named import MAX_NAMED, named_symbols
+from algotrade.config.edges.portfolio import TRACKED_INDEXES
+from algotrade.config.site.settings import load_macro
 from algotrade.config.strategy.schema import Group, Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.configs.files import FileConfigStore
+from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import document
 
 TIMED = {
@@ -142,3 +146,19 @@ def test_only_a_sleeve_has_the_delta_equivalent_base_and_out_of_window_keeps_no_
         parse_edge(document(variants=[{"id": "v2", "base": "delta_equivalent"}]), "drift", "x.toml")
     with pytest.raises(ConfigurationError, match="no variants"):
         timed(variants=[{"id": "v2", "outcome": {"cost_bps": 5}}])
+
+
+def test_only_a_sleeve_tracks_a_cboe_strategy_index() -> None:
+    tracked = {**SLEEVE["outcome"], "tracks": "PUT"}  # type: ignore[dict-item]
+    assert sleeve(outcome=tracked).outcome.tracks == "PUT"
+    assert sleeve().outcome.tracks is None
+    with pytest.raises(ConfigurationError, match="tracks"):
+        sleeve(outcome={**SLEEVE["outcome"], "tracks": "SPX"})  # type: ignore[dict-item]
+    out_of_window = {**TIMED["outcome"], "tracks": "PUT"}
+    with pytest.raises(ConfigurationError, match="only a named option sleeve"):
+        timed(outcome=out_of_window)
+
+
+def test_every_tracked_index_is_a_site_cboe_series() -> None:
+    keys = {s.key for s in load_macro(FileConfigStore(REPO_ROOT / "config", local=False)).series}
+    assert set(TRACKED_INDEXES) <= keys

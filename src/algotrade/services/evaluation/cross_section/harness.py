@@ -229,9 +229,8 @@ class VariantResult:
     side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
     capital_basis: str | None = None  # the trade contract's (ADR 0088); None for a book
     timing: Mapping[str, Any] | None = None  # a time-series edge: timing vs buy-and-hold Sharpe
-    grid: int | None = (
-        None  # an ensemble: the size of its pre-registered grid (ADR 0074); else None
-    )
+    book: Mapping[str, Any] | None = None  # a named option sleeve's book and index tracking (E8b)
+    grid: int | None = None  # an ensemble: the size of its pre-registered grid (ADR 0074)
 
     @property
     def licence(self) -> str | None:
@@ -786,6 +785,7 @@ def _time_series(
                 *r.measures[1:],
             ),
             edge_variant=r.edge_variant, lost_sessions=r.lost, timing=r.timing or None,
+            book=r.book or None,
         )
         for r in run.results
     ]  # fmt: skip

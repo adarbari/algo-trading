@@ -19,6 +19,12 @@ unpaired (``excluded_missing``). No random window sets and no timing Sharpe rati
 same-session stock, not other periods. A known approximation: the stock is held to the hold cap
 even when a trade's exit rule closed it earlier (the stock outcome is stored at fixed horizons).
 
+Each edge variant's trades also form its book (E8b, ``cross_section/portfolio/ladder.py``: fixed
+collateral slots, one per named instrument times the ladder's depth, its drawdown and worst month
+over realised exits) and, with ``tracks``, the book's cohorts are set beside that Cboe strategy
+index over the same windows (``evidence/benchmarks.py``); both go on each trial of the variant as
+``book``. Only a sleeve has a book here, so a share setup never gets a second drawdown.
+
 The one-session rule holds: the option and stock rows are read at their own S as of ``as_of``
 through ``harness.py`` (the package's one importer of ``data.outcomes``)."""
 
@@ -40,7 +46,13 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, chain_rows
+from algotrade.services.evaluation.cross_section.portfolio.ladder import (
+    book_figures,
+    cohorts,
+    ladder_depth,
+)
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
+from algotrade.services.evaluation.evidence.benchmarks import index_tracking
 from algotrade.services.evaluation.evidence.contract import empty_trades
 from algotrade.services.evaluation.evidence.shapes import trade_frame
 from algotrade.services.evaluation.time_series import harness
@@ -84,7 +96,7 @@ def evaluate_sleeve(
     days = sessions_between(start, end)
     # by (hold, entry offset): a variant may move either, and its legs and keys move with them
     reads: dict[tuple[int, int], tuple[list[Period], pd.DataFrame, harness.Returns]] = {}
-    results = []
+    results: list[InstrumentResult] = []
     for variant, outcome in outcomes:
         held = replace(edge, outcome=outcome, variants=(), variant_grid=())
         horizon = outcome.horizon_sessions[0]
@@ -104,11 +116,13 @@ def evaluate_sleeve(
             )
         ps, trades, stock = reads[at]
         mine = chain_rows(held, trades)
-        for symbol in symbols:
-            results.append(
-                _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
-                       stock, label, gate, split, exploratory, option_costs)
-            )  # fmt: skip
+        trials = [
+            _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
+                   stock, label, gate, split, exploratory, option_costs)
+            for symbol in symbols
+        ]  # fmt: skip
+        book = _book(reader, held, trials, ps, days, len(symbols), start, end, as_of)
+        results += [replace(r, book=book) for r in trials]
     main = reads[edge.outcome.horizon_sessions[0], edge.outcome.start_offset_sessions][0]
     measured = {e for r in results if r.edge_variant == MAIN for e, _ in r.in_window}
     return TimeSeriesRun(
@@ -206,3 +220,41 @@ def _base(row: pd.Series, stock_return: float | None, cost_bps: float | None) ->
         return None
     cost = (cost_bps or 0.0) / 1e4
     return float(delta * spot * (r - np.sign(delta) * cost) / collateral)
+
+
+def _book(
+    reader: StoreReader,
+    edge: Edge,
+    trials: Sequence[InstrumentResult],
+    ps: Sequence[Period],
+    days: Sequence[date],
+    names: int,
+    start: date,
+    end: date,
+    as_of: datetime,
+) -> dict[str, float | int | str | None]:
+    """One edge variant's book over its trials' measured (open-gate) trades and, when the outcome
+    ``tracks`` an index, its tracking; the slots from the placed entries alone."""
+    horizon = edge.outcome.horizon_sessions[0]
+    depth = max(ladder_depth([p.entry for p in ps], horizon, days), 1)
+    trades: list[tuple[str, date, date, float]] = []
+    for r in trials:
+        if r.trades is None:
+            continue
+        frame = r.trades
+        values = pd.to_numeric(frame["return_on_capital"], errors="coerce").tolist()
+        for entry, exit_, value in zip(
+            frame["entry_session"], frame["exit_session"], values, strict=True
+        ):
+            if isinstance(exit_, date) and isinstance(entry, date):
+                trades.append((r.symbol, entry, exit_, float(value)))
+    book = cohorts(trades, names, depth)
+    figures = book_figures(book, names * depth)
+    if edge.outcome.tracks is None:
+        return figures
+    decided = {p.entry: p.decision for p in ps}
+    windows = [(decided[c.entry], c.entry, c.exit, c.value) for c in book if c.entry in decided]
+    bills = harness.bill_returns(reader, [w[0] for w in windows], horizon, as_of)
+    last = max([end, *(c.exit for c in book)])
+    levels = harness.index_levels(reader, edge.outcome.tracks, start, last, as_of)
+    return {**figures, **index_tracking(windows, levels, bills, edge.outcome.tracks)}

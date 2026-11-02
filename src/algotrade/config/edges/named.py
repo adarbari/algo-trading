@@ -51,9 +51,17 @@ def check_variants(where: str, base: str | None, edge_base: str, universe: bool 
         )
 
 
-def check_sleeve(where: str, kind: str, horizons: int, base: str) -> None:
+def check_sleeve(
+    where: str, kind: str, horizons: int, base: str, tracks: str | None = None
+) -> None:
     """A named option sleeve (an outcome measured at ``base = "delta_equivalent"``) holds one
-    ``option_pnl`` position of one hold (``horizons``: the number of its ``horizon_sessions``)."""
+    ``option_pnl`` position of one hold (``horizons``: the number of its ``horizon_sessions``);
+    only a sleeve ``tracks`` a Cboe strategy index (E8b)."""
+    if tracks is not None and base != DELTA_EQUIVALENT:
+        raise ConfigurationError(
+            f"{where} tracks: only a named option sleeve (base {DELTA_EQUIVALENT!r}) is tracked "
+            f"against a Cboe strategy index, got base {base!r}"
+        )
     if base == DELTA_EQUIVALENT and (kind != CHAIN_KIND or horizons != 1):
         raise ConfigurationError(
             f"{where} kind: base {DELTA_EQUIVALENT!r} pairs an option position with its "

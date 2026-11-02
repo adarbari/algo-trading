@@ -6,13 +6,16 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from algotrade.config.edges.document import Edge, parse_edge
 from algotrade.config.edges.positions.key import position_key, with_legs
 from algotrade.config.edges.positions.templates import KIND, NAME, load_templates
+from algotrade.core.model.instruments import index_id
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
+from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
 from algotrade.services.evaluation.time_series.sleeve import evaluate_sleeve, sleeve_outcomes
@@ -41,6 +44,12 @@ STOCK = 0.01  # SPY's raw return over every hold
 # the mid P&L per unit and the entry delta of each trial (the edge's own and the grid's points)
 PNL = {"main": (1.0, 0.25), "g_d20": (0.6, 0.20), "g_d30": (1.4, 0.30)}
 SPREAD, COLLATERAL = 0.1, 95.0  # half-spreads 0.05 at entry and exit; the strike, cash-secured
+BILL = 0.05  # the 3-month bill's par rate on the curve every decision session saw
+
+
+def PUT_LEVEL(day: date) -> float:  # noqa: N802 - a level path, read like a constant
+    """The PUT index's level on ``day``: up 0.1% a calendar day from 100."""
+    return 100.0 * (1.001 ** (day - FIRST).days)
 
 
 def sleeve_edge(**changes: Any) -> Edge:
@@ -58,6 +67,8 @@ def world(
     skip: frozenset[tuple[str, date]] = frozenset(),
     changes: dict[tuple[str, date], dict[str, Any]] | None = None,
     no_stock: frozenset[date] = frozenset(),
+    tracked: bool = False,
+    pnl: dict[str, tuple[float, float]] | None = None,
 ) -> StoreReader:
     """SPY in the reference, its stock return and one trade per trial at each S; ``skip``: the
     (trial, S) with no trade row; ``changes``: fields of a trade row; ``no_stock``: S with no
@@ -79,15 +90,31 @@ def world(
         trades = [
             structure_pnl_row(
                 SPY_ID, keys[v], day, hold=H, ts=datetime.combine(day, datetime.min.time(), UTC),
-                window_end=day + timedelta(days=3), price_source="option_history",
+                window_end=day + timedelta(days=3), exit_session=day + timedelta(days=3),
+                price_source="option_history",
                 licence="personal", entry_spot=100.0, collateral=COLLATERAL,
-                **{"pnl_mid": pnl, "position_delta": delta, **(changes or {}).get((v, day), {})},
+                **{"pnl_mid": pnl_mid, "position_delta": delta,
+                   **(changes or {}).get((v, day), {})},
             )
-            for v, (pnl, delta) in PNL.items()
+            for v, (pnl_mid, delta) in (pnl or PNL).items()
             if v in keys and (v, day) not in skip
         ]  # fmt: skip
         known = (changes or {}).get(("known", day), {}).get("at", KNOWN)
         writer.write_table(STRUCTURE_PNL, day, f"c-{day}", stamped(trades, day, f"c-{day}", known))
+    if tracked:  # the PUT index's level each day and a bill curve from before the range
+        put = [
+            {"instrument_id": index_id("PUT"), "series": "PUT", "obs_date": d,
+             "vintage_date": d, "value": PUT_LEVEL(d), "vintage_kind": "lagged"}
+            for d in (FIRST + timedelta(days=k) for k in range(40))
+        ]  # fmt: skip
+        writer.write_table(MACRO_SERIES, LAST, "m1", stamped(put, LAST, "m1"))
+        day = FIRST - timedelta(days=10)
+        curve = [
+            {"instrument_id": f"RATE:UST-{t}", "ts": pd.Timestamp(day, tz="UTC"), "tenor": t,
+             "tenor_days": d, "rate_par": r, "rate_cont": r}
+            for t, d, r in (("1M", 30, 0.04), ("3M", 91, BILL), ("2Y", 730, 0.06))
+        ]  # fmt: skip
+        writer.write_table("rates/treasury", day, "r1", stamped(curve, day, "r1"))
     return StoreReader(backend)
 
 
@@ -190,3 +217,29 @@ def test_a_variant_that_moves_the_entry_reads_its_own_sessions_and_keys() -> Non
     assert moved.edge_variant == "late" and main.lost == {}
     # its own sessions, its own key: never main's rows read as its trades
     assert moved.lost == {"NO_OUTCOME": len(entries(shifted))} and moved.in_window == ()
+
+
+def test_a_spy_thirty_delta_sleeve_reports_its_book_and_its_put_tracking() -> None:
+    edge = sleeve_edge(
+        outcome={**SLEEVE["outcome"], "strike_delta": 0.3, "tracks": "PUT"}, variant_grid=None
+    )  # type: ignore[dict-item]
+    (main,) = run(world(edge, tracked=True, pnl={"main": (1.0, 0.30)}), edge).results
+    n = len(entries(edge))
+    value = (1.0 - SPREAD) / COLLATERAL
+    book = main.book
+    # one named instrument, entries spaced by the hold: one slot, every trade the whole book
+    assert (book["slots"], book["cohorts"], book["max_drawdown"]) == (1, n, 0.0)
+    assert book["tracks"] == "PUT" and book["tracked_windows"] == n
+    diffs = [
+        value + BILL * H / 252 - (PUT_LEVEL(s + timedelta(days=3)) / PUT_LEVEL(s) - 1)
+        for _, s in entries(edge)
+    ]
+    assert book["tracking_mean_difference"] == pytest.approx(sum(diffs) / n)
+    assert book["tracking_error"] == pytest.approx(float(pd.Series(diffs).std(ddof=1)))
+
+
+def test_a_sleeve_with_no_tracked_index_has_its_book_and_no_tracking() -> None:
+    edge = sleeve_edge()
+    out = run(world(edge), edge)
+    assert {r.book["slots"] for r in out.results} == {1}
+    assert all("tracks" not in r.book for r in out.results)

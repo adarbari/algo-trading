@@ -27,6 +27,12 @@ VOL_WINDOW = 60  # sessions of the book's daily returns its volatility is measur
 MIN_VOL_WINDOW = 20  # a sample standard deviation over fewer sessions says nothing
 WEIGHTINGS = ("equal", "inverse_vol", "score")
 EQUAL, INVERSE_VOL, SCORE = WEIGHTINGS
+# A named option sleeve's book (ADR 0088, G16, E8b): fixed collateral slots, each held position
+# one slot's share, an unfilled slot cash; never declared, the sleeve's ladder always uses it.
+SLOTS = "slots"
+# The Cboe strategy indexes (``config/site/series/cboe.toml``, ``IDX:<key>``) a named option sleeve
+# may name as ``tracks``: its return over each window is set beside the index's (E8b).
+TRACKED_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR")
 # A blend's weights add to one within this tolerance (``0.6, 0.4`` is exact, thirds are not).
 MIX_TOLERANCE = 1e-6
 _TICKER = re.compile(r"[A-Z][A-Z0-9.\-]{0,9}")
@@ -109,6 +115,12 @@ def weighting_of(o: Table, kind: str) -> tuple[str, str | None]:
     if weighting != INVERSE_VOL and vol_field is not None:
         raise ConfigurationError(f"{o.where} vol_field: only an inverse_vol book reads one")
     return weighting, vol_field
+
+
+def tracks_of(o: Table) -> str | None:
+    """The Cboe strategy index an outcome's windows are tracked against (``TRACKED_INDEXES``;
+    None: none). Only a named option sleeve has one (``named.check_sleeve``)."""
+    return o.choice("tracks", "", TRACKED_INDEXES) if "tracks" in o.names() else None
 
 
 def vol_target_of(o: Table, kind: str) -> tuple[float | None, int, str]:
