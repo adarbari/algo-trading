@@ -7,16 +7,22 @@
  */
 import { Button, Disclosure, Stack, Text } from '@algotrade/ui';
 
-import { useIdeas, type PausedIdea } from '@/entities/idea';
+import { useIdeas, type IdeaTab, type PausedIdea } from '@/entities/idea';
 
 export interface PausedIdeasProps {
+  /** The tab whose screeners' held picks are listed (ADR 0083). */
+  tab?: IdeaTab;
   /** Open one ticker in Explore, with the screener that paused it. */
   onOpen: (symbol: string, via: string) => void;
   /** Open the screener that paused a pick (its name). */
   onOpenScreener: (screenerId: string) => void;
 }
 
-function PausedRow({ idea, onOpen, onOpenScreener }: { idea: PausedIdea } & PausedIdeasProps) {
+function PausedRow({
+  idea,
+  onOpen,
+  onOpenScreener,
+}: { idea: PausedIdea } & Omit<PausedIdeasProps, 'tab'>) {
   const { symbol } = idea;
   return (
     <Stack direction="row" gap={2} align="center" wrap>
@@ -49,8 +55,8 @@ function PausedRow({ idea, onOpen, onOpenScreener }: { idea: PausedIdea } & Paus
   );
 }
 
-export function PausedIdeas({ onOpen, onOpenScreener }: PausedIdeasProps) {
-  const ideas = useIdeas();
+export function PausedIdeas({ tab, onOpen, onOpenScreener }: PausedIdeasProps) {
+  const ideas = useIdeas(undefined, tab);
   if (ideas.isError && !ideas.data) {
     return (
       <Text size="sm" tone="muted">

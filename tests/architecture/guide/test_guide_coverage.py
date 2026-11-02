@@ -521,3 +521,48 @@ def test_section_and_route_paths_are_read_from_the_sources(tmp_path: Path) -> No
         "createRoute({\n  getParentRoute: () => parent,\n  path: 'ingestion',\n});\n"
     )
     assert route_paths(tmp_path) == {"/edges", "/backtests", "/admin/ingestion"}
+
+
+# ADR 0083 decision 4 and the Evening Desk rules (docs/ui/evening-desk-plan.md section 2): the
+# trader Ideas surfaces and their Guide terms say "publishes setups" and "the setup's historical
+# exit rule"; never "recommend", "buy" or "sell" as an instruction, "your plan", "your stop" or
+# "your size".
+_REPO = Path(__file__).resolve().parents[3]
+_WEB = _REPO / "apps/web/src"
+_WORDING_SURFACES = [
+    _WEB / "pages/trader-ideas",
+    _WEB / "widgets/setup-ideas",
+    _WEB / "widgets/ideas-heading",
+    _WEB / "widgets/top-ideas",
+    _WEB / "widgets/paused-ideas",
+]
+_WORDING_GUIDE = [_REPO / "config/site/guide/glossary/ideas.toml"]
+_INSTRUCTION_WORDS = re.compile(
+    r"\b(recommend\w*|buy(ing)?|sell(ing)?|your (plan|stop|size))\b", re.IGNORECASE
+)
+
+
+def _wording_files() -> list[Path]:
+    found = [
+        f
+        for root in _WORDING_SURFACES
+        for f in root.rglob("*.ts*")
+        if ".test." not in f.name and ".stories." not in f.name
+    ]
+    return found + _WORDING_GUIDE
+
+
+def test_the_trader_ideas_surfaces_use_no_instruction_words() -> None:
+    files = _wording_files()
+    assert any(f.name == "SetupIdeas.tsx" for f in files), (
+        "the Ideas surfaces moved: update _WORDING_SURFACES"
+    )
+    offenders = [
+        f"{f.relative_to(_REPO)}:{n}: {m.group(0)}"
+        for f in files
+        for n, line in enumerate(f.read_text().splitlines(), start=1)
+        if (m := _INSTRUCTION_WORDS.search(line))
+    ]
+    assert not offenders, (
+        f"ADR 0083 wording rule (publishes setups, never an instruction): {offenders}"
+    )

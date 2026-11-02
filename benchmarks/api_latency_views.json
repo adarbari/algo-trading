@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 01:10 UTC",
+ "generated": "2026-11-02 01:55 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -1670,10 +1670,9 @@
    "clicks": [],
    "params": {},
    "ops": [
-    "EdgeDesk",
     "FilterSet",
     "GuideHelpField",
-    "IdeasPage",
+    "SetupIdeas",
     "TableView"
    ],
    "uncertain": [
@@ -1681,7 +1680,8 @@
     "TableView"
    ],
    "interaction": [
-    "GuideEntries"
+    "GuideEntries",
+    "IdeasPage"
    ],
    "source": "static"
   },
