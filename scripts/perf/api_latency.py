@@ -35,7 +35,7 @@ swap is under `--min-free-swap-mb` (500).
 
 `--view VIEW_ID` (repeatable) is `--page` for one VIEW of `benchmarks/api_latency_views.json`
 (route + search + the clicks that reach a sub-view, e.g. `/edges?edge={edge} > tab:...`; list
-them in docs/perf/view-coverage.md): the operations and variables the crawler captured for it,
+them in var/perf/view-coverage.md): the operations and variables the crawler captured for it,
 else its static ones; the same guards apply (`--profile --view ID` profiles one view).
 """
 

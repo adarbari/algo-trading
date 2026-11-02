@@ -11,13 +11,16 @@ points that differ only in ``take_profit`` are two keys. ``parse_position_key`` 
 (``ParsedKey``), so a stored row round-trips to the spec that wrote it. ``share_position_key`` is
 the same string for a share position with declared exits (E3c-2): its legs, the entry offset, its
 side's ordered exit rules (``share_exit_rules``: moves of the entry price, not credit shares) and
-the hold cap, the option parameters empty, so a share and an option trade never share a key."""
+the hold cap, the option parameters empty, so a share and an option trade never share a key.
+``grid_outcomes`` gives the outcome of each ``[[variant_grid]]`` point (the writer stores them,
+the harness reads them)."""
 
 import json
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
+from algotrade.config.edges.positions.grid import points
 from algotrade.config.edges.positions.spec import (
     ExitRule,
     ExitSettings,
@@ -232,6 +235,25 @@ def case_points(outcome: "Outcome", templates: Templates) -> tuple["Outcome", ..
         values = [case.default, *(c.value for c in case.cases)]
         found += [_apply(base, case.name, v, templates) for v in dict.fromkeys(values)]
     return tuple(found)
+
+
+def grid_outcomes(edge: Any, templates: Templates) -> tuple[tuple[str, "Outcome"], ...]:
+    """``(point id, outcome)`` of every point of ``edge``'s ``[[variant_grid]]`` tables, in their
+    fixed order: the edge's own outcome with the point's parameters set and its legs resolved
+    again (``points``; none: ``()``)."""
+    return tuple(
+        (p.id, _with_values(edge.outcome, p.values, templates))
+        for g in edge.variant_grid
+        for p in points(g)
+    )
+
+
+def _with_values(
+    outcome: "Outcome", values: tuple[tuple[str, float], ...], templates: Templates
+) -> "Outcome":
+    for name, value in values:
+        outcome = _apply(outcome, name, value, templates)
+    return outcome
 
 
 def with_legs(edge: Any, templates: Templates) -> Any:

@@ -36,6 +36,7 @@ CHAIN_FIELDS = (
     "exit_unknown_closes", "exit_session", "exit_kind", "collateral", "max_adverse",
     "price_source", "licence", "exit_basis", "leg_kinds", "leg_qty",
     "pnl_hedged_mid", "stock_pnl", "leg_entry_mid",  # E6b-3: the option-only figures
+    "position_delta",  # E8a: a named sleeve's delta-equivalent stock (shares per unit)
 )  # fmt: skip
 CHAIN_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS, *CHAIN_FIELDS)
 _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "window_end")
@@ -124,6 +125,7 @@ def select_chain(
         "pnl_hedged_mid",
         "stock_pnl",
         "leg_entry_mid",
+        "position_delta",
     ):
         # a column no row of the partitions set (an all-UNMEASURED set has no exit)
         if nullable not in out.columns:

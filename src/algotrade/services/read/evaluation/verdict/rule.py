@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from algotrade.config.edges.document import MODEL_KIND, PAIR_KIND
-from algotrade.config.edges.named import OUT_OF_WINDOW
+from algotrade.config.edges.named import TIME_SERIES
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.portfolio import benchmark_words as benchword
 from algotrade.config.edges.verdict import VerdictSettings
@@ -192,7 +192,7 @@ def _judge_one(
     from ``_criteria`` and ``_level`` alone (the haircut, decay, robustness, columns, evidence
     and outlook are pieces the verdict carries beside them, never inputs to them), so they are
     the same as the full verdict's."""
-    c = replace(c, timed=facts.base == OUT_OF_WINDOW)
+    c = replace(c, timed=facts.base in TIME_SERIES)
     crit = _criteria(c, t, draws, decoys, facts.portfolio, facts.profile)
     level, reason = _level(c, crit, t, facts.profile)
     gap = _next_gap(crit)

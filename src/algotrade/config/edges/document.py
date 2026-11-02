@@ -191,7 +191,7 @@ BENCHMARKS = ("SPY", "none")
 __all__ = ["EVENT_CLASSES", "EVENT_SUBTYPES", "ON_EVENT", "SUBTYPE_REQUIRED", "event_class",
            "event_subtype"]  # fmt: skip
 SCHEDULES = ("every_session", "month_end")
-BASES = ("event", "universe", named.OUT_OF_WINDOW, BENCHMARK_BASE)
+BASES = ("event", "universe", *named.TIME_SERIES, BENCHMARK_BASE)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
 ANNOUNCED_AHEAD = ("earnings_expected", "ipo_lockup")  # an entry may precede these
@@ -461,7 +461,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     universe = _universe(t, edge_id)
     named.check_time_series(
         base, window_name(schedule) in WINDOW_NAMES, universe, where,
-        market=market_trigger(schedule) is not None,
+        market=market_trigger(schedule) is not None, schedule=schedule,
     )  # fmt: skip
     picks = _picks(t, schedule, base)
     sources = _sources(t)
@@ -472,6 +472,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     chain.check_kinds(where, [outcome, *(v.outcome for v in variants)])
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
         check_base(held.kind, held_base, where)
+        named.check_sleeve(where, held.kind, len(held.horizon_sessions), held_base)
         if held.side != LONG and top_k is None:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
@@ -861,7 +862,7 @@ def _variants(
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         v_base = _base(v, schedule) if "base" in v.names() else None
-        named.check_variants(v.where, v_base, edge_base)
+        named.check_variants(v.where, v_base, edge_base, "universe" in v.names())
         _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(

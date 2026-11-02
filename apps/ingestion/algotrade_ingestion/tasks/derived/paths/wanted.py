@@ -14,7 +14,12 @@ from typing import Any
 
 from algotrade.config.edges.document import CLOSED, Edge, Outcome
 from algotrade.config.edges.positions.chain import CHAIN_KIND, reads_share_path
-from algotrade.config.edges.positions.key import case_points, position_key, share_position_key
+from algotrade.config.edges.positions.key import (
+    case_points,
+    grid_outcomes,
+    position_key,
+    share_position_key,
+)
 from algotrade.config.edges.positions.spec import ExitRule, exit_rules, share_exit_rules
 from algotrade.config.edges.positions.templates import (
     OPTION,
@@ -60,7 +65,11 @@ def positions_wanted(
         o
         for e in edges
         if e.status not in CLOSED
-        for o in (e.outcome, *(v.outcome for v in e.variants))
+        for o in (
+            e.outcome,
+            *(v.outcome for v in e.variants),
+            *(o for _, o in grid_outcomes(e, templates)),  # a named sleeve's grid (E8a)
+        )
     ]
     found: dict[tuple[str, str | None], Wanted] = {}
     for outcome in (o for o in outcomes if _stored(o, kind)):

@@ -9,7 +9,7 @@ confirmed) and the bounds are sane; it refuses a port of 8000 or a non-loopback 
 crawler (`capture_views.mjs`) additionally aborts every browser request that leaves the web
 origin or writes (see `view_crawler.mjs`). It fills `benchmarks/api_latency_views.json` view by
 view (resumable: captured views are skipped; `--retry` revisits the ones that timed out),
-at most `--max-views` per run; then `view_coverage.py` writes docs/perf/view-coverage.md.
+at most `--max-views` per run; then `view_coverage.py` writes var/perf/view-coverage.md.
 """
 
 from __future__ import annotations
