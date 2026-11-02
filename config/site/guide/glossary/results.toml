@@ -517,4 +517,4 @@ The site publishes setups: rules that picked names in the past, with how those p
 The site never knows your account, your size or your other positions, so it cannot say what is suitable for you. A stop or an exit shown on a page is the setup's historical exit rule, not an instruction. Trading, and options in particular, can lose more than you put in. Read the methodology and conflicts page before acting on anything here.
 """
 next = "Look for the label beside each figure: backtested (hypothetical) or forward paper record since a date."
-see_also = ["paper_trading", "verdict", "not_a_return"]
+see_also = ["paper_trading", "verdict", "not_a_return", "idea_exit_rule"]
