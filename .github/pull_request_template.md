@@ -4,6 +4,10 @@
      the `no-automerge` label to keep it open for review (also while an `architect` review is
      pending). -->
 
+<!-- Optional: Unblocks: V10, V11, O3 -- slice ids (or #N) of planned work this PR unblocks. The push
+     queue counts each id, so the push that frees the most work goes first (docs/ci.md). -->
+Unblocks:
+
 ## Ownership (ADR 0019)
 - Owner module(s) this change extends (from `architecture/*_ownership.toml`):
 - [ ] No responsibility re-implemented outside its owner; a new responsibility has an entry + owner in `architecture/*_ownership.toml`
