@@ -1178,7 +1178,7 @@ type ExitRule {
   winners: Int!
   inSampleOnly: Boolean!
   takeProfit: Float
-  takeProfitBasis: StopBasis!
+  takeProfitBasis: StopBasis
   exitDte: Int
   conditionFields: [String!]!
   expiry: Date

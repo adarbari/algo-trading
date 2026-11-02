@@ -71,6 +71,11 @@ def test_a_declared_share_stop_is_published_as_declared_with_the_target_as_a_ris
     assert rule.hold_sessions == 20 and rule.unknown is None and rule.winners == 0
 
 
+def test_a_share_exit_with_no_take_profit_has_no_take_profit_basis() -> None:
+    rule = at(None, outcome={"exit": {"stop_loss": 0.05}})
+    assert (rule.take_profit, rule.take_profit_basis) == (None, None)
+
+
 def test_the_condition_fields_of_a_share_exit_are_published() -> None:
     rule = at(None, outcome={"exit": {**SHARE["exit"], "when": WHEN}})
     assert rule.condition_fields == ("momentum.rsi_14",)

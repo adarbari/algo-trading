@@ -16,14 +16,20 @@ export function exitRuleText(
 ): string | null {
   const parts: string[] = [];
   const stop = exit.stop;
-  if (stop && stop.fraction !== null) {
+  const at = prices?.stop == null ? '' : ` (${money(prices.stop)})`;
+  if (stop && stop.fraction !== null && stop.basis === 'CREDIT') {
+    const times = formatValue(stop.fraction, { kind: 'number', digits: 1 }).text;
+    parts.push(`declared stop ${times} × the credit`);
+  } else if (stop && stop.fraction !== null && stop.basis === 'COLLATERAL') {
+    const share = formatValue(stop.fraction, { kind: 'percent', digits: 1 }).text;
+    parts.push(`stop ${share} of the collateral`);
+  } else if (stop && stop.fraction !== null) {
     const declared = stop.kind === 'DECLARED' ? 'declared ' : '';
-    const at = prices?.stop == null ? '' : ` (${money(prices.stop)})`;
-    parts.push(
-      `${declared}stop ${formatValue(stop.fraction, { kind: 'percent', digits: 1 }).text} below the entry close${at}`,
-    );
+    const pct = formatValue(stop.fraction, { kind: 'percent', digits: 1 }).text;
+    parts.push(`${declared}stop ${pct} below the entry close${at}`);
   } else if (stop && stop.multiple !== null) {
-    parts.push(`stop ${formatValue(stop.multiple, { kind: 'number', digits: 1 }).text} × ATR(14)`);
+    const times = formatValue(stop.multiple, { kind: 'number', digits: 1 }).text;
+    parts.push(`stop ${times} × ATR(14)${at}`);
   }
   if (exit.takeProfit != null && exit.takeProfitBasis === 'ENTRY') {
     const at = prices?.target == null ? '' : ` (${money(prices.target)})`;

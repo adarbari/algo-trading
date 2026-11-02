@@ -114,7 +114,7 @@ class ExitRule:
     # a setup's other declared exits, published as declared (None: not declared)
     take_profit: float | None = None  # close when this share of the credit is captured (CREDIT)
     # or the entry close has risen by this fraction (ENTRY, a share setup)
-    take_profit_basis: StopBasis = StopBasis.CREDIT
+    take_profit_basis: StopBasis | None = None  # None exactly when take_profit is None
     exit_dte: int | None = None  # close at this many calendar days to expiry
     condition_fields: tuple[str, ...] = ()  # the catalogue fields its exit condition reads
     expiry: date | None = None  # the selected expiry the hold was cut to (None: not given)
@@ -296,6 +296,7 @@ def _from_option(
         return replace(base, unknown=unknown)
     rule = replace(
         base, take_profit=exits.take_profit, exit_dte=exits.exit_dte,
+        take_profit_basis=StopBasis.CREDIT if exits.take_profit is not None else None,
         condition_fields=_when_fields(exits),
     )  # fmt: skip
     if exits.stop_loss is not None:
@@ -319,20 +320,24 @@ def _from_share(
     assert outcome.position is not None and outcome.position.exit is not None
     exits = outcome.position.exit
     hold = summary.basis_horizon or 0
-    base = ExitRule(edge.id, None, hold, take_profit_basis=StopBasis.ENTRY)
+    base = ExitRule(edge.id, None, hold)
     if outcome.side != LONG:
         why = "the exit rule is published for long picks only"
         return replace(base, unknown=_unknown(edge, UnknownCode.NOT_APPLICABLE, why))
     unknown = _tested(edge, run, outcome)
     if unknown is not None:
         return replace(base, unknown=unknown)
-    declared = replace(base, take_profit=exits.take_profit, condition_fields=_when_fields(exits))
+    basis = StopBasis.ENTRY if exits.take_profit is not None else None
+    declared = replace(
+        base, take_profit=exits.take_profit, take_profit_basis=basis,
+        condition_fields=_when_fields(exits),
+    )  # fmt: skip
     if exits.stop_loss is not None:
         own = Stop(StopKind.DECLARED, fraction=exits.stop_loss, basis=StopBasis.ENTRY)
         return replace(declared, stop=own)
     found = _from_history(ctx, edge, run, summary, instrument_id)
     return replace(
-        found, take_profit=declared.take_profit, take_profit_basis=StopBasis.ENTRY,
+        found, take_profit=declared.take_profit, take_profit_basis=basis,
         condition_fields=declared.condition_fields,
     )  # fmt: skip
 

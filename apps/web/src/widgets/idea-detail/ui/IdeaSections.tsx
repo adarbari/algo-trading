@@ -39,7 +39,21 @@ function stopItems(exit: Exit): KeyValueItem[] {
   const stop = exit.stop;
   if (!stop) return [];
   const items: KeyValueItem[] = [];
-  if (stop.fraction !== null) {
+  if (stop.fraction !== null && stop.basis === 'CREDIT') {
+    items.push({
+      label: 'Declared stop, multiple of the credit',
+      value: stop.fraction,
+      format: { kind: 'number', digits: 1 },
+      action: termHelp('exit_basis_credit'),
+    });
+  } else if (stop.fraction !== null && stop.basis === 'COLLATERAL') {
+    items.push({
+      label: 'Stop, share of the collateral',
+      value: stop.fraction,
+      format: PERCENT,
+      action: termHelp('exit_basis_collateral'),
+    });
+  } else if (stop.fraction !== null) {
     const declared = stop.kind === 'DECLARED';
     items.push({
       label: declared ? 'Declared stop, below the entry close' : 'Stop, below the entry close',

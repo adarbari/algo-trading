@@ -57,7 +57,7 @@ class ExitRule:
     winners: int
     in_sample_only: bool
     take_profit: float | None
-    take_profit_basis: exit_rule.StopBasis
+    take_profit_basis: exit_rule.StopBasis | None
     exit_dte: int | None
     condition_fields: list[str]
     expiry: date | None

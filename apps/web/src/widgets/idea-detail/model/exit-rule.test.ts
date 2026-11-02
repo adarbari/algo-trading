@@ -94,4 +94,23 @@ describe('exitRuleText', () => {
     const text = exitRuleText({ ...rule, takeProfit: 0.5, takeProfitBasis: 'CREDIT' }, noPrices);
     expect(text).not.toContain('target');
   });
+
+  it("never calls an option setup's stop a fall below the entry close", () => {
+    const credit = { ...stop, kind: 'DECLARED', fraction: 2, basis: 'CREDIT' } as const;
+    expect(exitRuleText({ ...rule, stop: credit }, noPrices)).toContain(
+      'declared stop 2.0 × the credit',
+    );
+    const collateral = { ...stop, fraction: 0.08, basis: 'COLLATERAL' } as const;
+    const text = exitRuleText({ ...rule, stop: collateral }, noPrices);
+    expect(text).toContain('stop 8.0% of the collateral');
+    for (const t of [exitRuleText({ ...rule, stop: credit }, noPrices), text]) {
+      expect(t).not.toContain('below the entry close');
+    }
+  });
+
+  it('adds the served stop price to an ATR fallback stop', () => {
+    const atr = { ...stop, kind: 'FALLBACK', fraction: null, atr: 1.5, multiple: 2 } as const;
+    const text = exitRuleText({ ...rule, stop: atr }, { stop: 97, target: null, unknown: null });
+    expect(text).toContain('stop 2.0 × ATR(14) ($97.00)');
+  });
 });

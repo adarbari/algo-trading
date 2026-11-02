@@ -153,6 +153,36 @@ describe('IdeaDetail', () => {
     expect(screen.getByText('momentum.rsi_14')).toBeVisible();
   });
 
+  it("words an option setup's stops by their basis, never as a fall below the entry close", () => {
+    const stop = {
+      kind: 'DECLARED',
+      atr: null,
+      multiple: null,
+      winners: null,
+      beyond: null,
+    } as const;
+    const credit: Idea = {
+      ...idea,
+      exitRule: { ...idea.exitRule, stop: { ...stop, fraction: 2, basis: 'CREDIT' } },
+    };
+    hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(credit));
+    const { unmount } = render(<IdeaDetail {...props} />);
+    expect(screen.getByText('Declared stop, multiple of the credit')).toBeVisible();
+    expect(screen.queryByText(/below the entry close/)).toBeNull();
+    unmount();
+    const collateral: Idea = {
+      ...idea,
+      exitRule: {
+        ...idea.exitRule,
+        stop: { ...stop, kind: 'HISTORY', fraction: 0.08, basis: 'COLLATERAL' },
+      },
+    };
+    hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(collateral));
+    render(<IdeaDetail {...props} />);
+    expect(screen.getByText('Stop, share of the collateral')).toBeVisible();
+    expect(screen.queryByText(/below the entry close/)).toBeNull();
+  });
+
   it('shows no price lines when the server serves none', () => {
     hooks.useIdeaDetail.mockReturnValue(fakeQuery<Idea>(idea));
     render(<IdeaDetail {...props} />);
