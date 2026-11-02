@@ -13,6 +13,7 @@ from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.positions.cases import Case, CaseValue
 from algotrade.config.edges.positions.key import (
     case_points,
+    grid_outcomes,
     key_of,
     parse_position_key,
     parsed_key,
@@ -125,6 +126,26 @@ def test_one_spelling_per_value_numbers_as_floats_and_dates_as_text() -> None:
 
     assert keyed(1) == keyed(1.0)
     assert keyed(date(2026, 1, 1)) == keyed("2026-01-01")  # a date does not crash the dump
+
+
+def test_each_grid_point_is_the_edges_outcome_with_its_values_and_legs_resolved_again() -> None:
+    edge = with_legs(
+        parse_edge(
+            document(
+                schedule="every_session", outcome=PUT,
+                variant_grid=[{"prefix": "g", "strike_delta": [0.15, 0.25], "take_profit": [0.5]}],
+            ),
+            "drift", WHERE,
+        ),
+        TEMPLATES,
+    )  # fmt: skip
+    points = grid_outcomes(edge, TEMPLATES)
+    assert [p for p, _ in points] == ["g_d15_tp50", "g_d25_tp50"]
+    assert [o.position.legs[0].delta for _, o in points] == [0.15, 0.25]  # the wing keeps 0.1
+    assert {o.position.exit.take_profit for _, o in points} == {0.5}
+    keys = {position_key(o, 21) for _, o in points} | {position_key(edge.outcome, 21)}
+    assert len(keys) == 3
+    assert grid_outcomes(replace(edge, variant_grid=()), TEMPLATES) == ()
 
 
 def test_a_share_key_holds_its_sides_exit_rules_and_no_option_parameters() -> None:
