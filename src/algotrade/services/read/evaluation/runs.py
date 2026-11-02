@@ -96,6 +96,7 @@ class EdgeRun:
     trigger: str | None = None
     screener_hashes: tuple[tuple[str, str], ...] = ()
     evidence_licence: str = "open"  # the strictest licence of the outcome rows it joined (E1)
+    exits_digest: str | None = None  # the declared exits it tested (None: none, or an older run)
 
 
 @dataclass(frozen=True)
@@ -269,6 +270,7 @@ def run_of_record(
         trigger=stats.get("trigger"),
         screener_hashes=tuple(sorted((stats.get("screener_hashes") or {}).items())),
         evidence_licence=str(stats.get("evidence_licence") or "open"),
+        exits_digest=stats.get("exits_digest"),
     )
 
 
@@ -676,9 +678,11 @@ def load_measured_sessions(ctx: Stores, run: EdgeRun) -> dict[tuple[str, int], i
 # ---------------------------------------------------------------------------- the trade ledger
 LEDGER = "edge_trades"
 OPEN = "open"
-# The per-name columns each recorded column licence covers (ADR 0064 decision 10).
+# The per-name columns each recorded column licence covers (ADR 0064 decision 10); the trade
+# contract's ``max_adverse`` is under the row's value licence (ADR 0088 2.5a: a bought-history
+# option trade is personal).
 LICENSED: Final = {
-    "value_licence": ("value", "gross_value", "reference", "touch"),
+    "value_licence": ("value", "gross_value", "reference", "touch", "max_adverse"),
     "score_licence": ("score",),
     "adv_licence": ("adv_usd_20d",),
 }
@@ -739,6 +743,9 @@ class TradeRow:
     symbol: TradeText = TradeText()  # filled by the ledger read from the reference snapshot
     company: TradeText = TradeText()
     symbol_as_of: date | None = None  # the reference snapshot the ticker was read from
+    # the trade contract's worst loss as a share of capital (ADR 0088 2.5a; an option's worst
+    # mark loss over its collateral; null in rows written before it)
+    max_adverse: TradeCell = TradeCell()
 
 
 @dataclass(frozen=True)
@@ -793,6 +800,7 @@ def _trade(row: Mapping[str, Any], hidden: dict[str, Unknown]) -> TradeRow:
         reference=cell("reference"),
         touch=cell("touch", _flag),
         side=str(to_scalar(row.get("side")) or "long"),
+        max_adverse=cell("max_adverse"),
     )
 
 
@@ -830,7 +838,32 @@ def load_run_trades(
     out-of-sample one), sorted by ``sort`` (one of ``SORTABLE``, ties in key order, a missing
     value last) and paged. A run whose out-of-sample result is hidden serves its rows before the
     split only, whatever is asked. A per-name value the viewer may not see sorts as missing: the
-    order never discloses it."""
+    order never discloses it. Read once per request and arguments (``once_per_request``): a page
+    of picks asks for the same ledger once per pick (an exit rule each)."""
+    key = (
+        "run-trades", run.run_id, run.oos_hidden, ctx.user.user_id, variant, horizon,
+        before_split, offset, limit, sort, descending,
+    )  # fmt: skip
+    return once_per_request(
+        ctx,
+        key,
+        lambda: _load_run_trades(
+            ctx, run, variant, horizon, before_split, offset, limit, sort, descending
+        ),
+    )
+
+
+def _load_run_trades(
+    ctx: Stores,
+    run: EdgeRun,
+    variant: str | None,
+    horizon: int | None,
+    before_split: bool | None,
+    offset: int,
+    limit: int | None,
+    sort: str | None,
+    descending: bool,
+) -> RunTrades:
     record = ctx.reader.run(run.run_id)
     count = None if record is None else record.stats.get("ledger_rows")
     if record is None or count is None:
