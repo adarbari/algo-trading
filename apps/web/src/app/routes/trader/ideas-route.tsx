@@ -74,7 +74,6 @@ export const ideasRoute = createRoute({
 
 const idea = pageRoute(IdeaPage);
 
-
 function validateIdeaSearch(raw: Record<string, unknown>): { setup?: string } {
   return typeof raw['setup'] === 'string' && raw['setup'] !== '' ? { setup: raw['setup'] } : {};
 }
