@@ -375,9 +375,10 @@ detect = [{ call = "import_session" }, { call = "import_history" }]
 id = "option-outcomes"
 description = "Compute and store option trade outcomes (ADR 0053 amendment, EB H13; ADR 0088, design 2.5): for each window a session closes (S = T - h exchange sessions; the positions, holds and exit rules from the open edge documents' option_pnl outcomes, their variants, their [[variant_grid]] points and the case points of their case-valued parameters), for every underlying whose chain at S is OK, the legs chosen from S's chain alone and the trade held to the first exit its rules give or to T by the option-structure engine (quotes and our own delta from each session's stored chain, never filled from an earlier session), the rows shaped under a position_key built from the resolved legs (option_paths.position_rows), the catalogue fields an exit rule names read per close from that close's own partition only (option_fields.FieldLoader; a rule over a field the window cannot read is REFUSED, recorded and failing the check), a row's knowledge_ts the latest chain and field partition read up to its own exit and its licence the strictest of the price source and the rule's fields, written once per start session by frame_and_publish, the one publisher of outcomes/option/structure_pnl@v2 (the history writer calls it), and its acceptance check; forward-only (chains from 2026-10-02); read back only through algotrade.data.outcomes, importable only from services/evaluation"
 owner = [
-    "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py",
-    "apps/ingestion/algotrade_ingestion/tasks/derived/option_paths.py",
-    "apps/ingestion/algotrade_ingestion/tasks/derived/option_fields.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/paths/option_outcomes.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/paths/option_rows.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/paths/close_fields.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/paths/wanted.py",
     "src/algotrade/data/outcomes/chain.py",
 ]
 allowed = [
@@ -433,6 +434,17 @@ allowed = [
 ]
 section = "docs/adr/0077-serving-release.md#decision"
 detect = [{ call = "serve_release" }, { string_prefix = "serve-release" }]
+
+[[responsibility]]
+id = "share-outcomes"
+description = "Compute and store share path outcomes (ADR 0088, E3c-2): for each window a session closes (S = T - h exchange sessions; the share positions of the open edge documents' return outcomes that declare an [outcome.exit], their variants and case points, for each hold, from paths/wanted.positions_wanted(..., SHARES)), for every name in the universe at S with a bar at S (the outcomes task's eligible_at), the share walked over the closes of S..T split-adjusted as of T to the first exit its ordered rules give or to T by the share path walker (engines/structures/share_walk), a delisted name to its last close (DELISTED), a name with a close missing before its exit UNMEASURED (BAD_BAR when a flagged bar is in its window, else NO_BAR), the catalogue fields a rule names read per close from that close's own partition only (close_fields.FieldLoader; a rule over a field the window cannot read is REFUSED, recorded and failing the check), a row's knowledge_ts the latest bars and field partition read up to its own exit (data.prices.bar_stamps; a DELISTED or UNMEASURED row's the write time) and its licence the strictest of the bars' and the rule's fields, keyed by share_position_key and the outcome's benchmark (its return over the same S..exit beside the name's), written once per start session and only where new or changed (outcomes.changed_rows; a stored row a recheck changes is stamped at the write), the one publisher of outcomes/instrument/share_path@v1, and its acceptance check; read back only through algotrade.data.outcomes (E3c-2b), importable only from services/evaluation"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/derived/paths/share_outcomes.py"]
+allowed = [
+    "src/algotrade/storage/tables/schemas/outcomes.py",  # declares the grain's schema
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_market.py",  # the registry entry
+]
+section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
+detect = [{ string = "outcomes/instrument/share_path@v1" }, { call = "compute_share_outcomes" }, { call = "check_share_outcomes" }]
 
 [[responsibility]]
 id = "statements-backlog-priority"

@@ -1,10 +1,10 @@
-"""The helpers of the option-outcomes writer. ``option_fields``: the catalogue fields of an option
+"""The helpers of the option-outcomes writer. ``close_fields``: the catalogue fields of an option
 trade's exit rules, read per close: a
 close's value comes only from that close's own partition (a later or earlier session's value for
 the same name is never read), the latest ``knowledge_ts`` read is returned, a missing partition,
 name or NaN is no value (the rule is UNKNOWN), and a field no stored group holds is refused with a
 reason (an expression feature, an instrument fact, a group with no partition in the range).
-``option_paths.position_rows`` (below): the row shaping of a trade window."""
+``option_rows.position_rows`` (below): the row shaping of a trade window."""
 
 from datetime import UTC, date, datetime
 
@@ -14,8 +14,8 @@ import pytest
 from algotrade.engines.structures.trades import Trade
 from algotrade.storage.tables.schemas import STRUCTURE_PNL, spec_for, structure_pnl_problems
 from algotrade.storage.tables.spec import COMMON
-from algotrade_ingestion.tasks.derived.option_fields import FieldLoader, refuse_unstored
-from algotrade_ingestion.tasks.derived.option_paths import COLUMNS, position_rows
+from algotrade_ingestion.tasks.derived.paths.close_fields import FieldLoader, refuse_unstored
+from algotrade_ingestion.tasks.derived.paths.option_rows import COLUMNS, position_rows
 from tests.helpers.rollup_store import store
 from tests.helpers.stored_frames import stamped
 
@@ -75,7 +75,7 @@ def test_a_field_that_is_not_a_stored_group_column_is_refused(field: str) -> Non
     assert field in problem and "not a stored feature" in problem
 
 
-# ---- option_paths.position_rows: the row shaping of a trade window ----------------------
+# ---- option_rows.position_rows: the row shaping of a trade window ----------------------
 
 STAMPS = [datetime(2026, 10, 5 + i, 23, tzinfo=UTC) for i in range(4)]
 END = date(2026, 10, 9)
