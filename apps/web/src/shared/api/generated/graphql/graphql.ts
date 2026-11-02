@@ -233,7 +233,7 @@ export type AcceptedFormulasQuery = { acceptedFormulas: { today: string, days: n
 export type AppearanceQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AppearanceQuery = { appearance: { theme: string } };
+export type AppearanceQuery = { appearance: { theme: string, startTab: string | null } };
 
 export type OptionChainQueryVariables = Exact<{
   key: string;
@@ -836,6 +836,11 @@ export type DataStatusQueryVariables = Exact<{
 
 export type DataStatusQuery = { session: { date: string, newer: { date: string } | null, dataStatus: { state: DataState, knowledgeTs: string | null, affectedScreeners: number, totalScreeners: number, datasets: Array<{ name: DatasetName, status: DatasetState, share: number | null, unavailable: Array<{ kindText: string, cause?: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string }> } | null }> }> } } | null };
 
+export type TraderPreferencesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type TraderPreferencesQuery = { traderPreferences: { defaultTab: string | null, watchlist: Array<{ instrumentId: string, symbol: string | null }> } };
+
 export type UserRegistryQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -922,6 +927,7 @@ export const AppearanceDocument = new TypedDocumentString(`
     query Appearance {
   appearance {
     theme
+    startTab
   }
 }
     `) as unknown as TypedDocumentString<AppearanceQuery, AppearanceQueryVariables>;
@@ -4961,6 +4967,17 @@ export const DataStatusDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DataStatusQuery, DataStatusQueryVariables>;
+export const TraderPreferencesDocument = new TypedDocumentString(`
+    query TraderPreferences {
+  traderPreferences {
+    defaultTab
+    watchlist {
+      instrumentId
+      symbol
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<TraderPreferencesQuery, TraderPreferencesQueryVariables>;
 export const UserRegistryDocument = new TypedDocumentString(`
     query UserRegistry {
   userRegistry {
