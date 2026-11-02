@@ -5,7 +5,13 @@ import pytest
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
-from algotrade.data.prices import adjusted_bars, frame_to_series, load_price_data, session_bars
+from algotrade.data.prices import (
+    adjusted_bars,
+    bar_stamps,
+    frame_to_series,
+    load_price_data,
+    session_bars,
+)
 from algotrade.data.prices import bars as read_bars
 from algotrade.services.datasets import list_datasets
 from algotrade.storage.backends.memory import MemoryBackend
@@ -172,3 +178,20 @@ def test_an_open_ended_read_does_not_overflow_the_flag_range() -> None:
     by a day for the flag read overflowed (``OverflowError``, CI on #450)."""
     reader = StoreReader(_flagged_store(FLAG))
     assert len(read_bars(reader, "1d", date.min, date.max)) == 5
+
+
+def test_bar_stamps_are_the_latest_knowledge_of_each_sessions_bars() -> None:
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    first, second = date(2026, 10, 1), date(2026, 10, 2)
+    known = {
+        first: datetime(2026, 10, 1, 21, tzinfo=UTC),
+        second: datetime(2026, 10, 3, tzinfo=UTC),
+    }
+    for day, stamp in known.items():
+        rows = [{"instrument_id": i, "ts": pd.Timestamp(day, tz="UTC"), "open": 1.0, "high": 1.0,
+                 "low": 1.0, "close": 1.0, "volume": 1.0} for i in ("EQ:A", "EQ:B")]  # fmt: skip
+        writer.write_table("bars/1d", day, f"b-{day}", stamped(rows, day, f"b-{day}", stamp))
+    reader = StoreReader(backend)
+    assert bar_stamps(reader, first, second) == known
+    assert bar_stamps(reader, date(2026, 9, 1), date(2026, 9, 2)) == {}

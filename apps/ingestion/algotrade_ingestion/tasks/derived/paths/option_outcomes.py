@@ -10,7 +10,7 @@ chain alone, the trade held to the first exit its rules give or to T (the option
 ``engines/structures/trades``; quotes and our own delta from each session's stored chain, never
 filled from an earlier session), written to partition S under a ``position_key`` built from the
 resolved legs (``config/edges/positions/key.py``). An exit rule over catalogue fields reads each
-close's fields from that close's partition only (``option_fields``); a rule over a field the
+close's fields from that close's partition only (``close_fields``); a rule over a field the
 window cannot read at all is REFUSED (recorded, the position's other windows and the other
 positions still write, the check FAILs), as is ``skip_report_in_life`` until the earnings read
 lands (E4b). A row's ``knowledge_ts`` is the latest chain and field partition read up to its own
@@ -29,20 +29,14 @@ refused position FAILs.
 """
 
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass
 from datetime import date
 
 import pandas as pd
 
-from algotrade.config.edges.document import CLOSED, Edge, Outcome
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.edges.positions.chain import CHAIN_KIND
-from algotrade.config.edges.positions.key import case_points, position_key
-from algotrade.config.edges.positions.spec import ExitRule, exit_rules
-from algotrade.config.edges.positions.templates import Templates, load_templates
+from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
-from algotrade.core.model.fields import is_position_field
 from algotrade.core.time.calendar import close_time, sessions_between, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
@@ -57,16 +51,19 @@ from algotrade.data.chains import (
 from algotrade.engines.structures.chain import DayChain
 from algotrade.engines.structures.trades import select_window, walk_trades
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import strictest
 from algotrade.features.rollups.positioning.chain_inputs import closing_spots, one_row_per_contract
 from algotrade.features.site import site_features
-from algotrade.services.licences import licence_of
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.schemas import STRUCTURE_PNL, spec_for
 from algotrade.storage.tables.spec import COMMON
-from algotrade_ingestion.tasks.derived.option_fields import FieldLoader, refuse_unstored
-from algotrade_ingestion.tasks.derived.option_paths import position_rows
+from algotrade_ingestion.tasks.derived.paths.close_fields import (
+    FieldLoader,
+    refuse_unstored,
+    rule_licence,
+)
+from algotrade_ingestion.tasks.derived.paths.option_rows import position_rows
+from algotrade_ingestion.tasks.derived.paths.wanted import Wanted, positions_wanted
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.quality import Check
 
@@ -82,44 +79,6 @@ QUOTE_COLUMNS = (
     "ts",
 )  # fmt: skip
 SITE = FileConfigStore(config_dir())
-
-
-@dataclass(frozen=True)
-class Wanted:
-    """One position to write for a window ending at a night: the outcome (a document's, a
-    variant's or a case point's) held at most ``hold`` sessions, its stored ``key``, its ordered
-    exit ``rules`` and the catalogue ``fields`` they name."""
-
-    outcome: Outcome
-    hold: int
-    key: str
-    rules: tuple[ExitRule, ...]
-    fields: tuple[str, ...]
-
-
-def positions_wanted(edges: Collection[Edge], templates: Templates) -> list[Wanted]:
-    """Every position of the open edge documents' (and ``[[variants]]``') ``option_pnl`` outcomes
-    and their case points, for each hold of its ``horizon_sessions``, by key (a new edge needs no
-    code change; two setups that resolve to one key share its rows)."""
-    outcomes = [
-        o
-        for e in edges
-        if e.status not in CLOSED
-        for o in (e.outcome, *(v.outcome for v in e.variants))
-    ]
-    found: dict[str, Wanted] = {}
-    for outcome in outcomes:
-        if outcome.kind != CHAIN_KIND or outcome.position is None:
-            continue
-        for point in case_points(outcome, templates):
-            rules = exit_rules(point.position.exit if point.position else None)
-            names = {
-                r.field for x in rules for r in x.rule.rules() if not is_position_field(r.field)
-            }
-            for hold in point.horizon_sessions:
-                key = position_key(point, hold)
-                found[key] = Wanted(point, hold, key, rules, tuple(sorted(names)))
-    return sorted(found.values(), key=lambda w: (w.hold, w.key))
 
 
 class ChainLoader:
@@ -205,12 +164,6 @@ def compute_option_outcomes(
     return record
 
 
-def _licence(features: FeatureSet | None, fields: tuple[str, ...]) -> str:
-    """The strictest licence of Cboe's open quotes and the exit rule's catalogue fields."""
-    held = [] if features is None else [licence_of(features, f) for f in fields]
-    return strictest(["open", *held])
-
-
 def trade_rows(
     w: Wanted,
     sessions: list[date],
@@ -269,7 +222,7 @@ def _one(
             if sessions[0] != current:
                 loader.reset()  # the previous hold's entry chain is not this one's
                 current = sessions[0]
-            rows, ok = trade_rows(w, sessions, loader, fields, _licence(features, w.fields))
+            rows, ok = trade_rows(w, sessions, loader, fields, rule_licence(features, w.fields))
             if len(rows):
                 parts.setdefault(sessions[0], []).append(rows)
             reasons = rows.loc[rows["outcome_status"] == "UNMEASURED", "outcome_reason"]
