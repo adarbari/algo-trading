@@ -122,9 +122,12 @@ def _static_steps(present: list[str]) -> list[Step]:
     css = sorted(f for f in present if f.startswith("design-system/") and f.endswith(".css"))
     if css:
         steps.append(("stylelint", ["npx", "stylelint", *css]))
-    if any(f.startswith("design-system/") for f in present):
+    if any(f.startswith("design-system/") and f.endswith(".stories.tsx") for f in present):
         # a new story without its light and dark baseline fails CI's screenshot shard (5 runs in
-        # the 2026-11-02 sample); makes only the missing ones, in the CI image (Docker off Linux)
+        # the 2026-11-02 sample); makes only the missing ones, in the CI image (Docker off Linux).
+        # Only a changed story file can add one: the step costs nothing when none is missing and
+        # a Storybook build plus a Docker run when one is, so a stylesheet or component edit
+        # (several sessions push at once, #1048) never pays for it.
         steps.append(("screenshot baselines (missing ones)", ["npm", "run", "visual:missing"]))
     steps.append(("design system", ["npm", "run", "ds:check"]))
     linted = sorted(f for f in present if f.endswith(LINTED))

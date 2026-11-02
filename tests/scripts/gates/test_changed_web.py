@@ -119,3 +119,13 @@ def test_eslint_does_not_fail_on_a_changed_file_the_config_ignores() -> None:
     # argument it warns "File ignored", and --max-warnings=0 turned that into a failed push
     got = cmds("apps/web/src/shared/api/generated/graphql/gql.ts")
     assert any(c.startswith("npx eslint") and "--no-warn-ignored" in c for c in got)
+
+
+def test_only_a_changed_story_file_can_need_new_baselines() -> None:
+    for name in ("Banner.tsx", "Banner.module.css", "Banner.test.tsx", "index.ts"):
+        assert "npm run visual:missing" not in cmds(
+            f"apps/web/design-system/components/Banner/{name}"
+        )
+    assert "npm run visual:missing" in cmds(
+        "apps/web/design-system/components/Banner/Banner.stories.tsx"
+    )

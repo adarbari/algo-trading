@@ -320,7 +320,7 @@ screenshot baselines, and a lazy page without a budget. What catches each before
 |---|---|---|
 | Route over budget | `make changed`: the production build and `perf:bundle` for a change under `src/` or `design-system/` | the `pre-push` hook |
 | Lazy page without a budget (or a budget for a removed page) | the unit test `a budget for every lazy page` (`scripts/check-bundle-budgets.test.ts`, no build) | `npm run test`, CI `web-static` |
-| New story without light and dark baselines | `npm run visual:missing` makes only the missing PNGs in the CI Playwright image (Docker off Linux), then `ds:check` verifies them | `make changed` for a `design-system/` change |
+| New story without light and dark baselines | `npm run visual:missing` makes only the missing PNGs in the CI Playwright image (Docker off Linux), then `ds:check` verifies them | `make changed`, only when a `*.stories.tsx` changed (nothing to do, nothing run, when no baseline is missing) |
 | Anything the above skip | CI, the full gate | every PR |
 
 The hook is `make-changed` in `.pre-commit-config.yaml`. Hooks live in the main checkout's
