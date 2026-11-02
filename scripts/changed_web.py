@@ -26,6 +26,10 @@ WEB = "apps/web/"
 TESTED_ROOTS = ("src", "design-system", "scripts", "vite-plugins", "build", "lint-rules")
 # A changed stylesheet reaches the tests of the components that import it.
 TESTED = (".ts", ".tsx", ".js", ".css")
+# The shared Mac under load runs unrelated tests past vitest's 5 s default (CalendarGrid 14 s,
+# MoreFilters 8.5 s, DataStatusPill 7.6 s at 2 workers, 2026-11-02): pushes failed on files they
+# did not touch. Locally only; CI, the vitest gate, keeps the default.
+LOCAL_TIMEOUTS = ("--testTimeout=30000", "--hookTimeout=30000")
 # A changed story or CSS module changes that component's screenshots.
 STYLED = (".stories.tsx", ".module.css")
 # Generated: every test imports it, so `related` would run the whole suite (CI does that).
@@ -121,7 +125,9 @@ def _steps(typed: bool, related: list[str], visual: set[str], on_linux: bool) ->
     if typed:
         steps.append(("types", ["npm", "run", "typecheck"]))
     if related:
-        steps.append(("unit (related)", ["npx", "vitest", "related", "--run", *related]))
+        steps.append(
+            ("unit (related)", ["npx", "vitest", "related", "--run", *LOCAL_TIMEOUTS, *related])
+        )
     for component in sorted(visual):
         argv = ["npm", "run", "visual", "--", "--grep", component]
         if not on_linux:
