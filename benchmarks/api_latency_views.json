@@ -254,6 +254,20 @@
    ],
    "source": "static"
   },
+  "/admin/users": {
+   "route": "/admin/users",
+   "search": {},
+   "clicks": [],
+   "params": {},
+   "ops": [
+    "UserRegistry"
+   ],
+   "uncertain": [],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
   "/calendar": {
    "route": "/calendar",
    "search": {},

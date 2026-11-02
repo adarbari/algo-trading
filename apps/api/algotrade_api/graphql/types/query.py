@@ -4,10 +4,9 @@ argument (default: the latest with bars), opens the request's read context for i
 is for exactly that session). Fields over configs and run records (the catalogue, configs,
 backtests, the user's screens, the nightly runs and run records) are not session data: they
 take no ``date`` and read the request's session-free context (``info.context.stores()``), so
-they answer on a store with no market data yet. The Admin reads about a session (its quality
-checks and verification, the completeness window ending at it, one completeness cell, the
-review lists over its reference snapshot) take ``date`` like any other. Every Admin field
-is ``AdminOnly`` (ADR 0040: a trader gets ``FORBIDDEN``)."""
+they answer on a store with no market data yet. The Admin reads about a session (quality checks,
+verification, the completeness window and cell, the review lists) take ``date`` like any other.
+Every Admin field is ``AdminOnly`` (ADR 0040: a trader gets ``FORBIDDEN``); more: ``AdminReads``."""
 
 import datetime as dt
 from functools import partial
@@ -73,6 +72,7 @@ from algotrade_api.graphql.limits import (
 from algotrade_api.graphql.offload import INLINE, off_loop
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
+from algotrade_api.graphql.types.admin_query import AdminReads
 from algotrade_api.graphql.types.coverage.known_values import KnownCoverage
 from algotrade_api.graphql.types.evaluation.edge import Edge, EdgeProblem, EdgeRun
 from algotrade_api.graphql.types.evaluation.evidence import (
@@ -135,7 +135,7 @@ MAX_REFS = 100  # guideEntries(refs)
 
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
-class Query(IdeasQuery):
+class Query(IdeasQuery, AdminReads):
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Who this request is for: the signed-in registry user, their role and "
         "workspaces (ADR 0040; not session data)",
