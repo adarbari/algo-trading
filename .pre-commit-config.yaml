@@ -46,7 +46,10 @@ repos:
       # the web gates over the changed files). Never --no-verify; CI stays the full gate.
       - id: make-changed
         name: make changed (the checks CI fails on, over what changed)
-        entry: make changed
+        # git hands a pre-push hook GIT_DIR=<the worktree's git dir>: a test that ran `git init
+        # --bare` or `git config` then acted on the REAL repository and left core.bare=true in
+        # the shared config, breaking git in every worktree (2026-11-02). So run with none of it.
+        entry: env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR -u GIT_PREFIX make changed
         language: system
         stages: [pre-push]
         pass_filenames: false
