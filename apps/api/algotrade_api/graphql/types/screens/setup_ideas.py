@@ -118,7 +118,10 @@ class SetupGroup:
     "night that picks nothing is an empty list, never a fall back) or unproven (none does: the "
     "page shows `Query.ideas(tab)` as Unproven). `groups` the qualifying setups, strongest "
     "evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; "
-    "`leftOut` counts by kind; `ruleVersion` the ranking rule's"
+    "`leftOut` counts by kind; `ruleVersion` the ranking rule's; `watchlist`: the ideas under "
+    "the cap before the viewer's watchlist kept the watched ones (only those are in `ideas`; "
+    "`total`, `picked` and the ranks are unfiltered, no count counts a hidden name), null: no "
+    "watchlist, no filter"
 )
 class SetupIdeas:
     session: dt.date
@@ -129,6 +132,7 @@ class SetupIdeas:
     ideas: list[SetupIdea]
     total: int
     left_out: list[LeftOut]
+    watchlist: int | None
 
     @classmethod
     def of(cls, d: picks.SetupPicks, ctx: ReadContext) -> Self:
@@ -141,4 +145,5 @@ class SetupIdeas:
             ideas=[SetupIdea.of(i, ctx) for i in d.ideas],
             total=d.total,
             left_out=[LeftOut.of(c) for c in d.left_out],
+            watchlist=d.watchlist,
         )

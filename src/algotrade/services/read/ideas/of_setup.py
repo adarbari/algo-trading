@@ -30,15 +30,16 @@ PROBE = "~probe"  # an id no run holds: the edge's row says what the night was, 
 @dataclass(frozen=True)
 class SetupPickSet:
     """``state``: PICKED, NOTHING_PICKED, NOT_A_DECISION_DAY or UNKNOWN (``unknown`` says why);
-    ``picks``: the setup's own picks, place 1 first; ``dropped``: picks a licence the viewer
-    lacks keeps off their list; ``run``: the basis screener's run (None: it has none)."""
+    ``picks``: the setup's own picks, place 1 first; ``dropped``: the ids of the picks a licence
+    the viewer lacks keeps off their list (never shown, only counted); ``run``: the basis
+    screener's run (None: it has none)."""
 
     setup: QualifyingSetup
     state: str
     unknown: Unknown | None
     run: ScreenerRun | None
     picks: tuple[CandidatePick, ...] = ()
-    dropped: int = 0
+    dropped: tuple[str, ...] = ()
 
 
 def _unknown(setup: QualifyingSetup, ctx: ReadContext, text: str) -> Unknown:
@@ -75,7 +76,7 @@ def load_pick_set(ctx: ReadContext, setup: QualifyingSetup) -> SetupPickSet:
         ),
     )
     if run_withheld(ctx, run):
-        return SetupPickSet(setup, NOTHING_PICKED, None, run, (), len(mine))
+        return SetupPickSet(setup, NOTHING_PICKED, None, run, (), tuple(i for _, i in mine))
     picks = tuple(CandidatePick(iid, setup.standing, place) for place, iid in mine)
     return SetupPickSet(setup, PICKED if picks else NOTHING_PICKED, None, run, picks)
 

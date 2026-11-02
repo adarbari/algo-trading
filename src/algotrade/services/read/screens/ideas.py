@@ -34,7 +34,14 @@ before it is paged (never the loaded page), from one masked pass over a frame of
 read under the viewer's licences: a field the viewer may not use has no filter and no column, so a
 count never leaks it). ``total`` is then the matched count, ``Ideas.facets`` carries the counts
 (``facets.total`` the unfiltered ones), ``rank`` stays the idea's place in the unfiltered rule, and
-the cursor's fingerprint carries the filters' hash (a cursor from another filter set is refused)."""
+the cursor's fingerprint carries the filters' hash (a cursor from another filter set is refused).
+
+A tab's pool (``tab`` given: the Ideas page's Unproven section) is filtered by the viewer's
+watchlist (ADR 0083 amendment (c)) after the rule ranked it and before the filters and the page:
+only watched tickers are listed (``rank`` still the unfiltered place) and held back, ``total``,
+the facets and ``paused_total`` count only them, and ``Ideas.watchlist`` says how many the rule
+ranked before the watchlist (None: no watchlist, or no tab). The rule's per-screener first picks
+are unchanged, so a watched name a screener ranked below them is not listed."""
 
 import base64
 import binascii
@@ -81,6 +88,7 @@ from algotrade.services.read.screens.runs import (
     run_picks,
 )
 from algotrade.services.read.screens.screeners import Screener, load_screeners
+from algotrade.services.read.users.trader import load_watchlist_ids
 from algotrade.services.read.values import Unknown, to_scalar
 from algotrade.services.screening.rule_results import PAUSED
 
@@ -174,7 +182,8 @@ class Ideas:
     ticker the rule listed that the filters leave (``items`` holds one page of it,
     ``next_cursor`` the next; ``facets.total`` counts them before the filters);
     ``paused_total``: every pick the gate held back (``paused`` holds the first ``limit`` of the
-    rule's paused section); ``rule_hash``: the ranking rule's parameters' hash."""
+    rule's paused section); ``rule_hash``: the ranking rule's parameters' hash; ``watchlist``:
+    the ideas ranked before the viewer's watchlist kept the watched ones (None: no filter)."""
 
     session: date
     screeners: tuple[IdeaScreener, ...]
@@ -185,6 +194,7 @@ class Ideas:
     next_cursor: str | None = None  # where the next page starts (None: this is the last)
     rule_hash: str = ""
     facets: Facets | None = None  # None only for a caller that built the object itself
+    watchlist: int | None = None
 
 
 def _pool(
@@ -384,6 +394,10 @@ def load_ideas(
     latest = load_latest_runs(ctx, [(s.owner, s.id) for s in screeners])
     pool, scores = _pool(ctx, screeners, latest)
     ranked = rank_ideas(pool, rule)
+    watched = frozenset(load_watchlist_ids(ctx)) if tab is not None else frozenset()
+    before = len(ranked)
+    if watched:
+        ranked = [i for i in ranked if i.instrument_id in watched]
     facets = compute_facets(_frame(ctx, resolved, ranked), len(ranked), resolved, filters)
     matched = [ranked[i] for i in facets.matched_rows]
     stamp = _fingerprint(
@@ -397,7 +411,8 @@ def load_ideas(
     end = start + max(limit, 0)
     shown = matched[start:end]
     standings = pool_standing(pool, rule)
-    held: list[PausedPick] = rank_paused(pool, rule)[: max(limit, 0)] if start == 0 else []
+    paused_all = [p for p in rank_paused(pool, rule) if not watched or p.instrument_id in watched]
+    held: list[PausedPick] = paused_all[: max(limit, 0)] if start == 0 else []
     wanted: dict[str, list[str]] = {}
     for idea in shown:
         wanted.setdefault(idea.best.run_id, []).append(idea.instrument_id)
@@ -443,7 +458,7 @@ def load_ideas(
         for st in standings
     )
     read = {p.run_id for p in pool if p.status == RAN}  # a withheld run's held rows are not counted
-    paused_total = sum(r.paused for r in runs if r.run_id in read)
+    paused_total = len(paused_all) if watched else sum(r.paused for r in runs if r.run_id in read)
     more = encode_cursor(stamp, end) if end < len(matched) and shown else None
     return Ideas(
         ctx.session.date,
@@ -455,4 +470,5 @@ def load_ideas(
         more,
         rule.hash,
         facets,
+        before if watched else None,
     )

@@ -26,6 +26,8 @@ export interface IdeasPageProps {
   onOpenRegime: () => void;
   /** Open a setup's page. */
   onOpenEdge: (edgeId: string) => void;
+  /** Open Settings (the watchlist that filters the lists). */
+  onOpenSettings: () => void;
 }
 
 export function IdeasPage({
@@ -37,6 +39,7 @@ export function IdeasPage({
   onOpenScreener,
   onOpenRegime,
   onOpenEdge,
+  onOpenSettings,
 }: IdeasPageProps) {
   const tab = search.tab ?? 'stocks';
   return (
@@ -52,6 +55,7 @@ export function IdeasPage({
         tab={tab}
         onOpen={onOpen}
         onOpenEdge={onOpenEdge}
+        onOpenSettings={onOpenSettings}
         unproven={
           <Stack gap={3}>
             <PausedIdeas tab={tab} onOpen={onOpen} onOpenScreener={onOpenScreener} />
@@ -62,6 +66,7 @@ export function IdeasPage({
               onCompare={onCompare}
               onOpen={onOpen}
               onScreeners={onScreeners}
+              onOpenSettings={onOpenSettings}
             />
           </Stack>
         }

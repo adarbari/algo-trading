@@ -5,7 +5,7 @@
  */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@algotrade/ui';
 
@@ -37,11 +37,18 @@ function setup() {
           onOpenScreener={vi.fn()}
           onOpenRegime={vi.fn()}
           onOpenEdge={vi.fn()}
+          onOpenSettings={vi.fn()}
         />
       </QueryClientProvider>
     </ToastProvider>,
   );
 }
+
+// `createQueryClient` starts the page cache with a dynamic import it does not await: loaded here
+// first, it never resolves after the test file has closed its module runner.
+beforeAll(async () => {
+  await import('@/entities/page-cache');
+});
 
 beforeEach(() => {
   GQL.mockReset();
