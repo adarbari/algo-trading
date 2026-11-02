@@ -273,7 +273,6 @@ class CallResult:
     dropped: tuple[Drop, ...] = ()
     answer_chars: int | None = None
     rate_limit_retries: int = 0
-    suggestions: int = 0  # checks the draft offered (never scored: counted and reported)
     parts: PartsStats | None = None  # how its explained parts were made (None: it had none)
     doubts: int = 0  # verifier doubts left in the draft served (ADR 0041, 2026-10-17)
 
@@ -374,7 +373,7 @@ def _call(
     if made.stage == "phrasebook":  # no model was asked: nothing was metered or spent
         return CallResult(
             provider, case.id, "ok", graded.passed, fields, "phrasebook", cost_usd=0.0,
-            dropped=drops, suggestions=len(made.suggestions), parts=made.parts_stats,
+            dropped=drops, parts=made.parts_stats,
         )  # fmt: skip
     return _result(
         provider,
@@ -385,7 +384,6 @@ def _call(
         passed=graded.passed,
         fields=fields,
         dropped=drops,
-        suggestions=len(made.suggestions),
         parts=made.parts_stats,
         doubts=len(made.doubts),
     )
@@ -402,7 +400,6 @@ def _result(
     fields: frozenset[str] = frozenset(),
     error: str | None = None,
     dropped: tuple[Drop, ...] = (),
-    suggestions: int = 0,
     parts: PartsStats | None = None,
     doubts: int = 0,
 ) -> CallResult:
@@ -411,7 +408,7 @@ def _result(
     return CallResult(
         provider, case_id, status, passed, fields, got.model, got.input_tokens,
         got.output_tokens, got.cache_read_tokens, got.cache_write_tokens, got.latency_s,
-        costs.cost_of(got.call_id), got.text, error, dropped, len(got.text), 0, suggestions, parts,
+        costs.cost_of(got.call_id), got.text, error, dropped, len(got.text), 0, parts,
         doubts,
     )  # fmt: skip
 
@@ -465,7 +462,6 @@ def measure(results: Sequence[CallResult]) -> dict[str, Any]:
         "latency_p50_s": percentile(latencies, 0.5),
         "latency_p90_s": percentile(latencies, 0.9),
         "cost_usd": sum(costs) if costs else None,
-        "suggestions": sum(r.suggestions for r in results),
         "parts": aggregate(r.parts for r in answered),
         "doubts_served": sum(r.doubts for r in answered),
         **drop_metrics(results),

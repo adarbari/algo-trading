@@ -1,7 +1,7 @@
 /**
  * The parts of a draft answer (docs/drafting/describe-it-plan.md "Explained parts"): the sentence
  * as the server split it, one entry per part with the ids of the criteria, formulas, unresolved
- * terms, missing features and suggestions it owns. The server decides every offset, kind and
+ * terms and missing features it owns. The server decides every offset, kind and
  * reference (ADR 0038); this module reads them (an older answer has none) and
  * compares the trader's own edits to the answer's original rows. Pure.
  */
@@ -13,18 +13,10 @@ import type { ScreenDraft } from './review';
 
 export type DraftPart = components['schemas']['Part'];
 export type PartKind = DraftPart['kind'];
-export type DraftSuggestion = components['schemas']['Suggestion'];
 
 /** The parts of an answer in sentence order; empty for an answer that carries none (the degrade). */
 export function partsOf(answer: ScreenDraft): readonly DraftPart[] {
   return answer.parts ?? [];
-}
-
-/** The suggestions the trader may accept: soft or score checks only, whatever arrives. */
-export function suggestionsOf(answer: ScreenDraft): readonly DraftSuggestion[] {
-  return (answer.suggestions ?? []).filter(
-    ({ criterion }) => criterion['mode'] === 'soft' || criterion['mode'] === 'score',
-  );
 }
 
 type Table = Record<string, unknown>;

@@ -56,22 +56,6 @@ const FORMULA = {
 };
 
 const SPREAD = { field: 'f.spread', op: 'lte', value: 0.01, mode: 'soft' };
-const SUGGESTIONS = [
-  { id: 's1', criterion: SPREAD, source: 'spread', why: 'Wide spreads make fills costly' },
-  {
-    id: 's2',
-    criterion: { field: 'f.gap', op: 'lte', value: 3, mode: 'score' },
-    source: null,
-    why: 'Large gaps raise risk',
-  },
-  {
-    id: 's3',
-    criterion: { field: 'f.float', op: 'gte', value: 1, mode: 'hard' },
-    source: null,
-    why: 'Never offered: hard',
-  },
-];
-
 const PART: Omit<Part, 'id' | 'kind' | 'words'> = {
   start: 0,
   end: 0,
@@ -85,7 +69,6 @@ const PART: Omit<Part, 'id' | 'kind' | 'words'> = {
   formulas: [],
   unresolved: [],
   missing: [],
-  suggestions: [],
 };
 const PARTS: Part[] = [
   {
@@ -96,7 +79,6 @@ const PARTS: Part[] = [
     reading: 'over $50M traded a day',
     criteria: ['dollar_volume'],
     unresolved: ['liquid'],
-    suggestions: ['s1'],
   },
   {
     ...PART,
@@ -173,7 +155,6 @@ const ANSWER = {
       ],
     },
   ],
-  suggestions: SUGGESTIONS,
   sentence: 'liquid optionable stocks',
   parts: PARTS,
 } satisfies ScreenDraft;
@@ -188,7 +169,6 @@ function setup(over: Partial<DraftReviewProps> = {}) {
     onReviewFormula: vi.fn(),
     onSkipFormula: vi.fn(),
     onPickReading: vi.fn(),
-    onAcceptSuggestion: vi.fn(),
     renderFieldHelp: (field) => <Text>{`field help ${field}`}</Text>,
     ...over,
   };
@@ -376,34 +356,12 @@ describe('DraftReview with parts', () => {
     expect(screen.queryByText('Edited')).not.toBeInTheDocument();
   });
 
-  describe('suggestions', () => {
-    it('shows soft and score checks in their part, never a hard one, each with its why', () => {
-      setup();
-      const group = within(card('liquid'));
-      expect(group.getByText('Suggested')).toBeInTheDocument();
-      expect(group.getByText('help describe_suggested')).toBeInTheDocument();
-      expect(group.getByText('Wide spreads make fills costly')).toBeInTheDocument();
-      // s2 no part owns: a trailing group; s3 is hard: never offered
-      expect(screen.getByText('Large gaps raise risk')).toBeInTheDocument();
-      expect(screen.queryByText('Never offered: hard')).not.toBeInTheDocument();
-    });
-
-    it('Add hands the criterion to the Builder once and shows it as added; nothing is applied before', async () => {
-      const { props } = setup();
-      expect(props.onAcceptSuggestion).not.toHaveBeenCalled();
-      await userEvent.click(screen.getByRole('button', { name: 'Add f.spread' }));
-      expect(props.onAcceptSuggestion).toHaveBeenCalledTimes(1);
-      expect(props.onAcceptSuggestion).toHaveBeenCalledWith(SPREAD);
-      expect(screen.getByText('Added')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Add f.spread' })).not.toBeInTheDocument();
-    });
-
-    it('Skip leaves the screen alone and shows it as skipped', async () => {
-      const { props } = setup();
-      await userEvent.click(screen.getByRole('button', { name: 'Skip f.gap' }));
-      expect(props.onAcceptSuggestion).not.toHaveBeenCalled();
-      expect(screen.getByText('Skipped')).toBeInTheDocument();
-    });
+  it('never offers a rule the sentence did not ask for, even when an answer carries one', () => {
+    // ADR 0083 decision 4: an old answer's `suggestions` are ignored: no group, no Add.
+    const stray = { id: 's1', criterion: SPREAD, source: null, why: 'Wide spreads cost fills' };
+    setup({ answer: { ...ANSWER, ...{ suggestions: [stray] } } });
+    expect(screen.queryByText('Wide spreads cost fills')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Add / })).not.toBeInTheDocument();
   });
 
   it('keeps the answer notes and the screen not-covered notes, each removable', async () => {

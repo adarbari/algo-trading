@@ -387,24 +387,6 @@ def test_a_curated_case_is_drafted_with_the_criteria_in_force_and_record_clears_
     assert "recorded" not in json.loads(case_file.read_text())
 
 
-def test_suggestions_are_counted_per_call_and_never_change_the_score() -> None:
-    answers = [json.dumps({"criteria": [], "suggestions": [1, 2]}), "not json"]
-
-    def drafting(model: TextModel, sentence: str, current: Mapping[str, Any] | None = None) -> Any:
-        text = model.complete("system", sentence).text
-        offered = json.loads(text)["suggestions"]  # a bare list: only its length is reported
-        made = draft(Scripted([GOOD], CostTap()), sentence)
-        return replace(made, suggestions=tuple(offered))
-
-    costs = CostTap()
-    plan = plan_of([case()], repeat=1)
-    result = evaluate(plan, {"paid": Scripted(answers[:1], costs)}, drafting, costs,
-                      budget_usd=1.0, max_calls=5)  # fmt: skip
-    (call,) = result.results
-    assert call.suggestions == 2 and call.passed
-    assert measure(result.results)["suggestions"] == 2
-
-
 def test_the_explained_parts_measures_are_reported_apart_and_never_score_a_case() -> None:
     stats = PartsStats(
         items=4, by_model=3, by_fallback=1, spans=2, located=2, readings=2, readings_kept=1

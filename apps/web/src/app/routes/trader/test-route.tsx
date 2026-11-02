@@ -2,7 +2,7 @@
  * Trader > Test (`/test`): the one flow for trying an idea on past data. Start (the four ways in
  * and the list of screeners; the filter bar's `f` and the search text `q` are its search params),
  * Guided (`/test/guided`, templates), Expert and Describe it (`/test/expert`, `/test/describe`: a
- * new draft; `/test/expert/$id`: its rules), the Result (`/test/result/$id`) and the setup builder
+ * new draft; `/test/expert/$id`: its rules; `/test/describe/$id`: its sentence), the Result (`/test/result/$id`) and the setup builder
  * (`/test/setup`, `/test/setup/$id`). The pages after Start load lazily (`test-flow-routes.tsx`).
  * The old `/screeners` and `/edges/new`, `/edges/$id/edit` URLs redirect here (`redirects.ts`).
  * Tickers open in Explore.
@@ -20,6 +20,7 @@ const Guided = lazyPage(flowRoutes, 'Guided');
 const NewExpert = lazyPage(flowRoutes, 'NewExpert');
 const NewDescribe = lazyPage(flowRoutes, 'NewDescribe');
 const Expert = lazyPage(flowRoutes, 'Expert');
+const Describe = lazyPage(flowRoutes, 'Describe');
 const Result = lazyPage(flowRoutes, 'Result');
 const Setup = lazyPage(flowRoutes, 'Setup');
 const TestStartPage = lazyPage(() => import('@/pages/test'), 'TestStartPage');
@@ -100,6 +101,12 @@ const expertRoute = createRoute({
   ...pageRoute(Expert, (m) => m.preloadExpert()),
   component: Expert,
 });
+const describeIdRoute = createRoute({
+  getParentRoute: () => testRoute,
+  path: 'describe/$id',
+  ...pageRoute(Describe, (m) => m.preloadDescribe()),
+  component: Describe,
+});
 const resultRoute = createRoute({
   getParentRoute: () => testRoute,
   path: 'result/$id',
@@ -126,6 +133,7 @@ export const testRoutes = testRoute.addChildren([
   newExpertRoute,
   describeRoute,
   expertRoute,
+  describeIdRoute,
   resultRoute,
   setupNewRoute,
   setupRoute,

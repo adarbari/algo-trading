@@ -149,16 +149,6 @@ Without a card, a ranking sentence would show as not understood.
 """
 see_also = ["describe_part_reading", "describe_applied"]
 
-[[term]]
-id = "describe_suggested"
-term = "Describe it: Suggested"
-short = "A protective check the draft offers beside your own criteria, never added until you say so."
-body = """
-A suggestion is a soft or score criterion, such as a limit on the bid-ask spread, that the draft thinks a screen like yours should have. Each one says why it was raised.
-Add puts it in the screen as a new row you can edit. Skip leaves it out. Nothing is added on its own, and a suggestion never makes a hard filter.
-"""
-see_also = ["describe_applied", "describe_part_reading"]
-next = "Add a suggestion to try it in the preview, or Skip it to keep the screen as you wrote it."
 
 [[term]]
 id = "describe_part_retype"
@@ -179,9 +169,9 @@ term = "Describe it: Daily limit of part redrafts reached"
 short = "You have used today's part redrafts; retyping a part works again when the exchange day turns."
 body = """
 Each retype is one model call, so each person gets a fixed number a day. Only a retype that returned a draft counts: a failed one gives its place back. The day is the exchange's calendar day, not midnight where you are.
-Retype turns itself back on when the exchange day turns, with no reload. Everything that needs no model call still works meanwhile: pick another reading of a term, edit a row, add or skip a suggestion.
+Retype turns itself back on when the exchange day turns, with no reload. Everything that needs no model call still works meanwhile: pick another reading of a term, or edit a row.
 """
-see_also = ["describe_part_retype", "describe_suggested"]
+see_also = ["describe_part_retype"]
 next = "Fix the part by hand with its rows or readings, or retype again after the exchange day turns."
 
 [[term]]

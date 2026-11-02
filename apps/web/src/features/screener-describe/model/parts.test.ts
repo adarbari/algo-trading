@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { toCriterion } from '@/entities/screen';
 
-import { baselineAfter, partEdited, partsOf, suggestionsOf, type DraftPart } from './parts';
+import { baselineAfter, partEdited, partsOf, type DraftPart } from './parts';
 import { readingSwap } from './readings';
 import type { ScreenDraft } from './review';
 
@@ -30,7 +30,6 @@ const PART: DraftPart = {
   formulas: [],
   unresolved: ['liquid'],
   missing: [],
-  suggestions: [],
 };
 
 describe('partsOf', () => {
@@ -43,23 +42,6 @@ describe('partsOf', () => {
     expect(partsOf(answer({}))).toEqual([]);
     expect(partsOf(answer({ parts: null }))).toEqual([]);
     expect(partsOf(answer({ parts: [] }))).toEqual([]);
-  });
-});
-
-describe('suggestionsOf', () => {
-  const s = (mode: string, id: string) => ({
-    id,
-    criterion: { field: 'f.x', mode },
-    source: null,
-    why: 'w',
-  });
-
-  it('offers soft and score checks only, whatever arrives', () => {
-    const found = suggestionsOf(
-      answer({ suggestions: [s('hard', 'h'), s('soft', 'a'), s('score', 'b')] }),
-    );
-    expect(found.map((x) => x.id)).toEqual(['a', 'b']);
-    expect(suggestionsOf(answer({}))).toEqual([]);
   });
 });
 

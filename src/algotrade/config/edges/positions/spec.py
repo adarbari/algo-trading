@@ -12,6 +12,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
+from math import prod
 from typing import TYPE_CHECKING, Any
 
 from algotrade.config.edges.identity import LONG_SHORT
@@ -75,6 +76,10 @@ class PositionSpec:
     # outcome resolves them, and its collateral), so a reader keys a trade without the templates
     legs: tuple[Leg, ...] = ()
     collateral: str = ""
+    # filled by the loader too when there are cases (key.py ``with_legs``): every point the cases
+    # can resolve to, as (case values in ``cases`` order, hold, position key); in the trial's
+    # identity, so a template edit that moves a case point's key is another trial
+    points: tuple[tuple[tuple[Any, ...], int, str], ...] = ()
 
 
 def spec_of(
@@ -221,8 +226,8 @@ SHARE_PATH_BASES = ("event", "universe")  # what a share path is compared with (
 
 def _check_share_path_edge(edge: Any, where: str) -> None:
     """What an edge with a share path outcome may not combine with: a time-series or named base
-    (their windows are not paths) and a ``position:<shares>`` baseline (it would value the picks
-    at the fixed horizon, with no exit)."""
+    (their windows are not paths), a ``position:<shares>`` baseline (it would value the picks at
+    the fixed horizon, with no exit) and a case value (only the default point's rows are read)."""
     held = [(edge.outcome, edge.base), *((v.outcome, v.base or edge.base) for v in edge.variants)]
     for outcome, base in held:
         if not reads_share_path(outcome):
@@ -237,6 +242,11 @@ def _check_share_path_edge(edge: Any, where: str) -> None:
                 f"{where} baselines: position:<template> values the picks at the fixed horizon, "
                 f"so it is not offered beside an [outcome.exit] on shares"
             )
+        if outcome.position is not None and outcome.position.cases:  # E13b resolves cases at D
+            raise ConfigurationError(
+                f"{where} case values: the share path reader selects the default point's rows "
+                f"only, so a case value is not offered beside an [outcome.exit] on shares yet"
+            )
 
 
 def check_edge(edge: Any, where: str, templates: Templates) -> None:
@@ -246,7 +256,13 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
     for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
         for candidate in candidates(outcome):
             check_outcome(candidate, where, templates)
-        case_names = {c.name for c in outcome.position.cases} if outcome.position else set()
+        cases = outcome.position.cases if outcome.position else ()
+        case_names = {c.name for c in cases}
+        points = prod(len({c.default, *(x.value for x in c.cases)}) for c in cases)
+        if points > grid.MAX_POINTS:  # the writer stores every combination for every name
+            raise ConfigurationError(
+                f"{where} outcome: its case values make {points} points, at most {grid.MAX_POINTS}"
+            )
         axes = {name for g in edge.variant_grid for name, _ in g.axes}
         if case_names & axes:
             raise ConfigurationError(
@@ -255,19 +271,6 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
             )
     check_known(where, "baselines", edge.position_baselines, templates)
     _check_share_path_edge(edge, where)
-    for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
-        pending = [
-            (what, slice_)
-            for what, slice_, used in (
-                ("case values", "E13b", outcome.position is not None and outcome.position.cases),
-            )
-            if used
-        ]
-        if pending:
-            raise ConfigurationError(
-                f"{where} {pending[0][0]}: not applied by any run yet ({pending[0][1]}), so the "
-                f"edge would be measured without it"
-            )
     if not edge.variant_grid:
         return
     if edge.outcome.kind != OPTION_KIND or edge.outcome.position is None:

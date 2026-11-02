@@ -27,7 +27,6 @@ from tests.unit.services.drafting.test_screens import (
     Canned,
     ctx,  # noqa: F401  (the fixture)
     proposal,
-    sug,
 )
 
 SENTENCE = "active stocks over $50, deep open interest and oi per dollar for a year"
@@ -49,7 +48,6 @@ def tagged(**extra: Any) -> dict[str, Any]:
         formulas=[{**FORMULA, "part": "p4"}],
         missing=[{**GAP, "part": "p5"}],
         unresolved=[{**READINGS, "part": "p3"}],
-        suggestions=[sug(op="lt", value=9, part="p2")],
         parts=PARTS,
         **extra,
     )
@@ -85,19 +83,16 @@ def test_every_part_serves_the_sentences_words_its_kind_and_its_refs(ctx: ReadCo
     for p in parts.values():
         assert SENTENCE[p.start : p.end] == p.words  # all ASCII: code points are UTF-16 units
     assert (parts["p1"].kind, parts["p1"].criteria) == ("applied", ("active",))
-    assert (parts["p2"].criteria, parts["p2"].suggestions, parts["p2"].rank) == (
-        ("price",), ("s1",), True,
-    )  # fmt: skip
+    assert (parts["p2"].criteria, parts["p2"].rank) == (("price",), True)
     assert (parts["p3"].kind, parts["p3"].unresolved, parts["p3"].criteria) == (
         "needs_choice", ("deep",), ("deep",),
     )  # fmt: skip
     assert (parts["p4"].kind, parts["p4"].formulas) == ("formula", ("draft_oi_per_dollar",))
     assert (parts["p5"].kind, parts["p5"].missing) == ("not_available", ("oi_history",))
-    assert [s.id for s in draft.suggestions] == ["s1"]
     assert draft.parts_stats is not None
     assert (
-        draft.parts_stats.by_model == draft.parts_stats.items == 8
-    )  # 3 criteria, formula, term, request, check, rank
+        draft.parts_stats.by_model == draft.parts_stats.items == 7
+    )  # 3 criteria, formula, term, request, rank
 
 
 def test_a_part_tag_never_reaches_the_document_so_the_spec_and_its_hash_do_not_change(
@@ -112,9 +107,6 @@ def test_a_part_tag_never_reaches_the_document_so_the_spec_and_its_hash_do_not_c
     assert (with_parts.formulas[0].criterion, with_parts.formulas[0].fingerprint) == (
         without.formulas[0].criterion, without.formulas[0].fingerprint,
     )  # fmt: skip
-    assert [s.criterion for s in with_parts.suggestions] == [
-        s.criterion for s in without.suggestions
-    ]
     assert [a.criterion for u in with_parts.unresolved for a in u.alternatives] == [
         a.criterion for u in without.unresolved for a in u.alternatives
     ]

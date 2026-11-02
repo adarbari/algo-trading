@@ -33,7 +33,6 @@ const PART: components['schemas']['Part'] = {
   formulas: [],
   unresolved: [],
   missing: [],
-  suggestions: [],
 };
 const ANSWER: ScreenDraft = {
   screener_id: 'mine',
@@ -82,8 +81,6 @@ describe('useRedraftPart', () => {
         formulas_dropped: [],
         missing: [],
         notes: ['assumed US'],
-        suggestions: [],
-        suggestions_dropped: [],
         unresolved: [],
         draft_session_id: 'sess-1',
       },

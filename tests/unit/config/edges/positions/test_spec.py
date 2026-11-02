@@ -288,3 +288,12 @@ def test_the_exits_digest_names_the_declared_exits_and_only_them() -> None:
     assert exits_digest(replace(spec, exit=ExitSettings(0.5, 3.0, 21))) != exits_digest(spec)
     assert exits_digest(replace(spec, book=False)) == exits_digest(spec)  # not an exit
     assert exits_digest(None) is None
+
+
+def test_a_case_value_beside_a_share_exit_is_refused_until_its_points_are_read() -> None:
+    """E13b resolves case values at D, but the share path reader selects the default point's rows
+    only, so a case-valued share exit stays refused (never measured on its default alone)."""
+    high_iv = {"all": [{"field": "rollup.iv_history@v2.iv_rank_252d", "op": "gte", "value": 0.8}]}
+    exit = {"take_profit": {"cases": [{"when": high_iv, "value": 0.2}], "default": 0.1}}
+    with pytest.raises(ConfigurationError, match="case values"):
+        check_edge(parse_edge(shares(exit=exit), "drift", WHERE), WHERE, TEMPLATES)

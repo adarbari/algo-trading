@@ -12,6 +12,7 @@ from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.positions.cases import Case, CaseValue
 from algotrade.config.edges.positions.key import (
+    case_point,
     case_points,
     grid_outcomes,
     key_of,
@@ -128,6 +129,20 @@ def test_one_spelling_per_value_numbers_as_floats_and_dates_as_text() -> None:
     assert keyed(date(2026, 1, 1)) == keyed("2026-01-01")  # a date does not crash the dump
 
 
+def test_the_writer_stores_every_combination_a_name_can_resolve_to() -> None:
+    o = outcome()
+    high = Group("all", (Rule("a", "gt", 1),))
+    cases = (
+        CaseValue("tenor_days", (Case(high, 30),), 45),
+        CaseValue("exit_dte", (Case(high, 5),), 0),
+    )
+    case_valued = replace(o, position=replace(o.position, cases=cases))
+    points = case_points(case_valued, TEMPLATES)
+    keys = {position_key(p, 21) for p in points}
+    assert len(keys) == 4  # (45, 0), (45, 5), (30, 0), (30, 5): both cases off their defaults too
+    assert position_key(case_point(case_valued, (30, 5), TEMPLATES), 21) in keys
+
+
 def test_each_grid_point_is_the_edges_outcome_with_its_values_and_legs_resolved_again() -> None:
     edge = with_legs(
         parse_edge(
@@ -162,3 +177,24 @@ def test_a_share_key_holds_its_sides_exit_rules_and_no_option_parameters() -> No
     assert rules == [("TAKE_PROFIT", "lte", -0.1), ("STOP_LOSS", "gte", 0.05)]
     with pytest.raises(ConfigurationError, match="share legs"):
         share_position_key(outcome(), 21)  # an option position has no share key
+
+
+def test_a_grid_point_of_a_case_valued_outcome_keys_its_own_case_points() -> None:
+    high = Group("all", (Rule("a", "gt", 1),))
+    body = {**PUT, "tenor_days": {"cases": [{"when": {"all": [{"field": "a", "op": "gt",
+                                                               "value": 1}]}, "value": 45}],
+                                  "default": 30}}  # fmt: skip
+    edge = with_legs(
+        parse_edge(
+            document(schedule="every_session", outcome=body,
+                     variant_grid=[{"prefix": "g", "strike_delta": [0.15]}]),
+            "drift", WHERE,
+        ),
+        TEMPLATES,
+    )  # fmt: skip
+    ((_, point),) = grid_outcomes(edge, TEMPLATES)
+    assert point.position is not None and point.position.cases[0].cases[0].when == high
+    own = {
+        position_key(p, h) for p in case_points(point, TEMPLATES) for h in point.horizon_sessions
+    }
+    assert {key for _, _, key in point.position.points} == own  # not the 0.25-delta base's

@@ -1,6 +1,6 @@
 /**
- * Test > Expert or Describe it, step one: name a screener and its blank draft opens in the Builder
- * (Expert's rules, with the Describe it box on top for the sentence way in).
+ * Test > Expert or Describe it, step one: name a screener and its blank draft opens: Expert's
+ * rules, or the Describe it page for the sentence way in.
  */
 import { Heading, Panel, Stack, Text } from '@algotrade/ui';
 

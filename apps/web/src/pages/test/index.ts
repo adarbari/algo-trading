@@ -1,6 +1,6 @@
 /**
  * Page group: the Test flow (`/test`): Start (the four ways in and the list of screeners), Guided
- * (templates), Expert and Describe it (a new draft, then the rules), the Result of a screener and
+ * (templates), Expert and Describe it (a new draft, then the sentence or the rules), the Result of a screener and
  * the setup builder. The steps at the top of each page are `TestSteps`.
  */
 import { lazyPage } from '@/shared/lib/lazy';
@@ -21,6 +21,7 @@ export { TestNewPage, type TestNewPageProps } from './ui/TestNewPage';
 // it renders unsuspended.
 export const TestStartPage = lazyPage(() => import('./ui/TestStartPage'), 'TestStartPage');
 export const TestExpertPage = lazyPage(() => import('./ui/TestExpertPage'), 'TestExpertPage');
+export const TestDescribePage = lazyPage(() => import('./ui/TestDescribePage'), 'TestDescribePage');
 export const TestResultPage = lazyPage(() => import('./ui/TestResultPage'), 'TestResultPage');
 export const TestSetupPage = lazyPage(() => import('./ui/TestSetupPage'), 'TestSetupPage');
 
@@ -40,5 +41,6 @@ export function prefetchTestStartReads(
 
 export type { TestStartPageProps, TestWay } from './ui/TestStartPage';
 export type { TestExpertPageProps } from './ui/TestExpertPage';
+export type { TestDescribePageProps } from './ui/TestDescribePage';
 export type { TestResultPageProps } from './ui/TestResultPage';
 export type { TestSetupPageProps } from './ui/TestSetupPage';
