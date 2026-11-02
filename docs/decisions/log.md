@@ -894,3 +894,11 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: reversible; the empty Ideas window is at most one trading day on the pre-launch site and closes itself; decided while the owner was away.
 - Reasoning: the owner-away rule (2026-11-01: PRs merge as built, no `needs-owner`); CLAUDE.md "PRs auto-merge"; the live-store rule in `.claude/skills/review-and-release` section 2 (a dry run is a read; the nightly step is the sanctioned writer); ADR 0083 decision 2 fixes "stored verdict"; ADR 0088 design 2.6 fixes the thresholds as design calls under review-and-release section 2.
+
+## 2026-11-01 | ADR 0088 S5 | short_premium_liquidity as a rule preset: decisions and the stale-chain contract
+- Question: the Python screener gave QUALIFIED / LIQUIDITY_RISK / UNKNOWN / REJECT and its UNKNOWN rows made a run PARTIAL (so a stale-chain tolerance excluded them, ADR 0054). A rule screen decides every row (ADR 0030: missing never passes, REJECT). Port as is, or keep the four decisions?
+- Options: a rule preset with REJECT for every non-pick (the engine's one vocabulary) / soft criteria to keep LIQUIDITY_RISK / extend the engine to produce UNKNOWN.
+- Decision: the plain rule preset: pick = chain current (`liq_status` OK) and the short put or the short call tier A / B (a group); everything else REJECT. `option_liquidity@v1` already is the feature group, so no new group was added. The legacy CSV reads the rule run's `[columns]` (same names) and `process_further` is QUALIFIED; the stale-chain contract moves to the gate: a stale name is a reject (never a pick), the `chains` step fails when more are stale than it tolerates, and the screens step needs it.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: owner rule G14 (every screener is a rule) and the less-code rule; changing the engine for one preset adds a second vocabulary. What is lost: LIQUIDITY_RISK on tier C/D names, and a PARTIAL screen on stale chains (the chains gate already fails the night). The liquidity picks are identical: QUALIFIED iff the put or call tier is A / B on a current chain.

@@ -10,7 +10,8 @@ from pathlib import Path
 
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import SITE_USER
-from algotrade.core.views.feature_view import FeatureValue
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.predicates import FieldValue
 from algotrade.services.screening.run import ScreenOutcome
 from algotrade.services.views import to_value
 from algotrade.strategies.screeners.base import Decision
@@ -77,7 +78,7 @@ _PASS_THROUGH = (
 _COUNT_SUFFIXES = ("_oi", "_dte")
 
 
-def _text(value: FeatureValue, key: str = "") -> str:
+def _text(value: FieldValue, key: str = "") -> str:
     if value is None:
         return ""
     if isinstance(value, bool):
@@ -87,7 +88,7 @@ def _text(value: FeatureValue, key: str = "") -> str:
     return str(value)
 
 
-def _side(values: Mapping[str, FeatureValue], side: str) -> dict[str, str]:
+def _side(values: Mapping[str, FieldValue], side: str) -> dict[str, str]:
     pct = values.get(f"{side}_spread_pct")
     out = {
         f"{side}_spread_pct_of_mid": f"{float(pct) * 100:.2f}" if pct is not None else "",
@@ -99,9 +100,14 @@ def _side(values: Mapping[str, FeatureValue], side: str) -> dict[str, str]:
 
 
 def legacy_rows(outcome: ScreenOutcome) -> list[dict[str, str]]:
+    """The rule run's rows of ``short_premium_liquidity`` (its ``[columns]`` are the legacy
+    columns by name, ADR 0088 S5)."""
+    if outcome.rules is None:
+        raise ConfigurationError("legacy_liquidity_csv exports a rule screen's run")
     meta = outcome.universe.frame.set_index("instrument_id")
     rows = []
-    for r in outcome.run.rows:
+    for r in outcome.rules.rows:
+        values = dict(r.columns)
         u = meta.loc[r.instrument_id]
         row = {"ticker": str(u["symbol"])}  # ids may be FIGI-based (ADR 0018)
         row.update(
@@ -111,12 +117,12 @@ def legacy_rows(outcome: ScreenOutcome) -> list[dict[str, str]]:
             }
         )
         row["process_further"] = _text(r.decision is Decision.QUALIFIED)
-        row["short_put_ok"] = _text(bool(r.values.get("short_put_ok")))
-        row["short_call_ok"] = _text(bool(r.values.get("short_call_ok")))
-        row.update({k: _text(r.values.get(k), k) for k in _PASS_THROUGH})
-        row["liq_status"] = _text(r.values.get("liq_status")) or "NOT_SCREENED"
-        row.update(_side(r.values, "put"))
-        row.update(_side(r.values, "call"))
+        row["short_put_ok"] = _text(bool(values.get("short_put_ok")))
+        row["short_call_ok"] = _text(bool(values.get("short_call_ok")))
+        row.update({k: _text(values.get(k), k) for k in _PASS_THROUGH})
+        row["liq_status"] = _text(values.get("liq_status")) or "NOT_SCREENED"
+        row.update(_side(values, "put"))
+        row.update(_side(values, "call"))
         rows.append(row)
     rows.sort(key=lambda x: (x["asset_class"] != "STOCK", x["ticker"]))
     return rows

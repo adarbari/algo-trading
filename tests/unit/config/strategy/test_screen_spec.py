@@ -331,13 +331,16 @@ def test_a_spec_without_groups_hashes_as_before_groups_existed() -> None:
 
 
 def test_every_site_preset_has_the_canonical_form_it_had_before_groups() -> None:
-    """No preset has ``groups``, so none gained a key: the canonical JSON is the old shape."""
+    """A preset without ``groups`` gained no key: the canonical JSON is the old shape. The ones
+    that declare groups (``short_premium_liquidity``: put or call tier) carry the new key."""
 
     store = FileConfigStore(REPO_ROOT / "config", local=False)
     names = store.names("site", "screeners")
     assert names
     for name in names:
         resolved = resolve_config(store, name, UserContext(SITE_USER))
+        if "groups" in resolved.config.rules:
+            continue
         canonical = resolved.canonical()
         c = resolved.config
         before = {  # the pre-groups form of ``ResolvedConfig.canonical``

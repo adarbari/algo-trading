@@ -100,7 +100,7 @@ id = "income"
 title = "Option income"
 purpose = "Option names where the market charges more for movement than the share delivers."
 intro = "Selling options earns money when implied volatility, the movement the options price in, runs above the movement the share then delivers. These screens rank optionable names by that gap and by where implied volatility sits in its own year."
-presets = ["vrp_scanner", "vrp_iv_hv", "vrp_cross_section", "iv_rank_high"]
+presets = ["vrp_scanner", "vrp_iv_hv", "vrp_cross_section", "iv_rank_high", "short_premium_liquidity"]
 
 [[family]]
 id = "events"

@@ -15,7 +15,6 @@ from algotrade.services.screening.regime import MARKET, session_market
 from algotrade.services.screening.run import ScreenOutcome, run_screener
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
-from tests.unit.services.screening import test_screening_service as legacy
 from tests.unit.services.screening.test_rule_screens import DAY, configs, seeded
 
 LABEL = "market.regime@v3.label"
@@ -103,24 +102,3 @@ def test_the_gate_is_off_by_default() -> None:
     assert "regime" not in outcome.audit
     saved = rows(reader)
     assert saved["regime"].isna().all() and set(saved["size_multiplier"]) == {1.0}
-
-
-def test_a_coded_screener_is_gated_by_the_engine_too() -> None:
-    reader, writer = legacy.seeded()
-    regime = {"enabled": True, "pause_in": ["CRISIS"]}
-    config = legacy.preset(screening={"min_coverage": 0.7}, regime=regime)
-    outcome = run_screener(
-        reader, writer, config, DAY, now=T0, held=HARNESS_ALL
-    )  # no regime row: unknown
-    assert outcome.run.coverage is RunCoverage.COMPLETE
-    assert outcome.audit["decisions"] == {
-        "PAUSED": 1,
-        "LIQUIDITY_RISK": 1,
-        "UNKNOWN": 1,
-        "REJECT": 1,
-    }
-    saved = reader.table("results/short_premium_liquidity", DAY)
-    assert saved is not None
-    paused = saved[saved["decision"] == "PAUSED"].iloc[0]
-    assert paused["reasons"].startswith("regime unknown")
-    assert saved["regime"].isna().all() and set(saved["size_multiplier"]) == {0.0}
