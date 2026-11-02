@@ -878,6 +878,13 @@ TASKS: dict[str, Task] = {
                     None,
                     "read-only check: judge current rows too, list differences, write nothing",
                 ),
+                Param(
+                    "expect_same",
+                    ("--expect-same-headlines",),
+                    None,
+                    "compare each row with the newest earlier one of its run; any difference "
+                    "fails the run and writes nothing (the deploy of a judge change)",
+                ),
             ),
         ),
         Task(

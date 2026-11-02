@@ -143,6 +143,9 @@ from algotrade.services.read.evaluation.verdict.rule import (
     load_edge_verdict as load_edge_verdict,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
+    profile_of as profile_of,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
     projection_of as projection_of,
 )
 from algotrade.services.read.evaluation.verdict.stored import (

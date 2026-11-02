@@ -14,6 +14,7 @@ from algotrade.config.edges import document, loading
 from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
 from algotrade.config.edges.portfolio import benchmark_words
+from algotrade.config.edges.verdict import resolve_profile
 from algotrade.config.user import SITE_USER
 from algotrade.core.time.windows import window_name
 from algotrade.services.read.context import Stores, once_per_request
@@ -92,6 +93,10 @@ class EdgeSettings:
     outcome_sign: float = 1.0  # -1 for direction ``below``: the stored values are oriented
     factor_neutral: bool = False  # the outcome is a residual return (EB H11): the verdict says so
     hold_rank: int | None = None  # a buy/hold band: the cost is charged on entries and exits
+    # The judge's criteria (ADR 0088, 2.6): ``return`` (the older criteria) or ``tails``; the
+    # document's ``verdict_profile``, else ``tails`` for an option_pnl outcome and ``return`` for
+    # every other kind (``verdict.resolve_profile``).
+    verdict_profile: str = "return"
 
 
 @dataclass(frozen=True)
@@ -244,6 +249,7 @@ def _settings(e: document.Edge, own: Mapping[str, Any] | None) -> EdgeSettings:
         outcome_sign=e.outcome.sign,
         factor_neutral=e.outcome.measure in document.EXCESS_MEASURES,
         hold_rank=e.outcome.hold_rank,
+        verdict_profile=resolve_profile(e.outcome.kind, e.verdict_profile),
         quality_bar=tuple(EdgeAnswer(k, e.quality_bar.get(k, "")) for k in document.QUALITY_BAR),
         own={k: _json(v) for k, v in (own or {}).items() if k not in (FOLLOW, AUDIT, "status")},
     )

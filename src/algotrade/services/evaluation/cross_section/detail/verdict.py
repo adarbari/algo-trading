@@ -11,6 +11,8 @@ exploratory. Anything else gets none, and the reader judges live. The headline o
 moves with the site's trials, so it is never stored. Written by the edge-eval publish (and the
 edge-verdicts task, through ``verdict_frame``); ML never frames it (ADR 0053 decision 8)."""
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
@@ -184,22 +186,54 @@ def run_fingerprint(stores: Stores, edge: Edge, run: EdgeRun) -> str:
     return stamp.fingerprint(judge_call(edge, run, True), run, load_verdict(stores.configs))
 
 
+def _summary(r: Mapping[Any, Any]) -> EdgeSummary:
+    """The headline a stored row of ``results/edge_verdict`` holds; nulls stay None."""
+    return EdgeSummary(
+        r["edge_id"], r["verdict"], r["result"],
+        None if pd.isna(r["basis"]) else r["basis"],
+        _whole(r["trades"]), _whole(r["oos_trades"]), _real(r["lift"]), _real(r["lift_pts"]),
+        None if pd.isna(r.get("basis_screener")) else r["basis_screener"],
+        _whole(r.get("basis_horizon")),
+    )  # fmt: skip
+
+
 def summaries_of(table: pd.DataFrame | None) -> dict[tuple[str, str, str], EdgeSummary]:
     """The site's headline rows of ``table`` by (edge, judged run, fingerprint); nulls stay None."""
-    found: dict[tuple[str, str, str], EdgeSummary] = {}
     if table is None:
-        return found
-    for r in table.to_dict("records"):
-        if r["user_id"] != SITE_USER:
-            continue
-        found[(r["edge_id"], r["judged_run_id"], r["fingerprint"])] = EdgeSummary(
-            r["edge_id"], r["verdict"], r["result"],
-            None if pd.isna(r["basis"]) else r["basis"],
-            _whole(r["trades"]), _whole(r["oos_trades"]), _real(r["lift"]), _real(r["lift_pts"]),
-            None if pd.isna(r.get("basis_screener")) else r["basis_screener"],
-            _whole(r.get("basis_horizon")),
-        )  # fmt: skip
+        return {}
+    return {
+        (r["edge_id"], r["judged_run_id"], r["fingerprint"]): _summary(r)
+        for r in table.to_dict("records")
+        if r["user_id"] == SITE_USER
+    }
+
+
+@dataclass(frozen=True)
+class Headline:
+    """One stored headline: what it said, under which fingerprint, and when it became known."""
+
+    fingerprint: str
+    knowledge_ts: datetime
+    summary: EdgeSummary
+
+
+def headlines_of(table: pd.DataFrame | None) -> dict[tuple[str, str], list[Headline]]:
+    """The site's headline rows of ``table`` by (edge, judged run), every fingerprint, each with
+    its ``knowledge_ts`` (what the edge-verdicts task compares a re-judge with)."""
+    found: dict[tuple[str, str], list[Headline]] = {}
+    for r in () if table is None else table.to_dict("records"):
+        if r["user_id"] == SITE_USER:
+            found.setdefault((r["edge_id"], r["judged_run_id"]), []).append(
+                Headline(
+                    r["fingerprint"], pd.Timestamp(r["knowledge_ts"]).to_pydatetime(), _summary(r)
+                )
+            )
     return found
+
+
+def stored_headlines(stores: Stores, day: date) -> dict[tuple[str, str], list[Headline]]:
+    """The headlines stored on ``day`` (a run's range end) by (edge, judged run)."""
+    return headlines_of(stores.reader.table(EDGE_VERDICT.name, day))
 
 
 def stored_summaries(stores: Stores, day: date) -> dict[tuple[str, str, str], EdgeSummary]:
