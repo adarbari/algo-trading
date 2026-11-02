@@ -22,8 +22,6 @@ export {
   baselineAfter,
   partEdited,
   partsOf,
-  suggestionsOf,
   type DraftPart,
-  type DraftSuggestion,
   type PartKind,
 } from './model/parts';

@@ -405,7 +405,7 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/drafting/contract"
-purpose = "use case: the contract of the drafting model's answer (ADR 0041): its JSON Schema and local check, and what the server decides of each kind of item the model proposes (B1 formulas, missing features and unresolved terms, suggested checks) (split from services/drafting, at its module cap)"
+purpose = "use case: the contract of the drafting model's answer (ADR 0041): its JSON Schema and local check, and what the server decides of each kind of item the model proposes (B1 formulas, missing features and unresolved terms) (split from services/drafting, at its module cap)"
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
 
 [[dir]]

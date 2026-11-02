@@ -63,9 +63,6 @@ export function DescribeScreen() {
                   builder.setCriterion(criterion);
                   builder.recordChoice(choice);
                 }}
-                onAcceptSuggestion={(criterion) => {
-                  builder.addSuggested(criterion);
-                }}
                 onRedrafted={(next, prior, replaced) => {
                   // One part was retyped: the merged draft is the working document and the
                   // answer shown; the other parts' formula decisions and notes stay.

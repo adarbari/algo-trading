@@ -601,10 +601,9 @@ export async function mockBuilderApi(
 }
 
 /*
- * Describe it: answers any sentence with one applied criterion, one proposed formula whose
- * criterion waits for the trader's decision and one suggested soft check, as explained parts (one
- * card each), and records what the page sent. Register it after
- * `mockBuilderApi` (the later route is tried first; anything else falls through to it).
+ * Describe it: answers any sentence with one applied criterion and one proposed formula whose
+ * criterion waits for the trader's decision, as explained parts (one card each), and records what
+ * the page sent. Register it after `mockBuilderApi` (the later route is tried first; anything else falls through to it).
  */
 export const FORMULA_NAME = 'draft_iv_over_hv';
 export const FORMULA_EXPR = 'rollup.iv30@v1.iv30 - rollup.price_stats@v2.hv30';
@@ -634,15 +633,6 @@ const FORMULA = {
   },
 };
 
-export const SUGGESTION_FIELD = 'rollup.price_stats@v2.hv30';
-
-const SUGGESTION = {
-  id: 'sg1',
-  criterion: { field: SUGGESTION_FIELD, op: 'lte', value: 0.8, mode: 'soft' },
-  source: 'hv30',
-  why: 'A very high realised volatility makes the premium easy to lose',
-};
-
 const PART = {
   start: 0,
   end: 0,
@@ -663,7 +653,6 @@ const PARTS = [
     criteria: [],
     formulas: [FORMULA_NAME],
     unresolved: [],
-    suggestions: [],
   },
   {
     ...PART,
@@ -674,7 +663,6 @@ const PARTS = [
     criteria: ['iv30'],
     formulas: [],
     unresolved: [],
-    suggestions: ['sg1'],
   },
 ];
 
@@ -709,7 +697,6 @@ export async function mockDescribeApi(page: Page): Promise<DescribeMock> {
           dropped: [],
           notes: [],
           formulas: [FORMULA],
-          suggestions: [SUGGESTION],
           sentence: body['sentence'],
           parts: PARTS.map((part) =>
             part.id === 'p2'
@@ -738,7 +725,6 @@ export async function mockDescribeApi(page: Page): Promise<DescribeMock> {
         dropped: [],
         notes: [],
         formulas: [FORMULA],
-        suggestions: [SUGGESTION],
         sentence: typeof body['text'] === 'string' ? body['text'] : '',
         parts: PARTS,
         draft_session_id: 'sess-e2e',

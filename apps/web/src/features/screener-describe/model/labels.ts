@@ -105,10 +105,4 @@ export const PART_TEXT = {
   confirmTitle: 'Replace this part?',
   confirmEdits: 'This replaces your edits to this part.',
   limitHelp: { kind: 'term', id: 'describe_part_limit' } as TermRef,
-  suggested: 'Suggested',
-  suggestedHelp: { kind: 'term', id: 'describe_suggested' } as TermRef,
-  add: 'Add',
-  skip: 'Skip',
-  added: 'Added',
-  skipped: 'Skipped',
 } as const;
