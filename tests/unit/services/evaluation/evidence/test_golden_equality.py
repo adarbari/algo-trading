@@ -1,7 +1,10 @@
 """The golden edges' scores are the same with and without the trade contract (ADR 0088, 2.5a,
 risk 19): per outcome kind on the small world, a digest of every ``edge_eval`` column and of the
 ledger columns that existed before E6a, and the time series' measures. Pinned in the commit that
-precedes the contract, on unmodified code. A digest that changes is a defect, never a re-pin."""
+precedes the contract, on unmodified code. A digest that changes is a defect, never a re-pin.
+The random draws' rows are left out: their seed reads the hash of the site's expression-feature
+definitions (``legs/key.py``), so adding any site feature re-seeds them (what moved ``short`` and
+``long_short`` after #1027)."""
 
 import hashlib
 from datetime import date
@@ -90,10 +93,12 @@ def _evaluations() -> dict[str, EdgeEvaluation]:
     }
 
 
-DIGESTS: dict[str, tuple[str, str]] = {  # (edge_eval, ledger), computed on origin/main
+DIGESTS: dict[
+    str, tuple[str, str]
+] = {  # (edge_eval without the random draws, ledger), computed before E6a
     "long": ("30495083693dc0dd", "5ec1257fbe0a795f"),
-    "short": ("8a5be54b65cf7448", "60c7f37dd4cdaa30"),
-    "long_short": ("2f02dfade59107a7", "5625c55ec76c7220"),
+    "short": ("44b38105c200e6dc", "60c7f37dd4cdaa30"),
+    "long_short": ("de0571f44206c520", "5625c55ec76c7220"),
     "hit_target": ("4fa2a61dac328851", "ab73369e4bc0aff1"),
     "expires_otm": ("22d2faaee8d62085", "d92e6cd61083351c"),
     "option_pnl": ("3fbfc5c8a5dc6315", "5bceadef7c7c768b"),
@@ -113,7 +118,7 @@ def _digests(evaluations: dict[str, EdgeEvaluation]) -> dict[str, tuple[str, str
     for name, ev in evaluations.items():
         ledger = trades_frame(ev, "r", AS_OF)
         got[name] = (
-            _digest(edge_eval_frame(ev, "r", AS_OF)),
+            _scored({name: ev})[name],
             _digest(ledger, _ledger_columns(name)) if len(ledger) else "empty",
         )
     return got
@@ -129,9 +134,10 @@ def _scored(evaluations: dict[str, EdgeEvaluation]) -> dict[str, str]:
 
 
 def test_each_outcome_kinds_scores_and_ledger_are_pinned() -> None:
-    """Pinned as computed: the draws are seeded by ``DRAW_LEG_VERSION``, so the leg bump (E6a)
-    moves no random draw and no stored verdict."""
-    assert _digests(_evaluations()) == DIGESTS
+    """Pinned as computed over every row but the random draws', whose seed moves with the site's
+    feature definitions (the leg bump, E6a, moves none of them)."""
+    got = _digests(_evaluations())
+    assert got == DIGESTS
 
 
 def test_the_time_series_measures_and_windows_are_pinned() -> None:
