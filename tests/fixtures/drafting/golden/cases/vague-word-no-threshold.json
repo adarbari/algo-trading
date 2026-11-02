@@ -52,12 +52,8 @@
       "instrument.security_type"
     ],
     "contract": true,
-    "suggestions": {
-      "offered": [],
-      "dropped": [],
-      "notes": [
-        "jumpy"
-      ]
-    }
+    "notes": [
+      "jumpy"
+    ]
   }
 }

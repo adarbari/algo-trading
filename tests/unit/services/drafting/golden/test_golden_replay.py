@@ -164,23 +164,22 @@ def test_the_groups_of_a_recorded_answer_are_the_expected_tree_and_never_a_doubt
     assert '"part"' not in json.dumps(draft.document)
 
 
-def test_the_suggestions_of_a_contract_answer_are_offered_apart(ctx: ReadContext) -> None:
-    """The cases that expect suggestions: the offered ones are beside the document, never in its
-    criteria; the refused ones (hard, invented, duplicate) are not offered; notes say what was
-    left out."""
-    cases = [(c, s, t) for c, s, t in CONTRACT if c.suggested]
-    assert {c.id for c, _, _ in cases} >= {
-        "yield-trap-suggestions", "vague-word-no-threshold", "hard-suggestion-refused",
+def test_a_check_the_model_offers_beyond_the_sentence_never_reaches_the_draft(
+    ctx: ReadContext,
+) -> None:
+    """ADR 0083 decision 4: the model only translates the sentence. A recorded answer that still
+    carries ``suggestions`` (checks the sentence did not ask for) serves only the asked criteria,
+    and the draft has no ``suggestions`` at all; a case's ``notes`` words are in its notes."""
+    case, _, text = next((c, s, t) for c, s, t in CONTRACT if c.id == "yield-trap-nothing-added")
+    assert "suggestions" in json.loads(text)
+    draft = draft_screen(ctx, Recorded(text), "golden", case.sentence)
+    assert {c["field"] for c in draft.document["criteria"].values()} == {
+        "instrument.status", "instrument.security_type", "feature.div_yield",
     }  # fmt: skip
-    for case, _, text in cases:
-        draft = draft_screen(ctx, Recorded(text), "golden", case.sentence)
-        assert [s.criterion["field"] for s in draft.suggestions] == case.suggested["offered"]
-        held = {(c["field"], c["op"]) for c in draft.document["criteria"].values()}
-        assert not held & {(s.criterion["field"], s.criterion["op"]) for s in draft.suggestions}
-        assert all(s.criterion["mode"] in ("soft", "score") for s in draft.suggestions)
-        assert [d.field for d in draft.suggestions_dropped] == case.suggested["dropped"]
-        for word in case.suggested["notes"]:
-            assert any(word in n for n in draft.notes)
+    assert not hasattr(draft, "suggestions")
+    for case, _, text in [(c, s, t) for c, s, t in CONTRACT if c.notes]:
+        notes = draft_screen(ctx, Recorded(text), "golden", case.sentence).notes
+        assert all(any(word in n for n in notes) for word in case.notes)
 
 
 EXPLAINED = [(c, slug, text) for c, slug, text in CONTRACT if c.explained]

@@ -29,7 +29,7 @@ for = "earnings this week (an event play)"
 op = "lte"
 value = 5
 mode = "hard"
-note = "suggest rollup.earnings@v1.date_confirmed eq true when the date must be right"
+note = "rollup.earnings@v1.date_confirmed eq true applies when the sentence says the date must be confirmed"
 [[field.use]]
 for = "earnings more than 10 sessions away"
 op = "gt"

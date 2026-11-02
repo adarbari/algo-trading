@@ -1,7 +1,6 @@
 /**
  * Test > Expert: one screener's rules (the Builder): the Test steps, the draft bar, who an unsaved edit would add or
- * drop against the saved run, the regime gate in one line, the "Describe it" box (a sentence
- * to a draft, ADR 0041), the criteria beside the run summary and funnel, and the live preview's
+ * drop against the saved run, the regime gate in one line, the criteria beside the run summary and funnel, and the live preview's
  * top rows. The widgets share the Builder's state
  * through its provider (a draft with its 300 ms debounced preview).
  */
@@ -9,7 +8,6 @@ import { Grid, Stack } from '@algotrade/ui';
 
 import { ScreenerBuilderProvider } from '@/features/screener-builder';
 import { CriteriaTable } from '@/widgets/criteria-table';
-import { DescribeScreen } from '@/widgets/describe-screen';
 import { DraftBar } from '@/widgets/draft-bar';
 import { PreviewResults } from '@/widgets/feature-table';
 import { PreviewDiff } from '@/widgets/preview-diff';
@@ -46,7 +44,6 @@ export function TestExpertPage({
         <DraftBar onDeleted={onDeleted} onReturn={onReturn} />
         <PreviewDiff />
         <RegimeGateLine screenerId={id} onOpenRegime={onOpenRegime} />
-        <DescribeScreen />
         <Grid columns="main-aside" gap={4} collapse="lg" align="start">
           <CriteriaTable />
           <Stack gap={3}>

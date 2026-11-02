@@ -12,14 +12,13 @@ import {
   FORMULA_EXPR,
   FORMULA_NAME,
   RETYPED_WORDS,
-  SUGGESTION_FIELD,
   mockBuilderApi,
   mockDescribeApi,
 } from './builder-api';
 import { mockApi } from './mock-api';
 
 async function describeIt(page: Page) {
-  await page.goto('/screeners/my-vrp/edit');
+  await page.goto('/test/describe/my-vrp');
   await page
     .getByRole('textbox', { name: 'Describe the screen' })
     .fill('IV above HV and above 50%');
@@ -117,33 +116,6 @@ test('the review is one card per part of the sentence, in order, with the formul
   const applied = page.getByRole('article', { name: 'and above 50%' });
   await expect(applied.getByText(/We read this as/)).toBeVisible();
   await expectAccessible(page);
-});
-
-test('Add on a suggestion puts a soft row in the screen and the save carries it', async ({
-  page,
-}) => {
-  const mock = await mockBuilderApi(page);
-  await mockDescribeApi(page);
-  await describeIt(page);
-  const rows = page.getByRole('radiogroup', { name: /Mode of/ });
-  const before = await rows.count();
-  await page.getByRole('button', { name: `Add ${SUGGESTION_FIELD}` }).click();
-  await expect(rows).toHaveCount(before + 1);
-  await expect(page.getByText('Added', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect.poll(() => mock.drafts.length).toBe(1);
-  expect(JSON.stringify(mock.drafts[0]?.document['criteria'])).toContain(SUGGESTION_FIELD);
-});
-
-test('Skip on a suggestion adds no row', async ({ page }) => {
-  await mockBuilderApi(page);
-  await mockDescribeApi(page);
-  await describeIt(page);
-  const rows = page.getByRole('radiogroup', { name: /Mode of/ });
-  const before = await rows.count();
-  await page.getByRole('button', { name: `Skip ${SUGGESTION_FIELD}` }).click();
-  await expect(page.getByText('Skipped', { exact: true })).toBeVisible();
-  await expect(rows).toHaveCount(before);
 });
 
 test('Retype this part sends the draft it holds, then shows the merged draft with the other part untouched', async ({
