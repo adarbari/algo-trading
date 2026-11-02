@@ -2,9 +2,7 @@
   "bundle": {
     "entry_gzip_bytes": 26170,
     "entry_closure_gzip_bytes": 198000,
-    "lazy_only": [
-      "design-system/components/Chart/engine.ts"
-    ],
+    "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
       "src/pages/admin-feature-requests/index.ts": 30900,
       "src/pages/admin-feature-requests/ui/AcceptedFormulasSection.tsx": 4200,
