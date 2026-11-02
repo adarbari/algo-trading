@@ -409,9 +409,9 @@ VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object
     },
     "OptionGrid": {
         "key": (
-            "InstrumentFacts",
-            {"key": "AAPL", "names": []},
-            lambda d: d["instrument"]["symbol"],
+            "FeatureTable",
+            {"columns": [], "size": 1},
+            lambda d: d["table"]["instruments"][0]["symbol"],
         )
     },
     "HarnessRun": {"runId": ("HarnessRuns", {"limit": 1}, lambda d: d["harnessRuns"][0]["runId"])},

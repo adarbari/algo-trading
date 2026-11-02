@@ -5,7 +5,7 @@
  * its own.
  */
 import { Skeleton, Stack } from '@algotrade/ui';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 
 import { ComparePanel } from '@/widgets/compare-panel';
 import { EventStudyPanel } from '@/widgets/event-study-panel';
@@ -17,13 +17,12 @@ import { ScreenerHitsPanel, WhyIdeaPanel } from '@/widgets/screener-hits-panel';
 
 import { DEFAULT_DIMENSIONS, joinList } from '@/entities/explore';
 import { useViewer } from '@/entities/viewer';
+import { lazyPage } from '@/shared/lib/lazy';
 import { exploreState, openTicker } from '../model/state';
 import type { DetailTabsProps } from './DetailTabs';
 
 // The trader's option grid loads on its own: the Options tab is one of seven in this chunk.
-const OptionGrid = lazy(() =>
-  import('@/widgets/option-grid').then((m) => ({ default: m.OptionGrid })),
-);
+const OptionGrid = lazyPage(() => import('@/widgets/option-grid'), 'OptionGrid');
 
 export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: DetailTabsProps) {
   const state = exploreState(search);
