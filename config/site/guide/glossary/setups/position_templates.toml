@@ -11,25 +11,25 @@ short = "What a setup holds for each pick: one or more legs of shares or options
 body = """
 A position is a list of legs. A share leg is a number of shares, negative for a short. An option leg is a put or a call chosen at entry from that session's chain by a strike rule. A share setup holds one share leg. An option setup holds at least one option leg; a covered call holds both kinds. Every return the setup reports is measured on the position's capital, so read it with the template in mind.
 """
-see_also = ["position_template", "position_collateral", "screener_vs_setup"]
+see_also = ["setup_template", "setup_collateral", "screener_vs_setup"]
 
 [[term]]
-id = "position_template"
+id = "setup_template"
 term = "Position template"
 short = "A named shape of legs a setup can hold, such as long shares, a short put or an iron fly."
 body = """
 The site keeps a short list of templates. Long shares and short shares hold 100 shares. Short put sells one put near 0.30 delta. Put spread also buys a 0.10-delta put below it. Covered call holds 100 shares and sells one 0.30-delta call. Short straddle sells an at-the-money put and call. Iron fly adds two wings 5% out of the money. A setup names one template and may change its numbers, such as the delta. The shape decides the tab: any option leg puts a setup's picks on Premium.
 """
-see_also = ["position", "position_collateral", "exit_take_profit"]
+see_also = ["position", "setup_collateral", "exit_take_profit"]
 
 [[term]]
-id = "position_collateral"
+id = "setup_collateral"
 term = "Collateral"
 short = "The capital a position's return is measured on: its notional, the cash behind a put, its maximum loss or margin."
 body = """
 Shares are measured on their notional, the price times the quantity. A short put is measured on the cash that secures it: the strike times 100. A spread or iron fly is measured on its maximum loss, the width times 100 less the credit. A straddle is measured on a Reg T margin estimate. A 2% return on a cash-secured put and 2% on a spread are not the same risk. Compare setups only on the same collateral.
 """
-see_also = ["position", "position_template"]
+see_also = ["position", "setup_template"]
 
 [[term]]
 id = "verdict_profile"

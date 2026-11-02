@@ -62,4 +62,4 @@ body = """
 A screener is a list of rules over stored fields. It says which names pass at a session and nothing about what happened after. A setup is a written idea with a position, an entry, an exit and a holding period. It names one or more screeners as the way it finds names, and adds a gate over the market. The setup is what gets tested over past sessions and receives a verdict. A screener's hits are candidates; only a setup's picks reach Ideas. Don't treat a screener hit as an idea: it has no tested exit and no verdict.
 """
 next = "Open the setup page to see which screener it rests on and its verdict."
-see_also = ["screener", "edge", "setup_state", "position_template"]
+see_also = ["screener", "edge", "setup_state", "setup_template"]
