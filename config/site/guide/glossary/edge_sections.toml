@@ -80,4 +80,4 @@ body = """
 A setup publishes an idea and its history, not an instruction. Check the next report date of the name: a report inside the holding period changes what the history measured. The stop on the page is the setup's historical exit rule: the drawdown that most winners never passed. It is not fitted to an account, a position size or a risk limit. Those are yours to set. Every figure is backtested (hypothetical) or a forward paper record, and capital is at risk.
 """
 next = "Write down your own stop and size before the first order, not after."
-see_also = ["edge_definition", "setup_how_done", "setup_when_fails", "report_inside_expiry"]
+see_also = ["edge_definition", "setup_how_done", "setup_when_fails", "report_inside_expiry", "idea_exit_rule"]

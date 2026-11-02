@@ -42,13 +42,14 @@ class InstrumentSetup:
 
 
 @strawberry.type(
-    description="Why the name is here: the setup's `thesis` and `mechanism`, the screener's "
+    description="Why the name is here: the setup's `thesis` and `mechanism`, its `basisScreener`'s "
     "`decision` for the name and the `criteria` it met; `unknown` when the pick's row could "
     "not be read"
 )
 class IdeaWhy:
     thesis: str
     mechanism: str
+    basis_screener: str
     decision: str | None
     criteria: list[CriterionResult]
     unknown: Unknown | None
@@ -58,6 +59,7 @@ class IdeaWhy:
         return cls(
             thesis=d.thesis,
             mechanism=d.mechanism,
+            basis_screener=d.basis_screener,
             decision=d.decision,
             criteria=[CriterionResult.of(c) for c in d.criteria],
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,

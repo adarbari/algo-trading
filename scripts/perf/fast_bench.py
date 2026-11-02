@@ -407,11 +407,37 @@ VARIABLE_RESOLVERS: dict[str, dict[str, tuple[str, dict, Callable[[dict], object
             lambda d: [r["name"] for r in d["catalogue"][:3]],
         )
     },
+    "OptionGrid": {
+        "key": (
+            "FeatureTable",
+            {"columns": [], "size": 1},
+            lambda d: d["table"]["instruments"][0]["symbol"],
+        )
+    },
     "HarnessRun": {"runId": ("HarnessRuns", {"limit": 1}, lambda d: d["harnessRuns"][0]["runId"])},
     "AdminScreenerRun": {
         "runId": ("AdminScreenerRuns", {"limit": 1}, lambda d: d["screenerRuns"][0]["runId"])
     },
+    # an idea page needs a name a qualifying setup picked tonight; with none (an Unproven tab) the
+    # page answers null for any ticker, so the gate times that answer with a fixed ticker
+    "IdeaDetail": {
+        "symbol": (
+            "SetupIdeas",
+            {"tab": "STOCKS"},
+            lambda d: (d["setupIdeas"]["ideas"] or [{"instrument": {"symbol": "AAPL"}}])[0][
+                "instrument"
+            ]["symbol"],
+        )
+    },
     "GuideField": {"name": _FEATURE},
+    "FeatureDistribution": {"name": _FEATURE},
+    "EdgeDocument": {
+        "ids": (
+            "EdgesPage",
+            {"filters": None, "q": None},
+            lambda d: [d["edgeList"]["items"][0]["id"]],
+        )
+    },
     "GuideHelpField": {"name": _FEATURE},
     "GuideSituation": {
         "slug": ("GuideIndex", {}, lambda d: d["guideIndex"]["situations"][0]["slug"])

@@ -137,8 +137,26 @@ test('Ideas: a setup group fits the screen and a tapped pick opens its detail in
   expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
   await page.getByRole('row', { name: /AAPL/ }).tap();
   await expect(page.getByRole('dialog', { name: 'AAPL' })).toBeVisible();
-  await page.getByRole('dialog', { name: 'AAPL' }).getByRole('button', { name: 'Open AAPL' }).tap();
+  await page
+    .getByRole('dialog', { name: 'AAPL' })
+    .getByRole('button', { name: 'Open AAPL in Explore' })
+    .tap();
   await expect(page).toHaveURL(/\/explore/);
+});
+
+test('Idea page: the sections stack inside the screen and the exit rule keeps its label', async ({
+  page,
+}) => {
+  await mockIdeasApi(page, undefined, 'listed');
+  await page.goto('/ideas/AAPL?setup=drift');
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  await expect(page.getByRole('heading', { name: 'Historical exit rule' })).toBeVisible();
+  const box = await page.getByRole('heading', { name: 'Evidence' }).boundingBox();
+  expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    innerWidth,
+  );
+  await expect(page.getByRole('button', { name: 'Copy exit rule as text' })).toBeVisible();
 });
 
 test('Screener results: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({
@@ -147,7 +165,7 @@ test('Screener results: the filter bar is one Filters button and a sheet, and an
   await page.goto('/screeners/vrp_scanner');
   const rows = page.getByRole('grid', { name: 'Screener results' });
   await expect(rows.getByRole('row', { name: /CHTR/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Setup', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Filters' }).tap();
   const sheet = page.getByRole('dialog', { name: 'Filters' });
   await sheet.getByRole('button', { name: 'Setup' }).tap();
@@ -339,7 +357,7 @@ test('Screeners: each row is a card with evidence, picks and labelled actions, a
   );
   await expectAccessible(page);
   await row.getByRole('button', { name: /: 12 picks$/ }).tap();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
+  await expect(page).toHaveURL(/\/test\/result\/vrp_scanner$/);
 });
 
 test('Screeners: the filter bar is one Filters button and a sheet, and an empty result offers the way back', async ({
@@ -791,4 +809,31 @@ test('Data-status pill: a tap opens the datasets inside the phone screen', async
   const width = page.viewportSize()?.width ?? 0;
   expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+});
+
+test('Test: the ways in are cards, the steps stay in view, and a template opens its rules', async ({
+  page,
+}) => {
+  await page.goto('/test');
+  await expect(page.getByRole('heading', { level: 1, name: 'Test' })).toBeVisible();
+  const steps = page.getByRole('navigation', { name: 'Test steps' });
+  await expect(steps.getByRole('link', { name: 'Start' })).toHaveAttribute('aria-current', 'page');
+  for (const way of [/^Guided/, /^Expert/, /^Describe it/])
+    await expect(
+      page.getByRole('list', { name: 'Ways in' }).getByRole('button', { name: way }),
+    ).toBeVisible();
+  // The cards stack and the list holds no sideways scroll.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await expectAccessible(page);
+  await page.getByRole('button', { name: /^Guided/ }).tap();
+  await expect(page).toHaveURL(/\/test\/guided$/);
+  await expect(steps.getByRole('link', { name: 'Guided' })).toHaveAttribute('aria-current', 'page');
+  await page
+    .getByRole('list', { name: 'Templates' })
+    .getByRole('button', { name: /vrp_scanner/ })
+    .tap();
+  await expect(page).toHaveURL(/\/test\/expert\/vrp_scanner$/);
+  await expect(steps.getByRole('link', { name: 'Result' })).toBeVisible();
 });
