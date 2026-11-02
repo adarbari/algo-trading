@@ -182,9 +182,14 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
         check_edge(fly, WHERE, TEMPLATES)
 
 
+# Site setups written with ADR 0088's keys from the start (no stored hash of theirs can change).
+BORN_WITH_THE_KEYS = ("index_put_write",)
+
+
 def test_every_site_edge_hashes_without_the_new_keys() -> None:
     new = ("position", "gate", "verdict_profile", "variant_grid", "position_baselines")
-    for edge in load_edges(FileConfigStore(REPO_ROOT / "config")):
+    edges = load_edges(FileConfigStore(REPO_ROOT / "config"))
+    for edge in (e for e in edges if e.id not in BORN_WITH_THE_KEYS):
         assert not set(new) & set(identity_dict(asdict(edge))), edge.id
         assert "position" not in identity_dict(asdict(edge.outcome)), edge.id
 

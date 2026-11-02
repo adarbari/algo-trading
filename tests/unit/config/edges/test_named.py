@@ -170,3 +170,21 @@ def test_every_tracked_index_is_a_site_cboe_series() -> None:
 def test_naming_a_tracked_index_never_changes_the_trials_identity() -> None:
     tracked = sleeve(outcome={**SLEEVE["outcome"], "tracks": "PUT"})  # type: ignore[dict-item]
     assert identity_dict(asdict(tracked)) == identity_dict(asdict(sleeve()))
+
+
+def test_a_monthly_sleeve_holds_up_to_the_gap_between_expiries_and_a_variant_has_its_gate() -> None:
+    """X1: entries the session after each monthly expiry, held up to the window gap (17), a
+    variant with its own gate; a hold past the gap, or a gate on a non-sleeve variant, fails."""
+    monthly = {**SLEEVE["outcome"], "horizon_sessions": [17]}  # type: ignore[dict-item]
+    gate = {"all": [{"field": "market.market_conditions@v2.sessions_to_fomc", "op": "gt",
+                     "value": 2}]}  # fmt: skip
+    edge = sleeve(
+        schedule="calendar:after_monthly_expiry", outcome=monthly,
+        variants=[{"id": "no_fomc", "gate": gate}],
+    )  # fmt: skip
+    assert edge.outcome.horizon_sessions == (17,) and edge.variants[0].gate is not None
+    with pytest.raises(ConfigurationError, match="1 to 17 sessions"):
+        sleeve(schedule="calendar:after_monthly_expiry",
+               outcome={**monthly, "horizon_sessions": [18]})  # fmt: skip
+    with pytest.raises(ConfigurationError, match="only a named option sleeve's variant"):
+        parse_edge(document(variants=[{"id": "g", "gate": gate}]), "drift", "x.toml")

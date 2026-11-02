@@ -10,6 +10,7 @@ Back to the [index of every edge](../edges.md).
 | Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | candidate | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an delta hedged atm short (basis model, not a quote), costs 35 bps | `ivol_high` |
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
+| Index put write (`index_put_write`) | candidate | calendar:after monthly expiry | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a  from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 100% SVXY, entered 1 session after the decision session, costs 10 bps | `etf_priced` |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle long (basis model, not a quote), costs 35 bps | none yet |
@@ -181,6 +182,37 @@ Back to the [index of every edge](../edges.md).
 - Byun, S.-J. and Kim, D.-H. (2016), Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html>
 - Barberis, N. and Huang, M. (2007), Stocks as Lotteries: The Implications of Probability Weighting for Security Prices, NBER working paper 12936 (American Economic Review 2008) <https://www.nber.org/papers/w12936>
 - Kumar, A. (2009), Who Gambles in the Stock Market?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v64y2009i4p1889-1933.html>
+
+## Index put write (`index_put_write`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Selling a cash-secured put on SPY, QQQ or IWM each month earns more on its collateral than holding the same share delta, because index puts are priced above the moves that follow.
+
+- **Outcome:** option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a  from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02)
+- **Schedule:** calendar:after monthly expiry
+- **Universe:** `instrument.symbol in ('SPY', 'QQQ', 'IWM')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** NO VERDICT before a 3-month unseen holdout (ADR 0088): the holdout starts at 2026-11-03, the session after this document was committed (frozen_from is the site's 2026-04-01, before any Cboe chain), so the earliest verdict is on trades whose window closed after 2027-02-03. Built on the Cboe-era store only (chains from 2026-10-02); the bought option history (build row E5) is not purchased, so no earlier trades exist, and evidence derived from it would be owner-only (personal). Entry: the first session after each monthly expiry (the date the Cboe PUT index rolls; owner decision 2026-11-01 (c)), a 20-delta put on the next monthly expiry (tenor_days 21 always selects it), held 17 sessions (the shortest gap between two such entries, so holds never overlap; the put is closed 0 to 7 sessions before its expiry, where the PUT index holds it to expiry; in the rare month whose next expiry falls inside the hold, the expiry floor takes the following monthly, a two-month put). The every-session ladder (overlapping puts) is a separate setup to build, not a variant here: a schedule is not a variant key (backend-plan G18); it must name this edge in its notes, since it is the same idea tested again. The fomc_clear variant only skips an entry with 2 or fewer sessions to the next FOMC decision known at D; most 17-session holds still contain a decision. Each named symbol, the fomc_clear variant and every grid point is one trial of the deflated Sharpe ratio. Not paper traded (the record refuses a setup with no screener), and the holdout is not enforced by code yet: a verdict before 2027-02-03 is prevented only by the 40 out-of-sample trades a verdict needs (at most 12 a year per trial). Tracking: each window's return on collateral beside the Cboe PUT index's (personal licence); the SPX index itself is not traded.
+
+**Quality bar**
+
+1. **Mechanism:** Investors pay for index protection (insurance mandates, portfolio overlays), and dealers who sell it charge for carrying the short-gamma risk; index implied volatility sits above the realised volatility that follows (Driessen, Maenhout and Vilkov: 24.7% against 20.8%, 1996-2003).
+2. **Persistence:** The demand for protection is structural and the seller is paid for a tail few hold through, but most of a put writer's return is its equity beta (Israelov and Nielsen), so the claim tested here is the part beyond the delta-equivalent stock, on the same collateral and cost.
+3. **Outcome:** The option position's return on its cash-secured collateral (strike x 100) from the entry close to the close 17 sessions later (or its declared exit), net of the site's option cost levels, against the delta-equivalent stock held over the same sessions on the same collateral and cost (base delta_equivalent); the T-bill on the collateral is set beside it.
+4. **Trigger timing:** The monthly expiry is fixed by the exchange calendar ahead of time; D is the monthly expiry session and S the session after it, so nothing beyond D is read to place an entry. The gate reads market_conditions@v2 at D (the VIX curve, implied against realised volatility, trend); the fomc_clear variant also needs more than 2 sessions to the next FOMC decision known at D.
+5. **Faithful replication:** The Cboe PUT index sells a one-month at-the-money SPX put each month at the roll and holds it to expiry, collateralised in T-bills. Here: SPY, QQQ and IWM puts at 20 delta on the next monthly expiry, entered the session after the roll, held 17 sessions, a setup gate on top. A 16 and 30 delta, a two-month tenor and a 50% take-profit are the pre-registered grid.
+6. **Expected size and sample:** PUT has matched the S&P 500 total return over 1986-2024 with about two thirds of its volatility (Cboe-commissioned study; not a harness figure); against beta-matched equity the excess is about 1 to 2% a year before costs (practitioner estimates, not verified). Expect a small excess over the delta-equivalent stock, and losses in sharp sell-offs (2008, 2020, 2022).
+7. **Capacity and costs:** SPY, QQQ and IWM options are among the most liquid listed; a cash-secured put needs the strike x 100 in cash. 12 entries a year per symbol; the round trip pays the option cost levels and commission in verdict.toml [option_costs].
+8. **Failure modes and retirement:** A crash inside the hold (the put loses many times its credit); a regime where implied volatility no longer exceeds realised; the gate keeping the sleeve out of the best-paid months. Retire if the frozen-period return on collateral over the delta-equivalent stock is not above zero after costs, or its tail (CVaR) is worse than the stock's on the same collateral.
+9. **Decoys:** Equity beta (the delta-equivalent stock on the same collateral is the base), the T-bill on the collateral, and the Cboe PUT index's own return over each window (the tracking figure).
+
+**Sources**
+
+- Israelov, R. and Nielsen, L., Covered Calls Uncovered, Financial Analysts Journal, 2015 <https://rpc.cfainstitute.org/research/financial-analysts-journal/2015/covered-calls-uncovered>
+- Driessen, J., Maenhout, P. and Vilkov, G., The Price of Correlation Risk, Journal of Finance, 2009
+- Cboe S&P 500 PutWrite Index (PUT) methodology <https://www.cboe.com/us/indices/dashboard/put/>
 
 ## Option-implied signals (`option_cp_iv_signals`)
 

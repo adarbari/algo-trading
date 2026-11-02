@@ -60,6 +60,11 @@ WINDOW_LENGTHS: dict[str, int] = {
     "pre_holiday": 1,
 }
 WINDOW_NAMES = tuple(WINDOW_LENGTHS)
+# The fewest sessions from one window's first session to the next's, over 2000-2040 (a test
+# recomputes it from the calendar): a named option sleeve (``delta_equivalent``) on such a window
+# may hold up to this many sessions, the window placing only its entry, and its holds never
+# overlap. Only the windows a sleeve may use are declared.
+WINDOW_GAPS: dict[str, int] = {"after_monthly_expiry": 17}
 _QUARTER_MONTHS = (3, 6, 9, 12)
 
 

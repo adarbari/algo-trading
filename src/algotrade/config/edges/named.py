@@ -8,11 +8,14 @@ it measures an ``option_pnl`` outcome of one hold on a plain or calendar schedul
 variants and a grid. Pure: it reads the parsed selection only; turning a symbol into an id is the
 harness's, through ``SymbolResolver`` (ADR 0018), never a string built here."""
 
+from collections.abc import Sequence
+
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.schedules.events import ON_EVENT
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import Rule
+from algotrade.core.time.windows import WINDOW_GAPS, window_length
 
 OUT_OF_WINDOW = "out_of_window"  # the ``base`` of a time-series edge
 DELTA_EQUIVALENT = "delta_equivalent"  # the ``base`` of a named option sleeve (ADR 0088)
@@ -32,11 +35,18 @@ def check_raw_returns(where: str, kind: str, benchmark: str, timed: bool) -> Non
         )
 
 
-def check_variants(where: str, base: str | None, edge_base: str, universe: bool = False) -> None:
+def check_variants(
+    where: str, base: str | None, edge_base: str, universe: bool = False, gate: bool = False
+) -> None:
     """A variant's ``base`` (None: the edge's) against the edge's ``edge_base``: an out-of-window
     edge has no variants, and a named option sleeve's variants stay sleeves (a variant neither
     leaves nor joins ``delta_equivalent``) over the edge's own names (``universe``: the variant
-    sets one)."""
+    sets one). Only a sleeve's variant may set its own ``gate`` (ADR 0088 decision 7: the
+    sleeve's trials apply it; a screener edge's picks and harness apply the edge's alone)."""
+    if gate and edge_base != DELTA_EQUIVALENT:
+        raise ConfigurationError(
+            f"{where} gate: only a named option sleeve's variant has its own gate"
+        )
     if OUT_OF_WINDOW in (base, edge_base):
         raise ConfigurationError(f"{where}: a time-series edge has no variants")
     if universe and edge_base == DELTA_EQUIVALENT:
@@ -49,6 +59,25 @@ def check_variants(where: str, base: str | None, edge_base: str, universe: bool 
             f"{DELTA_EQUIVALENT!r}, and only a sleeve has it; got {base!r} on an edge "
             f"of base {edge_base!r}"
         )
+
+
+def check_window_hold(where: str, window: str, horizons: Sequence[int], sleeve: bool) -> None:
+    """The hold of an edge on ``calendar:<window>``: the window's length (ADR 0073 decision 2),
+    or for a named option ``sleeve``, whose window places only the entry, one hold from that
+    length to the window's declared gap (``WINDOW_GAPS``), so two holds never overlap."""
+    low = window_length(window)
+    high = WINDOW_GAPS.get(window, low) if sleeve else low
+    if len(horizons) == 1 and low <= horizons[0] <= high:
+        return
+    if not sleeve:
+        raise ConfigurationError(
+            f"{where} horizon_sessions: calendar:{window} is {low} sessions long, so its one "
+            f"horizon is [{low}], got {list(horizons)}"
+        )
+    raise ConfigurationError(
+        f"{where} horizon_sessions: a sleeve on calendar:{window} holds one horizon of {low} to "
+        f"{high} sessions (the shortest gap between its windows), got {list(horizons)}"
+    )
 
 
 def check_sleeve(

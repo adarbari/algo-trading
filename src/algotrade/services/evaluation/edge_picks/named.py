@@ -9,7 +9,7 @@ from dataclasses import replace
 from datetime import date
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.named import OUT_OF_WINDOW, named_symbols
+from algotrade.config.edges.named import DELTA_EQUIVALENT, OUT_OF_WINDOW, named_symbols
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.windows import window_name
 from algotrade.data import StoreReader
@@ -29,8 +29,9 @@ from algotrade.storage.tables.edge_schemas import NAMED
 
 
 def is_named(edge: Edge) -> bool:
-    """Whether ``edge`` is a named-symbol (time-series) setup, whose rows are under ``NAMED``."""
-    return edge.base == OUT_OF_WINDOW
+    """Whether ``edge`` is a named-symbol setup (a time-series edge or a named option sleeve),
+    whose rows are under ``NAMED``."""
+    return edge.base in (OUT_OF_WINDOW, DELTA_EQUIVALENT)
 
 
 def decides(reader: StoreReader, edge: Edge, day: date) -> bool:
