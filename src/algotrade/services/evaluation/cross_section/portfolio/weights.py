@@ -12,12 +12,15 @@ an input (a missing volatility given zero weight would be a bet nobody declared)
 - A book has ``slots`` places (``top_k``): each one the picks leave unfilled, and each ``CASH``
   pick, is a share of ``1 / slots`` in cash (re-normalising over fewer names would put the whole
   book in one); the names share the rest by the weighting (cash has no score or volatility).
+- ``slots`` (a named option sleeve's ladder, E8b): each pick ``1 / slots`` of the collateral, the
+  rest cash; the slots are fixed before the run (``ladder.py``), so no pick is sized from
+  hindsight and the book is never levered (more picks than slots is refused).
 - No picks: all cash, a cash session (not an excluded one)."""
 
 import math
 from collections.abc import Mapping, Sequence
 
-from algotrade.config.edges.portfolio import CASH, EQUAL, INVERSE_VOL, SCORE
+from algotrade.config.edges.portfolio import CASH, EQUAL, INVERSE_VOL, SCORE, SLOTS
 
 NO_VOL = "no_vol"  # a pick has no finite positive volatility at D
 NO_SCORE = "no_score"  # a pick has no finite positive score at D
@@ -44,7 +47,11 @@ def book_weights(
     names = [i for i in ids if i != CASH]
     size = max(slots or len(ids), len(ids))  # the book's slots; one a pick does not fill is cash
     cash = (size - len(names)) / size if size > len(names) else 0.0
-    if weighting == EQUAL:
+    if weighting == SLOTS:
+        if slots is None or len(names) > slots:
+            raise ValueError(f"a slots book has fixed slots: {len(names)} picks for {slots}")
+        raw = dict.fromkeys(names, 1.0)
+    elif weighting == EQUAL:
         raw = dict.fromkeys(names, 1.0)
     elif weighting == INVERSE_VOL:
         if not all(_usable(vols.get(i)) for i in names):
