@@ -1,4 +1,4 @@
-"""`scripts/changed_web.py`: changed web files map to vitest folders, e2e specs, screenshots."""
+"""`scripts/changed_web.py`: changed web files map to the static gates, related tests, budgets."""
 
 import importlib.util
 import sys
@@ -22,33 +22,52 @@ def test_a_slice_file_maps_to_its_folder_and_the_type_gate() -> None:
         "npm run ds:check",
         "npx eslint --max-warnings=0 --no-warn-ignored src/entities/feature/columns.tsx",
         "npm run typecheck",
-        "npx vitest run src/entities/feature",
+        "npx vitest related --run src/entities/feature/columns.tsx",
         "env VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key"
         " npx vite build",
         "npm run perf:bundle",
     ]
 
 
-def test_a_page_maps_to_the_spec_named_after_it() -> None:
-    got = cmds("apps/web/src/pages/trader-ideas/IdeasPage.tsx")
-    assert "npx playwright test e2e/ideas.spec.ts" in got
-    assert "npx vitest run src/pages/trader-ideas" in got
+def test_the_changed_code_files_go_to_one_related_vitest_run() -> None:
+    got = cmds(
+        "apps/web/src/pages/trader-ideas/IdeasPage.tsx",
+        "apps/web/src/widgets/watchlist-editor/ui/Editor.tsx",
+        "apps/web/scripts/check-bundle-budgets.ts",
+    )
+    unit = [c for c in got if "vitest" in c]
+    assert unit == [
+        "npx vitest related --run scripts/check-bundle-budgets.ts"
+        " src/pages/trader-ideas/IdeasPage.tsx src/widgets/watchlist-editor/ui/Editor.tsx"
+    ]
 
 
-def test_a_route_maps_to_its_spec_and_an_unknown_one_to_smoke() -> None:
-    assert "npx playwright test e2e/regime.spec.ts" in cmds(
-        "apps/web/src/app/routes/trader/regime-route.tsx"
+def test_the_generated_client_is_not_a_related_root() -> None:
+    # every test imports the client: `related` on it would be the whole suite, which CI runs
+    got = cmds("apps/web/src/shared/api/generated/graphql/gql.ts")
+    assert not any("vitest" in c for c in got)
+    assert "npm run typecheck" in got
+
+
+def test_no_e2e_spec_runs_locally_but_the_bundle_budgets_do() -> None:
+    # owner decision 2026-11-02: CI runs the Playwright specs; the bundle stays local
+    got = cmds(
+        "apps/web/src/pages/trader-ideas/IdeasPage.tsx",
+        "apps/web/src/app/routes/trader/regime-route.tsx",
+        "apps/web/e2e/ideas.spec.ts",
     )
-    assert "npx playwright test e2e/smoke.spec.ts" in cmds(
-        "apps/web/src/pages/placeholder/Page.tsx"
-    )
-    assert "npx playwright test e2e/smoke.spec.ts" in cmds("apps/web/src/app/routes/root.ts")
+    assert not any("playwright" in c for c in got)
+    assert got[-2:] == [
+        "env VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key"
+        " npx vite build",
+        "npm run perf:bundle",
+    ]
 
 
 def test_a_story_or_css_module_maps_to_the_component_screenshots() -> None:
     got = cmds("apps/web/design-system/components/Banner/Banner.module.css")
     assert "npm run visual -- --grep Banner" in got
-    assert "npx vitest run design-system/components/Banner" in got
+    assert "npx vitest related --run design-system/components/Banner/Banner.module.css" in got
     off = cmds("apps/web/design-system/components/Banner/Banner.stories.tsx", linux=False)
     assert "npm run visual:docker -- --grep Banner" in off
 
@@ -85,8 +104,9 @@ def test_a_deleted_file_is_not_format_checked(tmp_path: Path) -> None:
     assert "Kept.tsx" in fmt and "Gone.tsx" not in fmt
 
 
-def test_a_deleted_folder_has_no_tests_to_run(tmp_path: Path) -> None:
-    (tmp_path / "src/widgets/kept").mkdir(parents=True)
+def test_a_deleted_file_has_no_related_tests(tmp_path: Path) -> None:
+    (tmp_path / "src/widgets/kept/ui").mkdir(parents=True)
+    (tmp_path / "src/widgets/kept/ui/Kept.tsx").write_text("")
     got = [
         " ".join(c)
         for _, c in changed_web.plan(
@@ -98,8 +118,21 @@ def test_a_deleted_folder_has_no_tests_to_run(tmp_path: Path) -> None:
             tmp_path,
         )
     ]
-    assert "npx vitest run src/widgets/kept" in got
-    assert "npx vitest run src/widgets/gone" not in got
+    assert "npx vitest related --run src/widgets/kept/ui/Kept.tsx" in got
+
+
+def test_type_checking_stays_incremental_between_runs() -> None:
+    # `tsc -b` reuses its build info only if it survives the run: node_modules/.tmp does
+    web = SCRIPTS.parent / "apps" / "web"
+    for name in ("tsconfig.app.json", "tsconfig.node.json"):
+        text = (web / name).read_text()
+        assert '"tsBuildInfoFile": "./node_modules/.tmp/' in text, name
+
+
+def test_a_design_system_change_makes_the_missing_screenshot_baselines_first() -> None:
+    got = cmds("apps/web/design-system/components/Banner/Banner.stories.tsx")
+    assert got.index("npm run visual:missing") < got.index("npm run ds:check")
+    assert "npm run visual:missing" not in cmds("apps/web/src/entities/feature/columns.tsx")
 
 
 def test_app_and_design_system_code_adds_the_bundle_budgets_but_a_config_file_does_not() -> None:
@@ -113,3 +146,13 @@ def test_eslint_does_not_fail_on_a_changed_file_the_config_ignores() -> None:
     # argument it warns "File ignored", and --max-warnings=0 turned that into a failed push
     got = cmds("apps/web/src/shared/api/generated/graphql/gql.ts")
     assert any(c.startswith("npx eslint") and "--no-warn-ignored" in c for c in got)
+
+
+def test_only_a_changed_story_file_can_need_new_baselines() -> None:
+    for name in ("Banner.tsx", "Banner.module.css", "Banner.test.tsx", "index.ts"):
+        assert "npm run visual:missing" not in cmds(
+            f"apps/web/design-system/components/Banner/{name}"
+        )
+    assert "npm run visual:missing" in cmds(
+        "apps/web/design-system/components/Banner/Banner.stories.tsx"
+    )
