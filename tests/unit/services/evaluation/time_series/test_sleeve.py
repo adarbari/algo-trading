@@ -228,8 +228,9 @@ def test_a_spy_thirty_delta_sleeve_reports_its_book_and_its_put_tracking() -> No
     value = (1.0 - SPREAD) / COLLATERAL
     book = main.book
     # one named instrument, entries spaced by the hold: one slot, every trade the whole book
-    assert (book["slots"], book["cohorts"], book["max_drawdown"]) == (1, n, 0.0)
+    assert (book["slots"], book["cohorts"], book["max_drawdown_realised"]) == (1, n, 0.0)
     assert book["tracks"] == "PUT" and book["tracked_windows"] == n
+    assert book["tracking_licence"] == "personal"  # Cboe data: a reader filters on it
     diffs = [
         value + BILL * H / 252 - (PUT_LEVEL(s + timedelta(days=3)) / PUT_LEVEL(s) - 1)
         for _, s in entries(edge)
@@ -243,3 +244,20 @@ def test_a_sleeve_with_no_tracked_index_has_its_book_and_no_tracking() -> None:
     out = run(world(edge), edge)
     assert {r.book["slots"] for r in out.results} == {1}
     assert all("tracks" not in r.book for r in out.results)
+
+
+def test_a_book_of_two_slots_tracks_each_cohort_on_its_own_collateral() -> None:
+    # two named instruments, so two slots: SPY's trade is half the book (QQQ is not in the
+    # reference, its slot stays cash), but the index is set beside SPY's own return on collateral
+    two = {"where": {"all": [{"field": "instrument.symbol", "op": "in", "value": ["SPY", "QQQ"]}]}}
+    edge = sleeve_edge(
+        outcome={**SLEEVE["outcome"], "tracks": "PUT"}, variant_grid=None, universe=two
+    )  # type: ignore[dict-item]
+    spy, qqq = run(world(edge, tracked=True), edge).results
+    value = (1.0 - SPREAD) / COLLATERAL
+    assert spy.book == qqq.book and spy.book["slots"] == 2 and qqq.in_window == ()
+    diffs = [
+        value + BILL * H / 252 - (PUT_LEVEL(s + timedelta(days=3)) / PUT_LEVEL(s) - 1)
+        for _, s in entries(edge)
+    ]
+    assert spy.book["tracking_mean_difference"] == pytest.approx(sum(diffs) / len(diffs))

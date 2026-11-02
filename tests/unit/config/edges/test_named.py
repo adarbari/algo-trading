@@ -2,13 +2,15 @@
 short list, and the document rules around ``base = "out_of_window"`` and a named option sleeve's
 ``base = "delta_equivalent"`` (ADR 0088 decision 14)."""
 
+from dataclasses import asdict
 from typing import Any
 
 import pytest
 
 from algotrade.config.edges.document import parse_edge
+from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.named import MAX_NAMED, named_symbols
-from algotrade.config.edges.portfolio import TRACKED_INDEXES
+from algotrade.config.edges.portfolio import TRACKED_INDEXES, TRACKED_LICENCE
 from algotrade.config.site.settings import load_macro
 from algotrade.config.strategy.schema import Group, Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
@@ -160,5 +162,11 @@ def test_only_a_sleeve_tracks_a_cboe_strategy_index() -> None:
 
 
 def test_every_tracked_index_is_a_site_cboe_series() -> None:
-    keys = {s.key for s in load_macro(FileConfigStore(REPO_ROOT / "config", local=False)).series}
-    assert set(TRACKED_INDEXES) <= keys
+    site = {s.key: s for s in load_macro(FileConfigStore(REPO_ROOT / "config", local=False)).series}
+    assert set(TRACKED_INDEXES) <= set(site)
+    assert {site[k].licence for k in TRACKED_INDEXES} == {TRACKED_LICENCE}  # what a figure carries
+
+
+def test_naming_a_tracked_index_never_changes_the_trials_identity() -> None:
+    tracked = sleeve(outcome={**SLEEVE["outcome"], "tracks": "PUT"})  # type: ignore[dict-item]
+    assert identity_dict(asdict(tracked)) == identity_dict(asdict(sleeve()))

@@ -38,6 +38,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN, Edge, Outcome
 from algotrade.config.edges.named import DELTA_EQUIVALENT, named_symbols
+from algotrade.config.edges.portfolio import TRACKED_LICENCE
 from algotrade.config.edges.positions.key import grid_outcomes, position_key
 from algotrade.config.edges.positions.templates import Templates
 from algotrade.config.edges.verdict import OptionCosts
@@ -236,7 +237,9 @@ def _book(
     """One edge variant's book over its trials' measured (open-gate) trades and, when the outcome
     ``tracks`` an index, its tracking; the slots from the placed entries alone."""
     horizon = edge.outcome.horizon_sessions[0]
-    depth = max(ladder_depth([p.entry for p in ps], horizon, days), 1)
+    placed = [p.entry for p in ps]  # the sessions through the last S: an S after ``end`` counts
+    through = sessions_between(days[0], max(placed)) if placed else list(days)
+    depth = max(ladder_depth(placed, horizon, through), 1)
     trades: list[tuple[str, date, date, float]] = []
     for r in trials:
         if r.trades is None:
@@ -253,8 +256,10 @@ def _book(
     if edge.outcome.tracks is None:
         return figures
     decided = {p.entry: p.decision for p in ps}
-    windows = [(decided[c.entry], c.entry, c.exit, c.value) for c in book if c.entry in decided]
+    # each cohort on the collateral its own trades used, as the index is on its whole collateral
+    windows = [(decided[c.entry], c.entry, c.exit, c.mean) for c in book if c.entry in decided]
     bills = harness.bill_returns(reader, [w[0] for w in windows], horizon, as_of)
     last = max([end, *(c.exit for c in book)])
     levels = harness.index_levels(reader, edge.outcome.tracks, start, last, as_of)
-    return {**figures, **index_tracking(windows, levels, bills, edge.outcome.tracks)}
+    tracked = index_tracking(windows, levels, bills, edge.outcome.tracks)
+    return {**figures, **tracked, "tracking_licence": TRACKED_LICENCE}

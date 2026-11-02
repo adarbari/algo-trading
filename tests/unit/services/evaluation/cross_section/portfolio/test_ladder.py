@@ -32,18 +32,20 @@ def test_each_trade_holds_one_slot_and_an_unfilled_slot_is_cash() -> None:
     assert [c.value for c in book] == pytest.approx([(0.02 - 0.04) / 2, 0.03 / 2])
     deeper = cohorts(trades, names=2, depth=2)  # twice the slots: each trade half as large
     assert [c.value for c in deeper] == pytest.approx([-0.005, 0.0075])
+    # its own return on the collateral its trades used is the same at any depth (the tracking's)
+    assert [c.mean for c in deeper] == [c.mean for c in book] == pytest.approx([-0.01, 0.03])
 
 
 def test_the_drawdown_and_worst_month_are_over_realised_exits() -> None:
     book = [
-        Cohort(date(2024, 1, 2), date(2024, 1, 30), 0.10),
-        Cohort(date(2024, 2, 1), date(2024, 2, 27), -0.22),
-        Cohort(date(2024, 2, 28), date(2024, 3, 26), 0.05),
-        Cohort(date(2024, 1, 31), date(2024, 2, 28), -0.03),
+        Cohort(date(2024, 1, 2), date(2024, 1, 30), 0.10, 0.10),
+        Cohort(date(2024, 2, 1), date(2024, 2, 27), -0.22, -0.22),
+        Cohort(date(2024, 2, 28), date(2024, 3, 26), 0.05, 0.05),
+        Cohort(date(2024, 1, 31), date(2024, 2, 28), -0.03, -0.03),
     ]
     got = book_figures(book, slots=1)
     # equity 1 -> 1.10 (Jan) -> 0.88 -> 0.85 (Feb) -> 0.90 (Mar): from the 1.10 peak to 0.85
-    assert got["max_drawdown"] == pytest.approx(1 - 0.85 / 1.10)
+    assert got["max_drawdown_realised"] == pytest.approx(1 - 0.85 / 1.10)
     assert (got["worst_month"], got["worst_month_of"]) == (pytest.approx(-0.25), "2024-02")
     assert (got["cohorts"], got["slots"]) == (4, 1)
-    assert book_figures([], slots=3)["max_drawdown"] is None
+    assert book_figures([], slots=3)["max_drawdown_realised"] is None

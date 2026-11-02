@@ -33,6 +33,7 @@ SLOTS = "slots"
 # The Cboe strategy indexes (``config/site/series/cboe.toml``, ``IDX:<key>``) a named option sleeve
 # may name as ``tracks``: its return over each window is set beside the index's (E8b).
 TRACKED_INDEXES = ("PUT", "WPUT", "BXM", "BXMD", "CNDR")
+TRACKED_LICENCE = "personal"  # Cboe data: what a tracking figure read from them carries
 # A blend's weights add to one within this tolerance (``0.6, 0.4`` is exact, thirds are not).
 MIX_TOLERANCE = 1e-6
 _TICKER = re.compile(r"[A-Z][A-Z0-9.\-]{0,9}")

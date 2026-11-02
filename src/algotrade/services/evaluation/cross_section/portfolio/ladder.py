@@ -27,12 +27,14 @@ from algotrade.services.evaluation.cross_section.portfolio.weights import book_w
 
 @dataclass(frozen=True)
 class Cohort:
-    """The trades entered at one session: ``entry`` S, the last ``exit`` among them and the
-    cohort's slot-weighted return on the book's collateral."""
+    """The trades entered at one session: ``entry`` S, the last ``exit`` among them, the cohort's
+    slot-weighted return on the book's collateral (``value``) and its own return on the collateral
+    its trades used (``mean``, the plain mean over them: what an index on that collateral earns)."""
 
     entry: date
     exit: date
     value: float
+    mean: float
 
 
 def ladder_depth(entries: Sequence[date], hold: int, sessions: Sequence[date]) -> int:
@@ -62,18 +64,19 @@ def cohorts(
         returns = {name: value for name, _, value in held}
         weights, _ = book_weights(sorted(returns), SLOTS, {}, {}, names)
         value = sum(w * returns[n] for n, w in weights if n in returns) / depth
-        out.append(Cohort(entry, max(e for _, e, _ in held), value))
+        mean = sum(returns.values()) / len(returns)
+        out.append(Cohort(entry, max(e for _, e, _ in held), value, mean))
     return tuple(out)
 
 
 def book_figures(book: Sequence[Cohort], slots: int) -> dict[str, float | int | str | None]:
-    """The book's ``max_drawdown`` (a positive fraction of the fixed capital, over realised
-    exits), ``worst_month`` (the lowest summed return of the cohorts exiting in one calendar
-    month, ``worst_month_of`` its ``YYYY-MM``), the cohorts counted and the ``slots``; None
-    figures without a cohort."""
+    """The book's ``max_drawdown_realised`` (a positive fraction of the fixed capital, over realised
+    exits, never a mark-to-market drawdown), ``worst_month`` (the lowest summed return of the
+    cohorts exiting in one calendar month, ``worst_month_of`` its ``YYYY-MM``), the cohorts counted
+    and the ``slots``; None figures without a cohort."""
     ordered = sorted(book, key=lambda c: (c.exit, c.entry))
     if not ordered:
-        return {"slots": slots, "cohorts": 0, "max_drawdown": None, "worst_month": None,
+        return {"slots": slots, "cohorts": 0, "max_drawdown_realised": None, "worst_month": None,
                 "worst_month_of": None}  # fmt: skip
     equity = 1.0 + np.cumsum([c.value for c in ordered])
     months: dict[str, float] = {}
@@ -84,7 +87,7 @@ def book_figures(book: Sequence[Cohort], slots: int) -> dict[str, float | int | 
     return {
         "slots": slots,
         "cohorts": len(ordered),
-        "max_drawdown": max_drawdown(np.concatenate([[1.0], equity])),
+        "max_drawdown_realised": max_drawdown(np.concatenate([[1.0], equity])),
         "worst_month": months[worst],
         "worst_month_of": worst,
     }
