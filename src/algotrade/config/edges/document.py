@@ -276,6 +276,7 @@ class Outcome:
     position: PositionSpec | None = None  # a template of config/site/positions (ADR 0088)
     entry: EntrySpec | None = None  # an entry condition (ADR 0088): the same rule for both kinds
     tracks: str | None = None  # a named sleeve's Cboe strategy index (portfolio.TRACKED_INDEXES)
+    wheel: named.WheelSpec | None = None  # the call phase of a wheel (named.py)
 
     @property
     def result_side(self) -> str:
@@ -476,7 +477,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     chain.check_kinds(where, [outcome, *(v.outcome for v in variants)])
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
         check_base(held.kind, held_base, where)
-        named.check_sleeve(where, held.kind, len(held.horizon_sessions), held_base, held.tracks)
+        named.check_sleeve(where, held, held_base)
         if held.side != LONG and top_k is None:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
@@ -741,7 +742,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     horizons = _horizons(o)
     offset = o.integer("start_offset_sessions", 0)
     event = event_class(schedule)
-    window = window_name(schedule)
+    window, wheel = window_name(schedule), named.wheel_of(o, base, schedule)
     if market_trigger(schedule) is not None and (offset != 1 or len(horizons) != 1):
         raise ConfigurationError(
             f"{o.where}: {schedule} enters at the session after the trigger session "
@@ -754,7 +755,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
                 f"{o.where} start_offset_sessions: a calendar window starts at the session after "
                 f"the decision session (D = S - 1), so 1, got {offset}"
             )
-        named.check_window_hold(o.where, window, horizons, base == named.DELTA_EQUIVALENT)
+        named.check_window_hold(o.where, window, horizons, base, wheel)
     if event is None and offset < 1:
         raise ConfigurationError(
             f"{o.where} start_offset_sessions: the screen runs after the decision session's "
@@ -806,6 +807,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         vol_return_field=vol_return_field,
         canary=canary_of(o, kind),
         tracks=tracks_of(o),
+        wheel=wheel,
         position=spec_of(o, kind, offset, cases),
         entry=entry_of(o),
     )

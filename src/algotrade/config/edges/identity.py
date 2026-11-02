@@ -34,7 +34,7 @@ def identity_dict(value: Any) -> Any:
             and not (plain and k in ("weighting", "vol_field"))
             and not (k == "ensemble" and not v)
             and not (k == "canary" and v is None)
-            and not (k in ("position", "gate", "verdict_profile", "entry") and v is None)
+            and not (k in ("position", "gate", "verdict_profile", "entry", "wheel") and v is None)
             # tracks: a benchmark only, naming one never changes a trade (E8b); holdout_from: when a
             # verdict may be given, never what is measured (ADR 0088 decision 15)
             and k not in ("tracks", "holdout_from")

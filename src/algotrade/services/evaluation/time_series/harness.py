@@ -24,6 +24,7 @@ from algotrade.data import StoreReader
 from algotrade.data.macro.series import series_as_of
 from algotrade.data.outcomes import (
     CHAIN_COLUMNS,
+    held_rows,
     read_chain_stored,
     read_stored,
     select_chain,
@@ -111,6 +112,34 @@ def read_trades(
         return pd.DataFrame(columns=[*CHAIN_COLUMNS, *CHAIN_KEYS])
     found = select_chain(stored, horizon, wanted, as_of)
     return found[found["instrument_id"].isin(set(ids))].reset_index(drop=True)
+
+
+def read_trade_holds(
+    reader: StoreReader,
+    ids: Collection[str],
+    entries: Sequence[date],
+    holds: Collection[int],
+    as_of: datetime,
+) -> dict[int, tuple[pd.DataFrame, pd.DataFrame]]:
+    """For each of ``holds``, ``(trades, paths)`` of ``ids`` entered on ``entries``, from one read
+    of the partitions as they stood at ``as_of``: ``trades`` as ``read_trades`` has them (every
+    position key), ``paths`` the same rows in the grain's own columns (the legs' expiries and the
+    spot path ``select_chain`` leaves out, which a cycle reads). None stored: empty frames."""
+    wanted = sorted(set(entries))
+    stored = read_chain_stored(reader, wanted, as_of) if wanted and ids else None
+    out: dict[int, tuple[pd.DataFrame, pd.DataFrame]] = {}
+    for hold in sorted(set(holds)):
+        if stored is None:
+            out[hold] = (pd.DataFrame(columns=[*CHAIN_COLUMNS, *CHAIN_KEYS]), pd.DataFrame())
+            continue
+        trades = select_chain(stored, hold, wanted, as_of)
+        paths = held_rows(stored, hold, wanted, as_of)
+        mine = set(ids)
+        out[hold] = (
+            trades[trades["instrument_id"].isin(mine)].reset_index(drop=True),
+            paths[paths["instrument_id"].isin(mine)].reset_index(drop=True),
+        )
+    return out
 
 
 def bill_returns(

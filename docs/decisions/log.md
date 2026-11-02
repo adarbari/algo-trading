@@ -284,6 +284,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: G18 settled that a schedule is not a variant key after the owner's (c), so the ladder is a sibling naming X1; identical parameters isolate the entry-date axis; joint trial counting cannot affect a verdict before the holdout closes, so it is a dated follow-up, not a blocker.
 
+## 2026-11-02 | X7 the wheel (EF-G13) | A book over stored v2 rows, entries after an assignment the next session, holds 17-25
+- Question: (1) a wheel as a book over existing rows, a new "hold to expiry" semantic or a new grain? (2) when does the phase after an assignment enter? (3) what does the first PR report and judge?
+- Options: (1) book over rows with one hold per entry length / a row-varying hold under one key (a stored-contract change) / a wheel grain; (2) the expiry's close / the next session; (3) a judged trial with a baseline / a candidate whose book is the evidence.
+- Decision: (1) a book over rows (`portfolio/cycle.py`, generic: a transition table from how a row ended to the next phase), `[outcome.wheel]` for the call phase, `horizon_sessions` the calendar's gaps and one less (17-25), no schema change. (2) an assignment is learned after the close, so the call (and the put after a call-away) enters the next session; an expiry that was not assigned enters at the expiry session (the Cboe roll). (3) a candidate `index_put_wheel` with no verdict trial or baseline; the book (drawdown, worst month, stock and option parts, cycles dropped) is the evidence, Cboe-era only; dividends, splits, single names and rolls are not measured and said so.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: EF-G13 and backend-plan 2.11 already specify a book over v2 rows; a row-varying hold would change the stored contract; entering the call at the expiry close would use a few hours of hindsight on assignment (pin risk).
 ## 2026-11-02 | FilterBar's narrow form (ADR 0052 MU3, ADR 0082, ADR 0085) | The sheet form stays; the `scroll` form is deleted
 - Question: which phone form of `FilterBar` stays, the sheet ("Filters · N" button, a side sheet) or the sideways-scrolling chip row?
 - Options: sheet / scroll.

@@ -28,6 +28,7 @@ from algotrade.data.outcomes.grains import (
 )
 from algotrade.data.outcomes.reading import (
     OUTCOME_FIELDS,
+    held_rows,
     missing_outcomes,
     outcome_known,
     outcome_seqs,
@@ -74,6 +75,7 @@ __all__ = [
     "chain_seqs",
     "chain_sessions",
     "chain_stamps",
+    "held_rows",
     "licence_frames",
     "missing_chain",
     "missing_outcomes",
