@@ -124,7 +124,7 @@ def test_every_reason_the_harness_can_produce_maps_to_a_public_kind() -> None:
     constants = {
         v for k, v in vars(hit).items()
         if k.isupper() and isinstance(v, str) and v.islower() and "_" in v
-        and k not in {"IMPLIED_VOL_FIELD", "CHAIN_KIND"}
+        and k not in {"IMPLIED_VOL_FIELD", "CHAIN_KIND", "RAW_RETURN"}
     }  # fmt: skip
     assert constants <= produced, constants - produced  # a new reason constant joins the list
 

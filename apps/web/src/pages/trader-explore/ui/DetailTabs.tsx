@@ -1,5 +1,6 @@
 /**
- * The detail of Explore, the page's hero: the tabs of the ticker in focus (Overview, Compare,
+ * The detail of Explore, the page's hero: where the ticker in focus stands (the setups that picked
+ * it, the avoid-list checks, the next report), then the tabs of the ticker in focus (Overview, Compare,
  * Chart, Options, Features, Events, Screener hits, Why it is an idea), only the selected tab's
  * widget mounted. Overview and Chart are in the page; the other tabs load on demand
  * (`OtherTabs`). A ticker named inside a panel (a holding, a peer, a row of the comparison)
@@ -12,6 +13,7 @@ import { lazyPage } from '@/shared/lib/lazy';
 import { HoldingsPanel } from '@/widgets/holdings-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
+import { TickerStands } from '@/widgets/ticker-stands';
 
 import type { ExploreSearch } from '@/entities/explore';
 import { exploreState, openTicker, type SearchPatch } from '../model/state';
@@ -87,8 +89,16 @@ function Content(props: DetailTabsProps) {
 export function DetailTabs(props: DetailTabsProps) {
   const { open, tab, via } = exploreState(props.search);
   return (
-    <ExploreTabs tab={tab} openCount={open.length} via={via} onSearchChange={props.onSearchChange}>
-      <Content {...props} />
-    </ExploreTabs>
+    <Stack gap={4}>
+      <TickerStands symbol={props.symbol} />
+      <ExploreTabs
+        tab={tab}
+        openCount={open.length}
+        via={via}
+        onSearchChange={props.onSearchChange}
+      >
+        <Content {...props} />
+      </ExploreTabs>
+    </Stack>
   );
 }
