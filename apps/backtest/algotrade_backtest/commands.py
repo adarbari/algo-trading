@@ -33,9 +33,10 @@ from algotrade.services.evaluation.baseline import (
     save_baseline,
     save_edge_baseline,
 )
-from algotrade.services.evaluation.cross_section.harness import screen_uses, stored_outcome_sessions
+from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.cross_section.reads.screens import ScreenCache, shared_screens
 from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
+from algotrade.services.evaluation.cross_section.run.scopes import screen_uses
 from algotrade.services.evaluation.discovery.drafts import DEFAULT_DIR, write_draft
 from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
 from algotrade.services.evaluation.regime_report import render

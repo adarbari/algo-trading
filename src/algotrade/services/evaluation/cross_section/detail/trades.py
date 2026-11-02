@@ -22,11 +22,6 @@ import pandas as pd
 
 from algotrade.config.edges.document import MAIN
 from algotrade.features.framework.feature import strictest
-from algotrade.services.evaluation.cross_section.harness import (
-    EdgeEvaluation,
-    LegDetail,
-    VariantResult,
-)
 from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
     MISSING_DRAWDOWN,
@@ -42,6 +37,11 @@ from algotrade.services.evaluation.cross_section.hit import (
 from algotrade.services.evaluation.cross_section.measures import SCREENER, Pick
 from algotrade.services.evaluation.cross_section.measuring import NO_ENTRY_BAR
 from algotrade.services.evaluation.cross_section.reporting.report_containment import window_end
+from algotrade.services.evaluation.cross_section.run.evaluation import (
+    EdgeEvaluation,
+    LegDetail,
+    VariantResult,
+)
 from algotrade.storage.tables.edge_schemas import EDGE_TRADES
 
 RESULT = EDGE_TRADES.name.removeprefix("results/")

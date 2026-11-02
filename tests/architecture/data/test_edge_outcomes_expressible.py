@@ -21,7 +21,6 @@ from algotrade.core.time.calendar import sessions_between
 from algotrade.data.outcomes import CHAIN_FIELDS, OUTCOME_FIELDS
 from algotrade.services.configs import field_catalog
 from algotrade.services.evaluation.cross_section.events import event_field
-from algotrade.services.evaluation.cross_section.harness import MIXED_SOURCE_IV
 from algotrade.services.evaluation.cross_section.hit import (
     CHAIN_PNL_FIELDS,
     EXPIRES_OTM_FIELDS,
@@ -33,6 +32,7 @@ from algotrade.services.evaluation.cross_section.hit import (
 from algotrade.services.evaluation.cross_section.portfolio.session import (
     FIELDS as PORTFOLIO_FIELDS,
 )
+from algotrade.services.evaluation.cross_section.run.scopes import MIXED_SOURCE_IV
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade_ingestion.tasks.derived.outcomes import horizons_and_benchmarks
