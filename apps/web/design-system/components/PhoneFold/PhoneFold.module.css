@@ -1,0 +1,4 @@
+/* PhoneFold: the measured root; min-width 0 lets it shrink inside a flex or grid parent. */
+.root {
+  min-width: 0;
+}
