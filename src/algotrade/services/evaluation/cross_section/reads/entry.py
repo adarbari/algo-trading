@@ -17,6 +17,7 @@ from algotrade.config.edges.document import Edge
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions.cases import EntrySpec
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.strategy.levels import is_computed
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import FieldValue
 from algotrade.core.views.market_features import MARKET_FEATURES
@@ -29,6 +30,7 @@ from algotrade.services.evaluation.cross_section.reads.cases import (
     session_tables,
 )
 from algotrade.services.evaluation.cross_section.sessions import entry_session, wait_closes
+from algotrade.services.evaluation.portfolio_level.ordered import in_order
 from algotrade.services.features import has_rows
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.regime import session_market
@@ -48,8 +50,9 @@ class Entered:
 
 
 def split_fields(spec: EntrySpec) -> tuple[list[str], list[str]]:
-    """``(instrument fields, market fields)`` the rule names, each sorted."""
-    names = sorted({r.field for r in spec.when.rules()})
+    """``(instrument fields, market fields)`` the rule names, each sorted; a field of a computed
+    level (``portfolio.*``) is neither: it is not read, the caller gives it (``read_entries``)."""
+    names = sorted({r.field for r in spec.when.rules() if not is_computed(r.field)})
     return [n for n in names if not n.startswith(MARKET_HEAD)], [
         n for n in names if n.startswith(MARKET_HEAD)
     ]
@@ -62,9 +65,15 @@ def read_entries(
     ids: Collection[str],
     decision: date,
     domains: Mapping[str, Sequence[str]] | None = None,
+    extra: Mapping[str, FieldValue] | None = None,
 ) -> Entered:
-    """The entry session of each of ``ids`` decided at D (``decision``) over the wait."""
+    """The entry session of each of ``ids`` decided at D (``decision``) over the wait. The fields
+    of a computed level are taken from ``extra`` (the book at D, the same at every close of the
+    wait), missing: None."""
     own, market = split_fields(spec)
+    given = {
+        n: (extra or {}).get(n) for n in {r.field for r in spec.when.rules()} if is_computed(n)
+    }
     waiting = sorted(ids)
     out = Entered()
     closes: list[date] = []
@@ -81,7 +90,7 @@ def read_entries(
             rows = {i: {n: view.get(i, n) for n in own} for i in waiting}
         still: list[str] = []
         for i in waiting:  # a waiting name was FALSE at every earlier close: this one decides
-            found = first_entry(spec.when, [{**rows[i], **shared}], domains)
+            found = first_entry(spec.when, [{**rows[i], **shared, **given}], domains)
             if found.entered:
                 out.at[i] = entry_session(t, offset)
             elif found.reason == ENTRY_UNKNOWN:
@@ -124,11 +133,15 @@ def check_entries(
 ) -> str | None:
     """``check_entry`` of each of ``edges`` (a run's scopes), whatever the run, then why the run
     reuses no stored leg: ``requested`` (``full``), ``entry_condition`` (an entry leg depends on
-    every partition of its wait, ADR 0063), else None."""
+    every partition of its wait, ADR 0063), else None. ``portfolio_level``: an edge that reads the
+    portfolio level (``in_order``) depends on the trades of every earlier session, so a stored leg
+    is never reused, whatever the run (ADR 0088, G15)."""
     for edge in edges:
         check_entry(reader, edge, features, first, last, as_of)
     if full:
         return "requested"
+    if any(in_order(edge) for edge in edges):
+        return "portfolio_level"
     return "entry_condition" if any(edge.outcome.entry for edge in edges) else None
 
 

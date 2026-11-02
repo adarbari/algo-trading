@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.strategy.schema import parse_selection
+from algotrade.core.model.predicates import Group, Rule
 from algotrade.services.evaluation.cross_section import picks
 from algotrade.services.evaluation.cross_section.measuring import (
     _Measured,
@@ -122,3 +123,13 @@ def test_a_books_history_is_logged_against_every_decision_session_that_read_it()
     seen = {d: {(r.table, r.start, r.end) for r in session.day_reads(d).reads} for d in DAYS[1:3]}
     on_shared = {r for r in seen[DAYS[1]] if r[0].startswith("rollups/") and r[1] <= shared <= r[2]}
     assert on_shared and on_shared <= seen[DAYS[2]]  # the shared day's partition, in both
+
+
+def test_the_gate_cache_never_shares_a_state_across_books(world: World) -> None:
+
+    gate = Group("all", (Rule("portfolio.open_positions", "lt", 3),))
+    session = SessionReads(world.reader, "label")
+    assert session.gate(gate, DAYS[0], {"portfolio.open_positions": 1}) == "open"
+    assert session.gate(gate, DAYS[0], {"portfolio.open_positions": 5}) == "closed"
+    assert session.gate(gate, DAYS[0]) == "unknown"
+    assert len(session._gates) == 3

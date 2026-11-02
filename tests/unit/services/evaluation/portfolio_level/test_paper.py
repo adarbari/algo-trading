@@ -61,18 +61,10 @@ def test_only_this_edges_rows_for_its_owner_that_entered() -> None:
     assert {t.instrument_id for t in book} == {"EQ:A", "EQ:OLD"}  # not another edge, owner, skipped
 
 
-def test_an_open_row_is_due_at_its_planned_sell_and_its_exit_is_not_known() -> None:
-    a = next(
-        t for t in paper_book(_store(), "mine", "site", D1, EARLY) if t.instrument_id == "EQ:A"
-    )
-    assert (a.exit_session, a.planned_exit, a.capital) == (None, PLANNED, None)
-
-
-def test_a_settlement_written_after_the_cut_off_is_not_leaked() -> None:
-    late = next(
-        t for t in paper_book(_store(), "mine", "site", D1, LATE) if t.instrument_id == "EQ:A"
-    )
-    assert late.exit_session == PLANNED
+def test_every_entered_row_exits_at_its_planned_sell_settled_or_not() -> None:
+    a = _held(EARLY, "EQ:A")  # still open at the cut-off: no settlement lag makes it unknown
+    assert (a.exit_session, a.planned_exit, a.capital) == (PLANNED, PLANNED, None)
+    assert _held(LATE, "EQ:A").exit_session == PLANNED  # settled "won" later: the same exit
 
 
 def test_a_trade_still_open_from_an_early_signal_is_in_the_book() -> None:

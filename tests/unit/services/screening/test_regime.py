@@ -119,3 +119,11 @@ def test_an_edge_gate_reads_that_session_whatever_the_regime_overlay_says() -> N
         assert edge_gate(reader, gate, DAY, domains).state == state
     reader, _ = seeded()  # nothing stored for the session: unknown, never open
     assert edge_gate(reader, gate, DAY, domains).state == "unknown"
+
+
+def test_an_edge_gate_takes_a_computed_levels_field_from_extra() -> None:
+    gate = Group("all", (Rule("portfolio.open_positions", "lt", 3),))
+    reader, _ = seeded()  # no market row: a computed field is never read from the store
+    assert edge_gate(reader, gate, DAY, extra={"portfolio.open_positions": 2}).state == "open"
+    assert edge_gate(reader, gate, DAY, extra={"portfolio.open_positions": 3}).state == "closed"
+    assert edge_gate(reader, gate, DAY).state == "unknown"  # missing: UNKNOWN, never open
