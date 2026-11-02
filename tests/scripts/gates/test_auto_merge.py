@@ -78,10 +78,12 @@ def _decide(
     pull_request: list[dict],
     dispatch: list[dict],
     check_runs: list[dict] | None = None,
+    branch: str = "",
 ) -> str:
     pr = {
         "state": "OPEN", "isDraft": False, "isCrossRepository": False, "headRefOid": SHA,
         "mergeable": "MERGEABLE", "baseRefName": "main", "labels": [],
+        "headRefName": branch,
     }  # fmt: skip
     suites = {r["check_suite_id"]: r["conclusion"] for r in pull_request + dispatch}
     checks = [
@@ -167,3 +169,19 @@ def test_a_newer_held_run_does_not_hide_a_failed_check_of_the_dispatched_suite(
 def test_a_run_of_another_workflow_named_ci_is_ignored(tmp_path: Path) -> None:
     other = _ci(2, "success", suite=20, path=".github/workflows/evil.yml")
     assert "is 'missing', waiting" in _decide(tmp_path, [HELD], [other])
+
+
+def test_a_head_with_no_ci_run_gets_ci_dispatched_once(tmp_path: Path) -> None:
+    """2026-11-01: #1012 / #1015 had no checks at all (a bot push starts none) and waited."""
+    out = _decide(tmp_path, [], [], branch="claude/x")
+    assert "no CI run on abc1234, WOULD DISPATCH ci.yml on claude/x" in out
+    assert "is 'missing', waiting" in out
+
+
+def test_a_head_that_has_a_dispatched_run_is_not_dispatched_again(tmp_path: Path) -> None:
+    out = _decide(tmp_path, [], [_ci(2, None, suite=20, status="queued")], branch="claude/x")
+    assert "DISPATCH" not in out
+
+
+def test_a_held_run_is_not_a_missing_run(tmp_path: Path) -> None:
+    assert "DISPATCH" not in _decide(tmp_path, [HELD], [], branch="claude/x")

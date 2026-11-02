@@ -76,6 +76,27 @@
   line-height: var(--line-height-sm);
 }
 
+/* Segmented: pills in one bordered track; the selected pill is raised, not underlined. */
+.list[data-variant='segmented'] {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: var(--space-1);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.list[data-variant='segmented'] .tab {
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.list[data-variant='segmented'] .tab[aria-selected='true'] {
+  background: var(--color-row);
+  font-weight: var(--font-weight-semibold);
+}
+
 @media (pointer: coarse) {
   .tab {
     min-height: var(--density-control-height);
