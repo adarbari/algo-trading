@@ -12,7 +12,6 @@ from algotrade.services.drafting.contract.answer_schema import (
     FORMULA,
     MISSING,
     PART,
-    SUGGESTION,
     TIE_BREAK,
     UNRESOLVED,
     check_answer,
@@ -154,26 +153,18 @@ def test_check_item_types_one_item_with_its_name() -> None:
     assert check_item({}, FORMULA, "formula") == "formula: missing 'name'"
 
 
-SUGGESTION_ITEM = {
-    "field": "feature.trend_state", "op": "ne", "value": "DOWNTREND", "mode": "score",
-    "tolerance": None, "on_miss": None, "why": "a falling price", "source": None,
-}  # fmt: skip
-
-
-def test_suggestions_are_optional_nullable_and_typed() -> None:
-    assert "suggestions" in ANSWER_SCHEMA["required"]
-    assert check_answer({**GOOD, "suggestions": None}, ANSWER_SCHEMA) is None
+def test_the_answer_has_no_suggestions_and_an_old_answer_with_them_still_passes() -> None:
+    """ADR 0083 decision 4: the model is never asked for checks the sentence did not ask for;
+    an answer recorded before still fits (an unlisted key is tolerated, then ignored)."""
+    assert "suggestions" not in ANSWER_SCHEMA["properties"]
+    assert "suggestions" not in ANSWER_SCHEMA["required"]
     assert check_answer({"criteria": []}, ANSWER_SCHEMA) is None  # an old answer
-    assert check_answer({**GOOD, "suggestions": [SUGGESTION_ITEM]}, ANSWER_SCHEMA) is None
-    assert check_item(SUGGESTION_ITEM, SUGGESTION, "suggestion") is None
-    assert check_item({**SUGGESTION_ITEM, "why": None}, SUGGESTION, "suggestion") is not None
-    why = check_answer({**GOOD, "suggestions": [{"field": "x"}]}, ANSWER_SCHEMA)
-    assert why is not None and "suggestions[0]: missing" in why
+    assert check_answer({**GOOD, "suggestions": [{"field": "x"}]}, ANSWER_SCHEMA) is None
 
 
 def test_the_explained_parts_are_optional_nullable_and_a_part_tag_is_read_leniently() -> None:
     assert "parts" in ANSWER_SCHEMA["required"]
-    for schema in (CRITERION, FORMULA, MISSING, UNRESOLVED, SUGGESTION):
+    for schema in (CRITERION, FORMULA, MISSING, UNRESOLVED):
         assert "part" in schema["properties"] and "part" in schema["required"]
     assert "part" in TIE_BREAK["anyOf"][0]["required"]
     alternative = UNRESOLVED["properties"]["alternatives"]["items"]["properties"]["criterion"]
@@ -185,4 +176,3 @@ def test_the_explained_parts_are_optional_nullable_and_a_part_tag_is_read_lenien
     # a malformed tag never refuses its item: the server reads it with ``part_tag``
     odd = {"field": "x.y", "op": "gt", "value": 5, "part": 7}
     assert check_criterion(odd) is None
-    assert check_item({**SUGGESTION_ITEM, "part": ["p1"]}, SUGGESTION, "suggestion") is None

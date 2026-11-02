@@ -49,7 +49,6 @@ const PART: Omit<Part, 'id' | 'kind' | 'words'> = {
   formulas: [],
   unresolved: [],
   missing: [],
-  suggestions: [],
 };
 const PARTS: Part[] = [
   {
@@ -159,7 +158,6 @@ function Harness({
             criteria: { ...document.criteria, [criterion.id]: { ...criterion } },
           });
         }}
-        onAcceptSuggestion={vi.fn()}
         {...(withRedraft
           ? {
               onRedrafted: (next: ScreenDraft, prior: ScreenDraft, part: DraftPart) => {

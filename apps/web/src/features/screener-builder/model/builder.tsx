@@ -96,12 +96,6 @@ export interface ScreenerBuilder {
   removeCriterion: (id: string) => void;
   /** A blank criterion row; returns its id. */
   addCriterion: (field?: string) => string;
-  /**
-   * Add the criterion of an accepted suggestion (a soft or score check the draft offered, never
-   * applied on its own) as a new row under a fresh id; returns the id. One edit. A hard one is
-   * refused: no edit, returns ''.
-   */
-  addSuggested: (criterion: Readonly<Record<string, unknown>>) => string;
   /** Can the loose criterion join the one before it as "either this or the previous"? */
   canJoinPrevious: (id: string) => boolean;
   /** "Either this or the previous": an `any` group of the two, or added to the `any` group before. */
@@ -343,14 +337,6 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     addCriterion: (field = '') => {
       const created = newCriterionId(criterionIds(base, document), field);
       edit(withCriterion(document, { id: created, field, op: 'gte', mode: 'hard' }));
-      return created;
-    },
-    addSuggested: (table) => {
-      // Only a soft or score check is ever a suggestion: never a hard filter.
-      if (table['mode'] !== 'soft' && table['mode'] !== 'score') return '';
-      const field = typeof table['field'] === 'string' ? table['field'] : '';
-      const created = newCriterionId(criterionIds(base, document), field);
-      edit(withCriterion(document, toCriterion(created, { ...table })));
       return created;
     },
     canJoinPrevious: (criterionId) => joinTarget(layout, criterionId) !== null,

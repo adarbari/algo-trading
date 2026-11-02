@@ -8,12 +8,10 @@ reads a missing nullable property as absent, so an answer that leaves out ``mode
 as valid as one with ``null``. It types the shape only: whether an op, mode or field is known
 stays with ``criteria_of`` (a wrong one is dropped with a reason, not a rejected answer). The
 A / B / C contract (PR 5, ADR 0041 amendment 2026-10-11) adds ``formulas`` (B1), ``missing``
-(B2 / C) and ``unresolved`` (an ambiguous term with ready alternatives); ``suggestions``
-(protective soft or score checks the sentence did not ask for, never applied silently,
-``suggestions.py``); the explained parts (2026-10-11) add ``parts`` (``{id, words, reading}``: the
-sentence split as the model read it) and a nullable ``part`` on every item, the id of the part it
-comes from; every one is nullable or optional, so answers recorded before it still pass
-(a new answer key must be the same). The
+(B2 / C) and ``unresolved`` (an ambiguous term with ready alternatives); the explained parts
+(2026-10-11) add ``parts`` (``{id, words, reading}``: the sentence split as the model read it)
+and a nullable ``part`` on every item, the id of the part it comes from; every one is nullable
+or optional, so answers recorded before it still pass (a new answer key must be the same). The
 check is a small subset of JSON Schema (``type``, ``properties``, ``required``, ``items``,
 ``anyOf``), enough for these shapes and no dependency; a key the schema does not list is
 tolerated (``additionalProperties = false`` is for the provider, strict mode needs it)."""
@@ -66,20 +64,6 @@ CRITERION: Mapping[str, Any] = {
     **CRITERION_BODY,
     "properties": {**CRITERION_BODY["properties"], "part": NULLABLE_STRING},
     "required": [*CRITERION_BODY["required"], "part"],
-}
-SUGGESTION: Mapping[str, Any] = {
-    "type": "object",
-    "properties": {
-        **{
-            key: CRITERION["properties"][key]
-            for key in ("field", "op", "value", "mode", "tolerance", "on_miss")
-        },
-        "why": {"type": "string"},
-        "source": NULLABLE_STRING,
-        "part": NULLABLE_STRING,
-    },
-    "required": ["field", "op", "value", "mode", "tolerance", "on_miss", "why", "source", "part"],
-    "additionalProperties": False,
 }
 TIE_BREAK: Mapping[str, Any] = {
     "anyOf": [
@@ -186,7 +170,6 @@ ANSWER_SCHEMA: Mapping[str, Any] = {
         "formulas": {"type": ["array", "null"], "items": FORMULA},
         "missing": {"type": ["array", "null"], "items": MISSING},
         "unresolved": {"type": ["array", "null"], "items": UNRESOLVED},
-        "suggestions": {"type": ["array", "null"], "items": SUGGESTION},
         "parts": {"type": ["array", "null"], "items": PART},
     },
     "required": [
@@ -196,7 +179,6 @@ ANSWER_SCHEMA: Mapping[str, Any] = {
         "formulas",
         "missing",
         "unresolved",
-        "suggestions",
         "parts",
     ],
     "additionalProperties": False,

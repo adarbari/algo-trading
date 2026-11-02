@@ -56,7 +56,6 @@ describe('DescribeScreen', () => {
     const loadDocument = vi.fn();
     state.builder = { status: 'ready', id: 'mine', document: { id: 'mine' }, loadDocument };
     render(<DescribeScreen />);
-    expect(screen.getByText('Describe it')).toBeInTheDocument();
     expect(probe.props['screenerId']).toBe('mine');
     expect(probe.props['document']).toEqual({ id: 'mine' });
     expect(probe.props['onDraft']).toBe(loadDocument);
@@ -155,7 +154,6 @@ describe('DescribeScreen', () => {
       skipFormula: vi.fn(),
       setCriterion: vi.fn(),
       recordChoice: vi.fn(),
-      addSuggested: vi.fn(),
     };
     state.builder = builder;
     render(<DescribeScreen />);
@@ -178,9 +176,7 @@ describe('DescribeScreen', () => {
       subject: 'liquid',
       picked: 1,
     });
-    const accept = review.props['onAcceptSuggestion'] as (c: unknown) => void;
-    accept({ field: 'f.spread', mode: 'soft' });
-    expect(builder.addSuggested).toHaveBeenCalledWith({ field: 'f.spread', mode: 'soft' });
+    expect(review.props).not.toHaveProperty('onAcceptSuggestion');
     const field = review.props['renderFieldHelp'] as (f: string) => ReactNode;
     expect(field('rollup.known@v1.x')).not.toBeNull();
     expect(field('rollup.nope@v1.y')).toBeNull();

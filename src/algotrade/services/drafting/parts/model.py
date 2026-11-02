@@ -12,7 +12,7 @@ ORIGINS = ("words", "gap", "kept", "unplaced")  # words: a part of the model, lo
 # no part covers; kept / unplaced: catch-alls with no words
 JOIN_KINDS = ("and", "or", "and_not")  # how a part relates to the one before it (``connectors``)
 READING_SOURCES = ("model", "server")
-GROUPS = ("criteria", "dropped", "formulas", "unresolved", "missing", "suggestions", "rank")
+GROUPS = ("criteria", "dropped", "formulas", "unresolved", "missing", "rank")
 
 MAX_PARTS = 12  # parts that carry words (the model's located ones and the not-understood gaps)
 MAX_WORDS = 200  # characters of a part's words
@@ -33,7 +33,7 @@ class Part:
     wrote it (a draft the phrasebook made, from its entries' criteria) or when it is absent
     (the model's disagreed with the criteria: the web shows the rows alone). The refs name items
     of the same draft: the ids of criteria in the document and of the dropped ones, formula
-    names, unresolved terms, the key (or new slug) of missing requests and suggestion ids;
+    names, unresolved terms and the key (or new slug) of missing requests;
     ``rank`` is true when the document's tie-break is this part's. ``join`` (one of ``JOIN_KINDS``)
     is how this part relates to the one before it, read by the server from the connector the model
     left out of the words (``and``, ``or``, ``and_not``), ``join_words`` the sentence's own slice
@@ -53,7 +53,6 @@ class Part:
     formulas: tuple[str, ...] = ()
     unresolved: tuple[str, ...] = ()
     missing: tuple[str, ...] = ()
-    suggestions: tuple[str, ...] = ()
     rank: bool = False
     join: str | None = None
     join_words: str = ""

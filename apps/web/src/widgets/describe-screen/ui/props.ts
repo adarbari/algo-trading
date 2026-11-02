@@ -1,6 +1,6 @@
 /**
  * The props of the draft review: the answer, the Builder's working document and what the trader
- * decides on the answer's options (a reading, a formula, a suggestion). Shared by the parts
+ * decides on the answer's options (a reading, a formula). Shared by the parts
  * review and the grouped one it falls back to.
  */
 import type { ReactNode } from 'react';
@@ -21,8 +21,6 @@ export interface DraftReviewProps {
   onSkipFormula: (name: string) => void;
   /** A reading was picked: the criterion that replaces the row, and the choice to record. */
   onPickReading: (criterion: Criterion, choice: DraftChoice) => void;
-  /** A suggestion was accepted: its criterion joins the screen as a new row (soft or score). */
-  onAcceptSuggestion: (criterion: Readonly<Record<string, unknown>>) => void;
   /** The help for a field the draft names (null for a field the Guide does not know). */
   renderFieldHelp?: ((field: string) => ReactNode) | undefined;
   /**

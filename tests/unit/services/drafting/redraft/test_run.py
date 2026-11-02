@@ -32,7 +32,6 @@ from tests.unit.services.drafting.test_screens import (
     GAP,
     READINGS,
     ctx,  # noqa: F401  (the fixture)
-    sug,
 )
 
 PRICE_80 = {"id": "price", "field": PRICE, "op": "gt", "value": 80}
@@ -223,12 +222,11 @@ def test_an_item_another_part_already_offers_is_not_offered_twice(ctx: ReadConte
     assert (p2.missing, by_id(draft)["p5"].missing) == (("oi_history",), ("oi_history",))
 
 
-def test_a_new_formula_term_check_and_request_are_the_parts_own(ctx: ReadContext) -> None:  # noqa: F811
+def test_a_new_formula_and_term_are_the_parts_own(ctx: ReadContext) -> None:  # noqa: F811
     formula = {**FORMULA, "name": "draft_oi_cover", "part": "p1"}
     term = {**READINGS, "term": "liquid", "span": "liquid", "part": "p1"}
     answer = answer_for(
         "liquid cover", PRICE_80, formulas=[formula], unresolved=[term],
-        suggestions=[sug(op="lt", value=9, part="p1")],
     )  # fmt: skip
     done, _ = redraft(ctx, Canned(answer), "p2", "liquid cover")
     p2, draft = by_id(done.draft)["p2"], done.draft
@@ -239,41 +237,19 @@ def test_a_new_formula_term_check_and_request_are_the_parts_own(ctx: ReadContext
     )
     assert {f.name for f in draft.formulas} == {"draft_oi_per_dollar", "draft_oi_cover"}
     assert {u.term for u in draft.unresolved} == {"deep", "liquid"}
-    assert p2.suggestions == ("s1",) and [s.id for s in draft.suggestions] == [
-        "s1"
-    ]  # its old s1 went
-
-
-def test_a_new_suggestion_takes_the_next_free_id_and_the_others_keep_theirs(
-    ctx: ReadContext,  # noqa: F811
-) -> None:
-    prior = held_draft(ctx)
-    assert [s.id for s in prior.suggestions] == ["s1"] and by_id(prior)["p2"].suggestions == ("s1",)
-    answer = answer_for(
-        "deep oi", {"id": "oi", "field": OI, "op": "gt", "value": 7},
-        suggestions=[sug(field=PRICE, op="lt", value=9, part="p1")],
-    )  # fmt: skip
-    done, _ = redraft(ctx, Canned(answer), "p3", "deep oi")
-    draft = done.draft
-    assert [s.id for s in draft.suggestions] == ["s1", "s2"]
-    assert by_id(draft)["p2"].suggestions == ("s1",) and by_id(draft)["p3"].suggestions == ("s2",)
 
 
 def test_ids_of_the_new_items_never_collide_with_those_of_the_other_parts(
     ctx: ReadContext,  # noqa: F811
 ) -> None:
     clash = {"id": "deep", "field": "instrument.status", "op": "ne", "value": "DELISTED"}
-    answer = answer_for(
-        "not delisted", clash, suggestions=[sug(field=PRICE, op="lt", value=9, part="p1")]
-    )
+    answer = answer_for("not delisted", clash)
     done, prior = redraft(ctx, Canned(answer), "p2", "not delisted")
     criteria = done.draft.document["criteria"]
     assert criteria["deep"] == prior.document["criteria"]["deep"]  # p3's is untouched
     assert criteria["deep_2"]["field"] == "instrument.status"
     p2 = by_id(done.draft)["p2"]
     assert p2.criteria == ("deep_2",)
-    ids = [s.id for s in done.draft.suggestions]
-    assert len(ids) == len(set(ids)) and set(p2.suggestions) <= set(ids)
 
 
 def test_the_tie_break_stays_when_another_part_owns_it_and_goes_with_its_own_part(
@@ -426,16 +402,15 @@ def test_what_only_grows_stays_within_what_the_next_request_may_carry(
     ctx: ReadContext,  # noqa: F811
 ) -> None:
     prior = held_draft(ctx)
-    for n in range(45):  # forty-five retypes, each leaving two notes and a dropped check behind
+    for n in range(45):  # forty-five retypes, each leaving two notes behind
         answer = answer_for(
             f"over ${n + 80}",
             {**PRICE_80, "value": n + 80},
             notes=[f"note {n} one", f"note {n} two " + "x" * 2000],
-            suggestions=[sug(field="nope.x", part="p1")],
         )
         req = check_request("my_screen", body_of(prior, "p2", f"over ${n + 80}"))
         prior = redraft_part(ctx, Canned(answer), req).draft
-    assert len(prior.notes) == len(prior.suggestions_dropped) == MAX_ITEMS
+    assert len(prior.notes) == MAX_ITEMS
     assert prior.notes[-1].startswith("note 44 two") and len(prior.notes[-1]) <= MAX_TEXT
     assert "note 0 one" not in prior.notes  # the oldest went first
 

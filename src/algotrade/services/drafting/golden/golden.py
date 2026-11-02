@@ -29,16 +29,14 @@ Layout (``root`` = ``tests/fixtures/drafting/golden``):
   them with the draft's ``groups`` table (``groups=``); absent: not checked. A part may also
   carry ``mode`` (default: not checked), the mode its words ask for inside a group.
   ``scope_fields`` are tolerated scaffolding (status, security type). Only ``criteria`` are
-  scored: the draft's ``suggestions`` (soft / score checks offered, never applied) never pass or
-  fail a case, they are counted and reported (``golden_run``). ``EQUIVALENT_READINGS`` names the
+  scored. ``EQUIVALENT_READINGS`` names the
   readings that say the same thing (an ETF as ``is_etf`` or as ``security_type in [ETF]``).
   ``"contract": true`` in ``expect`` marks a case written for the contract: CI replays its
-  answer through the whole ``draft_screen``; its ``suggestions`` (``{offered, dropped, notes}``:
-  fields offered, fields dropped, words a note must contain) are asserted by the replay, not
-  by ``score``. ``expect.explained`` (``{parts: [{words, kind, origin, reading?}], model_share,
-  not_understood}``) is asserted by the replay through ``parts/scoring.py``: the served words,
-  kind and origin of each part (never the reading's text), the share of items the model placed
-  itself, how many parts were not understood.
+  answer through the whole ``draft_screen``; its ``notes`` (words a note must contain) are
+  asserted by the replay, not by ``score``. ``expect.explained`` (``{parts: [{words, kind, origin,
+  reading?}], model_share, not_understood}``) is asserted by the replay through
+  ``parts/scoring.py``: the served words, kind and origin of each part (never the reading's text),
+  the share of items the model placed itself, how many parts were not understood.
 - ``answers/<model-slug>/<id>.json``: the model's raw answer text for that case, replayed in CI.
 
 To add a case: write ``cases/<id>.json``, record the model's raw answer into
@@ -85,9 +83,7 @@ class GoldenCase:
     recorded: bool = True  # False: curated, no answer recorded yet (``golden run --record``)
     curated: str | None = None  # the date a curated case was written (ISO)
     contract: bool = False  # the whole draft is replayed (formulas checked, gaps resolved)
-    suggested: Mapping[str, Any] = field(
-        default_factory=dict
-    )  # replay: offered / dropped fields, notes
+    notes: tuple[str, ...] = ()  # replay: words a note of the draft must contain
     explained: Mapping[str, Any] = field(
         default_factory=dict
     )  # replay: the parts expected (``parts/scoring.py``); empty: not checked
@@ -130,7 +126,7 @@ def load_cases(root: Path) -> tuple[GoldenCase, ...]:
                 raw.get("recorded", True),
                 raw.get("curated"),
                 bool(expect.get("contract", False)),
-                expect.get("suggestions", {}),
+                tuple(expect.get("notes", ())),
                 expect.get("explained", {}),
                 tuple(expect["groups"]) if "groups" in expect else None,
             )

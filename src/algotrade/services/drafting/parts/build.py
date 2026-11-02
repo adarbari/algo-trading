@@ -5,8 +5,8 @@ malformed is dropped and its items go down the fallback), the words nobody cover
 becomes the ``join`` of the part after it, glue vanishes), every item is attributed
 (``attribute``), the kind of a part comes from what it holds (never from the model): a term to
 choose ``needs_choice`` over a formula over a missing request or a dropped criterion
-(``not_available``) over a plain criterion (``applied``), nothing ``not_understood``; suggestions
-and the model's reading never change it. The reading is kept only when its numbers are the part's
+(``not_available``) over a plain criterion (``applied``), nothing ``not_understood``; the model's
+reading never changes it. The reading is kept only when its numbers are the part's
 (``consistency``); the stats leave out the criteria kept from ``current`` (the model rightly tags
 them with nothing). Caps: ``MAX_PARTS`` parts with words, ``MAX_WORDS`` characters of words,
 ``MAX_READING`` of reading. ``None`` when the model gave no parts, or none could be located: the
@@ -135,7 +135,7 @@ def _part(
         pid, words, start, end, text, source, kind, origin,
         tuple(refs.get("criteria", ())), tuple(refs.get("dropped", ())),
         tuple(refs.get("formulas", ())), tuple(refs.get("unresolved", ())),
-        tuple(refs.get("missing", ())), tuple(refs.get("suggestions", ())), "rank" in refs,
+        tuple(refs.get("missing", ())), "rank" in refs,
         join.logic if join else None, join.words if join else "",
     )  # fmt: skip
 
@@ -152,7 +152,7 @@ def kind_of(refs: Mapping[str, Sequence[str]]) -> str:
         return "not_available"
     if refs.get("criteria") or refs.get("rank"):
         return "applied"
-    return "not_understood"  # suggestions alone do not make a part understood
+    return "not_understood"
 
 
 def _reading(
