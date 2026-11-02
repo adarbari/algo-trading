@@ -373,15 +373,16 @@ detect = [{ call = "import_session" }, { call = "import_history" }]
 
 [[responsibility]]
 id = "option-outcomes"
-description = "Compute and store chain P&L outcomes (ADR 0053 amendment, EB H13): for each window a session closes (S = T - h exchange sessions; structure, tenor rule and horizons from the open edge documents' option_pnl outcomes), for every underlying whose chain at S is OK, the contracts chosen from S's chain (the first expiry at least tenor_days out and not before T; the at-the-money strike or the put of a target delta by our own delta), their entry mid and ask, exit mid and bid (intrinsic at expiry), the P&L per unit premium and per underlying and the daily delta-hedged P&L (our own delta from each session's chain), UNMEASURED with a reason when a chain of the window is missing or STALE_DATA (ADR 0054; never filled from an earlier session), one run per window end into outcomes/option/structure_pnl@v1 with knowledge_ts the latest chain partition read, and its acceptance check; forward-only (chains from 2026-10-02); read back only through algotrade.data.outcomes, importable only from services/evaluation"
+description = "Compute and store option trade outcomes (ADR 0053 amendment, EB H13; ADR 0088, design 2.5): for each window a session closes (S = T - h exchange sessions; the positions, holds and exit rules from the open edge documents' option_pnl outcomes, their variants and the case points of their case-valued parameters), for every underlying whose chain at S is OK, the legs chosen from S's chain alone and the trade held to the first exit its rules give or to T by the option-structure engine (quotes and our own delta from each session's stored chain, never filled from an earlier session), the rows shaped under a position_key built from the resolved legs (option_paths.position_rows), the catalogue fields an exit rule names read per close from that close's own partition only (option_fields.FieldLoader; a rule over a field the window cannot read is REFUSED, recorded and failing the check), a row's knowledge_ts the latest chain and field partition read up to its own exit and its licence the strictest of the price source and the rule's fields, written once per start session by frame_and_publish, the one publisher of outcomes/option/structure_pnl@v2 (the history writer calls it), and its acceptance check; forward-only (chains from 2026-10-02); read back only through algotrade.data.outcomes, importable only from services/evaluation"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py",
     "apps/ingestion/algotrade_ingestion/tasks/derived/option_paths.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/option_fields.py",
     "src/algotrade/data/outcomes/chain.py",
 ]
 allowed = ["src/algotrade/storage/tables/schemas/outcomes.py"]  # declares the grain's schema
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-18-optionpnl-the-chain-pl-grain-eb-h13"
-detect = [{ string_prefix = "outcomes/option/" }, { call = "structure_rows" }, { call = "read_chain_stored" }]
+detect = [{ string_prefix = "outcomes/option/" }, { call = "position_rows" }, { call = "frame_and_publish" }, { call = "read_chain_stored" }]
 
 [[responsibility]]
 id = "refresh-scheduling"

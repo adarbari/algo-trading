@@ -131,6 +131,11 @@ purpose = "GraphQL types of the Admin run histories (mirrors services/read/ops/a
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
+path = "apps/api/algotrade_api/graphql/types/options"
+purpose = "GraphQL types of the option reads (mirrors services/read/options): the option grid and its cells"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/graphql/types/screens"
 purpose = "GraphQL types over stored screen results (mirrors services/read/screens): Screener, ScreenerRun, ScreenResult, Ideas, TableView"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
@@ -222,7 +227,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/derived"
-purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060) and the forward outcomes tasks (outcomes: price windows from bars; option-outcomes: chain P&L of option windows from the stored chains, ADR 0053 and its EB H13 amendment) with their window arithmetic (outcome_paths, option_paths)"
+purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060) and the forward outcomes tasks (outcomes: price windows from bars; option-outcomes: option trades of position windows from the stored chains, ADR 0053 and its EB H13 amendment, ADR 0088) with their window arithmetic and row shaping (outcome_paths, option_paths) and the catalogue fields an exit rule reads per close (option_fields)"
 kind = "task-domain"
 
 [[dir]]

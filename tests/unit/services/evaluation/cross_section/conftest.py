@@ -12,14 +12,17 @@ import pandas as pd
 import pytest
 
 from algotrade.config.edges.document import QUALITY_BAR, Edge, parse_edge
+from algotrade.config.edges.positions.key import with_legs
+from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.time.calendar import next_session, sessions_between
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade.storage.tables.writers import StoreWriter
+from tests.conftest import REPO_ROOT
 from tests.helpers.stored_frames import reference_rows, stamped, universe_rows
 
 DAYS = sessions_between(date(2026, 9, 1), date(2026, 9, 10))
@@ -69,8 +72,12 @@ def edge_document(**changes: Any) -> dict[str, Any]:
     return {k: v for k, v in doc.items() if v is not None}
 
 
+TEMPLATES = load_templates(FileConfigStore(REPO_ROOT / "config", local=False))
+
+
 def edge(**changes: Any) -> Edge:
-    return parse_edge(edge_document(**changes), "drift", "drift.toml")
+    """The edge as the loader gives it: a position outcome carries its resolved legs."""
+    return with_legs(parse_edge(edge_document(**changes), "drift", "drift.toml"), TEMPLATES)
 
 
 def outcome_row(iid: str, i: int, day: date, **changes: Any) -> dict[str, Any]:

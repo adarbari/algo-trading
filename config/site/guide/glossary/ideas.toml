@@ -1,0 +1,178 @@
+# L3 site setting: the Guide glossary, Ideas from the picks of setups (ADR 0083): the two tabs, whether a tab's list is
+# listed or Unproven, what a setup did tonight and why a setup or a pick was left out. One [[term]] each: id, term,
+# short (one sentence), body, next, see_also. Typed by src/algotrade/config/site/guide/glossary.py; fitness tests:
+# tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "idea_tab"
+term = "Stocks and Premium"
+short = "Ideas has two tabs: Stocks for setups that trade shares, Premium for setups that sell option premium."
+body = """
+A setup belongs to the tab of the position it tests. A position made of shares is Stocks. A position with any option leg is Premium. Each tab is its own list, built the same way, with its own cap of 15 ideas. A tab with no setup that qualifies shows its Unproven section, while the other tab may show its list. Premium stays Unproven until an option setup has a stored verdict of works or promising, which needs a three-month unseen holdout. The tab is part of the address, so a link opens the tab it was copied from.
+"""
+next = "Open the tab you trade; switch tab to see the other list."
+see_also = ["ideas_listed", "ideas_unproven", "verdict"]
+
+[[term]]
+id = "ideas_listed"
+term = "Listed"
+short = "At least one setup of this tab has a good stored verdict, so the list is built from the picks of those setups."
+body = """
+The list holds the names that setups with a verdict of works or promising picked tonight, strongest evidence first, at most 15. A night on which those setups pick nothing is an empty list with the reason beside each setup, such as not a decision day. It never falls back to Unproven. The setups and the order are the same for every viewer. The only difference between viewers is the names a data licence keeps off a list, which are counted, never named.
+"""
+next = "Read the setup line above each group before the names under it."
+see_also = ["ideas_ranking", "ideas_unproven", "verdict", "idea_setup_picked", "edge_pick_not_a_decision_day"]
+
+[[term]]
+id = "ideas_unproven"
+term = "Unproven"
+short = "No setup of this tab has a good stored verdict yet, so tonight's matches are shown without that evidence."
+body = """
+The names are what the screeners of this tab matched tonight. No setup has a verdict of works or promising for them, so nothing says these matches have beaten chance. The counts beside the section say how many setups were left out for want of a readable verdict, so a stale verdict never turns the list Unproven unseen. Premium is Unproven until an option setup passes its holdout. Don't treat an Unproven match as a tested idea: it is a screen result.
+"""
+next = "Open the setup behind a screener to see how much evidence it has so far."
+see_also = ["idea_tab", "ideas_listed", "idea_left_out_no_verdict"]
+
+[[term]]
+id = "idea_setup_picked"
+term = "Picked tonight"
+short = "The setup took names tonight; they sit in its group, ranked by its own order."
+body = """
+Each setup takes names by its own rule at its own schedule, and only the screener its verdict rests on counts. The group shows how many it picked and how many made the cap of 15. A name picked by two setups is listed once, under the stronger one, with the other named as also in.
+"""
+next = "Open the setup to see its rules and how it has done."
+see_also = ["ideas_listed", "verdict_basis", "picked_by"]
+
+[[term]]
+id = "idea_setup_nothing_picked"
+term = "Nothing picked"
+short = "It was a day this setup decides, and no name met its rule."
+body = """
+An empty group is a result, not a gap. The setup looked at the screener's matches and none passed its universe or its cut. The list stays a list: a quiet night does not turn it into Unproven.
+"""
+next = "Check the next decision day of the setup on its page."
+see_also = ["edge_pick_not_a_decision_day", "ideas_listed"]
+
+[[term]]
+id = "idea_setup_unknown"
+term = "Picks not known"
+short = "The nightly pick step did not store this setup's picks for the session, so tonight's picks are unknown, not none."
+body = """
+The setup qualifies, but its picks for this session were not stored or could not be judged. The group says so rather than showing an empty list. Names it would have picked are missing from the list.
+"""
+next = "Come back after the next nightly run; the setup's page names the gap."
+see_also = ["unavailable_not_stored", "not_run", "idea_setup_nothing_picked"]
+
+[[term]]
+id = "idea_left_out_newer_run"
+term = "Only a newer run"
+short = "The setup's only evidence was committed after this session, so it cannot be used for it."
+body = """
+A past session reads the verdict as it was known then. A run committed later is disclosed and not used, so an old list never borrows later knowledge. The count is setups, not names.
+"""
+next = "Open today's list to see the setup with its newer run."
+see_also = ["ideas_unproven", "verdict"]
+
+[[term]]
+id = "idea_left_out_no_verdict"
+term = "No readable verdict"
+short = "The setup has a run but no stored verdict that matches its current document, so it is not listed."
+body = """
+The verdict is stored once a night. It is missing when the row was not written, when the setup's document or the judging rules changed since, or when the row cannot be read. The setup is left out instead of being judged on the spot. The count is setups, not names.
+"""
+next = "It returns to the list once the nightly step stores a matching verdict."
+see_also = ["ideas_unproven", "verdict"]
+
+[[term]]
+id = "idea_left_out_no_basis"
+term = "No basis recorded"
+short = "The stored verdict does not say which screener it rests on, so the setup's picks cannot be told apart."
+body = """
+A verdict names the screener and holding period it was judged on. Older rows do not, and only that screener's names count as ideas. The setup is left out until a newer verdict records its basis. The count is setups, not names.
+"""
+next = "It returns after the next evaluation run stores the basis."
+see_also = ["verdict_basis", "ideas_unproven"]
+
+[[term]]
+id = "idea_left_out_licence"
+term = "Kept off by a licence"
+short = "Some picks rest on data under a licence your account does not hold, so they are not listed and not ranked."
+body = """
+The count is of picks, never of which names. The list is renumbered without them, so no rank reveals a hidden pick. The setups and verdicts behind the list are the same for every viewer.
+"""
+next = "Nothing to do: the list shows everything your licences allow."
+see_also = ["withheld_screener", "ideas_listed"]
+
+# The option grid (ADR 0083 amendment of 2026-11-01).
+[[term]]
+id = "option_grid"
+term = "Option grid"
+short = "The puts and calls of one stock at several strikes and expiry dates, each cell the figures of one sold option."
+body = """
+Each row is an expiry about 7, 14, 30, 45, 60 or 90 days away, the nearest listed one. Each column is a delta from 0.10 to 0.30, the strike whose delta of ours is nearest it. A cell shows the premium we compute as the middle of the stored bid and ask, never the bid or ask itself, and the figures that follow from it. A cell that says why it is empty (no listed expiry, too thin a quote, no strike near that delta) is not a zero. The prices are the last stored quotes of the session, end of day and delayed, so judge a trade on a live quote.
+"""
+next = "Pick the expiry first, then read down the delta you are comfortable with."
+see_also = ["delta_band", "return_on_collateral", "yield_a_year", "breakeven_price", "chance_below_strike", "spread_of_mid", "report_inside_expiry"]
+
+[[term]]
+id = "delta_band"
+term = "Delta band"
+short = "The delta a cell aims for: the strike whose own delta is nearest, within 0.025 of it."
+body = """
+Delta is our own, worked out from the option's mid premium with the Treasury rate and the dividend yield, not copied from the feed. A put's delta is negative and a call's positive, and the grid reads each by its size. A band with no strike within 0.025 of it stays empty rather than showing a strike far from it. A lower delta sits farther from the price, pays less and is less likely to be reached.
+"""
+see_also = ["option_grid", "chance_below_strike"]
+
+[[term]]
+id = "return_on_collateral"
+term = "Return on collateral"
+short = "The premium over what backs the position: a put's premium over its strike, a call's over the share price."
+body = """
+A cash-secured put sets aside the strike price to buy the shares if they are assigned, so its premium is measured against that cash. A covered call is backed by the shares, so its premium is measured against the share price. It is a return for the whole period to the expiry, not a year.
+"""
+see_also = ["yield_a_year"]
+
+[[term]]
+id = "yield_a_year"
+term = "Yield a year"
+short = "The return on collateral scaled to a year: that return times 365, over the days to the expiry."
+body = """
+It is simple, not compounded, and it assumes the same trade could be repeated at the same price for a year. That is rarely true, so use it to compare cells, not as a forecast. Short expiries and wide spreads inflate it. A high yield is usually a high implied volatility paying for a real risk.
+"""
+see_also = ["return_on_collateral", "spread_of_mid"]
+
+[[term]]
+id = "breakeven_price"
+term = "Breakeven"
+short = "The price the stock can fall to at the expiry before the sold option loses money."
+body = """
+For a put it is the strike minus the premium. For a covered call it is the share price now minus the premium. It ignores commissions and early assignment, and it describes the expiry, not a stop.
+"""
+see_also = ["return_on_collateral"]
+
+[[term]]
+id = "chance_below_strike"
+term = "Chance below the strike"
+short = "The model's chance that the stock ends below the strike at the expiry."
+body = """
+It comes from the option's implied volatility with no drift and no interest, the same convention the setups use. It is a model number, not a forecast, and it is only as good as the volatility the market priced in. The volatility we solve uses the Treasury rate and the dividend yield, so the two differ by about one percentage point at 30 days.
+"""
+see_also = ["delta_band", "option_grid"]
+
+[[term]]
+id = "spread_of_mid"
+term = "Spread of mid"
+short = "The gap between the stored bid and ask as a share of the middle price."
+body = """
+A wide spread means the premium shown is less reachable: filling at the middle is unlikely and the real price is nearer the worse side. It is measured on the stored end-of-day quote, so a live quote can differ.
+"""
+see_also = ["option_grid", "yield_a_year"]
+
+[[term]]
+id = "report_inside_expiry"
+term = "Report inside"
+short = "Whether the company's next earnings report falls after today and on or before the expiry."
+body = """
+An earnings report inside the life of the option can move the stock past the strike, so the premium may be paying for it. When the report date is not known the column says so rather than showing no report. An ETF has no earnings report, so the question does not apply to it.
+"""
+see_also = ["option_grid"]

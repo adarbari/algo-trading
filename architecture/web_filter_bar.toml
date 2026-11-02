@@ -24,6 +24,7 @@
 "src/pages/admin-llm-usage/ui/CallsSection.tsx" = "list beside its detail over UsageCallsPanel; admin usage log, not yet on the bar"
 "src/pages/admin-screener-runs/ui/AdminScreenerRunsPage.tsx" = "the filter bar is in ScreenerRunList, which this page renders beside its detail"
 "src/pages/trader-explore/ui/OtherTabs.tsx" = "the Compare tab's side-by-side table: at most six tickers the reader chose, a fixed handful of rows (the universe table, the many-row one, is UniverseTable on the bar)"
+"src/pages/trader-calendar/ui/EarningsWeek.tsx" = "the reports of five sessions for the scope list or one screener's picks, narrowed by the source picker; time-boxed: slice V8c builds the calendar_week filter surface and deletes this line by 2026-11-08 (decisions log 2026-11-01, V8 Calendar PR)"
 "src/widgets/accepted-formula-list/ui/AcceptedFormulaList.tsx" = "per-user accepted formulas, a short list (admin review)"
 "src/widgets/setup-deeper/ui/EdgeCompare.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"
 "src/widgets/setup-deeper/ui/EdgeDetailsBody.tsx" = "edge detail panel: fixed rows of one edge's evidence (years, horizons, regimes, variants, figures, signals, drawdown, monthly, compare, live, criteria)"

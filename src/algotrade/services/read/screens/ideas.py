@@ -68,6 +68,7 @@ from algotrade.services.read.filtering.definitions import ResolvedFilters
 from algotrade.services.read.filtering.facets import Facets, compute_facets
 from algotrade.services.read.filtering.masks import Cell, FilterInput, filter_hash
 from algotrade.services.read.filtering.served import load_list_filters
+from algotrade.services.read.ideas.setups import in_tab
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -287,7 +288,7 @@ def display_metrics(result: ScreenResult) -> tuple[IdeaMetric, ...]:
     return tuple(IdeaMetric(n, v) for n, v in found.items())
 
 
-def _watch_out(best: ScreenResult, earnings_first: bool) -> tuple[str, ...]:
+def watch_out(best: ScreenResult, earnings_first: bool) -> tuple[str, ...]:
     ids = [*best.flags]
     if best.decision == LIQUIDITY_RISK:
         ids.append(WATCH_LIQUIDITY)
@@ -296,7 +297,7 @@ def _watch_out(best: ScreenResult, earnings_first: bool) -> tuple[str, ...]:
     return tuple(dict.fromkeys(ids))
 
 
-def _earnings_first(ctx: ReadContext, ids: Sequence[str]) -> set[str]:
+def earnings_first(ctx: ReadContext, ids: Sequence[str]) -> set[str]:
     """The tickers of ``ids`` whose stored fact says the earnings fall on or before the nearest
     expiry (one read for them all)."""
     if not ids:
@@ -368,14 +369,18 @@ def load_ideas(
     limit: int,
     after: str | None = None,
     filters: Sequence[FilterInput] = (),
+    tab: str | None = None,
 ) -> Ideas:
     """``limit`` ideas of the viewer's screeners' runs for ``ctx.session`` that pass ``filters``,
     best first, from the ``after`` cursor (none: the first page); ``Ideas.next_cursor`` is the
-    next page's. ``FilterRefusedError`` for a filter the viewer is not offered."""
+    next page's. ``tab``: only the screeners of that tab (the Unproven section of a tab,
+    ``ideas.setups.in_tab``, ADR 0083 amendment (a)); None: every screener of the viewer's.
+    ``FilterRefusedError`` for a filter the viewer is not offered."""
     rule = load_ideas_rule(ctx.configs)
     resolved = load_list_filters(ctx, SURFACE, [i.id for i in filters]).resolved
     resolved.check(i.id for i in filters)  # before any read: a hidden filter is refused whole
-    screeners = load_screeners(ctx)
+    keep = None if tab is None else in_tab(ctx, tab)
+    screeners = [s for s in load_screeners(ctx) if keep is None or keep(s.id)]
     latest = load_latest_runs(ctx, [(s.owner, s.id) for s in screeners])
     pool, scores = _pool(ctx, screeners, latest)
     ranked = rank_ideas(pool, rule)
@@ -403,7 +408,7 @@ def load_ideas(
     results = load_results(ctx, wanted, runs)
     top_ids = sorted({p.instrument_id for st in standings for p in st.top})
     instruments = load_instruments(ctx, top_ids)
-    early = _earnings_first(ctx, [i.instrument_id for i in shown])
+    early = earnings_first(ctx, [i.instrument_id for i in shown])
     items = []
     for idea in shown:
         best = results[(idea.best.run_id, idea.instrument_id)]
@@ -418,7 +423,7 @@ def load_ideas(
                 regime=best.regime,
                 size_multiplier=best.size_multiplier,
                 metrics=display_metrics(best),
-                watch_out=_watch_out(best, idea.instrument_id in early),
+                watch_out=watch_out(best, idea.instrument_id in early),
             )
         )
     paused = tuple(

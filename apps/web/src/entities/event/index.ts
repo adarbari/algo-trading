@@ -8,9 +8,11 @@ export { useInstrumentEventStudy, type EventStudyResponse } from './api/study';
 export {
   aheadItems,
   calendarDays,
+  earningsWeek,
   filingItem,
   gapLines,
   ladderRows,
+  macroItems,
   studyChartEvents,
   type StudyFiling,
 } from './model/items';
