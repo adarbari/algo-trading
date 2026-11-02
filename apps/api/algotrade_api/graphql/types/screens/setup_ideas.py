@@ -9,9 +9,8 @@ import strawberry
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.evaluation.positions import state
-from algotrade.services.read.ideas import picks
-from algotrade.services.read.ideas.setups import Tab, load_session_setups
+from algotrade.services.read.ideas import inverse, picks
+from algotrade.services.read.ideas.setups import Tab
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.types.evaluation.verdict import SetupState
 from algotrade_api.graphql.types.instruments.feature import Unknown
@@ -124,14 +123,9 @@ class SetupGroup:
         "ON or PAUSED; null: no session is served or the setup is not readable"
     )
     async def setup_state(self, info: Info) -> SetupState | None:
-        # the request's own context (the date the groups were read for), and the edge the tab
-        # already loaded (memoised per request): no second read of every edge per group
-        setups = await off_loop(load_session_setups, self.ctx)
-        found = next((q.edge for q in setups.qualifying if q.edge.id == self.edge_id), None)
-        if found is None:
-            return None
-        decided = await off_loop(state.load_setup_state, self.ctx, found)
-        return SetupState.of(decided) if decided is not None else None
+        # the request's own context: the date the groups were read for
+        found = await off_loop(inverse.load_state_of_setup, self.ctx, self.edge_id)
+        return SetupState.of(found) if found is not None else None
 
 
 @strawberry.type(

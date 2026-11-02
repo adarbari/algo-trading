@@ -164,31 +164,23 @@ def test_a_setup_group_carries_the_setups_state_for_the_chip() -> None:
     assert "setupState: SetupState" in group
 
 
-def test_a_groups_state_is_read_for_the_groups_own_session_and_edge(
+def test_a_groups_state_is_read_for_the_groups_own_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Review of #1093: `setupState` uses the context the group was read with (a dated
-    `setupIdeas(date: D)` must not mix in the latest session's state) and the edge the tab's
-    session setups already hold, never a second read of every edge."""
+    """Review of #1093: `setupState` goes through one read-model loader with the context the
+    group was read with, so a dated `setupIdeas(date: D)` never mixes in another session."""
     import asyncio  # noqa: PLC0415
-    from types import SimpleNamespace  # noqa: PLC0415
 
-    from algotrade.services.read.evaluation.positions import state  # noqa: PLC0415
+    from algotrade.services.read.ideas import inverse  # noqa: PLC0415
     from algotrade_api.graphql.types.screens import setup_ideas  # noqa: PLC0415
 
-    seen: list[object] = []
-    edge = SimpleNamespace(id="drift")
+    seen: list[tuple[object, str]] = []
+
+    def fake(c: object, edge_id: str) -> None:
+        seen.append((c, edge_id))
+
+    monkeypatch.setattr(inverse, "load_state_of_setup", fake)
     ctx = object()
-    monkeypatch.setattr(
-        setup_ideas,
-        "load_session_setups",
-        lambda c: SimpleNamespace(qualifying=[SimpleNamespace(edge=edge)]) if c is ctx else None,
-    )
-
-    def fake_state(c: object, e: object) -> None:
-        seen.append((c, e))
-
-    monkeypatch.setattr(state, "load_setup_state", fake_state)
     group = setup_ideas.SetupGroup(  # type: ignore[call-arg]
         edge_id="drift",
         name="n",
@@ -204,20 +196,4 @@ def test_a_groups_state_is_read_for_the_groups_own_session_and_edge(
         ctx=ctx,
     )
     assert asyncio.run(group.setup_state(None)) is None  # type: ignore[arg-type]
-    assert seen == [(ctx, edge)]
-    other = setup_ideas.SetupGroup(  # type: ignore[call-arg]
-        edge_id="missing",
-        name="n",
-        level="works",
-        lift_pts=None,
-        oos_trades=None,
-        basis_screener="s",
-        basis_horizon=None,
-        state="picked",
-        unknown=None,
-        picked=1,
-        shown=1,
-        ctx=ctx,
-    )
-    assert asyncio.run(other.setup_state(None)) is None  # type: ignore[arg-type]
-    assert len(seen) == 1  # no state read for a setup the tab does not hold
+    assert seen == [(ctx, "drift")]

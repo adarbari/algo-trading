@@ -10,13 +10,16 @@ import { SetupIdeas } from './SetupIdeas';
 
 const hooks = vi.hoisted(() => ({ useSetupIdeas: vi.fn() }));
 vi.mock('@/entities/idea', () => ({ useSetupIdeas: hooks.useSetupIdeas }));
-vi.mock('@/entities/edge', () => ({
-  verdictLabel: (v: string) => (v === 'works' ? 'Works' : 'Promising'),
-  verdictTone: () => 'positive',
-  setupStateTerm: (s: string) => `setup_state_${s.toLowerCase()}`,
-  SetupStateChip: ({ state }: { state: { state: string } | null }) =>
-    state ? <span>{`chip ${state.state}`}</span> : null,
-}));
+vi.mock('@/entities/edge', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    verdictLabel: (v: string) => (v === 'works' ? 'Works' : 'Promising'),
+    verdictTone: () => 'positive',
+    setupStateTerm: (s: string) => `setup_state_${s.toLowerCase()}`,
+    SetupStateChip: ({ state }: { state: { state: string } | null }) =>
+      state ? <Text>{`chip ${state.state}`}</Text> : null,
+  };
+});
 vi.mock('@/features/guide-help', () => ({ termHelp: () => null }));
 
 const idea = (instrumentId: string, symbol: string, rank: number): SetupIdea => ({
