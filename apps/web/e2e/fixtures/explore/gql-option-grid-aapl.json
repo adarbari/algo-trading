@@ -1,0 +1,28 @@
+{
+  "__typename": "OptionGrid",
+  "underlyingId": "EQ:AAPL",
+  "session": "2026-10-23",
+  "pricedAt": 79.3,
+  "qKnown": true,
+  "bands": [0.1],
+  "columns": [
+    {
+      "bucket": 7,
+      "expiry": "2026-10-30",
+      "days": 7,
+      "reportInside": false,
+      "reportInsideUnknown": null,
+      "gap": null
+    },
+    {
+      "bucket": 28,
+      "expiry": "2026-11-20",
+      "days": 28,
+      "reportInside": true,
+      "reportInsideUnknown": null,
+      "gap": null
+    }
+  ],
+  "puts": [[], []],
+  "calls": [[], []]
+}

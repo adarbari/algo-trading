@@ -1,0 +1,74 @@
+{
+  "gap": null,
+  "preview": {
+    "underlying_id": "EQ:AAPL",
+    "session": "2026-10-23",
+    "priced_at": 79.3,
+    "right": "put",
+    "strike": 80,
+    "expiry": "2026-10-30",
+    "sold_at": 1.4,
+    "buy_back": 1.85,
+    "over_collected": 0.45,
+    "above_strike": -0.009,
+    "days_left": 7,
+    "delta": -0.4,
+    "rolls": [
+      {
+        "expiry": "2026-11-20",
+        "strike": 80,
+        "extra_credit": 0.6,
+        "new_breakeven": 78.1,
+        "credit_per_extra_day": 0.022,
+        "delta": -0.31,
+        "report_inside": true,
+        "report_inside_unknown": null
+      },
+      {
+        "expiry": "2026-11-20",
+        "strike": 79,
+        "extra_credit": 0.5,
+        "new_breakeven": 78.1,
+        "credit_per_extra_day": 0.022,
+        "delta": -0.31,
+        "report_inside": false,
+        "report_inside_unknown": null
+      },
+      {
+        "expiry": "2026-11-20",
+        "strike": 78,
+        "extra_credit": 0.4,
+        "new_breakeven": 78.1,
+        "credit_per_extra_day": 0.022,
+        "delta": -0.31,
+        "report_inside": null,
+        "report_inside_unknown": {
+          "code": "NOT_STORED",
+          "kind": "NOT_STORED",
+          "guide_term": "unavailable_not_stored",
+          "kind_text": "Report date not known"
+        }
+      },
+      {
+        "expiry": "2026-11-20",
+        "strike": 77,
+        "extra_credit": 0.3,
+        "new_breakeven": 78.1,
+        "credit_per_extra_day": 0.022,
+        "delta": -0.31,
+        "report_inside": false,
+        "report_inside_unknown": null
+      },
+      {
+        "expiry": "2026-11-20",
+        "strike": 76,
+        "extra_credit": 0.2,
+        "new_breakeven": 78.1,
+        "credit_per_extra_day": 0.022,
+        "delta": -0.31,
+        "report_inside": false,
+        "report_inside_unknown": null
+      }
+    ]
+  }
+}

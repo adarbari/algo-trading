@@ -373,7 +373,7 @@ contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow
 
 [[dir]]
 path = "src/algotrade/quant/options"
-purpose = "the figures of a sold option from its mid premium (split from quant, at its module cap): return on collateral, yield a year, breakeven and the risk-neutral chance of ending below the strike (premium.py, the option grid's maths)"
+purpose = "the figures of a sold option from its mid premium (split from quant, at its module cap): return on collateral, yield a year, breakeven and the risk-neutral chance of ending below the strike (premium.py, the option grid's maths); the payoff of a short option held to expiry: breakeven over every credit, credit per extra day, the return if called away and extrinsic value (payoff.py, the option calculators' maths)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -545,6 +545,11 @@ purpose = "read-only dry runs of unsaved Builder input (ADR 0029) over the reque
 contracts = ["Preview is read-only: no writers, no jobs (ADR 0029)"]
 
 [[dir]]
+path = "src/algotrade/services/preview/options"
+purpose = "the option calculators (plan V11): read-only previews of a sold option's rolls and calls on shares held, from figures a trader types (never stored or logged) priced on the request's session chain; derived figures only, the vendor quote stops in pool.py; payoff maths in quant/options; the API serves them as body-only POSTs"
+contracts = ["Preview is read-only: no writers, no jobs (ADR 0029)"]
+
+[[dir]]
 path = "src/algotrade/services/read"
 purpose = "the read model (ADR 0037): session resolution (ADR 0036), UNKNOWN values and scalar coercion, the read context the GraphQL layer calls; one loader per domain object in the subfolders (docs/api/read-model.md)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -661,7 +666,7 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/options"
-purpose = "read objects over an underlying's option chain for one session (split from instruments/, at its module cap): the option grid, puts and calls at our delta bands and expiry buckets with derived figures only, never a vendor bid, ask, last or size (grid.py)"
+purpose = "read objects over an underlying's option chain for one session (split from instruments/, at its module cap): the option grid, puts and calls at our delta bands and expiry buckets with derived figures only, never a vendor bid, ask, last or size (grid.py); the session inputs it and the option calculators price from: chain, spot, curve, dividend yield, next report (session_inputs.py)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

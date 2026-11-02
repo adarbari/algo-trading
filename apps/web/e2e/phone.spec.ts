@@ -837,3 +837,24 @@ test('Test: the ways in are cards, the steps stay in view, and a template opens 
   await expect(page).toHaveURL(/\/test\/expert\/vrp_scanner$/);
   await expect(steps.getByRole('link', { name: 'Result' })).toBeVisible();
 });
+
+test('Explore: Roll a put and Calls on shares fit a phone', async ({ page }) => {
+  for (const tab of ['roll', 'calls']) {
+    await page.goto(`/explore?focus=AAPL&tab=${tab}`);
+    await expect(page.getByRole('button', { name: /^Show / })).toBeVisible();
+    const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+  }
+  await page.getByRole('spinbutton', { name: 'Shares you hold' }).fill('300');
+  await page.getByRole('spinbutton', { name: /Your price/ }).fill('78.5');
+  await page.getByRole('button', { name: 'Show calls' }).tap();
+  await expect(page.getByRole('grid', { name: 'AAPL calls you could sell' })).toBeVisible();
+  const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
+});
