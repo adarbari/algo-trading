@@ -59,6 +59,7 @@ export function edgeColumns(live: ReadonlyMap<string, LiveState>): DataTableColu
       header: 'Tonight',
       headerAction: termHelp('setup_state'),
       value: (e) => e.setupState?.state ?? '',
+      essential: true,
       cell: ({ row }) => (
         <SetupStateChip
           state={row.setupState}

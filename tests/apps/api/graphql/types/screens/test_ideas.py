@@ -151,3 +151,13 @@ def test_an_empty_store_has_no_ideas_not_an_error(tmp_path: Path) -> None:
     query = '{ ideas(first: 5) { total } screeners { id } view(scope: "x") { scope } }'
     body = client.post("/graphql", json={"query": query}).json()
     assert body == {"data": {"ideas": None, "screeners": [], "view": None}}
+
+
+def test_a_setup_group_carries_the_setups_state_for_the_chip() -> None:
+    """O2: an Ideas group asks `setupState` (ON / PAUSED for a listed setup) through the same
+    read as `Edge.setupState`, so the chip is one source on the library, the page and Ideas."""
+    from algotrade_api.graphql.schema import schema  # noqa: PLC0415
+
+    sdl = schema.as_str()
+    group = sdl[sdl.index("type SetupGroup {") :].split("}")[0]
+    assert "setupState: SetupState" in group
