@@ -6,6 +6,8 @@
     "routes": {
       "src/pages/admin-feature-requests/index.ts": 31000,
       "src/pages/admin-feature-requests/ui/AcceptedFormulasSection.tsx": 4300,
+      "src/pages/admin-users/index.ts": 31600,
+      "src/pages/admin-llm-usage/ui/RequestsSection.tsx": 33900,
       "src/pages/admin-harness-runs/index.ts": 35300,
       "src/pages/admin-ingestion/index.ts": 55300,
       "src/pages/admin-llm-usage/index.ts": 49300,
@@ -89,6 +91,8 @@
     "bundle.routes.src/pages/trader-explore/index.ts": "2026-11-02 #1043 owner decision: route budgets back to measured + 5 % (parallel PRs had eaten the 2026-10-23 headroom: the margin had drifted below 5 % on 18 routes)",
     "bundle.routes.src/pages/trader-explore/ui/ChartEventsSection.tsx": "2026-11-02 #1043 owner decision: route budgets back to measured + 5 % (parallel PRs had eaten the 2026-10-23 headroom: the margin had drifted below 5 % on 18 routes)",
     "bundle.routes.src/pages/trader-explore/ui/OtherTabs.tsx": "2026-11-02 #1043 owner decision: route budgets back to measured + 5 % (parallel PRs had eaten the 2026-10-23 headroom: the margin had drifted below 5 % on 18 routes)",
+    "bundle.routes.src/pages/admin-users/index.ts": "2026-11-01 #1026 first budget: the Admin Users page (the people table, its strip and Guide help), measured locally 30.1 kB gzip + 5 % headroom (#909)",
+    "bundle.routes.src/pages/admin-llm-usage/ui/RequestsSection.tsx": "2026-11-01 #1026 first budget: the feature requests and accepted formulas inside the AI and requests page, a lazy chunk opened by the Requests tab (measured locally 32.3 kB gzip + 5 % headroom, #909)",
     "bundle.routes.src/pages/admin-harness-runs/index.ts": "2026-11-02 #1043 owner decision: route budgets back to measured + 5 % (parallel PRs had eaten the 2026-10-23 headroom: the margin had drifted below 5 % on 18 routes)",
     "bundle.routes.src/pages/guide/index.ts": "2026-11-02 #1043 owner decision: route budgets back to measured + 5 % (parallel PRs had eaten the 2026-10-23 headroom: the margin had drifted below 5 % on 18 routes)",
     "bundle.routes.src/pages/screener-results/index.ts": "2026-11-02 #1043 owner decision: route budgets back to measured + 5 % (parallel PRs had eaten the 2026-10-23 headroom: the margin had drifted below 5 % on 18 routes)",

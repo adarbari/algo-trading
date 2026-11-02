@@ -1,6 +1,6 @@
 /**
  * AppShell: the frame of every screen: a skip link, the TopBar, an optional status strip under
- * it (a StatusStrip) and the main content region.
+ * it (a StatusStrip), the main content region and an optional footer (data status, risk line).
  * `page` layout centres content up to the page width (1600 px) with page padding and a gap
  * between sections; `full` gives the page the whole width with no padding (split views such as
  * Explore). Padding tightens at phone width.
@@ -14,6 +14,8 @@ export interface AppShellProps {
   topBar: ReactNode;
   /** A slim strip under the bar, on every page (a StatusStrip); absent: nothing. */
   strip?: ReactNode;
+  /** The line under the content on every page (data status and the risk statement); absent: nothing. */
+  footer?: ReactNode;
   /** `page` (centred, max page width, padded; default) or `full` (edge to edge). */
   layout?: 'page' | 'full';
   /** Text of the skip link that jumps past the top bar to the content. */
@@ -25,6 +27,7 @@ export interface AppShellProps {
 export function AppShell({
   topBar,
   strip,
+  footer,
   layout = 'page',
   skipLabel = 'Skip to content',
   children,
@@ -40,6 +43,7 @@ export function AppShell({
       <main id={mainId} tabIndex={-1} className={styles.main} data-layout={layout}>
         {children}
       </main>
+      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </div>
   );
 }
