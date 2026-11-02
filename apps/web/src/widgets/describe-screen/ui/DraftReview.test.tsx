@@ -93,7 +93,6 @@ function setup(over: Partial<DraftReviewProps> = {}) {
     onReviewFormula: vi.fn(),
     onSkipFormula: vi.fn(),
     onPickReading: vi.fn(),
-    onAcceptSuggestion: vi.fn(),
     renderFieldHelp: (field) => <Text>{`field help ${field}`}</Text>,
     ...over,
   };

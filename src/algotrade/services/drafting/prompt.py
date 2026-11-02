@@ -53,7 +53,8 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # the parts (ADR 0071); only maths over fields stays one boolean formula.
 # 13: a side of an "or" that needs maths makes the whole "or" ONE part with ONE boolean formula.
 # 14: missing data never passes, an exclusion included.
-PROMPT_VERSION = "14"
+# 15: no ``suggestions`` (ADR 0083 decision 4: the model only translates the sentence).
+PROMPT_VERSION = "15"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -105,15 +106,15 @@ Rules:
   for a word with several readings it lists them and the first is the default.
 - Missing data never passes: a name with no value for a field fails a hard criterion, an
   exclusion ("except ...") included, so it is left out. Write no note about names with no value.
-- "criteria" holds ONLY what the sentence asks for; a caveat's check goes in "suggestions" (soft
-  or score). A vague word ("heavy") with no phrasebook or guide threshold stays out of "criteria":
-  offer "unresolved" readings when fields fit, else a note.
+- "criteria" holds ONLY what the sentence asks for: never add a check the sentence does not ask
+  for, not even a caveat's. A vague word ("heavy") with no phrasebook or guide threshold stays
+  out of "criteria": offer "unresolved" readings when fields fit, else a note.
 
 Answer shape:
 {"criteria": [ ... ], "tie_break": {"field": "...", "descending": true, "part": "p3"} or null,
- "notes": ["anything you could not map, or assumed"],
+ "notes": ["how you read the sentence: anything you could not map, or assumed; never advice"],
  "formulas": [ ... ] or null, "missing": [ ... ] or null, "unresolved": [ ... ] or null,
- "suggestions": [ ... ] or null, "parts": [ ... ]}
+ "parts": [ ... ]}
 
 "parts": the sentence split in order, 1 to 12 parts, one per thing the trader asks for:
 {"id": "p1", "words": their own words, copied exactly, "reading": one short line (160 characters at
@@ -133,7 +134,7 @@ its criterion negated. A formula cannot be one side of an "or" (the server canno
 maths over fields is needed on ANY side, the whole "or" is ONE part, its words covering both sides
 ("the 20 day return beats the 60 day return or RSI14 under 30"), with ONE boolean formula holding
 both sides ("a > b or rsi < 30") and no other criterion for them. Words you cannot map
-are still a part, with no item. Every criterion, formula, missing, unresolved, suggestion and the
+are still a part, with no item. Every criterion, formula, missing, unresolved and the
 tie_break carries "part"; scaffolding (status ACTIVE) goes with the part naming the kind of
 instrument.
 
@@ -154,10 +155,6 @@ one_of(x, a, ...) exists(group). No lag, window, rolling or history: anything ov
 "missing": [{"key": an open key from "Open requests" below, else null, "new_key_slug" (a-z0-9_) when
 key is null, "span", "description", "why_needed", "closest": [catalogue fields], "feasibility":
 "ROLLUP_FROM_STORED" (a window over stored data) | "NEEDS_SOURCE" (new data) | "UNCLEAR", "part"}].
-
-"suggestions": [{"field", "op", "value", "mode": "soft"|"score", "tolerance" (soft needs it),
-"on_miss", "why": the caveat, "source": field or null, "part": the part whose words raised it}], at
-most 5, shown to the trader to accept.
 
 "unresolved": [{"term", "span", "default_index", "part", "alternatives": [{"label", "criterion": a
 complete criterion}, 2 or 3]}] for a term with several readings ("liquid"); the server adds the

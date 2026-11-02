@@ -1,15 +1,26 @@
 /**
  * The draft review of "Describe it" as one card per part of the sentence (docs/drafting/
  * describe-it-plan.md "Explained parts"): the trader's own words quoted, "We read this as ..." in
- * plain language, then what that part owns: its criteria (the Builder's rows, by id), the formula
+ * plain language, then what that part owns (the whole sentence first, each part tagged with its
+ * kind): its criteria (the Builder's rows, by id), the formula
  * to review, the readings of an ambiguous term (picking another swaps the row locally, no model
- * call), the feature that is not available yet (the trader's OWN history only) and the protective
- * checks suggested (added or skipped, never applied silently). Words nothing understood and
+ * call) and the feature that is not available yet (the trader's OWN history only). The model only
+ * translates the sentence: nothing here adds a rule the trader did not write (ADR 0083 decision
+ * 4). Words nothing understood and
  * criteria kept from the screen are cards of their own. The server decides every part, kind and
  * reference; a card is marked edited when the trader changed its rows (ADR 0038). Zero applied
  * criteria is not an error: the Builder's document stays.
  */
-import { Mono, PartCard, PartJoin, PartList, Stack, Text, type PartCardProps } from '@algotrade/ui';
+import {
+  Mono,
+  PartCard,
+  PartJoin,
+  PartList,
+  Stack,
+  TaggedSentence,
+  Text,
+  type PartCardProps,
+} from '@algotrade/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { GuideHelp, termHelp } from '@/features/guide-help';
@@ -23,17 +34,16 @@ import {
   partKindLabel,
   partsOf,
   readingSwap,
-  suggestionsOf,
+  sentenceSegments,
   useMyFeatureRequests,
   type DraftPart,
-  type DraftSuggestion,
   type MissingFeature,
   type ScreenDraft,
   type Unresolved,
 } from '@/features/screener-describe';
 
 import { MissingCard, NotCovered, missingKey } from './NotAvailable';
-import { CriteriaRows, Readings, Suggested, type SuggestionState } from './PartRows';
+import { CriteriaRows, Readings } from './PartRows';
 import { FormulaCard } from './ProposedFormulas';
 import { RetypeCard } from './RetypePart';
 import type { DraftReviewProps } from './props';
@@ -63,7 +73,6 @@ export function PartsReview({
   onReviewFormula,
   onSkipFormula,
   onPickReading,
-  onAcceptSuggestion,
   onRedrafted,
   renderFieldHelp,
 }: DraftReviewProps) {
@@ -71,9 +80,7 @@ export function PartsReview({
   const unresolved = answer.unresolved ?? [];
   const formulas = answer.formulas ?? [];
   const missing: readonly MissingFeature[] = answer.missing ?? [];
-  const suggestions = suggestionsOf(answer);
   const [picked, setPicked] = useState<Readonly<Record<string, number>>>({});
-  const [decided, setDecided] = useState<Readonly<Record<string, SuggestionState>>>({});
   // What the answer's own rows were, to tell the trader's edits from them. A retype replaces the
   // answer, so the rows of the parts it did not touch stay as first shown (their edits still show).
   const [original, setOriginal] = useState<unknown>(answer.document['criteria']);
@@ -106,30 +113,17 @@ export function PartsReview({
     setPicked((now) => ({ ...now, [term.term]: to }));
     onPickReading(swap, { event: 'choice_made', subject: term.term, picked: to });
   };
-  const add = (suggestion: DraftSuggestion) => {
-    onAcceptSuggestion(suggestion.criterion);
-    setDecided((now) => ({ ...now, [suggestion.id]: 'added' }));
-  };
-  const skip = (id: string) => {
-    setDecided((now) => ({ ...now, [id]: 'skipped' }));
-  };
-  const suggestedIn = (ids: readonly string[]) => suggestions.filter((s) => ids.includes(s.id));
-  const owned = new Set(parts.flatMap((part) => part.suggestions));
-  const unowned = suggestions.filter((s) => !owned.has(s.id));
 
   const current = document['criteria'];
   const rowsNow = appliedRows(document);
 
   const redrafted = (next: ScreenDraft, replaced: DraftPart) => {
     setOriginal((before: unknown) => baselineAfter(before, next, replaced));
-    // What was decided on the redrafted part's own options is void: its readings and suggestions are new.
+    // What was decided on the redrafted part's own options is void: its readings are new.
     setPicked((now) =>
       Object.fromEntries(
         Object.entries(now).filter(([term]) => !replaced.unresolved.includes(term)),
       ),
-    );
-    setDecided((now) =>
-      Object.fromEntries(Object.entries(now).filter(([id]) => !replaced.suggestions.includes(id))),
     );
     onRedrafted?.(next, answer, replaced);
   };
@@ -139,12 +133,8 @@ export function PartsReview({
     const dropped = leftOut(part, answer);
     const own = formulas.filter((f) => part.formulas.includes(f.name));
     const gaps = missing.filter((item) => part.missing.includes(missingKey(item)));
-    const offered = suggestedIn(part.suggestions);
     const rankField = part.rank ? tieBreakOf(document) : null;
-    if (
-      criteria.length + dropped.length + own.length + gaps.length + offered.length === 0 &&
-      !rankField
-    )
+    if (criteria.length + dropped.length + own.length + gaps.length === 0 && !rankField)
       return null;
     return (
       <Stack gap={3}>
@@ -178,13 +168,6 @@ export function PartsReview({
             renderFieldHelp={renderFieldHelp}
           />
         ))}
-        <Suggested
-          suggestions={offered}
-          states={decided}
-          onAdd={add}
-          onSkip={skip}
-          renderFieldHelp={renderFieldHelp}
-        />
       </Stack>
     );
   };
@@ -215,6 +198,7 @@ export function PartsReview({
     const common = {
       kind: part.kind,
       kindLabel: kind.label,
+      headingLevel: 2,
       origin: part.origin === 'gap' ? 'words' : part.origin,
       keptLabel: PART_TEXT.keptMark,
       readingLabel: PART_TEXT.reading,
@@ -306,16 +290,10 @@ export function PartsReview({
 
   return (
     <Stack gap={3}>
-      <PartList aria-label={PART_TEXT.list}>{parts.flatMap(withJoin)}</PartList>
-      {unowned.length > 0 && (
-        <Suggested
-          suggestions={unowned}
-          states={decided}
-          onAdd={add}
-          onSkip={skip}
-          renderFieldHelp={renderFieldHelp}
-        />
+      {parts.length > 0 && (
+        <TaggedSentence aria-label={PART_TEXT.sentence} segments={sentenceSegments(answer)} />
       )}
+      <PartList aria-label={PART_TEXT.list}>{parts.flatMap(withJoin)}</PartList>
       {leftover.map((line) => (
         <Text key={line} size="sm" tone="muted">
           {line}

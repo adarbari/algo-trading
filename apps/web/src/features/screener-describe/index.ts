@@ -18,12 +18,5 @@ export {
   type TermRef,
 } from './model/labels';
 export { JOIN_TEXT, joinToken } from './model/joins';
-export {
-  baselineAfter,
-  partEdited,
-  partsOf,
-  suggestionsOf,
-  type DraftPart,
-  type DraftSuggestion,
-  type PartKind,
-} from './model/parts';
+export { sentenceSegments } from './model/sentence';
+export { baselineAfter, partEdited, partsOf, type DraftPart, type PartKind } from './model/parts';

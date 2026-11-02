@@ -2,8 +2,7 @@
 whose criteria the model keeps unless the sentence changes them) in; the draft document, the
 criteria dropped with their reasons and the model's notes out, plus the A / B / C contract
 (ADR 0041, amended 2026-10-11): pending formulas with their dry run, the formulas dropped, the
-missing features and the unresolved terms, and the suggested checks (soft or score, offered
-not applied) with those dropped. Pending formulas and suggestions are never in ``document``.
+missing features and the unresolved terms. Pending formulas are never in ``document``.
 The explained parts (same amendment, 2026-10-11): ``sentence`` (the whitespace-normalised text the
 parts' offsets count in) and ``parts``, each the trader's own words (the server's slice of the
 sentence), the model's reading when it checks out, the kind the server decided and the ids of the
@@ -103,20 +102,6 @@ class Unresolved(Schema):
     alternatives: list[Alternative]
 
 
-class Suggestion(Schema):
-    id: str = Field(description="the server's id (s1, s2...), what a part's suggestions name")
-    criterion: dict[str, Any] = Field(
-        description="a soft or score criterion, never in the document"
-    )
-    why: str = Field(description="the short reason, from the caveat or situation")
-    source: str | None = Field(description="the field guide entry or field that raised it")
-
-
-class DroppedSuggestion(Schema):
-    field: str
-    reason: str
-
-
 class Part(Schema):
     id: str = Field(
         description="p1... from the model; g1... a gap; kept / unplaced: catch-alls with no words"
@@ -144,7 +129,6 @@ class Part(Schema):
     formulas: list[str] = Field(description="names of pending formulas")
     unresolved: list[str] = Field(description="terms of the unresolved readings")
     missing: list[str] = Field(description="keys (or new slugs) of the missing-feature requests")
-    suggestions: list[str] = Field(description="ids of suggestions")
     rank: bool = Field(description="true when the document's tie-break belongs to this part")
     join: Literal["and", "or", "and_not"] | None = Field(
         default=None,
@@ -169,12 +153,6 @@ class ScreenDraft(Schema):
     unresolved: list[Unresolved] = Field(
         default_factory=list, description="ambiguous terms; the document has each default"
     )
-    suggestions: list[Suggestion] = Field(
-        default_factory=list,
-        description="protective checks offered (soft or score), never in the document: the "
-        "trader accepts or skips each",
-    )
-    suggestions_dropped: list[DroppedSuggestion] = Field(default_factory=list)
     sentence: str = Field(
         default_factory=str,  # not a literal default: the web client types those as required
         description="the whitespace-normalised sentence the parts' offsets count in",
@@ -224,8 +202,6 @@ class DraftPartBody(BaseModel):
     formulas_dropped: list[DroppedFormula] = Field(default_factory=list, max_length=MAX_ITEMS)
     missing: list[MissingFeature] = Field(default_factory=list, max_length=MAX_ITEMS)
     unresolved: list[Unresolved] = Field(default_factory=list, max_length=MAX_ITEMS)
-    suggestions: list[Suggestion] = Field(default_factory=list, max_length=MAX_ITEMS)
-    suggestions_dropped: list[DroppedSuggestion] = Field(default_factory=list, max_length=MAX_ITEMS)
 
 
 class DraftPartResult(Schema):

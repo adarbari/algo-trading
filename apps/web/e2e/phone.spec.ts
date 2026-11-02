@@ -563,7 +563,7 @@ test('Describe it: the review fits the screen and the formula dialog fills it', 
   const errors = collectErrors(page);
   await mockBuilderApi(page);
   await mockDescribeApi(page);
-  await page.goto('/screeners/my-vrp/edit');
+  await page.goto('/test/describe/my-vrp');
   await page.getByRole('textbox', { name: 'Describe the screen' }).fill('IV above HV');
   await page.getByRole('button', { name: 'Draft it' }).tap();
   await expect(page.getByRole('article', { name: 'IV above HV' })).toBeVisible();

@@ -16,6 +16,7 @@ owner = ["src/algotrade/config/edges/positions/cases.py", "src/algotrade/engines
 allowed = [
     "src/algotrade/config/edges/document.py",  # splits the case tables off an outcome before typing it
     "src/algotrade/services/evaluation/cross_section/reads/entry.py",  # the harness decides each name's entry close through first_entry (E13a)
+    "src/algotrade/services/evaluation/cross_section/reads/cases.py",  # the harness resolves each name's case values at D through resolve_case (E13b)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "resolve_case" }, { call = "split_cases" }, { call = "first_entry" }]
@@ -70,12 +71,13 @@ detect = [{ call = "fields_for" }]
 
 [[responsibility]]
 id = "position-key"
-description = "The stored identity of an option trade (ADR 0088, design 2.5, G24): resolve_legs gives an outcome's legs from its template (strike_delta replaces the delta of the short delta legs only), position_key the canonical sorted JSON of the resolved legs, collateral rule, selection parameters, entry offset, ordered exit rules and hold cap (never the template id, so a template edit changes the key a trade is stored under), parse_position_key its inverse, share_position_key the same string for a share position with declared exits (its side's share_exit_rules, no option parameters, E3c-2), case_points the concrete outcomes a case-valued setup can resolve to, grid_outcomes the outcome of each [[variant_grid]] point (the writer stores them, a named sleeve reads them), with_legs fills them on a loaded edge; callers key a trade through it, never build the string"
+description = "The stored identity of an option trade (ADR 0088, design 2.5, G24): resolve_legs gives an outcome's legs from its template (strike_delta replaces the delta of the short delta legs only), position_key the canonical sorted JSON of the resolved legs, collateral rule, selection parameters, entry offset, ordered exit rules and hold cap (never the template id, so a template edit changes the key a trade is stored under), parse_position_key its inverse, share_position_key the same string for a share position with declared exits (its side's share_exit_rules, no option parameters, E3c-2), case_points the concrete outcomes a case-valued setup can resolve to (every combination of its case values) and case_point one of them, grid_outcomes the outcome of each [[variant_grid]] point (the writer stores them, a named sleeve reads them), with_legs fills the legs and each case point's key (PositionSpec.points) on a loaded edge; callers key a trade through it, never build the string"
 owner = ["src/algotrade/config/edges/positions/key.py"]
 allowed = [
     "src/algotrade/config/edges/loading.py",  # fills the resolved legs once an edge is checked against the templates
     "apps/ingestion/algotrade_ingestion/tasks/derived/paths/wanted.py",  # the path writers store the key
     "src/algotrade/services/evaluation/cross_section/hit.py",  # the reader selects the edge's own key
+    "src/algotrade/services/evaluation/cross_section/reads/cases.py",  # the reader keys each name's resolved case point as the writer did (E13b)
     "src/algotrade/services/evaluation/time_series/sleeve.py",  # a sleeve trial's identity is its position key
 ]
 section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"

@@ -1,7 +1,7 @@
 """The licence of a trial and of each per-name column of its ledger (ADR 0064 decision 10, ADR
 0028): the most restrictive catalogue licence of what the trial reads. The trial's (on
 ``edge_eval`` and every ledger row) is that of its implied-vol field (when the outcome reads one),
-its screen's features, its universe's features and its entry condition's fields (E13); a ledger
+its screen's features, its universe's features and its entry and case rules' fields (E13); a ledger
 column's is that of what it is derived from: the outcome value (with its gross value, reference
 and touch) from the implied-vol field, the score from the screen's features, the ADV from its
 own field. A field the catalogue
@@ -18,6 +18,7 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import LICENCES, strictest
+from algotrade.services.evaluation.cross_section.reads.cases import case_fields
 from algotrade.services.evaluation.cross_section.reads.session import ADV_FIELD
 from algotrade.services.selection import selection_fields
 
@@ -78,8 +79,10 @@ def trial_licences(
     (None: the outcome reads none); ``outcome``: that of the outcome rows joined."""
     score = strictest(_of(features, screen_fields(c, edge)) for c in configs)
     universe_licence = _of(features, selection_fields(universe))
-    entry = edge.outcome.entry  # what decides each trade's S is read by the trial too (E13)
-    entry_licence = _of(features, sorted({r.field for r in entry.when.rules()})) if entry else OPEN
+    entry, position = edge.outcome.entry, edge.outcome.position  # read by the trial too (E13)
+    ruled = {r.field for r in entry.when.rules()} if entry else set()
+    ruled |= set(case_fields(position.cases)) if position is not None else set()
+    entry_licence = _of(features, sorted(ruled))
     value = iv_licence or OPEN
     return TrialLicences(
         trial=strictest((value, score, universe_licence, outcome, entry_licence)),

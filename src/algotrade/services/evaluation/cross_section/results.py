@@ -182,6 +182,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "no_entry_bar": sum(s.no_entry_bar for s in r.stats),
         "not_triggered": sum(s.not_triggered for s in r.stats),  # an entry condition's (E13)
         "entry_unknown": sum(s.entry_unknown for s in r.stats),
+        "case_unknown": sum(s.case_unknown for s in r.stats),  # a case value's (E13b)
         "excluded_coverage": m.excluded_coverage,
         "lost_sessions": dict(r.lost_sessions),  # table with no data -> decision sessions
         "timing": None if r.timing is None else dict(r.timing),  # time-series edge (ADR 0073)

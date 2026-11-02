@@ -81,6 +81,18 @@ def test_the_label_is_the_edges_hit() -> None:
         ({"scorer": None}, "no \\[scorer\\] features"),
         ({"frozen_from": None}, "needs frozen_from"),
         ({"schedule": "on_event:earnings_reaction"}, "event schedule"),
+        (
+            {
+                "outcome": {
+                    "kind": "excess_return",
+                    "horizon_sessions": [2],
+                    "benchmark": "SPY",
+                    "start_offset_sessions": 1,
+                    "entry": {"when": {"all": [{"field": PRICE, "op": "gt", "value": 0}]}},
+                }
+            },
+            "entry condition or case value",
+        ),  # labelled at D's offset otherwise (E13)
     ],
 )
 def test_an_edge_that_cannot_be_fitted_is_refused(changes, why: str) -> None:  # type: ignore[no-untyped-def]
