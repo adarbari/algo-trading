@@ -179,11 +179,11 @@ are null for share setups.
 
 **Measures** (on `edge_eval`, for every setup):
 - `mean_roc` at the verdict's cost level, before bill interest, with a 90% stationary-bootstrap
-  interval (mean block 3 decision sessions, seeded by the leg key);
+  interval (mean block 3 decision sessions, raised to the sessions a window spans when windows overlap, the correction the t ratios use; E6b-1 as built: seeded by the trial's identity and a frozen constant, never by the leg key, so a `LEG_VERSION` bump cannot flip a verdict on unchanged data);
 - `excess_roc`, paired per decision session with the base, and its bootstrap t. The base is:
   - cross-section: the same position on every eligible name (for shares, today's base);
   - named option sleeve: the delta-equivalent stock;
-- `cvar_5`, `cvar_5_n`, `cvar_1`, `worst_window`;
+- `cvar_5`, `cvar_5_n`, `cvar_1`, `worst_window`: CVaR is the mean of the `tail_count = ceil(alpha n - 1e-9)` lowest windows (at least 1), a return and never a positive loss; `cvar_n` is that count;
 - `psr`;
 - cost rows (the existing `slice_kind` rows);
 - benchmark rows;
@@ -228,7 +228,7 @@ min_tail_windows = 5
 bootstrap_draws = 2000
 bootstrap_mean_block = 3
 [option_costs]   # 2.4
-[option_quotes]  # 2.4
+[option_quotes]  # 2.4; typed apart in config/edges/positions/quotes.py (E6b-1): a quote filter sets outcome rows, so it is never in `settings_hash`
 [slices]         # 2.2
 [exit_rule]      # 2.4a; typed apart from VerdictSettings, not a judge input
 ```

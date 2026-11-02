@@ -32,6 +32,27 @@ settings.register_profile(
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "dev"))
 
 
+# What git exports to a hook (pre-push: GIT_DIR=<the worktree's git dir>). A test that shells out to
+# git (`git init --bare`, `git config`) with these set acts on the real repository, not its tmp one.
+GIT_REPOSITORY_ENV = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_PREFIX",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+)
+
+
+@pytest.fixture(autouse=True)
+def no_inherited_git_repository(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test starts with no git repository in its environment, so a suite run from the
+    pre-push hook cannot rewrite the real repository's config (core.bare, 2026-11-02)."""
+    for name in GIT_REPOSITORY_ENV:
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture(autouse=True)
 def strict_reference_events(monkeypatch: pytest.MonkeyPatch) -> None:
     """A universe build that would write two ``events/reference_change`` rows under one key

@@ -13,7 +13,7 @@ A site edge's canonical run also publishes its verdict headline (``results/edge_
 reader judges live, ``verdict_row`` ``failed`` on the record), never the evaluation."""
 
 import logging
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from datetime import datetime
 from typing import Any
 
@@ -35,6 +35,7 @@ from algotrade.services.evaluation.cross_section.measures import (
 )
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
+from algotrade.services.evaluation.evidence.measures import TailMeasures
 from algotrade.services.read.context import Stores
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -52,6 +53,7 @@ MEASURE_COLUMNS = (
     "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
     "pre_snapshot_sessions", "pick_adv_median", "pick_adv_known", "pick_adv_low",
 )  # fmt: skip
+TAIL_COLUMNS = tuple(f.name for f in fields(TailMeasures))  # ``SliceMeasure.tail``, flattened
 
 
 def _nan(value: float | None) -> float:
@@ -113,6 +115,7 @@ def _row(
         "touch_rate": _nan(m.touch_rate),
         **{f"decile_mean_{i:02d}": d for i, d in enumerate(deciles, start=1)},
         **{c: measured[c] for c in MEASURE_COLUMNS},
+        **asdict(m.tail),
     }
 
 
@@ -389,6 +392,7 @@ def write_edge_eval(
         "legs_computed": evaluation.legs_computed,
         "legs_invalidated": dict(evaluation.legs_invalidated),  # stored legs recomputed, by reason
         "ledger_rows": len(ledger),  # results/edge_trades rows written (ADR 0064)
+        "bootstrap": dict(evaluation.bootstrap),  # draws, mean block, seed version (ADR 0088 2.6)
     }
     record.finish(now, complete=True, stats=stats)  # what the publish below saves
     headline, status = _verdict_headline(stores, evaluation, record, frame, now)
