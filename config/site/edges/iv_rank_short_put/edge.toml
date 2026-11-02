@@ -19,6 +19,7 @@ baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
 notes = """The same idea as vrp_short_put, tested again on the iv_rank_high screen (filed 2026-11-02,
 ADR 0088, X2): so it is a second trial of the volatility premium, read beside vrp_short_put, never
 as independent evidence. The position, gate and variants are vrp_short_put's: a 0.30-delta put on
