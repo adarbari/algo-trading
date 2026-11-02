@@ -125,7 +125,9 @@ def _static_steps(present: list[str]) -> list[Step]:
     steps.append(("design system", ["npm", "run", "ds:check"]))
     linted = sorted(f for f in present if f.endswith(LINTED))
     if linted:
-        steps.append(("eslint", ["npx", "eslint", "--max-warnings=0", *linted]))
+        steps.append(
+            ("eslint", ["npx", "eslint", "--max-warnings=0", "--no-warn-ignored", *linted])
+        )
     return steps
 
 
