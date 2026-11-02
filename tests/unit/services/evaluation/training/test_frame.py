@@ -8,7 +8,7 @@ import pytest
 from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.evaluation.cross_section.harness import edge_universe
+from algotrade.services.evaluation.cross_section.run.scopes import edge_universe
 from algotrade.services.evaluation.discovery.frame import feature_reads
 from algotrade.services.evaluation.training import frame as module
 from algotrade.services.evaluation.training import no_ml

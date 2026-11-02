@@ -43,14 +43,14 @@ from algotrade.services.evaluation.cross_section.events import (
     EventSchedule,
     read_events,
 )
-from algotrade.services.evaluation.cross_section.harness import (
+from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
+from algotrade.services.evaluation.cross_section.measuring import MEASURED_COVERAGE, names_for
+from algotrade.services.evaluation.cross_section.picks import eligible, long_picks, screen_variant
+from algotrade.services.evaluation.cross_section.run.scopes import (
     MIXED_SOURCE_IV,
     edge_universe,
     iv_field_of,
 )
-from algotrade.services.evaluation.cross_section.hit import needs_implied_vol
-from algotrade.services.evaluation.cross_section.measuring import MEASURED_COVERAGE, names_for
-from algotrade.services.evaluation.cross_section.picks import eligible, long_picks, screen_variant
 from algotrade.services.evaluation.cross_section.sessions import Leg, leg_blocks
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore

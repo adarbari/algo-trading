@@ -21,7 +21,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.engines.selection.entry import ENTRY_UNKNOWN, NOT_TRIGGERED
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.reads import entry as entry_reads
 from algotrade.services.evaluation.cross_section.reads.entry import (
     Entered,
@@ -29,6 +29,7 @@ from algotrade.services.evaluation.cross_section.reads.entry import (
     entered_rows,
     read_entries,
 )
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.services.features import site_features
 from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
