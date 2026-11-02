@@ -103,3 +103,46 @@ Beside its fixed exits an option setup can declare a condition, such as the posi
 """
 next = "Open each field's Guide entry to see what it measures and when it can be missing."
 see_also = ["exit_take_profit", "exit_dte_declared", "position_delta"]
+
+# How a trade in a setup's ledger closed (the trade contract's `exit_kind`, ADR 0088 2.5a): the
+# declared exits above, plus the ways an option or share position ends on its own.
+
+[[term]]
+id = "exit_expired"
+term = "Expired"
+short = "The option position was held to its expiry and closed at the value it had then."
+body = """
+The trade ran to the option's expiry with no exit rule closing it first. An option out of the money at expiry is worth nothing, so a sold option keeps its whole credit. One in the money is worth what it is in the money, and that is what was paid to close it. The return is on the collateral the position set aside for its whole life.
+"""
+next = "Compare expired trades with those closed early in the ledger to see what the exit rules changed."
+see_also = ["exit_hold", "exit_take_profit", "exit_assigned"]
+
+[[term]]
+id = "exit_assigned"
+term = "Assigned"
+short = "A sold option was exercised against the position at expiry, so the trade ended with shares bought or sold at the strike."
+body = """
+A sold put in the money at expiry is assigned: the seller buys the shares at the strike. A sold call in the money is assigned the other way. The trade is closed at that point and its return counts the shares at the expiry close against the strike. A setup that keeps the shares to sell calls against them is a different setup, tested on its own.
+"""
+next = "Check how often the setup's trades were assigned before you sell puts on names you don't want to own."
+see_also = ["exit_expired", "exit_early_assigned_dividend"]
+
+[[term]]
+id = "exit_early_assigned_dividend"
+term = "Assigned early before a dividend"
+short = "A sold call in the money was exercised before expiry, on the day before the shares went ex-dividend."
+body = """
+An owner of a call in the money can exercise it the day before the shares go ex-dividend, to collect the dividend. When the dividend is worth more than the call's remaining time value, the backtest treats the sold call as exercised then. The trade ends early with the shares delivered at the strike. A covered call over a dividend date carries this risk.
+"""
+next = "Look at the ex-dividend dates inside a covered call's life before relying on its full credit."
+see_also = ["exit_assigned", "calls_early_exercise"]
+
+[[term]]
+id = "exit_delisted"
+term = "Delisted"
+short = "The shares stopped trading during the trade, so it ended at the last close that was stored."
+body = """
+A name can be delisted after a merger, a buyout or a failure. The trade is ended at its last stored close and counted, never dropped: leaving it out would make the setup look better than it was. A takeover usually ends with a gain, a failure with a large loss.
+"""
+next = "Read a delisted trade's return and the news behind it before treating it as typical."
+see_also = ["exit_hold"]

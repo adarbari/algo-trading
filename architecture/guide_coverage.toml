@@ -309,6 +309,12 @@ values = { on_track = "term:live_state", below = "term:live_state", above = "ter
 names = { below = "below range", above = "above range", too_early = "too few settled trades", no_backtest = "no backtest", no_trades = "no live record", not_settled = "not yet settled", not_recording = "not recording" }
 
 [[enum]]
+source = "graphql:EdgeTradeRow.exitKind"
+values_from = "python:algotrade.storage.tables.schemas.outcomes:EXIT_KINDS"
+values = { EXPIRED = "term:exit_expired", ASSIGNED = "term:exit_assigned", EARLY_ASSIGNED_DIVIDEND = "term:exit_early_assigned_dividend", TAKE_PROFIT = "term:exit_take_profit", STOP_LOSS = "term:exit_stop_declared", EXIT_DTE = "term:exit_dte_declared", CONDITION = "term:exit_condition_declared", HORIZON = "term:exit_hold", DELISTED = "term:exit_delisted" }
+names = { EXPIRED = "expired", ASSIGNED = "assigned", EARLY_ASSIGNED_DIVIDEND = "assigned early (dividend)", TAKE_PROFIT = "take profit", STOP_LOSS = "stop loss", EXIT_DTE = "days to expiry", CONDITION = "exit condition", HORIZON = "held to the end", DELISTED = "delisted" }
+
+[[enum]]
 source = "graphql:EdgeTradeRow.status"
 values_from = "python:algotrade.services.read.edge_ledger.trades:STATUSES"
 values = { won = "term:trade_status", lost = "term:trade_status", excluded = "term:trade_status", open = "term:trade_status" }

@@ -15,7 +15,7 @@ import pandas as pd
 from algotrade.config.edges.document import MAIN
 from algotrade.services.evaluation.cross_section.detail.windows import BlockWindow
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, VariantResult
-from algotrade.services.evaluation.cross_section.measures import BUCKETS, SessionStat
+from algotrade.services.evaluation.cross_section.measures import BUCKETS, SessionStat, session_rocs
 
 RESULT = "edge_series"
 SOURCE = "edge-eval"
@@ -41,6 +41,15 @@ def _base_mean(stat: SessionStat) -> float | None:
     return (sum(stat.pick_values) + stat.rest[0] * stat.rest[1]) / n
 
 
+def _rocs(stat: SessionStat) -> tuple[float | None, float | None]:
+    """``(picks, base)``: the block's mean return on capital of its counted picks and of the
+    base, as the evidence measures read them (``session_rocs``); None when it has none."""
+    _, rocs, bases = session_rocs([stat], True)
+    if not rocs:
+        return None, None
+    return rocs[0], bases[0]
+
+
 def _nan(value: float | None) -> float:
     return float("nan") if value is None else value
 
@@ -53,6 +62,7 @@ def _row(
     measured = status in (MEASURED, NO_PICKS)
     deciles = stat.deciles if measured and stat.deciles else (float("nan"),) * BUCKETS
     assert r.series is not None
+    roc, base_roc = _rocs(stat) if status == MEASURED else (None, None)
     return {
         "edge_id": evaluation.edge_id,
         "user_id": evaluation.user_id,
@@ -76,6 +86,7 @@ def _row(
         "status": status,
         "lost_table": window.lost_table,
         "unit": r.series.unit,
+        "capital_basis": r.capital_basis,
         "licence": r.licence,
         # Counts and means are null where nothing was measured, never zero.
         "picks": len(stat.pick_values) if measured else None,
@@ -84,6 +95,8 @@ def _row(
         "eligible": stat.eligible if measured else None,
         "base_hits": stat.base_hits if measured else None,
         "base_mean": _nan(_base_mean(stat) if measured else None),
+        "pick_roc_mean": _nan(roc),
+        "base_roc_mean": _nan(base_roc),
         "excluded_missing": stat.excluded_missing if measured else None,
         "excluded_unmeasured": stat.excluded_unmeasured if measured else None,
         "excluded_score_coverage": stat.excluded_score_coverage if measured else None,
