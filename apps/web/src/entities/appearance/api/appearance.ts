@@ -15,6 +15,7 @@ const AppearanceQuery = graphql(`
   query Appearance {
     appearance {
       theme
+      startTab
     }
   }
 `);
@@ -39,6 +40,20 @@ export function useTheme(enabled: boolean): ThemeChoice | undefined {
   return theme;
 }
 
+/**
+ * Whether the user has not answered the sign-up question yet (no stored start tab): `true` sends
+ * them to the question, `undefined` until known. It rides on this query (one request for the
+ * shell, never a second one), so the check adds no request to any page (ADR 0083).
+ */
+export function useStartTabUnanswered(): boolean | undefined {
+  const { data } = useQuery({
+    queryKey: appearanceKey,
+    queryFn: ({ queryKey }) => gql(AppearanceQuery, {}, queryKey),
+    select: (answer) => answer.appearance.startTab === null,
+  });
+  return data;
+}
+
 /** Saves the user's theme choice; the page follows it straight away. */
 export function useSaveTheme() {
   const client = useQueryClient();
@@ -46,7 +61,9 @@ export function useSaveTheme() {
     mutationFn: (theme: ThemeChoice) =>
       unwrap(api.PUT('/preferences/appearance', { body: { theme } })),
     onMutate: (theme) => {
-      client.setQueryData<gqlTypes.AppearanceQuery>(appearanceKey, { appearance: { theme } });
+      client.setQueryData<gqlTypes.AppearanceQuery>(appearanceKey, (cached) =>
+        cached ? { ...cached, appearance: { ...cached.appearance, theme } } : cached,
+      );
     },
   });
 }

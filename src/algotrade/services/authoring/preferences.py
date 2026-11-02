@@ -16,7 +16,13 @@ the old layout disappears with the user's next write.
 
 ``[appearance] theme`` (ADR 0085 decision 6: ``light`` / ``dark`` / ``system``, the user's
 Light / Dark / System choice) is saved by ``save_appearance``; every other write keeps the table
-as it is."""
+as it is.
+
+``[watchlist] instruments`` (``save_watchlist``: instrument ids only, each once, at most 50, every
+one known to the reference snapshot through ``SymbolResolver``) and ``[ideas] default_tab``
+(``save_ideas_tab``: ``stocks`` / ``premium``, the sign-up answer) are the trader site's two
+stored choices (ADR 0083, amendment 2026-11-01). Nothing personal is stored here: no position,
+size, basis or account."""
 
 import re
 from collections.abc import Mapping, Sequence
@@ -24,9 +30,11 @@ from typing import Any
 
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.data.reference import resolver
 from algotrade.services.authoring.scope import ScreenNotFoundError, author, screen_id
 from algotrade.services.configs import catalog_of
 from algotrade.services.features import catalogue
+from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens.views import (
     LEGACY_SCREENERS,
     SCREENER_SCOPE,
@@ -35,6 +43,11 @@ from algotrade.services.read.screens.views import (
     surface_exists,
 )
 from algotrade.services.read.users.appearance import APPEARANCE, THEMES
+from algotrade.services.read.users.trader import (
+    IDEAS_TABS,
+    MAX_WATCHLIST,
+    WATCHLIST,
+)
 from algotrade.storage.configs.writer import ConfigWriter
 
 PREFERENCES = "preferences"
@@ -221,3 +234,40 @@ def save_appearance(writer: ConfigWriter, user: str, theme: str) -> str:
     current[APPEARANCE] = {**dict(current.get(APPEARANCE) or {}), "theme": theme}
     writer.save_preferences(who, current)
     return theme
+
+
+def save_watchlist(
+    writer: ConfigWriter, user: str, instruments: Sequence[str], ctx: ReadContext
+) -> list[str]:
+    """Replace ``user``'s ``[watchlist] instruments`` (other preferences are kept): instrument
+    ids only, each once (a repeat is dropped, order kept), at most 50. An id not already saved
+    must be in the session's reference snapshot, through ``SymbolResolver`` (a ticker is never
+    accepted); one already saved stays even when a later snapshot dropped it, so a delisting
+    never blocks the user's next edit. Returns the saved ids."""
+    ids = list(dict.fromkeys(instruments))
+    if len(ids) > MAX_WATCHLIST:
+        raise ConfigurationError(f"watchlist.instruments: at most {MAX_WATCHLIST} instruments")
+    who = author(user).user_id
+    current = _load(writer, who)
+    saved = (current.get(WATCHLIST) or {}).get("instruments") or []
+    new = [i for i in ids if i not in saved]
+    if new:
+        known = resolver(ctx.reader, ctx.session.date)
+        bad = [i for i in new if known.symbol_for(i) is None]
+        if bad:
+            raise ConfigurationError(f"watchlist.instruments: not known instrument ids: {bad}")
+    current[WATCHLIST] = {"instruments": ids}
+    writer.save_preferences(who, current)
+    return ids
+
+
+def save_ideas_tab(writer: ConfigWriter, user: str, default_tab: str) -> str:
+    """Replace ``user``'s ``[ideas] default_tab`` (``stocks`` / ``premium``; the retired
+    ``priority`` and other preferences are kept). Returns it."""
+    if default_tab not in IDEAS_TABS:
+        raise ConfigurationError(f"ideas.default_tab: one of {', '.join(IDEAS_TABS)}")
+    who = author(user).user_id
+    current = _load(writer, who)
+    current["ideas"] = {**dict(current.get("ideas") or {}), "default_tab": default_tab}
+    writer.save_preferences(who, current)
+    return default_tab
