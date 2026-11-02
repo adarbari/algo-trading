@@ -1379,7 +1379,10 @@ export interface components {
         };
         /** MarginPreview */
         MarginPreview: {
-            /** Cash Secured */
+            /**
+             * Cash Secured
+             * @description a put's strike, a call's shares at tonight's price (covered), x 100 x n
+             */
             cash_secured: number;
             /** Contracts */
             contracts: number;
@@ -1390,7 +1393,10 @@ export interface components {
              * Format: date
              */
             expiry: string;
-            /** Margin Held */
+            /**
+             * Margin Held
+             * @description the exchange minimum for an uncovered short option (a call: a naked call)
+             */
             margin_held: number;
             /** Open Interest Share */
             open_interest_share: number | null;
@@ -1398,7 +1404,10 @@ export interface components {
             premium: number;
             /** Premium Over Cash */
             premium_over_cash: number;
-            /** Premium Over Margin */
+            /**
+             * Premium Over Margin
+             * @description the premium over the uncovered minimum
+             */
             premium_over_margin: number;
             /** Premium Total */
             premium_total: number;

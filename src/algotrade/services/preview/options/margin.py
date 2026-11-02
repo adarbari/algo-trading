@@ -3,8 +3,9 @@ from a contract a trader picks and a count, what it ties up, never how much to t
 no position size, no stored account profile).
 
 - **Cash-secured**: a put's strike x 100 per contract; a call's shares at tonight's price x 100
-  (a covered call holds the shares).
-- **Margin account**: the exchange minimum for an uncovered short option (Reg-T, the Cboe rule
+  (a covered call holds the shares, and needs no option margin beyond them).
+- **Margin account**: the exchange minimum for an UNCOVERED short option (for a call, a naked
+  call: a different position from the covered call above) (Reg-T, the Cboe rule
   most US brokers start from; owner-away decision 2026-11-02, docs/decisions/log.md: no named
   broker's rule), per share: the mid plus the larger of 20% of the underlying's price less the
   out-of-the-money amount, and 10% of the strike (a put) or of the underlying's price (a call);
@@ -26,6 +27,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from algotrade.features.rollups.premium.band_pick import OurDeltas
+from algotrade.features.rollups.price import episodes
 from algotrade.services.preview.options.pool import CALL, Contract, listed_contract, underlying
 from algotrade.services.read.availability.cause import feature_cause
 from algotrade.services.read.context import ReadContext
@@ -37,7 +39,7 @@ __all__ = ["REG_T", "MarginPreview", "Stress", "preview_margin", "reg_t_per_shar
 
 CONTRACT_SIZE = 100
 REG_T = "reg_t"  # the one rule offered (decision 2026-11-02)
-EPISODES = ("covid_2020", "hikes_2022", "tariffs_2025")  # episode_behaviour@v1's dd_<episode>
+EPISODES = tuple(e.key for e in episodes.EPISODES)  # episode_behaviour@v1's dd_<episode>
 _DRAWDOWN = "rollup.episode_behaviour@v1.dd_{}"
 
 

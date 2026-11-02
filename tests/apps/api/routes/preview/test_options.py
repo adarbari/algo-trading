@@ -1,4 +1,4 @@
-"""``POST /preview/options/{roll,calls}``: what a trader types stays out of request logs and
+"""``POST /preview/options/{roll,calls,margin}``: what a trader types stays out of request logs and
 caches (body only, no query parameter, ``Cache-Control: no-store``, no log record carries a
 typed figure), a gap is served in public words with its cause for an admin only, an undefined
 figure is null (never NaN), and an unknown ticker is a 404."""

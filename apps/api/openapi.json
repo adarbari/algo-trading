@@ -2064,6 +2064,7 @@
       "MarginPreview": {
         "properties": {
           "cash_secured": {
+            "description": "a put's strike, a call's shares at tonight's price (covered), x 100 x n",
             "title": "Cash Secured",
             "type": "number"
           },
@@ -2081,6 +2082,7 @@
             "type": "string"
           },
           "margin_held": {
+            "description": "the exchange minimum for an uncovered short option (a call: a naked call)",
             "title": "Margin Held",
             "type": "number"
           },
@@ -2104,6 +2106,7 @@
             "type": "number"
           },
           "premium_over_margin": {
+            "description": "the premium over the uncovered minimum",
             "title": "Premium Over Margin",
             "type": "number"
           },

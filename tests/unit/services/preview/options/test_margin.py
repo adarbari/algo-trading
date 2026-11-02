@@ -75,9 +75,11 @@ def test_cash_secured_and_margin_held_for_five_puts() -> None:
     assert p.margin_held < p.cash_secured
 
 
-def test_a_call_is_covered_by_the_shares_and_has_no_stress() -> None:
+def test_a_calls_cash_is_the_shares_held_and_its_margin_the_naked_call_minimum() -> None:
     p = good(margin(episodes, contract=Contract("call", 105.0, EXPIRY)))
     assert p.cash_secured == pytest.approx(100.0 * 500) and p.stress is None
+    naked = reg_t_per_share("call", 100.0, 105.0, p.premium) * 500
+    assert p.margin_held == pytest.approx(naked)
 
 
 def test_size_is_against_the_days_volume_and_open_interest() -> None:

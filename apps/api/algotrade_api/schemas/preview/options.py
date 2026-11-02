@@ -238,10 +238,14 @@ class MarginPreview(Schema):
     days: int
     premium: float
     premium_total: float
-    cash_secured: float
-    margin_held: float
+    cash_secured: float = Field(
+        description="a put's strike, a call's shares at tonight's price (covered), x 100 x n"
+    )
+    margin_held: float = Field(
+        description="the exchange minimum for an uncovered short option (a call: a naked call)"
+    )
     premium_over_cash: float
-    premium_over_margin: float
+    premium_over_margin: float = Field(description="the premium over the uncovered minimum")
     volume_share: float | None
     open_interest_share: float | None
     stress: Stress | None
