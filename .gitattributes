@@ -2,3 +2,9 @@
 docs/decisions/log.md merge=union
 docs/decisions/log-2026-10-11-to-17.md merge=union
 docs/history.md merge=union
+
+# Shared perf / latency files every UI PR touches: merged mechanically by scripts/ops/merge_budgets.py
+# (registered per clone by scripts/ops/install_merge_drivers.sh; without it git conflicts as usual).
+apps/web/perf-budgets.json merge=perfbudgets
+benchmarks/api_latency_views.json merge=latencyviews
+benchmarks/api_latency_views.captured.json merge=latencyviews

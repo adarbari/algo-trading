@@ -871,6 +871,8 @@ def _measure_plan(
             rows = closed[p.horizon][leg.entry]
             drawing = _drawing(spec, variant, block, scope.edge)
             with session.attribute(leg.decision):
+                if p.scope.edge.gate is not None:  # its market read is logged against D
+                    session.gate(p.scope.edge.gate, leg.decision)
                 stat = _stat(
                     scope, session, variant, leg, p.horizon, rows, names, spec.costs,
                     spec.adv_floor, spec.option_costs,

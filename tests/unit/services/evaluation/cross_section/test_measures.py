@@ -805,3 +805,26 @@ def test_the_option_values_reach_the_slice_and_a_share_setups_columns_stay_null(
     plain = slice_measures(shares, [ALL], tail=spec)[0].tail
     assert (plain.hedged_mean_roc, plain.stock_share, plain.wing_cost) == (None, None, None)
     assert replace(got, hedged_mean_roc=None, stock_share=None, wing_cost=None) == plain
+
+
+def test_a_gated_edge_keeps_open_sessions_and_slices_the_gate_states() -> None:
+    states = ["open", "closed", "unknown", "open"]
+    stats = [replace(s, gate=g) for s, g in zip(_stats(), states, strict=True)]
+    slices = edge_slices(stats, date(2026, 4, 1), exploratory=False)
+    kept = {(s.kind, s.value): [x.session for x in stats if s.keep(x)] for s in slices}
+    open_days = [stats[0].session, stats[3].session]
+    assert kept["all", "all"] == open_days  # the edge's result: open sessions only
+    assert kept["frozen", "frozen"] == [stats[3].session]
+    assert {v for (k, v) in kept if k == "gate"} == {"open", "closed", "unknown"}
+    assert kept["gate", "closed"] == [stats[1].session]
+    # an ungated edge has no gate slices and keeps every session
+    plain = edge_slices(_stats(), None, exploratory=False)
+    assert not any(s.kind == "gate" for s in plain) and all(plain[0].keep(x) for x in _stats())
+
+
+def test_a_block_counts_only_the_days_sharing_its_first_days_gate() -> None:
+    open_day, closed_day = (replace(stat(d, (0.01,), (0.0,), 1), gate=g) for d, g in
+                            ((date(2026, 4, 1), "open"), (date(2026, 4, 2), "closed")))  # fmt: skip
+    pooled = pool_stats([open_day, closed_day])
+    assert pooled.gate == "open" and pooled.pick_values == open_day.pick_values
+    assert pool_stats([closed_day, open_day]).gate == "closed"
