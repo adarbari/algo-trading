@@ -6,8 +6,7 @@
 import { calendarRoute } from './calendar-route';
 import { edgesBuilderRoutes, edgesRoute } from './edges-route';
 import { exploreRoute } from './explore-route';
-import { ideaRoute } from './idea-route';
-import { ideasRoute } from './ideas-route';
+import { ideaRoute, ideasRoute } from './ideas-route';
 import { traderRoute } from './layout-route';
 import { regimeRoute } from './regime-route';
 import { screenersRoutes } from './screeners-route';
