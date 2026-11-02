@@ -61,4 +61,4 @@ from the API.
 7. **Docs.** The endpoint table in `docs/architecture.md` section 12. A new user-visible
    word the endpoint introduces (a run trigger, a status the page shows) is a glossary term,
    declared where GraphQL serves it (`add-graphql-field`, "Guide entry"; `add-guide-content`).
-8. `make changed`, then push: CI is the full gate.
+8. Push (the `pre-push` hook runs `make pre-push`): CI is the full gate.
