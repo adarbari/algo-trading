@@ -23,6 +23,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.user import SITE_USER
 from algotrade.services.read.context import ReadContext, partition
 from algotrade.services.read.evaluation.edges import load_edges, parsed_edges
@@ -53,7 +54,8 @@ class PickEdge:
     that says why (``CODES``); ``top_k``: the edge's cut (None: every qualified name); ``place``:
     the pick's place among the edge's own picks (None: not one of them); ``side``: the pick's side
     there (None: not one of them); ``reason``: why a closed setup gate paused it (else empty);
-    ``by_score``: the edge's outcome ranks its picks by score (``short`` or ``long_short``)."""
+    ``by_score``: the edge's list is not the run's long picks in its order (a ``short`` or
+    ``long_short`` outcome, ranked by score, or a book, held with weights)."""
 
     edge_id: str
     edge_name: str
@@ -141,7 +143,7 @@ def load_pick_edges(
             if side == SHORT:  # not shown as counting until the page can say "short" (E10)
                 code, place = NOT_COUNTED, None
             reason = row.reason if row is not None and row.status == GATE_CLOSED else ""
-            by_score = e.outcome.side != LONG
+            by_score = e.outcome.side != LONG or e.outcome.kind == PORTFOLIO_KIND
             found.append(
                 PickEdge(e.id, e.name, code == COUNTS, code, e.top_k, place, side, reason, by_score)
             )

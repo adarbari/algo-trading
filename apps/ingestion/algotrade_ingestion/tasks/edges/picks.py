@@ -2,7 +2,8 @@
 (ADR 0081), so the screener page's "counts toward" reads the edge's own picks instead of
 ranking the run again.
 
-One row per (edge, screener) per session, decided by the harness's own pick rule
+One row per (edge, screener) per session (an ensemble's averaged book one more under
+``ensemble``, a named-symbol setup's one row under ``@named``), decided by the harness's own rule
 (``services/evaluation/edge_picks/night.py``: ``screen_variant``, the edge's universe, its schedule
 and ``top_k``); this task only chooses the sessions and edges, skips what is stored and publishes.
 
@@ -32,9 +33,10 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.edge_picks.frame import RESULT, edge_picks_frame
+from algotrade.services.evaluation.edge_picks.named import is_named, named_night
 from algotrade.services.evaluation.edge_picks.night import SKIPPED, EdgePicks, Night, edge_night
 from algotrade.storage.runs import RunRecord, RunStatus
-from algotrade.storage.tables.edge_schemas import EDGE_PICKS
+from algotrade.storage.tables.edge_schemas import EDGE_PICKS, NAMED
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.quality import Check
 
@@ -64,6 +66,14 @@ def stored_keys(reader: StoreReader, session: date) -> set[tuple[str, str]]:
     return set(zip(site["edge_id"], site["screener"], strict=True))
 
 
+def _rows_of(edge: Edge) -> int:
+    """How many rows ``edge`` stores per session: one per screener (and its ensemble's), one for a
+    named-symbol setup."""
+    if is_named(edge):
+        return 1
+    return len(edge.screeners) + (1 if edge.ensemble else 0)
+
+
 def _missing(edge_id: str, have: set[tuple[str, str]]) -> Callable[[str], bool]:
     """Whether a screener of ``edge_id`` has no row stored yet."""
     return lambda screener: (edge_id, screener) not in have
@@ -75,7 +85,10 @@ def _one_session(
     rows: list[EdgePicks] = []
     for edge in edges:
         try:
-            rows += edge_night(night, edge, _missing(edge.id, have))
+            if is_named(edge):
+                rows += [named_night(night, edge)] if (edge.id, NAMED) not in have else []
+            else:
+                rows += edge_night(night, edge, _missing(edge.id, have))
         except Exception as exc:  # one edge's failure never stops the others
             key = f"{edge.id}@{night.session.isoformat()}"
             run.fail(key, f"{type(exc).__name__}: {exc}", kind="FAILED")
@@ -91,13 +104,16 @@ def store_picks(ctx: TaskContext, session: date, options: Options | None = None)
         raise ConfigurationError("edge-picks needs the config store (the edge documents)")
     user = UserContext(SITE_USER)
     edges = sorted(
-        (e for e in load_edges(ctx.configs, SITE_USER) if e.screeners), key=lambda e: e.id
+        (e for e in load_edges(ctx.configs, SITE_USER) if e.screeners or is_named(e)),
+        key=lambda e: e.id,
     )
-    pairs = sum(len(e.screeners) for e in edges)
+    pairs = sum(_rows_of(e) for e in edges)
     if opt.edge is not None:
         edges = [e for e in edges if e.id == opt.edge]
         if not edges:
-            raise ConfigurationError(f"{opt.edge!r} is not a site edge with a screener")
+            raise ConfigurationError(
+                f"{opt.edge!r} is not a site edge with a screener or named symbols"
+            )
     days = sessions_between(opt.start or session, opt.end or session)
     written: dict[date, list[EdgePicks]] = {}
     failed: list[str] = []
@@ -133,8 +149,8 @@ def store_picks(ctx: TaskContext, session: date, options: Options | None = None)
 
 def check_edge_picks(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
     """The acceptance of the ``edge-picks`` step for ``session``: a complete run exists and every
-    site edge with a screener has a row for each screener it lists (a ``skipped`` row is a stated
-    gap, listed in the message, never a missing one)."""
+    site edge has its rows (one per screener it lists, its ensemble's, a named-symbol setup's one;
+    a ``skipped`` row is a stated gap, listed in the message, never a missing one)."""
     runs = [r for r in reader.runs(TASK, session) if r.status == RunStatus.COMPLETE]
     if not runs:
         return [Check("edge_picks", "FAIL", f"no complete edge-picks run for {session}")]
