@@ -410,6 +410,7 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         base_roc_m2=None if s.base_roc is None else s.base_roc[2],
         not_triggered=s.not_triggered or None,
         entry_unknown=s.entry_unknown or None,
+        case_unknown=s.case_unknown or None,
         **encode_picks(s.picks),
         **encode_band(s.band),
     )
@@ -486,6 +487,7 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         base_roc=_base_roc(row),
         not_triggered=_count(row.get("not_triggered")),
         entry_unknown=_count(row.get("entry_unknown")),
+        case_unknown=_count(row.get("case_unknown")),
     )
     drawn = None
     if rand is not None:

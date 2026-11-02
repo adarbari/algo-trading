@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from algotrade.config.edges.document import Edge
-from algotrade.config.edges.positions.cases import EntrySpec
+from algotrade.config.edges.positions.cases import CaseValue, EntrySpec
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.verdict import OPTION_LEVELS, OptionCosts
 from algotrade.config.strategy.schema import Selection
@@ -40,6 +40,13 @@ from algotrade.services.evaluation.cross_section.picks import (
     RankedRun,
     SelectionReads,
     screen_variant,
+)
+from algotrade.services.evaluation.cross_section.reads.cases import (
+    CaseKeys,
+    Resolved,
+    case_keys,
+    cased_rows,
+    read_cases,
 )
 from algotrade.services.evaluation.cross_section.reads.entry import (
     Entered,
@@ -88,7 +95,7 @@ class SessionReads:
         domains: Mapping[str, Sequence[str]] | None = None,
     ):
         self._reader, self._label_field = reader.recording(), label_field
-        self._domains = domains  # the catalogue's string domains, for a gate or entry rule
+        self._domains = domains  # the catalogue's string domains, for a gate, entry or case rule
         self._screens, self._owner = screens, owner
         self._selections = SelectionReads(self._reader)
         self._runs: dict[tuple[str, date], RankedRun | None] = {}
@@ -96,6 +103,8 @@ class SessionReads:
         self._labels: dict[date, str] = {}
         self._gates: dict[tuple[Group, date], str] = {}
         self._entries: dict[tuple[EntrySpec, int, frozenset[str], date], Entered] = {}
+        self._cases: dict[tuple[tuple[CaseValue, ...], frozenset[str], date], Resolved] = {}
+        self._case_keys: dict[str, CaseKeys | None] = {}  # by the outcome's text: kept all run
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
         self._siblings: dict[tuple[str, frozenset[str], date], dict[str, str | None]] = {}
@@ -195,6 +204,7 @@ class SessionReads:
         self._labels.clear()
         self._gates.clear()
         self._entries.clear()
+        self._cases.clear()
         self._implied.clear()
         self._adv.clear()
         self._siblings.clear()
@@ -240,24 +250,65 @@ class SessionReads:
         leg: "Leg",
         by_entry: Mapping[date, pd.DataFrame],
         rows: pd.DataFrame,
+        setup: Edge | None = None,
     ) -> tuple[Entered | None, pd.DataFrame | None, date | None]:
-        """``(None, rows, None)`` for an edge without an entry condition. With one: its entries
-        at ``leg`` over the eligible names and the entered names' rows at their own S
-        (``reads/entry.py``), read inside the leg's attribution, so a restated partition of any
-        close of the wait invalidates the leg. A market gap at a
-        reached close loses the leg to the market table (``lost``; the rows are None); an S some
-        name entered at with no partition is returned last, for the caller to lose the leg to
-        the outcome table (rows None)."""
-        spec = edge.outcome.entry
-        if spec is None:
+        """``(None, rows, None)`` for an edge with no entry condition and no case values. An entry
+        condition: its entries at ``leg`` over the eligible names and the entered names' rows at
+        their own S (``reads/entry.py``). Case values: each eligible name's resolved at D and its
+        row at its own point (``reads/cases.py``), a name CASE_UNKNOWN kept out under that reason
+        whatever its entry (cases are read at D, before the wait). ``setup``: the edge a baseline
+        scope (its cases dropped) belongs to, whose CASE_UNKNOWN names the baseline holds out too,
+        so the two are compared over the same names. Read inside the leg's attribution, so a
+        restated partition invalidates the leg. A market gap at a reached close or at D loses the
+        leg to the market table (``lost``; the rows are None); an S some name entered at with no
+        partition is returned last, for the caller to lose the leg to the outcome table."""
+        spec, keys = edge.outcome.entry, self.case_keys(edge)
+        held = self.case_keys(setup) if setup is not None and keys is None else None
+        if held is not None:  # a baseline of a cased setup: the setup's unselectable names out
+            eligible = self.eligible(universe, leg.decision)
+            out = self.cases(held.cases, eligible, leg.decision)
+            if out.gap is not None:
+                self.lost[variant_id, leg.decision] = out.gap
+                return Entered(gap=out.gap), None, None
+            gone = rows["instrument_id"].isin(set(out.reasons))
+            at = {i: leg.entry for i in eligible if i not in out.reasons}  # the leg's own S
+            return Entered(at, dict(out.reasons)), rows[~gone], None
+        if spec is None and keys is None:
             return None, rows, None
         eligible = self.eligible(universe, leg.decision)
-        found = self.entries(spec, edge.outcome.start_offset_sessions, eligible, leg.decision)
+        found = Entered(dict.fromkeys(eligible, leg.entry))
+        kept: pd.DataFrame | None = rows
+        missing: date | None = None
+        if spec is not None:
+            found = self.entries(spec, edge.outcome.start_offset_sessions, eligible, leg.decision)
+            if found.gap is None:
+                kept, missing = entered_rows(by_entry, found, leg.entry)
+        if keys is not None and found.gap is None and kept is not None:
+            resolved = self.cases(keys.cases, eligible, leg.decision)
+            if resolved.gap is not None:
+                found = Entered(gap=resolved.gap)
+            else:
+                at = {i: s for i, s in found.at.items() if i in resolved.chosen}
+                found = Entered(at, {**found.reasons, **resolved.reasons}, None, found.closes)
+                kept = cased_rows(kept, resolved, keys)
         if found.gap is not None:
             self.lost[variant_id, leg.decision] = found.gap
             return found, None, None
-        kept, missing = entered_rows(by_entry, found, leg.entry)
         return found, kept, missing
+
+    def case_keys(self, edge: Edge) -> CaseKeys | None:
+        """The keys of every point ``edge``'s case values can resolve to (None: it has none)."""
+        text = repr(edge.outcome)
+        if text not in self._case_keys:
+            self._case_keys[text] = case_keys(edge.outcome)
+        return self._case_keys[text]
+
+    def cases(self, cases: tuple[CaseValue, ...], ids: frozenset[str], decision: date) -> Resolved:
+        """Each of ``ids``' case values at D (``reads/cases.py``), cached per D only."""
+        key = (cases, ids, decision)
+        if key not in self._cases:
+            self._cases[key] = read_cases(self._reader, cases, ids, decision, self._domains)
+        return self._cases[key]
 
     def implied(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
         key = (field_name, ids, day)

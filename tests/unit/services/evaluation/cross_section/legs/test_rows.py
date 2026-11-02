@@ -481,11 +481,12 @@ def test_an_entry_conditions_counts_and_each_picks_own_s_round_trip_and_older_ro
     None
 ):
     picks = tuple(replace(p, entry_session=S + timedelta(days=k)) for k, p in enumerate(PICKS))
-    original = leg(stat=stat(picks=picks, not_triggered=3, entry_unknown=1))
+    original = leg(stat=stat(picks=picks, not_triggered=3, entry_unknown=1, case_unknown=2))
     row = encode_leg(original, "site", "drift")
     back = decode_leg(row)
     assert back.stat == original.stat
     assert [p.entry_session for p in back.stat.picks] == [p.entry_session for p in picks]
     plain = encode_leg(leg(), "site", "drift")  # no entry condition: nothing new is stored
     assert (plain["pick_entry"], plain["not_triggered"], plain["entry_unknown"]) == (None,) * 3
+    assert plain["case_unknown"] is None
     assert decode_leg(plain).stat.not_triggered == 0

@@ -81,6 +81,9 @@ def _unjudged(edge: Edge) -> str | None:
     """Why the edge's pick is not ranked from the screener's run (None: it is)."""
     if edge.outcome.kind == PORTFOLIO_KIND:
         return "a portfolio outcome holds a book, not the screener's picks"
+    cased = edge.outcome.position is not None and edge.outcome.position.cases
+    if edge.outcome.entry is not None or cased:  # E9 applies them at the served session
+        return "its entry condition or case values are not applied to tonight's picks yet"
     return None
 
 

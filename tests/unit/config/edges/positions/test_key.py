@@ -12,6 +12,7 @@ from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.positions.cases import Case, CaseValue
 from algotrade.config.edges.positions.key import (
+    case_point,
     case_points,
     key_of,
     parse_position_key,
@@ -124,3 +125,17 @@ def test_one_spelling_per_value_numbers_as_floats_and_dates_as_text() -> None:
 
     assert keyed(1) == keyed(1.0)
     assert keyed(date(2026, 1, 1)) == keyed("2026-01-01")  # a date does not crash the dump
+
+
+def test_the_writer_stores_every_combination_a_name_can_resolve_to() -> None:
+    o = outcome()
+    high = Group("all", (Rule("a", "gt", 1),))
+    cases = (
+        CaseValue("tenor_days", (Case(high, 30),), 45),
+        CaseValue("exit_dte", (Case(high, 5),), 0),
+    )
+    case_valued = replace(o, position=replace(o.position, cases=cases))
+    points = case_points(case_valued, TEMPLATES)
+    keys = {position_key(p, 21) for p in points}
+    assert len(keys) == 4  # (45, 0), (45, 5), (30, 0), (30, 5): both cases off their defaults too
+    assert position_key(case_point(case_valued, (30, 5), TEMPLATES), 21) in keys

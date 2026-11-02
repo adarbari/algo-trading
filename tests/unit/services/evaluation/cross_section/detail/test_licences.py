@@ -71,3 +71,17 @@ def test_an_entry_condition_over_a_personal_feature_makes_the_trial_personal() -
     )  # fmt: skip
     found = trial_licences(catalogue(store, "site"), entering, universe, [resolved], None)
     assert (found.trial, found.score, found.value) == ("personal", "open", "open")
+
+
+def test_a_case_rule_over_a_personal_feature_makes_the_trial_personal() -> None:
+    store = configs(PRICE)
+    resolved = resolve_config(store, "momo", USER)
+    universe = parse_selection(ACTIVE, "active")
+    rule = {"all": [{"field": IBKR, "op": "gt", "value": 0.2}]}
+    cased = edge(outcome={
+        "kind": "option_pnl", "horizon_sessions": [2], "benchmark": "none",
+        "start_offset_sessions": 1, "position": "short_put", "strike_delta": 0.25,
+        "tenor_days": {"cases": [{"when": rule, "value": 45}], "default": 30},
+    })  # fmt: skip
+    found = trial_licences(catalogue(store, "site"), cased, universe, [resolved], None)
+    assert (found.trial, found.score) == ("personal", "open")
