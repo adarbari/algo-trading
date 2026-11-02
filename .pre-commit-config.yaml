@@ -42,11 +42,12 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
-      # What CI fails on most, before the push (`make changed`: mirrored tests, fitness tests,
-      # the web gates over the changed files). Never --no-verify; CI stays the full gate. Queued
-      # machine-wide by `scripts/ops/push_queue.py` (2 at a time, most dependants first).
-      - id: make-changed
-        name: make changed (the checks CI fails on, over what changed)
+      # What CI fails on most, per second it costs, before the push (`make pre-push`,
+      # scripts/pre_push.py, about 90 s; `make changed` stays the full local check). Never
+      # --no-verify; CI is the gate. Queued machine-wide by `scripts/ops/push_queue.py` (2 at a
+      # time, most dependants first).
+      - id: pre-push-fast
+        name: make pre-push (the checks CI fails on most, about 90 s)
         # git hands a pre-push hook GIT_DIR=<the worktree's git dir>: a test that ran `git init
         # --bare` or `git config` then acted on the REAL repository and left core.bare=true in
         # the shared config, breaking git in every worktree (2026-11-02). So run with none of it.

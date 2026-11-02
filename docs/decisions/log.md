@@ -917,6 +917,13 @@ follow-up PR).
 - status: final
 - Reasoning: the owner's decision in chat (2026-11-02); the local hook exists to catch the common CI failures early (architecture and layout tests, bundle budgets, Guide coverage, lint and types), not to repeat CI.
 
+## 2026-11-02 | Pre-push hook (`make pre-push`) | A 90 s fast lane of the checks that fail most; the rest CI's (replaces the testmon plan of PR B)
+- Question: after #1051 the hook (`make changed`) still took 5-12 min a push on the shared Mac while GitHub CI idled; what should run locally?
+- Options: affected-only tests with pytest-testmon (the earlier PR B plan) / a fast lane chosen by measured failure frequency per second of local cost, the rest in CI / no local hook.
+- Decision: the fast lane. The hook runs `make pre-push` (`scripts/pre_push.py`, target 90 s warm): `make numbering` and a fixed list of fast file- and TOML-only tests that failed most in the last 100 red CI runs, and for web changes Prettier, Stylelint, `ds:check` and the bundle and DOM budgets; a merge-only push runs the python lane alone. ESLint, `tsc`, vitest, the mirrored pytest, e2e and screenshots are CI's. `make changed` stays as the full local check; CI's per-branch `cancel-in-progress` stays (now tested).
+- decided by: owner
+- status: final
+- Reasoning: the owner's words in chat (2026-11-02): "things which often fail (in make changed locally or in CI previously) we do locally through a hook, but minimize the runtime on local load; the rest we push to GitHub CI." The table and timings are in `docs/ci.md` "Pre-push fast lane".
 ## 2026-11-02 | Harness: shared-file conflict loop, push-queue order | Merge drivers and `Unblocks:`
 - Question: how do five UI PRs stop re-conflicting on `perf-budgets.json` and the two latency files at every merge to main, and how does the push queue favour the push that frees the most work?
 - Options: hand-merge each time / merge drivers (budgets union + max, views union) plus regeneration in `merge_main.sh` / generate the files only in CI. Queue: open dependants only / also an `Unblocks:` PR-body line.
