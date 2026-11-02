@@ -64,6 +64,8 @@ FAST_TESTS = (
     "tests/unit/config/site/guide",
     # [3, 2026-11-02] a resolver with logic in the GraphQL layer (4 s)
     "tests/architecture/api/test_read_model.py",
+    # [2, #1058 and S4] a new site preset changes the Ideas screener count (2 s)
+    "tests/apps/api/graphql/types/screens/test_ideas.py",
     # [2 + local reports] folder caps
     "tests/architecture/test_layout.py",
     # [1, 2026-11-02 #1109] registry TOML entries out of sorted order (0.1 s)
