@@ -138,7 +138,7 @@ id = "calls_your_price"
 term = "Your price"
 short = "What the shares cost you per share, after the premiums you have already collected on them."
 body = """
-Take the price you paid for the shares and subtract the net premium per share from puts and calls you already sold on them: everything collected, less what you paid to buy any back. The calls table measures every figure against this price, not today's.
+Take the price you paid for the shares and subtract the net premium per share from puts and calls you already sold on them. Net means everything collected, less what you paid to buy any back. The calls table measures every figure against this price, not today's.
 """
 see_also = ["calls_premium_over_price", "calls_if_called", "calls_below_price"]
 
