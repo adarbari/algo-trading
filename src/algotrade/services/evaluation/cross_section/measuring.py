@@ -50,6 +50,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     UNMEASURED,
     Pairs,
     apply_outcome,
+    chain_rows,
     is_return,
     needs_implied_vol,
     needs_pairs,
@@ -57,6 +58,8 @@ from algotrade.services.evaluation.cross_section.hit import (
     short_view,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
+    DRAW_LEG_VERSION,
+    LEG_VERSION,
     leg_key,
     universe_hash,
 )
@@ -99,9 +102,11 @@ from algotrade.services.evaluation.cross_section.random_picks import (
     random_stat,
 )
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
+from algotrade.services.evaluation.cross_section.reporting.report_containment import window_end
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
 )
+from algotrade.services.evaluation.evidence.shapes import trade_frame
 
 BENCHMARK = "SPY"  # outcomes are read over SPY for every edge: returns and vols ignore it
 
@@ -312,7 +317,17 @@ def _stat(
         picks=tuple(
             p
             for side_, ids_ in legs
-            for p in _picks(scope.edge, ids_, run.scores, res, rows, adv, side_)
+            for p in _picks(
+                scope.edge,
+                ids_,
+                run.scores,
+                res,
+                rows,
+                adv,
+                side_,
+                leg.entry,
+                window_end(leg.entry, horizon),
+            )
         ),
         base_hits_at=tuple(int(hits.sum()) for hits in levels),
         pick_hits_at=tuple(int(hits.loc[got].sum()) for hits in levels),
@@ -489,14 +504,22 @@ def _picks(
     res: pd.DataFrame,
     rows: pd.DataFrame,
     adv: Mapping[str, float | None],
-    side: str = LONG,
+    side: str,
+    entry: date,
+    exit_on: date,
 ) -> tuple[Pick, ...]:
     """Every pick of a session in rank order (leg v2, ADR 0064): counted or with its reason.
-    ``res`` is the scored outcomes of the base names, ``rows`` the stored ones at S; a ``short``
-    leg's value and hit are the short's."""
+    ``res`` is the scored outcomes of the base names, ``rows`` the stored ones at S (the option
+    trade grain's hold every edge's position keys: ``chain_rows`` picks this edge's); a ``short``
+    leg's value and hit are the short's. The contract's fields (leg v5, ADR 0088 2.5a) come from
+    ``trade_frame`` over the picks only; ``entry`` is S, ``exit_on`` S + h sessions."""
     if side == SHORT:
         res = short_view(res)
-    stored = rows[rows["instrument_id"].isin(set(picks))].set_index("instrument_id")
+    rows = chain_rows(edge, rows[rows["instrument_id"].isin(set(picks))])
+    stored = rows.set_index("instrument_id")
+    named = res.loc[[i for i in picks if i in res.index]]
+    trades = trade_frame(edge, rows, named, entry=entry, bars_exit=exit_on, side=side)
+    trades = trades.set_index("instrument_id")
     gross = is_return(edge)
     out = []
     for rank, i in enumerate(picks, start=1):
@@ -520,9 +543,21 @@ def _picks(
                 reference=_finite(r["reference"]),
                 touch=None if _finite(r["reference"]) is None else bool(r["touch"]),
                 side=side,
+                exit_session=_none_if_null(trades.at[i, "exit_session"]),
+                exit_kind=_none_if_null(trades.at[i, "exit_kind"]),
+                capital=_finite(trades.at[i, "capital"]),
+                roc_gross=_finite(trades.at[i, "return_on_capital_gross"]),
+                roc=_finite(trades.at[i, "return_on_capital"]),
+                adverse=_finite(trades.at[i, "max_adverse"]),
+                price_source=str(trades.at[i, "price_source"]),
+                outcome_licence=str(trades.at[i, "outcome_licence"]),
             )
         )
     return tuple(out)
+
+
+def _none_if_null(value: Any) -> Any:
+    return None if pd.isna(value) else value
 
 
 def _finite(value: object) -> float | None:
@@ -636,28 +671,44 @@ class _RandomSpec:
     costs: tuple[float, ...]
     adv_floor: float | None = None  # a short leg's least dollar volume (in the key of its legs)
     keys: dict[tuple[str, str], str] = field(default_factory=dict)  # (scope, variant) -> leg key
+    draw_keys: dict[tuple[str, str], str] = field(default_factory=dict)  # same, for the draws
 
     def key_for(self, scope: "_Scope", variant: "Variant") -> str:
-        """The leg key of one scope's screener: what its legs (and draws) are a function of."""
+        """The leg key of one scope's screener: what its legs are a function of."""
         found = self.keys.get((scope.key, variant.id))
         if found is None:
-            found = self.keys[scope.key, variant.id] = leg_key(
-                _trial_hash(scope, variant),
-                universe_hash(scope.universe),
-                scope.iv_field,
-                scope.edge.event_class,
-                scope.edge.outcome.start_offset_sessions,
-                self.draws,
-                self.expr_hash,
-                scope.edge.top_k,
-                scope.edge.base,
-                scope.edge.picks,
-                self.costs,
-                None if scope.edge.outcome.side == LONG else self.adv_floor,
-                scope.edge.event_subtype,
-                scope.edge.outcome.hold_rank,
+            found = self.keys[scope.key, variant.id] = self._key(scope, variant, LEG_VERSION)
+        return found
+
+    def draw_key_for(self, scope: "_Scope", variant: "Variant") -> str:
+        """The key that seeds the draws: ``key_for`` at the frozen ``DRAW_LEG_VERSION``."""
+        found = self.draw_keys.get((scope.key, variant.id))
+        if found is None:
+            found = self.draw_keys[scope.key, variant.id] = self._key(
+                scope, variant, DRAW_LEG_VERSION
             )
         return found
+
+    def _key(self, scope: "_Scope", variant: "Variant", leg_version: int) -> str:
+        """One leg key at ``leg_version``."""
+        key = leg_key(
+            _trial_hash(scope, variant),
+            universe_hash(scope.universe),
+            scope.iv_field,
+            scope.edge.event_class,
+            scope.edge.outcome.start_offset_sessions,
+            self.draws,
+            self.expr_hash,
+            scope.edge.top_k,
+            scope.edge.base,
+            scope.edge.picks,
+            self.costs,
+            None if scope.edge.outcome.side == LONG else self.adv_floor,
+            scope.edge.event_subtype,
+            scope.edge.outcome.hold_rank,
+            leg_version,
+        )
+        return key
 
 
 def _measure(
@@ -862,7 +913,7 @@ def _measure_random(
     names = names_for(p.scope.edge, eligible, event_names)
     res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
     counted = res[res["excluded"] == ""]
-    key, label = spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
+    key, label = spec.draw_key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
     rng = generator(key, label, p.horizon, leg.decision)
     side = p.scope.edge.outcome.side
     if side == LONG:  # the sector-matched draws are the long leg's (a short leg has none)

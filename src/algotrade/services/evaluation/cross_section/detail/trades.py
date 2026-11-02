@@ -4,7 +4,11 @@ v2 legs (``harness.LegDetail``), never recomputed.
 
 A pick is ``won`` or ``lost`` by the edge's own hit (``hit.apply_outcome``), or ``excluded`` with
 the public kind of its reason (``EXCLUDED_KINDS``); eligible names that were not picked are never
-listed. ``exit_session`` is S + h sessions (the window's close, from the calendar);
+listed. ``exit_session`` is S + h sessions (the window's close, from the calendar) for a share
+and the trade's own for an option; the trade contract's columns (ADR 0088, 2.5a: ``exit_kind``,
+``capital_basis``, ``return_on_capital`` at the document's cost, ``max_adverse``, ``price_source``)
+are the pick's, null when not known; ``value_licence`` is per row the strictest of the trial's and
+the outcome row's (a bought-history option trade is personal);
 ``before_split`` is the side of the run's split the leg's block is on, as for the slices (a run
 with no split has no out-of-sample side: every row is before it). A block the screen could not
 measure has no rows, as it has no statistic. Rows are ordered by their key, so a run's ledger is
@@ -16,6 +20,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.edges.document import MAIN
+from algotrade.features.framework.feature import strictest
 from algotrade.services.evaluation.cross_section.harness import (
     EdgeEvaluation,
     LegDetail,
@@ -88,7 +93,12 @@ def _row(ev: EdgeEvaluation, r: VariantResult, leg: LegDetail, pick: Pick) -> di
         "exploratory": ev.exploratory,
         "decision_session": leg.decision,
         "entry_session": leg.entry,
-        "exit_session": window_end(leg.entry, r.horizon),
+        "exit_session": pick.exit_session or window_end(leg.entry, r.horizon),
+        "exit_kind": pick.exit_kind,
+        "capital_basis": r.capital_basis,
+        "return_on_capital": pick.roc,
+        "max_adverse": pick.adverse,
+        "price_source": pick.price_source,
         "before_split": ev.split_from is None or leg.block < ev.split_from,
         "instrument_id": pick.instrument_id,
         "rank": pick.rank,
@@ -104,7 +114,9 @@ def _row(ev: EdgeEvaluation, r: VariantResult, leg: LegDetail, pick: Pick) -> di
         "reference": pick.reference,
         "touch": pick.touch,
         "licence": r.licence,
-        "value_licence": licences.value if licences else None,
+        "value_licence": strictest((licences.value, pick.outcome_licence or "open"))
+        if licences
+        else None,
         "score_licence": licences.score if licences else None,
         "adv_licence": licences.adv if licences else None,
     }

@@ -28,7 +28,8 @@ from algotrade.storage.tables.schemas import FORWARD_RETURNS, STRUCTURE_PNL, spe
 CBOE = "cboe"
 CHAIN_FIELDS = (
     "position_key", "entry_spot", "entry_half_spread", "exit_half_spread", "pnl_mid",
-    "exit_unknown_closes",
+    "exit_unknown_closes", "exit_session", "exit_kind", "collateral", "max_adverse",
+    "price_source", "licence",
 )  # fmt: skip
 CHAIN_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS, *CHAIN_FIELDS)
 _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "window_end")
@@ -127,7 +128,8 @@ def select_chain(
                    "fwd_realised_vol"):  # fmt: skip
         out[column] = np.nan
     out["benchmark"] = "none"
-    for nullable in ("outcome_reason",):  # a column no row of the partitions set
+    for nullable in ("outcome_reason", "exit_session", "exit_kind", "collateral", "max_adverse"):
+        # a column no row of the partitions set (an all-UNMEASURED set has no exit)
         if nullable not in out.columns:
             out[nullable] = None
     kept = out[[*_KEY, *OUTCOME_FIELDS, *CHAIN_FIELDS, "knowledge_ts"]]
