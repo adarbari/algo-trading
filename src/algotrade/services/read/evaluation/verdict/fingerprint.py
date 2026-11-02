@@ -32,7 +32,9 @@ READER_MODULES = ("stored.py",)
 # test (tests/unit/.../test_fingerprint.py) lists every name the package imports from outside
 # and requires it here or in its own ``NOT_JUDGED`` with a reason.
 JUDGED_CODE: tuple[str, ...] = (
+    "algotrade.config.edges.named:DELTA_EQUIVALENT",
     "algotrade.config.edges.named:OUT_OF_WINDOW",
+    "algotrade.config.edges.named:TIME_SERIES",
     "algotrade.config.edges.verdict:MAIN_OPTION_LEVEL",
     "algotrade.config.edges.verdict:OptionCosts",  # reached through the settings (E6b)
     "algotrade.config.edges.verdict:TailsVerdict",

@@ -1,6 +1,7 @@
 """``evaluate_time_series`` and its place in ``evaluate_edge``: a known result by hand, exclusions
 that are never misses, the frozen split, random window sets, and the rows the verdict reads."""
 
+import hashlib
 from datetime import date
 
 import pytest
@@ -9,7 +10,7 @@ from algotrade.config.edges.document import MAIN, QUALITY_BAR
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.engines.selection.entry import NOT_TRIGGERED
-from algotrade.services.evaluation.cross_section.harness import evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import HARNESS_VERSION, evaluate_edge
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
 from algotrade.services.evaluation.evidence.contract import trade_problems as trades_problems
 from algotrade.services.evaluation.time_series import harness
@@ -127,6 +128,9 @@ def test_evaluate_edge_gives_the_rows_the_verdict_reads() -> None:
     )  # fmt: skip
     (r,) = ev.results
     assert (r.variant, r.role, r.horizon, r.edge_variant) == ("SPY", "screener", H, MAIN)
+    # the trial hash a time-series edge has always had (E8a moved it onto the trial's identity)
+    pinned = f"tom|{WINDOW}|SPY|{HARNESS_VERSION}"
+    assert r.config_hash == hashlib.sha256(pinned.encode()).hexdigest()
     assert (
         ev.trials == 1 and r.measures[0].trials == 1 and r.measures[0].deflated_sharpe is not None
     )
