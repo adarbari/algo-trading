@@ -626,6 +626,8 @@ links = [
   { kind = "term", id = "win_rate" },
   { kind = "term", id = "base_rate" },
   { kind = "term", id = "year_by_year" },
+  { kind = "term", id = "setup_how_done" },
+  { kind = "term", id = "setup_when_fails" },
   { kind = "term", id = "risk_statement" },
   { kind = "start", id = "read_an_edge_page" },
   { kind = "start", id = "methodology_and_conflicts" },
