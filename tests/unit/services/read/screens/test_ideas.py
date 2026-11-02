@@ -9,6 +9,7 @@ the field of the leak tests)."""
 import copy
 from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -684,3 +685,32 @@ def test_tab_narrows_the_pool_to_the_screeners_of_that_tab(ctx: ReadContext) -> 
     assert _ids(load_ideas(ctx, 10, tab="stocks")) == _ids(load_ideas(ctx, 10))
     premium = load_ideas(ctx, 10, tab="premium")
     assert premium.screeners == () and premium.items == ()
+
+
+def _watching(*ids: str) -> dict[tuple[str, str, str], dict[str, Any]]:
+    return {("me", "preferences", "preferences"): {"watchlist": {"instruments": list(ids)}}}
+
+
+def test_a_watchlist_keeps_a_tabs_watched_ideas_at_their_place(reader: StoreReader) -> None:
+    """ADR 0083 amendment (c): the rule ranks the whole pool, the watchlist keeps the watched
+    tickers; ``total`` counts only them, ``watchlist`` how many the rule ranked."""
+    found = load_ideas(context(reader, _watching("EQ:DDD", "EQ:ZZZ")), 10, tab="stocks")
+    assert (_ids(found), found.items[0].rank, found.total, found.watchlist) == (
+        ["EQ:DDD"], 2, 1, 3
+    )  # fmt: skip
+    assert found.facets is not None and found.facets.total == 1  # no count of a hidden name
+
+
+def test_no_watchlist_or_no_tab_is_no_filter(reader: StoreReader) -> None:
+    assert load_ideas(context(reader), 10, tab="stocks").watchlist is None
+    every = load_ideas(context(reader, _watching("EQ:DDD")), 10)
+    assert (_ids(every), every.watchlist) == (["EQ:BBB", "EQ:DDD", "EQ:AAA"], None)
+
+
+def test_a_watchlist_counts_only_watched_paused_picks(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)
+    found = load_ideas(context(reader, _watching("EQ:DDD")), 10, tab="stocks")
+    assert found.paused_total == 1
+    assert [p.instrument_id for p in found.paused] == ["EQ:DDD"]

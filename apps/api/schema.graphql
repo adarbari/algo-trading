@@ -1163,7 +1163,7 @@ type EvidenceProgress {
 }
 
 """
-A setup's historical exit rule at the served session: the `stop` and the `holdSessions` (the verdict's basis horizon), each null only with `unknown` saying why (never filled from an older value; none of it is read from a run that ends after the served session). `winners`: the basis's winning long trades read; `inSampleOnly`: the run hides its out-of-sample trades, so only in-sample winners were read
+A setup's historical exit rule at the served session: the `stop` and the `holdSessions` (the verdict's basis horizon), each null only with `unknown` saying why (never filled from an older value; none of it is read from a run that ends after the served session). `winners`: the basis's winning long trades read; `inSampleOnly`: the run hides its out-of-sample trades, so only in-sample winners were read. An option setup's declared `takeProfit` (a share of the credit), `exitDte` (calendar days to expiry) and the `conditionFields` of its exit condition; its hold is the earlier of the basis horizon and the `expiry` when one was given
 """
 type ExitRule {
   edgeId: String!
@@ -1172,6 +1172,10 @@ type ExitRule {
   unknown: Unknown
   winners: Int!
   inSampleOnly: Boolean!
+  takeProfit: Float
+  exitDte: Int
+  conditionFields: [String!]!
+  expiry: Date
 }
 
 """
@@ -2350,7 +2354,7 @@ type IdeaWhy {
 }
 
 """
-The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`)
+The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`); `watchlist` (a tab's pool only): the ideas the rule ranked before the viewer's watchlist kept the watched ones, null: no watchlist, no filter (ADR 0083)
 """
 type Ideas {
   session: Date!
@@ -2361,6 +2365,7 @@ type Ideas {
   paused: [PausedIdea!]!
   nextCursor: String
   facets: FilterFacets
+  watchlist: Int
 
   """Whether another page follows this one"""
   hasMore: Boolean!
@@ -4099,7 +4104,7 @@ type SetupIdea {
 }
 
 """
-The Ideas of one tab for the session. `state`: listed (a setup qualifies; a night that picks nothing is an empty list, never a fall back) or unproven (none does: the page shows `Query.ideas(tab)` as Unproven). `groups` the qualifying setups, strongest evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; `leftOut` counts by kind; `ruleVersion` the ranking rule's
+The Ideas of one tab for the session. `state`: listed (a setup qualifies; a night that picks nothing is an empty list, never a fall back) or unproven (none does: the page shows `Query.ideas(tab)` as Unproven). `groups` the qualifying setups, strongest evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; `leftOut` counts by kind; `ruleVersion` the ranking rule's; `watchlist`: the ideas under the cap before the viewer's watchlist kept the watched ones (only those are in `ideas`; `total`, `picked` and the ranks are the whole list's, `shown` and the licence left-out count only watched names), null: no watchlist, no filter
 """
 type SetupIdeas {
   session: Date!
@@ -4110,6 +4115,7 @@ type SetupIdeas {
   ideas: [SetupIdea!]!
   total: Int!
   leftOut: [LeftOut!]!
+  watchlist: Int
 }
 
 """A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""
@@ -4160,7 +4166,7 @@ type SliceFigure {
 }
 
 """
-A stop. `fraction`: how far below the entry reference close (HISTORY: the drawdown that `1 - beyond` of the setup's winning trades never exceeded, on `winners` trades; DECLARED: the setup's own rule); FALLBACK: `multiple` x `atr` (ATR(14), usd per share), not from this setup's history
+A stop. `fraction` of its `basis`: below the entry reference close (ENTRY), a multiple of the credit (CREDIT) or a share of the collateral (COLLATERAL); HISTORY: the level that `1 - beyond` of the setup's winning trades never passed, on `winners` trades; DECLARED: the setup's own rule; FALLBACK: `multiple` x `atr` (ATR(14), usd per share), not from this setup's history
 """
 type Stop {
   kind: StopKind!
@@ -4169,6 +4175,14 @@ type Stop {
   multiple: Float
   winners: Int
   beyond: Float
+  basis: StopBasis!
+}
+
+"""What a published stop's `fraction` is of"""
+enum StopBasis {
+  ENTRY
+  CREDIT
+  COLLATERAL
 }
 
 """Where a published stop comes from"""
