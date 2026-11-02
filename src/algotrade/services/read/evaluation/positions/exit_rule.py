@@ -13,20 +13,41 @@ declared share exits of E3c fill); the percentile applies only without one.
 Point in time at the served session S: the canonical run must end by S (``range_to <= S``) and
 only trades that exited by S count. Nothing is filled: a missing input is an ``Unknown`` with its
 reason, never an older value. The rule is a reading of the evaluation's own winners and never feeds
-back into it (so it is not a judge input and not in the verdict fingerprint)."""
+back into it (so it is not a judge input and not in the verdict fingerprint).
 
-from dataclasses import dataclass
+An option setup (an ``option_pnl`` outcome, ADR 0088 decision 19, design 2.4a) publishes its own
+declared ``[outcome.exit]``, the rule its backtest used: a declared ``stop_loss`` as it is (a
+multiple of the credit), with ``take_profit``, ``exit_dte`` and the fields of the ``when``
+condition beside it. Only without a declared stop is the stop the percentile of the contract's
+``max_adverse`` (the worst mark loss over the collateral) over the basis's winners, under the
+same point-in-time bounds; below ``min_winners`` it is UNKNOWN (no ATR fallback: an ATR of the
+underlying is no loss on an option position). Its hold is the earlier of the cap (the basis
+horizon) and the selected expiry, when the caller gives one. An exit chosen by case is published
+only as the caller resolved it at the session (``resolved``), else UNKNOWN."""
+
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
+from datetime import date
 from enum import StrEnum
 
 import numpy as np
 
+from algotrade.config.edges.document import Outcome
+from algotrade.config.edges.positions.cases import EXIT_CASE_NAMES
 from algotrade.config.edges.positions.exit_rule import ExitRuleSettings
+from algotrade.config.edges.positions.spec import (
+    OPTION_KIND,
+    ExitSettings,
+    PositionSpec,
+    exits_digest,
+)
 from algotrade.config.site.settings import site_document
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.time.calendar import next_session, sessions_to
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.evaluation import runs
-from algotrade.services.read.evaluation.edges import Edge
+from algotrade.services.read.evaluation.edges import Edge, parsed_edges
 from algotrade.services.read.evaluation.verdict import (
     EdgeSummary,
     load_edge_summary,
@@ -44,9 +65,16 @@ class StopKind(StrEnum):
     DECLARED = "DECLARED"  # the setup's own declared stop, published as it is
 
 
+class StopBasis(StrEnum):
+    ENTRY = "ENTRY"  # a share setup: a fall below the entry reference close
+    CREDIT = "CREDIT"  # an option setup's declared stop: a loss of this multiple of the credit
+    COLLATERAL = "COLLATERAL"  # an option setup's history: a mark loss of this share of collateral
+
+
 @dataclass(frozen=True)
 class Stop:
-    """A stop. ``fraction``: how far below the entry reference close (HISTORY, DECLARED); ``atr``
+    """A stop. ``fraction`` of the ``basis``: how far below the entry reference close (ENTRY), a
+    multiple of the credit received (CREDIT) or a share of the collateral (COLLATERAL); ``atr``
     and ``multiple``: the ATR(14) in usd per share and its multiple (FALLBACK, the distance is
     their product). ``winners``: the winning trades a HISTORY stop rests on; ``beyond``: the
     share of them that went past it (1 - the percentile)."""
@@ -57,6 +85,7 @@ class Stop:
     multiple: float | None = None
     winners: int | None = None
     beyond: float | None = None
+    basis: StopBasis = StopBasis.ENTRY
 
 
 @dataclass(frozen=True)
@@ -71,21 +100,25 @@ class ExitRule:
     unknown: Unknown | None = None
     winners: int = 0
     in_sample_only: bool = False  # the canonical run hides its out-of-sample trades: not read
+    # an option setup's other declared exits, published as declared (None: not declared)
+    take_profit: float | None = None  # close when this share of the credit is captured
+    exit_dte: int | None = None  # close at this many calendar days to expiry
+    condition_fields: tuple[str, ...] = ()  # the catalogue fields its exit condition reads
+    expiry: date | None = None  # the selected expiry the hold was cut to (None: not given)
 
 
 def _unknown(edge: Edge, code: UnknownCode, why: str) -> Unknown:
     return Unknown(code, run_cause(edge.id, why))
 
 
-def history_stop(dips: list[float], share: float) -> Stop:
+def history_stop(dips: list[float], share: float, basis: StopBasis = StopBasis.ENTRY) -> Stop:
     """The stop of ``dips`` (the winners' adverse moves): the smallest observed dip that ``share``
     of them did not exceed (numpy's ``inverted_cdf``: an observed value, never an interpolated
     one), with the real share that went past it (ties make it differ from ``1 - share``)."""
     values = np.asarray(dips, dtype=float)
     stop = float(np.quantile(values, share, method="inverted_cdf"))
-    return Stop(
-        StopKind.HISTORY, fraction=stop, winners=len(dips), beyond=float((values > stop).mean())
-    )
+    beyond = float((values > stop).mean())
+    return Stop(StopKind.HISTORY, fraction=stop, winners=len(dips), beyond=beyond, basis=basis)
 
 
 def _settings(ctx: ReadContext) -> ExitRuleSettings:
@@ -107,22 +140,29 @@ def _fallback(
     return Stop(StopKind.FALLBACK, atr=float(cell.value), multiple=multiple, winners=winners), None
 
 
+def _ledger(
+    ctx: ReadContext, edge: Edge, run: runs.EdgeRun, summary: EdgeSummary
+) -> tuple[list[runs.TradeRow], Unknown | None]:
+    """The basis's trades in the canonical run that exited by the session, or why they cannot be
+    read (no ledger, or one under a licence the viewer does not hold)."""
+    ledger = runs.load_run_trades(
+        ctx, run, variant=summary.basis_screener or "", horizon=summary.basis_horizon or 0
+    )
+    unknown = ledger.unknown
+    if unknown is None and ledger.licence not in (None, "", runs.OPEN, *ctx.licences):
+        why = f"the winners' outcomes are under the {ledger.licence} data licence"
+        unknown = _unknown(edge, UnknownCode.LICENCE, why)
+    day = ctx.session.date
+    return [t for t in ledger.rows if t.exit_session is not None and t.exit_session <= day], unknown
+
+
 def _from_history(
     ctx: ReadContext, edge: Edge, run: runs.EdgeRun, summary: EdgeSummary, instrument_id: str | None
 ) -> ExitRule:
     """The percentile stop of the basis's winners, else the ATR fallback (the rules of the module
     docstring: a ledger the viewer's licences do not cover, or that is long-only, is UNKNOWN)."""
-    screener, horizon, day = (
-        summary.basis_screener or "",
-        summary.basis_horizon or 0,
-        ctx.session.date,
-    )
-    ledger = runs.load_run_trades(ctx, run, variant=screener, horizon=horizon)
-    unknown = ledger.unknown
-    if unknown is None and ledger.licence not in (None, "", runs.OPEN, *ctx.licences):
-        why = f"the winners' outcomes are under the {ledger.licence} data licence"
-        unknown = _unknown(edge, UnknownCode.LICENCE, why)
-    known = [t for t in ledger.rows if t.exit_session is not None and t.exit_session <= day]
+    horizon = summary.basis_horizon or 0
+    known, unknown = _ledger(ctx, edge, run, summary)
     if unknown is None and any(t.side != "long" for t in known):
         why = "the exit rule is published for long picks only"
         unknown = _unknown(edge, UnknownCode.NOT_APPLICABLE, why)
@@ -137,18 +177,130 @@ def _from_history(
     return ExitRule(edge.id, fallback, horizon, unknown, len(dips), run.oos_hidden)
 
 
+def option_outcome(ctx: ReadContext, edge: Edge, run: runs.EdgeRun) -> Outcome | None:
+    """``edge``'s main outcome as ``run``'s owner resolves it (never as the viewer, as the run
+    resolved it) when it is an option setup (an ``option_pnl`` outcome with a position), else
+    None. The ledger and the verdict basis are the main edge variant's (``edge_variant`` null),
+    so its declared exits are the main outcome's."""
+    doc = next((e for e in parsed_edges(ctx, run.owner) if e.id == edge.id), None)
+    if doc is None or doc.outcome.kind != OPTION_KIND or doc.outcome.position is None:
+        return None
+    return doc.outcome
+
+
+def _declared_exits(
+    edge: Edge, spec: PositionSpec, resolved: Mapping[str, float] | None
+) -> tuple[ExitSettings, Unknown | None]:
+    """The declared exits with each case-valued one replaced by its value ``resolved`` at the
+    session (0: off, as a grid spells it); one not resolved makes the rule UNKNOWN."""
+    exits = spec.exit or ExitSettings()
+    chosen = {c.name for c in spec.cases if c.name in EXIT_CASE_NAMES}
+    missing = sorted(chosen - set(resolved or {}))
+    if missing:
+        why = f"{missing[0]} is chosen by case for each pick: not resolved for this one"
+        return exits, _unknown(edge, UnknownCode.NOT_APPLICABLE, why)
+    got = {k: v for k, v in (resolved or {}).items() if k in chosen}
+    take_profit = (float(got["take_profit"]) or None) if "take_profit" in got else exits.take_profit
+    stop_loss = (float(got["stop_loss"]) or None) if "stop_loss" in got else exits.stop_loss
+    exit_dte = (int(got["exit_dte"]) or None) if "exit_dte" in got else exits.exit_dte
+    return ExitSettings(take_profit, stop_loss, exit_dte, exits.when), None
+
+
+def _option_hold(ctx: ReadContext, offset: int, cap: int, expiry: date | None) -> int | None:
+    """The earlier of the cap and the selected expiry, in sessions after the entry session (the
+    ``offset``-th session after the served one); None: the expiry is not after the entry."""
+    if expiry is None:
+        return cap
+    entry = ctx.session.date
+    for _ in range(offset):
+        entry = next_session(entry)
+    return min(cap, sessions_to(entry, expiry)) if expiry > entry else None
+
+
+def _tested(edge: Edge, run: runs.EdgeRun, outcome: Outcome) -> Unknown | None:
+    """Why the document's declared exits are not the ones ``run`` tested, else None."""
+    if run.exits_digest is None:
+        why = f"run {run.run_id} is older than its recorded exits: re-run the backtest"
+        return _unknown(edge, UnknownCode.NOT_STORED, why)
+    if run.exits_digest != exits_digest(outcome.position):
+        why = f"the setup's declared exits changed after run {run.run_id}: re-run the backtest"
+        return _unknown(edge, UnknownCode.NOT_RUN, why)
+    return None
+
+
+def _percentile(
+    ctx: ReadContext, edge: Edge, run: runs.EdgeRun, summary: EdgeSummary
+) -> tuple[Stop | None, Unknown | None, int]:
+    """The percentile stop of the basis's winners' ``max_adverse`` (a share of collateral), the
+    reason there is none, and the winners read. A winner's loss the viewer may not read, or one
+    not stored, makes it UNKNOWN: never a percentile over a subset."""
+    known, unknown = _ledger(ctx, edge, run, summary)
+    winners = [t.max_adverse for t in known if t.hit is True]
+    losses = [float(c.value) for c in winners if c.value is not None]
+    hidden = next((c.unknown for c in winners if c.unknown is not None), None)
+    t = _settings(ctx)
+    if unknown is None and hidden is not None:
+        unknown = hidden
+    elif unknown is None and len(losses) < len(winners):
+        why = f"run {run.run_id} has winning trades with no max_adverse stored: re-run it"
+        unknown = _unknown(edge, UnknownCode.NOT_STORED, why)
+    elif unknown is None and len(losses) < t.min_winners:
+        why = f"only {len(losses)} winning trades, fewer than {t.min_winners}: no stop from so few"
+        unknown = _unknown(edge, UnknownCode.NOT_APPLICABLE, why)
+    if unknown is not None:
+        return None, unknown, len(losses)
+    return history_stop(losses, t.stop_percentile, StopBasis.COLLATERAL), None, len(losses)
+
+
+def _from_option(
+    ctx: ReadContext,
+    edge: Edge,
+    run: runs.EdgeRun,
+    summary: EdgeSummary,
+    outcome: Outcome,
+    expiry: date | None,
+    resolved: Mapping[str, float] | None,
+) -> ExitRule:
+    """An option setup's own declared exits; only without a declared stop the percentile of its
+    winners' ``max_adverse``, UNKNOWN below ``min_winners`` (the module docstring). An UNKNOWN
+    rule publishes no declared exit, only the hold (as a share setup's keeps its hold)."""
+    assert outcome.position is not None  # option_outcome returns only an outcome with one
+    hold = _option_hold(ctx, outcome.start_offset_sessions, summary.basis_horizon or 0, expiry)
+    base = ExitRule(edge.id, None, hold, expiry=expiry)
+    if hold is None:
+        why = f"the expiry {expiry} is not after the entry session"
+        return replace(base, unknown=_unknown(edge, UnknownCode.NOT_APPLICABLE, why))
+    exits, unknown = _declared_exits(edge, outcome.position, resolved)
+    unknown = _tested(edge, run, outcome) or unknown
+    if unknown is not None:
+        return replace(base, unknown=unknown)
+    rule = replace(
+        base, take_profit=exits.take_profit, exit_dte=exits.exit_dte,
+        condition_fields=tuple(sorted({r.field for r in exits.when.rules()})) if exits.when else (),
+    )  # fmt: skip
+    if exits.stop_loss is not None:
+        own = Stop(StopKind.DECLARED, fraction=exits.stop_loss, basis=StopBasis.CREDIT)
+        return replace(rule, stop=own)
+    stop, unknown, winners = _percentile(ctx, edge, run, summary)
+    return replace(rule, stop=stop, unknown=unknown, winners=winners, in_sample_only=run.oos_hidden)
+
+
 def exit_rule_at(
     ctx: ReadContext,
     edge: Edge,
     instrument_id: str | None = None,
     declared: Stop | None = None,
     bounded: bool = False,
+    expiry: date | None = None,
+    resolved: Mapping[str, float] | None = None,
 ) -> ExitRule:
     """The exit rule of ``edge`` at ``ctx.session``; ``instrument_id``: the pick, for the ATR
-    fallback; ``declared``: the setup's own stop, published as it is when given. Nothing, the
-    hold included, is read from a canonical run that ends after the session. ``bounded``: the
-    canonical run is the latest committed on or before the session (as Ideas reads the verdict,
-    ``runs.load_canonical_run``), so the rule and the verdict it sits beside name one run."""
+    fallback; ``declared``: a share setup's own stop, published as it is when given (an option
+    setup's comes from its document). Nothing, the hold included, is read from a canonical run
+    that ends after the session. ``bounded``: the canonical run is the latest committed on or
+    before the session (as Ideas reads the verdict, ``runs.load_canonical_run``), so the rule and
+    the verdict it sits beside name one run. ``expiry`` and ``resolved``: an option pick's
+    selected expiry and its case-valued exits resolved at the session (the example position)."""
     canonical = (
         runs.load_canonical_run(ctx, edge, True) if bounded else runs.load_canonical_run(ctx, edge)
     )
@@ -164,6 +316,9 @@ def exit_rule_at(
     if summary.basis_screener is None or summary.basis_horizon is None:
         why = f"{edge.id} has no verdict basis ({summary.result})"
         return ExitRule(edge.id, None, None, _unknown(edge, UnknownCode.NOT_RUN, why))
+    option = option_outcome(ctx, edge, run)
+    if option is not None:
+        return _from_option(ctx, edge, run, summary, option, expiry, resolved)
     if declared is not None:
         return ExitRule(edge.id, declared, summary.basis_horizon)
     return _from_history(ctx, edge, run, summary, instrument_id)

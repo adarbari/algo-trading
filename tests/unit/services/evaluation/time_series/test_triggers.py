@@ -207,3 +207,41 @@ def test_a_trigger_on_the_session_before_a_weekend_first_is_scanned() -> None:
     taken = set(triggers._window(friday, H))
     base = [p for p in got.periods if not p.inside]
     assert base and all(not set(sessions_of(p)) & taken for p in base)
+
+
+def test_trigger_decides_on_the_counted_windows_decisions_only_from_readings_up_to_d() -> None:
+    """The stored picks' check (ADR 0088): D decides when ``trigger_periods`` counts a window at
+    D; a trigger inside the last window does not; a later session's row is never read."""
+    first = date(2024, 3, 1)
+    inside = next_session(next_session(first))
+    after = next_session(sessions_of(next(p for p in placed([first]) if p.inside))[-1])
+    reader = world([first, inside, after], until=after)  # nothing stored after ``after``
+    decided = [
+        d for d in sessions_between(previous_session(first), after)
+        if triggers.trigger_decides(reader, "vix_spike", d, H, AS_OF)
+    ]  # fmt: skip
+    assert decided == [first, after]
+
+
+def test_trigger_decides_with_no_row_at_d_is_an_error() -> None:
+    day = date(2024, 3, 1)
+    with pytest.raises(ConfigurationError, match="no stored market row"):
+        triggers.trigger_decides(world([], until=day, skip=(day,)), "vix_spike", day, H, AS_OF)
+
+
+def test_trigger_decides_on_a_run_of_triggers_follows_the_chain_from_its_last_reset() -> None:
+    """A trigger every session from ``start``: the chain counts every H-th one from the first,
+    as ``trigger_periods`` started at that reset point does, whatever D is asked."""
+    start = date(2024, 3, 1)
+    run_days = sessions_between(start, date(2024, 4, 30))
+    reader = world(run_days, until=run_days[-1])
+    counted = {
+        p.decision
+        for p in triggers.trigger_periods(
+            reader, "vix_spike", start, run_days[-1], H, AS_OF
+        ).periods
+        if p.inside
+    }
+    asked = run_days[20:32]
+    decided = {d for d in asked if triggers.trigger_decides(reader, "vix_spike", d, H, AS_OF)}
+    assert decided == {d for d in counted if d in asked} and decided

@@ -9,6 +9,7 @@ const response: SetupIdeasResponse = {
     state: 'listed',
     ruleVersion: 1,
     total: 2,
+    watchlist: null,
     leftOut: [{ kind: 'no_verdict', count: 1 }],
     groups: [
       {

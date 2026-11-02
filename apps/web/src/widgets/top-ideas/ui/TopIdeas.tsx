@@ -19,6 +19,7 @@ import {
 import { ExportButton } from '@/features/filter-export';
 import { GuideHelp, helped, termHelp } from '@/features/guide-help';
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
+import { WatchlistShowing } from '@/features/watchlist';
 import {
   IDEA_COLUMN_SETS,
   IDEAS_PAGE,
@@ -59,6 +60,8 @@ export interface TopIdeasProps {
   onOpen: (symbol: string, via: string) => void;
   /** Open the Screeners list (where a screener is run). */
   onScreeners: () => void;
+  /** Open Settings (where the watchlist that filters the list is edited). */
+  onOpenSettings: () => void;
 }
 
 export function TopIdeas({
@@ -68,6 +71,7 @@ export function TopIdeas({
   onCompare,
   onOpen,
   onScreeners,
+  onOpenSettings,
 }: TopIdeasProps) {
   const filters = useFilterState(search.f, (f) => {
     onSearchChange({ f });
@@ -157,6 +161,14 @@ export function TopIdeas({
         }
       >
         <Stack gap={2}>
+          {ideas.data && ideas.data.watchlist !== null && (
+            <WatchlistShowing
+              shown={ideas.data.total}
+              of={ideas.data.watchlist}
+              help={termHelp('ideas_watchlist')}
+              onEdit={onOpenSettings}
+            />
+          )}
           {withheld.length > 0 && (
             <Stack direction="row" gap={2} align="center" wrap>
               <Text size="sm" tone="muted">
