@@ -39,7 +39,6 @@ from algotrade.data.outcomes import (
     select_outcomes,
 )
 from algotrade.engines.screening.runner import RunCoverage
-from algotrade.engines.selection.entry import ENTRY_UNKNOWN, NOT_TRIGGERED
 from algotrade.features.framework.feature import strictest
 from algotrade.quant.edges.statistics import moments
 from algotrade.services.evaluation.cross_section.baselines.variant import (
@@ -88,6 +87,7 @@ from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     band_picks,
     decile_means,
+    held_counts,
 )
 from algotrade.services.evaluation.cross_section.picks import (
     MIN_SCORE_COVERAGE,
@@ -297,8 +297,7 @@ def _stat(
         pre_snapshot=run.pre_snapshot,
         outside_universe=len(run.qualified) - len(in_universe) if side == LONG else 0,
         no_entry_bar=len(ids - have - held.keys()),
-        not_triggered=sum(held.get(i) == NOT_TRIGGERED for i in ids),
-        entry_unknown=sum(held.get(i) == ENTRY_UNKNOWN for i in ids),
+        **held_counts(held, ids),  # names an entry condition or a case kept out, by reason
         pick_reference=tuple(float(v) for v in counted.loc[got, "reference"].dropna()),
         pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
         no_implied_vol=sum(1 for i in picks if i in no_iv),
@@ -835,7 +834,13 @@ def _measure_plan(
                 if p.scope.edge.gate is not None:  # its market read is logged against D
                     session.gate(p.scope.edge.gate, leg.decision)
                 entered, kept, missing = session.entered(  # an entry condition: own S per name
-                    scope.edge, scope.universe, variant.id, leg, closed[p.horizon], rows
+                    scope.edge,
+                    scope.universe,
+                    variant.id,
+                    leg,
+                    closed[p.horizon],
+                    rows,
+                    p.scope.edge,
                 )
                 if missing is not None:  # no partition at an S a name entered at: lost
                     session.lost[variant.id, leg.decision] = missing_outcomes([missing]).dataset

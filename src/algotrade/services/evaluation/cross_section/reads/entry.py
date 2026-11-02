@@ -18,25 +18,21 @@ from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions.cases import EntrySpec
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import (
-    FEATURE_FIELD_PREFIX,
-    GROUP_FIELD_HEADS,
-    field_source,
-    group_of_table,
-    is_feature_field,
-)
 from algotrade.core.model.predicates import FieldValue
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
 from algotrade.engines.selection.entry import ENTRY_UNKNOWN, NOT_TRIGGERED, first_entry
 from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.services.evaluation.cross_section.reads.cases import (
+    MARKET_HEAD,
+    check_cases,
+    session_tables,
+)
 from algotrade.services.evaluation.cross_section.sessions import entry_session, wait_closes
 from algotrade.services.features import has_rows
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.regime import session_market
 from algotrade.services.selection import fields_view
-
-MARKET_HEAD = f"{GROUP_FIELD_HEADS['market']}."
 
 
 @dataclass(frozen=True)
@@ -149,6 +145,7 @@ def check_entry(
     value per session, no names to enter); a rule naming a field whose feature group has no rows
     over the closes the run reads, D in ``first..last`` and their waits (G9-M4: every name would
     be ENTRY_UNKNOWN, a silent change of the rule)."""
+    check_cases(reader, edge, features, first, last, as_of)  # its case values (E13b)
     spec = edge.outcome.entry
     if spec is None:
         return
@@ -164,17 +161,9 @@ def check_entry(
         raise ConfigurationError(f"{where}: a pair_spread pair would be measured over two windows")
     end = wait_closes(last, spec.within_sessions)[-1]
     for name in sorted({r.field for r in spec.when.rules()}):
-        for table in _tables(features, name):
+        for table in session_tables(features, name):
             if not has_rows(reader, table, first, end, as_of):
                 raise ConfigurationError(
                     f"{where}: {name} has no rows in {table} over {first}..{end}, so the rule "
                     f"would be UNKNOWN at every close (G9-M4)"
                 )
-
-
-def _tables(features: FeatureSet, name: str) -> list[str]:
-    """The session-grain feature tables ``name`` is read from (a snapshot field: none)."""
-    if is_feature_field(name):
-        return sorted(features.stored_columns([name.removeprefix(FEATURE_FIELD_PREFIX)]))
-    table, _ = field_source(name)
-    return [table] if group_of_table(table) is not None else []

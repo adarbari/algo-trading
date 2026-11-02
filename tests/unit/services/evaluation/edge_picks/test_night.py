@@ -223,3 +223,10 @@ def test_a_gated_edge_with_no_market_row_is_skipped_unknown_never_picked(world: 
     (stored,) = edge_night(night(world), edge(top_k=3, gate=gate))
     assert stored.status == "skipped" and stored.pick_ids == ()
     assert stored.reason == "regime unknown"  # the gate applies with [regime] off, and fails closed
+
+
+def test_an_edge_with_an_entry_condition_is_skipped_until_its_picks_apply_it(world: World) -> None:
+    rule = {"all": [{"field": "x", "op": "gt", "value": 0}]}
+    entering = edge(outcome={**_outcome(), "horizon_sessions": [2], "entry": {"when": rule}})
+    (stored,) = edge_night(night(world), entering)
+    assert stored.status == SKIPPED and "entry condition" in stored.reason

@@ -14,15 +14,17 @@ value is not a return, a cushion or a ratio (ADR 0064 amendment 2026-10-11: ``tr
 """
 
 import math
-from collections.abc import Callable, Hashable, Mapping, Sequence
+from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import partial
-from typing import Protocol
+from typing import Protocol, TypedDict
 
 import numpy as np
 
 from algotrade.config.edges.verdict import TailsVerdict
+from algotrade.engines.selection.cases import CASE_UNKNOWN
+from algotrade.engines.selection.entry import ENTRY_UNKNOWN, NOT_TRIGGERED
 from algotrade.quant.edges.statistics import (
     Moments,
     decile_spread,
@@ -115,6 +117,23 @@ def band_picks(ids: Sequence[str], first: int, view: Mapping[Hashable, float]) -
     return tuple(out)
 
 
+class HeldCounts(TypedDict):
+    not_triggered: int
+    entry_unknown: int
+    case_unknown: int
+
+
+def held_counts(held: Mapping[str, str], ids: Iterable[str]) -> HeldCounts:
+    """Of ``ids``, how many an entry condition or a case value kept out, by reason: the
+    ``not_triggered`` / ``entry_unknown`` / ``case_unknown`` counts of a ``SessionStat``."""
+    reasons = [held.get(i) for i in ids]
+    return HeldCounts(
+        not_triggered=reasons.count(NOT_TRIGGERED),
+        entry_unknown=reasons.count(ENTRY_UNKNOWN),
+        case_unknown=reasons.count(CASE_UNKNOWN),
+    )
+
+
 @dataclass(frozen=True)
 class SessionStat:
     """One variant at one session and horizon. Counts are over names with a counted outcome;
@@ -147,6 +166,7 @@ class SessionStat:
     no_entry_bar: int = 0  # names eligible at D with no outcome row at S (over the base names)
     not_triggered: int = 0  # base names whose entry condition never held in the wait (E13)
     entry_unknown: int = 0  # base names whose entry condition was UNKNOWN first (E13)
+    case_unknown: int = 0  # base names a case value could not be resolved for at D (E13b)
     pick_reference: tuple[float, ...] = ()  # expires_otm: risk-neutral chance of a hit, per pick
     pick_touches: int = 0  # expires_otm: counted picks whose strike was touched intraday
     no_implied_vol: int = 0  # picks excluded for a missing or invalid implied vol at D
@@ -273,6 +293,7 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         no_entry_bar=sum(leg.no_entry_bar for leg in legs),
         not_triggered=sum(leg.not_triggered for leg in legs),
         entry_unknown=sum(leg.entry_unknown for leg in legs),
+        case_unknown=sum(leg.case_unknown for leg in legs),
         pick_reference=tuple(v for leg in legs for v in leg.pick_reference),
         pick_touches=sum(leg.pick_touches for leg in legs),
         no_implied_vol=sum(leg.no_implied_vol for leg in legs),

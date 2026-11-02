@@ -106,6 +106,7 @@ EDGE_SERIES = fixed(
         "excluded_unmeasured", "excluded_score_coverage", "no_entry_bar", "no_implied_vol",
         "outside_universe", "delisted", "unscored",
         "not_triggered", "entry_unknown",  # E13: an entry condition's (nullable in older rows)
+        "case_unknown",  # E13b: names a case value could not be resolved for (nullable)
     )),
     *floats("pick_mean", "base_mean", *(f"decile_mean_{i:02d}" for i in range(1, 11))),
     runs="merge",
@@ -244,6 +245,7 @@ EDGE_LEGS = fixed(
     "pick_entry date[]",
     "not_triggered int64",
     "entry_unknown int64",
+    "case_unknown int64",  # E13b: base names a case value could not be resolved for at D
     *(f"{n} int64[]" for n in ("pick_ranks", "pick_flags", "base_hits_at", "pick_hits_at")),
     *(f"{n} string[]" for n in ("pick_ids", "pick_reasons")),
     *(f"{n} int64" for n in (
