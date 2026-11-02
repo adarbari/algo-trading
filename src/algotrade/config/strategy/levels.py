@@ -35,6 +35,9 @@ class Level:
     join: str  # self | broadcast | through <key field>
     scopes: tuple[str, ...]  # the use sites that may read it
     licence: str  # where a field's licence comes from
+    in_order: bool = (
+        False  # a row depends on earlier decisions' trades: evaluated session by session
+    )
 
 
 LEVELS: tuple[Level, ...] = (
@@ -55,6 +58,7 @@ LEVELS: tuple[Level, ...] = (
         "portfolio", ("portfolio",), "computed", "services.evaluation.portfolio_level",
         "(setup, decision session)", "trades with S <= D still open after D's close",
         "broadcast", (GATE, ENTRY, CASE), "the strictest price source of the trades it reads",
+        in_order=True,
     ),
 )  # fmt: skip
 BY_KEY = {level.key: level for level in LEVELS}
@@ -63,3 +67,17 @@ BY_KEY = {level.key: level for level in LEVELS}
 def levels_at(site: str, declared: tuple[Level, ...] = LEVELS) -> tuple[Level, ...]:
     """The levels a rule at ``site`` may name, from ``declared[*].scopes`` (none hand-written)."""
     return tuple(level for level in declared if site in level.scopes)
+
+
+def level_of_field(name: str, declared: tuple[Level, ...] = LEVELS) -> Level | None:
+    """The level whose head starts ``name`` (``portfolio.open_positions``: the portfolio level),
+    None for a field no level claims."""
+    head = name.partition(".")[0]
+    return next((level for level in declared if head in level.heads), None)
+
+
+def is_computed(name: str, declared: tuple[Level, ...] = LEVELS) -> bool:
+    """Whether ``name`` is of a level whose values a producer computes (``provider`` computed),
+    so no stored table holds it and a read takes its value from the caller."""
+    level = level_of_field(name, declared)
+    return level is not None and level.provider == "computed"

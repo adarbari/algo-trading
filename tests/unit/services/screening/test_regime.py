@@ -119,3 +119,26 @@ def test_an_edge_gate_reads_that_session_whatever_the_regime_overlay_says() -> N
         assert edge_gate(reader, gate, DAY, domains).state == state
     reader, _ = seeded()  # nothing stored for the session: unknown, never open
     assert edge_gate(reader, gate, DAY, domains).state == "unknown"
+
+
+def test_an_edge_gate_takes_a_computed_levels_field_from_extra() -> None:
+    gate = Group("all", (Rule("portfolio.open_positions", "lt", 3),))
+    reader, _ = seeded()  # no market row: a computed field is never read from the store
+    assert edge_gate(reader, gate, DAY, extra={"portfolio.open_positions": 2}).state == "open"
+    assert edge_gate(reader, gate, DAY, extra={"portfolio.open_positions": 3}).state == "closed"
+    assert edge_gate(reader, gate, DAY).state == "unknown"  # missing: UNKNOWN, never open
+
+
+def test_an_edge_gate_still_reads_the_market_field_beside_a_portfolio_one() -> None:
+    gate = Group(
+        "all",
+        (Rule(LABEL, "not_in", ("STRESS",)), Rule("portfolio.open_positions", "lt", 3)),
+    )
+    domains = {LABEL: ("CALM", "STRESS")}
+    reader, writer = seeded()
+    store_label(writer, "CALM")
+    book = {"portfolio.open_positions": 1}
+    assert edge_gate(reader, gate, DAY, domains, extra=book).state == "open"
+    reader, writer = seeded()
+    store_label(writer, "STRESS")
+    assert edge_gate(reader, gate, DAY, domains, extra=book).state == "closed"

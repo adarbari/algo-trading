@@ -7,7 +7,9 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.edges.positions.cases import Case, CaseValue, EntrySpec
 from algotrade.config.strategy.schema import parse_selection
+from algotrade.core.model.predicates import Group, Rule
 from algotrade.services.evaluation.cross_section import picks
 from algotrade.services.evaluation.cross_section.measuring import (
     _Measured,
@@ -22,6 +24,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     ACTIVE,
     AS_OF,
     DAYS,
+    IDS,
     World,
     build_world,
     edge,
@@ -122,3 +125,27 @@ def test_a_books_history_is_logged_against_every_decision_session_that_read_it()
     seen = {d: {(r.table, r.start, r.end) for r in session.day_reads(d).reads} for d in DAYS[1:3]}
     on_shared = {r for r in seen[DAYS[1]] if r[0].startswith("rollups/") and r[1] <= shared <= r[2]}
     assert on_shared and on_shared <= seen[DAYS[2]]  # the shared day's partition, in both
+
+
+def test_the_gate_cache_never_shares_a_state_across_books(world: World) -> None:
+
+    gate = Group("all", (Rule("portfolio.open_positions", "lt", 3),))
+    session = SessionReads(world.reader, "label")
+    assert session.gate(gate, DAYS[0], {"portfolio.open_positions": 1}) == "open"
+    assert session.gate(gate, DAYS[0], {"portfolio.open_positions": 5}) == "closed"
+    assert session.gate(gate, DAYS[0]) == "unknown"
+    assert len(session._gates) == 3
+
+
+def test_the_entries_and_cases_caches_never_share_a_read_across_books(world: World) -> None:
+    rule = Group("all", (Rule("portfolio.open_positions", "lt", 3),))
+    session = SessionReads(world.reader, "label")
+    ids = frozenset(IDS[:2])
+    spec = EntrySpec(rule)
+    low, high = {"portfolio.open_positions": 1}, {"portfolio.open_positions": 5}
+    assert set(session.entries(spec, 1, ids, DAYS[0], low).at) == ids
+    assert not session.entries(spec, 1, ids, DAYS[0], high).at
+    cases = (CaseValue("n", (Case(rule, 1),), 0),)
+    assert session.cases(cases, ids, DAYS[0], low).chosen == dict.fromkeys(ids, (1,))
+    assert session.cases(cases, ids, DAYS[0], high).chosen == dict.fromkeys(ids, (0,))
+    assert len(session._entries) == 2 and len(session._cases) == 2

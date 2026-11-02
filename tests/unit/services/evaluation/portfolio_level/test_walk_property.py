@@ -8,7 +8,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from algotrade.services.evaluation.portfolio_level.book import OpenTrade, PortfolioRow
-from algotrade.services.evaluation.portfolio_level.walk import walk_in_order
+from algotrade.services.evaluation.portfolio_level.walk import Book, walk_in_order
 
 START = date(2026, 1, 5)
 DAYS = st.lists(st.integers(0, 60), min_size=1, max_size=15, unique=True).map(
@@ -66,3 +66,23 @@ def test_unsorted_or_repeated_sessions_are_refused() -> None:
         walk_in_order([START + timedelta(days=1), START], _decide(1, []), _sectors)
     with pytest.raises(ValueError, match="ascending"):
         walk_in_order([START, START], _decide(1, []), _sectors)
+
+
+def test_a_book_adds_trades_and_a_lost_leg_makes_every_row_unknown_until_its_date() -> None:
+
+    book = Book()
+    d0, d1, d2 = START, START + timedelta(days=1), START + timedelta(days=2)
+    assert book.row_at(d0, _sectors).values["portfolio.open_positions"] == 0
+    book.add([OpenTrade("A", d1, d2 + timedelta(days=5), d2 + timedelta(days=5), None, "open")])
+    book.lost(d1)
+    lost = book.row_at(d1, _sectors)
+    assert lost.reason == "leg_lost" and set(lost.values.values()) == {None}
+    assert book.row_at(d2, _sectors).values["portfolio.open_positions"] == 1  # known again
+
+
+def test_a_later_lost_leg_never_shortens_an_earlier_unknown_stretch() -> None:
+    book = Book()
+    far, near = START + timedelta(days=5), START + timedelta(days=1)
+    book.lost(far)
+    book.lost(near)
+    assert book.row_at(START + timedelta(days=3), _sectors).reason == "leg_lost"

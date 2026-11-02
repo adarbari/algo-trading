@@ -34,12 +34,21 @@ def variant_gates(
 
 
 def tagged(
-    found: Mapping[date, SessionStat], edge: Edge, session: SessionReads
+    found: Mapping[date, SessionStat],
+    edge: Edge,
+    session: SessionReads,
+    decided: Mapping[date, str] | None = None,
 ) -> Mapping[date, SessionStat]:
-    """``found`` with each session tagged by the setup gate's state at D (none: unchanged)."""
+    """``found`` with each session tagged by the setup gate's state at D (none: unchanged).
+    ``decided``: the states an in-order walk already decided (its book's gate, ADR 0088 G15) by
+    decision session; those are used as they are and ``session.gate`` is not asked again."""
     if edge.gate is None:
         return found
-    return {d: replace(s, gate=session.gate(edge.gate, d)) for d, s in found.items()}
+    gate, known = edge.gate, decided or {}
+    return {
+        d: replace(s, gate=known[d] if d in known else session.gate(gate, d))
+        for d, s in found.items()
+    }
 
 
 def open_blocks(
