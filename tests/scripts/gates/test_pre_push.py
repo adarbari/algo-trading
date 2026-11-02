@@ -156,3 +156,20 @@ def test_a_signal_kills_every_running_step_and_exits_128_plus_it(
         pre_push.stop_all(15)
     pre_push.RUNNING.discard(child)
     assert stopped.value.code == 143 and child.wait(timeout=5) != 0
+
+
+def test_the_worktree_prune_runs_at_most_once_an_hour(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # 2026-11-02: 68 worktrees filled the disk; the hook prunes merged ones, detached and throttled
+    launched: list[list[str]] = []
+
+    class _Done:
+        stdout = str(tmp_path / ".git")
+
+    monkeypatch.setattr(pre_push.subprocess, "run", lambda *a, **k: _Done())
+    monkeypatch.setattr(pre_push.subprocess, "Popen", lambda cmd, **k: launched.append(cmd))
+    pre_push.prune_worktrees()
+    pre_push.prune_worktrees()
+    assert len(launched) == 1
+    assert launched[0][-1] == "--prune-merged"

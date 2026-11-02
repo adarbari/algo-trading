@@ -82,7 +82,7 @@ The pre-push hook runs `make pre-push` (the fast lane below) through `scripts/op
 
 Owner decision 2026-11-02: the hook runs locally only what fails often and costs little on the
 shared Mac; the rest is GitHub CI's (a public repo: hosted minutes are free, only concurrency is
-limited, and `ci.yml`'s `concurrency` cancels a branch's superseded run). Target: 90 s warm.
+limited, and `ci.yml`'s `concurrency` cancels a branch's superseded run, and every CI work job ends with a `gh run cancel` step on failure, so the first red job stops its siblings: owner 2026-11-02). Target: 90 s warm, hard budget 105 s. After the timed lanes the hook starts a detached `worktree.sh --prune-merged`, at most hourly (stamp `var/locks/worktree-prune.stamp`, log `var/logs/worktree-prune.log`), so merged worktrees never fill the disk again (2026-11-02: 68 worktrees, 2.3 GB free).
 `scripts/pre_push.py` runs two lanes side by side: python (`make numbering`, then `FAST_TESTS`
 at `-n 2`, whatever changed, then `check_ownership.py --files` over the branch's changed Python
 files: seconds, where the full scan is 2 min under load and stays CI's; #1064 and #1065 both
