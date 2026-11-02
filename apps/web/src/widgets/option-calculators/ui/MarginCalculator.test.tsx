@@ -54,8 +54,10 @@ const PREVIEW = {
 };
 
 const mutate = vi.fn();
+const reset = vi.fn();
 const mutation = (state: Record<string, unknown> = {}) => ({
   mutate,
+  reset,
   data: undefined,
   isPending: false,
   isError: false,
@@ -74,6 +76,7 @@ const fill = async (user: ReturnType<typeof userEvent.setup>) => {
 
 beforeEach(() => {
   mutate.mockReset();
+  reset.mockReset();
   hooks.useOptionGrid.mockReturnValue(fakeQuery(GRID));
   hooks.useMarginPreview.mockReturnValue(mutation());
 });
@@ -121,6 +124,19 @@ describe('MarginCalculator', () => {
     expect(screen.getByText('Margin account would hold $3,600.00')).toBeInTheDocument();
     expect(screen.getByText("1.8% of what's held, for 28 days")).toBeInTheDocument();
     await expectNoA11yViolations(document.body);
+  });
+
+  it('clears the last result when the contract is edited', async () => {
+    const user = userEvent.setup();
+    hooks.useMarginPreview.mockReturnValue(withPreview());
+    render(<MarginCalculator symbol="ORBT" />);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: 'Calculate' }));
+    expect(screen.getByText('$3,600.00')).toBeInTheDocument();
+    reset.mockClear();
+    await user.click(screen.getByRole('radio', { name: 'Call' }));
+    expect(reset).toHaveBeenCalled();
+    expect(screen.queryByText('$3,600.00')).toBeNull();
   });
 
   it('hides the parts that are null and says the stress is unknown in public words', async () => {
