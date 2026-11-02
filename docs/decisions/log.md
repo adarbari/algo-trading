@@ -965,7 +965,7 @@ follow-up PR).
 - Question: the OptMargin mockup has a "Your broker's rules: tastytrade" select; which margin rules does the calculator offer at launch?
 - Options: (a) the Reg-T / Cboe exchange minimum for an uncovered short option only, no broker named; (b) a site-config list of named brokers with their published multipliers, sourced and dated, kept by hand; (c) (a) now, (b) later only as a sourced, dated change.
 - Decision: (c). The select is dropped; its place is an "exchange minimum" label with its Guide entry (a broker may require more; a margin figure is a floor, not a quote). Cash-secured stays exact (strike x 100 x contracts).
-- decided by: Fable on the owner's behalf (owner away)
+- decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the exchange minimum is published, stable and broker-neutral, the one figure the site can state accurately for every trader; a stale multiplier shown as a named broker's rule is a data-quality and liability risk (data tenet), a hand-kept broker list has no ingestion check, and a broker select sits against ADR 0083's no-broker-links and no-account-profile rules.
 ## 2026-11-02 | ADR 0083 amendment (c), V7 follow-up | The watchlist filters both Ideas lists; one "Showing N of M on your watchlist" line, no toggle
