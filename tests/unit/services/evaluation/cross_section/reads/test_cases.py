@@ -17,7 +17,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
 from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.engines.selection.cases import CASE_UNKNOWN
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.reads import cases as case_reads
 from algotrade.services.evaluation.cross_section.reads.cases import (
     Resolved,
@@ -27,6 +27,7 @@ from algotrade.services.evaluation.cross_section.reads.cases import (
     read_cases,
 )
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from algotrade.services.evaluation.cross_section.sessions import Leg
 from algotrade.services.features import site_features
 from algotrade.storage.configs.files import FileConfigStore

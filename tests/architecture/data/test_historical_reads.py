@@ -9,8 +9,8 @@ from dataclasses import replace
 
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.user import UserContext
-from algotrade.services.evaluation.cross_section.harness import edge_universe
 from algotrade.services.evaluation.cross_section.historical import require_liquidity_rule
+from algotrade.services.evaluation.cross_section.run.scopes import edge_universe
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 

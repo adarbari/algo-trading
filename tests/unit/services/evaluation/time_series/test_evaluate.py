@@ -10,7 +10,8 @@ from algotrade.config.edges.document import MAIN, QUALITY_BAR
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.engines.selection.entry import NOT_TRIGGERED
-from algotrade.services.evaluation.cross_section.harness import HARNESS_VERSION, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
+from algotrade.services.evaluation.cross_section.legs.key import HARNESS_VERSION
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
 from algotrade.services.evaluation.evidence.contract import trade_problems as trades_problems
 from algotrade.services.evaluation.time_series import harness

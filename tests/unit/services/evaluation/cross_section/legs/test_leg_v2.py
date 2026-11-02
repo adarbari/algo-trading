@@ -12,9 +12,10 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.services.evaluation.cross_section import measuring
-from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
+from algotrade.services.evaluation.cross_section.run.evaluation import EdgeEvaluation
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,

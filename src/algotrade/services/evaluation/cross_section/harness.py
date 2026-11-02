@@ -30,39 +30,32 @@ EXPLORATORY: its rows carry its split in their key and the flag, and the split j
 """
 
 import hashlib
-import json
 from collections import Counter
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from functools import partial
 from typing import Any
 
 from algotrade.config.edges.document import (
-    LEGACY_SITE_CUTOFF,
-    LEGACY_SITE_OWNERS,
     MAIN,
-    PAIR_KIND,
     Edge,
     Outcome,
-    job_name,
 )
-from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
+from algotrade.config.edges.identity import LONG, LONG_SHORT
 from algotrade.config.edges.named import DELTA_EQUIVALENT, TIME_SERIES
-from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.positions.chain import CHAIN_KIND
 from algotrade.config.edges.positions.spec import exits_digest
-from algotrade.config.edges.positions.templates import POSITION_PREFIX, load_templates
+from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.edges.verdict import OPTION_LEVELS
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
-from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
-from algotrade.config.user import SITE_USER, UserContext
+from algotrade.config.strategy.schema import MODEL_IMPL
+from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import GrainReads, stored_sessions
-from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.baselines.variant import (
     Variant,
     _Scope,
@@ -79,20 +72,14 @@ from algotrade.services.evaluation.cross_section.detail.gating import (
     variant_gates,
 )
 from algotrade.services.evaluation.cross_section.detail.licences import (
-    TrialLicences,
     trial_licences,
 )
 from algotrade.services.evaluation.cross_section.detail.windows import (
-    SeriesFacts,
     counts_wins,
     plan_exits,
     projection_count,
     series_facts,
     unit_of,
-)
-from algotrade.services.evaluation.cross_section.events import EventSchedule, read_events_for
-from algotrade.services.evaluation.cross_section.historical import (
-    HistoricalCaveat,
 )
 from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
@@ -105,7 +92,6 @@ from algotrade.services.evaluation.cross_section.legs.key import (
     expression_hash,
 )
 from algotrade.services.evaluation.cross_section.legs.reuse import (
-    FULL,
     Need,
     Reuse,
     plan_reuse,
@@ -119,7 +105,6 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
 from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.measures import (
     BASELINE,
-    MEMBER,
     SCREENER,
     CostGrid,
     SessionStat,
@@ -144,9 +129,7 @@ from algotrade.services.evaluation.cross_section.measuring import (
 )
 from algotrade.services.evaluation.cross_section.random_picks import (
     DEFAULT_DRAWS,
-    RANDOM,
     SECTOR_RANDOM,
-    SEED_VERSION,
     RandomStat,
     pool_random,
     random_measures,
@@ -155,13 +138,30 @@ from algotrade.services.evaluation.cross_section.reads.entry import check_entrie
 from algotrade.services.evaluation.cross_section.reads.screens import ScreenCache
 from algotrade.services.evaluation.cross_section.reads.session import SessionReads
 from algotrade.services.evaluation.cross_section.reporting.report_containment import (
-    ReportContainment,
     containment,
     reports_after,
 )
 from algotrade.services.evaluation.cross_section.reporting.turnover import (
     apply_hold_bands,
     apply_rebalances,
+)
+from algotrade.services.evaluation.cross_section.run.evaluation import (
+    EdgeEvaluation,
+    LegDetail,
+    RandomPicks,
+    VariantResult,
+)
+from algotrade.services.evaluation.cross_section.run.identity import (
+    effective_split,
+    prior_trials,
+    run_hash,
+)
+from algotrade.services.evaluation.cross_section.run.scopes import (
+    MIXED_SOURCE_IV,
+    edge_scopes,
+    edge_variants,
+    event_schedules,
+    iv_licence,
 )
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
@@ -177,76 +177,6 @@ from algotrade.services.evaluation.time_series.sleeve import evaluate_sleeve, sl
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
-
-# What an edge contributes to a run's identity (``run_hash``); every other field of ``Edge`` is
-# ``BOOKKEEPING`` (the user's or the server's state, prose, the site's decisions): changing one
-# never changes what a run measures, so it never makes a new run (nor reseeds the random draws).
-# A fitness test classifies every field: a new one fails until it is named here.
-RUN_INPUTS = (
-    "id", "outcome", "schedule", "universe", "top_k", "screeners", "baselines", "frozen_from",
-    "site_frozen_from", "base", "picks", "variants", "scorer_features", "ensemble", "gate",
-    "variant_grid", "position_baselines",
-)  # fmt: skip
-BOOKKEEPING = (
-    "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
-    "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
-    "audit", "owner", "published", "family", "oos_class",
-    "mechanism_kind", "asset_class", "plain_reason", "verdict_profile", "holdout_from",
-)  # fmt: skip
-# The one fixed implied-vol field of a run is never a field mixing sources by name or by rule.
-MIXED_SOURCE_IV = ("feature.vrp_iv30",)
-SELECTIONS = "selections"
-
-
-@dataclass(frozen=True)
-class LegDetail:
-    """One leg of a measured block (leg v2, ADR 0064): its decision session D and entry session
-    S, the block's measured first session (the side of the split it is on, as for the slices)
-    and its statistic with every pick. What the ledger is framed from."""
-
-    decision: date
-    entry: date
-    block: date
-    stat: SessionStat
-
-
-@dataclass(frozen=True)
-class VariantResult:
-    variant: str
-    role: str
-    config_hash: str
-    horizon: int
-    stats: tuple[SessionStat, ...]
-    measures: tuple[SliceMeasure, ...]
-    edge_variant: str = MAIN  # the edge's own ``[[variants]]`` id, "main" for the edge itself
-    iv_source: str | None = None  # the run's iv_field when the outcome reads an implied vol
-    licences: TrialLicences | None = None  # the trial's and its ledger columns' (ADR 0064)
-    legs: tuple[LegDetail, ...] = ()  # the main edge variant's measured legs, for the ledger
-    side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
-    capital_basis: str | None = None  # the trade contract's (ADR 0088); None for a book
-    timing: Mapping[str, Any] | None = None  # a time-series edge: timing vs buy-and-hold Sharpe
-    book: Mapping[str, Any] | None = None  # a named option sleeve's book and index tracking (E8b)
-    grid: int | None = None  # an ensemble: the size of its pre-registered grid (ADR 0074)
-
-    @property
-    def licence(self) -> str | None:
-        """The trial's: the strictest of its implied-vol field, screen and universe features."""
-        return None if self.licences is None else self.licences.trial
-
-    @property
-    def unit(self) -> str | None:
-        """What the values measure (``series.unit``); None when no series was built."""
-        return None if self.series is None else self.series.unit
-
-    @property
-    def wins(self) -> bool:
-        """The trial statistics read the excess wins: the values are not returns."""
-        return counts_wins(self.unit)
-
-    lost_sessions: Mapping[str, int] = field(default_factory=dict)  # table -> decision sessions
-    report_containment: ReportContainment | None = None  # earnings_expected edges: diagnostic
-    series: SeriesFacts | None = None  # the windows of ``stats``, the unit, the projection (0064)
-    costs: tuple[SliceMeasure, ...] = ()  # cost rows of a return outcome (ADR 0064 decision 5)
 
 
 def _slice_rows(
@@ -271,63 +201,6 @@ def _slice_rows(
     return tuple(measures), tuple(costed)
 
 
-@dataclass(frozen=True)
-class RandomPicks:
-    """The random-pick backtest matched to one screener of one edge variant at one horizon:
-    one measure per draw over the out-of-sample slice (``random_picks.py``)."""
-
-    edge_variant: str
-    horizon: int
-    variant: str  # the screener the draws are matched to
-    config_hash: str  # that screener's trial hash
-    draws: tuple[SliceMeasure, ...]
-    kind: str = RANDOM  # ``RANDOM`` (uniform) or ``SECTOR_RANDOM`` (matched to the picks' sectors)
-    side: str = LONG
-
-
-@dataclass(frozen=True)
-class EdgeEvaluation:
-    edge_id: str
-    run_hash: str
-    user_id: str
-    benchmark: str  # the edge document's: "SPY" or "none"
-    start: date
-    end: date
-    as_of: datetime
-    snapshot: date | None  # the first (here: earliest read) universe snapshot
-    results: tuple[VariantResult, ...]
-    trials: int
-    start_sessions: Mapping[int, int]  # horizon -> decision blocks the schedule gave
-    unclosed_sessions: Mapping[int, int]  # horizon -> of those, blocks with no closed window
-    event_unknown: Mapping[str, int] = field(default_factory=dict)  # reason -> names excluded
-    split_from: date | None = None  # the test slice's first session (None: no split)
-    exploratory: bool = False  # the split is not the edge's frozen_from: never evidence
-    # Sessions before the first reference snapshot, read from the listing history (ADR 0053
-    # amendment 2026-10-09): the rule and the names by path; None when none was read.
-    historical: HistoricalCaveat | None = None
-    random_picks: tuple[RandomPicks, ...] = ()  # out-of-sample only: none without a split
-    # The run's legs, the reads of its sessions and its outcome reads as ``results/edge_legs``
-    # rows (``legs/rows.py``): what ``write_edge_eval`` stores with the run (ADR 0063).
-    leg_rows: tuple[Mapping[str, Any], ...] = field(default=(), repr=False, compare=False)
-    # How the run got its legs (ADR 0063): ``full`` or ``incremental``, the stored legs it
-    # reused, the ones it computed and the stored ones it recomputed, by reason.
-    mode: str = FULL
-    legs_reused: int = 0
-    legs_computed: int = 0
-    legs_invalidated: Mapping[str, int] = field(default_factory=dict)
-    # The share of an in-sample Sharpe ratio to expect lost out of sample (``verdict.toml
-    # [oos_haircut]`` of the edge's ``oos_class``; None: the edge has none), for the report.
-    oos_haircut: float | None = None
-    # Each screener's config hash as the run resolved it (``Variant.hash``), recorded in the run
-    # record's stats so the provenance line can tell a screener changed since (empty: none).
-    screener_hashes: Mapping[str, str] = field(default_factory=dict)
-    # The bootstrap's draws, mean block and seed version, recorded in the run record's stats
-    # (the evidence measures' audit, ADR 0088 2.6); empty: no tail measures (a time-series run).
-    bootstrap: Mapping[str, Any] = field(default_factory=dict)
-    # The main outcome's declared exits (``spec.exits_digest``; None: no position), in the stats.
-    exits_digest: str | None = None
-
-
 def _random_sets(
     edge_variant: str,
     horizon: int,
@@ -349,119 +222,6 @@ def _random_sets(
         found.append(
             RandomPicks(edge_variant, horizon, screener, trial, drawn, SECTOR_RANDOM, side)
         )
-    return found
-
-
-def run_hash(
-    edge: Edge,
-    variants: Sequence[Variant],
-    start: date,
-    end: date,
-    as_of: datetime,
-    iv_field: str = IMPLIED_VOL_FIELD,
-    split_from: date | None = None,
-    random_draws: int = DEFAULT_DRAWS,
-) -> str:
-    """Identity of one evaluation: the edge's ``RUN_INPUTS``, each variant's config hash, the range,
-    the outcomes' ``as_of``, the run's implied-vol field, its effective split, the random draws
-    per session and their seed scheme (``SEED_VERSION``), and the harness version."""
-    payload = {
-        "edge": identity_dict({k: asdict(edge)[k] for k in RUN_INPUTS}),
-        "iv_field": iv_field,
-        "variants": [(v.id, v.hash) for v in variants],
-        "range": [start, end],
-        "as_of": as_of,
-        "split_from": split_from,
-        "random": [random_draws, SEED_VERSION],
-        "version": HARNESS_VERSION,
-    }
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
-
-
-def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Variant]:
-    """The screeners, the baselines and, for an ``[ensemble]``, the combined variant (ADR 0074):
-    its grid's screeners are ``member``s (reported, never a trial nor a basis) and the ensemble
-    itself the one trial, counted once whatever the grid's size."""
-    found = [
-        *(
-            Variant(s, MEMBER if s in edge.ensemble else SCREENER, resolve_config(configs, s, user))
-            for s in edge.screeners
-        ),
-        *(Variant(s, BASELINE, resolve_config(configs, s, user)) for s in edge.baselines),
-    ]
-    if edge.position_baselines:  # the setup's own picks, valued as another position (G19)
-        own = next((v for v in found if v.role == SCREENER), found[0] if found else None)
-        if own is None:
-            raise ConfigurationError(f"edge {edge.id}: a position baseline needs a screener")
-        found += [
-            Variant(f"{POSITION_PREFIX}{t}", BASELINE, own.config, position=t)
-            for t in edge.position_baselines
-        ]
-    if edge.ensemble:
-        members = tuple(v for v in found if v.role == MEMBER)
-        found.append(Variant(ENSEMBLE, SCREENER, members[0].config, members))
-    if not found:
-        raise ConfigurationError(f"edge {edge.id}: no screeners or baselines to evaluate")
-    return found
-
-
-def screen_uses(configs: ConfigStore, edges: Sequence[Edge]) -> list[tuple[str, str]]:
-    """The (owner, config hash) of every screener and baseline the ``edges`` score, one pair
-    per use: what ``shared_screens`` counts to choose the screens worth caching for a run."""
-    uses: list[tuple[str, str]] = []
-    for edge in edges:
-        if edge.base in TIME_SERIES:
-            continue  # measured by time_series/, no screener runs
-        try:
-            found = _variants(configs, UserContext(edge.owner), edge)
-        except ConfigurationError:
-            continue  # the run of that edge reports it
-        uses.extend((edge.owner, v.config.hash) for v in found if not v.members)
-    return uses
-
-
-def edge_universe(configs: ConfigStore, user: UserContext, edge: Edge) -> Selection:
-    if isinstance(edge.universe, Selection):
-        return edge.universe
-    for scope in (user.user_id, "site"):
-        doc = configs.load(scope, SELECTIONS, edge.universe)
-        if doc is not None:
-            return parse_selection(doc, f"{scope}/{SELECTIONS}/{edge.universe}")
-    raise ConfigurationError(f"edge {edge.id}: unknown selection {edge.universe!r}")
-
-
-def effective_split(run: date | None, edge: Edge) -> tuple[date | None, bool]:
-    """(split, exploratory): the run's split, else the edge's own ``frozen_from``. Exploratory
-    when it is not the site edge's (a copy whose split moved), or the user moved the split of
-    an edge whose out-of-sample result they had seen (a permanent label)."""
-    split = run or edge.frozen_from
-    moved = "split_moved_after_viewing" in edge.audit.labels
-    return split, split != edge.site_frozen_from or moved
-
-
-def _prior_trials(
-    writer: ResultWriter, edge_id: str, user_id: str
-) -> set[tuple[str, str, str, int]]:
-    """(edge variant, variant, config hash, horizon) of earlier runs; a trial logged before
-    edge variants existed is the edge's own ("main"). The site's log includes the runs recorded
-    under ``LEGACY_SITE_OWNERS``, so the deflated Sharpe ratio still counts them. A logged
-    baseline is not a trial."""
-    found: set[tuple[str, str, str, int]] = set()
-    records = list(writer.runs_for(job_name(edge_id, user_id)))
-    if user_id == SITE_USER:  # the legacy owners' records from before the cutoff only
-        for legacy in LEGACY_SITE_OWNERS:
-            records += [
-                r
-                for r in writer.runs_for(job_name(edge_id, legacy))
-                if (r.finished_at or r.started_at) < LEGACY_SITE_CUTOFF
-            ]
-    for record in records:
-        for t in record.stats.get("trials", []):
-            if t.get("role") in (BASELINE, MEMBER):  # a comparison or a grid member, not a trial
-                continue  # (no role: counted; an ensemble is one trial, whatever its grid)
-            found.add(
-                (t.get("edge_variant") or MAIN, t["variant"], t["config_hash"], int(t["horizon"]))
-            )
     return found
 
 
@@ -512,12 +272,13 @@ def evaluate_edge(
         return _time_series(
             reader, writer, configs, user, edge, start, end, as_of, split_from, random_draws
         )
-    variants = _variants(configs, user, edge)
+    variants = edge_variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
     session = SessionReads(reader, label, screens, user.user_id, gate_domains(configs, edge))
     days = sessions_between(start, end)
-    scopes = _scopes(configs, user, edge, iv_field)
+    verdict = load_verdict(configs)
+    scopes = edge_scopes(configs, user, edge, iv_field, verdict.borrow_bps_annual)
     licences: dict[str, str | None] = {}
     for scope in scopes:
         if scope.iv_field in MIXED_SOURCE_IV:
@@ -525,16 +286,15 @@ def evaluate_edge(
                 f"iv_field {scope.iv_field!r} mixes sources: name one vendor's field"
             )
         licences[scope.key] = (
-            _licence(configs, user, scope.iv_field) if needs_implied_vol(scope.edge) else None
+            iv_licence(configs, user, scope.iv_field) if needs_implied_vol(scope.edge) else None
         )
-    schedules = _events(reader, session, scopes, days)
+    schedules = event_schedules(reader, session, scopes, days)
     session.release()  # the eligible sets read for the events are not kept
     plans = [
         _Plan(scope, horizon, leg_blocks(scope.edge, schedules.get(scope.key), days, horizon))
         for scope in scopes
         for horizon in scope.edge.outcome.horizon_sessions
     ]
-    verdict = load_verdict(configs)
     hashed = run_hash(edge, variants, start, end, as_of, iv_field, split, random_draws)
     features = catalogue(configs, user.user_id)
     spec = _RandomSpec(
@@ -704,7 +464,7 @@ def evaluate_edge(
     tried = {
         (r.edge_variant, r.variant, r.config_hash, r.horizon) for r in results if r.role == SCREENER
     }
-    trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
+    trials = len(tried | prior_trials(writer, edge.id, user.user_id))
     snapshot = min(session.snapshots(), default=None)
     return EdgeEvaluation(
         edge_id=edge.id,
@@ -779,7 +539,7 @@ def _time_series(
     }
     trial_rows = [r for r in run.results if r.role == SCREENER]  # baselines are never trials
     tried = {(r.edge_variant, r.symbol, keys[r.identity], r.horizon) for r in trial_rows}
-    trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
+    trials = len(tried | prior_trials(writer, edge.id, user.user_id))
     measured = deflated_measures(run.results, trials)
     results = [
         VariantResult(
@@ -902,93 +662,3 @@ def _earnings_horizons(plans: Sequence[_Plan]) -> frozenset[int]:
     """The horizons of the plans whose report diagnostic needs the names with an outcome row
     (``earnings_expected``): the only ones whose names an incremental run reads."""
     return frozenset(p.horizon for p in plans if p.scope.edge.event_class == "earnings_expected")
-
-
-def iv_field_of(edge: Edge, run_field: str = IMPLIED_VOL_FIELD) -> str:
-    """The implied-vol field an edge's outcome reads: its own ``iv_field``, else the run's."""
-    return edge.outcome.iv_field or run_field
-
-
-def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) -> list[_Scope]:
-    """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides. Each
-    reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
-    borrow = load_verdict(configs).borrow_bps_annual
-    edge = replace(edge, outcome=_borrowing(edge.outcome, borrow))
-    templates = load_templates(configs) if edge.position_baselines else {}
-    scopes = [
-        _Scope(
-            MAIN,
-            edge,
-            edge_universe(configs, user, edge),
-            iv_field_of(edge, iv_field),
-            (),
-            templates,
-        )
-    ]
-    for v in edge.variants:
-        base, picks = v.base or edge.base, v.picks or edge.picks
-        applied = replace(
-            edge,
-            outcome=_borrowing(v.outcome, borrow),
-            universe=v.universe,
-            base=base,
-            picks=picks,
-            variants=(),
-        )
-        field_name = v.outcome.iv_field or iv_field
-        marks = (f"base={base}", f"picks={picks}") if v.base or v.picks else ()
-        scopes.append(
-            _Scope(
-                v.id, applied, edge_universe(configs, user, applied), field_name, marks, templates
-            )
-        )
-    return scopes
-
-
-def _borrowing(outcome: Outcome, site_default: float) -> Outcome:
-    """``outcome`` with the borrow rate its short leg pays made explicit (its own, else the site's
-    ``verdict.toml`` default), so the trial hash and the values see one number; a long outcome has
-    no short leg and is returned as it is (a pair spread's short leg is the sibling)."""
-    if outcome.borrow_bps_annual is not None or (
-        outcome.side == LONG and outcome.kind != PAIR_KIND
-    ):
-        return outcome
-    return replace(outcome, borrow_bps_annual=site_default)
-
-
-def _events(
-    reader: StoreReader, session: SessionReads, scopes: Sequence[_Scope], days: Sequence[date]
-) -> dict[str, EventSchedule]:
-    """The event names by decision session of each scope with an event schedule (by scope key;
-    the others are absent). Scopes with the same event class, subtype and offset share one read of
-    the event fields."""
-    groups: dict[tuple[str, str | None, int], list[_Scope]] = {}
-    for scope in scopes:
-        if scope.edge.event_class is not None:
-            key = (
-                scope.edge.event_class,
-                scope.edge.event_subtype,
-                scope.edge.outcome.start_offset_sessions,
-            )
-            groups.setdefault(key, []).append(scope)
-    found: dict[str, EventSchedule] = {}
-    for (cls, subtype, offset), members in groups.items():
-        found.update(
-            read_events_for(
-                reader,
-                cls,
-                offset,
-                days,
-                {m.key: partial(session.eligible, m.universe) for m in members},
-                subtype,
-            )
-        )
-    return found
-
-
-def _licence(configs: ConfigStore, user: UserContext, iv_field: str) -> str:
-    """The catalogue licence of ``iv_field`` (a stored rollup column or an expression feature)."""
-    found = catalogue(configs, user.user_id).feature(iv_field)
-    if found is None:
-        raise ConfigurationError(f"iv_field {iv_field!r} is not a catalogue feature")
-    return str(found.licence)
