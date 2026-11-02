@@ -7,8 +7,9 @@ from typing import Self
 
 import strawberry
 
+from algotrade.services.read import values
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.ideas import picks
+from algotrade.services.read.ideas import picks, premium
 from algotrade.services.read.ideas.setups import Tab
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -45,6 +46,54 @@ class AlsoIn:
 
 
 @strawberry.type(
+    description="One leg of a Premium idea's example position: `right` P or C, `qty` signed "
+    "(negative: sold), `mid` our mid of the session's stored close quote, per share"
+)
+class PremiumLeg:
+    right: str
+    strike: float
+    expiry: dt.date
+    qty: int
+    mid: float
+
+    @classmethod
+    def of(cls, d: premium.PremiumLeg) -> Self:
+        return cls(right=d.right, strike=d.strike, expiry=d.expiry, qty=d.qty, mid=d.mid)
+
+
+@strawberry.type(
+    description="The option row of a Premium idea: the example position its setup's rule would "
+    "open at the session (derived figures only, never a bid or ask). `credit` and `collateral` "
+    "per contract, `returnOnCollateral` their ratio, `assignmentChance` the model chance at "
+    "least one sold leg finishes in the money (0 to 1), `expiry` the nearest leg's. `unknown`: "
+    "why there is no example (every figure null); a single null figure says why in "
+    "`chanceUnknown` / `collateralUnknown`"
+)
+class PremiumOption:
+    legs: list[PremiumLeg]
+    expiry: dt.date | None
+    credit: float | None
+    collateral: float | None
+    return_on_collateral: float | None
+    assignment_chance: float | None
+    unknown: Unknown | None
+    chance_unknown: Unknown | None
+    collateral_unknown: Unknown | None
+
+    @classmethod
+    def of(cls, d: premium.PremiumOption) -> Self:
+        def gap(u: values.Unknown | None) -> Unknown | None:
+            return None if u is None else Unknown.of(u)
+
+        return cls(
+            legs=[PremiumLeg.of(leg) for leg in d.legs], expiry=d.expiry, credit=d.credit,
+            collateral=d.collateral, return_on_collateral=d.return_on_collateral,
+            assignment_chance=d.assignment_chance, unknown=gap(d.unknown),
+            chance_unknown=gap(d.chance_unknown), collateral_unknown=gap(d.collateral_unknown),
+        )  # fmt: skip
+
+
+@strawberry.type(
     description="A ticker at its best pick: the setup it ranks under (`setupId`), its `place` "
     "there, the other setups that picked it, the stored `result` of that pick (null: its row "
     "could not be read) and its display `metrics` and `watchOut` ids"
@@ -59,6 +108,10 @@ class SetupIdea:
     result: ScreenResult | None
     metrics: list[IdeaMetric]
     watch_out: list[str]
+    option: PremiumOption | None = strawberry.field(
+        default=None,
+        description="The Premium tab's option row (null on Stocks)",
+    )
 
     @classmethod
     def of(cls, d: picks.SetupIdea, ctx: ReadContext) -> Self:
@@ -73,6 +126,7 @@ class SetupIdea:
             result=ScreenResult.of(result, ctx) if result is not None else None,
             metrics=[IdeaMetric.of(m) for m in d.metrics],
             watch_out=list(d.watch_out),
+            option=PremiumOption.of(d.option) if d.option is not None else None,
         )
 
 

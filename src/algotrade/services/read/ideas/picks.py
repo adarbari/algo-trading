@@ -16,7 +16,10 @@ licence's left-out count only watched names, so no left-out count counts a name 
 an empty list with the reason on each group, never a fall back) and ``UNPROVEN`` when none does:
 the page then shows the tab's pool of screeners, ``Query.ideas(tab:)``, labelled Unproven, with
 the left-out counts beside it. A setup left out for want of a readable verdict, and the picks a
-licence dropped, are counted by kind in ``left_out`` (counts never name a pick or a setup)."""
+licence dropped, are counted by kind in ``left_out`` (counts never name a pick or a setup).
+
+On the Premium tab each idea listed also carries its ``option`` row (``premium.py``: the example
+position its best setup would open at the session, as derived figures)."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -24,8 +27,10 @@ from datetime import date
 from algotrade.services.ideas.setup_rule import RULE_VERSION, CandidatePick, rank_picks, setup_key
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.ideas import of_setup
+from algotrade.services.read.ideas.premium import PremiumOption, load_premium_options
 from algotrade.services.read.ideas.setups import (
     LEFT_OUT_KINDS,
+    PREMIUM,
     QualifyingSetup,
     SessionSetups,
     load_session_setups,
@@ -80,6 +85,7 @@ class SetupIdea:
     result: ScreenResult | None
     metrics: tuple[IdeaMetric, ...]
     watch_out: tuple[str, ...]
+    option: PremiumOption | None = None  # the Premium tab's option row (None on Stocks)
 
 
 @dataclass(frozen=True)
@@ -165,6 +171,12 @@ def load_setup_picks(ctx: ReadContext, tab: str) -> SetupPicks:
     runs = [r for r in runs_of.values() if r is not None]
     results = load_results(ctx, wanted, list({r.run_id: r for r in runs}.values()))
     early = earnings_first(ctx, [i.instrument_id for i in shown])
+    by_id = {s.edge.id: s for s in setups}
+    options = (
+        load_premium_options(ctx, by_id, [(i.best.setup.edge_id, i.instrument_id) for i in shown])
+        if tab == PREMIUM
+        else {}
+    )
     ideas = []
     for idea in shown:
         run = runs_of[idea.best.setup.edge_id]
@@ -180,6 +192,7 @@ def load_setup_picks(ctx: ReadContext, tab: str) -> SetupPicks:
                 result,
                 () if result is None else display_metrics(result),
                 () if result is None else watch_out(result, idea.instrument_id in early),
+                options.get(idea.instrument_id),
             )
         )
     under = {s.edge.id: sum(1 for i in shown if i.best.setup.edge_id == s.edge.id) for s in setups}

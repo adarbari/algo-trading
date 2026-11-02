@@ -90,3 +90,31 @@ def test_one_sigma_day_loss_is_nan_when_an_iv_is_missing_and_never_negative() ->
     assert np.isnan(nan)
     longcall = position.one_sigma_day_loss(60.0, _arr(1), _arr(60), _arr(1), _arr(0.4), _arr(35))
     assert longcall >= 0
+
+
+def _chance(strikes: list[float], calls: list[bool], qty: list[int], ivs: list[float]) -> float:
+    n = len(strikes)
+    return position.assignment_chance(
+        100.0, np.array(strikes), np.array(ivs), np.full(n, 30.0), np.array(calls), np.array(qty)
+    )
+
+
+def test_assignment_chance_of_a_short_put_is_its_chance_in_the_money() -> None:
+    itm = position.p_itm(
+        100.0, np.array([95.0]), np.array([0.3]), np.array([30.0]), np.array([False])
+    )
+    assert _chance([95.0], [False], [-1], [0.3]) == pytest.approx(float(itm[0]))
+
+
+def test_assignment_chance_sums_the_highest_sold_put_and_lowest_sold_call_and_skips_wings() -> None:
+    strikes, calls = [90.0, 95.0, 105.0, 110.0], [False, False, True, True]
+    ivs = [0.4, 0.3, 0.25, 0.2]
+    itm = position.p_itm(100.0, np.array(strikes), np.array(ivs), np.full(4, 30.0), np.array(calls))
+    found = _chance(strikes, calls, [1, -1, -1, 1], ivs)  # an iron condor: the wings are bought
+    assert found == pytest.approx(float(itm[1] + itm[2]))
+
+
+def test_overlapping_sold_strikes_are_certain_none_sold_is_zero_a_missing_iv_nan() -> None:
+    assert _chance([100.0, 100.0], [False, True], [-1, -1], [0.3, 0.3]) == 1.0
+    assert _chance([95.0], [False], [1], [0.3]) == 0.0
+    assert np.isnan(_chance([95.0], [False], [-1], [np.nan]))

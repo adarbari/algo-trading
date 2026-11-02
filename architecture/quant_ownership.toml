@@ -25,11 +25,14 @@ detect = [{ call = "short_breakeven" }, { call = "called_away_return" }, { call 
 
 [[responsibility]]
 id = "option-position-figures"
-description = "The figures of an option position (one trade of a setup's template) from its legs, derived only, no bid or ask (quant/options/position.py, the option idea page's maths, plan O4): the most you can lose (the worst expiry payoff over every underlying price from 0 up, on the credit collected; None when unbounded), the position's theta a day (the feed's theta x quantity x 100, NaN when a leg has none), each leg's risk-neutral chance of finishing in the money (r = q = 0, premium.p_below) and the one-sigma-day loss (the worse of a one-day implied move either way, every leg repriced by Black-Scholes at its own IV). Written once; the idea page's option section calls it through services/read/ideas/option_detail.py"
+description = "The figures of an option position (one trade of a setup's template) from its legs, derived only, no bid or ask (quant/options/position.py, the option idea page's maths, plan O4): the most you can lose (the worst expiry payoff over every underlying price from 0 up, on the credit collected; None when unbounded), the position's theta a day (the feed's theta x quantity x 100, NaN when a leg has none), each leg's risk-neutral chance of finishing in the money (r = q = 0, premium.p_below), the one-sigma-day loss (the worse of a one-day implied move either way, every leg repriced by Black-Scholes at its own IV) and the chance of assignment (at least one sold leg in the money: the highest sold put and the lowest sold call, disjoint unless they overlap). Written once; the idea page's option section calls it through services/read/ideas/option_detail.py, the Premium list's option row through services/read/ideas/premium.py"
 owner = ["src/algotrade/quant/options/position.py"]
-allowed = ["src/algotrade/services/read/ideas/option_detail.py"]  # the one caller: an option pick's figures
+allowed = [
+    "src/algotrade/services/read/ideas/option_detail.py",  # an option pick's figures (O4)
+    "src/algotrade/services/read/ideas/premium.py",  # the Premium list's chance of assignment (O3)
+]
 section = "docs/ui/evening-desk-plan.md#4-data-gaps-each-inside-the-slice-that-needs-it"
-detect = [{ call = "one_sigma_day_loss" }, { call = "position_theta" }, { call = "p_itm" }]
+detect = [{ call = "one_sigma_day_loss" }, { call = "position_theta" }, { call = "p_itm" }, { call = "assignment_chance" }]
 
 [[responsibility]]
 id = "option-premium-figures"
