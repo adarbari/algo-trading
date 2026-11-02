@@ -166,7 +166,7 @@ id = "setup_tested_again"
 term = "Tested again"
 short = "A setup testing another setup's idea with a different rule, read beside it and never as separate proof."
 body = """
-Trying an idea several ways and keeping the best way makes a lucky result look real. Each way is counted as one more try, and the more tries an idea has, the stronger its evidence must be.
+Trying an idea several ways and keeping the best way makes a lucky result look real. So the more ways an idea is tried, the stronger its evidence must be, and both setups are read together.
 Two such setups agreeing is one result, not two.
 """
 see_also = ["deflated_sharpe", "option_ladder"]
