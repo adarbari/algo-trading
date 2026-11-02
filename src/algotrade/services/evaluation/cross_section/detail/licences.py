@@ -1,7 +1,8 @@
 """The licence of a trial and of each per-name column of its ledger (ADR 0064 decision 10, ADR
 0028): the most restrictive catalogue licence of what the trial reads. The trial's (on
 ``edge_eval`` and every ledger row) is that of its implied-vol field (when the outcome reads one),
-its screen's features, its universe's features and its entry and case rules' fields (E13); a ledger
+its screen's features, its universe's features, its entry and case rules' fields (E13) and its
+setup gate's fields (E1: a gate over the personal VIX statistics makes the trial personal); a ledger
 column's is that of what it is derived from: the outcome value (with its gross value, reference
 and touch) from the implied-vol field, the score from the screen's features, the ADV from its
 own field. A field the catalogue
@@ -82,6 +83,7 @@ def trial_licences(
     entry, position = edge.outcome.entry, edge.outcome.position  # read by the trial too (E13)
     ruled = {r.field for r in entry.when.rules()} if entry else set()
     ruled |= set(case_fields(position.cases)) if position is not None else set()
+    ruled |= {r.field for r in edge.gate.rules()} if edge.gate is not None else set()  # (E1)
     entry_licence = _of(features, sorted(ruled))
     value = iv_licence or OPEN
     return TrialLicences(
