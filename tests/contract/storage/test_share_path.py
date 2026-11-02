@@ -59,6 +59,7 @@ def test_the_table_is_registered_keyed_by_position_and_merges_runs() -> None:
         ({"exit_kind": "EXPIRED"}, "exit_kind must be one of"),
         ({"exit_kind": "DELISTED"}, "DELISTED goes with"),
         ({**UNMEASURED, "outcome_reason": "STALE_CHAIN"}, "outcome_reason must be one of"),
+        ({"benchmark_return": None}, "benchmark_return is null on a measured row"),
     ],
 )
 def test_the_value_rules_refuse_an_inconsistent_row(changes: dict[str, Any], problem: str) -> None:

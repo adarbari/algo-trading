@@ -80,10 +80,10 @@ def _bars(writer: StoreWriter, day: date, closes: dict[str, list[float]], run: s
     writer.write_table("bars/1d", day, run, stamped(rows, day, run, _bar_known(day)))
 
 
-def _store() -> tuple[StoreWriter, StoreReader]:
+def _store(bench: list[float] = BENCH) -> tuple[StoreWriter, StoreReader]:
     writer, reader = store()
     for day in DAYS:
-        _bars(writer, day, {**CLOSES, SPY: BENCH}, f"bars-{day}")
+        _bars(writer, day, {**CLOSES, SPY: bench}, f"bars-{day}")
     reference = [
         {"instrument_id": n, "symbol": n[3:], "asset_class": "EQ",
          "security_type": "COMMON_STOCK", "multiplier": 1.0, "status": "ACTIVE",
@@ -221,6 +221,28 @@ def test_a_recheck_that_changes_a_stored_row_stamps_it_no_earlier_than_its_write
     assert rows.loc["EQ:A", "exit_kind"] == "HORIZON"
     assert pd.Timestamp(rows.loc["EQ:A", "knowledge_ts"]) == pd.Timestamp(later)
     assert pd.Timestamp(rows.loc["EQ:B", "knowledge_ts"]) == pd.Timestamp(_bar_known(DAYS[4]))
+
+
+def test_a_benchmark_without_a_close_at_the_exit_leaves_the_row_unmeasured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writer, reader = _store(bench=[100, 100, 100, 101, NAN, 104])
+    _run(writer, _wanted(take_profit=0.05, stop_loss=0.05), monkeypatch)
+    rows = _rows(reader)
+    a, c = rows.loc["EQ:A"], rows.loc["EQ:C"]  # A exits on DAYS[4], C at the window's end
+    assert (a["outcome_status"], a["outcome_reason"]) == ("UNMEASURED", "NO_BENCHMARK_BAR")
+    assert pd.isna(a["gross_return"]) and pd.isna(a["benchmark_return"])
+    assert c["benchmark_return"] == pytest.approx(0.04)
+
+
+def test_a_benchmark_the_resolver_does_not_know_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writer, reader = _store()
+    wanted = [dataclasses.replace(w, benchmark="QQQ") for w in _wanted(take_profit=0.05)]
+    record = _run(writer, wanted, monkeypatch)
+    assert "QQQ" in record.stats[f"QQQ:{wanted[0].key}"]["refused"]
+    assert reader.table(TABLE, S) is None
 
 
 def test_a_field_rule_reads_each_close_acts_a_close_later_and_sets_the_licence(

@@ -248,9 +248,10 @@ def structure_pnl_problems(frame: pd.DataFrame) -> list[str]:
 # row's own exit (not the window's close); a DELISTED or UNMEASURED row, and a stored row a recheck
 # changes (a cleared flag, a late split), is known when written.
 # UNMEASURED: a reason and no exit (BAD_BAR: a flagged bar before the exit was known; NO_BAR: a
-# close missing before it, with no delisting), never a return over a gap.
+# close missing before it, with no delisting; NO_BENCHMARK_BAR: the benchmark has no close at S or
+# the exit), never a return over a gap; a measured row of a benchmark has its benchmark_return.
 SHARE_PATH = f"{OUTCOMES_PREFIX}share_path@v1"
-SHARE_PATH_REASONS = ("BAD_BAR", "NO_BAR")
+SHARE_PATH_REASONS = ("BAD_BAR", "NO_BAR", "NO_BENCHMARK_BAR")
 SHARE_EXIT_KINDS = frozenset({"TAKE_PROFIT", "STOP_LOSS", "CONDITION", "HORIZON", "DELISTED"})
 
 _SHARE_PATH_TYPES = (
@@ -303,6 +304,9 @@ def share_path_problems(frame: pd.DataFrame) -> list[str]:
         problems.append(f"exit_kind must be one of {sorted(SHARE_EXIT_KINDS)}: {sorted(found)}")
     if ((kinds == "DELISTED") != (status[~unmeasured][kinds.index] == "DELISTED")).any():
         problems.append("exit_kind DELISTED goes with outcome_status DELISTED")
+    benched = (frame["benchmark"].astype(str) != "none").to_numpy() & ~unmeasured
+    if frame["benchmark_return"][benched].isna().any():
+        problems.append("benchmark_return is null on a measured row of a benchmark")
     reasons = set(frame.loc[unmeasured, "outcome_reason"].dropna().astype(str))
     if reasons - set(SHARE_PATH_REASONS):
         problems.append(f"outcome_reason must be one of {list(SHARE_PATH_REASONS)}")

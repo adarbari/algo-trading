@@ -14,7 +14,9 @@ from that close's own partition only (``close_fields``); a rule over a field the
 at all is REFUSED (recorded, the position's other windows and the other positions still write, the
 check FAILs), never run as a rule that never fires. A name with no close before its exit is
 UNMEASURED (``BAD_BAR`` when the first missing close is a flagged bar, else ``NO_BAR``), unless the
-reference or the listing history says it left (DELISTED at its last close). A row's ``knowledge_ts``
+reference or the listing history says it left (DELISTED at its last close); one whose benchmark has
+no close at S or the exit is UNMEASURED ``NO_BENCHMARK_BAR``, and a benchmark ticker the resolver
+does not know is REFUSED. A row's ``knowledge_ts``
 is the latest bars and field partition read up to its own exit; a DELISTED or UNMEASURED row's is
 the write time (the delisting is noticed later than its last bar), as is a stored row's that a
 recheck changes (a cleared flag, a late split); its ``licence`` the strictest of the bars' and the
@@ -71,7 +73,7 @@ TASK = "share-outcomes"
 SOURCE = "share_outcomes"
 TABLE = SHARE_PATH
 TABLES = (TABLE,)
-NO_BAR = "NO_BAR"
+NO_BAR, NO_BENCHMARK_BAR = "NO_BAR", "NO_BENCHMARK_BAR"
 CHUNK = 40  # window ends whose bars are read at once in a backfill
 KEY = ("instrument_id", "position_key", "benchmark")  # a row's identity in a partition
 NO_BENCHMARK = "none"
@@ -138,6 +140,11 @@ def _one(
         ticker = w.benchmark or NO_BENCHMARK
         resolver = run.resolver(window.start)
         bench = resolver.id_for(ticker) if resolver.knows(ticker) else None
+        if bench is None and ticker != NO_BENCHMARK:  # never an excess read as a missing value
+            refusal = f"benchmark {ticker!r} is not a known instrument at {window.start}"
+            run.record_item(item, f"REFUSED: {refusal}")
+            run.stats[item] = {"refused": refusal}
+            continue
         rows = path_rows(w, window, names, panel, stamps, left, fields, licence, bench)
         parts.setdefault(window.start, []).append(rows.assign(benchmark=ticker))
         reasons = rows.loc[rows["outcome_status"] == UNMEASURED, "outcome_reason"]
@@ -199,6 +206,12 @@ def path_rows(
             if walk is not None
             else math.nan
         )
+        if benchmark is not None and walk is not None and not math.isfinite(moved):
+            # no benchmark close at S or the exit: the excess is unknown, never a NaN read as data
+            row = _row(
+                name, w, window, float(prices[window.start]), None, stamps, field_known, False
+            )
+            row["outcome_reason"] = NO_BENCHMARK_BAR
         rows.append({**row, "licence": licence, "benchmark_return": moved})
     return pd.DataFrame(rows, columns=[c for c in (*COLUMNS, "knowledge_ts") if c != "benchmark"])
 
