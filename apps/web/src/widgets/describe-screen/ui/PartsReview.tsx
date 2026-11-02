@@ -1,7 +1,8 @@
 /**
  * The draft review of "Describe it" as one card per part of the sentence (docs/drafting/
  * describe-it-plan.md "Explained parts"): the trader's own words quoted, "We read this as ..." in
- * plain language, then what that part owns: its criteria (the Builder's rows, by id), the formula
+ * plain language, then what that part owns (the whole sentence first, each part tagged with its
+ * kind): its criteria (the Builder's rows, by id), the formula
  * to review, the readings of an ambiguous term (picking another swaps the row locally, no model
  * call) and the feature that is not available yet (the trader's OWN history only). The model only
  * translates the sentence: nothing here adds a rule the trader did not write (ADR 0083 decision
@@ -10,7 +11,16 @@
  * reference; a card is marked edited when the trader changed its rows (ADR 0038). Zero applied
  * criteria is not an error: the Builder's document stays.
  */
-import { Mono, PartCard, PartJoin, PartList, Stack, Text, type PartCardProps } from '@algotrade/ui';
+import {
+  Mono,
+  PartCard,
+  PartJoin,
+  PartList,
+  Stack,
+  TaggedSentence,
+  Text,
+  type PartCardProps,
+} from '@algotrade/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { GuideHelp, termHelp } from '@/features/guide-help';
@@ -24,6 +34,7 @@ import {
   partKindLabel,
   partsOf,
   readingSwap,
+  sentenceSegments,
   useMyFeatureRequests,
   type DraftPart,
   type MissingFeature,
@@ -123,7 +134,8 @@ export function PartsReview({
     const own = formulas.filter((f) => part.formulas.includes(f.name));
     const gaps = missing.filter((item) => part.missing.includes(missingKey(item)));
     const rankField = part.rank ? tieBreakOf(document) : null;
-    if (criteria.length + dropped.length + own.length + gaps.length === 0 && !rankField) return null;
+    if (criteria.length + dropped.length + own.length + gaps.length === 0 && !rankField)
+      return null;
     return (
       <Stack gap={3}>
         {(criteria.length > 0 || dropped.length > 0) && (
@@ -186,6 +198,7 @@ export function PartsReview({
     const common = {
       kind: part.kind,
       kindLabel: kind.label,
+      headingLevel: 2,
       origin: part.origin === 'gap' ? 'words' : part.origin,
       keptLabel: PART_TEXT.keptMark,
       readingLabel: PART_TEXT.reading,
@@ -277,6 +290,9 @@ export function PartsReview({
 
   return (
     <Stack gap={3}>
+      {parts.length > 0 && (
+        <TaggedSentence aria-label={PART_TEXT.sentence} segments={sentenceSegments(answer)} />
+      )}
       <PartList aria-label={PART_TEXT.list}>{parts.flatMap(withJoin)}</PartList>
       {leftover.map((line) => (
         <Text key={line} size="sm" tone="muted">

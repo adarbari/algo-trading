@@ -953,3 +953,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the owner's decision in chat (2026-11-02); the shared files are mechanical unions, so a conflict there carried no judgement, only a 5-15 minute re-run each time.
+
+## 2026-11-02 | V10 Describe it (Evening Desk) | Where Describe it lives, and C18's `not_said` status
+- Question: (1) the Describe box sat on Expert; where does the sentence way in live now? (2) the plan gives C18 (`PartCard`) a `not_said` status; does V10 add it?
+- Options: (1) its own page `/test/describe/$id` with the rows it became / a mode of Expert. (2) add `not_said` now, unused / add it with the first draft that has a part the trader did not say.
+- Decision: (1) `/test/describe/$id` (steps, draft bar, the sentence box with the tagged sentence (C17) and the part cards (C18), then the criteria table, where a proposed formula waits as a pending row); Expert keeps the rules, preview and funnel; a new Describe draft opens there. The Builder's state is per page, so the rows sit beside the sentence and nothing pending is lost on a page change. (2) not now: a screener draft has no part the trader did not say (the mockup's two, "what it should beat" and "why it works", are a setup's, which Describe it does not draft yet); the status ships with the slice that drafts a setup from a sentence, with its Guide entry, so no unused design-system state lands.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: one tree, no lost pending formula; a component state with no screen to show it is dead code and an untested Guide entry.

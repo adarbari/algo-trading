@@ -18,7 +18,7 @@ import {
 import { mockApi } from './mock-api';
 
 async function describeIt(page: Page) {
-  await page.goto('/screeners/my-vrp/edit');
+  await page.goto('/test/describe/my-vrp');
   await page
     .getByRole('textbox', { name: 'Describe the screen' })
     .fill('IV above HV and above 50%');

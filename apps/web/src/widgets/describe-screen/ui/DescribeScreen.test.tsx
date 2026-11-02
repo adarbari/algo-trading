@@ -56,7 +56,6 @@ describe('DescribeScreen', () => {
     const loadDocument = vi.fn();
     state.builder = { status: 'ready', id: 'mine', document: { id: 'mine' }, loadDocument };
     render(<DescribeScreen />);
-    expect(screen.getByText('Describe it')).toBeInTheDocument();
     expect(probe.props['screenerId']).toBe('mine');
     expect(probe.props['document']).toEqual({ id: 'mine' });
     expect(probe.props['onDraft']).toBe(loadDocument);

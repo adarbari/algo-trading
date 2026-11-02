@@ -95,6 +95,7 @@ export const PART_TEXT = {
   editedHelp: { kind: 'term', id: 'describe_part_edited' } as TermRef,
   redrafting: 'Redrafting this part',
   list: 'Parts of your sentence',
+  sentence: 'Your sentence as read',
   rankedBy: 'Ranked by',
   rankHelp: { kind: 'term', id: 'describe_part_rank' } as TermRef,
   retype: 'Retype this part',

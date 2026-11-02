@@ -8,6 +8,7 @@ import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-ro
 
 import { compareSearch } from '@/features/idea-compare';
 import {
+  TestDescribePage,
   TestExpertPage,
   TestGuidedPage,
   TestNewPage,
@@ -17,6 +18,7 @@ import {
 
 /** What each route preloads with the glue: the heavy page's own chunk (it then renders unsuspended). */
 export const preloadExpert = TestExpertPage.preload;
+export const preloadDescribe = TestDescribePage.preload;
 export const preloadResult = TestResultPage.preload;
 export const preloadSetup = TestSetupPage.preload;
 
@@ -37,7 +39,11 @@ function NewDraft({ way }: { way: 'expert' | 'describe' }) {
       way={way}
       onCancel={() => void navigate({ to: '/test' })}
       onCreated={(id) =>
-        void navigate({ to: '/test/expert/$id', params: { id }, search: (prev) => prev })
+        void navigate({
+          to: way === 'describe' ? '/test/describe/$id' : '/test/expert/$id',
+          params: { id },
+          search: (prev) => prev,
+        })
       }
     />
   );
@@ -66,6 +72,18 @@ export function Expert() {
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })
       }
       onOpenRegime={() => void navigate({ to: '/regime' })}
+    />
+  );
+}
+
+export function Describe() {
+  const { id = '' } = useParams({ strict: false });
+  const navigate = useNavigate();
+  return (
+    <TestDescribePage
+      id={id}
+      onDeleted={() => void navigate({ to: '/test' })}
+      onOpenExpert={() => void navigate({ to: '/test/expert/$id', params: { id } })}
     />
   );
 }
