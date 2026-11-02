@@ -7,9 +7,9 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
-from algotrade.config.edges.positions.spec import ExitSettings
+from algotrade.config.edges.positions.spec import ExitSettings, share_exit_rules
 from algotrade.config.strategy.schema import Group, Rule
-from algotrade.engines.structures.share_walk import ShareClose, share_exit_rules, walk_share
+from algotrade.engines.structures.share_walk import ShareClose, walk_share
 from algotrade.services.evaluation.evidence.contract import trade_problems
 from algotrade.services.evaluation.evidence.shapes import share_path_trades
 
