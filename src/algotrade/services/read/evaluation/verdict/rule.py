@@ -524,7 +524,7 @@ def judge_call(
         edge_id=edge.id,
         split=run.split_from or edge.frozen_from,  # the split its year parts were cut at
         lost_inputs=run.lost_inputs,
-        decoys=bool(edge.baselines),
+        decoys=bool(edge.baselines or edge.position_baselines),
         declared=Declared(edge.promoted, edge.basis_horizon),
         facts=EdgeFacts(
             edge.published,

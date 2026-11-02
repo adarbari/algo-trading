@@ -350,7 +350,7 @@ def _old_assembly(ctx: Any, edge: Any, headline: bool) -> Any:
         load_verdict(ctx.configs),
         run.lost_inputs,
         draws=runs.load_run_draws(ctx, run),
-        decoys=bool(edge.baselines),
+        decoys=bool(edge.baselines or edge.position_baselines),
         declared=Declared(edge.promoted, edge.basis_horizon),
         facts=EdgeFacts(
             edge.published,

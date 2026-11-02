@@ -19,6 +19,7 @@ from algotrade.services.read.evaluation.verdict.model import (
     NOT_CANDIDATES,
     ORDER,
     _Candidate,
+    baselines_for,
 )
 
 
@@ -83,11 +84,7 @@ def _in_sample_rank(
     in-sample row stands for every period and the baselines are their in-sample rows; no
     random draws (they are out-of-sample), so the level is at most Promising for every one. The
     ``profile`` is the judge's, so a ``tails`` basis is ranked on the t it is judged on."""
-    base = tuple(
-        r
-        for r in main
-        if r.role == "baseline" and r.horizon_sessions == key[1] and r.slice_kind == runs.IN_SAMPLE
-    )
+    base = baselines_for(main, key[0], key[1], runs.IN_SAMPLE)
     c = _Candidate(key[0], key[1], ins, ins, ins, base, ())
     level, _ = _level(c, _criteria(c, t, (), decoys, portfolio, profile), t, profile)
     return ORDER.index(level), _rank(_strength(ins))
