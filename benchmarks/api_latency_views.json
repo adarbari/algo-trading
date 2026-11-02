@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-02 12:32 UTC",
+ "generated": "2026-11-02 15:34 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -452,6 +452,7 @@
     "EdgeVariantGrid",
     "EdgesPage",
     "GuideHelpField",
+    "OptionSetup",
     "TableView"
    ],
    "uncertain": [
@@ -490,6 +491,7 @@
     "EdgeVariantGrid",
     "EdgesPage",
     "GuideHelpField",
+    "OptionSetup",
     "TableView"
    ],
    "uncertain": [
@@ -941,6 +943,46 @@
    "interaction": [],
    "source": "static"
   },
+  "/explore?sel={instrument} > tab:View:Buying power": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Buying power"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": false
+  },
+  "/explore?sel={instrument} > tab:View:Calls on shares": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Calls on shares"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": false
+  },
   "/explore?sel={instrument} > tab:View:Chart": {
    "route": "/explore",
    "search": {
@@ -1095,6 +1137,26 @@
    "source": "static",
    "parent": "/explore?sel={instrument}",
    "target": true
+  },
+  "/explore?sel={instrument} > tab:View:Roll a put": {
+   "route": "/explore",
+   "search": {
+    "sel": "{instrument}"
+   },
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "View",
+     "name": "Roll a put"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/explore?sel={instrument}",
+   "target": false
   },
   "/explore?sel={instrument} > tab:View:Screener hits": {
    "route": "/explore",

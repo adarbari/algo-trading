@@ -10,7 +10,14 @@ above what the field's base rate predicts. Windows that overlap (a schedule spac
 the holding period) are weighted so a sum over them is a portfolio of staggered tranches, not the
 same days counted again (``Window.weight``). A row that holds no number (``excluded_coverage``,
 ``lost_input``, ``no_picks``, or a measured row with a field missing) is no window: it is kept
-apart as a gap, never valued at zero. Not stored (an older run) is ``NOT_STORED``."""
+apart as a gap, never valued at zero. Not stored (an older run) is ``NOT_STORED``.
+
+A setup whose trades hold collateral (an option position: capital basis ``cash_secured``,
+``max_loss`` or ``regt``, ADR 0088 2.5a) is valued on it (E11): each window is its picks' mean
+return on capital and the base's (``pick_roc_mean``, ``base_roc_mean``), the series' unit
+``return_on_capital``, so the curve, drawdown, monthly map and the rest read the money a trader
+put up. A row of such a setup with no return on capital stored is a gap, never its value per
+entry price. A share setup (``notional``) keeps its value as before."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -27,7 +34,9 @@ from algotrade.services.read.evaluation.verdict import ALL, IN_SAMPLE, OUT_OF_SA
 from algotrade.services.read.values import Unknown, UnknownCode
 
 EXCESS_RETURN, RETURN, CUSHION, RATIO, PNL = "excess_return", "return", "cushion", "ratio", "pnl"
-RETURN_UNITS: Final = (EXCESS_RETURN, RETURN, PNL)  # an outcome whose windows add up to a return
+ROC = "return_on_capital"  # a series valued on collateral (E11)
+RETURN_UNITS: Final = (EXCESS_RETURN, RETURN, PNL, ROC)  # windows that add up to a return
+COLLATERAL: Final = ("cash_secured", "max_loss", "regt")  # the contract's bases on collateral
 MEASURED, NO_PICKS = "measured", "no_picks"
 
 
@@ -88,6 +97,8 @@ def period_of(row: SeriesRow, split: date | None) -> str:
 
 def _value(row: SeriesRow, unit: str) -> tuple[float, float | None] | None:
     """``(value, base_value)`` of a measured row, None when a field it needs is not stored."""
+    if unit == ROC:
+        return None if row.pick_roc_mean is None else (row.pick_roc_mean, row.base_roc_mean)
     if unit in RETURN_UNITS:
         return None if row.pick_mean is None else (row.pick_mean, row.base_mean)
     counts = (row.pick_hits, row.picks, row.base_hits, row.eligible)
@@ -107,7 +118,10 @@ def _window(row: SeriesRow, unit: str, split: date | None, weight: float) -> Win
 
 
 def _unit(rows: list[SeriesRow]) -> str:
-    """The outcome's unit: the one its rows state (a row from before it was written: a return)."""
+    """The outcome's unit: ``return_on_capital`` for a setup on collateral, else the one its rows
+    state (a row from before it was written: a return)."""
+    if any(r.capital_basis in COLLATERAL for r in rows):
+        return ROC
     stated = [r.unit for r in rows if r.unit]
     return max(set(stated), key=stated.count) if stated else EXCESS_RETURN
 

@@ -19,20 +19,29 @@ unpaired (``excluded_missing``). No random window sets and no timing Sharpe rati
 same-session stock, not other periods. A known approximation: the stock is held to the hold cap
 even when a trade's exit rule closed it earlier (the stock outcome is stored at fixed horizons).
 
+Each edge variant's trades also form its book (E8b, ``cross_section/portfolio/ladder.py``: fixed
+collateral slots, one per named instrument times the ladder's depth, its drawdown and worst month
+over realised exits) and, with ``tracks``, the book's cohorts are set beside that Cboe strategy
+index over the same windows (``evidence/benchmarks.py``); both go on each trial of the variant as
+``book``. Only a sleeve has a book here, so a share setup never gets a second drawdown.
+
 The one-session rule holds: the option and stock rows are read at their own S as of ``as_of``
 through ``harness.py`` (the package's one importer of ``data.outcomes``)."""
 
 import hashlib
+import json
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import date, datetime
 
 import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import MAIN, Edge, Outcome
+from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.named import DELTA_EQUIVALENT, named_symbols
+from algotrade.config.edges.portfolio import TRACKED_LICENCE
 from algotrade.config.edges.positions.key import grid_outcomes, position_key
 from algotrade.config.edges.positions.templates import Templates
 from algotrade.config.edges.verdict import OptionCosts
@@ -41,7 +50,12 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.services.evaluation.cross_section.hit import apply_outcome, chain_rows
+from algotrade.services.evaluation.cross_section.hit import apply_outcome, own_rows
+from algotrade.services.evaluation.cross_section.portfolio.ladder import (
+    book_figures,
+    cohorts,
+    ladder_depth,
+)
 from algotrade.services.evaluation.cross_section.reads.cases import (
     case_keys,
     cased_rows,
@@ -49,6 +63,7 @@ from algotrade.services.evaluation.cross_section.reads.cases import (
     read_cases,
 )
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
+from algotrade.services.evaluation.evidence.benchmarks import index_tracking
 from algotrade.services.evaluation.evidence.contract import empty_trades
 from algotrade.services.evaluation.evidence.shapes import trade_frame
 from algotrade.services.evaluation.time_series import harness
@@ -82,16 +97,21 @@ def evaluate_sleeve(
     exploratory: bool,
     gate: Callable[[date], str] | None = None,
     option_costs: OptionCosts | None = None,
+    gates: Mapping[str, Callable[[date], str]] | None = None,
+    gate_keys: Mapping[str, str] | None = None,
     domains: Mapping[str, Sequence[str]] | None = None,
     features: FeatureSet | None = None,
 ) -> TimeSeriesRun:
     """``edge`` (``base = "delta_equivalent"``) for each of ``outcomes`` (``sleeve_outcomes``)
     over the decision sessions in ``start..end``; ``label``, ``split`` and ``gate`` as for
-    ``evaluate_time_series``; ``option_costs``: the commission a trade pays. A trial with case
-    values (E13b) takes, at each D, the point the symbol's cases resolve to from D's partition
-    (``reads/cases.py``; ``domains``: the catalogue's string domains), never the default when a
-    case is UNKNOWN (``CASE_UNKNOWN``, lost); ``features``: the catalogue its case fields are
-    checked against at run start (G9-M4)."""
+    ``evaluate_time_series``; ``option_costs``: the commission a trade pays; ``gates``: a
+    variant's own setup gate by its id (ADR 0088 decision 7), in place of ``gate`` for its trials
+    (the legs are the same: only which sessions count as open differs), and ``gate_keys`` a
+    digest of each such gate, part of the trial's identity (a different gate is another trial).
+    A trial with case values (E13b) takes, at each D, the point the symbol's cases resolve to
+    from D's partition (``reads/cases.py``; ``domains``: the catalogue's string domains), never
+    the default when a case is UNKNOWN (``CASE_UNKNOWN``, lost); ``features``: the catalogue its
+    case fields are checked against at run start (G9-M4)."""
     if edge.base != DELTA_EQUIVALENT or not isinstance(edge.universe, Selection):
         raise ConfigurationError(f"edge {edge.id}: not a named option sleeve")
     for _, outcome in outcomes:  # each trial's case values (a variant's or a grid point's)
@@ -102,7 +122,7 @@ def evaluate_sleeve(
     days = sessions_between(start, end)
     # by (hold, entry offset): a variant may move either, and its legs and keys move with them
     reads: dict[tuple[int, int], tuple[list[Period], pd.DataFrame, harness.Returns]] = {}
-    results = []
+    results: list[InstrumentResult] = []
     for variant, outcome in outcomes:
         held = replace(edge, outcome=outcome, variants=(), variant_grid=())
         horizon = outcome.horizon_sessions[0]
@@ -122,11 +142,14 @@ def evaluate_sleeve(
             )
         ps, trades, stock = reads[at]
         mine, out = _cased(reader, held, trades, ps, list(ids.values()), domains)
-        for symbol in symbols:
-            results.append(
-                _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
-                       stock, label, gate, split, exploratory, option_costs, out)
-            )  # fmt: skip
+        trials = [
+            _trial(held, variant, symbol, ids.get(symbol), unknown.get(symbol), ps, mine,
+                   stock, label, (gates or {}).get(variant, gate), split, exploratory,
+                   option_costs, (gate_keys or {}).get(variant, ""), out)
+            for symbol in symbols
+        ]  # fmt: skip
+        book = _book(reader, held, trials, ps, days, len(symbols), start, end, as_of)
+        results += [replace(r, book=book) for r in trials]
     main = reads[edge.outcome.horizon_sessions[0], edge.outcome.start_offset_sessions][0]
     measured = {e for r in results if r.edge_variant == MAIN for e, _ in r.in_window}
     return TimeSeriesRun(
@@ -152,6 +175,7 @@ def _trial(
     split: date | None,
     exploratory: bool,
     option_costs: OptionCosts | None,
+    gate_key: str = "",
     held_out: Mapping[tuple[str, date], str] | None = None,
 ) -> InstrumentResult:
     horizon = edge.outcome.horizon_sessions[0]
@@ -199,8 +223,10 @@ def _trial(
     kept = [frames[o.period.entry] for o in inside]
     key = position_key(edge.outcome, horizon)
     spec = edge.outcome.position
-    if spec is not None and spec.points:  # a case-valued trial is the set of its points
-        key = hashlib.sha256("|".join(sorted(k for _, _, k in spec.points)).encode()).hexdigest()
+    if spec is not None and spec.points:  # a case-valued trial: its rules and its points
+        rules = json.dumps(identity_dict(asdict(spec)["cases"]), sort_keys=True, default=str)
+        points = "|".join(sorted(k for _, _, k in spec.points))
+        key = hashlib.sha256(f"{rules}|{points}".encode()).hexdigest()
     return InstrumentResult(
         symbol=symbol,
         horizon=horizon,
@@ -212,7 +238,8 @@ def _trial(
         lost=dict(lost),
         trades=pd.concat(kept, ignore_index=True) if kept else empty_trades(),
         edge_variant=variant,
-        identity=f"{edge.id}|{edge.schedule}|{symbol}|{key}|{edge.outcome.cost_bps}",
+        identity=f"{edge.id}|{edge.schedule}|{symbol}|{key}|{edge.outcome.cost_bps}"
+        + (f"|gate:{gate_key}" if gate_key else ""),  # a variant's own gate: another trial
     )
 
 
@@ -224,13 +251,13 @@ def _cased(
     ids: Sequence[str],
     domains: Mapping[str, Sequence[str]] | None,
 ) -> tuple[pd.DataFrame, dict[tuple[str, date], str]]:
-    """``trades`` (every key) narrowed to ``edge``'s own rows (``chain_rows``) and, for a trial
+    """``trades`` (every key) narrowed to ``edge``'s own rows (``own_rows``) and, for a trial
     with case values, each symbol's row at the point its cases resolve to at each period's D (from
     D's partition only, relabelled to the default key: ``reads/cases.cased_rows``), with why each
     (instrument, S) has none (``CASE_UNKNOWN``, or the market table of a gap at D)."""
     keys = case_keys(edge.outcome)
     if keys is None:
-        return chain_rows(edge, trades), {}
+        return own_rows(edge, trades), {}
     starts = pd.to_datetime(trades["session_date"]).dt.date
     parts, out = [], {}
     for p in ps:
@@ -240,7 +267,7 @@ def _cased(
         at = trades[(starts == p.entry).to_numpy()]
         parts.append(at if resolved.gap else cased_rows(at, resolved, keys))
     kept = pd.concat(parts, ignore_index=True) if parts else trades.iloc[:0]
-    return chain_rows(edge, kept), out
+    return own_rows(edge, kept), out
 
 
 def _base(row: pd.Series, stock_return: float | None, cost_bps: float | None) -> float | None:
@@ -259,3 +286,45 @@ def _base(row: pd.Series, stock_return: float | None, cost_bps: float | None) ->
         return None
     cost = (cost_bps or 0.0) / 1e4
     return float(delta * spot * (r - np.sign(delta) * cost) / collateral)
+
+
+def _book(
+    reader: StoreReader,
+    edge: Edge,
+    trials: Sequence[InstrumentResult],
+    ps: Sequence[Period],
+    days: Sequence[date],
+    names: int,
+    start: date,
+    end: date,
+    as_of: datetime,
+) -> dict[str, float | int | str | None]:
+    """One edge variant's book over its trials' measured (open-gate) trades and, when the outcome
+    ``tracks`` an index, its tracking; the slots from the placed entries alone."""
+    horizon = edge.outcome.horizon_sessions[0]
+    placed = [p.entry for p in ps]  # the sessions through the last S: an S after ``end`` counts
+    through = sessions_between(days[0], max(placed)) if placed else list(days)
+    depth = max(ladder_depth(placed, horizon, through), 1)
+    trades: list[tuple[str, date, date, float]] = []
+    for r in trials:
+        if r.trades is None:
+            continue
+        frame = r.trades
+        values = pd.to_numeric(frame["return_on_capital"], errors="coerce").tolist()
+        for entry, exit_, value in zip(
+            frame["entry_session"], frame["exit_session"], values, strict=True
+        ):
+            if isinstance(exit_, date) and isinstance(entry, date):
+                trades.append((r.symbol, entry, exit_, float(value)))
+    book = cohorts(trades, names, depth)
+    figures = book_figures(book, names * depth)
+    if edge.outcome.tracks is None:
+        return figures
+    decided = {p.entry: p.decision for p in ps}
+    # each cohort on the collateral its own trades used, as the index is on its whole collateral
+    windows = [(decided[c.entry], c.entry, c.exit, c.mean) for c in book if c.entry in decided]
+    bills = harness.bill_returns(reader, [w[0] for w in windows], horizon, as_of)
+    last = max([end, *(c.exit for c in book)])
+    levels = harness.index_levels(reader, edge.outcome.tracks, start, last, as_of)
+    tracked = index_tracking(windows, levels, bills, edge.outcome.tracks)
+    return {**figures, **tracked, "tracking_licence": TRACKED_LICENCE}

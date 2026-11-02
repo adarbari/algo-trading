@@ -665,6 +665,11 @@ function graphqlAnswer(operation: Operation): Json | null {
           },
         },
       };
+    case 'OptionGrid':
+      // Synthetic, not recorded: it lists the expiries the Roll a put form offers.
+      return {
+        data: { instrument: { instrumentId, optionGrid: fixture('gql-option-grid-aapl.json') } },
+      };
     case 'OptionQuotes': {
       const expiry = operation.variables['expiry'];
       const quotes = (fixture('gql-quotes-aapl.json') as unknown as Json[]).filter(
@@ -680,6 +685,10 @@ function graphqlAnswer(operation: Operation): Json | null {
 function answer(url: URL, body: string | null): Json | Json[] | null {
   const path = url.pathname.replace(/^\/api/, '');
   if (path === '/graphql') return graphqlAnswer(JSON.parse(body ?? '{}') as Operation);
+  // The option calculators' previews (synthetic figures shaped like the real responses).
+  if (path === '/preview/options/roll') return fixture('preview-roll.json');
+  if (path === '/preview/options/calls') return fixture('preview-calls.json');
+  if (path === '/preview/options/margin') return fixture('preview-margin.json');
   return null;
 }
 

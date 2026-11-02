@@ -6,13 +6,16 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from algotrade.config.edges.document import Edge, parse_edge
 from algotrade.config.edges.positions.key import position_key, with_legs
 from algotrade.config.edges.positions.templates import KIND, NAME, load_templates
+from algotrade.core.model.instruments import index_id
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
+from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.services.evaluation.cross_section.harness import evaluate_edge
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
 from algotrade.services.evaluation.time_series.sleeve import evaluate_sleeve, sleeve_outcomes
@@ -41,6 +44,12 @@ STOCK = 0.01  # SPY's raw return over every hold
 # the mid P&L per unit and the entry delta of each trial (the edge's own and the grid's points)
 PNL = {"main": (1.0, 0.25), "g_d20": (0.6, 0.20), "g_d30": (1.4, 0.30)}
 SPREAD, COLLATERAL = 0.1, 95.0  # half-spreads 0.05 at entry and exit; the strike, cash-secured
+BILL = 0.05  # the 3-month bill's par rate on the curve every decision session saw
+
+
+def PUT_LEVEL(day: date) -> float:  # noqa: N802 - a level path, read like a constant
+    """The PUT index's level on ``day``: up 0.1% a calendar day from 100."""
+    return 100.0 * (1.001 ** (day - FIRST).days)
 
 
 def sleeve_edge(**changes: Any) -> Edge:
@@ -59,6 +68,8 @@ def world(
     changes: dict[tuple[str, date], dict[str, Any]] | None = None,
     no_stock: frozenset[date] = frozenset(),
     backend: MemoryBackend | None = None,
+    tracked: bool = False,
+    pnl: dict[str, tuple[float, float]] | None = None,
 ) -> StoreReader:
     """SPY in the reference, its stock return and one trade per trial at each S; ``skip``: the
     (trial, S) with no trade row; ``changes``: fields of a trade row; ``no_stock``: S with no
@@ -80,15 +91,31 @@ def world(
         trades = [
             structure_pnl_row(
                 SPY_ID, keys[v], day, hold=H, ts=datetime.combine(day, datetime.min.time(), UTC),
-                window_end=day + timedelta(days=3), price_source="option_history",
+                window_end=day + timedelta(days=3), exit_session=day + timedelta(days=3),
+                price_source="option_history",
                 licence="personal", entry_spot=100.0, collateral=COLLATERAL,
-                **{"pnl_mid": pnl, "position_delta": delta, **(changes or {}).get((v, day), {})},
+                **{"pnl_mid": pnl_mid, "position_delta": delta,
+                   **(changes or {}).get((v, day), {})},
             )
-            for v, (pnl, delta) in PNL.items()
+            for v, (pnl_mid, delta) in (pnl or PNL).items()
             if v in keys and (v, day) not in skip
         ]  # fmt: skip
         known = (changes or {}).get(("known", day), {}).get("at", KNOWN)
         writer.write_table(STRUCTURE_PNL, day, f"c-{day}", stamped(trades, day, f"c-{day}", known))
+    if tracked:  # the PUT index's level each day and a bill curve from before the range
+        put = [
+            {"instrument_id": index_id("PUT"), "series": "PUT", "obs_date": d,
+             "vintage_date": d, "value": PUT_LEVEL(d), "vintage_kind": "lagged"}
+            for d in (FIRST + timedelta(days=k) for k in range(40))
+        ]  # fmt: skip
+        writer.write_table(MACRO_SERIES, LAST, "m1", stamped(put, LAST, "m1"))
+        day = FIRST - timedelta(days=10)
+        curve = [
+            {"instrument_id": f"RATE:UST-{t}", "ts": pd.Timestamp(day, tz="UTC"), "tenor": t,
+             "tenor_days": d, "rate_par": r, "rate_cont": r}
+            for t, d, r in (("1M", 30, 0.04), ("3M", 91, BILL), ("2Y", 730, 0.06))
+        ]  # fmt: skip
+        writer.write_table("rates/treasury", day, "r1", stamped(curve, day, "r1"))
     return StoreReader(backend)
 
 
@@ -159,6 +186,27 @@ def test_a_gated_sleeve_keeps_its_open_sessions_and_slices_the_rest() -> None:
     assert gates == {"open": opened, "closed": n - opened}
 
 
+def test_a_variant_gate_narrows_only_its_own_trials_on_the_same_legs() -> None:
+    """ADR 0088 decision 7, X1: a variant with a stricter gate (e.g. also no FOMC within 2
+    sessions) has fewer open trades than main on the same legs; main is unchanged."""
+    gated = [{"id": "strict", "gate": {"all": [
+        {"field": "market.market_conditions@v2.sessions_to_fomc", "op": "gt", "value": 2}
+    ]}}]  # fmt: skip
+    edge = sleeve_edge(variants=gated)
+    reader, every = world(edge), entries(edge)
+    plain = run(reader, edge, gate=lambda d: "open")
+    strict = run(reader, edge, gate=lambda d: "open", gates={"strict": lambda d: (
+        "open" if d.day < 16 else "closed")})  # fmt: skip
+    by = {r.edge_variant: r for r in strict.results if r.symbol == "SPY"}
+    before = {r.edge_variant: r for r in plain.results if r.symbol == "SPY"}
+    assert len(by["main"].in_window) == len(before["main"].in_window) == len(every)
+    assert len(by["strict"].in_window) == sum(d.day < 16 for d, _ in every)
+    assert edge.variants[0].gate is not None
+    keyed = run(reader, edge, gates={"strict": lambda d: "open"}, gate_keys={"strict": "abc"})
+    ids = {r.edge_variant: r.identity for r in keyed.results if r.symbol == "SPY"}
+    assert ids["strict"] == ids["main"] + "|gate:abc"  # its own trial: PBO keeps main's series
+
+
 def test_evaluate_edge_gives_one_trial_per_grid_point_and_variant_of_the_sleeve() -> None:
     edge = sleeve_edge(variants=[{"id": "wide", "outcome": {"strike_delta": 0.15}}])
     reader = world(edge)
@@ -193,6 +241,50 @@ def test_a_variant_that_moves_the_entry_reads_its_own_sessions_and_keys() -> Non
     assert moved.lost == {"NO_OUTCOME": len(entries(shifted))} and moved.in_window == ()
 
 
+def test_a_spy_thirty_delta_sleeve_reports_its_book_and_its_put_tracking() -> None:
+    edge = sleeve_edge(
+        outcome={**SLEEVE["outcome"], "strike_delta": 0.3, "tracks": "PUT"}, variant_grid=None
+    )  # type: ignore[dict-item]
+    (main,) = run(world(edge, tracked=True, pnl={"main": (1.0, 0.30)}), edge).results
+    n = len(entries(edge))
+    value = (1.0 - SPREAD) / COLLATERAL
+    book = main.book
+    # one named instrument, entries spaced by the hold: one slot, every trade the whole book
+    assert (book["slots"], book["cohorts"], book["max_drawdown_realised"]) == (1, n, 0.0)
+    assert book["tracks"] == "PUT" and book["tracked_windows"] == n
+    assert book["tracking_licence"] == "personal"  # Cboe data: a reader filters on it
+    diffs = [
+        value + BILL * H / 252 - (PUT_LEVEL(s + timedelta(days=3)) / PUT_LEVEL(s) - 1)
+        for _, s in entries(edge)
+    ]
+    assert book["tracking_mean_difference"] == pytest.approx(sum(diffs) / n)
+    assert book["tracking_error"] == pytest.approx(float(pd.Series(diffs).std(ddof=1)))
+
+
+def test_a_sleeve_with_no_tracked_index_has_its_book_and_no_tracking() -> None:
+    edge = sleeve_edge()
+    out = run(world(edge), edge)
+    assert {r.book["slots"] for r in out.results} == {1}
+    assert all("tracks" not in r.book for r in out.results)
+
+
+def test_a_book_of_two_slots_tracks_each_cohort_on_its_own_collateral() -> None:
+    # two named instruments, so two slots: SPY's trade is half the book (QQQ is not in the
+    # reference, its slot stays cash), but the index is set beside SPY's own return on collateral
+    two = {"where": {"all": [{"field": "instrument.symbol", "op": "in", "value": ["SPY", "QQQ"]}]}}
+    edge = sleeve_edge(
+        outcome={**SLEEVE["outcome"], "tracks": "PUT"}, variant_grid=None, universe=two
+    )  # type: ignore[dict-item]
+    spy, qqq = run(world(edge, tracked=True), edge).results
+    value = (1.0 - SPREAD) / COLLATERAL
+    assert spy.book == qqq.book and spy.book["slots"] == 2 and qqq.in_window == ()
+    diffs = [
+        value + BILL * H / 252 - (PUT_LEVEL(s + timedelta(days=3)) / PUT_LEVEL(s) - 1)
+        for _, s in entries(edge)
+    ]
+    assert spy.book["tracking_mean_difference"] == pytest.approx(sum(diffs) / len(diffs))
+
+
 SIGNAL_TABLE = "rollups/instrument/price_stats@v2"
 SIGNAL = "rollup.price_stats@v2.adv_usd_20d"
 
@@ -208,8 +300,8 @@ def test_a_case_valued_sleeve_takes_each_ds_resolved_point_and_never_the_default
     position = edge.outcome.position
     assert position is not None
     long_key = next(k for v, _, k in position.points if v == (45,))
-    reader = world(edge)  # the 30-day default's rows (the edge's own key) at every S
-    backend = reader._backend
+    backend = MemoryBackend()
+    reader = world(edge, backend=backend)  # the 30-day default's rows (its own key) at every S
     writer = StoreWriter(backend)
     legs = entries(edge)
     for k, (d, s) in enumerate(legs):  # D: TRUE, FALSE, then no value, in turn
@@ -232,3 +324,26 @@ def test_a_case_valued_sleeve_takes_each_ds_resolved_point_and_never_the_default
     long_value, default_value = (2.0 - SPREAD) / COLLATERAL, (1.0 - SPREAD) / COLLATERAL
     assert values.count(pytest.approx(long_value)) == true_n
     assert len(values) == len(legs) - unknown_n and default_value == pytest.approx(min(values))
+
+
+def test_a_variant_s_case_rule_is_part_of_its_trial_identity() -> None:
+    """Editing a case threshold is another trial (the trial count the deflated Sharpe reads)."""
+
+    def edge_at(threshold: float) -> Edge:
+        tenor = {"cases": [{"when": {"all": [{"field": SIGNAL, "op": "gte", "value": threshold}]},
+                            "value": 45}], "default": 30}  # fmt: skip
+        variants = [{"id": "by_rank", "outcome": {"tenor_days": tenor}}]
+        return sleeve_edge(variant_grid=None, variants=variants)  # type: ignore[arg-type]
+
+    def identities(edge: Edge) -> dict[str, str]:
+        backend = MemoryBackend()
+        reader = world(edge, backend=backend)
+        writer = StoreWriter(backend)
+        for d, _ in entries(edge):  # the rule's field is stored (a field with none is refused)
+            rows = [{"instrument_id": SPY_ID, "adv_usd_20d": 1.0}]
+            writer.write_table(SIGNAL_TABLE, d, f"s-{d}", stamped(rows, d, f"s-{d}", KNOWN))
+        out = run(reader, edge).results
+        return {r.edge_variant: r.identity for r in out}
+
+    low, high = identities(edge_at(0.5)), identities(edge_at(0.7))
+    assert low["main"] == high["main"] and low["by_rank"] != high["by_rank"]

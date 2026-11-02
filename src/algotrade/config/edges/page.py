@@ -168,8 +168,8 @@ def _outcome(o: Outcome, event: bool) -> str:
         parts.append(
             f"the cheap share class against its sibling from {o.pair_field}, short leg pays borrow"
         )
-    elif o.kind == "option_pnl":
-        shape = (o.structure or "").replace("_", " ")
+    elif o.kind == "option_pnl":  # a position template names it (ADR 0088: no structure)
+        shape = (o.position.template if o.position else o.structure or "").replace("_", " ")
         parts.append(
             f"P&L of a {shape} from the stored chains (basis {o.basis}, quoted prices, "
             f"{o.tenor_days}-day tenor, forward-only from 2026-10-02)"

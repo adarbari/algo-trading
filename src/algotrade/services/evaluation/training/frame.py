@@ -24,14 +24,14 @@ import pandas as pd
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.positions.chain import reads_share_path
 from algotrade.config.edges.verdict import OptionCosts
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import read_outcomes
+from algotrade.data.outcomes import BENCHMARK, read_outcomes
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, needs_implied_vol
-from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.picks import eligible
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions, entry_session
 from algotrade.services.evaluation.training.no_ml import refuse_no_ml
@@ -157,6 +157,8 @@ def _check(edge: Edge, horizon: int) -> None:
         raise ConfigurationError(
             f"edge {edge.id}: an entry condition or case value is not fitted yet"
         )
+    if reads_share_path(edge.outcome):  # its rows are the share path grain's, not the price one
+        raise ConfigurationError(f"edge {edge.id}: an [outcome.exit] on shares is not fitted yet")
     if horizon not in edge.outcome.horizon_sessions:
         raise ConfigurationError(f"edge {edge.id}: horizon {horizon} is not one of its horizons")
 

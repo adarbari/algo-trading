@@ -287,3 +287,29 @@ test('an old ?view= link opens the list narrowed by the filter it stood for', as
   ).toBeVisible();
   await expectAccessible(page);
 });
+
+test("an option setup's page adds its position, its own history, how sure and the years; a share setup's does not", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const mock = await mockEdgesApi(page);
+  mock.optionEdges.push('momentum_12_1');
+  await page.goto('/edges?edge=momentum_12_1');
+  await page.locator('#setup-rules').scrollIntoViewIfNeeded();
+  await expect(page.getByRole('heading', { level: 3, name: 'The position' })).toBeVisible();
+  await page.locator('#setup-record').scrollIntoViewIfNeeded();
+  await expect(page.getByText('1 put, 0.30 delta, 30 days')).toBeVisible();
+  await expect(page.getByText('Every session', { exact: true })).toBeVisible();
+  const strip = page.getByRole('region', {
+    name: "The setup's own history, on the cash set aside",
+  });
+  await expect(strip).toContainText('A typical trade');
+  await expect(strip).toContainText('from \u22120.4% to 2.1%');
+  await expect(strip).toContainText('Backtested (hypothetical)');
+  await expect(page.getByText('72 of 100 trades')).toBeVisible();
+  await expect(page.getByText('At the full spread')).toBeVisible();
+  await expect(page.getByText('No trade was open')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'By year' })).toBeVisible();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});

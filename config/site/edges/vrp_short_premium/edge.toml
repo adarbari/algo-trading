@@ -17,9 +17,14 @@ top_k = 20
 # only from 2026-10-02: each rejoins once >= 40 independent sessions of chain data exist.
 screeners = ["vrp_iv_hv"]
 baselines = ["momentum_12_1", "size_small"]
-status = "candidate"
+status = "retired"
+rejection_reason = """Re-filed 2026-11-02 as vrp_short_put (ADR 0088, build row X2): the put's own P&L
+on the stored chains (option_pnl short_put), gated, on vrp_iv_hv; the iv_rank_high screen became
+its own setup, iv_rank_short_put. This version's modelled not-assigned rate stays on file with
+its runs and trials."""
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout (the latest of its gates' and thresholds'); no verdict until closed trades from it reach 3 months
 notes = """The one-IV rule (ADR 0053) governs the outcome (iv_field, the IBKR IV30), not the screener's selection, which reads feature.vrp_iv30.
 Hit (ED4a, owner intent 2026-10-08): the short put is not assigned, struck at a 0.30
 delta at the entry close on the IBKR IV30 read at D, held to the horizon's close (15, 21 or 31

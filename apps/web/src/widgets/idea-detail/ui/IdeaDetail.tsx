@@ -1,7 +1,8 @@
 /**
  * One idea's page: the name under the setup that picked it (a switch when several did), then the
- * sections in the order a trader reads them: why it is here, the setup's historical exit rule,
- * the evidence, what could go wrong and the setup to learn. The sections are the server's
+ * sections in the order a trader reads them: why it is here, the setup's historical exit rule
+ * (an option pick: the plan, its example position and exits), the evidence, what could go wrong
+ * (an option pick adds the position's risks) and the setup to learn. The sections are the server's
  * (`idea`); a name no setup picked for the session says so and links back to Ideas.
  */
 import { Button, Heading, Panel, SegmentedControl, Stack, Text } from '@algotrade/ui';
@@ -9,6 +10,7 @@ import { Button, Heading, Panel, SegmentedControl, Stack, Text } from '@algotrad
 import { useIdeaDetail } from '@/entities/idea';
 import { termHelp } from '@/features/guide-help';
 
+import { OptionPlanSection, OptionRisksSection } from './IdeaOptionSections';
 import {
   EvidenceSection,
   ExitRuleSection,
@@ -100,9 +102,10 @@ export function IdeaDetail({
         </Stack>
       </Stack>
       <WhySection idea={idea} />
-      <ExitRuleSection idea={idea} />
+      {idea.option ? <OptionPlanSection option={idea.option} /> : <ExitRuleSection idea={idea} />}
       <EvidenceSection idea={idea} />
       <RisksSection idea={idea} />
+      {idea.option ? <OptionRisksSection option={idea.option} /> : null}
       <LearnSection idea={idea} onOpenEdge={onOpenEdge} />
     </Stack>
   );

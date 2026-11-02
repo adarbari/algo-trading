@@ -74,6 +74,7 @@ owner = ["src/algotrade/features/rollups/premium/band_pick.py"]
 allowed = [
     "src/algotrade/features/rollups/premium/short_premium.py",  # the group: picks the 30-day expiry and the 0.20 band through it
     "src/algotrade/services/read/options/grid.py",  # the grid: every bucket and band through it
+    "src/algotrade/services/preview/options/calls.py",  # the calls calculator: the grid's expiry rule
 ]
 section = "docs/ui/evening-desk-plan.md#4-data-gaps-each-inside-the-slice-that-needs-it"
 detect = [{ call = "pick_band" }, { call = "pick_expiry" }, { call = "bucket_expiries" }]

@@ -297,7 +297,7 @@ type Config {
 }
 
 """
-One period at one round-trip cost of `bp` basis points: the `winRate`, `baseRate`, `liftPts` (win rate less base rate, in points) and `meanExcess` (the picks' mean return over the benchmark, a fraction, net of `bp`) over `sessions` independent sessions and `picks` picks; `assumed`: this is the edge document's own cost, the one every other figure of the page is net of
+One period at one round-trip cost of `bp` basis points: the `winRate`, `baseRate`, `liftPts` (win rate less base rate, in points) and `meanExcess` (the picks' mean return over the benchmark, a fraction, net of `bp`) over `sessions` independent sessions and `picks` picks; `assumed`: this is the edge document's own cost, the one every other figure of the page is net of. An option setup's rows are its cost `level` (mid: no spread or commission; effective: a share of the spreads; full: all of them; null for a share setup) at the document's `bp`, with `meanRoc` the picks' mean return on the collateral at that level and `assumed` on the level its verdict reads
 """
 type CostLevel {
   period: String!
@@ -309,6 +309,8 @@ type CostLevel {
   baseRate: Float
   liftPts: Float
   meanExcess: Float
+  level: String
+  meanRoc: Float
 }
 
 """
@@ -451,13 +453,19 @@ type DecisionCount {
 }
 
 """
-One drop of the curve: from the high at `peak` down `depth` (positive) to `trough` and back to `recovered` (null: not yet)
+One drop of the curve: from the high at `peak` down `depth` (positive) to `trough` and back to `recovered` (null: not yet). An option setup's only (empty / null for any other): `market` the market episodes (Guide `episode:<key>`) the drop overlaps that the session already knows; `indexChange` the move of the Cboe strategy `index` it tracks over the same dates (null: `indexUnknown` says why, LICENCE to a viewer without the index's licence); `regtExceeded` whether the positions' Reg-T margin exceeded their collateral (null: `regtUnknown` says why)
 """
 type DrawdownEpisode {
   peak: Date!
   trough: Date!
   recovered: Date
   depth: Float!
+  market: [String!]!
+  index: String
+  indexChange: Float
+  indexUnknown: Unknown
+  regtExceeded: Boolean
+  regtUnknown: Unknown
 }
 
 """
@@ -537,6 +545,11 @@ type Edge {
   The setup's historical exit rule at the served session, for a pick (`instrumentId`, for the ATR fallback): the stop and the hold, long picks only; null: no session is served
   """
   exitRule(instrumentId: String = null): ExitRule
+
+  """
+  The setup's state at the served session (ON, OFF, PAUSED or UNKNOWN with its reason; ADR 0088 decision 16); null: no session is served
+  """
+  setupState: SetupState
 }
 
 """One quality-bar answer: `key` names the question, `text` the answer"""
@@ -985,7 +998,7 @@ type EdgeTradePage {
 }
 
 """
-One trade of the ledger (a pick of the verdict's basis; excluded picks stay with their public `excludedReason`): `status` won, lost, excluded, or open (a paper trade not settled yet); `symbol` and `company` are the ticker and company name in the reference snapshot in force at the DECISION session (`symbolAsOf`; a delisted pick shows its last known); `beforeSplit`: the decision session is in-sample; `source`: backtest or live; `score` is the score at the decision session; `value` is oriented and net of cost (null: not stored)
+One trade of the ledger (a pick of the verdict's basis; excluded picks stay with their public `excludedReason`): `status` won, lost, excluded, or open (a paper trade not settled yet); `symbol` and `company` are the ticker and company name in the reference snapshot in force at the DECISION session (`symbolAsOf`; a delisted pick shows its last known); `beforeSplit`: the decision session is in-sample; `source`: backtest or live; `score` is the score at the decision session; `value` is oriented and net of cost (null: not stored). The trade contract's columns (ADR 0088): `exitKind` how it closed, `capitalBasis` what its return is on (notional for a share, the collateral for an option), `returnOnCapital` at the document's cost and `returnOnCapitalGross` before it, `capital` per unit, `maxAdverse` its worst loss as a share of capital, and an option's `hedgedRoc`, `stockRoc` and `wingCost` over its collateral (null: not stored, or a share)
 """
 type EdgeTradeRow {
   variant: String!
@@ -1011,6 +1024,15 @@ type EdgeTradeRow {
   advUsd: TradeNumber!
   reference: TradeNumber!
   touch: TradeFlag!
+  exitKind: String
+  capitalBasis: String
+  returnOnCapital: TradeNumber!
+  returnOnCapitalGross: TradeNumber!
+  capital: TradeNumber!
+  maxAdverse: TradeNumber!
+  hedgedRoc: TradeNumber!
+  stockRoc: TradeNumber!
+  wingCost: TradeNumber!
 }
 
 """
@@ -1163,7 +1185,7 @@ type EvidenceProgress {
 }
 
 """
-A setup's historical exit rule at the served session: the `stop` and the `holdSessions` (the verdict's basis horizon), each null only with `unknown` saying why (never filled from an older value; none of it is read from a run that ends after the served session). `winners`: the basis's winning long trades read; `inSampleOnly`: the run hides its out-of-sample trades, so only in-sample winners were read. An option setup's declared `takeProfit` (a share of the credit), `exitDte` (calendar days to expiry) and the `conditionFields` of its exit condition; its hold is the earlier of the basis horizon and the `expiry` when one was given
+A setup's historical exit rule at the served session: the `stop` and the `holdSessions` (the verdict's basis horizon), each null only with `unknown` saying why (never filled from an older value; none of it is read from a run that ends after the served session). `winners`: the basis's winning long trades read; `inSampleOnly`: the run hides its out-of-sample trades, so only in-sample winners were read. An option setup's declared `takeProfit` (a share of the credit; for a share setup a rise of the entry price: see `takeProfitBasis`), `exitDte` (calendar days to expiry) and the `conditionFields` of its exit condition; its hold is the earlier of the basis horizon and the `expiry` when one was given
 """
 type ExitRule {
   edgeId: String!
@@ -1173,6 +1195,7 @@ type ExitRule {
   winners: Int!
   inSampleOnly: Boolean!
   takeProfit: Float
+  takeProfitBasis: StopBasis
   exitDte: Int
   conditionFields: [String!]!
   expiry: Date
@@ -2273,7 +2296,7 @@ type Idea {
 }
 
 """
-One idea's page for the session, shown under `setup` (the best that picked it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is the setup's id, the key of its Guide entry
+One idea's page for the session, shown under `setup` (the best that picked it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is the setup's id, the key of its Guide entry; `option`: the option sections of a Premium pick
 """
 type IdeaDetail {
   session: Date!
@@ -2284,10 +2307,12 @@ type IdeaDetail {
   setups: [InstrumentSetup!]!
   why: IdeaWhy!
   exitRule: ExitRule!
+  exitPrices: IdeaExitPrices!
   evidence: IdeaEvidence!
   risks: IdeaRisks!
   learn: String!
   metrics: [IdeaMetric!]!
+  option: IdeaOption
 }
 
 """
@@ -2305,11 +2330,51 @@ type IdeaEvidence {
 }
 
 """
+The exit rule in prices of the name's reference close at the session: `stop` (below the close) and `target` (above it), each null when the rule publishes none or it is not a move of the entry price; `unknown` when the close could not be read
+"""
+type IdeaExitPrices {
+  stop: Float
+  target: Float
+  unknown: Unknown
+}
+
+"""
 A stored display value of an idea's best pick: a screener column or a criterion's value, by name
 """
 type IdeaMetric {
   name: String!
   value: JSON!
+}
+
+"""
+An option pick's sections, amounts in dollars per contract and prices per share: the example `legs`, `netCredit` and `cashSetAside`, the setup's `exitRule` with the marks on the credit, `maxLoss` (null and `unbounded` when a naked call has no limit), `thetaPerDay`, `oneSigmaLoss`, the report and ex-dividend flags and `mondayFloor`; each group's `unknown` says why a part is missing
+"""
+type IdeaOption {
+  chainDate: Date!
+  unknown: Unknown
+  legs: [OptionLegView!]!
+  chainClose: Float
+  entrySession: Date
+  exitSession: Date
+  netCredit: Float
+  cashSetAside: Float
+  exitRule: ExitRule
+  stopDebit: Float
+  stopLoss: Float
+  takeProfitDebit: Float
+  exitDteDate: Date
+  maxLoss: Float
+  unbounded: Boolean!
+  thetaPerDay: Float
+  oneSigmaLoss: Float
+  riskUnknown: Unknown
+  reportInLife: Boolean
+  reportDate: Date
+  exDividendInLife: Boolean
+  exDivDate: Date
+  calendarUnknown: Unknown
+  mondayFloor: Float
+  floorUnknown: Unknown
 }
 
 """
@@ -2785,6 +2850,27 @@ type OptionCount {
   count: Int!
 }
 
+"""
+What the setup's own history says on the cash it sets aside, from its stored trades at the verdict's basis (`basisScreener`, `basisHorizon`) as the session knew them; returns are fractions of the collateral at the document's cost. `typical` the median trade with its quartiles `typicalLo` / `typicalHi`; `badMean` the mean of the worst `badTrades` of `trades` (the worst 5%); `kept`: trades of `trades` that returned above zero; `costs` the stored cost levels (middle price, worse side, full spread: `level`, `meanRoc`); `byYear` and `stress` (the worst trade open in each reference episode; `stressUnknown` says why it is empty). `unknown`: why there is no section at all (every figure null); `inSampleOnly`: only in-sample trades are read. No verdict is made here
+"""
+type OptionEvidence {
+  unknown: Unknown
+  basisScreener: String
+  basisHorizon: Int
+  trades: Int!
+  typical: Float
+  typicalLo: Float
+  typicalHi: Float
+  badMean: Float
+  badTrades: Int!
+  kept: Int!
+  costs: EdgeCosts
+  byYear: [OptionYear!]!
+  stress: [OptionStressWindow!]!
+  stressUnknown: Unknown
+  inSampleOnly: Boolean!
+}
+
 """A listed expiry and its calendar days from the session"""
 type OptionExpiry {
   date: Date!
@@ -2812,6 +2898,32 @@ union OptionGridCell = GridCell | Unknown
 union OptionGridResult = OptionGrid | Unknown
 
 """
+One leg of the setup's position: `kind` (shares | option), `qty` signed (negative: sold); for an option its `right` (P | C), `strike` rule (delta | atm | otm_pct) with its `delta` or `otmPct` (a fraction) and its own `tenorDays` (null: the setup's)
+"""
+type OptionLegRule {
+  kind: String!
+  qty: Int!
+  right: String
+  strike: String
+  delta: Float
+  otmPct: Float
+  tenorDays: Int
+}
+
+"""
+One leg of the example position: `qty` signed (negative: sold), `mid` and our `delta` per share, `pItm` the quoted chance it finishes in the money (not backtested)
+"""
+type OptionLegView {
+  right: String!
+  strike: Float!
+  expiry: Date!
+  qty: Int!
+  mid: Float!
+  delta: Float
+  pItm: Float
+}
+
+"""
 One contract's stored quote; IV (a decimal) and Greeks as the feed computes them
 """
 type OptionQuote {
@@ -2830,6 +2942,58 @@ type OptionQuote {
   theta: Float
   vega: Float
   rho: Float
+}
+
+"""
+The option position the setup's document declares: its `template` and `legs`, the `collateral` rule (cash_secured | max_loss | regt), `schedule` (when it decides), `startOffsetSessions` (entry that many sessions after the decision), `tenorDays` sought, `expiryCycle`, `skipReportInLife`, the declared exits (`takeProfit` a share of the credit, `stopLoss` a multiple of it, `exitDte` calendar days to expiry, `exitConditionFields` the catalogue fields of its exit condition; null: not declared), the parameters chosen by case for each pick (`caseValued`, never given a value here)
+"""
+type OptionRules {
+  template: String!
+  legs: [OptionLegRule!]!
+  collateral: String!
+  schedule: String!
+  startOffsetSessions: Int!
+  tenorDays: Int
+  expiryCycle: String!
+  skipReportInLife: Boolean!
+  takeProfit: Float
+  stopLoss: Float
+  exitDte: Int
+  exitConditionFields: [String!]!
+  caseValued: [String!]!
+}
+
+"""
+The option setup page of an edge (ADR 0088): `positionKind` (shares | options); for an option setup its declared `rules` and its `evidence`; a share setup has neither (`rulesUnknown` says so, `evidence` is null)
+"""
+type OptionSetup {
+  edgeId: String!
+  positionKind: String!
+  rules: OptionRules
+  rulesUnknown: Unknown
+  evidence: OptionEvidence
+}
+
+"""
+One reference stress episode the session knows, from its `start` (the peak) to its `end` (the trough): how many of the setup's `trades` were open in it and the `worst` return on the cash set aside among them (null with 0 trades: none was open)
+"""
+type OptionStressWindow {
+  key: String!
+  name: String!
+  start: Date!
+  end: Date!
+  trades: Int!
+  worst: Float
+}
+
+"""
+One year of decision sessions of the setup's own history: its `trades`, the `typical` return on the cash set aside (the median, a fraction) and how many trades `kept` the premium
+"""
+type OptionYear {
+  year: Int!
+  trades: Int!
+  typical: Float
+  kept: Int!
 }
 
 """
@@ -3023,6 +3187,18 @@ type Query {
     """
     date: Date = null
   ): IdeaDetail
+
+  """
+  The option setup page of the edge `id` for the session: its declared option position as rules and its evidence on the cash set aside, from the canonical run's stored trades as the session knew them (ADR 0088). A share setup has `positionKind` shares and no sections. Null: no such edge for the viewer (or its evidence is under a licence they lack), or nothing stored
+  """
+  edgeOptionSetup(
+    id: String!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): OptionSetup
 
   """
   The people the site declares (id, name, role, held data licences; never an email), in declaration order, for the Admin Users page
@@ -4116,6 +4292,24 @@ type SetupIdeas {
   total: Int!
   leftOut: [LeftOut!]!
   watchlist: Int
+}
+
+"""
+A setup's state at the served session (ADR 0088 decision 16): ON (a good stored verdict, the gate open or none), OFF (any other judged verdict), PAUSED (a good verdict, the gate closed: stand aside) or UNKNOWN; `reason`: the server's sentence (for PAUSED the gate's), empty for UNKNOWN, whose `unknown` says why
+"""
+type SetupState {
+  edgeId: String!
+  state: SetupStateCode!
+  reason: String!
+  unknown: Unknown
+}
+
+"""A setup's state at the served session"""
+enum SetupStateCode {
+  ON
+  OFF
+  PAUSED
+  UNKNOWN
 }
 
 """A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""

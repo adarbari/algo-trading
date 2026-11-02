@@ -18,7 +18,12 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
     World,
+    build_world,
     edge,
+)
+from tests.unit.services.evaluation.cross_section.test_harness_trials import (
+    CHAIN_OUTCOME,
+    _with_chain_outcomes,
 )
 
 NOW = datetime(2026, 10, 6, 12, tzinfo=AS_OF.tzinfo)
@@ -91,3 +96,16 @@ def test_a_block_with_no_picks_and_a_block_the_screen_could_not_measure_say_so()
     assert _status(SessionStat(day, "UNKNOWN", excluded_coverage=1), lost) == "lost_input"
     stat = SessionStat(day, "UNKNOWN", pick_values=(0.1,))
     assert _status(stat, window) == "measured"
+
+
+def test_an_option_setups_rows_carry_its_return_on_collateral() -> None:
+    """E11: each measured block's mean return on capital of its picks and of the base, and the
+    trade contract's basis, so the evidence page reads an option setup on its collateral."""
+    w = _with_chain_outcomes(build_world())
+    frame = edge_series_frame(evaluated(w, outcome=CHAIN_OUTCOME), "r1", NOW)
+    measured = frame[frame["status"] == "measured"]
+    assert set(measured["capital_basis"]) == {"cash_secured"}
+    # the five picks earn pnl_mid i - 9.5 (i = 15..19) less 0.4 spread and 0.013 commission
+    expected = sum((i - 9.5 - 0.4 - 0.013) / 95 for i in range(15, 20)) / 5
+    assert measured["pick_roc_mean"].tolist() == pytest.approx([expected] * len(measured))
+    assert measured["base_roc_mean"].notna().all()

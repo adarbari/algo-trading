@@ -10,6 +10,7 @@ from algotrade.config.edges.document import MODEL_KIND, PAIR_KIND
 from algotrade.config.edges.named import TIME_SERIES
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.portfolio import benchmark_words as benchword
+from algotrade.config.edges.positions.chain import OPTION_KINDS
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
 from algotrade.services.read.context import Stores, once_per_request
@@ -54,6 +55,7 @@ from algotrade.services.read.evaluation.verdict.model import (
     EN_DASH,
     FAIL,
     IN_SAMPLE,
+    NOT_ENOUGH,
     NOT_WORKING,
     OUT_OF_SAMPLE,
     PROMISING,
@@ -93,6 +95,12 @@ class EdgeFacts:
     site_trials: Callable[[], int] | None = None  # the variants tried across every site
     # edge, read when the haircut is (None: not counted)
     chain: bool = False  # an option_pnl edge: the basis cannot have been fixed in-sample
+    # An option setup (any of ``OPTION_KINDS``) is judged only after its unseen holdout (ADR 0088
+    # decision 15): ``holdout_from`` its start (the setup's own or the site's, the later),
+    # ``holdout_closed``: how far the closed trades of each (screen, period) reach.
+    option: bool = False
+    holdout_from: date | None = None
+    holdout_closed: tuple[tuple[str, int, date], ...] = ()
     neutral: bool = False  # the outcome is a residual return: market, size, momentum, value gone
     # The judge's criteria (ADR 0088, 2.6): ``return`` (every edge today) or ``tails``. In the
     # call, so a change of profile is a change of fingerprint.
@@ -116,6 +124,12 @@ def counts_wins(edge: Edge) -> bool:
 def is_chain(edge: Edge) -> bool:
     """Whether the edge's outcome is a chain P&L (``option_pnl``): no in-sample history."""
     return edge.settings is not None and edge.settings.kind == "option_pnl"
+
+
+def is_option(edge: Edge) -> bool:
+    """Whether the edge's outcome is an option setup's (``OPTION_KINDS``): no verdict before its
+    unseen holdout."""
+    return edge.settings is not None and edge.settings.kind in OPTION_KINDS
 
 
 def profile_of(edge: Edge) -> str:
@@ -402,11 +416,58 @@ def judge(
     judged = _judge_candidate(
         replace(c, chain=facts.chain), t, draws, decoys, lost_inputs, facts, headline
     )
+    judged = _held_back(judged, facts, t, choice.key)
     years = () if headline else _years(c, split, range_to)
     return replace(
         judged, edge_id=edge_id, years=years, basis_why=choice.why,
         basis_screener=choice.key[0], basis_horizon=choice.key[1],
     )  # fmt: skip
+
+
+def closed_through(
+    series: Sequence[runs.SeriesRow], start: date, until: date | None = None
+) -> tuple[tuple[str, int, date], ...]:
+    """Per (screen, holding period) of the main variant, the last exit session of a measured
+    window decided on or after ``start``: how far the unseen holdout's closed trades reach (a
+    pair with none is absent); ``until``: the run's end, which no closed window may pass. Read
+    from the run's own series, so it is the run's, not a clock's."""
+    last: dict[tuple[str, int], date] = {}
+    for r in series:
+        if (
+            r.status == "measured"
+            and r.exit_session is not None
+            and r.decision_session >= start
+            and (until is None or r.exit_session <= until)
+        ):
+            key = (r.variant, r.horizon_sessions)
+            last[key] = max(last.get(key, r.exit_session), r.exit_session)
+    return tuple((v, h, d) for (v, h), d in sorted(last.items()))
+
+
+def _held_back(
+    v: EdgeVerdict, facts: EdgeFacts, t: VerdictSettings, basis: tuple[str, int]
+) -> EdgeVerdict:
+    """No option verdict before its unseen holdout (ADR 0088 decision 15): the basis's measured
+    windows decided on or after ``facts.holdout_from`` (the setup's latest gate or threshold, never
+    before the site's start) must have closed over at least ``holdout_days``; until then an option
+    setup is Not enough data with the reason, whatever its figures say. The figures stay."""
+    if (
+        not facts.option
+        or v.verdict not in (WORKS, PROMISING, NOT_WORKING)
+        or not facts.holdout_from
+    ):
+        return v
+    start, days = facts.holdout_from, t.tails.holdout_days
+    through = {(s, h): d for s, h, d in facts.holdout_closed}.get(basis)
+    needed = start + timedelta(days=days)
+    if through is not None and through >= needed:
+        return v
+    reason = (
+        f"No verdict on an option setup before its unseen holdout holds {days} days of closed "
+        f"trades: it starts {start}, and closed trades reach {through or 'none yet'}; "
+        f"the verdict needs them through {needed}"
+    )
+    return replace(v, verdict=NOT_ENOUGH, rationale=reason, headline=reason, result=reason)
 
 
 def _inputs(ctx: Stores, run: runs.EdgeRun) -> tuple[tuple[EdgeRow, ...], Draws]:
@@ -440,12 +501,25 @@ class JudgeCall:
 
 
 def judge_call(
-    edge: Edge, run: runs.EdgeRun, headline: bool = False, ctx: Stores | None = None
+    edge: Edge,
+    run: runs.EdgeRun,
+    headline: bool = False,
+    ctx: Stores | None = None,
+    settings: VerdictSettings | None = None,
+    series: Sequence[runs.SeriesRow] | None = None,
 ) -> JudgeCall:
     """The ``judge`` inputs for ``edge`` judged on its canonical ``run``. ``headline``: the
     haircut's two readers (the run's series, the site's trials) are left out; otherwise they read
-    through ``ctx`` when called (without a ``ctx`` they stay None, as a writer has none)."""
+    through ``ctx`` when called (without a ``ctx`` they stay None, as a writer has none).
+    ``settings`` (the site's thresholds) and, for an option setup, the run's ``series`` (read
+    through ``ctx`` when not given) fix its holdout: every caller passes the same, so the
+    reader's fingerprint and the stored row's agree."""
     full = ctx is not None and not headline
+    option = is_option(edge)
+    site = (settings or VerdictSettings()).tails.holdout_from
+    start = max(site, edge.holdout_from or site) if option else None
+    if option and series is None and ctx is not None:
+        series = runs.load_run_series(ctx, run)
     return JudgeCall(
         edge_id=edge.id,
         split=run.split_from or edge.frozen_from,  # the split its year parts were cut at
@@ -459,6 +533,11 @@ def judge_call(
             measured=(lambda: runs.load_measured_sessions(ctx, run)) if full and ctx else None,
             wins=counts_wins(edge),
             chain=is_chain(edge),
+            option=option,
+            holdout_from=start,
+            holdout_closed=closed_through(series or (), start, run.range_to)
+            if start is not None
+            else (),
             portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
             benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
             neutral=is_factor_neutral(edge),
@@ -482,7 +561,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge, headline: bool = False) -> EdgeVe
     if run is None:
         return judge(edge.id, None, edge.frozen_from, settings)
     rows, draws = _inputs(ctx, run)  # memoised: a page asking `summary` and `verdict` reads once
-    call = judge_call(edge, run, headline, ctx)
+    call = judge_call(edge, run, headline, ctx, settings)
     return judge(rows=rows, draws=draws, t=settings, headline=headline, **call.kwargs())
 
 

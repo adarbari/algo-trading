@@ -294,6 +294,24 @@ test('a pick opens its idea page: five sections, the exit rule labelled and copy
   expect(errors).toEqual([]);
 });
 
+test('an option pick opens its plan: the example put, the cash set aside, the most you can lose', async ({
+  page,
+}) => {
+  await mockIdeasApi(page);
+  const errors = collectErrors(page);
+  await page.goto('/ideas/KTLX?setup=rich_puts');
+  for (const title of ['The plan', "The position's risks", 'Evidence']) {
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  }
+  await expect(page.getByRole('heading', { name: 'Historical exit rule' })).toHaveCount(0);
+  await expect(page.getByText('Short 1 put')).toBeVisible();
+  await expect(page.getByText('$5,500')).toBeVisible();
+  await expect(page.getByText('$5,429')).toBeVisible();
+  await expect(page.getByText('Monday premium floor')).toBeVisible();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('a name no setup picked says so, with the way back to Ideas', async ({ page }) => {
   await page.goto('/ideas/ZZZZ');
   await expect(page.getByText('No setup picked this name for this session.')).toBeVisible();

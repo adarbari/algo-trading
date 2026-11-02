@@ -63,19 +63,13 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import (
-    chain_seqs,
-    chain_stamps,
-    outcome_seqs,
-    outcome_stamps,
-    stored_sessions,
-)
+from algotrade.data.outcomes import GrainReads, stored_sessions
 from algotrade.services.configs import resolve_config
 from algotrade.services.evaluation.cross_section.baselines.variant import (
     Variant,
     _Scope,
-    crosses,
-    on_chain,
+    grain_of,
+    split_keys,
     variant_scope,
 )
 from algotrade.services.evaluation.cross_section.detail.gating import (
@@ -84,6 +78,7 @@ from algotrade.services.evaluation.cross_section.detail.gating import (
     pooled_blocks,
     tagged,
     turned,
+    variant_gates,
 )
 from algotrade.services.evaluation.cross_section.detail.licences import (
     TrialLicences,
@@ -138,13 +133,14 @@ from algotrade.services.evaluation.cross_section.measures import (
     slice_measures,
 )
 from algotrade.services.evaluation.cross_section.measuring import (
-    _chain,
+    _beside,
     _drawn,
     _measure,
     _Measured,
     _needs,
     _Plan,
     _RandomSpec,
+    _reads,
     _trial_hash,
     both_seqs,
 )
@@ -195,7 +191,7 @@ BOOKKEEPING = (
     "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
     "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
     "audit", "owner", "published", "family", "oos_class",
-    "mechanism_kind", "asset_class", "plain_reason", "verdict_profile",
+    "mechanism_kind", "asset_class", "plain_reason", "verdict_profile", "holdout_from",
 )  # fmt: skip
 # The one fixed implied-vol field of a run is never a field mixing sources by name or by rule.
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
@@ -229,9 +225,8 @@ class VariantResult:
     side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
     capital_basis: str | None = None  # the trade contract's (ADR 0088); None for a book
     timing: Mapping[str, Any] | None = None  # a time-series edge: timing vs buy-and-hold Sharpe
-    grid: int | None = (
-        None  # an ensemble: the size of its pre-registered grid (ADR 0074); else None
-    )
+    book: Mapping[str, Any] | None = None  # a named option sleeve's book and index tracking (E8b)
+    grid: int | None = None  # an ensemble: the size of its pre-registered grid (ADR 0074)
 
     @property
     def licence(self) -> str | None:
@@ -564,12 +559,20 @@ def evaluate_edge(
             reader,
             as_of,
             _earnings_horizons(plans),
-            _chain(plans),
+            _reads(plans),
             residual_plans(plans),
-            crosses(plans, variants),  # a baseline the setup cannot be valued as fails here
+            _beside(plans, variants),  # a baseline the setup cannot be valued as fails here
         ),
         # an entry condition is refused here (G9-M3, G9-M4) or its legs are never reused
-        check_entries(reader, [c.edge for c in scopes], features, start, end, as_of, full),
+        check_entries(
+            reader,
+            [c.edge for c in scopes],
+            features,
+            start,
+            end,
+            as_of,
+            full or split_keys(plans),
+        ),
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
@@ -579,7 +582,7 @@ def evaluate_edge(
     for plan in plans:
         scope, horizon = plan.scope, plan.horizon
         needs_iv = needs_implied_vol(scope.edge)
-        closed = stats.closed[horizon]
+        closed = stats.plan_closed[plan.key]  # the sessions with a row of this setup's own key
         starts.setdefault(horizon, len(plan.blocks))  # the edge's own count, then its variants'
         unclosed.setdefault(
             horizon, sum(all(leg.entry not in closed for leg in b) for b in plan.blocks)
@@ -758,10 +761,11 @@ def _time_series(
     check_entry(reader, edge, features, start, end, as_of)  # G9-M3, G9-M4 (a sleeve: each trial)
     session = SessionReads(reader, site_regime(configs.load).label, domains=domains)
     gate = None if edge.gate is None else partial(session.gate, edge.gate)
+    gates, gate_keys = variant_gates(edge, session)
     run = (
         evaluate_sleeve(reader, edge, sleeve_outcomes(edge, load_templates(configs)), start, end,
                         as_of, session.label, split, exploratory, gate,
-                        load_verdict(configs).option_costs, domains, features)
+                        load_verdict(configs).option_costs, gates, gate_keys, domains, features)
         if edge.base == DELTA_EQUIVALENT
         else evaluate_time_series(
             reader, edge, start, end, as_of, session.label, split, exploratory, random_draws, gate,
@@ -785,6 +789,7 @@ def _time_series(
                 *r.measures[1:],
             ),
             edge_variant=r.edge_variant, lost_sessions=r.lost, timing=r.timing or None,
+            book=r.book or None,
         )
         for r in run.results
     ]  # fmt: skip
@@ -863,7 +868,7 @@ def _valued_as(
     grain) with the closed sessions, measured blocks and projected exits of that grain; ``own``
     are the plan's."""
     scope = variant_scope(plan.scope, variant)
-    if on_chain(scope) == on_chain(plan.scope):
+    if grain_of(scope) == grain_of(plan.scope):
         return scope, *own
     found = stats.legs.get((plan.key, variant.id), {})  # only the sessions it holds a leg for
     held = {leg.entry for block in plan.blocks for leg in block if leg.decision in found}
@@ -876,9 +881,9 @@ def _outcome_stamps(
     reader: StoreReader,
     as_of: datetime,
     names_for: Collection[int],
-    chain: bool,
+    reads: GrainReads,
     residuals: bool,
-    cross: bool,
+    cross: GrainReads | None,
     entries: Collection[date],
 ) -> tuple[
     dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
@@ -886,15 +891,9 @@ def _outcome_stamps(
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
     ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
     sequence (the harness is the one reader of outcomes)."""
-    if chain:  # an option_pnl edge reads the chain grain (EB H13)
-        known, names = chain_stamps(reader, entries, as_of, names_for)
-        seqs = chain_seqs(reader, entries)
-    else:
-        known, names = outcome_stamps(
-            reader, entries, as_of, names_for=names_for, residuals=residuals
-        )
-        seqs = outcome_seqs(reader, entries, residuals)
-    return known, names, both_seqs(reader, entries, chain, seqs, cross)
+    known, names = reads.stamps(reader, entries, as_of, names_for, residuals)  # the plans' grain
+    seqs = reads.seqs(reader, entries, residuals)
+    return known, names, both_seqs(reader, entries, seqs, cross)
 
 
 def residual_plans(plans: Sequence[_Plan]) -> bool:

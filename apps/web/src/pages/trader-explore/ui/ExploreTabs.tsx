@@ -1,6 +1,6 @@
 /**
  * Explore's tab row for the ticker in focus (Overview, Compare when two or more tickers are
- * open, Chart, Options, Features, Financials, Events, Screener hits, and Why it is an idea when Ideas opened
+ * open, Chart, Options, Roll a put, Calls on shares, Buying power, Features, Financials, Events, Screener hits, and Why it is an idea when Ideas opened
  * the ticker; field help is the Guide, opened from each field's help button).
  */
 import { Tabs, type TabItem } from '@algotrade/ui';
@@ -14,6 +14,9 @@ const TABS: readonly (TabItem & { id: ExploreTab })[] = [
   { id: 'compare', label: 'Compare' },
   { id: 'chart', label: 'Chart' },
   { id: 'options', label: 'Options' },
+  { id: 'roll', label: 'Roll a put' },
+  { id: 'calls', label: 'Calls on shares' },
+  { id: 'margin', label: 'Buying power' },
   { id: 'features', label: 'Features' },
   { id: 'financials', label: 'Financials' },
   { id: 'events', label: 'Events' },

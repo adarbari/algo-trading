@@ -95,6 +95,7 @@ EDGE_SERIES = fixed(
     ("edge_id", "user_id", "variant", "horizon_sessions", "range_from", "decision_session"),
     *strings("edge_id", "user_id", "variant", "role", "config_hash", "run_config_hash"),
     *strings("edge_variant", "benchmark", "regime", "status", "lost_table", "unit", "licence"),
+    "capital_basis string",  # E11: the trade contract's (ADR 0088 2.5a); null in older rows
     "horizon_sessions int64!",
     "range_from date!",
     "decision_session date!",
@@ -109,6 +110,9 @@ EDGE_SERIES = fixed(
         "case_unknown",  # E13b: names a case value could not be resolved for (nullable)
     )),
     *floats("pick_mean", "base_mean", *(f"decile_mean_{i:02d}" for i in range(1, 11))),
+    # E11 (nullable, no version bump): the block's mean return on capital of its counted picks
+    # and of the base (``measures.session_rocs``), what a page on collateral is drawn in.
+    *floats("pick_roc_mean", "base_roc_mean"),
     runs="merge",
     key=(
         "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "range_from",
@@ -235,6 +239,9 @@ EDGE_LEGS = fixed(
     # E6b-2 (nullable, no version bump): an option pick's value at each cost level (``mid``,
     # ``effective``, ``full``), flat, three per pick, aligned to ``pick_ids``.
     "pick_values_at float64[]",
+    # E11 (nullable, no version bump): a long option pick's return on capital at each level,
+    # flat like ``pick_values_at`` (``hit.level_rocs``); null for a share and in older legs.
+    "pick_rocs_at float64[]",
     # E6b-3 (nullable, no version bump): an option pick's hedged return on capital, stock return
     # on capital and wing cost, flat, three per pick, aligned to ``pick_ids`` (``pick_option``).
     "pick_option float64[]",
@@ -329,6 +336,10 @@ EDGE_TRADES = fixed(
     *(f"{n} bool" for n in ("hit", "delisted", "touch", "before_split", "exploratory")),
     *floats("score", "value", "gross_value", "max_drawdown", "adv_usd_20d", "reference"),
     *floats("return_on_capital", "max_adverse"),
+    # E11 (nullable, no version bump): the rest of the contract's figures of a pick (``capital``,
+    # the return on capital before cost) and an option pick's own over its collateral at the mid
+    # level (E6b-3: after the daily delta hedge, the share leg's part, the bought wing's cost).
+    *floats("capital", "return_on_capital_gross", "hedged_roc", "stock_roc", "wing_cost"),
     runs="merge",
     key=(
         "edge_id", "user_id", "edge_variant", "variant", "horizon_sessions", "range_from",

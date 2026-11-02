@@ -42,6 +42,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | [family C](edges/c.md) |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | [family C](edges/c.md) |
 | Covered calls on index, sector, gold and bond ETFs (`covered_call_strike_tenor`) | candidate | [family C](edges/c.md) |
+| Index put write (`index_put_write`) | candidate | [family C](edges/c.md) |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | [family C](edges/c.md) |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | [family C](edges/c.md) |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | [family C](edges/c.md) |
@@ -86,9 +87,11 @@ Each edge's full section is on its family page (docs/edges/).
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | candidate | [family I](edges/i.md) |
 | Target-date fund contrarian flows (`tdf_contrarian_flows`) | blocked | [family I](edges/i.md) |
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | [no family](edges/other.md) |
+| High IV rank: short put (`iv_rank_short_put`) | candidate | [no family](edges/other.md) |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | candidate | [no family](edges/other.md) |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | [no family](edges/other.md) |
-| Volatility risk premium (`vrp_short_premium`) | candidate | [no family](edges/other.md) |
+| Volatility risk premium: short put (`vrp_short_put`) | candidate | [no family](edges/other.md) |
+| Volatility risk premium (`vrp_short_premium`) | retired | [no family](edges/other.md) |
 | Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | rejected | [no family](edges/other.md) |
 | S&P 500 index changes (`sp500_index_changes`) | rejected | [no family](edges/other.md) |
 | Russell reconstitution (`russell_reconstitution`) | blocked | [no family](edges/other.md) |

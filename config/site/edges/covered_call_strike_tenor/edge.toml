@@ -23,9 +23,13 @@ status = "candidate"
 mechanism_kind = "paid_for_risk"
 asset_class = "options"
 frozen_from = 2026-04-01
+holdout_from = 2026-11-03  # ADR 0088 d15: the session after its IV-rank threshold was fixed (2026-11-02); no verdict until closed trades from it reach 3 months
 notes = """A named option sleeve: one covered call (100 shares and one short call at 0.30 delta, the
-covered_call template) on each of seven ETFs, entered at S = D + 1 and held to the call's expiry or
-31 sessions, whichever is first; decisions every 31 sessions so no two trades of a symbol overlap.
+covered_call template) on each of seven ETFs, entered at S = D + 1 and held 21 sessions (about 30
+calendar days); the expiry is never before the hold's end, so every trade is closed at 21 sessions.
+The variant's 30-day call is the first monthly expiry at least 30 days out (up to about 60 days),
+and on about half the sessions it is the same expiry as the main edge's 45-day one. Decisions
+every 21 sessions, so no two trades of a symbol overlap.
 Each trade's return on its collateral is read against the delta-equivalent stock at the same S
 (base delta_equivalent: the sleeve's reading of "against the stock"; a position:long_shares
 baseline is not valued for a sleeve, so it is not declared). The main edge sells the
@@ -50,7 +54,7 @@ strike_delta = 0.30
 tenor_days = 45
 expiry_cycle = "monthly"
 skip_report_in_life = true
-horizon_sessions = [31]
+horizon_sessions = [21]
 benchmark = "none"
 start_offset_sessions = 1
 cost_bps = 35
@@ -62,31 +66,31 @@ cases = [{ when = { all = [{ field = "rollup.iv_history@v2.iv_rank_252d", op = "
 default = 45
 
 [quality_bar]
-outcome = """The covered call's return on its collateral over the trade (to the call's expiry, at
-most 31 sessions), net of the quoted half-spreads, the commission and 35 bps, read against the
+outcome = """The covered call's return on its collateral over the trade (21 sessions), net of the quoted half-spreads, the commission and 35 bps, read against the
 return of the trade's entry delta in shares of the same ETF held over the same sessions (the
 delta-equivalent stock)."""
 trigger_timing = """Every input is known after the decision session D's close: the chain the call is
 chosen from and filled at is S = D + 1's (start_offset_sessions = 1), and the variant's IV rank is
 read from D's partition only, so the tenor is fixed before the entry close."""
 replication = """Buy 100 shares of the ETF at S's close and sell one call whose delta is closest to
-0.30 in the monthly expiry nearest 45 calendar days out (30 for the variant when the rank is at
-least 0.5), hold to expiry or 31 sessions. The Cboe BXM index is the monthly at-the-money version on
+0.30 in the first monthly expiry at least 45 calendar days out (30 for the variant when the rank
+is at least 0.5), hold 21 sessions. The Cboe BXM index is the monthly at-the-money version on
 the S&P 500."""
 expected_size = """Israelov and Nielsen (2015) find the covered call's return is mostly equity beta, with
 a short-volatility component of Sharpe around 1 that is about a tenth of its risk; against the
 delta-equivalent stock the expected excess is that premium, a few percent a year before costs (not
-verified for these ETFs). About 8 trades a year per symbol; seven symbols give about 56 a year."""
+verified for these ETFs). About 12 trades a year per symbol; seven symbols give about 84 a year."""
 capacity_costs = """ETF option spreads on these names are a few cents on a premium of one to three dollars;
 the quoted half-spreads are charged on both sides, and 35 bps covers the shares. One contract per
 100 shares is far below the open interest of every symbol."""
 failure_modes = """A strong rally takes the shares away at the strike and the trade earns only the
 premium; a sharp fall loses nearly as much as the shares. Retire if, after the holdout, the trades'
-mean return on collateral is not above the delta-equivalent stock's, or the variant does not beat
-the main edge on the same sessions."""
+mean return on collateral is not above the delta-equivalent stock's. The variant is a separate
+trial with its own reading against the stock; whether it beats the main edge is read by comparing
+the two trials (no paired figure is computed between them)."""
 decoys = """The delta-equivalent stock (the base): the covered call must add more than its
-scaled-down beta. The IV-rank variant against the main edge
-reads whether the tenor rule adds anything over always selling 45 days."""
+scaled-down beta. The IV-rank variant, read beside the main edge, shows whether the tenor rule adds
+anything over always selling 45 days (a comparison of the two trials, not a paired statistic)."""
 
 [[sources]]
 title = "Israelov, R. and Nielsen, L. N. (2015), Covered Calls Uncovered, Financial Analysts Journal"

@@ -87,7 +87,7 @@ def at(trades: list[dict[str, Any]] | None, **kwargs: Any) -> ExitRule:
 def test_the_world_is_an_option_setup_with_a_verdict_basis() -> None:
     ctx, edge = world(WINNERS)
     run = runs.load_canonical_run(ctx, edge).run
-    assert run is not None and module.option_outcome(ctx, edge, run) is not None
+    assert run is not None and module.declared_outcome(ctx, edge, run) is not None
 
 
 def test_a_declared_stop_is_published_as_it_is_with_the_other_declared_exits() -> None:
@@ -171,7 +171,7 @@ def test_a_case_valued_exit_is_published_only_as_resolved_for_the_pick(
     one here: its stop is published only as the caller resolved it at the session."""
     high = Group("all", (Rule("market.vix_close", "gt", 30),))
     case = CaseValue("stop_loss", (Case(high, 3.0),), 2.0)
-    loaded = module.option_outcome
+    loaded = module.declared_outcome
     exits = ExitSettings(take_profit=0.5, stop_loss=2.0)
 
     def with_case(ctx: Any, edge: Any, run: Any) -> Any:
@@ -179,7 +179,7 @@ def test_a_case_valued_exit_is_published_only_as_resolved_for_the_pick(
         assert found is not None and found.position is not None
         return replace(found, position=replace(found.position, exit=exits, cases=(case,)))
 
-    monkeypatch.setattr(module, "option_outcome", with_case)
+    monkeypatch.setattr(module, "declared_outcome", with_case)
     ctx, edge = world(None)
     run = runs.load_canonical_run(ctx, edge).run
     assert run is not None
@@ -203,7 +203,7 @@ def test_exits_edited_after_the_run_are_not_published_beside_its_verdict() -> No
     old = ExitSettings(stop_loss=2.0)
     ctx, edge = world(WINNERS, exit={"stop_loss": 3.0})
     run = runs.load_canonical_run(ctx, edge).run
-    outcome = module.option_outcome(ctx, edge, run) if run else None
+    outcome = module.declared_outcome(ctx, edge, run) if run else None
     assert outcome is not None and outcome.position is not None
     tested = exits_digest(replace(outcome.position, exit=old))
     edited = at(WINNERS, outcome={"exit": {"stop_loss": 3.0}}, recorded=tested)
@@ -227,7 +227,7 @@ def test_the_document_is_read_as_the_runs_owner_never_the_viewer() -> None:
 
     with pytest.MonkeyPatch.context() as m:
         m.setattr(module, "parsed_edges", spy)
-        module.option_outcome(ctx, edge, run)
+        module.declared_outcome(ctx, edge, run)
     assert seen == ["site"]
 
 

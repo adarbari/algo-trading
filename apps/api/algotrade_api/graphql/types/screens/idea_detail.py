@@ -14,6 +14,7 @@ from algotrade_api.graphql.types.evaluation.exit_rule import ExitRule
 from algotrade_api.graphql.types.events.instrument_events import AheadEvent
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.instruments.instrument import Instrument
+from algotrade_api.graphql.types.screens.idea_option import IdeaOption
 from algotrade_api.graphql.types.screens.ideas import IdeaMetric
 from algotrade_api.graphql.types.screens.result import CriterionResult
 from algotrade_api.graphql.types.screens.setup_ideas import IdeaTab
@@ -62,6 +63,25 @@ class IdeaWhy:
             basis_screener=d.basis_screener,
             decision=d.decision,
             criteria=[CriterionResult.of(c) for c in d.criteria],
+            unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
+        )
+
+
+@strawberry.type(
+    description="The exit rule in prices of the name's reference close at the session: "
+    "`stop` (below the close) and `target` (above it), each null when the rule publishes none "
+    "or it is not a move of the entry price; `unknown` when the close could not be read"
+)
+class IdeaExitPrices:
+    stop: float | None
+    target: float | None
+    unknown: Unknown | None
+
+    @classmethod
+    def of(cls, d: detail.IdeaExitPrices) -> Self:
+        return cls(
+            stop=d.stop,
+            target=d.target,
             unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
         )
 
@@ -121,7 +141,7 @@ class IdeaRisks:
 @strawberry.type(
     description="One idea's page for the session, shown under `setup` (the best that picked "
     "it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is "
-    "the setup's id, the key of its Guide entry"
+    "the setup's id, the key of its Guide entry; `option`: the option sections of a Premium pick"
 )
 class IdeaDetail:
     session: dt.date
@@ -132,10 +152,12 @@ class IdeaDetail:
     setups: list[InstrumentSetup]
     why: IdeaWhy
     exit_rule: ExitRule
+    exit_prices: IdeaExitPrices
     evidence: IdeaEvidence
     risks: IdeaRisks
     learn: str
     metrics: list[IdeaMetric]
+    option: IdeaOption | None
 
     @classmethod
     def of(cls, d: detail.IdeaDetail, ctx: ReadContext) -> Self:
@@ -148,8 +170,10 @@ class IdeaDetail:
             setups=[InstrumentSetup.of(s) for s in d.setups],
             why=IdeaWhy.of(d.why),
             exit_rule=ExitRule.of(d.exit_rule),
+            exit_prices=IdeaExitPrices.of(d.exit_prices),
             evidence=IdeaEvidence.of(d.evidence),
             risks=IdeaRisks.of(d.risks),
             learn=d.learn,
             metrics=[IdeaMetric.of(m) for m in d.metrics],
+            option=IdeaOption.of(d.option) if d.option is not None else None,
         )

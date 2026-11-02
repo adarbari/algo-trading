@@ -17,10 +17,15 @@ pre-frozen basis exists and every row is out of sample (ADR 0065 amendment).
 """
 
 import re
-from typing import NoReturn
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, NoReturn
 
+from algotrade.config.edges.positions.templates import RETURN_KINDS
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
+
+if TYPE_CHECKING:
+    from algotrade.config.edges.document import Outcome
 
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 # An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
@@ -29,6 +34,11 @@ MODEL_STRUCTURES = (
     "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
 CHAIN_KIND = "option_pnl"
+# Every outcome kind of an option setup (ADR 0088 decision 15: no verdict before its unseen
+# holdout): a priced chain P&L, a model P&L of a position, and a short option's not-assigned hit
+# (decided by Fable for the owner, 2026-11-02: a short-premium verdict is an option verdict
+# whether its hit is priced from chains or read from the underlying's bars).
+OPTION_KINDS = (CHAIN_KIND, "option_model_pnl", "expires_otm")
 CHAIN_BASIS = "chain"  # what a P&L of quoted prices is labelled (results and UI)
 MAX_TENOR_DAYS = 400
 
@@ -75,17 +85,33 @@ def chain_tenor(o: Table, kind: str) -> int | None:
     return days
 
 
-def check_kinds(where: str, kinds: set[str]) -> None:
-    """Refuse an edge whose outcome and variants mix ``option_pnl`` (another grain) with others."""
-    if chain_kind_mixed(kinds):
+def reads_share_path(o: "Outcome") -> bool:
+    """Whether the outcome is read from the share path grain (``outcomes/instrument/share_path@v1``,
+    ADR 0088, E3c-2): a return outcome whose shares position declares an ``[outcome.exit]``; one
+    without keeps its fixed-horizon outcome on the price grain. The one test: the share-outcomes
+    writer (``paths/wanted.py``) and every reader call it, so they cannot drift apart."""
+    return o.kind in RETURN_KINDS and o.position is not None and o.position.exit is not None
+
+
+def grain_name(o: "Outcome") -> str:
+    """The outcome grain ``o`` is read from: ``chain`` (option trades), ``share_path`` or
+    ``stock`` (the price windows). The names are those of ``data/outcomes/grains.py``."""
+    if o.kind == CHAIN_KIND:
+        return "chain"
+    return "share_path" if reads_share_path(o) else "stock"
+
+
+def check_kinds(where: str, outcomes: Sequence["Outcome"]) -> None:
+    """Refuse an edge whose outcome and variants are read from different grains (option trades,
+    share paths, price windows): a run reads one grain for its setups, so a mix is refused here
+    at config time, never split per kind at run time."""
+    grains = {grain_name(o) for o in outcomes}
+    if len(grains) > 1:
         raise ConfigurationError(
-            f"{where} variants: an edge's outcome and its variants are all option_pnl or none is "
-            f"(another grain)"
+            f"{where} variants: an edge's outcome and its variants all read one outcome grain "
+            f"(option_pnl, a share outcome with an [outcome.exit], or any other), got "
+            f"{sorted(grains)}"
         )
-
-
-def chain_kind_mixed(kinds: set[str]) -> bool:
-    return CHAIN_KIND in kinds and len(kinds) > 1
 
 
 def structures_of(kind: str, otm: tuple[str, ...], model: tuple[str, ...]) -> tuple[str, ...]:

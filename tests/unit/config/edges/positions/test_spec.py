@@ -12,6 +12,7 @@ from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.named import DELTA_EQUIVALENT
+from algotrade.config.edges.positions.chain import grain_name, reads_share_path
 from algotrade.config.edges.positions.spec import (
     SLEEVE_BASE,
     ExitSettings,
@@ -21,6 +22,7 @@ from algotrade.config.edges.positions.spec import (
 )
 from algotrade.config.edges.positions.templates import load_templates
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.evaluation.forward.settle import outcome_hash
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import WHERE, document
@@ -180,13 +182,111 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
         check_edge(fly, WHERE, TEMPLATES)
 
 
+# Site setups written with ADR 0088's keys from the start (no stored hash of theirs can change).
+# X1; X2 (vrp_short_premium's new version and its iv_rank_high twin)
+BORN_WITH_THE_KEYS = (
+    "index_put_write", "vrp_short_put", "iv_rank_short_put", "covered_call_strike_tenor",
+)  # fmt: skip
+
+
 def test_every_site_edge_hashes_without_the_new_keys() -> None:
     new = ("position", "gate", "verdict_profile", "variant_grid", "position_baselines")
-    for edge in load_edges(FileConfigStore(REPO_ROOT / "config")):
-        if edge.outcome.position is not None:  # a position edge (X3 on) hashes with its keys
-            continue
+    edges = load_edges(FileConfigStore(REPO_ROOT / "config"))
+    for edge in (e for e in edges if e.id not in BORN_WITH_THE_KEYS):
         assert not set(new) & set(identity_dict(asdict(edge))), edge.id
         assert "position" not in identity_dict(asdict(edge.outcome)), edge.id
+
+
+SHARE_EXIT = {
+    "kind": "excess_return", "horizon_sessions": [10], "benchmark": "SPY",
+    "start_offset_sessions": 1, "position": "long_shares",
+    "exit": {"take_profit": 0.1, "stop_loss": 0.05},
+}  # fmt: skip
+
+
+def shares(**changes: Any) -> Any:
+    body = {k: v for k, v in {**SHARE_EXIT, **changes}.items() if v is not None}
+    return document(outcome=body)
+
+
+def test_a_shares_position_may_declare_take_profit_stop_loss_and_when_exits() -> None:
+    """E3c-2b: the share path grain stores these, so the refusal is lifted: the settings are a
+    move of the entry price (no credit), and the outcome reads the share path grain."""
+    when = {"all": [{"field": "position.move_since_entry_pct", "op": "gte", "value": 0.2}]}
+    for exit in ({"take_profit": 0.1}, {"stop_loss": 0.05}, {"when": when},
+                 SHARE_EXIT["exit"]):  # fmt: skip
+        edge = parse_edge(shares(exit=exit), "drift", WHERE)
+        check_edge(edge, WHERE, TEMPLATES)
+        assert reads_share_path(edge.outcome) and grain_name(edge.outcome) == "share_path"
+    short = shares(position="short_shares", side="short", exit={"stop_loss": 0.05})
+    check_edge(parse_edge({**short, "top_k": 5}, "drift", WHERE), WHERE, TEMPLATES)
+    plain = parse_edge(shares(exit=None), "drift", WHERE)  # no exit: the price grain, as before
+    assert not reads_share_path(plain.outcome) and grain_name(plain.outcome) == "stock"
+
+
+@pytest.mark.parametrize(
+    ("changes", "match"),
+    [
+        ({"exit": {"exit_dte": 21}}, "exit_dte"),
+        ({"hold_rank": 8}, "hold_rank"),
+        ({"measure": "residual_return"}, "a residual measure"),
+        ({"kind": "hit_target", "measure": "excess_return", "direction": "above", "target": 0.1},
+         "a hit_target outcome"),
+        ({"side": "long_short"}, "a long_short outcome"),
+        ({"position": "short_shares", "side": "short", "exit": {"take_profit": 0.1},
+          "hold_rank": 8}, "hold_rank"),
+    ],
+)  # fmt: skip
+def test_what_the_share_path_cannot_measure_is_refused_beside_an_exit(
+    changes: dict[str, Any], match: str
+) -> None:
+    doc = shares(**changes)
+    if {"hold_rank", "side"} & set(changes):
+        doc = {**doc, "top_k": 5}
+    with pytest.raises(ConfigurationError, match=match):
+        check_edge(parse_edge(doc, "drift", WHERE), WHERE, TEMPLATES)
+
+
+def test_a_share_path_has_one_benchmark_to_be_scored_against() -> None:
+    """``benchmark = none`` is refused for an excess return at parse; the position check holds
+    it too, for an outcome built another way (the path is scored against its benchmark's)."""
+    edge = parse_edge(shares(), "drift", WHERE)
+    bare = replace(edge, outcome=replace(edge.outcome, benchmark="none"))
+    with pytest.raises(ConfigurationError, match="benchmark = none"):
+        check_edge(bare, WHERE, TEMPLATES)
+
+
+def test_a_take_profit_above_one_names_the_move_of_the_entry_price_for_shares() -> None:
+    with pytest.raises(ConfigurationError, match="a favourable move of the entry price"):
+        parse_edge(shares(exit={"take_profit": 1.5}), "drift", WHERE)
+
+
+def test_a_time_series_base_or_a_position_baseline_is_refused_beside_a_share_exit() -> None:
+    with pytest.raises(ConfigurationError, match="position:<template> values the picks"):
+        edge = parse_edge({**shares(), "baselines": ["position:long_shares"]}, "drift", WHERE)
+        check_edge(edge, WHERE, TEMPLATES)
+
+
+def test_an_edge_and_its_variants_may_not_mix_share_path_and_price_outcomes() -> None:
+    alone = {"kind": "hit_target", "measure": "excess_return", "direction": "above",
+             "target": 0.05}  # another kind drops the position: the price grain  # fmt: skip
+    mixed = {**shares(), "variants": [{"id": "alone", "outcome": alone}]}
+    with pytest.raises(ConfigurationError, match="all read one outcome grain"):
+        parse_edge(mixed, "drift", WHERE)
+    both = {**shares(), "variants": [{"id": "tighter", "outcome": {"exit": {"stop_loss": 0.02}}}]}
+    parse_edge(both, "drift", WHERE)  # two exits are two positions on one grain
+
+
+def test_adding_an_exit_is_a_new_version_of_the_setup_not_of_its_profile() -> None:
+    """E3c-2b versioning: ``position.exit`` is part of the outcome's identity, so the trial hash,
+    the leg keys and the paper trades' ``outcome_hash`` change with it; the verdict profile (the
+    rules that judge the setup, its return kind) does not."""
+    plain = parse_edge(shares(exit=None), "drift", WHERE)
+    held = parse_edge(shares(), "drift", WHERE)
+    tighter = parse_edge(shares(exit={"take_profit": 0.1, "stop_loss": 0.04}), "drift", WHERE)
+    assert len({outcome_hash(plain), outcome_hash(held), outcome_hash(tighter)}) == 3
+    assert identity_dict(asdict(plain.outcome)) != identity_dict(asdict(held.outcome))
+    assert plain.verdict_profile == held.verdict_profile
 
 
 def test_the_exits_digest_names_the_declared_exits_and_only_them() -> None:
@@ -196,3 +296,12 @@ def test_the_exits_digest_names_the_declared_exits_and_only_them() -> None:
     assert exits_digest(replace(spec, exit=ExitSettings(0.5, 3.0, 21))) != exits_digest(spec)
     assert exits_digest(replace(spec, book=False)) == exits_digest(spec)  # not an exit
     assert exits_digest(None) is None
+
+
+def test_a_case_value_beside_a_share_exit_is_refused_until_its_points_are_read() -> None:
+    """E13b resolves case values at D, but the share path reader selects the default point's rows
+    only, so a case-valued share exit stays refused (never measured on its default alone)."""
+    high_iv = {"all": [{"field": "rollup.iv_history@v2.iv_rank_252d", "op": "gte", "value": 0.8}]}
+    exit = {"take_profit": {"cases": [{"when": high_iv, "value": 0.2}], "default": 0.1}}
+    with pytest.raises(ConfigurationError, match="case values"):
+        check_edge(parse_edge(shares(exit=exit), "drift", WHERE), WHERE, TEMPLATES)
