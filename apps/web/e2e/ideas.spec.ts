@@ -58,35 +58,6 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
-test('the screener chips show each run state and link to the screener, with no Run now', async ({
-  page,
-}) => {
-  const errors = collectErrors(page);
-  await page.goto('/ideas');
-  const chips = page.getByRole('list', { name: 'Screeners' });
-  await expect(chips.getByRole('listitem')).toHaveCount(4);
-  const vrp = chips.getByRole('listitem').filter({ hasText: 'VRP scanner' });
-  await expect(vrp).toContainText('16 picks');
-  await expect(vrp.getByRole('link', { name: 'VRP scanner' })).toHaveAttribute(
-    'href',
-    '/screeners/vrp-scanner',
-  );
-  const partial = chips.getByRole('listitem').filter({ hasText: 'Post-earnings IV crush' });
-  await expect(partial).toContainText('4 picks · partial');
-  await expect(partial).toContainText('not stored for this session');
-  await expect(chips.getByRole('listitem').filter({ hasText: 'Momentum breakout' })).toContainText(
-    'Not run',
-  );
-  await expect(page.getByRole('button', { name: /run now/i })).toHaveCount(0);
-  await chips
-    .getByRole('button', { name: /NOT_RUN|not run/i })
-    .first()
-    .click();
-  await expect(page.getByRole('dialog')).toContainText('NOT_RUN');
-  await expectAccessible(page);
-  expect(errors).toEqual([]);
-});
-
 test('a field header in Top ideas opens its Guide drawer', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/ideas?columns=options');
@@ -271,45 +242,29 @@ test('opens a ticker and a compare set in Explore', async ({ page }) => {
   await expect(page).toHaveURL(/via=short-premium-liquidity/);
 });
 
-test('lists what the followed edges say to buy and sell above the table', async ({ page }) => {
-  const trade = (symbol: string) => ({
-    edgeId: 'drift',
-    edgeName: 'Drift',
-    instrumentId: `EQ:${symbol}`,
-    instrument: { symbol },
-    rank: 1,
-    buySession: '2026-10-05',
-    sellSession: '2026-11-02',
-  });
-  await mockIdeasApi(page, {
-    data: {
-      edgeDesk: {
-        session: '2026-10-02',
-        sellSession: '2026-10-05',
-        buys: [trade('MSFT')],
-        sells: [trade('KO')],
-        followed: [
-          {
-            edgeId: 'drift',
-            name: 'Drift',
-            state: 'following',
-            tonight: 'signalled',
-            tonightReason: '',
-            missed: [],
-            record: { state: 'on_track', closed: 20, open: 2, winRate: 0.6 },
-          },
-        ],
-      },
-    },
-  });
+test('a tab with qualifying setups lists their picks by setup, beside a detail', async ({
+  page,
+}) => {
+  await mockIdeasApi(page, undefined, 'listed');
   const errors = collectErrors(page);
   await page.goto('/ideas');
-  const buys = page.getByRole('grid', { name: 'Buy next session' });
-  await expect(buys.getByText('MSFT')).toBeVisible();
-  await expect(page.getByRole('grid', { name: 'Sell next session' }).getByText('KO')).toBeVisible();
-  await expect(
-    page.getByRole('grid', { name: 'Followed edges' }).getByText('On track'),
-  ).toBeVisible();
-  await expectAccessible(page);
+  await expect(page.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
+  await expect(page.getByText('Post-earnings drift')).toBeVisible();
+  await expect(page.getByText(/Backtested \(hypothetical\) · lift 3\.2 pts/)).toBeVisible();
+  await expect(page.getByText('Unproven')).toHaveCount(0);
+  await page.getByRole('row', { name: /AAPL/ }).click();
+  await expect(page.getByRole('button', { name: 'Open AAPL' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open AAPL' }).click();
+  await expect(page).toHaveURL(/\/explore\?.*sel=AAPL/);
   expect(errors).toEqual([]);
+});
+
+test('the Premium tab is its Unproven section, kept in the URL', async ({ page }) => {
+  await mockIdeasApi(page, undefined, 'listed');
+  await page.goto('/ideas');
+  await page.getByRole('radio', { name: 'Premium' }).click();
+  await expect(page).toHaveURL(/tab=premium/);
+  await expect(page.getByText('Unproven', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 no readable verdict')).toBeVisible();
+  await expectAccessible(page);
 });

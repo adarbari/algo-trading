@@ -99,9 +99,13 @@ it is not a new layer.
 
 **The contract.** One frozen column set, `TRADE_COLUMNS`, defined in
 `services/evaluation/evidence/contract.py` (owner `trade-evidence`; a new folder, because
-`cross_section/` is at its module cap). `apply_outcome` and the time-series harness's valuation emit
-it for every outcome that is one position. `pair_spread` maps its two legs as one row. A
-`portfolio_return` book stays outside: it is one value per session, not trades.
+`cross_section/` is at its module cap). It is built by one pure mapping, `evidence/shapes.py`
+(`trade_frame`, `series_trades`, `book_trades`), called **right after `apply_outcome`, which is not
+edited** (E6a, decided there): `value`, `hit` and `excluded` stay byte-identical by construction, and
+the ~8,000 eligible names of a session are never given ten more columns; only picks become trades.
+The harness's picks, the paper settlement and the time-series valuation call it. `pair_spread` maps
+its two legs as one row. A `portfolio_return` book stays outside the ledger: it is one value per
+session, not trades (`book_trades` feeds the evidence only).
 
 | column | share setup (from `forward_returns@v2`) | option setup (from `structure_pnl@v2`) |
 |---|---|---|
@@ -109,6 +113,7 @@ it for every outcome that is one position. `pair_spread` maps its two legs as on
 | `entry_session`, `exit_session` | S, and the h-th exchange session after S | S, and the engine's exit session |
 | `exit_kind` | `HORIZON` or `DELISTED` | the kinds in 2.4a |
 | `capital_basis`, `capital` | `notional`; `capital` null in P1 (neither `forward_returns` nor the legs hold the entry close; the return is enough) | the template's rule (`cash_secured`, `max_loss`, `regt`, `notional`), from v2 `collateral` |
+| `return_on_capital_gross`, `underlying_return`, `outcome_licence` (E6a) | the raw `fwd_return` (a short: its negative) before cost; the name's own `fwd_return` | `pnl_mid` / collateral before cost; null (the chain grain's return is the option's); v2 `licence` |
 | `return_on_capital` by `cost_level` | `fwd_return` less each `[edge_costs] levels_bps` level and the document's `cost_bps` | `pnl_mid` / collateral at `mid`, `effective` and `full` (`[option_costs]`) |
 | `max_adverse` | `fwd_max_drawdown` (long picks; a short's stays null in P1, no leg column) | v2 `max_adverse` |
 | `price_source` | `bars` | `cboe` or `option_history` |
@@ -117,14 +122,20 @@ it for every outcome that is one position. `pair_spread` maps its two legs as on
 **One evidence path.** Everything after `apply_outcome` reads only the contract, never a grain's
 column: `cross_section/measures.py`, `services/evaluation/evidence/` (2.6), the ledger framer and
 the paper record.
-- `results/edge_trades` gains `exit_kind`, `capital_basis`, `return_on_capital` (at the verdict's
-  cost level), `max_adverse` and `price_source`, all nullable. Rows written earlier read them as
+- `results/edge_trades` gains `exit_kind`, `capital_basis`, `return_on_capital` (at the document's
+  `cost_bps`, the level `value` is net of; E6b adds the levels), `max_adverse` and `price_source`,
+  all nullable. Rows written earlier read them as
   null. Its `max_drawdown` stays as the share alias until its readers move.
 - `results/edge_paper` gains `exit_kind`, `return_on_capital` and `price_source`; today its raw return
   is null for an option P&L. The settlement change is in `forward/settle.py:133` (it reads
   `fwd_return`), beside the frame in `forward/results.py`.
-- If the stored legs (ADR 0063) lack a column the contract needs, E6a bumps the leg version: a full
-  run, measured and stated in the PR.
+- The stored legs (ADR 0063) lacked the share `fwd_return` and every option field, and a default is
+  never filled: E6a bumps `LEG_VERSION` 4 -> 5 (each pick stores `pick_exit` .. `pick_adverse`),
+  one full run, stated in the PR. The key also seeds the random draws, so every draw is re-drawn
+  once (screeners', baselines' and the ledger's values are unchanged).
+- A share's `max_adverse` is the window's intraday dip, an option's the worst close mark: do not
+  pool them without saying so. `value_licence` is now per row (the strictest of the trial's and
+  the outcome row's); a reader exposing the new columns extends `runs.LICENSED` (E11 / E12b).
 - Acceptance: on the golden edges, every existing `value`, `hit` and `edge_eval` row is equal before
   and after.
 
