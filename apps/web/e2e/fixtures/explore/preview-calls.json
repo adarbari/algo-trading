@@ -1,0 +1,62 @@
+{
+  "gap": null,
+  "preview": {
+    "underlying_id": "EQ:AAPL",
+    "session": "2026-10-23",
+    "priced_at": 84.2,
+    "shares": 300,
+    "price": 78.5,
+    "contracts": 3,
+    "above_price": 0.073,
+    "rows": [
+      {
+        "expiry": "2026-11-20",
+        "days": 28,
+        "strike": 77,
+        "premium": 0.9,
+        "premium_over_price": 0.0115,
+        "if_called": 0.052,
+        "below_price": true,
+        "report_inside": false,
+        "report_inside_unknown": null,
+        "ex_div_before_expiry": false,
+        "early_exercise_risk": false,
+        "premium_total": 270
+      },
+      {
+        "expiry": "2026-11-20",
+        "days": 28,
+        "strike": 85,
+        "premium": 0.9,
+        "premium_over_price": 0.0115,
+        "if_called": 0.052,
+        "below_price": false,
+        "report_inside": true,
+        "report_inside_unknown": null,
+        "ex_div_before_expiry": true,
+        "early_exercise_risk": true,
+        "premium_total": 270
+      },
+      {
+        "expiry": "2026-11-20",
+        "days": 28,
+        "strike": 90,
+        "premium": 0.9,
+        "premium_over_price": 0.0115,
+        "if_called": 0.052,
+        "below_price": false,
+        "report_inside": false,
+        "report_inside_unknown": null,
+        "ex_div_before_expiry": false,
+        "early_exercise_risk": false,
+        "premium_total": 270
+      }
+    ],
+    "dividend": {
+      "ex_date": "2026-11-12",
+      "amount": 0.62,
+      "own_by": "2026-11-11"
+    },
+    "dividend_unknown": null
+  }
+}

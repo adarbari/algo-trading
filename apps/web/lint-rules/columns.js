@@ -43,6 +43,7 @@ const STRUCTURE = [
   'src/widgets/harness-run-list/model/columns.tsx', // admin: edge evaluation runs, one record each
   'src/widgets/holdings-panel/model/columns.tsx', // an ETF's holdings (issuer-dated weights)
   'src/widgets/options-panel/model/columns.tsx', // an option chain's quotes by strike
+  'src/widgets/option-calculators/model/columns.tsx', // the option calculators: one roll or one call per row
   'src/widgets/regime-episodes/model/columns.tsx', // the regime's reference market falls
   'src/widgets/setup-ideas/model/columns.tsx', // one setup's picks tonight, one pick per row (rank, place, also in)
   'src/widgets/screener-run-list/model/columns.tsx', // admin: screener runs, one record each
