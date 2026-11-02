@@ -787,6 +787,7 @@ def _time_series(
     return EdgeEvaluation(
         edge_id=edge.id,
         run_hash=run_hash(edge, [], start, end, as_of, split_from=split, random_draws=random_draws),
+        exits_digest=exits_digest(edge.outcome.position),
         user_id=user.user_id,
         benchmark=edge.outcome.benchmark,
         start=start,

@@ -309,7 +309,9 @@ def _check_position_cases(spec: PositionSpec, where: str, templates: Templates) 
 def exits_digest(spec: PositionSpec | None) -> str | None:
     """A digest of the declared exits of a position (``[outcome.exit]`` and its exit cases), None
     without a position. The evaluation run records it, so the exit rule a setup publishes is the
-    one its run tested: a reader compares it with the document's now (ADR 0088 decision 19)."""
+    one its run tested: a reader compares it with the document's now (ADR 0088 decision 19).
+    It hashes the ``asdict`` of ``ExitSettings``, ``CaseValue`` and ``Group``: a field added to
+    one of them changes every digest, so every option exit rule reads NOT_RUN until re-run."""
     if spec is None:
         return None
     cases = [asdict(c) for c in spec.cases if c.name in EXIT_CASE_NAMES]
