@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-01 23:20 UTC",
+ "generated": "2026-11-02 00:21 UTC",
  "views": {
   "(shell)": {
    "route": "/ideas",
@@ -261,14 +261,82 @@
    "params": {},
    "ops": [
     "EventCalendar",
+    "FeatureTable",
     "ScreenerConfigs",
+    "ScreenerPicks"
+   ],
+   "uncertain": [
+    "FeatureTable",
+    "ScreenerPicks"
+   ],
+   "interaction": [
+    "GuideEntries"
+   ],
+   "source": "static"
+  },
+  "/calendar > tab:Calendar views:Earnings week": {
+   "route": "/calendar",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Calendar views",
+     "name": "Earnings week"
+    }
+   ],
+   "params": {},
+   "ops": [
+    "FeatureTable",
+    "ScreenerPicks"
+   ],
+   "uncertain": [
+    "FeatureTable",
+    "ScreenerPicks"
+   ],
+   "interaction": [],
+   "source": "static",
+   "parent": "/calendar",
+   "target": true
+  },
+  "/calendar > tab:Calendar views:Macro": {
+   "route": "/calendar",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Calendar views",
+     "name": "Macro"
+    }
+   ],
+   "params": {},
+   "ops": [],
+   "uncertain": [],
+   "interaction": [],
+   "source": "static",
+   "parent": "/calendar",
+   "target": true
+  },
+  "/calendar > tab:Calendar views:Next 90 days": {
+   "route": "/calendar",
+   "search": {},
+   "clicks": [
+    {
+     "kind": "tab",
+     "group": "Calendar views",
+     "name": "Next 90 days"
+    }
+   ],
+   "params": {},
+   "ops": [
     "ScreenerPicks"
    ],
    "uncertain": [
     "ScreenerPicks"
    ],
    "interaction": [],
-   "source": "static"
+   "source": "static",
+   "parent": "/calendar",
+   "target": true
   },
   "/edges": {
    "route": "/edges",
