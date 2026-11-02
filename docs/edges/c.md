@@ -10,7 +10,7 @@ Back to the [index of every edge](../edges.md).
 | Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | candidate | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an delta hedged atm short (basis model, not a quote), costs 35 bps | `ivol_high` |
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
-| Index put write (`index_put_write`) | candidate | calendar:after monthly expiry | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a  from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
+| Index put write (`index_put_write`) | candidate | calendar:after monthly expiry | option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02) | none yet |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
 | Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 100% SVXY, entered 1 session after the decision session, costs 10 bps | `etf_priced` |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle long (basis model, not a quote), costs 35 bps | none yet |
@@ -187,7 +187,7 @@ Back to the [index of every edge](../edges.md).
 
 **Status:** candidate. **Family:** C. **Thesis:** Selling a cash-secured put on SPY, QQQ or IWM each month earns more on its collateral than holding the same share delta, because index puts are priced above the moves that follow.
 
-- **Outcome:** option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a  from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02)
+- **Outcome:** option pnl, over 17 sessions, entered 1 session after the decision session, P&L of a short put from the stored chains (basis chain, quoted prices, 21-day tenor, forward-only from 2026-10-02)
 - **Schedule:** calendar:after monthly expiry
 - **Universe:** `instrument.symbol in ('SPY', 'QQQ', 'IWM')`
 - **Top K:** all qualified names

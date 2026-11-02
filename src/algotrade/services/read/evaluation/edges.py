@@ -97,6 +97,7 @@ class EdgeSettings:
     # document's ``verdict_profile``, else ``tails`` for an option_pnl outcome and ``return`` for
     # every other kind (``verdict.resolve_profile``).
     verdict_profile: str = "return"
+    tracks: str | None = None  # a named option sleeve's Cboe strategy index (E8b); else None
 
 
 @dataclass(frozen=True)
@@ -250,6 +251,7 @@ def _settings(e: document.Edge, own: Mapping[str, Any] | None) -> EdgeSettings:
         factor_neutral=e.outcome.measure in document.EXCESS_MEASURES,
         hold_rank=e.outcome.hold_rank,
         verdict_profile=resolve_profile(e.outcome.kind, e.verdict_profile),
+        tracks=e.outcome.tracks,
         quality_bar=tuple(EdgeAnswer(k, e.quality_bar.get(k, "")) for k in document.QUALITY_BAR),
         own={k: _json(v) for k, v in (own or {}).items() if k not in (FOLLOW, AUDIT, "status")},
     )

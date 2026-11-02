@@ -13,22 +13,41 @@ observed a year, never more than the sessions a year allow a window of the holdi
 windows of an every-session schedule overlap, and counting each as independent would overstate
 it). Only a return outcome has a drawdown or a volatility: for ``cushion`` and ``ratio`` its
 ``state`` is ``not_a_return`` (there is no return to fall: a state with a Guide term, not a data
-gap, so no cause chain); with no series at all it is ``not_stored`` and ``unknown`` says why."""
+gap, so no cause chain); with no series at all it is ``not_stored`` and ``unknown`` says why.
 
-from dataclasses import dataclass
-from datetime import date
+An option setup's episodes (its series on collateral, unit ``return_on_capital``; E11) carry
+three more facts (``with_option_extras``): the market episodes (``regime/episodes.toml``, the
+twelve bear markets and the vol shocks of 2015, 2018 and 2024) whose peak-to-trough overlaps
+the drop and that the session already knows (``known_from``); the move of the Cboe strategy index
+the setup ``tracks`` over the same dates, its level at each as the series knew it on the session,
+under the index's licence (``LICENCE`` to a viewer without it); and whether the Reg-T margin of
+the positions exceeded their collateral, UNKNOWN while ``regt_margin`` is not stored."""
+
+from dataclasses import dataclass, replace
+from datetime import date, timedelta
 from typing import Final
 
+from algotrade.config.edges.portfolio import TRACKED_LICENCE
+from algotrade.config.site.regime.episodes import Episode, load_episodes
+from algotrade.core.model.instruments import index_id
+from algotrade.core.time.calendar import sessions_between
+from algotrade.data.macro.series import TABLE as MACRO_SERIES
+from algotrade.data.macro.series import series_as_of
 from algotrade.quant.edges import paths
 from algotrade.quant.realized_vol import TRADING_DAYS
-from algotrade.services.read.edge_evidence.series import BasisSeries, Window
+from algotrade.services.read.availability.cause import table_cause
+from algotrade.services.read.context import ReadContext
+from algotrade.services.read.edge_evidence.series import ROC, BasisSeries, Window
+from algotrade.services.read.evaluation.edges import Edge
 from algotrade.services.read.evaluation.verdict import IN_SAMPLE, OUT_OF_SAMPLE
-from algotrade.services.read.values import Unknown
+from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.storage.tables.schemas import STRUCTURE_PNL  # where ``regt_margin`` is stored
 
 MEASURED, NOT_STORED, NOT_A_RETURN = "measured", "not_stored", "not_a_return"
 DRAWDOWN_STATES: Final = (MEASURED, NOT_STORED, NOT_A_RETURN)
 EPISODES = 3
 DAYS_PER_YEAR = 365.25
+LEVEL_REACH = timedelta(days=7)  # an index level is read on the date, else the last before it
 
 
 @dataclass(frozen=True)
@@ -48,6 +67,14 @@ class DrawdownEpisode:
     trough: date
     recovered: date | None
     depth: float
+    # An option setup's only (E11; empty / None for every other): the market episodes the drop
+    # overlaps, the tracked index's move over it (or why not), the Reg-T flag (or why not)
+    market: tuple[str, ...] = ()
+    index: str | None = None
+    index_change: float | None = None
+    index_unknown: Unknown | None = None
+    regt_exceeded: bool | None = None
+    regt_unknown: Unknown | None = None
 
 
 @dataclass(frozen=True)
@@ -129,3 +156,69 @@ def load_drawdown(series: BasisSeries | Unknown) -> EdgeDrawdown:
         vol_in_sample=_vol(sides[IN_SAMPLE], series.horizon),
         vol_out_of_sample=_vol(sides[OUT_OF_SAMPLE], series.horizon),
     )
+
+
+def _overlapping(
+    episodes: tuple[Episode, ...], e: DrawdownEpisode, session: date
+) -> tuple[str, ...]:
+    """The keys of the market episodes known by ``session`` whose peak-to-trough overlaps the
+    drop's, in the file's order."""
+    return tuple(
+        m.key
+        for m in episodes
+        if m.known_from <= session and m.peak <= e.trough and e.peak <= m.trough
+    )
+
+
+def _level(levels: dict[date, float], day: date) -> float | None:
+    """The level on ``day``, else the last one within ``LEVEL_REACH`` before it."""
+    found = [d for d in levels if day - LEVEL_REACH <= d <= day]
+    return levels[max(found)] if found else None
+
+
+def _index_move(
+    levels: dict[date, float], key: str, e: DrawdownEpisode, session: date
+) -> tuple[float | None, Unknown | None]:
+    start, end = _level(levels, e.peak), _level(levels, e.trough)
+    if start is None or end is None or not start > 0:
+        why = f"{index_id(key)} has no level near {e.peak.isoformat()} or {e.trough.isoformat()}"
+        return None, Unknown(UnknownCode.NO_ROW, table_cause(MACRO_SERIES, why, "NO_ROW", session))
+    return end / start - 1.0, None
+
+
+def with_option_extras(ctx: ReadContext, edge: Edge, found: EdgeDrawdown) -> EdgeDrawdown:
+    """``found`` with an option setup's episode facts (the module); any other unchanged."""
+    if found.unit != ROC or not found.episodes:
+        return found
+    session = ctx.session.date
+    market = load_episodes(ctx.configs).episodes
+    key = edge.settings.tracks if edge.settings is not None else None
+    held = TRACKED_LICENCE in ctx.licences
+    levels: dict[date, float] = {}
+    if key is not None and held:
+        first = min(e.peak for e in found.episodes) - LEVEL_REACH
+        frame = series_as_of(
+            ctx.reader, [index_id(key)], session, len(sessions_between(first, session))
+        )
+        levels = {d: float(v) for d, v in zip(frame["obs_date"], frame["value"], strict=True)}
+    regt = Unknown(
+        UnknownCode.NOT_STORED,
+        table_cause(STRUCTURE_PNL, "regt_margin is not stored yet", "NOT_STORED", session),
+    )
+    out = []
+    for e in found.episodes:
+        change, why = None, None
+        if key is not None and not held:
+            why = Unknown(
+                UnknownCode.LICENCE,
+                table_cause(MACRO_SERIES, f"{index_id(key)} is {TRACKED_LICENCE}", "LICENCE"),
+            )
+        elif key is not None:
+            change, why = _index_move(levels, key, e, session)
+        out.append(
+            replace(
+                e, market=_overlapping(market, e, session), index=key, index_change=change,
+                index_unknown=why, regt_unknown=regt,
+            )
+        )  # fmt: skip
+    return replace(found, episodes=tuple(out))

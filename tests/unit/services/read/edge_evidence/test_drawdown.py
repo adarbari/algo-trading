@@ -2,15 +2,29 @@
 on its own, volatility by independent windows, and no drawdown for an outcome with no return."""
 
 import math
+from dataclasses import replace
 from datetime import date, timedelta
+from typing import Any
 
 import numpy as np
 import pytest
 
 from algotrade.core.time.calendar import is_session
-from algotrade.services.read.edge_evidence.drawdown import load_drawdown
-from algotrade.services.read.values import Unknown
+from algotrade.data.macro.series import TABLE as MACRO_SERIES
+from algotrade.services.read.edge_evidence.drawdown import (
+    DrawdownEpisode,
+    EdgeDrawdown,
+    load_drawdown,
+    with_option_extras,
+)
+from algotrade.services.read.evaluation.edges import load_edge
+from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import FileConfigStore
+from algotrade.storage.tables.writers import StoreWriter
+from tests.conftest import REPO_ROOT
+from tests.helpers.stored_frames import stamped
+from tests.unit.services.read.edge_desk.conftest import context
 from tests.unit.services.read.edge_evidence.stored_result import (
     DAYS,
     EXIT,
@@ -18,7 +32,7 @@ from tests.unit.services.read.edge_evidence.stored_result import (
     series_of,
     stored_run,
 )
-from tests.unit.services.read.evaluation.conftest import FROZEN, series_row
+from tests.unit.services.read.evaluation.conftest import FROZEN, series_row, write_run
 
 VALUES = [0.02, -0.03, 0.01, -0.01, -0.02, 0.04, -0.01, 0.03]  # four before the split, four after
 
@@ -121,3 +135,53 @@ def test_an_every_session_curve_is_a_tranche_portfolio_not_a_sum_of_overlaps(
     # each window is 1 / 20 of the capital (the first takes the second's spacing): the deepest
     # drop is one losing window's weighted value, 0.02 / 20, not 0.02
     assert d.episodes and max(e.depth for e in d.episodes) == pytest.approx(0.02 / 20)
+
+
+# --- E11: an option setup's episode facts (market episodes, the tracked index, Reg-T) ---------
+
+SITE = FileConfigStore(REPO_ROOT / "config", local=False)
+DROP = DrawdownEpisode(date(2018, 1, 29), date(2018, 2, 9), None, 0.12)  # inside volmageddon
+
+
+def option_context(personal: bool) -> tuple[Any, Any]:
+    backend = MemoryBackend()
+    write_run(backend, "site1", FROZEN, 0.6)
+    put = [
+        {"instrument_id": "IDX:PUT", "series": "PUT", "obs_date": d, "vintage_date": d,
+         "value": v, "vintage_kind": "lagged"}
+        for d, v in ((date(2018, 1, 26), 100.0), (date(2018, 2, 8), 95.0))
+    ]  # fmt: skip
+    day = date(2018, 3, 1)
+    StoreWriter(backend).write_table(MACRO_SERIES, day, "m1", stamped(put, day, "m1"))
+    me = {"id": "me", "role": "trader", "licences": ["personal"] if personal else []}
+    users = {"user": [{"id": "owner", "role": "admin"}, me]}
+    ctx = context(backend, extra={
+        ("site", "regime", "episodes"): SITE.load("site", "regime", "episodes"),
+        ("site", "settings", "users"): users,
+    })  # fmt: skip
+    edge = load_edge(ctx, "drift")
+    assert edge is not None and edge.settings is not None
+    return ctx, replace(edge, settings=replace(edge.settings, tracks="PUT"))
+
+
+def test_an_option_setups_drop_has_its_market_episode_index_move_and_regt_flag() -> None:
+    ctx, edge = option_context(personal=True)
+    found = with_option_extras(ctx, edge, EdgeDrawdown("return_on_capital", episodes=(DROP,)))
+    (e,) = found.episodes
+    assert e.market == ("volmageddon_2018",)  # the 2018 vol shock; no bear market overlaps
+    assert (e.index, e.index_unknown) == ("PUT", None)
+    # the PUT index on the peak's last level (26 January) and the trough's (8 February)
+    assert e.index_change == pytest.approx(95.0 / 100.0 - 1)
+    assert e.regt_exceeded is None and e.regt_unknown is not None  # regt_margin not stored yet
+    assert e.regt_unknown.code == UnknownCode.NOT_STORED
+
+
+def test_a_viewer_without_the_index_licence_sees_why_and_a_share_setup_is_unchanged() -> None:
+    ctx, edge = option_context(personal=False)
+    found = with_option_extras(ctx, edge, EdgeDrawdown("return_on_capital", episodes=(DROP,)))
+    (e,) = found.episodes
+    assert e.index_change is None and e.index_unknown is not None
+    assert e.index_unknown.code == UnknownCode.LICENCE
+    assert e.market == ("volmageddon_2018",)  # the episodes are open
+    share = EdgeDrawdown("excess_return", episodes=(DROP,))
+    assert with_option_extras(ctx, edge, share) == share  # no option facts on a share setup

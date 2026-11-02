@@ -5,6 +5,7 @@ here, and each default is the owner's decision of 2026-10-09."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date, datetime
 from itertools import pairwise
 from typing import Any
 
@@ -51,6 +52,8 @@ TAILS_KEYS = (
     "min_tail_windows",
     "bootstrap_draws",
     "bootstrap_mean_block",
+    "holdout_from",
+    "holdout_days",
 )
 OPTION_COSTS_KEYS = ("levels", "effective_share_by_legs", "commission_usd")
 OPTION_LEVELS = ("mid", "effective", "full")  # the contract's option ``cost_level`` names, in order
@@ -63,6 +66,15 @@ DECOYS_STANDARD = (
     "size_small", "momentum_12_1", "ivol_high", "max_ret_high", "amihud_illiquid", "beta_low",
 )  # fmt: skip
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
+
+
+def _day(value: Any, default: date, where: str) -> date:
+    """A TOML date (``holdout_from = 2026-10-26``), the default when absent."""
+    if value is None:
+        return default
+    if isinstance(value, datetime) or not isinstance(value, date):
+        raise ConfigurationError(f"{where} holdout_from: expected a date such as 2026-10-26")
+    return value
 
 
 @dataclass(frozen=True)
@@ -79,6 +91,10 @@ class TailsVerdict:
     min_tail_windows: int = 5
     bootstrap_draws: int = 2000
     bootstrap_mean_block: float = 3.0
+    # ADR 0088 decision 15: no option verdict before the unseen holdout, the sessions after the
+    # research's data cut-off (``holdout_from``, decision D's default), holds ``holdout_days``.
+    holdout_from: date = date(2026, 10, 26)
+    holdout_days: int = 92  # 3 months
 
     def __post_init__(self) -> None:
         if self.option_cost_level not in OPTION_LEVELS:
@@ -97,6 +113,8 @@ class TailsVerdict:
             min_tail_windows=t.integer("min_tail_windows", d.min_tail_windows, 1),
             bootstrap_draws=t.integer("bootstrap_draws", d.bootstrap_draws, 100),
             bootstrap_mean_block=t.number("bootstrap_mean_block", d.bootstrap_mean_block, 1),
+            holdout_from=_day(t.raw("holdout_from"), d.holdout_from, t.where),
+            holdout_days=t.integer("holdout_days", d.holdout_days, 1),
         )
 
 
