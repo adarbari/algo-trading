@@ -12,8 +12,10 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
+from math import prod
 from typing import TYPE_CHECKING, Any
 
+from algotrade.config.edges.identity import LONG_SHORT
 from algotrade.config.edges.positions import grid
 from algotrade.config.edges.positions.cases import (
     EXIT_CASE_NAMES,
@@ -22,6 +24,7 @@ from algotrade.config.edges.positions.cases import (
     canonical,
     when_of,
 )
+from algotrade.config.edges.positions.chain import reads_share_path
 from algotrade.config.edges.positions.fields import fields_for, is_credit
 from algotrade.config.edges.positions.templates import (
     RETURN_KINDS,
@@ -73,6 +76,10 @@ class PositionSpec:
     # outcome resolves them, and its collateral), so a reader keys a trade without the templates
     legs: tuple[Leg, ...] = ()
     collateral: str = ""
+    # filled by the loader too when there are cases (key.py ``with_legs``): every point the cases
+    # can resolve to, as (case values in ``cases`` order, hold, position key); in the trial's
+    # identity, so a template edit that moves a case point's key is another trial
+    points: tuple[tuple[tuple[Any, ...], int, str], ...] = ()
 
 
 def spec_of(
@@ -126,7 +133,10 @@ def _exit(o: Table) -> ExitSettings | None:
     stop, dte = t.number("stop_loss", None, 0), t.integer("exit_dte", -1, -1)
     profit = t.number("take_profit", None, 0)
     if profit is not None and profit > 1:
-        raise ConfigurationError(f"{t.where} take_profit: expected a share of the credit, 0 to 1")
+        raise ConfigurationError(
+            f"{t.where} take_profit: expected 0 to 1 (an option position: a share of the credit; "
+            f"shares: a favourable move of the entry price)"
+        )
     if dte > MAX_EXIT_DTE:
         raise ConfigurationError(f"{t.where} exit_dte: at most {MAX_EXIT_DTE} days")
     when = when_of(t.raw("when"), f"{t.where} when") if "when" in t.names() else None
@@ -170,19 +180,72 @@ def check_outcome(outcome: "Outcome", where: str, templates: Templates) -> None:
             f"{where} strike_delta: {spec.template!r} has no leg chosen by delta"
         )
     credit_exits = spec.exit is not None and (spec.exit.take_profit or spec.exit.stop_loss)
-    if credit_exits and not is_credit(template):
+    if credit_exits and not template.share_only and not is_credit(template):
         raise ConfigurationError(
             f"{where} position: take_profit and stop_loss are measured against a credit, and "
             f"{spec.template!r} is not a net-credit position"
         )
     if template.share_only:
-        if spec.exit is not None or spec.book or spec.skip_report_in_life:
+        if spec.book or spec.skip_report_in_life:
             raise ConfigurationError(
-                f"{where} position: exit, book and skip_report_in_life are for an option position"
+                f"{where} position: book and skip_report_in_life are for an option position"
             )
+        if spec.exit is not None:
+            _check_share_exit(outcome, where)
         if SIDE_TEMPLATES.get(outcome.side) != (spec.template,):
             raise ConfigurationError(
                 f"{where} position: {spec.template!r} is not the position of side {outcome.side!r}"
+            )
+
+
+def _check_share_exit(outcome: "Outcome", where: str) -> None:
+    """A shares position with an ``[outcome.exit]`` is read from the share path grain, which
+    stores one long or short path per name against its benchmark (ADR 0088, E3c-2): the settings
+    it cannot measure are refused here, never run as another outcome."""
+    exit = outcome.position.exit if outcome.position else None
+    if exit is None:
+        return
+    refused = {
+        "a long_short outcome": outcome.side == LONG_SHORT,  # two paths: none is stored
+        "exit_dte": exit.exit_dte is not None,  # an option's days to expiry
+        "a hit_target outcome": outcome.kind == "hit_target",
+        "a residual measure": outcome.measure is not None,  # an excess_return's is residual
+        "benchmark = none": outcome.benchmark == "none",  # the path is scored against one
+        "hold_rank": outcome.hold_rank is not None,  # a rank band holds names to a fixed horizon
+    }
+    for what, found in refused.items():
+        if found:
+            raise ConfigurationError(
+                f"{where} position: an [outcome.exit] on shares is not measured with {what} "
+                f"(the share path grain stores an excess return to the exit, one path per name)"
+            )
+
+
+SHARE_PATH_BASES = ("event", "universe")  # what a share path is compared with (no time series)
+
+
+def _check_share_path_edge(edge: Any, where: str) -> None:
+    """What an edge with a share path outcome may not combine with: a time-series or named base
+    (their windows are not paths), a ``position:<shares>`` baseline (it would value the picks at
+    the fixed horizon, with no exit) and a case value (only the default point's rows are read)."""
+    held = [(edge.outcome, edge.base), *((v.outcome, v.base or edge.base) for v in edge.variants)]
+    for outcome, base in held:
+        if not reads_share_path(outcome):
+            continue
+        if base not in SHARE_PATH_BASES:
+            raise ConfigurationError(
+                f"{where} base: {base!r} is a time-series or named base; a share outcome with an "
+                f"[outcome.exit] is judged against {list(SHARE_PATH_BASES)}"
+            )
+        if edge.position_baselines:
+            raise ConfigurationError(
+                f"{where} baselines: position:<template> values the picks at the fixed horizon, "
+                f"so it is not offered beside an [outcome.exit] on shares"
+            )
+        if outcome.position is not None and outcome.position.cases:  # E13b resolves cases at D
+            raise ConfigurationError(
+                f"{where} case values: the share path reader selects the default point's rows "
+                f"only, so a case value is not offered beside an [outcome.exit] on shares yet"
             )
 
 
@@ -193,7 +256,13 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
     for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
         for candidate in candidates(outcome):
             check_outcome(candidate, where, templates)
-        case_names = {c.name for c in outcome.position.cases} if outcome.position else set()
+        cases = outcome.position.cases if outcome.position else ()
+        case_names = {c.name for c in cases}
+        points = prod(len({c.default, *(x.value for x in c.cases)}) for c in cases)
+        if points > grid.MAX_POINTS:  # the writer stores every combination for every name
+            raise ConfigurationError(
+                f"{where} outcome: its case values make {points} points, at most {grid.MAX_POINTS}"
+            )
         axes = {name for g in edge.variant_grid for name, _ in g.axes}
         if case_names & axes:
             raise ConfigurationError(
@@ -201,19 +270,7 @@ def check_edge(edge: Any, where: str, templates: Templates) -> None:
                 f"the case would override the grid point"
             )
     check_known(where, "baselines", edge.position_baselines, templates)
-    for outcome in (edge.outcome, *(v.outcome for v in edge.variants)):
-        pending = [
-            (what, slice_)
-            for what, slice_, used in (
-                ("case values", "E13b", outcome.position is not None and outcome.position.cases),
-            )
-            if used
-        ]
-        if pending:
-            raise ConfigurationError(
-                f"{where} {pending[0][0]}: not applied by any run yet ({pending[0][1]}), so the "
-                f"edge would be measured without it"
-            )
+    _check_share_path_edge(edge, where)
     if not edge.variant_grid:
         return
     if edge.outcome.kind != OPTION_KIND or edge.outcome.position is None:

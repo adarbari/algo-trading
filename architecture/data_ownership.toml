@@ -182,6 +182,7 @@ allowed = [
     "src/algotrade/data/outcomes/reading.py",  # the outcome partitions' stamps, for the harness's legs
     "src/algotrade/data/outcomes/chain.py",  # the chain outcome partitions' stamps, likewise (EB H13)
     "src/algotrade/data/outcomes/residuals.py",  # the residual partitions' stamps, likewise
+    "src/algotrade/data/outcomes/share_path.py",  # the share path partitions' stamps, likewise (E3c-2b)
     "src/algotrade/services/evaluation/cross_section/legs/reuse.py",  # checks a stored leg's reads against the partitions' stamps
     "src/algotrade/services/serving/build.py",  # records each input partition's stamp at the pin in the release manifest (ADR 0077)
     "apps/ingestion/algotrade_ingestion/workflows/serve_release/serve_release.py",  # compares a release's recorded stamps with the live ones: stale when an input was restated

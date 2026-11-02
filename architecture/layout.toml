@@ -207,7 +207,7 @@ contracts = ["Option history is quarantined: only ingestion reads it (ADR 0084)"
 
 [[dir]]
 path = "src/algotrade/data/outcomes"
-purpose = "reads of the outcomes grains (outcomes/instrument/ price windows, reading.py; outcomes/option/ chain P&L of option structures, chain.py; ADR 0053 and its EB H13 amendment): what happened after a start session, the tables read across sessions, only by the edge harness"
+purpose = "reads of the outcomes grains (outcomes/instrument/ price windows, reading.py; outcomes/option/ chain P&L of option structures, chain.py; outcomes/instrument/share_path@v1 share paths to a declared exit, share_path.py, ADR 0088; grains.py the one dispatch between the three; ADR 0053 and its EB H13 amendment): what happened after a start session, the tables read across sessions, only by the edge harness"
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
 
 [[dir]]
@@ -454,7 +454,7 @@ purpose = "the portfolio_return outcome of the edge harness (ADR 0074): the weig
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reads"
-purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 0063): each screener's run, the regime label, the eligible names per universe, the implied vol, the picks' ADV at D and the scored outcomes, cached until a chunk of sessions is released (session.py), the implied vol of names at a session (implied_at, also the paper record's), an entry condition's entry session per name over its wait and the entered names' rows at their own S (entry.py, E13), and the screens the edges of one CLI run share through a scratch cache of pickles (screens.py, ADR 0059 amendment 2026-10-20)"
+purpose = "what the edge harness reads once per decision session (ADR 0053, ADR 0063): each screener's run, the regime label, the eligible names per universe, the implied vol, the picks' ADV at D and the scored outcomes, cached until a chunk of sessions is released (session.py), the implied vol of names at a session (implied_at, also the paper record's), an entry condition's entry session per name over its wait and the entered names' rows at their own S (entry.py, E13), each name's case values at D and its row at its resolved point (cases.py, E13b), and the screens the edges of one CLI run share through a scratch cache of pickles (screens.py, ADR 0059 amendment 2026-10-20)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reporting"
@@ -591,7 +591,7 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/evaluation/positions"
-purpose = "the position a setup publishes for a pick (ADR 0083, 0088), split from evaluation (at its module cap): the historical exit rule (exit_rule.py: the percentile stop of the basis's winners, the ATR fallback, a declared stop as it is, the hold)"
+purpose = "the position a setup publishes for a pick (ADR 0083, 0088), split from evaluation (at its module cap): the historical exit rule (exit_rule.py: the percentile stop of the basis's winners, the ATR fallback, a declared stop as it is, the hold) and the setup state (state.py: ON / OFF / PAUSED / UNKNOWN from the stored headline and the night's gate row; outside verdict/ so the verdict fingerprint is unchanged)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

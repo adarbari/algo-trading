@@ -537,6 +537,11 @@ type Edge {
   The setup's historical exit rule at the served session, for a pick (`instrumentId`, for the ATR fallback): the stop and the hold, long picks only; null: no session is served
   """
   exitRule(instrumentId: String = null): ExitRule
+
+  """
+  The setup's state at the served session (ON, OFF, PAUSED or UNKNOWN with its reason; ADR 0088 decision 16); null: no session is served
+  """
+  setupState: SetupState
 }
 
 """One quality-bar answer: `key` names the question, `text` the answer"""
@@ -4116,6 +4121,24 @@ type SetupIdeas {
   total: Int!
   leftOut: [LeftOut!]!
   watchlist: Int
+}
+
+"""
+A setup's state at the served session (ADR 0088 decision 16): ON (a good stored verdict, the gate open or none), OFF (any other judged verdict), PAUSED (a good verdict, the gate closed: stand aside) or UNKNOWN; `reason`: the server's sentence (for PAUSED the gate's), empty for UNKNOWN, whose `unknown` says why
+"""
+type SetupState {
+  edgeId: String!
+  state: SetupStateCode!
+  reason: String!
+  unknown: Unknown
+}
+
+"""A setup's state at the served session"""
+enum SetupStateCode {
+  ON
+  OFF
+  PAUSED
+  UNKNOWN
 }
 
 """A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""

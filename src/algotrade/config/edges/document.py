@@ -469,7 +469,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
     baselines, position_baselines = _baselines(t)
-    chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
+    chain.check_kinds(where, [outcome, *(v.outcome for v in variants)])
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
         check_base(held.kind, held_base, where)
         named.check_sleeve(where, held.kind, len(held.horizon_sessions), held_base)

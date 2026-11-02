@@ -90,6 +90,7 @@ def _row(
         "no_entry_bar": stat.no_entry_bar if measured else None,
         "not_triggered": stat.not_triggered if measured else None,
         "entry_unknown": stat.entry_unknown if measured else None,
+        "case_unknown": stat.case_unknown if measured else None,
         "no_implied_vol": stat.no_implied_vol if measured else None,
         "outside_universe": stat.outside_universe if measured else None,
         "delisted": stat.delisted if measured else None,

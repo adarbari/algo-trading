@@ -16,8 +16,10 @@ the hold cap, the option parameters empty, so a share and an option trade never 
 the harness reads them)."""
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
+from itertools import product
 from typing import TYPE_CHECKING, Any
 
 from algotrade.config.edges.positions.grid import points
@@ -33,6 +35,7 @@ from algotrade.core.model.predicates import Group, Rule
 
 if TYPE_CHECKING:
     from algotrade.config.edges.document import Outcome
+    from algotrade.config.edges.positions.cases import CaseValue
 
 
 def resolve_legs(outcome: "Outcome", template: Template) -> tuple[Leg, ...]:
@@ -223,18 +226,31 @@ def _apply(outcome: "Outcome", name: str, value: Any, templates: Templates) -> "
 
 
 def case_points(outcome: "Outcome", templates: Templates) -> tuple["Outcome", ...]:
-    """The concrete outcomes a case-valued setup can resolve to (design 2.4): its defaults, then
-    one point per value of each case, so the writer stores the union of them (rows are keyed by the
+    """The concrete outcomes a case-valued setup can resolve to (design 2.4): one point per
+    combination of the cases' values (their defaults first), so the writer stores every point a
+    name can resolve to at D, two cases away from their defaults included (rows are keyed by the
     point, never by the case rule). An outcome without cases: itself."""
     spec = outcome.position
     base = _outcome_with_legs(outcome, templates)
     if spec is None or not spec.cases:
         return (base,)
-    found = [base]
-    for case in spec.cases:
-        values = [case.default, *(c.value for c in case.cases)]
-        found += [_apply(base, case.name, v, templates) for v in dict.fromkeys(values)]
-    return tuple(found)
+    return tuple(case_point(base, values, templates) for values in case_combinations(spec.cases))
+
+
+def case_combinations(cases: Sequence["CaseValue"]) -> list[tuple[Any, ...]]:
+    """Every combination of the cases' values (each case's default first), in ``cases`` order."""
+    choices = [list(dict.fromkeys([c.default, *(x.value for x in c.cases)])) for c in cases]
+    return list(product(*choices))
+
+
+def case_point(outcome: "Outcome", values: Sequence[Any], templates: Templates) -> "Outcome":
+    """``outcome`` at one combination of its case values (``values``, in the order of
+    ``position.cases``): the point a name resolves to at D, keyed as the writer keyed it."""
+    spec = outcome.position
+    assert spec is not None
+    for case, value in zip(spec.cases, values, strict=True):
+        outcome = _apply(outcome, case.name, value, templates)
+    return outcome
 
 
 def grid_outcomes(edge: Any, templates: Templates) -> tuple[tuple[str, "Outcome"], ...]:
@@ -253,14 +269,28 @@ def _with_values(
 ) -> "Outcome":
     for name, value in values:
         outcome = _apply(outcome, name, value, templates)
-    return outcome
+    return _loaded(outcome, templates)  # its own case points' keys, never the base point's
 
 
 def with_legs(edge: Any, templates: Templates) -> Any:
     """``edge`` with the resolved legs and collateral on the ``position`` of its outcome and of
     each variant's (after ``check_edge`` found every template), so ``position_key`` needs no
     template at a reader."""
-    variants = tuple(
-        replace(v, outcome=_outcome_with_legs(v.outcome, templates)) for v in edge.variants
+    variants = tuple(replace(v, outcome=_loaded(v.outcome, templates)) for v in edge.variants)
+    return replace(edge, outcome=_loaded(edge.outcome, templates), variants=variants)
+
+
+def _loaded(outcome: "Outcome", templates: Templates) -> "Outcome":
+    """``outcome`` with its legs and, when it has case values, the key of every point they can
+    resolve to at every hold (``PositionSpec.points``), so a reader keys a name's point without
+    the templates."""
+    base = _outcome_with_legs(outcome, templates)
+    spec = base.position
+    if spec is None or not spec.cases:
+        return base
+    points = tuple(
+        (values, hold, position_key(case_point(base, values, templates), hold))
+        for values in case_combinations(spec.cases)
+        for hold in base.horizon_sessions
     )
-    return replace(edge, outcome=_outcome_with_legs(edge.outcome, templates), variants=variants)
+    return replace(base, position=replace(spec, points=points))

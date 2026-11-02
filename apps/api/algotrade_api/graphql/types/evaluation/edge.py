@@ -12,7 +12,7 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import edges, provenance, runs, versions
-from algotrade.services.read.evaluation.positions import exit_rule
+from algotrade.services.read.evaluation.positions import exit_rule, state
 from algotrade.services.read.evaluation.verdict import model as verdict_model
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.graphql.permissions import AdminCause
@@ -24,6 +24,7 @@ from algotrade_api.graphql.types.evaluation.verdict import (
     EdgeSource,
     EdgeSummary,
     EdgeVerdict,
+    SetupState,
 )
 from algotrade_api.graphql.types.instruments.feature import Unknown
 
@@ -392,3 +393,12 @@ class Edge:
         read = await info.context.aread(None)
         found = await off_loop(exit_rule.load_exit_rule, read, self.edge, instrument_id)
         return ExitRule.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The setup's state at the served session (ON, OFF, PAUSED or UNKNOWN with "
+        "its reason; ADR 0088 decision 16); null: no session is served"
+    )
+    async def setup_state(self, info: Info) -> SetupState | None:
+        read = await info.context.aread(None)
+        found = await off_loop(state.load_setup_state, read, self.edge)
+        return SetupState.of(found) if found is not None else None

@@ -176,6 +176,10 @@ def _decide(night: Night, edge: Edge, screener: str, names: frozenset[str] | Non
     if isinstance(got, EdgePicks):
         return got
     made, run, universe, found = got
+    cased = edge.outcome.position is not None and edge.outcome.position.cases
+    if edge.outcome.entry is not None or cased:  # never the default point or D's offset (E13)
+        reason = "its entry condition or case values are not applied to tonight's picks yet"
+        return replace(made, reason=reason)
     if edge.outcome.kind == PORTFOLIO_KIND:
         return _booked(night, edge, made, (run,), found)
     if edge.outcome.side == LONG:
