@@ -20,6 +20,7 @@ baselines = ["vrp_iv_hv", "vrp_cross_section"]
 status = "candidate"
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout (the latest of its gates' and thresholds'); no verdict until closed trades from it reach 3 months
 notes = """The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8). No
 historical option chains are stored (owner decision O3), so the position is one at-the-money
 straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 read at D, held to the horizon's

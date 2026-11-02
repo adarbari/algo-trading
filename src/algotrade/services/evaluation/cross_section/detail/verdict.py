@@ -11,7 +11,7 @@ exploratory. Anything else gets none, and the reader judges live. The headline o
 moves with the site's trials, so it is never stored. Written by the edge-eval publish (and the
 edge-verdicts task, through ``verdict_frame``); ML never frames it (ADR 0053 decision 8)."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -115,13 +115,15 @@ def _judged(
     draws: runs.Draws,
     settings: VerdictSettings,
     *,
+    series: Sequence[runs.SeriesRow],
     run_id: str,
     source: str,
     now: datetime,
 ) -> pd.DataFrame:
     """The one judgement and framing both writers share: the headline of ``edge`` on ``run``'s
-    ``rows`` through the reader's own judge call, as a ``results/edge_verdict`` row."""
-    call = judge_call(edge, run, True)
+    ``rows`` (and its ``series``, for an option setup's holdout) through the reader's own judge
+    call, as a ``results/edge_verdict`` row."""
+    call = judge_call(edge, run, True, settings=settings, series=series)
     verdict = judge(rows=rows, draws=draws, t=settings, headline=True, **call.kwargs())
     return verdict_frame(
         summary_of(verdict),
@@ -136,7 +138,12 @@ def _judged(
 
 
 def edge_verdict_frame(
-    stores: Stores, edge_id: str, record: RunRecord, frame: pd.DataFrame, now: datetime
+    stores: Stores,
+    edge_id: str,
+    record: RunRecord,
+    frame: pd.DataFrame,
+    now: datetime,
+    series_frame: pd.DataFrame | None = None,
 ) -> pd.DataFrame | None:
     """The ``results/edge_verdict`` row of the run ``record`` that is publishing ``frame`` (its
     ``edge_eval`` rows), or None when the run is not one a reader would resolve as canonical (a
@@ -151,8 +158,9 @@ def edge_verdict_frame(
     if not canonical_kind(edge, run):
         return None
     rows, draws = runs.rows_of_frame(frame)
+    series = () if series_frame is None else runs.series_of_frame(series_frame)
     return _judged(
-        edge, run, rows, draws, load_verdict(stores.configs),
+        edge, run, rows, draws, load_verdict(stores.configs), series=series,
         run_id=record.run_id, source=SOURCE, now=now,
     )  # fmt: skip
 
@@ -168,7 +176,8 @@ def rejudged_frame(
         return None
     return _judged(
         edge, run, runs.load_run_rows(stores, run), runs.load_run_draws(stores, run),
-        load_verdict(stores.configs), run_id=run_id, source=REJUDGE_SOURCE, now=now,
+        load_verdict(stores.configs), series=runs.load_run_series(stores, run),
+        run_id=run_id, source=REJUDGE_SOURCE, now=now,
     )  # fmt: skip
 
 
@@ -183,7 +192,8 @@ def _real(value: Any) -> float | None:
 def run_fingerprint(stores: Stores, edge: Edge, run: EdgeRun) -> str:
     """The fingerprint a row of ``edge``'s headline on ``run`` carries now: what the edge-verdicts
     task compares the stored rows' with (the reader's own, built from the one judge call)."""
-    return stamp.fingerprint(judge_call(edge, run, True), run, load_verdict(stores.configs))
+    settings = load_verdict(stores.configs)
+    return stamp.fingerprint(judge_call(edge, run, True, stores, settings), run, settings)
 
 
 def _summary(r: Mapping[Any, Any]) -> EdgeSummary:

@@ -5,13 +5,18 @@ all option_pnl or none is (another grain); a document that never names a tenor h
 before."""
 
 from dataclasses import asdict
+from datetime import date
 from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import parse_edge
+from algotrade.config.edges.document import OUTCOME_KINDS, parse_edge
 from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.positions.chain import OPTION_KINDS
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.configs.files import FileConfigStore
+from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import WHERE, document
 
 CHAIN = {
@@ -79,3 +84,33 @@ def test_a_document_that_never_names_a_tenor_hashes_as_before() -> None:
     assert "tenor_days" not in identity_dict(asdict(plain.outcome))  # ... the identity omits it
     chained = parse_edge(chain(), "drift", WHERE)
     assert identity_dict(asdict(chained.outcome))["tenor_days"] == 30
+
+
+# The outcome kinds that are not an option setup's: a new kind must be put on one side or the
+# other here, so it cannot slip past the option holdout by being forgotten (ADR 0088 d15).
+NOT_OPTION_KINDS = ("excess_return", "hit_target", "portfolio_return", "pair_spread")
+
+
+def test_every_outcome_kind_is_an_option_kind_or_declared_not() -> None:
+    assert set(OUTCOME_KINDS) == set(OPTION_KINDS) | set(NOT_OPTION_KINDS)
+    assert not set(OPTION_KINDS) & set(NOT_OPTION_KINDS)
+
+
+def test_every_site_option_setup_declares_its_holdout_start_after_the_research_data() -> None:
+    """ADR 0088 decision 15 / D: the setup's ``holdout_from`` is declared, never before the first
+    session after the option research's data (2026-10-26)."""
+    edges = load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
+    options = [e for e in edges if e.outcome.kind in OPTION_KINDS and not e.extends]
+    assert options  # the site has option setups
+    for e in options:
+        assert e.holdout_from is not None, f"{e.id}: declare holdout_from"
+        assert e.holdout_from >= date(2026, 10, 26), e.id
+
+
+def test_holdout_from_is_a_date_and_never_changes_an_edges_identity() -> None:
+    plain = parse_edge(document(), "drift", WHERE)
+    held = parse_edge({**document(), "holdout_from": date(2026, 11, 3)}, "drift", WHERE)
+    assert held.holdout_from == date(2026, 11, 3) and plain.holdout_from is None
+    assert identity_dict(asdict(held)) == identity_dict(asdict(plain))  # not a run input
+    with pytest.raises(ConfigurationError, match="holdout_from"):
+        parse_edge({**document(), "holdout_from": "2026-11-03"}, "drift", WHERE)

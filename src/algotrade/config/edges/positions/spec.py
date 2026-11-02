@@ -12,6 +12,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
+from datetime import date
 from math import prod
 from typing import TYPE_CHECKING, Any
 
@@ -124,6 +125,18 @@ def gate_of(t: Table) -> Group | None:
     if not isinstance(raw, Mapping):
         raise ConfigurationError(f"{t.where} gate: expected a rule table, got {raw!r}")
     return when_of(raw, f"{t.where} gate")
+
+
+def holdout_of(t: Table) -> date | None:
+    """``holdout_from``: the first session of the unseen holdout of the setup's research-chosen
+    gates and thresholds (ADR 0088 decision 15; the latest of them, a threshold tuned later
+    restarts it); None: the site's default."""
+    raw = t.raw("holdout_from")
+    if raw is None:
+        return None
+    if type(raw) is not date:
+        raise ConfigurationError(f"{t.where} holdout_from: expected a date (2026-10-26)")
+    return raw
 
 
 def _exit(o: Table) -> ExitSettings | None:

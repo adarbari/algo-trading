@@ -34,6 +34,11 @@ MODEL_STRUCTURES = (
     "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
 CHAIN_KIND = "option_pnl"
+# Every outcome kind of an option setup (ADR 0088 decision 15: no verdict before its unseen
+# holdout): a priced chain P&L, a model P&L of a position, and a short option's not-assigned hit
+# (decided by Fable for the owner, 2026-11-02: a short-premium verdict is an option verdict
+# whether its hit is priced from chains or read from the underlying's bars).
+OPTION_KINDS = (CHAIN_KIND, "option_model_pnl", "expires_otm")
 CHAIN_BASIS = "chain"  # what a P&L of quoted prices is labelled (results and UI)
 MAX_TENOR_DAYS = 400
 

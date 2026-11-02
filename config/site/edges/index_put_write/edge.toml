@@ -20,6 +20,7 @@ status = "candidate"
 mechanism_kind = "paid_for_risk"
 asset_class = "options"
 frozen_from = 2026-04-01
+holdout_from = 2026-11-03  # ADR 0088 d15: the first session of the unseen holdout (the latest of its gates' and thresholds'); no verdict until closed trades from it reach 3 months
 notes = """NO VERDICT before a 3-month unseen holdout (ADR 0088): the holdout starts at 2026-11-03,
 the session after this document was committed (frozen_from is the site's 2026-04-01, before any
 Cboe chain), so the earliest verdict is on trades whose window closed after 2027-02-03. Built on the Cboe-era store only (chains from 2026-10-02); the bought
@@ -35,8 +36,8 @@ edge in its notes, since it is the same idea tested again. The fomc_clear varian
 entry with 2 or fewer sessions to the next FOMC decision known at D; most 17-session holds still
 contain a decision. Each named symbol, the fomc_clear variant and every grid point is one trial of
 the deflated Sharpe ratio. Not paper traded (the record refuses a setup with no screener), and the
-holdout is not enforced by code yet: a verdict before 2027-02-03 is prevented only by the 40
-out-of-sample trades a verdict needs (at most 12 a year per trial). Tracking: each window's return on
+holdout is enforced by the judge: no verdict until closed trades decided from `holdout_from`
+reach 3 months (and the 40 out-of-sample trades a verdict needs, at most 12 a year per trial). Tracking: each window's return on
 collateral beside the Cboe PUT index's (personal licence); the SPX index itself is not traded."""
 
 [universe.where]

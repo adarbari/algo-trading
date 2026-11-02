@@ -65,6 +65,9 @@ NOT_JUDGED = {
     "algotrade.config.site.settings:load_users": "gate on who sees a setup",
     "algotrade.services.licences:held_by": "gate on who sees a setup",
     "algotrade.services.read.evaluation.runs:load_edge_runs": "gate on who sees a setup",
+    "algotrade.config.edges.positions.chain:OPTION_KINDS": "feeds the call's option flag",
+    "algotrade.services.read.evaluation.runs:SeriesRow": "the type of the call's holdout input",
+    "algotrade.services.read.evaluation.runs:load_run_series": "reads the call's holdout input",
     "algotrade.config.edges.document:MODEL_KIND": "feeds counts_wins, so the call",
     "algotrade.config.edges.document:PAIR_KIND": "feeds counts_wins, so the call",
     "algotrade.config.edges.portfolio:PORTFOLIO_KIND": "feeds the call's portfolio flag",
@@ -405,6 +408,10 @@ CASES: dict[str, dict[str, Any]] = {
     "undeclared_basis_waits": {"rows": [], "declared": Declared("scr", 99)},
     "portfolio": {"rows": result(), "facts": EdgeFacts(portfolio=True, benchmark="SPY")},
     "out_of_window": {"rows": result(), "facts": EdgeFacts(base="out_of_window", chain=True)},
+    "option_unproven": {
+        "rows": result(),
+        "facts": EdgeFacts(option=True, holdout_from=date(2026, 10, 26)),  # no closed trades yet
+    },
 }
 EXPECTED: dict[int, dict[str, tuple[Any, ...]]] = {
     1: {
@@ -500,11 +507,11 @@ EXPECTED[2] = EXPECTED[1]
 # case changes (its run reaches no session here); every share setup's headline is version 2's.
 EXPECTED[3] = {
     **EXPECTED[2],
-    "out_of_window": (
+    "option_unproven": (
         "not_enough_data",
         "No verdict on an option setup before its unseen holdout holds 92 days of closed "
-        "trades: it starts 2026-10-26, the trades of 20 sessions close on the exchange "
-        "calendar and the run reaches no session; the earliest verdict is 2027-02-25",
+        "trades: it starts 2026-10-26, and closed trades reach none yet; the verdict needs "
+        "them through 2027-01-26",
         "scr, 20 trading days",
         70,
         60,

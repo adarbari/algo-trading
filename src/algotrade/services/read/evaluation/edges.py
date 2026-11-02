@@ -147,6 +147,7 @@ class Edge:
     # and horizon (None: not declared; a user's edge never declares one).
     promoted: str | None = None
     basis_horizon: int | None = None
+    holdout_from: date | None = None  # an option setup's unseen-holdout start (ADR 0088 d15)
     # Interim, until the surfaces speak status (ADR 0053 amendment 2026-10-10): the old state
     # words the GraphQL type still serves, derived (``following`` when bookmarked, else
     # ``researching``; ``since`` the bookmark's; ``state_reason`` the status's).
@@ -272,6 +273,7 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         baselines=e.baselines,
         variants=(document.MAIN, *(v.id for v in e.variants)),
         frozen_from=e.frozen_from,
+        holdout_from=e.holdout_from,
         evidence=EdgeEvidence(e.evidence.run_id, e.evidence.split_from) if e.evidence else None,
         rejection_reason=e.rejection_reason,
         sources=tuple(EdgeSource(x.title, x.url) for x in e.sources),

@@ -21,6 +21,7 @@ baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
 notes = """THE NEW VERSION of vrp_short_premium (retired 2026-11-02, ADR 0088, X2): from expires_otm (a
 modelled not-assigned rate on the IBKR IV30) to option_pnl short_put, the put's own P&L on the
 stored Cboe chains: a 0.30-delta put on the expiry nearest 30 days and never before the window's

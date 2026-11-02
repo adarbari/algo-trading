@@ -143,7 +143,7 @@ from algotrade.config.edges.portfolio import (
 from algotrade.config.edges.positions import chain, grid
 from algotrade.config.edges.positions.cases import EntrySpec, entry_of, split_cases
 from algotrade.config.edges.positions.spec import KEYS as POSITION_KEYS
-from algotrade.config.edges.positions.spec import PositionSpec, gate_of, spec_of
+from algotrade.config.edges.positions.spec import PositionSpec, gate_of, holdout_of, spec_of
 from algotrade.config.edges.positions.templates import POSITION_PREFIX, baseline_template
 from algotrade.config.edges.schedules.events import (
     EVENT_CLASSES,
@@ -218,7 +218,7 @@ KEYS = (
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
     "extends", "follow", "audit", "published", "family", "ensemble", "oos_class", "mechanism_kind",
     "plain_reason",
-    "asset_class", "gate", "variant_grid", "verdict_profile",
+    "asset_class", "gate", "variant_grid", "verdict_profile", "holdout_from",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -395,6 +395,7 @@ class Edge:
     gate: Group | None = None
     variant_grid: tuple[grid.Grid, ...] = ()
     verdict_profile: str | None = None
+    holdout_from: date | None = None  # ADR 0088 d15: the latest start of its gates' holdouts
     position_baselines: tuple[str, ...] = ()
     # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
     # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
@@ -501,6 +502,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         baselines=baselines,
         position_baselines=position_baselines,
         gate=gate_of(t),
+        holdout_from=holdout_of(t),
         variant_grid=grid.parse_grids(t),
         verdict_profile=t.choice("verdict_profile", "", PROFILES)
         if "verdict_profile" in doc

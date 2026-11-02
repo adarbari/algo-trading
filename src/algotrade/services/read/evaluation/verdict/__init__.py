@@ -122,6 +122,9 @@ from algotrade.services.read.evaluation.verdict.rule import (
     JudgeCall as JudgeCall,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
+    closed_through as closed_through,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
     counts_wins as counts_wins,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
@@ -129,6 +132,9 @@ from algotrade.services.read.evaluation.verdict.rule import (
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     is_factor_neutral as is_factor_neutral,
+)
+from algotrade.services.read.evaluation.verdict.rule import (
+    is_option as is_option,
 )
 from algotrade.services.read.evaluation.verdict.rule import (
     judge as judge,

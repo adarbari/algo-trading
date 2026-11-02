@@ -8,7 +8,7 @@ import pytest
 
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation.edges import load_edge
-from algotrade.services.read.evaluation.runs import Draw, EdgeRow, _lost
+from algotrade.services.read.evaluation.runs import Draw, EdgeRow, SeriesRow, _lost, _series_row
 from algotrade.services.read.evaluation.verdict import (
     ALL,
     BOTH,
@@ -25,6 +25,7 @@ from algotrade.services.read.evaluation.verdict import (
     EdgeFacts,
     EdgeVerdict,
     choose_basis,
+    closed_through,
     judge,
     load_edge_verdict,
 )
@@ -668,7 +669,7 @@ def test_a_chain_edge_can_be_promising_but_never_works_without_an_in_sample_basi
     )
     rows = [r for r in strong if r.slice_kind != "in_sample"]  # nothing in-sample exists
     chain = EdgeFacts(chain=True)
-    v = verdict(rows, draws=draws(100), facts=chain, range_to=AFTER_HOLDOUT)
+    v = verdict(rows, draws=draws(100), facts=chain)
     assert v.verdict == PROMISING and "Basis fixed on an in-sample period" in v.rationale
     by = {c.id: c for c in v.criteria}
     assert by["oos_lift"].status == "not_applicable" and by["basis_in_sample"].status == "fail"
@@ -677,7 +678,14 @@ def test_a_chain_edge_can_be_promising_but_never_works_without_an_in_sample_basi
     assert plain.verdict == NOT_ENOUGH and "basis_in_sample" not in {c.id for c in plain.criteria}
 
 
-AFTER_HOLDOUT = date(2027, 2, 25)  # 2026-10-26 + 92 days, then 21 sessions (entry and window)
+START = date(2026, 10, 26)  # the site's holdout start (ADR 0088 decision D)
+
+
+def optioned(through: date | None, chain: bool = False) -> EdgeFacts:
+    """An option setup's facts whose closed holdout trades reach ``through`` (None: none yet);
+    ``chain=False`` is an ``option_model_pnl`` or ``expires_otm`` setup (not a chain P&L)."""
+    closed = () if through is None else (("scr", 20, through),)
+    return EdgeFacts(chain=chain, option=True, holdout_from=START, holdout_closed=closed)
 
 
 @pytest.mark.parametrize(
@@ -692,19 +700,50 @@ AFTER_HOLDOUT = date(2027, 2, 25)  # 2026-10-26 + 92 days, then 21 sessions (ent
     ],
     ids=["strong", "promising", "not working"],
 )
-def test_no_option_verdict_is_given_before_its_unseen_holdout_has_run(rows: list[EdgeRow]) -> None:
-    """Fitness (ADR 0088 decision 15): whatever the figures, an option setup's label is Not enough
-    data, with the reason, until the run reaches ``holdout_from`` + ``holdout_days``; the one
-    judge is the only place a label is decided (the stored row and the reader both call it)."""
-    chain = EdgeFacts(chain=True)
-    for end in (None, date(2026, 12, 1), AFTER_HOLDOUT - timedelta(days=1)):
-        v = verdict(rows, draws=draws(100), facts=chain, range_to=end)
+@pytest.mark.parametrize("chain", [True, False], ids=["option_pnl", "other option kinds"])
+def test_no_option_verdict_is_given_before_its_unseen_holdout_has_closed_trades(
+    rows: list[EdgeRow], chain: bool
+) -> None:
+    """Fitness (ADR 0088 decision 15): whatever the figures and the option kind, the label is Not
+    enough data, with the reason, until closed trades decided from ``holdout_from`` reach
+    ``holdout_days`` (92) on; a run's own end date is not enough. The one judge decides every
+    label (the stored row and the reader both call it)."""
+    needed = START + timedelta(days=92)
+    for through in (None, START, needed - timedelta(days=1)):
+        v = verdict(
+            rows, draws=draws(100), facts=optioned(through, chain), range_to=date(2027, 6, 1)
+        )
         assert v.verdict == NOT_ENOUGH and "unseen holdout" in v.result
-        assert "2027-02-25" in v.rationale  # the earliest verdict, in words
-    after = verdict(rows, draws=draws(100), facts=chain, range_to=AFTER_HOLDOUT)
-    assert after.verdict != NOT_ENOUGH or "unseen holdout" not in after.result
-    plain = verdict(rows, draws=draws(100), range_to=None)  # a share setup is never held back
+        assert str(needed) in v.rationale  # the date closed trades must reach, in words
+    after = verdict(rows, draws=draws(100), facts=optioned(needed, chain))
+    assert "unseen holdout" not in after.result
+    plain = verdict(rows, draws=draws(100))  # a share setup is never held back
     assert "unseen holdout" not in plain.result
+
+
+def test_closed_trades_are_counted_from_the_holdout_start_on_the_basis_alone() -> None:
+    """``closed_through``: measured windows decided on or after the start, the last exit of each
+    (screen, period); an excluded window or an earlier decision is not counted."""
+
+    def at(decision: date, exit_: date, status: str = "measured", horizon: int = 20) -> SeriesRow:
+        return _series_row(
+            series_row(decision, None, exit_session=exit_, status=status, horizon_sessions=horizon)
+        )
+
+    series = [
+        at(date(2026, 10, 23), date(2026, 11, 20)),  # decided before the start
+        at(date(2026, 10, 26), date(2026, 11, 23)),
+        at(date(2026, 12, 1), date(2027, 1, 4)),
+        at(date(2026, 12, 2), date(2027, 2, 1), status="excluded_coverage"),
+        at(date(2026, 12, 3), date(2027, 3, 1), horizon=5),
+    ]
+    assert closed_through(series, START) == (
+        ("momo", 5, date(2027, 3, 1)),
+        ("momo", 20, date(2027, 1, 4)),
+    )
+    assert closed_through(series, date(2027, 6, 1)) == ()
+    # a window that closes after the run's end is not counted
+    assert closed_through(series, START, date(2027, 1, 4)) == (("momo", 20, date(2027, 1, 4)),)
 
 
 # portfolio_return (ADR 0074): a book beats a blended benchmark, with no base rate over names
@@ -830,40 +869,3 @@ def test_a_member_does_not_count_as_a_peer_trial_of_the_ensemble() -> None:
     ]
     crit = {c.id: c for c in verdict(rows, facts=BOOK).criteria}
     assert crit["pbo"].status == "not_applicable" and crit["works_pbo"].status == "not_applicable"
-
-
-def test_a_trade_window_that_has_not_closed_does_not_count_toward_the_holdout() -> None:
-    """The holdout counts closed trades (ADR 0088 d15): a run ending on holdout_from + 92 days has
-    decisions whose 20-session windows are still open, so it is not yet a verdict."""
-    rows = result()
-    chain = EdgeFacts(chain=True)
-    early = verdict(rows, draws=draws(100), facts=chain, range_to=date(2027, 1, 26))
-    assert early.verdict == NOT_ENOUGH and "unseen holdout" in early.result
-    after = verdict(rows, draws=draws(100), facts=chain, range_to=AFTER_HOLDOUT)
-    assert after.verdict != NOT_ENOUGH
-
-
-def test_the_closing_of_a_window_follows_the_exchange_calendar_across_holidays() -> None:
-    """A 20-session window across Christmas and New Year closes 32 calendar days on, past any
-    fixed allowance: holdout_from 2026-12-04 + 1 day, then 21 sessions, is 2027-01-06."""
-    holiday = replace(T, tails=replace(T.tails, holdout_from=date(2026, 12, 4), holdout_days=1))
-    held = judge(
-        "e",
-        result(),
-        SPLIT,
-        holiday,
-        draws=draws(100),
-        facts=EdgeFacts(chain=True),
-        range_to=date(2027, 1, 5),
-    )
-    assert held.verdict == NOT_ENOUGH and "2027-01-06" in held.rationale
-    free = judge(
-        "e",
-        result(),
-        SPLIT,
-        holiday,
-        draws=draws(100),
-        facts=EdgeFacts(chain=True),
-        range_to=date(2027, 1, 6),
-    )
-    assert free.verdict != NOT_ENOUGH
