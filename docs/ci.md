@@ -170,7 +170,9 @@ see the new head. GitHub also holds the `pull_request` run of a bot-pushed commi
 run instead when the `pull_request` run is `action_required` or missing: the latest `workflow_dispatch`
 CI run of this repository for the same head sha, started by `github-actions[bot]`, must be `success`
 (a failed, running or foreign run never counts, and every check run on the sha must still pass; the
-held run's suite is ignored as superseded). That run tests the branch head, not its merge with
+held run's suite is ignored as superseded). As a safety net, a sweep that finds a head with no CI run
+at all (neither `pull_request` nor dispatched) dispatches `ci.yml` on its branch once and logs it
+(2026-11-01: #1012 and #1015 sat with no checks until closed and reopened). That run tests the branch head, not its merge with
 main. Review the PNG diff in the PR once CI has run.
 
 ## Web performance
