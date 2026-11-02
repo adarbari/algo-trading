@@ -64,3 +64,14 @@ unit = "flag"
 description = "Whether the options price the next earnings report at 0.8 times or less the name's mean absolute move on its last eight reports (earnings_move_ratio <= 0.8, params.cheap_ratio): the straddle is cheap against what the name has done, the setting a buyer of the report looks for, or a name to leave out of a sale"
 null_meaning = "earnings_move_ratio is null (the move expiry does not cover the next report, or fewer than 4 past reports had a closed window)"
 version = 1
+
+[earnings_move_vs_usual]
+kind = "label"
+expr = 'if(is_null(earnings_move_ratio), null, if(earnings_move_ratio >= above_ratio, "above", if(earnings_move_ratio <= below_ratio, "below", "in line")))'
+params = { above_ratio = 1.15, below_ratio = 0.85 }
+dtype = "str"
+unit = "category"
+categories = ["above", "in line", "below"]
+description = "How the options' price for the next earnings report compares with the name's usual report move: above (earnings_move_ratio >= 1.15, params.above_ratio), below (<= 0.85, params.below_ratio) or in line between them; the plain-words reading of earnings_move_ratio for the Earnings week page"
+null_meaning = "earnings_move_ratio is null (the move expiry does not cover the next report, or fewer than 4 past reports had a closed window)"
+version = 1

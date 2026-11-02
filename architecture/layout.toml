@@ -72,7 +72,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges/positions"
-purpose = "positions of an edge document (ADR 0088), split from config/edges (at its module cap): the site's position templates and position_of (templates.py), the position key, option parameters and [outcome.exit] of an outcome (spec.py), the variant grids (grid.py), the published exit rule's settings (exit_rule.py) and the option_pnl outcome's structures, tenor rule and checks (chain.py, moved here)"
+purpose = "positions of an edge document (ADR 0088), split from config/edges (at its module cap): the site's position templates and position_of (templates.py), the position key of a stored option trade (key.py), the option parameters and [outcome.exit] of an outcome (spec.py), the variant grids (grid.py), the published exit rule's settings (exit_rule.py) and the option_pnl outcome's structures, tenor rule and checks (chain.py, moved here)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
@@ -245,7 +245,7 @@ purpose = "the selection engine: evaluate a Selection with a per-rule audit"
 
 [[dir]]
 path = "src/algotrade/engines/structures"
-purpose = "the option-structure engine (ADR 0088, design 2.4): marks a position of option legs (and a share leg held with them) through its window from the chains the caller loads, the quoted and intrinsic exit value, the exit fallback for a thin quote, the daily hedge's net delta and the reasons a name is unmeasured (marking.py, chain.py); pure: features, config and quant only"
+purpose = "the option-structure engine (ADR 0088, design 2.4): marks a position of option legs (and a share leg held with them) through its window from the chains the caller loads, the quoted and intrinsic exit value, the exit fallback for a thin quote, the daily hedge's net delta and the reasons a name is unmeasured (marking.py, chain.py), the exit scan and position fields (exits.py, position_fields.py), settlement (settlement.py) and a window's trades: legs chosen, exits, values and collateral (trades.py); pure: features, config and quant only"
 contracts = ["The option-structure engine is pure: features, config, quant and core only (no data, storage or services; ADR 0088)"]
 
 [[dir]]
@@ -328,7 +328,12 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/positioning"
-purpose = "options positioning and chain-shape feature groups (ADR 0031): flow, implied move, skew and term structure, from the same chain inputs options/ reads; one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus chain_inputs.py, the chain readings they share"
+purpose = "options positioning and chain-shape feature groups (ADR 0031): flow, implied move, skew and term structure, from the same chain inputs options/ reads, and earnings_moves.py (the realised moves of the last twelve reports against the stored implied moves before them); one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus chain_inputs.py, the chain readings they share"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/premium"
+purpose = "feature groups of the premium a short option collects, from the option chain (split from options/, at its module cap): the one band pick the option grid and the summary group share (band_pick.py) and short_premium@v1; one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
@@ -364,6 +369,11 @@ contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow
 [[dir]]
 path = "src/algotrade/quant/edges"
 purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py); the maths of a chain P&L: two-sided mids, long P&L, our own delta of a leg, the daily delta-hedged P&L (chain_pnl.py, EB H13)"
+contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/quant/options"
+purpose = "the figures of a sold option from its mid premium (split from quant, at its module cap): return on collateral, yield a year, breakeven and the risk-neutral chance of ending below the strike (premium.py, the option grid's maths)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -500,7 +510,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/services/ideas"
-purpose = "use case: the Ideas ranking rule (owner decision 2026-10-22): the pure function that turns the viewer's screener pool into their ideas (rule.py); reads nothing, the loader in services/read/screens builds the pool"
+purpose = "use case: the Ideas ranking rule (owner decision 2026-10-22): the pure function that turns the viewer's screener pool into their ideas (rule.py) and the one rule that ranks the picks of qualifying setups (setup_rule.py, ADR 0083 decision 2); reads nothing, the loaders in services/read/screens and services/read/ideas build the inputs"
 contracts = ["Ideas rule is pure: config and core only (no read, storage, data or other use case)"]
 
 [[dir]]
@@ -611,6 +621,11 @@ purpose = "the Guide's Screeners section as read objects (ADR 0051), session-fre
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/ideas"
+purpose = "Ideas from the picks of setups with a good stored verdict (ADR 0083 decision 2, amendment 2026-11-01): the qualifying setups of the session and their tab (setups.py), one setup's own picks through pick_edges (of_setup.py), the ranking rule (rank.py), a tab's list with groups and left-out counts (picks.py) and the inverse reads (inverse.py: a setup's picks, an instrument's setups)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/instruments"
 purpose = "read objects at instrument grain for one session: Instrument identity, feature values by catalogue name (ADR 0038), catalogue, option chain, holdings, series, the feature table"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -633,6 +648,11 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 [[dir]]
 path = "src/algotrade/services/read/ops/admin_runs"
 purpose = "the Admin run histories as read objects over run records, session-free: every edge evaluation run (harness_runs) and every screener run (screener_runs) of the site and each declared user, any status, as the record left it"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/options"
+purpose = "read objects over an underlying's option chain for one session (split from instruments/, at its module cap): the option grid, puts and calls at our delta bands and expiry buckets with derived figures only, never a vendor bid, ask, last or size (grid.py)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

@@ -47,6 +47,13 @@ type AheadEvent {
   sourceUrl: String
 }
 
+"""Another setup that picked the ticker, at its `place` there"""
+type AlsoIn {
+  edgeId: String!
+  edgeName: String!
+  place: Int!
+}
+
 """
 The theme the user chose: `light`, `dark` or `system` (the device decides); `system` when nothing valid is stored
 """
@@ -1486,6 +1493,35 @@ type FundReference {
 }
 
 """
+The short option at one delta band of one expiry: strike, our delta (signed as the right) and IV, the mid premium per share (the middle of the stored quote), the return on collateral (a put's premium over its strike, a call's over the share price), yield a year (simple, 365 days), breakeven, the model chance of ending below the strike (r = q = 0), the spread as a share of the mid and open interest
+"""
+type GridCell {
+  band: Float!
+  strike: Float!
+  delta: Float!
+  iv: Float!
+  mid: Float!
+  roc: Float!
+  yieldAnn: Float!
+  breakeven: Float!
+  pBelow: Float!
+  spreadPct: Float!
+  openInterest: Int
+}
+
+"""
+A row of the grid: the expiry that stands for `bucket` calendar days and its days, or `gap` (no listed expiry near it, or one a nearer bucket took). `reportInside` is true when the next report falls after the session and on or before the expiry; null with `reportInsideUnknown` when its date is not known (never false then)
+"""
+type GridExpiry {
+  bucket: Int!
+  expiry: Date
+  days: Int
+  reportInside: Boolean
+  reportInsideUnknown: Unknown
+  gap: Unknown
+}
+
+"""
 A screener row of a family page: its `id` and name, `line` (what it asks, in one line; empty without prose) and the site edges that use it, as rows
 """
 type GuideCategoryScreener {
@@ -2228,11 +2264,54 @@ type Idea {
 }
 
 """
+One idea's page for the session, shown under `setup` (the best that picked it, or the one asked for); `setups` lists every qualifying setup that picked it. `learn` is the setup's id, the key of its Guide entry
+"""
+type IdeaDetail {
+  session: Date!
+  instrumentId: String!
+  instrument: Instrument
+  tab: IdeaTab!
+  setup: InstrumentSetup!
+  setups: [InstrumentSetup!]!
+  why: IdeaWhy!
+  exitRule: ExitRule!
+  evidence: IdeaEvidence!
+  risks: IdeaRisks!
+  learn: String!
+  metrics: [IdeaMetric!]!
+}
+
+"""
+The stored verdict headline of the setup: every figure is backtested (hypothetical), never a forecast. `liftPts`: the out-of-sample lift in points; `oosTrades` and `trades`: the trades behind it; null: not measured
+"""
+type IdeaEvidence {
+  level: String!
+  result: String!
+  basis: String
+  basisHorizon: Int
+  liftPts: Float
+  lift: Float
+  trades: Int
+  oosTrades: Int
+}
+
+"""
 A stored display value of an idea's best pick: a screener column or a criterion's value, by name
 """
 type IdeaMetric {
   name: String!
   value: JSON!
+}
+
+"""
+What could go wrong: `persistence` (why the setup's edge should last, so what would end it), the name's own earnings `events` before the hold ends on `holdEnds`, and the pick's `watchOut` ids; `unknown` when the hold is not known
+"""
+type IdeaRisks {
+  persistence: String!
+  holdEnds: Date
+  events: [AheadEvent!]!
+  watchOut: [String!]!
+  unknown: Unknown
 }
 
 """
@@ -2245,6 +2324,23 @@ type IdeaScreener {
   picked: Int!
   top: [TopPick!]!
   withheld: Boolean!
+}
+
+"""An Ideas tab: Stocks (share setups) or Premium (option setups)"""
+enum IdeaTab {
+  STOCKS
+  PREMIUM
+}
+
+"""
+Why the name is here: the setup's `thesis` and `mechanism`, the screener's `decision` for the name and the `criteria` it met; `unknown` when the pick's row could not be read
+"""
+type IdeaWhy {
+  thesis: String!
+  mechanism: String!
+  decision: String
+  criteria: [CriterionResult!]!
+  unknown: Unknown
 }
 
 """
@@ -2361,6 +2457,11 @@ type Instrument {
   chain: OptionChain
 
   """
+  The option grid for the session (ADR 0083 amendment 2026-11-01): puts and calls at our delta bands and expiry buckets, derived figures only (never a vendor bid, ask, last or size); or why there is none
+  """
+  optionGrid: OptionGridResult!
+
+  """
   An ETF's `top` largest holdings as of the issuer's date the session sees (null: not an ETF)
   """
   holdings(top: Int! = 10): Holdings
@@ -2392,6 +2493,17 @@ type InstrumentEvents {
   ladder: [LadderRung!]!
   reference: FundReference
   gaps: [EventGap!]!
+}
+
+"""
+A qualifying setup that picked the idea: its `place` among the setup's picks, `tab` and verdict `level` (works or promising)
+"""
+type InstrumentSetup {
+  edgeId: String!
+  edgeName: String!
+  tab: IdeaTab!
+  level: String!
+  place: Int!
 }
 
 """
@@ -2456,6 +2568,12 @@ type LadderRung {
   spans: [AheadEvent!]!
   clear: Boolean!
   marked: Boolean!
+}
+
+"""Setups (or, for `licence`, picks) left out of the list for `kind`"""
+type LeftOut {
+  kind: String!
+  count: Int!
 }
 
 """
@@ -2658,6 +2776,26 @@ type OptionExpiry {
 }
 
 """
+An underlying's option grid for the session. `puts[i][j]` and `calls[i][j]` are the cell of `columns[i]` at `bands[j]` (|delta|). `pricedAt` is the underlying's price the cells are priced at; `qKnown` false: the dividend yield was not stored and was priced as 0. The IV rank is a feature (`features`), not a grid field
+"""
+type OptionGrid {
+  underlyingId: String!
+  session: Date!
+  pricedAt: Float!
+  qKnown: Boolean!
+  bands: [Float!]!
+  columns: [GridExpiry!]!
+  puts: [[OptionGridCell!]!]!
+  calls: [[OptionGridCell!]!]!
+}
+
+"""A cell, or why there is none"""
+union OptionGridCell = GridCell | Unknown
+
+"""The grid, or why there is none"""
+union OptionGridResult = OptionGrid | Unknown
+
+"""
 One contract's stored quote; IV (a decimal) and Greeks as the feed computes them
 """
 type OptionQuote {
@@ -2809,6 +2947,46 @@ type Quantile {
 """Reads for the web app, each for one session (ADR 0036)"""
 type Query {
   """
+  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list before it is paged: `total` then counts the ideas that pass, `facets` the counts (ADR 0082); a cursor is only good for the filters it was issued under. `tab` keeps the screeners of that tab (the Unproven section of `setupIdeas`, ADR 0083); none: every screener. Null: nothing stored
+  """
+  ideas(
+    first: Int! = 50
+    after: String = null
+    filters: [FilterInput!] = null
+    tab: IdeaTab = null
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Ideas
+
+  """
+  One Ideas tab (Stocks or Premium) for the session, built from the picks of the setups whose stored verdict is works or promising, one ranking rule, at most 15 (ADR 0083 decision 2): the setups with what each picked, the ideas, and the setups and picks left out by kind. `state` unproven: no setup of the tab qualifies, the page shows `ideas(tab)` as Unproven. Null: nothing stored
+  """
+  setupIdeas(
+    tab: IdeaTab!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): SetupIdeas
+
+  """
+  One idea's page for the session: the ticker (or instrument id) `symbol` as picked by a qualifying setup, shown under `setup` (default: the best by the Ideas rule), with why it is here, the setup's historical exit rule, its evidence, what could go wrong and the setup to learn (ADR 0083). Null: the name is unknown, no setup picked it at the session, or `setup` is not one that did
+  """
+  idea(
+    symbol: String!
+    setup: String = null
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): IdeaDetail
+
+  """
   Who this request is for: the signed-in registry user, their role and workspaces (ADR 0040; not session data)
   """
   viewer: Viewer!
@@ -2874,20 +3052,6 @@ type Query {
     """
     date: Date = null
   ): EventCalendar
-
-  """
-  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list before it is paged: `total` then counts the ideas that pass, `facets` the counts (ADR 0082); a cursor is only good for the filters it was issued under. Null: nothing stored
-  """
-  ideas(
-    first: Int! = 50
-    after: String = null
-    filters: [FilterInput!] = null
-
-    """
-    the session to read (default: the latest with bars); every value below is for exactly this date
-    """
-    date: Date = null
-  ): Ideas
 
   """
   The US market for the session: the market-entity features by catalogue name (ADR 0047). Null: nothing stored
@@ -3857,6 +4021,52 @@ type Session {
   How complete this session's data is (prices, option chains, fundamentals) and how many of the viewer's screeners it touches: for every viewer, from run records alone; a dataset with no record is UNKNOWN, never 0%
   """
   dataStatus: DataStatus!
+}
+
+"""
+A setup of the tab with what it picked tonight. `state`: picked, nothing_picked, not_a_decision_day or unknown (`unknown` says why: the night was not stored, never read as no picks); `picked`: its picks on the viewer's list before the cap, `shown`: the ideas under the cap that rank under it. `level` is the stored verdict (works or promising); the figures are labelled backtested (hypothetical) on the page
+"""
+type SetupGroup {
+  edgeId: String!
+  name: String!
+  level: String!
+  liftPts: Float
+  oosTrades: Int
+  basisScreener: String!
+  basisHorizon: Int
+  state: String!
+  unknown: Unknown
+  picked: Int!
+  shown: Int!
+}
+
+"""
+A ticker at its best pick: the setup it ranks under (`setupId`), its `place` there, the other setups that picked it, the stored `result` of that pick (null: its row could not be read) and its display `metrics` and `watchOut` ids
+"""
+type SetupIdea {
+  rank: Int!
+  instrumentId: String!
+  instrument: Instrument
+  setupId: String!
+  place: Int!
+  alsoIn: [AlsoIn!]!
+  result: ScreenResult
+  metrics: [IdeaMetric!]!
+  watchOut: [String!]!
+}
+
+"""
+The Ideas of one tab for the session. `state`: listed (a setup qualifies; a night that picks nothing is an empty list, never a fall back) or unproven (none does: the page shows `Query.ideas(tab)` as Unproven). `groups` the qualifying setups, strongest evidence first; `ideas` at most 15, best first; `total` the ideas before the cap; `leftOut` counts by kind; `ruleVersion` the ranking rule's
+"""
+type SetupIdeas {
+  session: Date!
+  tab: IdeaTab!
+  state: String!
+  ruleVersion: Int!
+  groups: [SetupGroup!]!
+  ideas: [SetupIdea!]!
+  total: Int!
+  leftOut: [LeftOut!]!
 }
 
 """A fast (market) or slow (macro) indicator, or the screener gate (GATE)"""

@@ -31,15 +31,14 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   (``quant/black_scholes``), ``delta_hedged_atm_short`` its negative. ``cost_bps`` is charged
   once, in bps of ``P`` (the excess return's convention); no hedging cost, spread or fill is
   modelled and the cost grid does not apply (it scales a stored return). A hit is ``value > 0``.
-- ``option_pnl`` (basis ``chain``, quoted prices; ADR 0053 amendment, EB H13): the P&L of the
-  structure the stored chains priced (``outcomes/option/structure_pnl@v1``, rows of the edge's
-  structure and tenor only), as a fraction of the entry underlying price, net of the quoted
-  spread: ``sign * (pnl_per_underlying)`` less the half-spread paid at entry
-  (``entry_ask - entry_mid``) and at exit (``exit_mid - exit_bid``) over ``entry_spot``, ``sign``
-  -1 for a short structure, ``pnl_per_underlying`` the daily-hedged one
-  (``hedged_pnl_per_underlying``, our own delta) for ``delta_hedged_atm[_short]``; ``cost_bps``
-  once on top. No hedge cost and no financing. A hedged structure's row with a ``hedge_reason``
-  (a hedge session lacked a chain or a delta) is UNMEASURED. A hit is ``value > 0``.
+- ``option_pnl`` (basis ``chain``, quoted prices; ADR 0053 amendment, EB H13; ADR 0088): the P&L of
+  the position the stored chains priced (``outcomes/option/structure_pnl@v2``, the rows of the
+  edge's ``position_key`` for each horizon only), as a fraction of the entry underlying price, net
+  of the quoted spread: ``pnl_mid`` (signed quantities: a short position's sign is in it) less the
+  half-spread paid at entry (``entry_half_spread``) and at exit (``exit_half_spread``) over
+  ``entry_spot``; ``cost_bps`` once on top. No hedge cost and no financing. A row whose exit rule
+  was UNKNOWN on a close (``exit_unknown_closes`` above 0) is UNMEASURED (the strictest stand-in
+  until the verdict names a share). A hit is ``value > 0``.
 - ``side`` ``short`` or ``long_short`` (an ``excess_return`` outcome only): ``short_value`` is the
   value of being short the name, ``-fwd_excess_return - cost_bps / 1e4 - borrow``, with the
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
@@ -74,12 +73,8 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import EXCESS_MEASURES, Edge
-from algotrade.config.edges.positions.chain import (
-    CHAIN_KIND,
-    HEDGED_STRUCTURES,
-    SHORT_STRUCTURES,
-    grain_structure,
-)
+from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.key import position_key
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant.black_scholes import (
     atm_straddle_price,
@@ -111,17 +106,13 @@ SIBLING_MISMATCH = "sibling_mismatch"  # the sibling's own sibling at D is not t
 NO_SIBLING_ROW = "no_sibling_row"  # the sibling has no outcome row at S (not listed, no bar)
 SIBLING_UNMEASURED = "sibling_unmeasured"  # the sibling's window is UNMEASURED
 CHAIN_PNL_FIELDS = (
-    "structure",
-    "tenor_days",
+    "position_key",
     "entry_spot",
-    "entry_mid",
-    "entry_ask",
-    "exit_mid",
-    "exit_bid",
-    "pnl_per_underlying",
-    "hedged_pnl_per_underlying",
-    "hedge_reason",
-)  # the stored chain-grain fields an option_pnl outcome reads
+    "entry_half_spread",
+    "exit_half_spread",
+    "pnl_mid",
+    "exit_unknown_closes",
+)  # the stored option trade fields an option_pnl outcome reads
 MISSING_VALUE = "missing_value"  # a row, but the measure is null (no benchmark bar, no vol)
 NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not positive
 INVALID_IMPLIED_VOL = "invalid_implied_vol"  # ... or non-finite or above MAX_IMPLIED_VOL: garbage
@@ -326,32 +317,27 @@ def _pair_outcome(
 
 
 def chain_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
-    """The rows of ``outcomes`` (the chain grain's, every structure and tenor) the edge's
-    ``option_pnl`` outcome names: one per instrument; any other outcome's rows unchanged."""
+    """The rows of ``outcomes`` (the option trade grain's, every position key) the edge's
+    ``option_pnl`` outcome names: the ``position_key`` of its resolved legs, parameters, exits and
+    each of its horizons (one row per instrument); any other outcome's rows unchanged."""
     o = edge.outcome
     if o.kind != CHAIN_KIND:
         return outcomes
-    held = grain_structure(o.structure or "", o.strike_delta)
-    keep = (outcomes["structure"] == held) & (outcomes["tenor_days"] == o.tenor_days)
-    return outcomes[keep]
+    keys = {position_key(o, h) for h in o.horizon_sessions}
+    return outcomes[outcomes["position_key"].isin(keys)]
 
 
 def _chain_pnl(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
-    """The ``option_pnl`` value per row of ``chain_rows`` (NaN where a price is missing), net of
-    the quoted half-spreads and ``cost_bps``."""
+    """The ``option_pnl`` value per row of ``chain_rows`` (NaN where a price is missing): the
+    position's mid P&L less the half-spreads paid at entry and at exit, over the entry underlying
+    price, less ``cost_bps``. A short position's sign is already in ``pnl_mid`` (quantities are
+    signed). No hedge cost and no financing."""
     o = edge.outcome
-    hedged = o.structure in HEDGED_STRUCTURES
-    gross = _numbers(outcomes, "hedged_pnl_per_underlying" if hedged else "pnl_per_underlying")
+    gross = _numbers(outcomes, "pnl_mid")
     spot = _numbers(outcomes, "entry_spot")
-    spread = (
-        _numbers(outcomes, "entry_ask")
-        - _numbers(outcomes, "entry_mid")
-        + _numbers(outcomes, "exit_mid")
-        - _numbers(outcomes, "exit_bid")
-    )
-    sign = -1.0 if o.structure in SHORT_STRUCTURES else 1.0
+    spread = _numbers(outcomes, "entry_half_spread") + _numbers(outcomes, "exit_half_spread")
     with np.errstate(divide="ignore", invalid="ignore"):
-        value = sign * gross - spread / spot - (o.cost_bps or 0.0) / 1e4
+        value = (gross - spread) / spot - (o.cost_bps or 0.0) / 1e4
     return np.where(spot > 0, value, np.nan)
 
 
@@ -428,8 +414,9 @@ def _chain_outcome(edge: Edge, outcomes: pd.DataFrame, excluded: np.ndarray) -> 
     """``_chain_pnl`` per row; ``excluded`` gets the reason of each row that has no value."""
     value = _chain_pnl(edge, outcomes)
     excluded[~np.isfinite(value)] = MISSING_VALUE
-    if edge.outcome.structure in HEDGED_STRUCTURES:  # a hedge session was missing: no hedged P&L
-        excluded[outcomes["hedge_reason"].notna().to_numpy()] = UNMEASURED
+    # a close on which an exit rule was UNKNOWN: the strictest stand-in until verdict.toml names
+    # an exit_unknown_share (a named follow-up of E4)
+    excluded[_numbers(outcomes, "exit_unknown_closes") > 0] = UNMEASURED
     return value
 
 

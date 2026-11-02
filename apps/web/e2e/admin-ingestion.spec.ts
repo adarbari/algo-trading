@@ -7,7 +7,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
-import { ADMIN_FIXTURES, FAIL, mockAdminApi } from './admin-api';
+import { ADMIN_FIXTURES, FAIL, mockAdminApi, mockNoGuideEntries } from './admin-api';
 import { mockViewer } from './auth-api';
 import { mockRegimeApi } from './regime-api';
 
@@ -22,6 +22,7 @@ for (const theme of ['dark', 'light'] as const) {
     const errors = collectErrors(page);
     await mockRegimeApi(page); // the top-bar chip reads the regime
     await mockViewer(page);
+    await mockNoGuideEntries(page);
     await mockAdminApi(page);
     await page.goto('/admin/ingestion');
     await page.evaluate((t) => {
@@ -30,17 +31,19 @@ for (const theme of ['dark', 'light'] as const) {
     const summary = page.getByLabel('Ingestion summary');
     await expect(summary.first()).toContainText('98.9%');
     await expect(summary.first()).toContainText('4 pass · 1 fail');
+    await expect(page.getByRole('grid', { name: 'Quality checks' })).toContainText(
+      'chains_coverage',
+    );
+    await expect(page.getByRole('list', { name: 'Recent nightly runs' })).toContainText('26m 0s');
+    await page.getByRole('tab', { name: 'Data coverage' }).click();
     const grid = page.getByRole('grid', { name: 'Completeness by dataset and session' });
     await expect(grid).toContainText('Option chains');
     await expect(page.getByRole('heading', { name: 'Option chains · Fri 2 Oct' })).toBeVisible();
     await expect(page.getByText('3,623 of 4,203 expected', { exact: false })).toBeVisible();
-    await expect(page.getByRole('grid', { name: 'Quality checks' })).toContainText(
-      'chains_coverage',
-    );
+    await page.getByRole('tab', { name: 'Checks against IBKR' }).click();
     await expect(page.getByRole('grid', { name: 'Failing verification checks' })).toContainText(
       'SPY',
     );
-    await expect(page.getByRole('list', { name: 'Recent nightly runs' })).toContainText('26m 0s');
     await expectAccessible(page);
     expect(errors).toEqual([]);
   });
@@ -50,6 +53,7 @@ test('a cell drills in, opens its run record and downloads its items', async ({ 
   const errors = collectErrors(page);
   await mockRegimeApi(page); // the top-bar chip reads the regime
   await mockViewer(page);
+  await mockNoGuideEntries(page);
   await mockAdminApi(page, {
     'ingestionCell:bars/1d/2026-10-02': {
       ...(ADMIN_FIXTURES['ingestionCell:chains/option_quotes/2026-10-02'] as object),
@@ -65,6 +69,7 @@ test('a cell drills in, opens its run record and downloads its items', async ({ 
     },
   });
   await page.goto('/admin/ingestion');
+  await page.getByRole('tab', { name: 'Data coverage' }).click();
   await page.getByRole('gridcell', { name: /^Daily bars, Fri 2:/ }).click();
   await expect(page).toHaveURL(/dataset=bars%2F1d&session=2026-10-02/);
   await expect(page.getByRole('heading', { name: 'Daily bars · Fri 2 Oct' })).toBeVisible();
@@ -90,6 +95,7 @@ test('warns when the latest session is not ingested; a failed section shows its 
 }) => {
   await mockRegimeApi(page); // the top-bar chip reads the regime
   await mockViewer(page);
+  await mockNoGuideEntries(page);
   await mockAdminApi(page, {
     completeness: {
       ...(ADMIN_FIXTURES['completeness'] as object),
@@ -105,5 +111,6 @@ test('warns when the latest session is not ingested; a failed section shows its 
     .click();
   await expect(page.getByText(/a nightly run may have been missed/)).toBeVisible();
   await expect(page.getByText('Quality checks could not load.')).toBeVisible();
+  await page.getByRole('tab', { name: 'Checks against IBKR' }).click();
   await expect(page.getByText('No verification for this session')).toBeVisible();
 });

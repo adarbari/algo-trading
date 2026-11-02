@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { CALENDAR_FIXTURE, STUDY_FIXTURE } from './fixtures';
 import {
+  earningsWeek,
+  macroItems,
   aheadItems,
   calendarDays,
   eventItem,
@@ -172,5 +174,25 @@ describe('calendarDays', () => {
   it('has no Market column when nothing is market-wide', () => {
     const own = { ...CALENDAR_FIXTURE, days: [DAY1] };
     expect(calendarDays(own).names.map((n) => n.symbol)).toEqual(['AAPL', 'NVDA']);
+  });
+});
+
+describe('earningsWeek', () => {
+  it('names the reporters of the first five sessions, in order, with the span', () => {
+    expect(earningsWeek(CALENDAR_FIXTURE)).toEqual({
+      from: '2026-10-14',
+      to: '2026-11-20',
+      symbols: ['AAPL'],
+    });
+  });
+
+  it('is null when the calendar has no session', () => {
+    expect(earningsWeek({ ...CALENDAR_FIXTURE, days: [] })).toBeNull();
+  });
+});
+
+describe('macroItems', () => {
+  it('keeps the market-wide events only', () => {
+    expect(macroItems(CALENDAR_FIXTURE).map((e) => e.label)).toEqual(['CPI', 'Monthly expiry']);
   });
 });

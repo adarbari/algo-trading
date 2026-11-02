@@ -16,6 +16,14 @@ section = "docs/adr/0021-option-pricing-conventions.md#implied-volatility"
 detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|bisect|fsolve)$" }]
 
 [[responsibility]]
+id = "option-premium-figures"
+description = "The figures of a sold option from its mid premium (quant/options/premium.py, the option grid's maths): return on collateral (a put's mid / strike, a call's mid / spot), yield a year (roc x 365 / days, simple, NaN where days <= 0), breakeven (strike or spot minus the mid) and the risk-neutral chance of ending below the strike (r = q = 0, ADR 0053's convention: a put's 1 - prob_otm, a call's prob_otm). Written once; the grid and short_premium@v1 call it through features/rollups/premium/band_pick.py"
+owner = ["src/algotrade/quant/options/premium.py"]
+allowed = ["src/algotrade/features/rollups/premium/band_pick.py"]  # the one caller: the figures of a picked cell
+section = "docs/ui/evening-desk-plan.md#4-data-gaps-each-inside-the-slice-that-needs-it"
+detect = [{ call = "return_on_collateral" }, { call = "yield_annualised" }, { call = "p_below" }]
+
+[[responsibility]]
 id = "option-pricing"
 description = "European option prices and Greeks (Black-Scholes-Merton, continuous q and r), delta strikes and out-of-the-money probabilities (ADR 0053 expires_otm), the at-the-money straddle's closed-form price and vega and the delta-hedged vega P&L (ADR 0053 option_model_pnl), and the normal CDF and its inverse they use"
 owner = ["src/algotrade/quant/black_scholes.py"]
@@ -27,8 +35,8 @@ id = "quant-chain-pnl"
 description = "The maths of a chain P&L (ADR 0053 amendment, EB H13): the two-sided mid of a quote (never of a one-sided or crossed one), a long position's P&L mid to mid and bought at the ask and sold at the bid, intrinsic value at expiry, our own delta of a leg from its mid (the implied vol of the mid, r = q = 0) and the daily delta-hedged P&L of a position over the closes of a window, per-leg Greeks and the quantity-weighted sum of a multi-leg position (ADR 0088); pure numpy"
 owner = ["src/algotrade/quant/edges/chain_pnl.py"]
 allowed = [
-    "apps/ingestion/algotrade_ingestion/tasks/derived/option_paths.py",  # the chain P&L writer calls them
     "src/algotrade/engines/structures/marking.py",  # the option-structure engine marks legs with them (ADR 0088)
+    "src/algotrade/engines/structures/trades.py",  # a trade's hedged P&L, intrinsic value and Greeks (ADR 0088)
     "src/algotrade/features/rollups/options/wing_search.py",  # select_legs picks a leg by our own delta
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-18-optionpnl-the-chain-pl-grain-eb-h13"
