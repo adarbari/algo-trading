@@ -24,6 +24,8 @@ import pandas as pd
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.verdict import OptionCosts
+from algotrade.config.site.settings import load_verdict
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_between
@@ -93,6 +95,7 @@ def _settlements(
     book: pd.DataFrame,
     session: date,
     now: datetime,
+    option_costs: OptionCosts | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, str]]]:
     open_rows = book[(book["status"] == OPEN) & (book["sell_session"] <= session)]
     rows: list[dict[str, Any]] = []
@@ -104,7 +107,7 @@ def _settlements(
             continue
         by_name = group.set_index("instrument_id")
         try:
-            settled = settle_group(reader, edge, group, session, now)
+            settled = settle_group(reader, edge, group, session, now, option_costs)
         except ConfigurationError as error:  # one edge's outcome never stops the night's record
             why = f"the outcome could not be settled: {error}"
             failed.append({"edge": edge.id, "reason": why})
@@ -270,7 +273,9 @@ def run_night(
     user_id = user.user_id
     edges = {e.id: e for e in load_edges(configs, user_id)}
     book = read_stored(reader, user_id, session - timedelta(days=LOOKBACK_DAYS), session, now)
-    settled, settled_n, unsettled = _settlements(reader, edges, book, session, now)
+    settled, settled_n, unsettled = _settlements(
+        reader, edges, book, session, now, load_verdict(configs).option_costs
+    )
     recording = [e for e in edges.values() if e.owner == user_id and paper_traded(e)]
     nights = _nights(writer, user, session)
     since = _since(nights)

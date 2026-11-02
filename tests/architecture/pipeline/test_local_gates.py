@@ -87,7 +87,9 @@ def test_the_pre_push_hook_runs_make_changed_without_the_git_environment() -> No
     """Git exports GIT_DIR to a hook; the tests under `make changed` then ran `git init --bare`
     against the real repository and left core.bare=true in the shared config (2026-11-02)."""
     words = shlex.split(_pre_push_entry())
-    assert words[-2:] == ["make", "changed"] and words[0] == "env"
+    # the queue wrapper runs `make changed` once it has a slot (scripts/ops/push_queue.py)
+    assert words[-2:] == [".venv/bin/python", "scripts/ops/push_queue.py"] and words[0] == "env"
+    assert '["make", "changed"' in (ROOT / "scripts" / "ops" / "push_queue.py").read_text()
     unset = {words[i + 1] for i, w in enumerate(words) if w == "-u"}
     assert {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"} <= unset
     probe = [*words[:-2], "sh", "-c", 'printf "%s" "${GIT_DIR-unset}"']
