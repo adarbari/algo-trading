@@ -1,5 +1,5 @@
 /**
- * Explore > Roll a put and Calls on shares end to end, against the production build with the API
+ * Explore > Roll a put, Calls on shares and Buying power end to end, against the production build with the API
  * mocked (explore-api.ts): type a contract, see the buy-back sentence and the rolls with
  * Basics and More and "See all", type shares and a price, see the calls with their flags, the muted
  * call below the price and the dividend, and that neither tab puts what was typed in the URL.
@@ -58,6 +58,25 @@ test('Calls on shares: the calls with their flags, the muted one labelled, and t
   await expect(table.getByText('Early exercise risk')).toBeVisible();
   await expect(page.getByText('Next ex-dividend date 12 Nov 2026, $0.62 a share.')).toBeVisible();
   expect(page.url()).not.toContain('300');
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
+test('Buying power: the contract in, what it ties up in each account, size and stress out', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/explore?focus=AAPL&tab=margin');
+  await page.getByRole('spinbutton', { name: 'Strike' }).fill('80');
+  await page.getByRole('combobox', { name: 'Expiry' }).selectOption('2026-11-20');
+  await page.getByRole('spinbutton', { name: 'Contracts' }).fill('2');
+  await page.getByRole('button', { name: 'Calculate' }).click();
+  await expect(page.getByText('$3,600.00')).toBeVisible();
+  await expect(page.getByText('Cash-secured would hold $16,000.00')).toBeVisible();
+  await expect(page.getByText(/Covid crash, early 2020, −34%/)).toBeVisible();
+  await page.getByRole('radio', { name: 'Cash-secured' }).click();
+  await expect(page.getByText('Margin account would hold $3,600.00')).toBeVisible();
+  expect(page.url()).not.toContain('80');
   await expectAccessible(page);
   expect(errors).toEqual([]);
 });
