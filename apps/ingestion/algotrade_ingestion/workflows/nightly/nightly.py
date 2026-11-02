@@ -52,8 +52,9 @@ from algotrade.services.jobs import JobContext
 from algotrade.storage.runs import published
 from algotrade_ingestion.tasks.analyst.backlog import check_analyst_backlog, check_finnhub_backlog
 from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
-from algotrade_ingestion.tasks.derived.option_outcomes import check_option_outcomes
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
+from algotrade_ingestion.tasks.derived.paths.option_outcomes import check_option_outcomes
+from algotrade_ingestion.tasks.derived.paths.share_outcomes import check_share_outcomes
 from algotrade_ingestion.tasks.derived.residual_returns import check_residual_returns
 from algotrade_ingestion.tasks.edges.picks import check_edge_picks
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
@@ -288,6 +289,14 @@ NIGHTLY: tuple[Step, ...] = (
         needs=("chains",),
         critical=False,
         accept=(check_option_outcomes,),
+    ),
+    # Share path trades of the windows the session closes (ADR 0088, E3c-2), for share setups that
+    # declare an exit: bars to each exit, the exit rule's fields per close. Optional, harness-only.
+    Step(
+        "share-outcomes",
+        needs=("bars", "corporate-actions", "bar-quality", "rollups"),
+        critical=False,
+        accept=(check_share_outcomes,),
     ),
     # The factor-neutral sibling of the outcomes (ADR 0053 amendment, EB H11): the same windows
     # less the loadings of factor_betas@v1 (the rollups step) times the ETF factor returns.

@@ -819,8 +819,13 @@ note = "ADR 0053: forward outcomes per (instrument, start session, horizon, benc
 
 [[table]]
 name = "outcomes/option/structure_pnl@v2"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/option_outcomes.py"
 note = "ADR 0088, design 2.5 (replaces the v1 structure grain, ADR 0053 amendment EB H13): one option trade per (underlying, start session, position_key built from the resolved legs) from the stored chains, written only by frame_and_publish; read only by the edge harness through algotrade.data.outcomes"
+
+[[table]]
+name = "outcomes/instrument/share_path@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/share_outcomes.py"
+note = "ADR 0088, E3c-2: one share trade per (name, start session, position_key: legs, entry offset, the side's exit rules, hold cap) walked over bars/1d to its first declared exit or hold cap, for share setups with an [outcome.exit]; knowledge_ts the latest bars and field partition read up to its own exit; read only by the edge harness through algotrade.data.outcomes (E3c-2b)"
 
 [[table]]
 name = "outcomes/instrument/residual_returns@v1"
