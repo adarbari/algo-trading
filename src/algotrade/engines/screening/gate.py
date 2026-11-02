@@ -9,17 +9,67 @@ read as CALM. A screener that pauses in no label is never paused. Other decision
 they are. PAUSED is processed, so coverage is unchanged. Every row of the run carries the
 session's ``regime`` and its ``size_multiplier``: the label's multiplier, 0 in a label the
 screener pauses in, and ``unknown_multiplier`` when the label is unknown.
+
+The open / closed / unknown decision is one pure function of a rule group (``decide_gate``): a
+setup's edge gate (ADR 0088, a rule over the session's market row) and a screener's ``pause_in``
+(read as the rule ``label not_in pause_in`` over the label's known labels, ``pause_group``) are
+decided by it alike: TRUE is open, FALSE closed, UNKNOWN unknown (fail closed, never open).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 
+from algotrade.core.model.predicates import FieldValue, Group, Rule, evaluate_group
 from algotrade.core.views.feature_view import FeatureValue
 from algotrade.strategies.screeners.base import Decision, ScreenRow
 from algotrade.strategies.screeners.rules import RuleScreenResult
 
 GATED = frozenset({Decision.QUALIFIED, Decision.WATCH})
 UNKNOWN = "regime unknown"
+OPEN, CLOSED, UNDECIDED = "open", "closed", "unknown"  # a gate's state at one session
+LABEL = "label"  # the field a ``pause_in`` rule reads
+
+
+@dataclass(frozen=True)
+class GateDecision:
+    """A gate's state at one session and, unless open, the first rule that did not pass."""
+
+    state: str
+    reason: str | None = None
+
+    @property
+    def open(self) -> bool:
+        return self.state == OPEN
+
+
+def decide_gate(
+    group: Group,
+    row: Mapping[str, FieldValue],
+    domains: Mapping[str, Sequence[str]] | None = None,
+    term: Callable[[str], str] = str,
+) -> GateDecision:
+    """``group`` over one session's market ``row``: TRUE open, FALSE closed, UNKNOWN unknown. A
+    string field with a declared domain reads a value outside it as missing, so a label never seen
+    is UNKNOWN, never open. The reason names the first FALSE rule (closed) or UNKNOWN rule
+    (unknown) by its field's ``term``, never a value."""
+    read = {
+        k: None if domains and k in domains and v not in domains[k] else v for k, v in row.items()
+    }
+    truth = evaluate_group(group, read)
+    if truth:
+        return GateDecision(OPEN)
+    wanted = None if truth is None else False
+    for rule in group.rules():
+        if evaluate_group(Group("all", (rule,)), read) is wanted:
+            why = "not known" if truth is None else "not met"
+            state = UNDECIDED if truth is None else CLOSED
+            return GateDecision(state, f"{term(rule.field)} {why}")
+    return GateDecision(UNDECIDED if truth is None else CLOSED)
+
+
+def pause_group(pause_in: frozenset[str]) -> Group:
+    """A screener's ``pause_in`` as the rule ``label not_in pause_in``."""
+    return Group("all", (Rule(LABEL, "not_in", tuple(sorted(pause_in))),))
 
 
 @dataclass(frozen=True)
@@ -44,9 +94,14 @@ class RegimeGate:
     @property
     def reason(self) -> str | None:
         """Why the gate pauses this run's picks (``None``: it lets them through)."""
-        if not self.known:
-            return UNKNOWN if self.pause_in else None
-        if self.label in self.pause_in:
+        if not self.pause_in:
+            return None
+        decision = decide_gate(
+            pause_group(self.pause_in), {LABEL: self.label}, {LABEL: tuple(self.multipliers)}
+        )
+        if decision.state == UNDECIDED:
+            return UNKNOWN
+        if decision.state == CLOSED:
             return f"regime={self.label}: {self.screener} pauses in {self.label}"
         return None
 

@@ -158,6 +158,7 @@ class SessionStat:
     # every other outcome (``session_rocs`` derives it from the values) and a leg stored before
     # E6b-2. Stored with the leg (nullable columns, no version bump).
     base_roc: Moments | None = None
+    gate: str = ""  # the setup gate's state at D (open / closed / unknown); "" with no gate
 
     @property
     def net_values(self) -> tuple[float, ...]:
@@ -207,16 +208,21 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
     day: values and counts added, the decile figures the mean of the days that had them. A
     block with a day the screen could not measure (coverage) is not measured at all."""
     first = legs[0]
+    if first.gate:  # a gated block counts the days that share its first day's gate state
+        legs = [leg for leg in legs if leg.gate == first.gate]
     if len(legs) == 1:
         return first
     if any(leg.excluded_coverage for leg in legs):
-        return SessionStat(session=first.session, regime=first.regime, excluded_coverage=1)
+        return SessionStat(
+            session=first.session, regime=first.regime, gate=first.gate, excluded_coverage=1
+        )
     tops = [leg.top_decile for leg in legs if leg.top_decile is not None]
     spreads = [leg.spread for leg in legs if leg.spread is not None]
     ranked = [leg.deciles for leg in legs if leg.deciles]
     return SessionStat(
         session=first.session,
         regime=first.regime,
+        gate=first.gate,
         pick_values=tuple(v for leg in legs for v in leg.pick_values),
         pick_hits=sum(leg.pick_hits for leg in legs),
         rest=merge_moments([leg.rest for leg in legs]),
@@ -712,6 +718,31 @@ def edge_slices(stats: Sequence[SessionStat], split: date | None, exploratory: b
     """The slices of a variant's sessions: all, each year (a year the split falls in also as its
     two ``year_part`` sides) and regime label (with a split also as its two ``regime_part``
     sides), and with a split the in-sample and frozen (or exploratory) sides."""
+    return _gated(stats, _edge_slices(stats, split, exploratory))
+
+
+def _gated(stats: Sequence[SessionStat], slices: list[Slice]) -> list[Slice]:
+    """With a setup gate (``stats`` carry its state) every slice keeps the open sessions only (the
+    edge's result) and the ``gate`` slices (``open`` / ``closed`` / ``unknown``) are added beside
+    them: the closed one is the inverse-gate decoy, open against closed the gate's test."""
+    if not any(s.gate for s in stats):
+        return slices
+    gated = [Slice(sl.kind, sl.value, partial(_when_open, sl.keep)) for sl in slices]
+    states = sorted({s.gate for s in stats})
+    return gated + [Slice("gate", state, partial(_in_gate, state)) for state in states]
+
+
+def _when_open(keep: Callable[[SessionStat], bool], stat: SessionStat) -> bool:
+    return stat.gate == "open" and keep(stat)
+
+
+def _in_gate(state: str, stat: SessionStat) -> bool:
+    return stat.gate == state
+
+
+def _edge_slices(
+    stats: Sequence[SessionStat], split: date | None, exploratory: bool
+) -> list[Slice]:
     slices = [Slice("all", "all", _always)]
     for year in sorted({s.session.year for s in stats}):
         slices.append(Slice("year", str(year), partial(_in_year, year)))
