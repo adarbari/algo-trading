@@ -136,6 +136,18 @@ def _is_loopback(host: object) -> bool:
 
 
 @pytest.fixture(autouse=True)
+def _no_real_yahoo_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test builds a real ``yfinance`` session: it opens a process-global sqlite cookie cache
+    that is never closed, and Python 3.13 reports that as an unraisable ResourceWarning in
+    whichever test the collector runs in (#887). A test that needs Yahoo passes a fake session."""
+
+    def refuse(cache_dir: str) -> Any:
+        raise OSError("yahoo: no real session in tests; pass a fake session to yahoo_transport")
+
+    monkeypatch.setattr("algotrade_sources.vendors.yahoo.client.load_session", refuse)
+
+
+@pytest.fixture(autouse=True)
 def _block_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
     """CI never calls the network: a real socket connection fails the test. Unix sockets are
     fine; ``@pytest.mark.allow_localhost`` allows loopback (a test's own server);

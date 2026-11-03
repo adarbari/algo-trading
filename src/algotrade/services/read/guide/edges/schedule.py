@@ -26,6 +26,7 @@ EVENT_WORDS = {
     "earnings_reaction": "After a company reports earnings",
     "earnings_reaction_session": "On the day a company's earnings report moves the price",
     "earnings_expected": "Ahead of an expected earnings report",
+    "earnings_reaction_expected": "Ahead of the day an expected earnings report moves the price",
     "index_change": "When the S&P 500 changes a member",
     "filing_8k": "When a company files an 8-K",
     "nt_late_filing": "When a company files a late-filing notice",
