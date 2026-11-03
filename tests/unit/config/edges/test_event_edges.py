@@ -324,13 +324,18 @@ def test_the_lockup_edge_enters_before_the_expiry_and_shorts_the_most_liquid_fir
 
 # The ten site edges on an ``on_event:earnings*`` class and the (count field, date field, sign,
 # announced ahead) each reads (F10): the opt-in ``earnings_reaction_session`` class is added
-# beside them and changes none of these windows (a golden pin, not a recomputation).
+# beside them and changes none of these windows (a golden pin, not a recomputation). F10b's
+# ``earnings_reaction_expected`` reads the expected-report count, projected (c17 opts in).
 EARNINGS_EDGES = {
     "on_event:earnings_reaction": (
         "rollup.earnings_reaction@v2.sessions_since_reaction",
         "rollup.earnings_reaction@v2.reaction_end_date", 1, False,
     ),
     "on_event:earnings_expected": (
+        "rollup.earnings_expected@v1.sessions_to_expected_report",
+        "rollup.earnings_expected@v1.expected_report_date", -1, True,
+    ),
+    "on_event:earnings_reaction_expected": (
         "rollup.earnings_expected@v1.sessions_to_expected_report",
         "rollup.earnings_expected@v1.expected_report_date", -1, True,
     ),
@@ -344,7 +349,10 @@ EARNINGS_EDGES = {
 def test_the_earnings_edges_keep_their_event_fields_beside_the_reaction_session_class() -> None:
     edges = [e for e in load_edges(STORE) if e.schedule.startswith("on_event:earnings")]
     assert len(edges) >= 10  # the ten of F10's golden pin and the setups filed since
-    assert {e.schedule for e in edges} <= set(EARNINGS_EDGES)  # none opted into the new class
+    # none opted into the F10 class; only c17 into F10b's projection
+    assert {e.schedule for e in edges} <= set(EARNINGS_EDGES)
+    projected = {e.id for e in edges if e.schedule == "on_event:earnings_reaction_expected"}
+    assert projected == {"c17_earnings_straddle_sell"}
     for edge in edges:
         spec = event_field(event_class(edge.schedule) or "", event_subtype(edge.schedule))
         assert (spec.count, spec.date, spec.sign, spec.announced_ahead) == EARNINGS_EDGES[
@@ -382,18 +390,19 @@ def test_an_x6_setup_is_blocked_on_the_history_and_its_old_version_retired(new: 
 
 def test_the_conditional_earnings_sale_waits_on_the_history_and_pauses_in_stress() -> None:
     """X5 (ADR 0088, plan C2): c17's new version is blocked with the import named, sells the
-    short straddle (the iron fly as its variant) the close before the report, and its gate keeps
-    STRESS and CRISIS out (an unknown label never passes)."""
+    short straddle (the iron fly as its variant) at the close before the reaction session the
+    schedule projects from the report time known at D (F10b: one anchor for before-open and
+    after-close reports), and its gate keeps STRESS and CRISIS out (an unknown label never
+    passes)."""
     edge = next(e for e in load_edges(STORE) if e.id == "c17_earnings_straddle_sell")
     assert (
         edge.status == "blocked" and "E5" in edge.rejection_reason and "F7" in edge.rejection_reason
     )
     assert edge.outcome.kind == "option_pnl" and edge.outcome.position is not None
     assert edge.outcome.position.template == "short_straddle"
-    assert (
-        edge.outcome.start_offset_sessions == -1 and edge.schedule == "on_event:earnings_expected"
-    )
-    assert {v.id for v in edge.variants} == {"iron_fly", "after_hours"}
+    assert edge.outcome.start_offset_sessions == -1
+    assert edge.schedule == "on_event:earnings_reaction_expected"
+    assert {v.id for v in edge.variants} == {"iron_fly"}
     rule = edge.gate.rules()[0]  # type: ignore[union-attr]
     assert (rule.field, rule.op) == ("market.regime@v3.label", "in")
     assert set(rule.value) == {"CALM", "CAUTION"} and "earnings_move_rich" in edge.screeners

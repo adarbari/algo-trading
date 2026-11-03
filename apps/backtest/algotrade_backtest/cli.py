@@ -15,6 +15,7 @@ algotrade-backtest evaluate-edges [--edge ID] [--from D] [--to D] [--as-of T] [-
     (no --user: each edge is run as its owner, from where its document lives)
 algotrade-backtest study-winners                           (the ED6 winners study, one run)
 algotrade-backtest draft-edges --run ID [--out-dir DIR]    (a candidate edge draft, if it passed)
+algotrade-backtest --user U draft-edges --run ID           (its proposal as U's researching edge)
 """
 
 import argparse
@@ -147,7 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
     fs.add_argument("--out", type=Path, help="the features file (default edge_scores.toml)")
     sub.add_parser("study-winners", help="the ED6 winners study: find the tells, persist one run")
     de = sub.add_parser(
-        "draft-edges", help="write the candidate edge draft of a winners study run that passed"
+        "draft-edges", help="a passed winners study run: U's edge (--user), else a draft"
     )
     de.add_argument("--run", required=True, help="the run id printed by study-winners")
     de.add_argument("--out-dir", type=Path, help="where the draft goes (default var/edge_drafts)")
