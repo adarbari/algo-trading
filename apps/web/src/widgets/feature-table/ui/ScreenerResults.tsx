@@ -7,19 +7,12 @@
  * part of the screener). The header says the regime the run stamped, and the picks the regime
  * gate paused are a decision of their own (PAUSED, reason in the row's detail).
  * A PARTIAL run says so with the tables it ran without, apart from the session's missing tables.
- * Enter on a row opens the ticker in Explore. With `renderDetail`, the row under review's detail
- * sits beside the table, or on a phone opens in a full-height sheet when a row is chosen
+ * Enter on a row opens the ticker in Explore. The row under review's detail (`PickDetail`: its
+ * decision, criteria scorecard and what it counts toward, with the page's `renderBesidePick`
+ * under it) sits beside the table, or on a phone opens in a full-height sheet when a row is chosen
  * (MasterDetail), with previous / next and Open in Explore, Compare and Dismiss pinned below.
  */
-import {
-  ActionGroup,
-  Button,
-  MasterDetail,
-  SearchInput,
-  Stack,
-  Text,
-  type DataTableSort,
-} from '@algotrade/ui';
+import { Button, MasterDetail, SearchInput, Stack, Text, type DataTableSort } from '@algotrade/ui';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
@@ -35,7 +28,7 @@ import { termHelp } from '@/features/guide-help';
 import { formatSort, parseSort, screenerScope, useTableView } from '@/entities/saved-view';
 import { UnknownNote, type ServedUnavailable } from '@/entities/availability';
 import { useFilterSet } from '@/entities/filter';
-import { byName, useFeatureCatalogue, type CriterionInfo, type TableRow } from '@/entities/feature';
+import { byName, useFeatureCatalogue, type TableRow } from '@/entities/feature';
 import { RunRegimeChip } from '@/entities/regime';
 import {
   DEFAULT_DECISIONS,
@@ -50,6 +43,7 @@ import { usePageOf } from '../model/paging';
 import { pageCount, resultsPlan } from '../model/plan';
 import { resultRows } from '../model/rows';
 
+import { PickActions, PickDetail } from './PickDetail';
 import { TableFrame } from './TableFrame';
 
 export interface ScreenerResultsProps {
@@ -77,13 +71,8 @@ export interface ScreenerResultsProps {
   leaving?: ReadonlySet<string>;
   /** The run line and strip above the table, given the screener's recent runs (page-composed). */
   renderRunLine?: (runs: readonly RecentRun[], gaps: readonly ServedUnavailable[]) => ReactNode;
-  /** What to show beside the table for the row under review (its detail, chart, ...). */
-  renderDetail?: (focus: {
-    row: TableRow;
-    criteria: readonly CriterionInfo[];
-    /** Drawn in the phone sheet, whose footer carries the pick's actions. */
-    inSheet: boolean;
-  }) => ReactNode;
+  /** Under the pick's detail, for the row under review (the page's price chart). */
+  renderBesidePick?: (row: TableRow) => ReactNode;
 }
 
 /** The surface of the filter bar: its definitions are `config/site/filters/screener_results.toml`. */
@@ -120,7 +109,7 @@ export function ScreenerResults({
   onShowDismissed,
   leaving,
   compared = [],
-  renderDetail,
+  renderBesidePick,
   renderRunLine,
 }: ScreenerResultsProps) {
   const definitions = useFilterSet(SURFACE);
@@ -323,7 +312,6 @@ export function ScreenerResults({
     ) : (
       body
     );
-  if (!renderDetail) return withLine(table);
   // The sheet opens only for a row the user chose, not the first-row fallback.
   const chosen = focusRow !== null && focusRow.instrumentId === focusId ? focusId : null;
   const index = chosen === null ? -1 : rows.findIndex((row) => row.instrumentId === chosen);
@@ -332,9 +320,25 @@ export function ScreenerResults({
       columns="main-aside"
       master={table}
       detail={(inSheet) =>
-        screener && focusRow
-          ? renderDetail({ row: focusRow, criteria: screener.criteria, inSheet })
-          : null
+        screener && focusRow ? (
+          <Stack gap={3}>
+            <PickDetail
+              row={focusRow}
+              screenerId={id}
+              criteria={screener.criteria}
+              compared={compared.includes(focusRow.symbol)}
+              showActions={!inSheet}
+              onOpen={onOpen}
+              onToggleCompare={() => {
+                onToggleCompare(focusRow);
+              }}
+              onDismiss={() => {
+                onDismiss(focusRow);
+              }}
+            />
+            {renderBesidePick?.(focusRow)}
+          </Stack>
+        ) : null
       }
       detailKey={chosen}
       detailTitle={focusRow?.symbol ?? ''}
@@ -352,37 +356,16 @@ export function ScreenerResults({
       }}
       detailFooter={
         focusRow ? (
-          <ActionGroup
-            label="Pick actions"
-            actions={[
-              {
-                id: 'open',
-                label: 'Open in Explore',
-                icon: 'external',
-                onClick: () => {
-                  onOpen(focusRow.symbol);
-                },
-              },
-              {
-                id: 'compare',
-                label: compared.includes(focusRow.symbol)
-                  ? 'Remove from compare'
-                  : 'Add to compare',
-                icon: compared.includes(focusRow.symbol) ? 'minus' : 'plus',
-                onClick: () => {
-                  onToggleCompare(focusRow);
-                },
-              },
-              {
-                id: 'dismiss',
-                label: 'Dismiss',
-                icon: 'close',
-                variant: 'ghost',
-                onClick: () => {
-                  onDismiss(focusRow);
-                },
-              },
-            ]}
+          <PickActions
+            symbol={focusRow.symbol}
+            compared={compared.includes(focusRow.symbol)}
+            onOpen={onOpen}
+            onToggleCompare={() => {
+              onToggleCompare(focusRow);
+            }}
+            onDismiss={() => {
+              onDismiss(focusRow);
+            }}
           />
         ) : null
       }

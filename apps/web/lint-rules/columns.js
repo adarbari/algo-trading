@@ -18,7 +18,7 @@ const FACTORIES = 'src/entities/feature/model/columns.tsx';
 
 // SHRINK-ONLY: each entry is removed by the read-model PR named beside it.
 const PENDING = [
-  'src/widgets/top-ideas/model/columns.tsx', // RM5: Ideas on GraphQL (top ideas rebuilt)
+  'src/widgets/setup-ideas/model/match-columns.tsx', // RM item "Ideas list on the feature table": the Unproven matches (moved from widgets/top-ideas); needs the ideas read to serve TableRows
 ];
 
 // Not feature tables: their rows are not instruments x catalogue features.
