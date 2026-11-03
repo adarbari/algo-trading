@@ -430,7 +430,7 @@ owner's generalisation to share setups and (1g) every part of a setup as a rule 
 | 25 | IV-HV straddles; 252-session realised vol | B1 / c12 | `hv252` | missing (`vol_stats@v1`: hv10 / hv60) | F6 `vol_stats@v2.hv252` (P2); X6 |
 | 26 | Calls on high-vol, puts on low-vol, never the reverse | B2 | two sleeves, each the other's decoy | partial: screeners `low_volatility`, `ivol_high` | X4; S2 |
 | 27 | Term slope 30 vs 180 days from chains | B3 / c13 | long-tenor ATM IV | partial: `iv_term@v1` (Cboe only) | F7 history features + `iv_term@v2.iv_180d` (P2); X6 |
-| 28 | Characteristic sorts (profitability, cash, default, vol-of-vol) | B4 / c14 | sorts as screeners | partial: `profitability_z`, `balance_sheet.cash`, `ohlson_o`; vol-of-vol missing | S4 (P2); vol-of-vol via F7 (P2) |
+| 28 | Characteristic sorts (profitability, cash, default, vol-of-vol) | B4 / c14 | sorts as screeners | partial: profitability, cash and default sorts built (S4: `cash_op_profitability`, `cash_to_assets_high`, `distress_ohlson`); vol-of-vol missing, waits on F7 | S4 (P2); vol-of-vol via F7 (P2) |
 | 29 | Overpriced puts on short-constrained names; borrow fee | B5 | delta-hedged put template | partial: `composite_rank`, `days_to_cover` | P3; borrow fee REJECTED: no source, short interest is the proxy |
 | 30 | Option momentum (trailing straddle returns) | B6 / c15 | per-name past straddle returns as a feature | missing | P3, through F7's path from past chains, never from the outcomes grain (quarantined) |
 | 31 | Illiquidity premium, order flow | B7 | signed trades | missing | REJECTED: intraday |

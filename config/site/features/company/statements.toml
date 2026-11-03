@@ -180,6 +180,15 @@ null_meaning = "ebit_ttm, net_income_ttm or ocf_ttm is null (no TTM, an untagged
 valid_range = [-inf, inf]
 version = 1
 
+[cash_to_assets]
+expr = 'if(balance_sheet.total_assets > 0 and balance_sheet.cash >= 0 and balance_sheet.bs_status == "OK", balance_sheet.cash / balance_sheet.total_assets, null)'
+dtype = "float"
+unit = "decimal"
+description = "Cash holdings over total assets: cash and equivalents / total assets at the latest balance sheet; 0.20 is 20 cents of cash on each dollar of assets. Short-term investments are left out, so a company holding its cash as securities shows less than it has"
+null_meaning = "cash or total_assets is null (an untagged line, or a bank, broker or insurer), the assets are not positive, or bs_status is not OK (STALE, or a core line sits at an older date)"
+valid_range = [0, 1]
+version = 1
+
 [ev_ebit]
 expr = 'if(one_of(income_statement.is_status, "OK", "PARTIAL") and income_statement.ebit_ttm > 0 and enterprise_value > 0, enterprise_value / income_statement.ebit_ttm, null)'
 dtype = "float"

@@ -97,3 +97,22 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 - Statement figures enter from the session after SEC acceptance of the filing and can be four months old.
 
 Sources: Ball, Gerakos, Linnainmaa and Nikolaev (2016), Journal of Financial Economics 121(1), Accruals, cash flows, and operating profitability in the cross section of stock returns
+
+### `feature.cash_to_assets`
+
+**How to read it.** Cash on each dollar of assets: cash and equivalents over total assets at the latest balance sheet, 0.20 is 20 cents of cash per dollar. Palazzo links high cash to higher average returns and to cash-flow risk; the options research uses it as a stock characteristic. Above 0.30 is a cash-heavy balance sheet, 0.05 to 0.30 is ordinary, and near 0 is a business that holds little cash.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a cash-heavy balance sheet | `gte 0.3` | soft | 0.3 x the threshold | - |
+
+**When the reading lies**
+
+- Short-term investments are left out, so a company that holds its cash as securities reads lower than it is. Compare feature.net_debt, which has the same limit.
+- Null for banks, brokers and insurers, for an untagged cash line, and for a stale balance sheet. A missing value is a gap, not a pass.
+- A high value is not safety: a young cash-burning company can hold most of its assets as cash. Read it with rollup.mispricing@v1.ohlson_o.
+- Statement figures enter from the session after SEC acceptance of the filing and can be four months old.
+
+Sources: Palazzo (2012), Journal of Financial Economics 104(1), Cash holdings, risk, and expected returns
