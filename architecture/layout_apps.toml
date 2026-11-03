@@ -400,6 +400,14 @@ module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/option_outcomes
 reason = "`check_option_outcomes` is the option-outcomes step's acceptance check (ADR 0053 amendment, EB H13, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
 
 [[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/close_fields.py"
+reason = "the history writer (tasks/options_history/outcomes.py, ADR 0088 decision 11) reads an exit rule's catalogue fields per close and refuses an unstored one with the same loader as option-outcomes: one reader, not a copy"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/wanted.py"
+reason = "the history writer takes the same positions to write as option-outcomes (`positions_wanted`): a new edge document needs no change in either writer"
+
+[[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/share_outcomes.py"
 reason = "`check_share_outcomes` is the share-outcomes step's acceptance check (ADR 0088, E3c-2, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
 

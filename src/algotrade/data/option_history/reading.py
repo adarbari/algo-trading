@@ -6,7 +6,7 @@ records. ``symbol`` (the vendor's underlying symbol) is what a read filters on, 
 by ``symbol``, so a read of a few names decodes few row groups.
 """
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from datetime import date
 
 import pandas as pd
@@ -44,6 +44,23 @@ def option_quotes(
 ) -> pd.DataFrame | None:
     """The contracts of ``symbols`` (``None``: every underlying) quoted on ``session``."""
     return _read(reader, QUOTES, session, symbols)
+
+
+def option_quote_rows(
+    reader: StoreReader,
+    session: date,
+    instrument_ids: Collection[str] | None,
+    columns: Sequence[str] | None = None,
+) -> pd.DataFrame | None:
+    """The quotes of the contracts ``instrument_ids`` (``None``: every contract) on ``session``,
+    of the named ``columns`` (a trade's held legs, or the chain of its entry session)."""
+    run_id = session_run(reader, session)
+    if run_id is None:
+        return None
+    where = (
+        () if instrument_ids is None else (RowFilter("instrument_id", frozenset(instrument_ids)),)
+    )
+    return reader.read_run(QUOTES, session, run_id, columns=columns, where=where)
 
 
 def underlying_quotes(
