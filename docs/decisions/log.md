@@ -331,7 +331,9 @@ follow-up PR).
 - Options: go / no-go / go with a condition.
 - Decision: go, with one condition: nobody runs it by hand tonight. The next nightly post-session runs `edge-eval` as it is built (`algotrade-ingest post-session`, which submits one `edge-eval` job per open edge); if the two backfills still hold the ingest lock at 15:00 the post-session returns BUSY and the watchdog retries, so they are not killed. The timing is read from the first post-session summary that ran the step (`edge_eval` in the summary: duration against `[post] edge_eval_target_s = 60`); a WARN on that first FULL run is expected, not a failure.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-11-02
+- Note: the owner said "Yes, run them" to outcomes and a full `evaluate-edges` run by hand on the live store; that lifts the "nobody runs it by hand" condition, and the nightly `edge-eval` writes stay on.
 - Reasoning: `var/data` lives on `/Volumes/AlgoData` (1.7 TB free), so the ~4 GB per edge worst case of ADR 0063 fits; the step is non-critical, outside the ingest lock and published atomically (ADR 0022), so a failure leaves no legs and the run is reversible.
 ## 2026-11-02 | IBS research as a swing setup | forced settings of `ibs_etf_swing_recovery`
 - Question: the brief asked for `benchmark = "none"`, a Cutler RSI(3) feature, a trend and a volatility variant by `hv10` vs `hv126`, and the IBS-only rule as a variant; what does the code allow, and does the owner's reuse rule (2026-11-02) change the model?
@@ -368,3 +370,10 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: under the null about 15% of reactions clear 1.5, so a median over 4 clears it about 2% of the time and about half of the names would carry a false peer across 40 candidates; at 8 or more reports the rate is a few percent.
+## 2026-11-02 | EV4b | the nightly's text model: where it is built, who logs its usage, the cap
+- Question: ingestion has no `TextModel`; its usage log and the seam's composition are the API's today (ADRs 0041, 0058, 0005). How does the nightly attribution classify headlines?
+- Options: build the chain in ingestion (a copy) / one composition callers share / skip the model.
+- Decision: `open_text_model` moves to `services/text_model/opening.py` (the library, the caller passes the registry's builders so no vendor import); ingestion builds it lazily through `TaskContext.text_model_factory` with `skip_restricted` (never an `only_users` provider); usage rows are written to `usage/llm_calls` by the nightly through the same recorder and ledger (`use_case = "attributing"`); `events/attribution.toml news_per_night = 40`, at most 8 headlines in the prompt, `prompt_version = "attributing/v1"`, a model row's `known_from` the run session, confidence capped at 0.8. Amendments to ADRs 0005, 0041, 0050, 0058.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: apps never import each other and the library never imports vendors, so one shared composition with injected builders is the only shape without a copy; the owner's login must never serve the site user; spend is one time series.

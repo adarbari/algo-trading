@@ -162,3 +162,11 @@ its `rejected` row (no cost), all under one `call_id`.
 - The owner's subscription spend appears as `reported` rows: notional, counted against the
   budget (set the caps with that in mind, or declare the login's calls free by leaving it out
   of the chain).
+
+## Amendment 2026-11-02: the nightly shares the ledger and the caps (EV4b)
+
+The ingestion `attribution` step builds the same `UsageLedger` from `llm.toml`, seeded from the
+store at the start of its model source and reserving against the same `[budget]` caps; its calls
+are rows with `use_case = "attributing"`. "One API process" becomes "the API plus the nightly",
+each able to overspend by its own share before the other's rows are read; a spent budget stops the
+night's calls (`DailyLimitError`), never the filing rows. Pending owner confirmation.

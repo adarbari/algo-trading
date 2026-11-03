@@ -1,0 +1,9 @@
+# L3 site setting: the move attribution (ADR 0050 EV4b), typed in
+# src/algotrade/config/site/events/attribution.py.
+#
+# news_per_night   the big movers (with no 8-K cause) the nightly asks Massive news and the text model
+#                  about: one news request and one model call each. The free tier is 5 requests a
+#                  minute, so 40 movers are about 8 minutes under the ingest lock. 0 turns the
+#                  headline source off (the filing causes are unaffected).
+
+news_per_night = 40

@@ -790,6 +790,7 @@ def job_task_context(ctx: JobContext) -> TaskContext:
         raw_sections=r.get("raw_sections", {}),
         pacing=r.get("pacing", {}),
         clock=r.get("clock") or utc_now,
+        text_model_factory=r.get("text_model_factory"),
     )
 
 

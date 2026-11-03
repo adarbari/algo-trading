@@ -23,6 +23,7 @@ from algotrade_sources.framework.series import (
     FilingsRequest,
     FilingTextRequest,
     InsiderRequest,
+    NewsRequest,
     ProspectusRequest,
     ProspectusSearchRequest,
     ReleaseRequest,
@@ -41,6 +42,7 @@ from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
 from algotrade_sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_sources.vendors.massive.corporate_actions import MassiveCorporateActions
+from algotrade_sources.vendors.massive.news import MassiveNews
 from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
@@ -209,6 +211,12 @@ def massive_tickers() -> Adapter:
 def massive_overview() -> Adapter:
     payload = (FIXTURES / "massive" / "overview_KO.json").read_bytes()
     return MassiveOverview(http_for(lambda url: payload)), FetchRequest("KO")
+
+
+def massive_news() -> Adapter:
+    payload = (FIXTURES / "massive" / "news_AAA.json").read_bytes()
+    request = NewsRequest(key="AAA", start="2026-10-02T20:00:00Z", end="2026-10-05T20:00:00Z")
+    return MassiveNews(http_for(lambda url: payload)), request
 
 
 def sec_fund_tickers() -> Adapter:
@@ -383,6 +391,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "finra_short_volume": finra_short_volume,
     "massive_tickers": massive_tickers,
     "massive_overview": massive_overview,
+    "massive_news": massive_news,
     "sec_fund_tickers": sec_fund_tickers,
     "sec_fund_objectives": sec_fund_objectives,
     "sec_fund_series": sec_fund_series,

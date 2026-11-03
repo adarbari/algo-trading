@@ -14,10 +14,12 @@ from algotrade.config.site.llm import LlmSettings
 from algotrade.core.model.completion import Attempt
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.ledger import UsageLedger
+from algotrade.services.text_model.opening import open_text_model as open_site_text_model
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from algotrade_api.text_model import FORCED_OFF, OFF, open_text_model
+from algotrade_sources.framework.registry import build_claude_cli, build_text_model
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.llm.claude_cli import ClaudeCli
 from tests.helpers.api_store import as_user
@@ -142,6 +144,21 @@ def test_a_lone_claude_cli_provider_still_answers_only_its_users(
 ) -> None:
     model, _ = open_text_model(configs(CLI_CHAIN | {"provider": CLI_CHAIN["provider"][:1]}))
     assert isinstance(model, FallbackTextModel) and model.names_for("bob") == ()
+
+
+def test_a_site_job_never_builds_a_provider_restricted_to_users(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ingestion (EV4b) opens the same chain with ``skip_restricted``: the owner's Claude login
+    never answers the site user's nightly calls."""
+    monkeypatch.setenv("ALGOTRADE_LLM_API_KEY_GEMINI", "sk-gemini")
+    model, _ = open_site_text_model(configs(CLI_CHAIN), None, chat=build_text_model,
+                                    cli=build_claude_cli, skip_restricted=True)  # fmt: skip
+    assert isinstance(model, FallbackTextModel) and model.names == ("gemini-2.5-flash",)
+    alone = CLI_CHAIN | {"provider": CLI_CHAIN["provider"][:1]}
+    off, reason = open_site_text_model(configs(alone), None, chat=build_text_model,
+                                       cli=build_claude_cli, skip_restricted=True)  # fmt: skip
+    assert off is None and "restricted to users" in reason
 
 
 def test_a_claude_cli_provider_without_only_users_turns_the_text_model_off() -> None:

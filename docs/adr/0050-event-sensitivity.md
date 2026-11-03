@@ -227,3 +227,16 @@ for a window that ended before the run's session.
 4. **Pacing** (the stepped SEC limiter, `docs/configuration.md` "Vendor pacing"): 8 requests a
    second at most for this task's three sources, one step down on an error, to a floor of 5, one
    step up after 15 minutes without one; every other SEC source stays at 5.
+
+## Amendment 2026-11-02: attribution as built (EV4a, EV4b)
+
+Filing attribution (EV4a) re-reads the last 5 sessions each night; every mover is attributed, an
+earnings day included. Headline attribution (EV4b): at most `events/attribution.toml news_per_night = 40` movers
+of the run session without a filing row (instrument id order), one Massive news request each for the
+headlines published after the previous close and by the reaction session's close (at most 8, title,
+publisher, time), one model call, `prompt_version = "attributing/v1"`; the answer must name a
+taxonomy cause and one of the headlines shown (the evidence, with its URL), confidence capped at
+0.8; a model row's `known_from` is the session the task ran on, never the reaction session on a
+backfill; `model` and `prompt_version` are columns. The step is skipped, with the reason, when the
+text model is off or Massive news is not built; the filing rows never depend on it. Chosen by a
+Fable agent on the owner's behalf; pending owner confirmation.

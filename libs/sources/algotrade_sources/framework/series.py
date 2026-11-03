@@ -57,6 +57,7 @@ FILING_FORMS = (
 # The periodic reports (edge build D10): a 10-K / 10-Q and their amendments, each its own filing
 # with its own accession and acceptance time (a 10-K/A is never merged into its 10-K).
 PERIODIC_FORMS = ("10-K", "10-K/A", "10-Q", "10-Q/A")
+NEWS_FRAME = "headlines"  # key of ``Normalized.parsed``: a ticker's headlines (ADR 0050 EV4b)
 FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's filing rows (ADR 0050)
 DAILY_INDEX_FRAME = "daily_index"  # key of ``Normalized.parsed`` holding a day's 8-K filers
 DAILY_INDEX_COLUMNS = ("cik", "form", "accession", "filing_date")
@@ -148,6 +149,17 @@ class SeriesRequest(FetchRequest):
     vintages: bool = True  # FRED: every vintage (ALFRED); False: the current values only
     start: date | None = None
     end: date | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class NewsRequest(FetchRequest):
+    """One ticker's headlines (``vendors/massive/news.py``, EV4b): ``key`` the ticker (ACT style);
+    ``start`` / ``end`` the ISO UTC instants bounding ``published_utc`` (inclusive); ``limit`` the
+    most headlines asked."""
+
+    start: str = ""
+    end: str = ""
+    limit: int = 8
 
 
 @dataclass(frozen=True, kw_only=True)

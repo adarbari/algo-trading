@@ -27,7 +27,8 @@ from algotrade_ingestion.tasks.derived import (
 )
 from algotrade_ingestion.tasks.edges import picks as edge_picks
 from algotrade_ingestion.tasks.edges import verdicts as edge_verdicts
-from algotrade_ingestion.tasks.events import attribution, filing_text, filings, insider, ipo_lockups
+from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
+from algotrade_ingestion.tasks.events.attribution import run as attribution
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -442,11 +443,11 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "attribution",
-            "Why each big mover moved (events/attribution, source filing): the session's "
-            "event_reaction@v1 movers matched to the 8-K of their reaction session (ADR 0050)",
+            "Why each big mover moved (events/attribution): the 8-K causes and the headline causes",
             attribution,
             (attribution.TABLE,),
             entries_market.run_attribution,
+            optional_sources=("massive_news",),
             params=(SESSION,),
         ),
         Task(

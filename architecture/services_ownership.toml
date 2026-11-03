@@ -242,7 +242,7 @@ allowed = [
     "src/algotrade/storage/tables/schemas/results.py",  # declares the table
     "src/algotrade/data/usage/*",  # the read of the recorded usage (spent_by_day, read_llm_calls)
     "src/algotrade/config/site/llm.py",  # the [[price]] and [budget] settings and each provider's rate
-    "apps/api/algotrade_api/text_model.py",  # wires the ledger into the chain
+    "src/algotrade/services/text_model/opening.py",  # composes the chain and its ledger once for the API and the nightly (ADR 0041 amendment 2026-11-02)
 ]
 section = "docs/adr/0058-llm-usage-log-prices-and-budget.md#budget"
 detect = [{ string = "usage/llm_calls" }, { call = "UsageWriter" }, { call = "UsageLedger" }]
@@ -252,7 +252,7 @@ id = "move-attribution"
 description = "Name the cause of a big move (ADR 0050 decisions 4-5, EV4): the closed cause taxonomy and the 8-K item codes that map to it (services/attributing/taxonomy.py), and the attribution of a session's big movers from the 8-K filed for their reaction session (filing.py): one row per instrument and session, confidence by the number of causes; ingestion's attribution task reads the movers and the filings and stores events/attribution, never classifying itself"
 owner = ["src/algotrade/services/attributing/*"]
 allowed = [
-    "apps/ingestion/algotrade_ingestion/tasks/events/attribution.py",  # the one caller: reads the movers and filings, stores the rows
+    "apps/ingestion/algotrade_ingestion/tasks/events/attribution/run.py",  # the one caller: reads the movers and filings, stores the rows
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "attribute_from_filings" }, { string = "8-K items" }]

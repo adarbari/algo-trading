@@ -12,8 +12,8 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.schemas import ATTRIBUTION_EVENTS
 from algotrade.storage.tables.schemas.registry import table_key
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.events import attribution
-from algotrade_ingestion.tasks.events.attribution import TABLE, ingest_attribution
+from algotrade_ingestion.tasks.events.attribution import run as attribution
+from algotrade_ingestion.tasks.events.attribution.run import TABLE, ingest_attribution
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped
 
