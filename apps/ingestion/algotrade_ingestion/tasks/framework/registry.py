@@ -175,9 +175,7 @@ TASKS: dict[str, Task] = {
                 Param("limit", ("--limit",), int, "fetch at most N companies this run"),
             ),
         ),
-        entries_reference.LISTING_HISTORY,
-        entries_reference.DELISTED_TICKERS,
-        entries_reference.DELISTINGS,
+        *entries_reference.LISTING_TASKS,
         Task(
             "analyst-probe",
             "which analyst endpoints the FMP and Finnhub keys may call (analyst/vendor_access); "
