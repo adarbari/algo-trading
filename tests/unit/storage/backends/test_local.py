@@ -52,7 +52,7 @@ def _write(root: Path, n: int) -> LocalBackend:
     return backend
 
 
-def _read_table(path: Path, instruments: Any, columns: Any) -> pa.Table:
+def _read_table(path: Path, instruments: Any, columns: Any, threaded: bool = True) -> pa.Table:
     """The reader before this change (``read_table`` with a filter), for comparison."""
     filters = None if instruments is None else [("instrument_id", "in", list(instruments))]
     if columns is None:
@@ -83,6 +83,9 @@ def test_read_file_decodes_what_read_table_did(
     path = _first_file(store)
     expected = _read_table(path, instruments, columns)
     assert _read_file(path, instruments, columns).equals(expected, check_metadata=True)
+    assert _read_file(path, instruments, columns, threaded=False).equals(
+        expected, check_metadata=True
+    )  # a pool worker decodes on its own thread: the same table
 
 
 def test_no_instruments_select_no_rows(store: Path) -> None:
