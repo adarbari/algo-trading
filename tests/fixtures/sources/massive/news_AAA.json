@@ -1,0 +1,5 @@
+{"status":"OK","results":[
+ {"title":"AAA cuts full-year guidance on weak demand","publisher":{"name":"Newswire"},"published_utc":"2026-10-05T12:15:00Z","article_url":"https://example.com/a1","tickers":["AAA"]},
+ {"title":"Analyst downgrades AAA to sell","publisher":{"name":"Markets Daily"},"published_utc":"2026-10-05T09:00:00Z","article_url":"https://example.com/a2","tickers":["AAA"]},
+ {"title":"","publisher":{"name":"Empty"},"published_utc":"2026-10-05T08:00:00Z","article_url":"https://example.com/a3"}
+],"request_id":"r1","count":3}

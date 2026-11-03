@@ -609,3 +609,12 @@ rest).
 ## Amended 2026-10-18: prompt v14, missing data never passes an exclusion
 
 A recorded note said names with no IV rank were not excluded by "except ... IV rank above 80%"; the engine (ADR 0015, 0071) leaves them out. Prompt v14 states the rule, but the model ignored it live (the note came back in 3 of 5 re-records), so the server also drops a model note that says names with no value pass or are not excluded, and adds one note per field of a `none` group: "Names with no <field> are also left out (missing data never passes)." (`contract/missing_notes.py`). Owner approved 2026-10-18.
+
+## Amendment 2026-11-02: the composition of the chain is a library module (EV4b)
+
+`open_text_model` moved from the API to `algotrade.services.text_model.opening`; the caller passes
+the source registry's two builders (`build_text_model`, `build_claude_cli`), so the library imports
+no vendor module (ADR 0027) and the API and ingestion share one composition. `only=` restricts the
+chain by provider id and `skip_restricted=True` leaves out every provider with `only_users`: a
+nightly job runs as the site user and never on the owner's Claude login. Pending owner
+confirmation.

@@ -11,12 +11,12 @@ import argparse
 import dataclasses
 import json
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from algotrade.config.env import config_dir, credential
+from algotrade.config.env import config_dir, credential, data_url
 from algotrade.config.site.settings import SourcesSettings, load_nightly, load_sources
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
@@ -24,6 +24,8 @@ from algotrade.data import StoreReader
 from algotrade.services.jobs import JobHandler, JobKind, JobRecord, JobStatus
 from algotrade.services.jobs import run_job as run_service_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
+from algotrade.services.text_model.model import TextModel
+from algotrade.services.text_model.opening import open_text_model
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.tables.writers import StoreWriter
@@ -39,7 +41,9 @@ from algotrade_sources.framework.base import Source
 from algotrade_sources.framework.registry import (
     RAW_SECTIONS,
     Built,
+    build_claude_cli,
     build_sources,
+    build_text_model,
     fixture_source,
 )
 
@@ -89,6 +93,22 @@ def task_sources(spec: Task, settings: SourcesSettings, params: Mapping[str, Any
 # ----------------------------------------------------------------------------- tasks
 
 
+def text_model_factory(args: argparse.Namespace) -> Callable[[], tuple[TextModel | None, str]]:
+    """What a task calls for the site's text model (nothing is built until it does): the chain of
+    ``llm.toml`` without any provider restricted to users, its usage written to the store."""
+
+    def build() -> tuple[TextModel | None, str]:
+        return open_text_model(
+            config_store(args),
+            data_url(),
+            chat=build_text_model,
+            cli=build_claude_cli,
+            skip_restricted=True,
+        )
+
+    return build
+
+
 def task_context(
     args: argparse.Namespace,
     reader: StoreReader,
@@ -102,6 +122,7 @@ def task_context(
         sources_settings(args),
         config_store(args),
         raw_sections=RAW_SECTIONS,
+        text_model_factory=text_model_factory(args),
     )
 
 
@@ -166,6 +187,7 @@ def run_job(
         "unavailable": built.skipped,
         "raw_sections": RAW_SECTIONS,
         "pacing": built.limiters,
+        "text_model_factory": text_model_factory(args),
     }
     handlers: dict[str, JobKind | JobHandler] = {
         **LIBRARY_HANDLERS,

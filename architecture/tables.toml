@@ -171,7 +171,7 @@ note = "ADR 0050: the macro release calendar (FRED release dates, ISM by rule), 
 
 [[table]]
 name = "events/attribution"
-owner = "apps/ingestion/algotrade_ingestion/tasks/events/attribution.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/events/attribution/run.py"
 note = "ADR 0050 EV4: the cause of a big move (cause class, text, confidence, evidence) per instrument, reaction session and source (filing now, model and analyst_review later); known_from = the session the attribution was knowable on (a filing row: its reaction session); the read takes the highest source, then the latest"
 
 [[table]]

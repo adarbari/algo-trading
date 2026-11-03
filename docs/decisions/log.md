@@ -363,3 +363,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: keeps the registry the only role authority and the public file the only grant of anything above `trader`; the git-ignored user folder is already the home of that user's personal data; no new secret and no outbound write to the provider from the public-facing API.
+## 2026-11-02 | EV4b | the nightly's text model: where it is built, who logs its usage, the cap
+- Question: ingestion has no `TextModel`; its usage log and the seam's composition are the API's today (ADRs 0041, 0058, 0005). How does the nightly attribution classify headlines?
+- Options: build the chain in ingestion (a copy) / one composition callers share / skip the model.
+- Decision: `open_text_model` moves to `services/text_model/opening.py` (the library, the caller passes the registry's builders so no vendor import); ingestion builds it lazily through `TaskContext.text_model_factory` with `skip_restricted` (never an `only_users` provider); usage rows are written to `usage/llm_calls` by the nightly through the same recorder and ledger (`use_case = "attributing"`); `events/attribution.toml news_per_night = 40`, at most 8 headlines in the prompt, `prompt_version = "attributing/v1"`, a model row's `known_from` the run session, confidence capped at 0.8. Amendments to ADRs 0005, 0041, 0050, 0058.
+- decided by: Fable agent on the owner's behalf (architect review pending)
+- status: pending owner confirmation
+- Reasoning: apps never import each other and the library never imports vendors, so one shared composition with injected builders is the only shape without a copy; the owner's login must never serve the site user; spend is one time series.
