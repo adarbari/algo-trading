@@ -4,10 +4,11 @@
  * and recoveries, the NBER recessions, hatched so overlapping spans stay readable). The charts
  * keep their own keys; this explains the colors in words, and the indicator charts point here.
  */
-import { Heading, Legend, Panel, Stack, Text } from '@algotrade/ui';
+import { Heading, Legend, Panel, Stack } from '@algotrade/ui';
 import type { ReactNode } from 'react';
 
 import { BAND_LABELS, LANE_LABELS, plainLabel, regimeTone } from '@/entities/regime';
+import { termHelp } from '@/features/guide-help';
 
 const REGIME_LABELS = ['CALM', 'CAUTION', 'STRESS', 'CRISIS', 'UNKNOWN'] as const;
 
@@ -24,7 +25,11 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 export function RegimeLegend() {
   return (
-    <Panel title="How to read the charts" description="The same colors on every chart of this page">
+    <Panel
+      title="How to read the charts"
+      description="The same colors on every chart of this page"
+      actions={termHelp('regime_chart_key')}
+    >
       <Stack gap={3}>
         <Stack direction="row" gap={4} wrap>
           <Group title="Shaded behind the lines">
@@ -81,12 +86,7 @@ export function RegimeLegend() {
             />
           </Group>
         </Stack>
-        <Text size="sm" tone="secondary">
-          Read a chart left to right: the line is the value, the dashed line is where the signal
-          turns on, a gap is a period with nothing stored, and the shading shows when the market
-          fell (peak to trough), when it recovered and when the economy was in recession.
-        </Text>
-      </Stack>
+              </Stack>
     </Panel>
   );
 }

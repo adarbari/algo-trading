@@ -229,7 +229,7 @@ test('a screener with no run says so, and Run now runs it and shows the results'
   await page.goto('/screeners/my-vrp');
   await expect(
     page.getByText(
-      'No run stored for this screener on 2026-10-02. Run it now to see what it picks.',
+      'No run stored for this screener on 2026-10-02; run it now.',
     ),
   ).toBeVisible();
   await expect(page.getByRole('group', { name: 'Last 1 sessions' })).toBeVisible();

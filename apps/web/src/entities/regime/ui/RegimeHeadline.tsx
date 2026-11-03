@@ -80,7 +80,7 @@ export function RegimeHeadline({ regime, macroTiers }: RegimeHeadlineProps) {
         />
         <RegimeScoreMeter
           label="Fragility"
-          caption="Context only: how deep a fall from here could be. Never changes the label."
+          caption="Context only; never changes the label."
           score={scores.fragility}
           banded={false}
         />

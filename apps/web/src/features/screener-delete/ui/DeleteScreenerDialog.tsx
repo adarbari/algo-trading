@@ -48,8 +48,7 @@ export function DeleteScreenerDialog({
       }
     >
       <Text size="sm" tone="muted">
-        Past results stay readable in the run history. The files are archived in your config folder,
-        so it can be restored by hand.
+        Past results stay readable; the files are archived in your config folder.
       </Text>
     </Dialog>
   );

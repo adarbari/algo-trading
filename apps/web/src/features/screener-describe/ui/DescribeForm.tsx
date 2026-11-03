@@ -48,7 +48,7 @@ export interface DescribeFormProps {
 }
 
 const HINT =
-  'Plain English, e.g. "optionable stocks over $5 with IV rank above 50% and $50M traded a day". The rows are a draft you review.';
+  'Plain English, e.g. "optionable stocks over $5 with IV rank above 50% and $50M traded a day".';
 
 interface Answered {
   answer: ScreenDraft;

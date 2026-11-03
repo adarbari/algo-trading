@@ -20,17 +20,3 @@ min_words = 12
 max_sentence_words = 25
 
 [baseline]
-"src/entities/feature/model/columns.tsx" = 1
-"src/entities/regime/ui/RegimeHeadline.tsx" = 1
-"src/features/indicator-history/ui/IndicatorHistory.tsx" = 1
-"src/features/screener-delete/ui/DeleteScreenerDialog.tsx" = 1
-"src/features/screener-describe/ui/DescribeForm.tsx" = 1
-"src/features/screener-finalise/ui/RebaseBanner.tsx" = 1
-"src/pages/test/ui/TestResultPage.tsx" = 1
-"src/pages/trader-regime/ui/RegimePage.tsx" = 1
-"src/widgets/completeness-panel/ui/CompletenessPanel.tsx" = 1
-"src/widgets/draft-bar/ui/DraftBar.tsx" = 1
-"src/widgets/feature-table/ui/ScreenerResults.tsx" = 1
-"src/widgets/options-panel/ui/OptionsPanel.tsx" = 1
-"src/widgets/paused-ideas/ui/PausedIdeas.tsx" = 1
-"src/widgets/regime-legend/ui/RegimeLegend.tsx" = 1

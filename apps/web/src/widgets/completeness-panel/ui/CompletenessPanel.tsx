@@ -12,6 +12,7 @@ import {
   useFocusCell,
   type CellRef,
 } from '@/entities/ingestion';
+import { termHelp } from '@/features/guide-help';
 
 export interface CompletenessPanelProps {
   /** The selected cell (else the latest session's worst cell is outlined). */
@@ -27,7 +28,8 @@ export function CompletenessPanel({ selected, onSelect }: CompletenessPanelProps
     <Panel
       title={`Completeness · last ${String(SESSIONS)} sessions`}
       description="share of expected rows present"
-      footer="Not collected: before a dataset's first stored session. Failed: missing after it was collected. Select a cell to drill in."
+      actions={termHelp('completeness_states')}
+      footer="Select a cell to drill in."
     >
       {completeness.isPending ? (
         <Skeleton variant="rect" height="lg" label="Loading completeness…" />
