@@ -8,7 +8,7 @@
  * narrows the list on the server; the filters in force are the page's `f` search param. Says
  * nothing about direction.
  */
-import { formatValue, Banner, EmptyState, Stack, Text, type DataTableSort } from '@algotrade/ui';
+import { formatValue, Banner, EmptyState, Stack, type DataTableSort } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { earningsWeek, gapLines, useEventCalendar } from '@/entities/event';
@@ -17,6 +17,8 @@ import { CalendarSourcePicker, useCalendarSource } from '@/features/calendar-sou
 import { SurfaceFilterBar, SurfaceZeroResults, useFilterState } from '@/features/filter-bar';
 import { termHelp } from '@/features/guide-help';
 import { FeatureTable } from '@/widgets/feature-table';
+
+import { GapNotes } from './GapNotes';
 
 /** The surface of the filter bar: its definitions are `config/site/filters/calendar_week.toml`. */
 const SURFACE = 'calendar_week';
@@ -90,17 +92,7 @@ export function EarningsWeek({ f, onFilterChange }: EarningsWeekProps) {
         <Stack gap={2}>
           {picker}
           {message}
-          {gaps.length > 0 && (
-            <Banner tone="info">
-              <Stack gap={0.5}>
-                {gaps.map((line) => (
-                  <Text key={line} size="sm">
-                    {line}
-                  </Text>
-                ))}
-              </Stack>
-            </Banner>
-          )}
+          <GapNotes lines={gaps} />
           <SurfaceFilterBar
             surface={SURFACE}
             views

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CALENDAR_FIXTURE as CALENDAR } from '@/entities/event';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
-import { EventCalendarPanel } from './EventCalendarPanel';
+import { EventsAhead } from './EventsAhead';
 
 const hooks = vi.hoisted(() => ({
   useEventCalendar: vi.fn(),
@@ -23,6 +23,8 @@ vi.mock('@/entities/screen', async (importOriginal) => ({
   useScreenerPicks: hooks.useScreenerPicks,
 }));
 
+vi.mock('@/features/guide-help', () => ({ termHelp: () => null }));
+
 stubElementSize();
 
 const picks = (ids: string[]) =>
@@ -38,9 +40,9 @@ beforeEach(() => {
   hooks.useScreenerPicks.mockReturnValue(picks(['EQ:A']));
 });
 
-describe('EventCalendarPanel', () => {
+describe('EventsAhead', () => {
   it('shows the scope list by default: names, a Market column and the ruled expiry day', async () => {
-    const { container } = render(<EventCalendarPanel />);
+    const { container } = render(<EventsAhead />);
     expect(hooks.useEventCalendar).toHaveBeenLastCalledWith([], true, true);
     const grid = screen.getByRole('table', { name: 'Events, next 90 days: scope list' });
     for (const symbol of ['Market', 'AAPL', 'NVDA']) {
@@ -51,7 +53,7 @@ describe('EventCalendarPanel', () => {
   });
 
   it("asks for the names of a chosen screener's latest results", async () => {
-    render(<EventCalendarPanel />);
+    render(<EventsAhead />);
     await userEvent.setup().selectOptions(screen.getByLabelText('Names'), 'vrp_scanner');
     expect(hooks.useEventCalendar).toHaveBeenLastCalledWith(['EQ:A'], false, true);
     expect(
@@ -75,7 +77,7 @@ describe('EventCalendarPanel', () => {
       }),
     );
     hooks.useEventCalendar.mockReturnValue(fakeQuery(undefined, { isPending: true }));
-    render(<EventCalendarPanel />);
+    render(<EventsAhead />);
     await userEvent.setup().selectOptions(screen.getByLabelText('Names'), 'vrp_scanner');
     expect(screen.getByText('This screener: not run for this session.')).toBeInTheDocument();
     expect(hooks.useEventCalendar).toHaveBeenLastCalledWith([], false, false);
@@ -102,7 +104,7 @@ describe('EventCalendarPanel', () => {
         unresolved: ['XYZ'],
       }),
     );
-    render(<EventCalendarPanel />);
+    render(<EventsAhead />);
     expect(
       screen.getByText('Macro releases: not available because of a system error'),
     ).toBeInTheDocument();
@@ -113,7 +115,7 @@ describe('EventCalendarPanel', () => {
     hooks.useEventCalendar.mockReturnValue(
       fakeQuery(undefined, { isError: true, isPending: false }),
     );
-    render(<EventCalendarPanel />);
+    render(<EventsAhead />);
     expect(screen.getByText('The calendar failed to load.')).toBeInTheDocument();
   });
 });

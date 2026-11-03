@@ -528,7 +528,7 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 # The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
 max_enums = 32
 max_sections = 4
-max_panels = 59
+max_panels = 58
 enums = [
   "graphql:Adjustment",
   "graphql:AheadEvent.kind",
@@ -575,13 +575,14 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/features/screener-finalise/ui/RebaseBanner.tsx" = 1
 "src/pages/test/ui/TestNewPage.tsx" = 1
 "src/pages/test/ui/TestSetupPage.tsx" = 1
+"src/pages/trader-calendar/ui/EventsAhead.tsx" = 2
 "src/widgets/compare-panel/ui/ComparePanel.tsx" = 1
 "src/widgets/criteria-table/ui/CriteriaTable.tsx" = 2
 "src/widgets/draft-bar/ui/DraftBar.tsx" = 2
 "src/widgets/drilldown-panel/ui/DrilldownPanel.tsx" = 1
-"src/widgets/event-calendar-panel/ui/EventCalendarPanel.tsx" = 3
 "src/widgets/event-study-panel/ui/EventStudyPanel.tsx" = 3
 "src/widgets/events-panel/ui/EventsPanel.tsx" = 1
+"src/widgets/feature-table/ui/PickDetail.tsx" = 1
 "src/widgets/feature-table/ui/TableFrame.tsx" = 2
 "src/widgets/features-panel/ui/FeatureDistribution.tsx" = 1
 "src/widgets/features-panel/ui/FeaturesPanel.tsx" = 1
@@ -597,7 +598,6 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/widgets/holdings-panel/ui/HoldingsPanel.tsx" = 1
 "src/widgets/options-panel/ui/OptionsPanel.tsx" = 2
 "src/widgets/overview-panel/ui/OverviewPanel.tsx" = 1
-"src/widgets/pick-detail/ui/PickDetail.tsx" = 1
 "src/widgets/preview-diff/ui/PreviewDiff.tsx" = 1
 "src/widgets/price-chart-panel/ui/PriceChartPanel.tsx" = 1
 "src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx" = 1

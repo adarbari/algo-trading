@@ -532,9 +532,6 @@ _WEB = _REPO / "apps/web/src"
 _WORDING_SURFACES = [
     _WEB / "pages/trader-ideas",
     _WEB / "widgets/setup-ideas",
-    _WEB / "widgets/ideas-heading",
-    _WEB / "widgets/top-ideas",
-    _WEB / "widgets/paused-ideas",
 ]
 _WORDING_GUIDE = [_REPO / "config/site/guide/glossary/ideas.toml"]
 _INSTRUCTION_WORDS = re.compile(

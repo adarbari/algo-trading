@@ -4,12 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { CalendarPage } from './CalendarPage';
 
-vi.mock('@/widgets/event-calendar-panel', async () => {
+vi.mock('./EventsAhead', async () => {
   const { Text } = await import('@algotrade/ui');
-  return {
-    EventCalendarPanel: () => <Text>calendar panel</Text>,
-    MacroCalendar: () => <Text>macro view</Text>,
-  };
+  return { EventsAhead: () => <Text>calendar panel</Text> };
+});
+
+vi.mock('./MacroDays', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { MacroDays: () => <Text>macro view</Text> };
 });
 
 vi.mock('./EarningsWeek', async () => {
