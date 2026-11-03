@@ -233,7 +233,7 @@ def _gap_ends(rows: pd.DataFrame) -> pd.Series:
             RELIST_GAP_SESSIONS - 1])
         for e in ends
     }  # fmt: skip
-    return rows["last_day"].map(sessions)
+    return pd.to_datetime(rows["last_day"].map(sessions))  # no ended row: all NaT, never float
 
 
 def _start_after_end(rows: pd.DataFrame) -> pd.Series:
