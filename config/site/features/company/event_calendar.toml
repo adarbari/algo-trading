@@ -1,0 +1,66 @@
+# Expression features over the event study (ADR 0050 EV6, docs/event-sensitivity-plan.md 5.4): what
+# is coming that has moved this name before, against the nearest option expiry. An impact event is
+# one whose class has a median reaction of at least `impact_multiple` normal days for the name
+# (event_reaction@v1: macro releases over three years, own earnings with at least `min_earnings`
+# reports); the dates are the next reaction sessions of the release calendar (event_calendar@v1) and
+# the next report (earnings). Language and keys: docs/configuration.md "Expression features".
+
+[days_to_next_impact_event]
+expr = '''
+if(event_reaction.reaction_status == "OK",
+   if(min(
+   coalesce(if(event_reaction.macro_cpi_multiple_median >= impact_multiple, event_calendar.cpi_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_employment_multiple_median >= impact_multiple, event_calendar.employment_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_pce_multiple_median >= impact_multiple, event_calendar.pce_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_gdp_multiple_median >= impact_multiple, event_calendar.gdp_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_ppi_multiple_median >= impact_multiple, event_calendar.ppi_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_retail_sales_multiple_median >= impact_multiple, event_calendar.retail_sales_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_ism_mfg_multiple_median >= impact_multiple, event_calendar.ism_mfg_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_ism_services_multiple_median >= impact_multiple, event_calendar.ism_services_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_fomc_multiple_median >= impact_multiple, event_calendar.fomc_sessions_to, null), never),
+   coalesce(if(event_reaction.earnings_n >= min_earnings and event_reaction.earnings_multiple_median >= impact_multiple, earnings.days_to_earnings, null), never)
+   ) >= never, null, min(
+   coalesce(if(event_reaction.macro_cpi_multiple_median >= impact_multiple, event_calendar.cpi_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_employment_multiple_median >= impact_multiple, event_calendar.employment_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_pce_multiple_median >= impact_multiple, event_calendar.pce_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_gdp_multiple_median >= impact_multiple, event_calendar.gdp_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_ppi_multiple_median >= impact_multiple, event_calendar.ppi_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_retail_sales_multiple_median >= impact_multiple, event_calendar.retail_sales_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_ism_mfg_multiple_median >= impact_multiple, event_calendar.ism_mfg_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_ism_services_multiple_median >= impact_multiple, event_calendar.ism_services_sessions_to, null), never),
+   coalesce(if(event_reaction.macro_fomc_multiple_median >= impact_multiple, event_calendar.fomc_sessions_to, null), never),
+   coalesce(if(event_reaction.earnings_n >= min_earnings and event_reaction.earnings_multiple_median >= impact_multiple, earnings.days_to_earnings, null), never)
+   )),
+   null)
+'''
+params = { impact_multiple = 1.5, min_earnings = 4, never = 100000 }
+dtype = "int"
+unit = "sessions"
+valid_range = [1, inf]
+description = "Exchange sessions to the first coming event whose kind has moved the name by at least 1.5 normal days at the median (a macro release, or its own earnings with at least 4 reports behind the median): event_reaction's per-kind multiples against the release calendar and the next report date"
+null_meaning = "the name has under 250 sessions of bars (event_reaction.reaction_status is not OK), or no coming event of a kind that has moved it that much is in the stored calendars (a calendar's horizon is not a quiet period: event_calendar says which releases are listed)"
+version = 1
+
+[impact_events_before_expiry]
+expr = '''
+if(is_null(nearest_expiry.expiry_date) or event_reaction.reaction_status != "OK", null,
+   (
+   coalesce(if(event_reaction.macro_cpi_multiple_median >= impact_multiple and event_calendar.cpi_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_employment_multiple_median >= impact_multiple and event_calendar.employment_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_pce_multiple_median >= impact_multiple and event_calendar.pce_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_gdp_multiple_median >= impact_multiple and event_calendar.gdp_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_ppi_multiple_median >= impact_multiple and event_calendar.ppi_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_retail_sales_multiple_median >= impact_multiple and event_calendar.retail_sales_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_ism_mfg_multiple_median >= impact_multiple and event_calendar.ism_mfg_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_ism_services_multiple_median >= impact_multiple and event_calendar.ism_services_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.macro_fomc_multiple_median >= impact_multiple and event_calendar.fomc_next_date <= nearest_expiry.expiry_date, 1, 0), 0) +
+   coalesce(if(event_reaction.earnings_n >= min_earnings and event_reaction.earnings_multiple_median >= impact_multiple and earnings.next_earnings_date <= nearest_expiry.expiry_date, 1, 0), 0)
+   ))
+'''
+params = { impact_multiple = 1.5, min_earnings = 4 }
+dtype = "int"
+unit = "count"
+valid_range = [0, 10]
+description = "How many kinds of coming event that have moved the name by at least 1.5 normal days at the median (a macro release, or its own earnings with at least 4 reports) fall on or before the nearest listed option expiry; each kind counts once, by its next occurrence"
+null_meaning = "no stored chain with an expiry on or after the session, or the name has under 250 sessions of bars (event_reaction.reaction_status is not OK); a kind with no date in the stored calendars counts as none"
+version = 1

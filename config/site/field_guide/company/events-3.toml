@@ -1,0 +1,35 @@
+[[field]]
+name = "feature.days_to_next_impact_event"
+theme = "events"
+reads = "Exchange sessions to the first coming event of a kind that has moved this name by 1.5 normal days or more at the median. The kinds are the nine scheduled macro releases (CPI, jobs, PCE, GDP, PPI, retail sales, the two ISM surveys, FOMC) and its own earnings. Low: something that has moved it is close. High or null: nothing that has mattered to it is listed ahead."
+caveats = [
+  "Null does not mean quiet. It is also null when the calendar lists no date of a kind that matters (see rollup.event_calendar@v1.cpi_next_date), or when the name has under 250 sessions of bars (rollup.event_reaction@v1.reaction_status is SHORT_HISTORY).",
+  "It looks only at kinds that have moved this name before, as a median over three years. A first-time event, a peer's report or a headline is not in it. The habit of unscheduled gaps is rollup.event_reaction@v1.unattributed_big_moves_252d.",
+  "Sessions, not calendar days: a release after the close counts for the next session.",
+]
+sources = ["ADR 0050 event study: event_reaction@v1, event_calendar@v1 and the earnings calendar"]
+[[field.use]]
+for = "no impact event for the next two weeks"
+op = "gte"
+value = 10
+mode = "soft"
+tolerance = 2
+on_miss = "EVENT_RISK"
+note = "null (nothing listed) passes a soft rule with on_miss EVENT_RISK; a hard 'gte' rejects names with no listed event"
+
+[[field]]
+name = "feature.impact_events_before_expiry"
+theme = "events"
+reads = "How many coming events fall on or before the nearest listed option expiry. Only kinds that have moved this name by 1.5 normal days or more at the median count (a macro release, its own earnings). 0 is the clean case for selling premium to that expiry. Each kind counts once, by its next occurrence."
+caveats = [
+  "A kind with no listed date counts as none. The nearest expiry can be a weekly a few days out: for a 30-day option compare rollup.event_calendar@v1.cpi_next_date and its siblings with the target expiry.",
+  "Null when no chain is stored for the session, or the name has under 250 sessions of bars. A hard 'eq 0' rejects those names; a soft one with EVENT_RISK keeps them listed.",
+]
+sources = ["ADR 0050 event study: event_reaction@v1, event_calendar@v1, nearest_expiry@v1 and the earnings calendar"]
+[[field.use]]
+for = "no impact event before the nearest expiry"
+op = "eq"
+value = 0
+mode = "soft"
+tolerance = 0
+on_miss = "EVENT_RISK"
