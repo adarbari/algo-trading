@@ -327,3 +327,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: `var/data` lives on `/Volumes/AlgoData` (1.7 TB free), so the ~4 GB per edge worst case of ADR 0063 fits; the step is non-critical, outside the ingest lock and published atomically (ADR 0022), so a failure leaves no legs and the run is reversible.
+## 2026-11-02 | IBS research as a swing setup | forced settings of `ibs_etf_swing_recovery`
+- Question: the brief asked for `benchmark = "none"`, a Cutler RSI(3) feature, a trend and a volatility variant by `hv10` vs `hv126`, and the IBS-only rule as a variant; what does the code allow, and does the owner's reuse rule (2026-11-02) change the model?
+- Options: follow the brief literally (refused by the parser, or a new stored group) or the nearest reuse-only form.
+- Decision: (a) no new feature: the main rule is `etf_low_ibs` (IBS < 0.2) with exit `close_range_pos` > 0.8 (Kinlay's recovery exit); the RSI(3) version is a follow-up proposal (no stored RSI(3), `rsi_14` is Wilder 14, expression features cannot read bar history, rules cannot compare a field with a field). (b) benchmark SPY (a share path with an exit is scored against a benchmark), SPY dropped from the list, `base = universe`. (c) Variants are universe variants: `pct_vs_sma_200 > 0`, `hv_ratio_10_60 > 1` (a rule cannot compare `hv10` and `hv126`), `volume_z_20d > 0`. (d) `horizon_sessions = [1, 10]`, so horizon 1 is the base rule shifted to D + 1 and the verdict is read at 10. (e) `holdout_from = 2026-11-03`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: each is the nearest accepted form of the brief; none changes a stored verdict of another setup.
