@@ -28,13 +28,6 @@ section = "docs/adr/0029-rule-screener.md#versioned-configs"
 detect = [{ call = "add_version" }, { call = "save_features" }]
 
 [[responsibility]]
-id = "user-onboarding"
-description = "Onboard a trader (ID5, ADR 0040, decision log 2026-11-02): the admin-only write of a new user's config/users/<id>/identity.toml (email, name, declared_by, declared_at in UTC) through the ConfigWriter, refusing an invalid id, `site`, an id or an email the registry already holds and any caller who is not an admin; the role is always trader, no licences (admin and licences change by PR to users.toml); no identity-provider call, the result carries the one remaining provider step as data (services/authoring/onboarding.py)"
-owner = ["src/algotrade/services/authoring/onboarding.py"]
-section = "docs/adr/0040-identity-and-roles.md#decision"
-detect = [{ call = "save_identity" }]
-
-[[responsibility]]
 id = "data-licence-gate"
 description = "Which catalogue fields a user may see values of (ADR 0069, ADR 0028, ADR 0064 decision 10): the licences a user holds from the users registry (open for everyone, others only when config/site/users.toml lists them; a role grants none, ADR 0040), the licence of a field (a stored feature's own, an expression's strictest of what it reads) and the fields a user lacks the licence of, and a setup whose canonical run joined outcome rows, or read a rule field (gate, entry, case, schedule), under a licence the user lacks (EdgeRun.evidence_licence from the trial's outcome and rule licences, of every trial kind: cross-section, time-series and named sleeve; not listed, no verdict, no pick; ADR 0084 decision 1, ADR 0088 decision 20); every path that serves per-name values removes those fields before it reads them (ReadContext.licences in the read model; `held` of fields_view / run_screener for a screener run and the Builder's preview), so they are UNKNOWN with the public kind LICENCE and a screen never passes a hard criterion on one (ADR 0015)"
 owner = ["src/algotrade/services/licences.py"]
@@ -473,6 +466,13 @@ allowed = [
 ]
 section = "docs/adr/0088-setups-as-positions-and-rules.md#decision"
 detect = [{ call = "trade_frame" }, { call = "series_trades" }, { call = "book_trades" }, { call = "capital_basis_of" }, { call = "tail_measures" }]
+
+[[responsibility]]
+id = "user-onboarding"
+description = "Onboard a trader (ID5, ADR 0040, decision log 2026-11-02): the admin-only write of a new user's config/users/<id>/identity.toml (email, name, declared_by, declared_at in UTC) through the ConfigWriter, refusing an invalid id, `site`, an id or an email the registry already holds and any caller who is not an admin; the role is always trader, no licences (admin and licences change by PR to users.toml); no identity-provider call, the result carries the one remaining provider step as data (services/authoring/onboarding.py)"
+owner = ["src/algotrade/services/authoring/onboarding.py"]
+section = "docs/adr/0040-identity-and-roles.md#decision"
+detect = [{ call = "save_identity" }]
 
 [[responsibility]]
 id = "virtual-feature-reads"
