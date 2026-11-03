@@ -48,6 +48,7 @@ TIMELINE_KINDS: tuple[str, ...] = (
 # page only by being added to ``TIMELINE_KINDS`` (fitness test
 # ``tests/architecture/api/test_events_timeline_kinds.py``), never by its prefix.
 NOT_TIMELINE: dict[str, str] = {
+    "attribution": "the cause of a big move (EV4): the Events tab's history reads it with EV7",
     "bar_flag": "bars the quality check rejected (ADR 0061); applied to prices, not a dated event",
     "filing": "8-K and other filings: read by the event study (``event_study``), no detail line",
     "filing_text": "10-K / 10-Q item text by CIK (``NO_INSTRUMENT_ROWS``): none per instrument",
