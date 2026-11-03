@@ -95,5 +95,5 @@ export {
   type SignalTiming,
 } from './model/signals';
 export { RegimeChip, type RegimeChipProps } from './ui/RegimeChip';
-export { RegimeHeadline, type RegimeHeadlineProps } from './ui/RegimeHeadline';
+export { RegimeHeadline, RegimeScoreMeter, type RegimeHeadlineProps } from './ui/RegimeHeadline';
 export { RunRegimeChip, type RunRegimeChipProps } from './ui/RunRegimeChip';

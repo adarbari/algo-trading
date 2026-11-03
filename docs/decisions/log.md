@@ -320,3 +320,10 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: ADR 0083 bars the model from writing rules, not from being a field a rule reads, and the judge stays the harness (ADR 0053); the score is a catalogue feature like any other. With no scorer on main either value is harmless today.
+## 2026-11-02 | Edge-eval runtime, ADR 0063 | Go-ahead for the nightly to write the first legs; timing read from its log
+- Question: the roadmap's "measure the real nightly against the 60 s target" writes the first `results/edge_legs` to the live store (a FULL first run); give the go-ahead while the owner is away?
+- Options: go / no-go / go with a condition.
+- Decision: go, with one condition: nobody runs it by hand tonight. The next nightly post-session runs `edge-eval` as it is built (`algotrade-ingest post-session`, which submits one `edge-eval` job per open edge); if the two backfills still hold the ingest lock at 15:00 the post-session returns BUSY and the watchdog retries, so they are not killed. The timing is read from the first post-session summary that ran the step (`edge_eval` in the summary: duration against `[post] edge_eval_target_s = 60`); a WARN on that first FULL run is expected, not a failure.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: `var/data` lives on `/Volumes/AlgoData` (1.7 TB free), so the ~4 GB per edge worst case of ADR 0063 fits; the step is non-critical, outside the ingest lock and published atomically (ADR 0022), so a failure leaves no legs and the run is reversible.

@@ -19,6 +19,7 @@ from algotrade.features.rollups.price import price_history as ph
 from algotrade.features.rollups.price import price_stats as ps
 from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import END, series, store, write_bars
+from tests.helpers.stored_frames import stamped
 
 P = ph.PriceHistoryParams()
 SMALL = ph.PriceHistoryParams(
@@ -61,6 +62,38 @@ def test_on_stored_bars() -> None:
     assert thin["range_status"] == "FEW_BARS" and pd.isna(thin["low_avail"])
     assert "EQ:GONE" not in set(frame["instrument_id"])  # no bar in the window: no row
     assert str(frame["range_sessions"].dtype) == "int64[pyarrow]"
+
+
+def _flag(iid: str, status: str, run_id: str) -> pd.DataFrame:
+    bar = pd.Timestamp(END, tz="UTC") + pd.Timedelta(hours=20)  # write_bars' bar timestamp
+    rows = [
+        {"instrument_id": iid, "ts": bar, "reason": "BELOW_FLOOR", "detail": "", "status": status}
+    ]
+    return stamped(rows, END, run_id)
+
+
+def test_a_flagged_bar_on_the_session_is_bad_bar_not_no_trade() -> None:
+    """ADR 0061 follow-up: a dropped bar is a bad datum; only a day without a bar is NO_TRADE."""
+    writer, reader = store()
+    write_bars(
+        writer,
+        {"EQ:BAD": series(320), "EQ:OK": series(320, seed=2), "EQ:QUIET": series(320, seed=3)},
+        skip={"EQ:QUIET": [319]},
+    )
+    writer.write_table("events/bar_flag", END, "f1", _flag("EQ:BAD", "FLAGGED", "f1"))
+    frame = compute_one(reader, ph.GROUP, END).frame
+    status = {i: row(frame, i)["bar_status"] for i in ("EQ:BAD", "EQ:OK", "EQ:QUIET")}
+    assert status == {"EQ:BAD": "BAD_BAR", "EQ:OK": "TRADED", "EQ:QUIET": "NO_TRADE"}
+    assert row(frame, "EQ:BAD")["range_status"] == "FULL"  # the other 251 bars still count
+
+
+def test_a_cleared_flag_restores_the_bar() -> None:
+    writer, reader = store()
+    write_bars(writer, {"EQ:BAD": series(320)})
+    writer.write_table("events/bar_flag", END, "f1", _flag("EQ:BAD", "FLAGGED", "f1"))
+    writer.write_table("events/bar_flag", END, "f2", _flag("EQ:BAD", "CLEARED", "f2"))
+    frame = compute_one(reader, ph.GROUP, END).frame
+    assert row(frame, "EQ:BAD")["bar_status"] == "TRADED"
 
 
 def test_full_matches_price_stats_52_week_rule() -> None:

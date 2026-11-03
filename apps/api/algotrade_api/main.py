@@ -83,6 +83,7 @@ from algotrade_api.graphql.schema import CachingRouter, graphql_router, sdl
 from algotrade_api.graphql.warm import CacheWarmer, seed_operations
 from algotrade_api.live import no_live, open_live
 from algotrade_api.ops.build import api_stamp, checkout_moved
+from algotrade_api.ops.gc_freeze import freeze_warm_heap, tune_collector
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
 from algotrade_api.text_model import OFF as TEXT_MODEL_OFF
 from algotrade_api.text_model import open_text_model
@@ -170,7 +171,9 @@ def _overloaded(request: Request, exc: Exception) -> JSONResponse:
 async def _start_warming(
     warmer: CacheWarmer | None, home_timeout_s: float = HOME_WARM_TIMEOUT_S
 ) -> asyncio.Task[None] | None:
-    """The home page's reads first (no request meets a cold cache), then the warmer's task."""
+    """The home page's reads first (no request meets a cold cache), then the warmer's task; the
+    heap they filled is frozen out of the garbage collector's scans (``ops/gc_freeze.py``)."""
+    tune_collector()
     if warmer is None:
         return None
     # not wait_for: off_loop shields its thread from cancellation, so a timeout would still wait
@@ -180,6 +183,7 @@ async def _start_warming(
         log.warning("warming the home page took over %.0f s: serving anyway", home_timeout_s)
     elif (error := reading.exception()) is not None:  # an empty store: serve, the warmer retries
         log.error("warming the home page before serving failed", exc_info=error)
+    freeze_warm_heap()
     return asyncio.create_task(warmer.run())
 
 

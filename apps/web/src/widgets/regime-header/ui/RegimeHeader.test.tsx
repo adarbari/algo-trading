@@ -22,6 +22,8 @@ vi.mock('@/features/regime-explain', async () => {
   };
 });
 
+vi.mock('@/features/guide-help', () => ({ termHelp: (id: string) => `[help ${id}]` }));
+
 beforeEach(() => {
   hooks.useRegime.mockReset();
 });
@@ -37,6 +39,15 @@ describe('RegimeHeader', () => {
     expect(screen.getByRole('button', { name: 'Explain the regime' })).toBeVisible();
     expect(screen.queryByText('Is the yield curve inverted?')).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it("shows the macro score's two tiers, each with its Guide help", () => {
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
+    render(<RegimeHeader />);
+    expect(screen.getByRole('meter', { name: /^Early tier/ })).toBeVisible();
+    expect(screen.getByRole('meter', { name: /^Confirming tier/ })).toBeVisible();
+    expect(screen.getByText('[help macro_early]')).toBeVisible();
+    expect(screen.getByText('[help macro_confirming]')).toBeVisible();
   });
 
   it('says nothing changed when no card turned on or off', () => {
