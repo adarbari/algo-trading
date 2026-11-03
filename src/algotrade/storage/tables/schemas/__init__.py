@@ -88,6 +88,7 @@ from algotrade.storage.tables.schemas.outcomes import (
     structure_pnl_problems,
 )
 from algotrade.storage.tables.schemas.reference import (
+    DELISTED_DETAILS,
     DELISTED_TICKERS,
     ETF_HOLDINGS,
     ETF_SHARES,
@@ -144,6 +145,7 @@ __all__ = [
     "CARRIED_FROM",
     "CHAIN_STATUS",
     "COVERAGE_STATUSES",
+    "DELISTED_DETAILS",
     "DELISTED_TICKERS",
     "DISPLAY_COLUMN_MODE",
     "EARNINGS_8K_SOURCE",

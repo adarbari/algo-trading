@@ -171,8 +171,8 @@ a renamed company's old ticker is absent. Tickers go through `act_symbol` like t
 (`KIMpL` -> `KIM$L`, a lowercase `w` / `r` mark upper-cased); no two records collapsed on it.
 Request budget: the shared `massive` limiter (`[massive] min_interval_s` = 12.5 s, the free
 tier's 5 a minute), so about 24 requests = 5 minutes; a pull under `[quality]
-min_delisted_tickers` (10,000) rows FAILS. Stored first, merged into `instruments/listing_history`
-in the next PR (ADR 0087). The repo holds a 60-record slice,
+min_delisted_tickers` (10,000) rows FAILS. Merged into `instruments/listing_history` (ADR 0087); the starts
+it lacks come from `/v3/reference/tickers/{T}?date=D` (`delisted-details`, 12.5 s a request). A 60-record slice:
 `tests/fixtures/sources/massive/inactive_tickers_slice.json`.
 
 ## Tiingo daily prices from 2018 (implemented, ADR 0050)
