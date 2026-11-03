@@ -6,9 +6,9 @@
 import { Heading, Stack, Tabs, Text, type TabItem } from '@algotrade/ui';
 import { useState } from 'react';
 
-import { EventCalendarPanel, MacroCalendar } from '@/widgets/event-calendar-panel';
-
 import { EarningsWeek } from './EarningsWeek';
+import { EventsAhead } from './EventsAhead';
+import { MacroDays } from './MacroDays';
 
 const VIEWS: readonly TabItem[] = [
   { id: 'week', label: 'Earnings week' },
@@ -29,8 +29,8 @@ export function CalendarPage() {
       </Stack>
       <Tabs label="Calendar views" items={VIEWS} value={view} onChange={setView}>
         {view === 'week' && <EarningsWeek />}
-        {view === 'ahead' && <EventCalendarPanel />}
-        {view === 'macro' && <MacroCalendar />}
+        {view === 'ahead' && <EventsAhead />}
+        {view === 'macro' && <MacroDays />}
       </Tabs>
     </Stack>
   );
