@@ -131,12 +131,20 @@ def run_winners_sample(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
+WEEK_OF_NIGHTS = 7  # a ``weekly`` run (the ``reference`` workflow) takes a week of per-night caps
+
+
+def weekly_cap(p: Params, per_night: int) -> int:
+    """A per-night cap, scaled to the week for a ``reference`` run (0: no cap stays 0)."""
+    return per_night * WEEK_OF_NIGHTS if p.get("weekly") else per_night
+
+
 def run_shares(ctx: TaskContext, p: Params) -> RunRecord:
     facts = ctx.sources["sec_company_facts"]
     sources = shares.SharesSources(
         facts,
         ctx.settings.sec_facts_refresh_days,
-        ctx.settings.sec_statements_backfill_per_night,
+        weekly_cap(p, ctx.settings.sec_statements_backfill_per_night),
         ctx.settings.sec_statements_priority_min_adv_usd,
         getattr(facts, "statements_tags_date", date.min),
         filings=ctx.sources["sec_filings"],
@@ -159,8 +167,9 @@ def run_etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
         daily_funds=ctx.settings.etf.daily_funds,
     )
     limit = p.get("limit")
-    if limit is None and p.get("nightly") and ctx.settings.etf.per_night > 0:
-        limit = ctx.settings.etf.per_night  # the nightly reads a slice a night (per_night)
+    if limit is None and p.get("weekly") and ctx.settings.etf.per_night > 0:
+        limit = weekly_cap(p, ctx.settings.etf.per_night)  # the reference run: a week of slices
     return etf_holdings.ingest_etf_holdings(
-        ctx, sources, session_of(p), bool(p.get("force")), limit, symbols(p)
-    )
+        ctx, sources, session_of(p), bool(p.get("force")), limit, symbols(p),
+        bool(p.get("daily_only")),
+    )  # fmt: skip

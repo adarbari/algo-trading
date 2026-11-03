@@ -31,7 +31,9 @@ class EtfHoldingsSettings:
 
     refresh_days: int = 7  # refetch a fund's holdings once per window (spread by ticker)
     keep_top: int = 100  # holdings stored per fund, largest weights first (0: all)
-    per_night: int = 200  # funds the nightly reads per night, new and stalest first (0: no cap)
+    per_night: int = (
+        200  # funds per night, new and stalest first; the weekly run reads 7x (0: no cap)
+    )
     fallback_scope: str = (
         "liquid"  # which funds SEC N-PORT is read for: liquid, optionable, all, off
     )

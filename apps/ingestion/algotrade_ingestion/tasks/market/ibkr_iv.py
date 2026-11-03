@@ -26,9 +26,9 @@ around the work) and only for underlyings with a resolved IBKR contract
   fetch last (``by_liquidity``), so they never block the rest; ``limit`` caps a run.
 - **Nightly** (``nightly_ivs``): one streamed snapshot of every underlying's IV (tick 106)
   and HV (tick 104) after the close, ``[ibkr] iv_batch`` streams at a time, written to the
-  session as ``source_kind = snapshot``; then the history of up to ``[ibkr]
-  iv_backfill_per_night`` underlyings that have none yet (new names; the initial backfill
-  spread over nights), up to the session before.
+  session as ``source_kind = snapshot``. **Enrichment** (``nightly_history``, ADR 0039 WF4):
+  the history of up to ``[ibkr] iv_backfill_per_night`` underlyings that have none yet (new
+  names; the initial backfill spread over nights), up to the session before.
 
 Every vol is checked before it is staged (``checked``, ADR 0028 amendment 2026-10-08): above
 zero, and an IV at most ``MAX_IV``; one outside is stored null with the reason in
@@ -446,8 +446,8 @@ def backfill_ivs(
 def nightly_ivs(
     ctx: TaskContext, source: SessionSource, session: date, symbols: Sequence[str] = ()
 ) -> RunRecord:
-    """The session's IV snapshot for every covered underlying, then the history of up to
-    ``[ibkr] iv_backfill_per_night`` underlyings without any (up to the session before)."""
+    """The session's IV snapshot for every covered underlying (the market-daily step: no
+    history, ADR 0039; the capped backfill is ``nightly_history``, an enrichment step)."""
     settings = ctx.settings.ibkr
 
     def work(run: IngestRun, source: SessionSource, names: list[Name]) -> None:
@@ -457,14 +457,28 @@ def nightly_ivs(
             with_iv=with_iv,
             coverage_pct=round(100.0 * with_iv / coverage, 1) if coverage else None,
         )
-        if settings.iv_backfill_per_night > 0:
-            end = sessions_ending(session, 2)[0]
-            start = session - timedelta(days=settings.iv_history_days)
-            per_night = settings.iv_backfill_per_night
-            stats = _backfill(run, source, names, start, end, per_night, None)
-            run.stats.update(stats)
 
     return _run(ctx, source, NIGHTLY_TASK, session, symbols, work)
+
+
+def nightly_history(
+    ctx: TaskContext, source: SessionSource, session: date, symbols: Sequence[str] = ()
+) -> RunRecord:
+    """The history of up to ``[ibkr] iv_backfill_per_night`` underlyings without any (new names;
+    the initial backfill spread over nights), up to the session before: the enrichment step
+    that runs after a done market-daily session. Recorded under the history task's name, so
+    every resume lookup (``finished_runs`` over both task names) still sees its items."""
+    settings = ctx.settings.ibkr
+
+    def work(run: IngestRun, source: SessionSource, names: list[Name]) -> None:
+        end = sessions_ending(session, 2)[0]
+        start = session - timedelta(days=settings.iv_history_days)
+        run.stats.update(history_from=start.isoformat(), history_to=end.isoformat())
+        if settings.iv_backfill_per_night > 0:
+            per_night = settings.iv_backfill_per_night
+            run.stats.update(_backfill(run, source, names, start, end, per_night, None))
+
+    return _run(ctx, source, HISTORY_TASK, session, symbols, work)
 
 
 def repair_ivs(ctx: TaskContext, start: date, end: date) -> RunRecord:

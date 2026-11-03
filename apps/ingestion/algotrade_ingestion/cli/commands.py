@@ -34,6 +34,7 @@ from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, nigh
 from algotrade_ingestion.workflows.nightly.records import arrivals, stored_summary
 from algotrade_ingestion.workflows.nightly.timing import arrival_line
 from algotrade_ingestion.workflows.post_session.post_session import POST_SESSION, post_session_job
+from algotrade_ingestion.workflows.reference.reference import REFERENCE, reference_job
 from algotrade_sources.framework.base import Source
 from algotrade_sources.framework.registry import (
     RAW_SECTIONS,
@@ -43,7 +44,7 @@ from algotrade_sources.framework.registry import (
 )
 
 # Job kinds this app runs under the ingest run lock: safe to recover at once (see cli.main).
-LOCKED_KINDS = ("nightly", "screen", "post-session")  # post-session: under its named lock
+LOCKED_KINDS = ("nightly", "screen", "post-session", "reference")  # the last two: named locks
 
 
 def config_store(args: argparse.Namespace) -> ConfigStore:
@@ -145,12 +146,15 @@ def run_job(
     kind: str,
     params: dict[str, object],
     user: str,
+    recover: tuple[str, ...] = LOCKED_KINDS,
 ) -> JobRecord:
     """Run one job to completion through the job service (an explicit re-run: force=True).
-    The caller holds the ingest run lock, so a queued/running job of ``LOCKED_KINDS`` was
-    left by a crashed process: it is marked failed first, or it would block this re-run."""
+    The caller holds the lock of the kinds in ``recover`` (the ingest run lock: all of
+    ``LOCKED_KINDS``; a named lock: its own kind only), so a queued/running job of those kinds
+    was left by a crashed process: it is marked failed first, or it would block this re-run.
+    A named-lock workflow never recovers the kinds another process may be running."""
     settings = sources_settings(args)
-    steps = [s.name for s in (*NIGHTLY, *FINALLY, *POST_SESSION) if s.name in TASKS]
+    steps = [s.name for s in (*NIGHTLY, *FINALLY, *POST_SESSION, *REFERENCE) if s.name in TASKS]
     names = [n for t in steps for n in (*task(t).sources, *task(t).optional_sources)]
     built = sources_for(names, settings)
     resources: dict[str, object] = {
@@ -167,10 +171,11 @@ def run_job(
         **LIBRARY_HANDLERS,
         "nightly": nightly_job,
         "post-session": post_session_job,
+        "reference": reference_job,
     }
     user_ctx = UserContext(user)
     return run_service_job(
-        writer.runs_backend, handlers, resources, kind, params, user_ctx, recover=LOCKED_KINDS
+        writer.runs_backend, handlers, resources, kind, params, user_ctx, recover=recover
     )
 
 
