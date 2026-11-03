@@ -58,6 +58,7 @@ from algotrade.storage.tables.schemas.outcomes import (
     outcomes_spec,
 )
 from algotrade.storage.tables.schemas.reference import (
+    DELISTED_DETAILS,
     DELISTED_TICKERS,
     ETF_HOLDINGS,
     ETF_SHARES,
@@ -97,6 +98,7 @@ KNOWN: dict[str, TableSpec] = {
         SYMBOL_HISTORY,
         ID_MAP,
         LISTING_HISTORY,
+        DELISTED_DETAILS,
         DELISTED_TICKERS,
         INDEX_MEMBERSHIP,
         INSTRUMENT_COMPANY,
