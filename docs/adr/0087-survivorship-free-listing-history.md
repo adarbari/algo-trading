@@ -144,6 +144,19 @@ last bar. A DELISTED row with no such event is `NO_EVENT` with no return. Reader
 `data/outcomes/reading.py` `READ_TABLE`; PR6c flips it after the owner's backfill. Share path and residual returns
 are untouched (PR6d).
 
+**PR6b built (2026-11-03):** the run stamp and the disclosure. `data/listings/basis.py` `universe_basis_counts(reader, start,
+end, as_of)` counts, from the latest listing snapshot and the delisting snapshot stored by `as_of`, the qualifying listings
+alive in the window and those with no id, the stock listings with a null `security_type`, whether the snapshot is the merged
+one, and the window's delistings with an event row, with an unknown basis (a missing event is unknown) and by reason and
+basis. The pure predicate `services/evaluation/cross_section/run/universe_basis.py` writes `stats["universe_basis"]` and the
+sorted `stats["universe_basis_gaps"]`; the limits are `verdict.toml [universe_basis]` (1%, 98%, 5%, 5%), typed apart in
+`config/edges/universe_basis.py` (never in `settings_hash` or the judge digest). Gaps besides the four shares: `outcomes_not_v3`
+(always while `READ_TABLE` is v2, so every stamp is `survivors` until PR6c), `grain_without_delisting_return` (share path,
+residual or option chain: PR6d), an unmerged history, no counts read, an empty window, no delisting snapshot. A leg's picks gain
+`delisting_basis`, `zero_value` and `zero_hit` (`apply_outcome` runs again on the zero view, the stored delisting return taken
+out: `(1 + f) / (1 + dr) - 1`); `LEG_VERSION` 6, `DRAW_LEG_VERSION` untouched. `stats["delistings"]` and a DELISTINGS report line
+give counts by reason and basis and the headline beside the zero figure. The verdict rule reads only the stamp.
+
 **Backfill** (detached, README "Long runs"): Massive inactive list ~6 minutes; Tiingo meta ~35 batches; Tiingo bars
 for the new ids plus the tails ~9,000 to 11,000 requests, 1 to 1.3 hours at 0.4 s, which holds only on the Power
 plan (ends 2026-11-09; the free tier would take about 20 months); SEC submissions for ~6,000 delisted CIKs 30 to

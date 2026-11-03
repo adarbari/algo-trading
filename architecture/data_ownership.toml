@@ -63,16 +63,6 @@ section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
 detect = [{ call = "read_delistings" }, { call = "convention" }]
 
 [[responsibility]]
-id = "universe-basis-counts"
-description = "Count what the run stamp universe_basis is decided on (ADR 0087 decision 6) over a window [start, end]: the in-scope listings alive in it that ADR 0013's rule admits and those with no id, the stock listings with a null security_type, whether the listing snapshot is the merged one, and the delistings with a last trading day in it with an events row (with bars to the last bar), with an unknown delisting return (ZERO_UNKNOWN or no row: a missing event is unknown, never 0) and by reason and basis, from the latest listing snapshot universe_asof reads and the delisting snapshot stored by the run's as_of; the data layer only counts, services/evaluation compares the shares with verdict.toml [universe_basis]"
-owner = ["src/algotrade/data/listings/basis.py"]
-allowed = [
-    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: counts the run's window once, into the stamp
-]
-section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
-detect = [{ call = "universe_basis_counts" }]
-
-[[responsibility]]
 id = "dossier-reading"
 description = "Read the deep-dive dossier tables (instruments/factors, events/factor_occurrence; ADR 0050 decision 6 and its amendment 2026-11-03, EV5): per instrument the rows of the latest import RUN (newest knowledge_ts, then run id) among those with known_from on or before the session, so a session before the import sees nothing, a later import that dropped a date removes it and a corrected same-session re-import replaces the first; the factors (a retired one kept with its status), the dated occurrences, the undated watch windows and the review date; the forward calendar and the Admin scope read call it, nothing reads the two tables itself (data/dossier/reading.py)"
 owner = ["src/algotrade/data/dossier/reading.py"]
@@ -328,3 +318,13 @@ allowed = [
 ]
 section = "docs/adr/0077-serving-release.md#decision"
 detect = [{ call = "destructive_epoch" }, { call = "unpin" }]
+
+[[responsibility]]
+id = "universe-basis-counts"
+description = "Count what the run stamp universe_basis is decided on (ADR 0087 decision 6) over a window [start, end]: the in-scope listings alive in it that ADR 0013's rule admits and those with no id, the stock listings with a null security_type, whether the listing snapshot is the merged one, and the delistings with a last trading day in it with an events row (with bars to the last bar), with an unknown delisting return (ZERO_UNKNOWN or no row: a missing event is unknown, never 0) and by reason and basis, from the latest listing snapshot universe_asof reads and the delisting snapshot stored by the run's as_of; the data layer only counts, services/evaluation compares the shares with verdict.toml [universe_basis]"
+owner = ["src/algotrade/data/listings/basis.py"]
+allowed = [
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: counts the run's window once, into the stamp
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "universe_basis_counts" }]
