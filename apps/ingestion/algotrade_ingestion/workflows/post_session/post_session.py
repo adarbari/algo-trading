@@ -181,6 +181,12 @@ def run_post_session(
         detail = f"post-session took {seconds / 60:.1f} min "
         detail += f"(alert above {settings.post_max_duration_minutes:g} min)"
         warnings.append({"check": "post_duration", "status": "WARN", "detail": detail})
+    edge_eval = _edge_eval_timing(done.get(EDGE_EVAL), settings.edge_eval_target_s)
+    if edge_eval is not None and not edge_eval["within_target"]:
+        detail = (
+            f"edge-eval took {edge_eval['duration_s']:g} s (target {edge_eval['target_s']:g} s)"
+        )
+        warnings.append({"check": "edge_eval_duration", "status": "WARN", "detail": detail})
     return {
         "session": session.isoformat(),
         "status": Status.SUCCEEDED.value,
@@ -189,8 +195,18 @@ def run_post_session(
         "started_at": started.isoformat(),
         "finished_at": finished.isoformat(),
         "duration_s": round(seconds, 3),
+        "edge_eval": edge_eval,
         "warnings": warnings,
     }
+
+
+def _edge_eval_timing(result: StepResult | None, target_s: float) -> dict[str, Any] | None:
+    """The edge-eval step's duration against its target (ADR 0063: under a minute once the legs
+    are stored); ``None`` when the step did not run (skipped, or not in this run)."""
+    if result is None or result.status is StepStatus.SKIPPED:
+        return None
+    seconds = round(result.duration_s, 3)
+    return {"duration_s": seconds, "target_s": target_s, "within_target": seconds <= target_s}
 
 
 def post_notice(summary: Mapping[str, Any]) -> Notice:

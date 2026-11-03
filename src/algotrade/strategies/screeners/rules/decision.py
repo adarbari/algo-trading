@@ -20,11 +20,17 @@ _DIGITS = 9  # rounding keeps scores identical however the penalties were summed
 
 
 def decide(gates: Sequence[Gate]) -> tuple[Decision, tuple[str, ...]]:
-    failed = [g for g in gates if g.verdict.rejects]
-    near = [g for g in gates if g.verdict.near]
-    soft_missing = [
-        g for g in gates if g.verdict.missing and not g.verdict.rejects and not g.verdict.near
-    ]
+    failed: list[Gate] = []
+    near: list[Gate] = []
+    soft_missing: list[Gate] = []
+    for g in gates:  # one pass; each list keeps the gates' order
+        v = g.verdict
+        if v.rejects:
+            failed.append(g)
+        elif v.on_miss is not None:  # Verdict.near
+            near.append(g)
+        elif v.missing:
+            soft_missing.append(g)
     reasons = tuple(g.describe() for g in (*failed, *near, *soft_missing))
     if failed:
         return Decision.REJECT, reasons
