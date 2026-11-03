@@ -203,7 +203,8 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
 # X7 (the wheel); ibs_etf_swing_recovery (a share position with a declared exit)
 BORN_WITH_THE_KEYS = (
     "index_put_write", "vrp_short_put", "c17_earnings_straddle_sell", "iv_rank_short_put",
-    "covered_call_strike_tenor",
+    "c12_vrp_straddle_ranked", "c13_term_slope_straddle_buy", "c14_speculative_straddle_sell",
+    "c16_pre_earnings_cheap_straddle_buy", "covered_call_strike_tenor",
     "high_vol_call_write", "low_vol_put_write", "index_put_ladder", "index_put_wheel",
     "ibs_etf_swing_recovery",
 )  # fmt: skip

@@ -1,0 +1,114 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. The new version of c16_pre_earnings_straddle_buy (ADR 0088, build row X6),
+# filed 2026-11-03 as an option setup on the bought history. BLOCKED until HistoricalOptionData L2
+# is imported (E5 job, F7 features). A new id is a new trial; the old version is retired with its runs.
+id = "c16_pre_earnings_cheap_straddle_buy"
+name = "Pre-earnings straddle purchase, cheap names"
+thesis = "Buying an at-the-money straddle three sessions before a report and selling it at the announcement earns a positive return where the options price the report below the name's own past earnings moves, because implied volatility under-estimates the event."
+mechanism = """Investors under-estimate event uncertainty where signals are noisy and information is thin;
+the pre-announcement rise in implied volatility plus the move itself more than covers the straddle's
+time decay (Gao, Xing and Zhang 2018)."""
+persistence = """The effect sits in small, illiquid, high-cost names, exactly where option spreads are widest,
+so costs, not competition, keep it in place; the authors say it pays only if costs are low enough.
+Practitioner tests report the pre-earnings ramp thinner in large caps (BSIC, not peer reviewed)."""
+family = "C"
+schedule = "on_event:earnings_expected"
+top_k = 20
+base = "event"
+screeners = ["earnings_move_cheap"]
+baselines = ["earnings_move_rich"]
+status = "blocked"
+plain_reason = "Needs years of option-chain history around earnings reports to test the purchase, and the purchased history is not imported yet."
+mechanism_kind = "paid_for_risk"
+frozen_from = 2018-01-01  # ADR 0088 H7: split = end of the paper sample (1996-2013); the bought history starts 2018, so all of it is out-of-sample
+holdout_from = 2026-10-26  # ADR 0088 d15: the first session of the unseen holdout; no verdict until closed trades from it reach 3 months
+rejection_reason = """Blocked until the bought option history is imported (ADR 0088 build row X6): the pre-earnings
+ratio (earnings_move_ratio, F4 and S3) needs the implied move of the straddle before past reports, and
+implied_move@v1 is stored from 2026-10-02 only; E5 (the history import job) and F7 (the history
+features) are being built and have no history yet. The screener (earnings_move_cheap) is written."""
+notes = """THE NEW VERSION of c16_pre_earnings_straddle_buy (retired 2026-11-03, ADR 0088, X6): from the modelled
+long straddle on one IBKR 30-day volatility (which could not price a 3-session hold) to option_pnl on stored
+chain rows, the long_straddle position (a new template: capital = the premium paid, collateral max_loss)
+bought at the close three sessions before the expected report and sold at the close of the reaction
+session. The old version had no screener; the new one keeps the names whose options price the report at
+0.8 times or less the name's mean absolute move on its last eight reports (earnings_move_cheap, S3), the
+cheap-straddle half of the research's ratio; the rich half is the baseline (sold by c17). Entry, as for
+c17 (decision log 2026-11-03): the F10 reaction-session class is known only after the event and cannot
+open a trade before it, so this uses on_event:earnings_expected (SCHEDULED dates, known at D) and the
+stored report time of day: a before-open report is entered three sessions before the report session
+(offset -3, held 3), an after-close report four sessions before the reaction session
+(the after_hours variant: offset -3, held 4); an unknown time is skipped. The source finds the return in
+small names; the universe floors ($5, $50M a day) remove many of them. Data: bought chains from 2018
+(E5, F7); the frozen period is all of it. No gate."""
+
+# Before-open reports only: the offset below is the close before the report session.
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "rollup.earnings_expected@v1.expected_basis", op = "eq", value = "SCHEDULED" },
+  { field = "rollup.earnings@v1.earnings_time", op = "eq", value = "pre" },
+]
+
+[outcome]
+kind = "option_pnl"
+position = "long_straddle"
+tenor_days = 30
+horizon_sessions = [3]
+benchmark = "none"
+start_offset_sessions = -3
+
+# An after-close report: the reaction session is one session after the report session.
+[[variants]]
+id = "after_hours"
+[variants.outcome]
+horizon_sessions = [4]
+[variants.universe]
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "rollup.earnings_expected@v1.expected_basis", op = "eq", value = "SCHEDULED" },
+  { field = "rollup.earnings@v1.earnings_time", op = "eq", value = "post" },
+]
+
+[quality_bar]
+outcome = """The long at-the-money straddle's return on the premium paid (its collateral) from three sessions
+before the report to the close of the reaction session, net of the site's option cost levels
+(verdict.toml [option_costs]); the tails profile weighs the return, its bootstrap t, the probabilistic
+Sharpe ratio and the CVaR of the worst trades against the same straddle on every reporting name."""
+trigger_timing = """The expected report date and its time of day are known weeks ahead (earnings_expected@v1,
+earnings@v1.earnings_time, known_from <= D); the ratio is read at the close of D and the entry is the next
+close, S = D + 1, three sessions before the report session (before-open) or the reaction session
+(after-close). A date taken from last year (PRIOR_YEAR) is a guess, a report whose time is unknown is
+skipped; the straddle is chosen on S's chain."""
+replication = """The source's rule: an at-the-money straddle in the nearest expiry after the announcement,
+bought at the close three sessions before and sold at the close of the announcement day (the next day for
+an after-close report); average return 3.34% over 1996-2013, stronger in small, high-kurtosis,
+low-volume names (Gao, Xing and Zhang 2018). The cheap-ratio screen is this site's, not the paper's."""
+expected_size = """3.34% per straddle gross over 1996-2013 (Gao, Xing and Zhang 2018, a one-leg average on
+the premium, not filed under [published]: no group's return is measured here the same way). The bought
+history gives plenty of reports a quarter; until it is imported no size can be stated."""
+capacity_costs = """Long options with defined risk and no margin; costs are the whole game: the site's
+effective and full cost levels are the test, and a spread over 5% of the straddle's price removes much of
+the published edge."""
+failure_modes = """Implied volatility that has already risen leaves nothing to earn; a report that arrives
+earlier than the guessed date. Retire if, in the frozen period, the picks' return on premium after costs is
+not above the same straddle on every reporting name the same sessions."""
+decoys = """The stock-return earnings announcement premium (separate: found no premium here), the sale of
+the same event (c17, the mirror image by price), and the pre-announcement ramp alone (close the straddle
+the session before the move): test both legs."""
+
+[[sources]]
+title = "Gao, C., Xing, Y. and Zhang, X., Anticipating Uncertainty: Straddles around Earnings Announcements, Journal of Financial and Quantitative Analysis, 2018"
+url = "https://resolve.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/anticipating-uncertainty-straddles-around-earnings-announcements/7B34877AD5E06304BA3C55FBA3219FDD"
+
+[[sources]]
+title = "BSIC, Straddling outside and into earnings (practitioner)"
+url = "https://bsic.it/straddling-outside-and-into-earnings/"
