@@ -107,3 +107,10 @@ def test_importing_the_registry_does_not_import_yfinance() -> None:
     argv = [sys.executable, "-c", code]
     done = subprocess.run(argv, check=False, capture_output=True, text=True, env=env)
     assert done.returncode == 0, done.stderr
+
+
+def test_a_test_never_builds_a_real_yfinance_session() -> None:
+    """The conftest refuses the default session loader (its sqlite cookie cache leaks, #887)."""
+    transport = yahoo_transport({})
+    with pytest.raises(OSError, match="no real session in tests"):
+        transport("https://query2.finance.yahoo.com/v10/finance/quoteSummary/AAPL")
