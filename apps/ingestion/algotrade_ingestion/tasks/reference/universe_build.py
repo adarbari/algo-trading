@@ -401,7 +401,11 @@ def _build(
     ):
         if table in (REFERENCE, "universe") or not frame.empty:
             run.write(table, frame, source)
-    unmatched = sorted(sp500 - set(listings["symbol"]))
+    missing = sp500 - set(listings["symbol"])
+    # a member delisted since (acquired, merged) stays in the index file until the index
+    # catches up: that is the reference's DELISTED row, not an unlisted symbol
+    delisted = missing & set(reference.loc[reference["status"].eq("DELISTED"), "symbol"])
+    unmatched = sorted(missing - delisted)
     run.stats.update({
         "listed": int(reference["status"].eq("ACTIVE").sum()),
         "delisted_carried": int(reference["status"].eq("DELISTED").sum()),
@@ -412,6 +416,7 @@ def _build(
         "optionable_covered": int(universe["optionable"].sum()),
         "sp500_members": in_file,
         "sp500_unmatched": unmatched,
+        "sp500_delisted": sorted(delisted),
         "leverage": {
             s: int(reference["leverage_source"].eq(s).sum()) for s in LEVERAGE_SOURCES
         },

@@ -167,6 +167,27 @@ def test_unmatched_index_members_make_the_run_partial() -> None:
     assert record.stats["sp500_unmatched"] == ["MISSN"]
 
 
+def test_an_index_member_delisted_since_is_not_unmatched() -> None:
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    index = fx.spy(["AAPL", "GONE"])  # the index file still lists GONE on day 2
+    day1 = sources(
+        fx.nasdaq([("AAPL", "Apple", "N", "N"), ("GONE", "Gone Corp Common Stock", "N", "N")]),
+        fx.other([("B", "B Corp", "N", "N")]),
+        fx.options(["AAPL"]),
+        index,
+    )
+    day2 = sources(
+        fx.nasdaq([("AAPL", "Apple", "N", "N")]), fx.other([("B", "B Corp", "N", "N")]),
+        fx.options(["AAPL"]), index,
+    )  # fmt: skip
+    build_universe(task_ctx(writer, reader, CLOCK), day1, SETTINGS, D1)
+    record = build_universe(task_ctx(writer, reader, CLOCK), day2, SETTINGS, D2)
+    assert record.status is RunStatus.COMPLETE
+    assert record.stats["sp500_unmatched"] == []
+    assert record.stats["sp500_delisted"] == ["GONE"]
+
+
 def test_universe_settings_from_site_config() -> None:
     store = MemoryConfigStore(
         {("site", "settings", "universe"): {"source": "nasdaq_trader", "exclude_symbols": ["spy"]}},
