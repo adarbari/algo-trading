@@ -415,5 +415,5 @@ follow-up PR).
 - Options: web-only mapping with idea-only column builders / the ideas read serves cells (`ideas(columns:)`, as `ScreenerRun.results`) and the web reuses the column factories.
 - Decision: the read-model route, in two PRs: PR 1 (backend, additive) `load_ideas(columns=)` and `Ideas.columns/rows/unknown/reasons/kinds`, `ideas(columns:)`, and the export fix (the Ideas file ignored the page's tab and columns); PR 2 (web) the list in `widgets/feature-table` on the existing factories (generic additions only: picked-by, size, price, expiry and earnings companions), the stocks|options column switch replaced by the tab plus the column picker, `Idea.metrics` removed, the PENDING entry deleted. Design: architect review, notes `ideas-feature-table-design.md`.
 - decided by: orchestrator (design call)
-- status: decided
+- status: pending owner confirmation
 - Reasoning: the browser derives nothing (ADR 0038, `architecture/web_forbidden_derivations.toml`); one cell shape and one set of factories serve every table of instruments, so a licence or UNKNOWN cell reads the same on Ideas as on a screener's results.
