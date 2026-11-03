@@ -51,7 +51,7 @@ COLUMNS = ["instrument_id", "ticker", "exchange", "asset_type", "start_date", "s
 ADDED_COLUMNS = (
     "name", "vendor_type", "security_type", "cik", "figi", "share_class_figi", "vendor_exchange",
     "data_provider_perma_ticker", "id_source", "no_id_reason", "scope_reason", "vendor_end_date",
-    "is_adr",
+    "is_adr", "start_source",
 )  # fmt: skip
 NASDAQ = "NASDAQ"
 ETF = "ETF"

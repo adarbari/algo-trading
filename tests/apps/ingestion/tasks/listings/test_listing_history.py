@@ -295,3 +295,23 @@ def test_a_later_snapshot_keeps_every_id_it_carried_even_when_the_rules_now_diff
     twtr = again[(again["ticker"] == "TWTR") & (again["source"] == "tiingo")].iloc[0]
     assert (twtr["instrument_id"], twtr["id_source"]) == ("EQ:TIINGO:US000000012345", "perma")
     assert second.stats["ids_carried"] == first.stats["with_id"] and second.stats["ids_held"] >= 1
+
+
+def test_stored_details_date_a_record_and_the_start_source_is_stored() -> None:
+    ctx = context(TWTR, GONE)
+    now = pd.Timestamp(DAY, tz="UTC")
+    answer = [
+        {"ticker": "GONE", "end_date": date(2015, 3, 2), "asked_date": DAY, "found": True,
+         "list_date": date(2009, 6, 1), "figi": "BBG000GONE0", "ts": now}
+    ]  # fmt: skip
+    ctx.writer.write_table(
+        "instruments/delisted_details", DAY, "d", stamped(answer, DAY, "d", source="massive")
+    )
+    record = ingest_listing_history(ctx, source(payloads.supported_tickers_zip()), DAY)
+    assert record.status is RunStatus.COMPLETE and record.stats["details_dated"] == 1
+    rows = stored(ctx)
+    gone = rows[rows["ticker"] == "GONE"].iloc[0]
+    assert (gone["start_date"], gone["start_source"]) == (date(2009, 6, 1), "massive_details")
+    assert gone["figi"] == "BBG000GONE0" and pd.isna(gone["no_id_reason"])
+    tiingo_rows = rows[rows["source"] == "tiingo"]
+    assert set(tiingo_rows["start_source"]) == {"tiingo"}

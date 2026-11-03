@@ -96,7 +96,7 @@ LISTING_HISTORY = fixed(
     "end_date date",
     *strings("name", "vendor_type", "security_type", "cik", "figi", "share_class_figi"),
     *strings("vendor_exchange", "data_provider_perma_ticker"),
-    *strings("id_source", "no_id_reason", "scope_reason"),
+    *strings("id_source", "no_id_reason", "scope_reason", "start_source"),
     "vendor_end_date date",
     "is_adr bool",
     key=("source", "ticker", "exchange", "asset_type", "start_date", "end_date"),
@@ -120,6 +120,31 @@ DELISTED_TICKERS = fixed(
     *strings("cik", "figi", "share_class_figi"),
     *strings("market", "locale", "currency_name", "last_updated_utc"),
     "end_date date",
+    key=("source", "ticker", "end_date"),
+)
+
+# L1: Massive's ticker details as of a delisted record's last day (ADR 0087, PR3b): one row per
+# (ticker, end_date) asked, from ``/v3/reference/tickers/{T}?date=end_date`` (the company as it was
+# then: its ``list_date`` is the start the inactive list lacks). Runs are increments (the rows asked
+# that run), so they merge; the latest wins. ``found`` false is the marker of a ticker Massive did
+# not know that day, never asked again. Identity only; every field the answer held is kept.
+# knowledge_ts is the write time.
+DELISTED_DETAILS = fixed(
+    "instruments/delisted_details",
+    "reference",
+    ("ticker", "end_date", "ts"),
+    "ts timestamp_utc!",
+    *strings("ticker", "name", "cik", "figi", "share_class_figi", "vendor_type", "exchange"),
+    *strings("market", "locale", "currency_name", "last_updated_utc", "sic_code"),
+    *strings("sic_description", "homepage_url", "description"),
+    "end_date date!",
+    "asked_date date!",
+    "found bool!",
+    "list_date date",
+    "delisted_date date",
+    "active bool",
+    "total_employees int64",
+    runs="merge",
     key=("source", "ticker", "end_date"),
 )
 

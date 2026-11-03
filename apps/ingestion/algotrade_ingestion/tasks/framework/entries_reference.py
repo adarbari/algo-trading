@@ -6,9 +6,17 @@ from pathlib import Path
 from algotrade.config.site.settings import load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework import source_guards
-from algotrade_ingestion.tasks.framework.params import SESSION, Params, Task, session_of, symbols
+from algotrade_ingestion.tasks.framework.params import (
+    SESSION,
+    Param,
+    Params,
+    Task,
+    session_of,
+    symbols,
+)
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import (
+    delisted_details,
     delisted_tickers,
     index_membership,
     listing_history,
@@ -89,6 +97,12 @@ def run_delisted_tickers(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
+def run_delisted_details(ctx: TaskContext, p: Params) -> RunRecord:
+    return delisted_details.ingest_delisted_details(
+        ctx, ctx.sources["massive_ticker_details"], session_of(p), p.get("limit")
+    )
+
+
 LISTING_HISTORY = Task(
     "listing-history",
     "every US stock / ETF Tiingo ever listed, with its dates "
@@ -112,6 +126,21 @@ DELISTED_TICKERS = Task(
     settings="sources.toml [massive] [quality]",
     params=(SESSION,),
 )  # declared here, not in registry.py (file cap); registry.py lists it in TASKS
+
+DELISTED_DETAILS = Task(
+    "delisted-details",
+    "Massive's ticker details at a delisted record's last day, for the starts it lacks "
+    "(instruments/delisted_details); in no workflow",
+    delisted_details,
+    ("instruments/delisted_details",),
+    run_delisted_details,
+    sources=("massive_ticker_details",),
+    settings="sources.toml [massive]",
+    params=(
+        SESSION,
+        Param("limit", ("--limit",), int, "ask for at most N names this run"),
+    ),
+)
 
 
 def run_index_membership(ctx: TaskContext, p: Params) -> RunRecord:

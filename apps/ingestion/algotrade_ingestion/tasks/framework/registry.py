@@ -177,6 +177,7 @@ TASKS: dict[str, Task] = {
         ),
         entries_reference.LISTING_HISTORY,
         entries_reference.DELISTED_TICKERS,
+        entries_reference.DELISTED_DETAILS,
         Task(
             "analyst-probe",
             "which analyst endpoints the FMP and Finnhub keys may call (analyst/vendor_access); "

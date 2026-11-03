@@ -70,6 +70,7 @@ from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
 from algotrade_sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_sources.vendors.massive.corporate_actions import MassiveCorporateActions
+from algotrade_sources.vendors.massive.details import MassiveTickerDetails
 from algotrade_sources.vendors.massive.news import MassiveNews
 from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.massive.tickers import MassiveTickers
@@ -306,6 +307,7 @@ SOURCES: dict[str, SourceSpec] = {
         _massive("massive_corporate_actions", MassiveCorporateActions),
         _massive("massive_tickers", MassiveTickers),
         _massive("massive_overview", MassiveOverview),
+        _massive("massive_ticker_details", MassiveTickerDetails),
         _massive("massive_news", MassiveNews),
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
