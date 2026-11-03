@@ -186,7 +186,7 @@ detect = [
 
 [[responsibility]]
 id = "partition-stamps"
-description = "The commit-sequence stamp of each committed partition in a range (TableStore.partition_seq: the highest sequence of any run in its index, 0 for a direct write, pending ignored) and the per-day log of the reads a computation made (RecordingReader, with the sequence at its first read): what lets a reader tell the partitions it read have not changed (ADR 0063)"
+description = "The commit-sequence stamp of each committed partition in a range (TableStore.partition_seq: the highest sequence of any run in its index, 0 for a direct write, pending ignored) and the per-day log of the reads a computation made (RecordingReader, with the sequence at its first read; a read of another store, the option-history root behind the splice, is a stamped record holding that store's own stamps, stamps_digest): what lets a reader tell the partitions it read have not changed (ADR 0063, ADR 0088 decision 11)"
 owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/readers.py"]
 allowed = [
     "src/algotrade/storage/tables/interfaces.py",  # declares partition_seq on TableStore
@@ -195,6 +195,7 @@ allowed = [
     "src/algotrade/data/outcomes/residuals.py",  # the residual partitions' stamps, likewise
     "src/algotrade/data/outcomes/share_path.py",  # the share path partitions' stamps, likewise (E3c-2b)
     "src/algotrade/services/evaluation/cross_section/legs/reuse.py",  # checks a stored leg's reads against the partitions' stamps
+    "src/algotrade/data/option_history/splice.py",  # the splice's stamps and recorder: a read of the history root is a stamped record (F7)
     "src/algotrade/services/serving/build.py",  # records each input partition's stamp at the pin in the release manifest (ADR 0077)
     "apps/ingestion/algotrade_ingestion/workflows/serve_release/serve_release.py",  # compares a release's recorded stamps with the live ones: stale when an input was restated
 ]

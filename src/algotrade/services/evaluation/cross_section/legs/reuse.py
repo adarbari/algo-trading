@@ -13,7 +13,8 @@ run record:
 - ``inputs``: the session's reads log still matches the store: every partition it read exists
   and was committed no later than the log's ``inputs_seq``, a read that found nothing still finds
   nothing, a listing of partition dates up to D is the same, the earliest snapshot is still the
-  earliest (``ReadRecord``);
+  earliest (``ReadRecord``); a ``stamped`` read (the option-history root behind the splice, whose
+  sequence is its own) still finds the partitions it found at the commit sequences it found;
 - ``outcomes``: no outcome row of (S, horizon) became known after the leg's outcome read
   (``outcomes_as_of``, up to the run's ``as_of``) and the outcome partition is the commit the leg
   read (``outcome_seq``: a commit landing after its rows' ``knowledge_ts`` slips past a timestamp);
@@ -32,7 +33,7 @@ from datetime import date, datetime
 from typing import Any
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data import ReadRecord, StoreReader, dates_digest
+from algotrade.data import STAMPED, ReadRecord, StoreReader, dates_digest, stamps_digest
 from algotrade.services.evaluation.cross_section.legs.rows import (
     DayReads,
     LegRecord,
@@ -196,16 +197,17 @@ def _sound_days(
     reader: StoreReader, reads: Mapping[date, DayReads], days: Iterable[date]
 ) -> dict[date, bool]:
     """Per decision session whether its stored reads log still matches the store."""
-    spans: dict[str, tuple[date, date]] = {}
-    listed: set[str] = set()
+    spans: dict[tuple[str, str], tuple[date, date]] = {}  # (kind, table): a stamped read's
+    listed: set[str] = set()  # sequence is another store's, so its span is kept apart
     for day in days:
         for record in reads[day].reads if day in reads else ():
-            if record.kind == "rows":
-                low, high = spans.get(record.table, (record.start, record.end))
-                spans[record.table] = (min(low, record.start), max(high, record.end))
+            if record.kind in ("rows", STAMPED):
+                at = (record.kind, record.table)
+                low, high = spans.get(at, (record.start, record.end))
+                spans[at] = (min(low, record.start), max(high, record.end))
             else:
                 listed.add(record.table)
-    stamps = {t: _Stamps(reader.partition_seq(t, lo, hi)) for t, (lo, hi) in spans.items()}
+    stamps = {at: _Stamps(reader.partition_seq(at[1], lo, hi)) for at, (lo, hi) in spans.items()}
     listings = {t: reader.dates(t) for t in listed}
     return {day: day in reads and _unchanged(reads[day], day, stamps, listings) for day in days}
 
@@ -223,13 +225,20 @@ class _Stamps:
 
 
 def _unchanged(
-    reads: DayReads, day: date, stamps: Mapping[str, _Stamps], listings: Mapping[str, list[date]]
+    reads: DayReads,
+    day: date,
+    stamps: Mapping[tuple[str, str], _Stamps],
+    listings: Mapping[str, list[date]],
 ) -> bool:
     if reads.inputs_seq is None:
         return False
     for record in reads.reads:
-        if record.kind == "rows":
-            found, seqs = stamps[record.table].within(record.start, record.end)
+        if record.kind == STAMPED:  # another store's partitions: their own stamps, as read
+            found, seqs = stamps[STAMPED, record.table].within(record.start, record.end)
+            if stamps_digest(dict(zip(found, seqs, strict=True))) != record.digest:
+                return False
+        elif record.kind == "rows":
+            found, seqs = stamps["rows", record.table].within(record.start, record.end)
             if any(s > reads.inputs_seq for s in seqs):
                 return False  # re-committed, or a partition that was not there committed since
             if record.digest and dates_digest(found) != record.digest:
