@@ -253,7 +253,9 @@ EDGE_LEGS = fixed(
     "pick_entry date[]",
     # Leg v6 (ADR 0087 decision 5; nullable): each pick's ``delisting_basis`` and its oriented
     # value with the delisting return taken out (``pick_zero_values``; its hit is a bit of
-    # ``pick_flags``), aligned to ``pick_ids``; null in older legs and where no pick was delisted.
+    # ``pick_flags``), aligned to ``pick_ids``, set for a DELISTED pick only (null for every
+    # other: its figure with the return taken out is its value); null in older legs and where no
+    # pick was delisted.
     "pick_delisting_basis string[]",
     "pick_zero_values float64[]",
     "not_triggered int64",

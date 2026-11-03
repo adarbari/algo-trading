@@ -15,8 +15,10 @@ every delisting is unknown):
   ``security_type`` (counted as common stocks by the proxy, ADR 0087 decision 3).
 - ``merged``: the snapshot is the merged one (it carries ``id_source``).
 - ``delisted`` / ``with_bars`` / ``unknown``: the delistings (``delisted_listings``) whose last
-  trading day is in the window, those with an ``events/delisting`` row for that day and a last
-  close (a name with no bar to its last session has no row), and those whose delisting return
+  trading day is in the window, those with an ``events/delisting`` row for that day (``with_bars``;
+  ``last_close`` is non-null by the table's schema and a name with no bar to its last session has
+  no row, so "has bars to its last bar" means "has an event row": a missing row fails closed), and
+  those whose delisting return
   has an unknown basis (``ZERO_UNKNOWN``, or no row: a missing event is unknown, never 0).
 - ``by_reason`` / ``by_basis``: the matched rows by ``reason`` and ``terminal_basis``, sorted.
 

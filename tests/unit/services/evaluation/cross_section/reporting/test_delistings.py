@@ -33,7 +33,7 @@ def _evaluation(picks: list[Pick], stamp: UniverseBasis | None) -> Any:
 PICKS = [
     Pick("EQ:A", 1, "", -0.5, False, delisted=True, delisting_basis="REPLACEMENT",
          zero_value=0.10, zero_hit=True),
-    Pick("EQ:B", 2, "", 0.02, True, zero_value=0.02, zero_hit=True),
+    Pick("EQ:B", 2, "", 0.02, True),  # not delisted: its own figures are its zero figures
     Pick("EQ:C", 3, "no_entry_bar"),  # not counted
 ]  # fmt: skip
 
@@ -53,7 +53,7 @@ def test_the_picks_figures_are_the_headline_beside_the_zero_convention() -> None
 
 
 def test_a_run_that_read_no_counts_has_no_window_and_a_v2_pick_reads_none() -> None:
-    v2 = [Pick("EQ:A", 1, "", 0.01, True, delisted=True, zero_value=0.01, zero_hit=True)]
+    v2 = [Pick("EQ:A", 1, "", 0.01, True, delisted=True)]
     found = delistings(_evaluation(v2, None))
     assert found["window"] is None and found["picks"][0]["delisted_by_basis"] == {"none": 1}
 

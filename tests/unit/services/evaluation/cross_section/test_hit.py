@@ -18,8 +18,10 @@ from algotrade.quant.black_scholes import (
     prob_otm,
     strike_from_delta,
 )
+from algotrade.services.evaluation.cross_section import hit
 from algotrade.services.evaluation.cross_section.hit import (
     Pairs,
+    _apply,
     apply_outcome,
     borrow_cost,
     needs_implied_vol,
@@ -815,3 +817,55 @@ def test_the_input_is_not_changed_and_a_v2_frame_is_returned_as_is() -> None:
     assert zero_view(v2) is v2
     none = frame.assign(delisting_return=None)
     assert zero_view(none) is none
+
+
+def _mixed() -> pd.DataFrame:
+    return rows(
+        fwd_excess_return=[-0.515, 0.02, -0.01, 0.3],
+        fwd_return=[-0.505, 0.03, 0.0, 0.31],
+        outcome_status=["DELISTED", "COMPLETE", "DELISTED", "COMPLETE"],
+        delisting_return=[-0.55, None, None, None],
+        delisting_basis=["REPLACEMENT", None, "NO_EVENT", None],
+        horizon_sessions=[2] * 4,
+    )
+
+
+@pytest.mark.parametrize("side", ["long", "short"])
+def test_the_spliced_zero_pass_equals_a_full_second_pass(side: str) -> None:
+    """Only the rows with a delisting return are valued twice; the figures are those of valuing
+    the whole zero view."""
+    e, frame = _excess_edge(side=side), _mixed()
+    out = apply_outcome(e, frame)
+    full = _apply(e, zero_view(frame), None, None, None)
+    counted = (out["excluded"] == "") & (full["excluded"] == "")
+    assert list(out["zero_value"].fillna(-9)) == list(full["oriented"].where(counted).fillna(-9))
+    assert list(out["zero_hit"]) == list(full["hit"] & counted)
+    assert list(out["zero_short_hit"]) == list(full["short_hit"] & counted)
+
+
+def test_a_frame_with_no_delisting_return_is_not_valued_twice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    real = hit._apply
+    monkeypatch.setattr(hit, "_apply", lambda *a: calls.append(1) or real(*a))
+    apply_outcome(_excess_edge(), rows(fwd_excess_return=[0.02, -0.01]))
+    assert len(calls) == 1  # v2: the zero figure is the value
+    calls.clear()
+    apply_outcome(_excess_edge(), _mixed())
+    assert len(calls) == 2  # v3 with a delisted name: the delisted rows only, a second time
+
+
+def test_a_pair_spread_takes_the_siblings_delisting_return_out_too() -> None:
+    """A (+5%) is held against B, which delisted: -50.5% stored with a -55% delisting return over
+    a +10% last-bar return. A's spread falls by the 60.5 points the convention gave it; the costs
+    are the same in both figures."""
+    stored = pair_rows(
+        {"EQ:A": 0.05, "EQ:B": -0.505},
+        delisting_return=[None, -0.55],
+        outcome_status=["COMPLETE", "DELISTED"],
+    )
+    a_only = stored[stored["instrument_id"] == "EQ:A"]
+    out = apply_outcome(pair_edge(), a_only, pairs=pairs_of(stored, AB)).iloc[0]
+    assert out["excluded"] == ""
+    assert out["oriented"] - out["zero_value"] == pytest.approx(0.605)

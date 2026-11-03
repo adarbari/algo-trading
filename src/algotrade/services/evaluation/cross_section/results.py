@@ -335,6 +335,11 @@ def universe_basis_of(evaluation: EdgeEvaluation) -> UniverseBasis:
     return evaluation.universe_basis or UniverseBasis(SURVIVORS, ("listing_counts_unread",))
 
 
+def _limits(stamp: UniverseBasis) -> dict[str, float] | None:
+    """The thresholds ``stamp`` was decided against, as stored in the run's stats."""
+    return None if stamp.limits is None else asdict(stamp.limits)
+
+
 def _verdict_headline(
     stores: Stores | None,
     evaluation: EdgeEvaluation,
@@ -418,6 +423,8 @@ def write_edge_eval(
         "universe_basis_gaps": list(
             universe_basis_of(evaluation).gaps
         ),  # sorted: the failed conditions
+        # the thresholds the stamp was decided against, so a later change shows on old runs
+        "universe_basis_limits": _limits(universe_basis_of(evaluation)),
         "delistings": delistings(evaluation),  # by reason and basis, the zero-convention figure
         "mode": evaluation.mode,  # full | incremental (ADR 0063): how the run got its legs
         "legs_reused": evaluation.legs_reused,

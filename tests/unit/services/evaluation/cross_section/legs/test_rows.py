@@ -516,11 +516,11 @@ def test_the_delisting_figures_of_a_pick_round_trip_and_older_legs_hold_none() -
         "EQ:G", 1, "", -0.5, False, delisted=True, delisting_basis="REPLACEMENT",
         zero_value=0.09, zero_hit=True,
     )  # fmt: skip
-    kept = Pick("EQ:H", 2, "", 0.02, True, zero_value=0.02, zero_hit=True)
+    kept = Pick("EQ:H", 2, "", 0.02, True)  # not delisted: no zero figure of its own
     held = leg(stat=stat(pick_values=(-0.5, 0.02), pick_hits=1, picks=(gone, kept)))
     row = encode_leg(held, "site", "drift")
     assert row["pick_delisting_basis"] == ["REPLACEMENT", None]
-    assert row["pick_zero_values"] == [0.09, 0.02]
+    assert row["pick_zero_values"] == [0.09, None]  # a delisted pick only
     assert decode_leg(row).stat.picks == (gone, kept)
     plain = encode_leg(leg(), "site", "drift")
     assert plain["pick_delisting_basis"] is None and plain["pick_zero_values"] is None

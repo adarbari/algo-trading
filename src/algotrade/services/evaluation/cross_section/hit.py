@@ -74,7 +74,7 @@ as an ``above`` one's.
 
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import pandas as pd
@@ -530,8 +530,9 @@ def zero_view(outcomes: pd.DataFrame) -> pd.DataFrame:
     gross = pd.to_numeric(out["fwd_return"], errors="coerce")
     plain = (1.0 + gross) / (1.0 + dr) - 1.0
     out["fwd_return"] = gross.where(~applied, plain)
-    excess = pd.to_numeric(out["fwd_excess_return"], errors="coerce")
-    out["fwd_excess_return"] = excess.where(~applied, excess - (gross - plain))
+    if "fwd_excess_return" in out.columns:  # a pair spread's rows read ``fwd_return`` alone
+        excess = pd.to_numeric(out["fwd_excess_return"], errors="coerce")
+        out["fwd_excess_return"] = excess.where(~applied, excess - (gross - plain))
     return out
 
 
@@ -555,10 +556,9 @@ def apply_outcome(
     (v2) they equal the value and the hit. ``delisting_basis`` is the row's (null: not delisted,
     or no basis stored)."""
     res = _apply(edge, outcomes, implied, pairs, option_costs)
-    flat = zero_view(outcomes)
-    zero = res if flat is outcomes else _apply(edge, flat, implied, pairs, option_costs)
-    counted = (res["excluded"] == "") & (zero["excluded"] == "")
     own = own_rows(edge, outcomes)
+    zero = _zero_pass(edge, own, res, implied, pairs, option_costs)
+    counted = (res["excluded"] == "") & (zero["excluded"] == "")
     basis = own["delisting_basis"] if "delisting_basis" in own.columns else None
     return res.assign(
         delisting_basis=None if basis is None else basis.astype(object).to_numpy(),
@@ -567,6 +567,48 @@ def apply_outcome(
         zero_short_value=np.where(counted, zero["short_value"], np.nan),
         zero_short_hit=zero["short_hit"].to_numpy() & counted.to_numpy(),
     )[list(RESULT_COLUMNS)]
+
+
+ZERO_COLUMNS = ("oriented", "hit", "excluded", "short_value", "short_hit")
+
+
+def _zero_rows(own: pd.DataFrame, pairs: Pairs | None) -> np.ndarray:
+    """The rows of ``own`` whose zero figure can differ from the value: a stored delisting return
+    on the row, or, for a pair spread, on its sibling's stored row."""
+    drop = "delisting_return"
+    hit = own[drop].notna().to_numpy() if drop in own.columns else np.zeros(len(own), dtype=bool)
+    if pairs is not None and drop in pairs.stored.columns:
+        gone = set(pairs.stored.loc[pairs.stored[drop].notna(), "instrument_id"])
+        if gone:
+            sibling = [pairs.siblings.get(i) in gone for i in own["instrument_id"]]
+            hit = hit | np.array(sibling, dtype=bool)
+    return hit
+
+
+def _zero_pass(
+    edge: Edge,
+    own: pd.DataFrame,
+    res: pd.DataFrame,
+    implied: Mapping[str, float | None] | None,
+    pairs: Pairs | None,
+    option_costs: OptionCosts | None,
+) -> pd.DataFrame:
+    """``res`` re-valued on ``zero_view``: only the rows with a delisting return of their own (or
+    of a pair's sibling, whose stored return is taken out too) go through ``_apply`` again, and
+    their figures are spliced into a copy of ``res``; ``res`` itself when there are none (a v2
+    frame, or a night with no delisted name in the window), so no second full pass is made."""
+    chosen = _zero_rows(own, pairs)
+    if not chosen.any():
+        return res
+    spot = None if pairs is None else replace(pairs, stored=zero_view(pairs.stored))
+    sub = _apply(edge, zero_view(own[chosen]), implied, spot, option_costs)
+    at = np.flatnonzero(chosen)
+    zero = res.copy()
+    for column in ZERO_COLUMNS:
+        values = zero[column].to_numpy(copy=True)
+        values[at] = sub[column].to_numpy()
+        zero[column] = values
+    return zero
 
 
 def _apply(

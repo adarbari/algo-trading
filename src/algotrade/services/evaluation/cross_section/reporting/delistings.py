@@ -23,9 +23,16 @@ def _picks_of(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
         if r.role != SCREENER or not r.legs:
             continue
         counted = [p for leg in r.legs for p in leg.stat.picks if p.reason == ""]
-        zero = [p for p in counted if p.zero_value is not None]
+        # a pick that was not delisted reads the same with the return taken out: its own figures
+        zero = [
+            (
+                p.value if p.zero_value is None else p.zero_value,
+                p.zero_hit if p.zero_value is not None else p.hit,
+            )
+            for p in counted
+        ]
         values = [p.value for p in counted if p.value is not None]
-        zeros = [p.zero_value for p in zero if p.zero_value is not None]
+        zeros = [v for v, _ in zero if v is not None]
         found.append(
             {
                 "variant": r.variant,
@@ -33,7 +40,7 @@ def _picks_of(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
                 "picks": len(counted),
                 "hits": sum(p.hit for p in counted),
                 "zero_picks": len(zero),
-                "zero_hits": sum(bool(p.zero_hit) for p in zero),
+                "zero_hits": sum(bool(h) for _, h in zero),
                 "mean_value": sum(values) / len(values) if values else None,
                 "mean_zero_value": sum(zeros) / len(zeros) if zeros else None,
                 "delisted_by_basis": dict(

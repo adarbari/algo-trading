@@ -48,6 +48,7 @@ class UniverseBasis:
     basis: str
     gaps: tuple[str, ...]
     counts: BasisCounts | None = None
+    limits: UniverseBasisLimits | None = None  # the thresholds it was decided against
 
 
 def grains_without_delisting_return(edges: Collection[Edge]) -> tuple[str, ...]:
@@ -111,4 +112,4 @@ def universe_basis(
         gaps.add("outcomes_not_v3")
     if grains:
         gaps.add("grain_without_delisting_return")
-    return UniverseBasis(SURVIVORS if gaps else FREE, tuple(sorted(gaps)), counts)
+    return UniverseBasis(SURVIVORS if gaps else FREE, tuple(sorted(gaps)), counts, limits)

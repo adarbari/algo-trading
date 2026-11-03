@@ -106,9 +106,10 @@ class Pick:
     entry_session: date | None = None
     # ADR 0087 decision 5 (leg v6): a DELISTED pick's ``delisting_basis`` (OTC_CLOSE, ZERO_ACQUIRED,
     # REPLACEMENT, ZERO_UNKNOWN, NO_EVENT; None for a name not delisted or from a v2 outcome row)
-    # and, for a counted pick, its oriented value and hit as they read with the delisting return
-    # taken out (``zero_value`` / ``zero_hit``: the zero-convention figure beside the verdict,
-    # never a verdict input); None where unknown, and in a leg stored before v6.
+    # and, for a counted DELISTED pick only (any other pick's figure is its value and hit), its
+    # oriented value and hit as they read with the delisting return taken out (``zero_value`` /
+    # ``zero_hit``: the zero-convention figure beside the verdict, never a verdict input); None
+    # elsewhere, and in a leg stored before v6.
     delisting_basis: str | None = None
     zero_value: float | None = None
     zero_hit: bool | None = None

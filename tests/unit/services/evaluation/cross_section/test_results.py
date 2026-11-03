@@ -562,6 +562,10 @@ def test_the_run_record_carries_the_stamp_the_gaps_and_the_delistings(world: Wor
     assert stats["universe_basis"] == "survivors"
     assert stats["universe_basis_gaps"] == ["listing_counts_unread", "outcomes_not_v3"]
     assert stats["delistings"]["window"] is None
+    assert stats["universe_basis_limits"] == {  # a later owner change shows on old runs
+        "max_no_id_share": 0.01, "min_delisted_bars_share": 0.98,
+        "max_unknown_delisting_share": 0.05, "max_null_type_share": 0.05,
+    }  # fmt: skip
     (momo,) = stats["delistings"]["picks"]
     assert momo["picks"] > 0 and momo["zero_picks"] == momo["picks"]  # v2: zero equals headline
     assert momo["zero_hits"] == momo["hits"] and momo["delisted_by_basis"] == {}
