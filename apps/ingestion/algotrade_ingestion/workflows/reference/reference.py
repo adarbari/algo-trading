@@ -46,19 +46,20 @@ from algotrade_ingestion.workflows.nightly.nightly import (
     step_item,
     universe_exists,
 )
-from algotrade_ingestion.workflows.nightly.notify import Notice, Notifier, default_notifier
+from algotrade_ingestion.workflows.nightly.notify import Notice, default_notifier, notify_workflow
 from algotrade_ingestion.workflows.nightly.sessions import last_done
 from algotrade_ingestion.workflows.nightly.steps import (
+    BUSY,
     Status,
     Step,
     StepResult,
     StepStatus,
     parse_status,
+    run_summary,
 )
 
 REFERENCE_RUN = "reference"  # the job name of the run records
 REFERENCE_LOCK = "reference"  # the named lock one run holds (a second one: busy)
-BUSY = "BUSY"
 MAX_ATTEMPTS = 3  # runs with a FAILED step in one week before the week counts as done
 OVERDUE = timedelta(days=8)  # no published run for this long: a weekday run is due too
 YIELDED = "yielded to a pending nightly"
@@ -183,16 +184,7 @@ def run_reference(
         for n, r in done.items()
         if r.status is StepStatus.FAILED
     ]
-    return {
-        "session": session.isoformat(),
-        "status": Status.SUCCEEDED.value,
-        "run_id": run.run_id,
-        "steps": steps,
-        "started_at": started.isoformat(),
-        "finished_at": finished.isoformat(),
-        "duration_s": round((finished - started).total_seconds(), 3),
-        "warnings": warnings,
-    }
+    return run_summary(session, run.run_id, steps, started, finished, warnings)
 
 
 def reference_notice(summary: Mapping[str, Any]) -> Notice:
@@ -202,18 +194,6 @@ def reference_notice(summary: Mapping[str, Any]) -> Notice:
     status = "FAILED" if failed else Status.SUCCEEDED.value
     detail = f": {', '.join(failed)} failed" if failed else ""
     return Notice(status, "algotrade reference", f"{status} ({summary['session']}){detail}")
-
-
-def _notify(summary: dict[str, Any], notifier: Notifier, settings: NightlySettings) -> None:
-    if not settings.notify_enabled or summary["status"] == BUSY:
-        return
-    try:
-        problem = notifier.notify(reference_notice(summary))
-    except Exception as exc:  # a notifier must not raise; if one does, it is a warning
-        problem = f"notifier failed: {type(exc).__name__}: {exc}"
-    if problem:
-        warn = {"check": "notify", "status": "WARN", "detail": problem}
-        summary["warnings"] = [*summary.get("warnings", []), warn]
 
 
 def reference_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
@@ -234,5 +214,6 @@ def reference_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
             and nightly_pending(task_ctx.writer, datetime.now(UTC), settings)
         ),
     )
-    _notify(summary, r.get("notifier") or default_notifier(settings), settings)
+    notifier = r.get("notifier") or default_notifier(settings)
+    notify_workflow(summary, reference_notice, notifier, settings)
     return {**summary, "_partial": summary["status"] != Status.SUCCEEDED}

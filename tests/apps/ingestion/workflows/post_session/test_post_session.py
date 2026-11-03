@@ -22,20 +22,21 @@ from algotrade_ingestion.tasks.framework.run import (
     recover_unpublished,
     stamp,
 )
+from algotrade_ingestion.workflows.nightly.notify import notify_workflow
 from algotrade_ingestion.workflows.nightly.records import stored_post_session
 from algotrade_ingestion.workflows.nightly.render import render_html, render_text
 from algotrade_ingestion.workflows.nightly.report import build_report
 from algotrade_ingestion.workflows.nightly.sessions import POST_STEPS
-from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
+from algotrade_ingestion.workflows.nightly.steps import BUSY, Outcome, StepStatus
 from algotrade_ingestion.workflows.post_session import post_session as post_module
 from algotrade_ingestion.workflows.post_session.post_session import (
-    BUSY,
     EDGE_EVAL,
     EDGE_VERDICTS,
     LOCKED,
     POST_SESSION,
     pending_session,
     post_done,
+    post_notice,
     run_post_session,
     target_session,
 )
@@ -414,9 +415,9 @@ def test_a_failed_post_session_step_or_a_blown_budget_alerts_like_a_failed_night
     assert not ok.alert
     sent, summary = Recorder(), {"session": "2026-10-02", "status": "SUCCEEDED", **{"steps": steps}}
     summary["warnings"] = []
-    post_module._notify(summary, sent, NightlySettings())
+    notify_workflow(summary, post_notice, sent, NightlySettings())
     assert [n.alert for n in sent.notices] == [True]
     quiet = Recorder()
-    post_module._notify(summary, quiet, NightlySettings(notify_enabled=False))
-    post_module._notify({**summary, "status": BUSY}, quiet, NightlySettings())
+    notify_workflow(summary, post_notice, quiet, NightlySettings(notify_enabled=False))
+    notify_workflow({**summary, "status": BUSY}, post_notice, quiet, NightlySettings())
     assert quiet.notices == []

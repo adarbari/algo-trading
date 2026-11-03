@@ -46,13 +46,14 @@ from algotrade_ingestion.workflows.nightly.nightly import (
 )
 from algotrade_ingestion.workflows.nightly.notify import (
     Notice,
-    Notifier,
     default_notifier,
+    notify_workflow,
 )
 from algotrade_ingestion.workflows.nightly.records import latest_nightly
 from algotrade_ingestion.workflows.nightly.screens import ScreenStep, edge_eval_jobs
 from algotrade_ingestion.workflows.nightly.sessions import POST_SESSION_RUN, last_done
 from algotrade_ingestion.workflows.nightly.steps import (
+    BUSY,
     SATISFIED,
     Outcome,
     Status,
@@ -61,12 +62,12 @@ from algotrade_ingestion.workflows.nightly.steps import (
     StepStatus,
     parse_status,
     run_isolated,
+    run_summary,
 )
 
 EDGE_EVAL = "edge-eval"  # not an ingestion task: one `edge-eval` job per open edge
 EDGE_VERDICTS = "edge-verdicts"  # a registry task, run after edge-eval under the ingest lock
 POST_LOCK = "post-session"  # the named lock one post-session run holds (a second one: busy)
-BUSY = "BUSY"  # the ingest lock was taken: nothing ran, a later start retries
 POST_SESSION: tuple[Step, ...] = (
     # Company and ETF descriptions (ADR 0034): Massive requests capped per night (~25 min).
     Step("descriptions", critical=False),
@@ -194,17 +195,8 @@ def run_post_session(
             f"edge-eval took {edge_eval['duration_s']:g} s (target {edge_eval['target_s']:g} s)"
         )
         warnings.append({"check": "edge_eval_duration", "status": "WARN", "detail": detail})
-    return {
-        "session": session.isoformat(),
-        "status": Status.SUCCEEDED.value,
-        "run_id": run.run_id,
-        "steps": steps,
-        "started_at": started.isoformat(),
-        "finished_at": finished.isoformat(),
-        "duration_s": round(seconds, 3),
-        "edge_eval": edge_eval,
-        "warnings": warnings,
-    }
+    summary = run_summary(session, run.run_id, steps, started, finished, warnings)
+    return {**summary, "edge_eval": edge_eval}
 
 
 def _edge_eval_timing(result: StepResult | None, target_s: float) -> dict[str, Any] | None:
@@ -227,19 +219,6 @@ def post_notice(summary: Mapping[str, Any]) -> Notice:
     return Notice(status, "algotrade post-session", message)
 
 
-def _notify(summary: dict[str, Any], notifier: Notifier, settings: NightlySettings) -> None:
-    """Tell the nightly's notifier (``[notify] enabled``); a delivery problem is a WARN."""
-    if not settings.notify_enabled or summary["status"] == BUSY:
-        return
-    try:
-        problem = notifier.notify(post_notice(summary))
-    except Exception as exc:  # a notifier must not raise; if one does, it is a warning
-        problem = f"notifier failed: {type(exc).__name__}: {exc}"
-    if problem:
-        warn = {"check": "notify", "status": "WARN", "detail": problem}
-        summary["warnings"] = [*summary.get("warnings", []), warn]
-
-
 def post_session_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """Job handler for the post-session workflow. params: ``session`` (the nightly-done session
     to run for), ``wait`` (queue behind a running ingest instead of ``BUSY``). Resources as the
@@ -256,5 +235,6 @@ def post_session_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str,
         evals,
         lambda: exclusive_run(backend, wait=bool(params.get("wait"))),
     )
-    _notify(summary, r.get("notifier") or default_notifier(settings), settings)
+    notifier = r.get("notifier") or default_notifier(settings)
+    notify_workflow(summary, post_notice, notifier, settings)
     return {**summary, "_partial": summary["status"] != Status.SUCCEEDED}

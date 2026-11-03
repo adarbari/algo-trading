@@ -32,7 +32,7 @@ from algotrade.config.site.settings import NightlySettings
 from algotrade.data import StoreReader
 from algotrade_ingestion.workflows.nightly.records import chain_drift, load_report
 from algotrade_ingestion.workflows.nightly.render import render_html, render_text
-from algotrade_ingestion.workflows.nightly.steps import HELD_PREFIX
+from algotrade_ingestion.workflows.nightly.steps import BUSY, HELD_PREFIX
 
 TITLE = "algotrade nightly"
 SMTP_TIMEOUT_S = 30
@@ -271,3 +271,22 @@ def report(
         out["warnings"] = [*out.get("warnings", []), *warns]
         _write(path, out)
     return out
+
+
+def notify_workflow(
+    summary: dict[str, Any],
+    make_notice: Callable[[Mapping[str, Any]], Notice],
+    notifier: Notifier,
+    settings: NightlySettings,
+) -> None:
+    """Tell ``notifier`` (``[notify] enabled``) about a finished post-session or reference run;
+    a delivery problem is a WARN in the summary, never an error. A busy run says nothing."""
+    if not settings.notify_enabled or summary["status"] == BUSY:
+        return
+    try:
+        problem = notifier.notify(make_notice(summary))
+    except Exception as exc:  # a notifier must not raise; if one does, it is a warning
+        problem = f"notifier failed: {type(exc).__name__}: {exc}"
+    if problem:
+        warn = {"check": "notify", "status": "WARN", "detail": problem}
+        summary["warnings"] = [*summary.get("warnings", []), warn]

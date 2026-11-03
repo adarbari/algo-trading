@@ -117,16 +117,13 @@ from algotrade_ingestion.tasks.framework.registry import TASKS, Task
 from algotrade_ingestion.tasks.framework.run import recover_unpublished
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from algotrade_ingestion.workflows.nightly.sessions import NIGHTLY_RUN, last_done
+from algotrade_ingestion.workflows.nightly.steps import BUSY
 from algotrade_ingestion.workflows.nightly.timing import DEFAULT_SESSIONS
 from algotrade_ingestion.workflows.post_session.post_session import (
-    BUSY,
     POST_LOCK,
     pending_session,
     post_done,
     target_session,
-)
-from algotrade_ingestion.workflows.reference.reference import (
-    BUSY as REFERENCE_BUSY,
 )
 from algotrade_ingestion.workflows.reference.reference import (
     REFERENCE_LOCK,
@@ -304,7 +301,7 @@ def reference(args: argparse.Namespace, backend: Backend) -> int:
     except RunLockedError as exc:  # another reference run: not an error when scheduled
         print(f"busy: {exc}")
         return LOCKED_EXIT
-    if job.result.get("status") == REFERENCE_BUSY:
+    if job.result.get("status") == BUSY:
         print(f"busy: {job.result.get('reason')}")
         return LOCKED_EXIT
     args.ran_job = True
