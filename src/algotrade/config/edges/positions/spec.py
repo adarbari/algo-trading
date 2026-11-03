@@ -88,11 +88,14 @@ class PositionSpec:
 
 
 def spec_of(
-    o: Table, kind: str, offset: int, cases: tuple[CaseValue, ...] = ()
+    o: Table, kind: str, offset: int, cases: tuple[CaseValue, ...] = (), ahead: bool = False
 ) -> PositionSpec | None:
     """The outcome's ``PositionSpec`` (None without ``position``: its other keys are refused).
     The entry offset of a position is at least 1: the screen and the gate are known only after
-    the decision session's close (G-H1)."""
+    the decision session's close (G-H1). The one exception is a schedule on an event announced
+    ahead (``ahead``: ``earnings_expected``, ...): its offset counts from the event's anchor, the
+    decision session is S - 1 whatever the offset and the event is known by it, so the entry may
+    precede the event (a straddle sold the close before a report, ADR 0088 X5)."""
     if "position" not in o.names():
         named = [k for k in KEYS[1:] if k in o.names()] + ["cases" for _ in cases]
         if named:
@@ -106,7 +109,7 @@ def spec_of(
         raise ConfigurationError(
             f"{o.where} position: not with structure (the older option kinds' enum)"
         )
-    if offset < 1:
+    if offset < 1 and not ahead:
         raise ConfigurationError(
             f"{o.where} start_offset_sessions: a position enters after the decision session's "
             f"close (>= 1), got {offset}"
