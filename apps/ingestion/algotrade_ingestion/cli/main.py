@@ -176,11 +176,13 @@ def writes(args: argparse.Namespace) -> bool:
     ):  # post-session, reference, serve-release: own locks (reference: one per step)
         return False
     # Probe the ingest lock themselves (compact-runs), hold the history store's own (ADR 0084) or
-    # take the main locks batch by batch (option-history-outcomes, ADR 0088 decision 11):
+    # take the main locks batch by batch (option-history-outcomes, ADR 0088 decision 11) or the
+    # history store's own (option-history-features):
     if getattr(args, "task", None) in (
         "compact-runs",
         "option-history-import",
         "option-history-outcomes",
+        "option-history-features",
     ):
         return False
     return not (args.command == "golden" and args.action in ("build", "verify"))

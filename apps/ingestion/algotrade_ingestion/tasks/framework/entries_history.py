@@ -19,7 +19,7 @@ from algotrade_ingestion.tasks.framework.params import (
     symbols,
 )
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.options_history import importer, outcomes
+from algotrade_ingestion.tasks.options_history import features, importer, outcomes
 from algotrade_ingestion.tasks.verification import put_check, put_engine
 
 TABLES = (
@@ -65,6 +65,17 @@ def run_option_history_put_engine_check(ctx: TaskContext, p: Params) -> RunRecor
     return put_engine.put_engine_check(
         ctx, session_of(p), p.get("start"), p.get("end"), p.get("position")
     )
+
+
+def run_option_history_features(ctx: TaskContext, p: Params) -> RunRecord:
+    options = features.HistoryFeatureOptions(
+        url=option_history_url(p.get("url")),
+        start=p.get("start"),
+        end=p.get("end"),
+        force=bool(p.get("force")),
+        batch=int(p.get("batch") or 250),
+    )
+    return features.compute_history_features(ctx, session_of(p), options)
 
 
 HISTORY_TASKS = (
@@ -132,6 +143,22 @@ HISTORY_TASKS = (
             FROM,
             TO,
             Param("position", ("--position",), str, "the position_key of the SPX put write"),
+        ),
+    ),
+    Task(
+        "option-history-features",
+        "compute the chain feature groups for the bought history, in the history store (F7)",
+        features,
+        (),  # the groups are written to the history root (personal licence), not the main store
+        run_option_history_features,
+        settings="ALGOTRADE_OPTION_HISTORY_URL; the main store's Treasury curve and dividends",
+        params=(
+            SESSION,
+            Param("url", ("--url",), str, "history store URL (default: the env variable)"),
+            FROM,
+            TO,
+            Param("batch", ("--batch",), int, "sessions per committed run (default 250)"),
+            Param("force", ("--force",), None, "recompute sessions already stored"),
         ),
     ),
 )
