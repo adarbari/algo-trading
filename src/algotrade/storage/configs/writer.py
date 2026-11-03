@@ -78,6 +78,13 @@ class ConfigWriter(ConfigStore, Protocol):
         """Replace ``users/<user>/preferences.toml``."""
         ...
 
+    def save_identity(
+        self, user: str, document: Mapping[str, Any], *, exclusive: bool = False
+    ) -> None:
+        """Replace ``users/<user>/identity.toml`` (the sign-in email, ADR 0040; the onboarding
+        write, ID5); ``exclusive``: create only, ``FileExistsError`` when there is one."""
+        ...
+
     def save_user_document(
         self, user: str, kind: str, name: str, document: Mapping[str, Any]
     ) -> None:
@@ -216,6 +223,15 @@ class FileConfigWriter(FileConfigStore):
     @_generation
     def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
         path = self.root / "users" / _user(user) / "preferences.toml"
+        self._write(user, path, toml_text(document))
+
+    @_generation
+    def save_identity(
+        self, user: str, document: Mapping[str, Any], *, exclusive: bool = False
+    ) -> None:
+        path = self.root / "users" / _user(user) / "identity.toml"
+        if exclusive and path.exists():
+            raise FileExistsError("identity.toml exists")
         self._write(user, path, toml_text(document))
 
     def _document_path(self, user: str, kind: str, name: str) -> Path:
@@ -362,6 +378,15 @@ class MemoryConfigWriter(MemoryConfigStore):
     @_memory_generation
     def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "preferences", "preferences")] = _copy(document)
+
+    @_memory_generation
+    def save_identity(
+        self, user: str, document: Mapping[str, Any], *, exclusive: bool = False
+    ) -> None:
+        key = (_user(user), "identity", "identity")
+        if exclusive and key in self._docs:
+            raise FileExistsError("identity.toml exists")
+        self._docs[key] = _copy(document)
 
     @_memory_generation
     def save_user_document(

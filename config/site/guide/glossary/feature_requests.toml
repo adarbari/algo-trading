@@ -111,3 +111,44 @@ body = """
 Some data comes from a personal-use source and may only be shown to the person whose licence it is. A person with such a licence sees values built from that source; everyone else sees them as not available for licence reasons. An empty cell means the person holds only the open data.
 """
 see_also = ["user_person", "user_role"]
+
+[[term]]
+id = "user_onboard"
+term = "Onboard a user"
+short = "Declare a new trader by id, email and name; the sign-in account is still added at the identity provider."
+body = """
+Onboarding writes the new person to the site's own files and gives them the trader role and no personal licences. It does not create the sign-in account: the API holds no key to the provider, so the last step is yours (see Supabase step). Admin rights and licences are only ever granted by a reviewed change to the users file, never by this form.
+The form refuses an id or email that is already in use, an id that is not 1-64 of a-z, 0-9, _ and -, and the reserved id site. Don't reuse an id to hand someone else's access to a new person.
+"""
+see_also = ["user_pending_provider", "user_supabase_step", "user_declared_by_identity", "user_role"]
+
+[[term]]
+id = "user_pending_provider"
+term = "Pending provider"
+short = "A user you onboarded whose sign-in account has not been used yet, so nobody can sign in as them."
+body = """
+The user is declared here but the identity provider has no matching account, or it has not signed in once. The first successful sign-in links the two and the mark goes away. Until then they cannot open the site.
+A user declared in the reviewed users file never shows this mark. If it stays after you added the account, check that the address matches exactly.
+"""
+next = "Add the address at the identity provider (see Supabase step), then ask the user to sign in once."
+see_also = ["user_onboard", "user_supabase_step"]
+
+[[term]]
+id = "user_supabase_step"
+term = "Supabase step"
+short = "The one step left by hand: add the user's email at Supabase, with confirmation on."
+body = """
+In the Supabase dashboard open Authentication, then Users, then Add user. Enter the email shown after onboarding, turn confirmation on, and keep public sign-ups off so only people you add can sign in.
+The site does the rest: the first sign-in with that address links the account to the declared user.
+"""
+see_also = ["user_onboard", "user_pending_provider"]
+
+[[term]]
+id = "user_declared_by_identity"
+term = "Declared by identity"
+short = "A user who exists only through their own identity file, as a trader with no licences."
+body = """
+An onboarded user has no line in the reviewed users file. Their identity file under the user's config folder holds the email, the name, who declared them and when. If the reviewed file later lists the same id, that entry wins: it sets the role and licences, and the identity file keeps only the email and the sign-in link.
+Because the reviewed file stays the only place that grants admin or licences, anyone with more than the trader role can be found by reading it.
+"""
+see_also = ["user_onboard", "user_role", "user_person"]

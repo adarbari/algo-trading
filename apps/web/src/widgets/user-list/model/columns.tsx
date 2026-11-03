@@ -8,6 +8,7 @@ import {
   licencesText,
   roleLabel,
   TERM_OF_LICENCES,
+  TERM_OF_PENDING_PROVIDER,
   TERM_OF_PERSON,
   TERM_OF_ROLE,
   type Person,
@@ -27,6 +28,13 @@ export function personColumns(): DataTableColumn<Person>[] {
       cell: ({ row }) => (
         <>
           <Mono size="sm">{row.id}</Mono> {row.name}
+          {row.pendingProvider && (
+            <>
+              {' '}
+              <StatusBadge tone="warning">Pending provider</StatusBadge>
+              {termHelp(TERM_OF_PENDING_PROVIDER)}
+            </>
+          )}
         </>
       ),
     },
