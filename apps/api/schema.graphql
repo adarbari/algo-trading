@@ -3346,7 +3346,7 @@ type Query {
   ): Instrument
 
   """
-  Instruments x `columns` (catalogue fields, in order) for the session: the universe, or the instruments `keys` (ids or tickers) name in that order; filtered (`filters`: the surface `universe` of `filterSet`, over the whole list, with the counts in the result's `facets`; `securityType`, `sector`, `liquidityClass`, `leveraged` and `optionable` are deprecated, they are those filters, text case-insensitive; `q`: the symbol or name contains it), sorted by `sort` (`symbol` or a catalogue field, `-` prefix: descending, missing values last) and paged (`page` from 1, `size` rows). Null: nothing stored
+  Instruments x `columns` (catalogue fields, in order) for the session: the universe, or the instruments `keys` (ids or tickers) name in that order; filtered (`filters`: the `surface` of `filterSet`, `universe` or `calendar_week` (Earnings week: `keys` the week's reports, its counts always), over the whole list, with the counts in the result's `facets`; `securityType`, `sector`, `liquidityClass`, `leveraged` and `optionable` are deprecated, they are those filters, text case-insensitive; `q`: the symbol or name contains it), sorted by `sort` (`symbol` or a catalogue field, `-` prefix: descending, missing values last) and paged (`page` from 1, `size` rows). Null: nothing stored
   """
   table(
     columns: [FeatureName!]!
@@ -3361,6 +3361,7 @@ type Query {
     page: Int! = 1
     size: Int! = 100
     filters: [FilterInput!] = null
+    surface: String! = "universe"
 
     """
     the session to read (default: the latest with bars); every value below is for exactly this date

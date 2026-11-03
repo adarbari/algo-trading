@@ -1,7 +1,7 @@
 /**
  * The feature table over GraphQL (ADR 0037): one page of instruments x catalogue columns for
  * the latest session per request, filtered, sorted and paged on the server (the universe), or
- * the instruments asked for (compare).
+ * the instruments asked for (compare, or Earnings week under its own filter surface).
  */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
@@ -18,6 +18,7 @@ const FeatureTable = graphql(`
     $sort: String
     $page: Int
     $size: Int
+    $surface: String! = "universe"
   ) {
     table(
       columns: $columns
@@ -27,6 +28,7 @@ const FeatureTable = graphql(`
       sort: $sort
       page: $page
       size: $size
+      surface: $surface
     ) {
       session {
         date

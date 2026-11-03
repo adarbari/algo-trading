@@ -19,7 +19,7 @@ vi.mock('./EarningsWeek', async () => {
 
 describe('CalendarPage', () => {
   it('opens on the earnings week and switches between the three views', async () => {
-    render(<CalendarPage />);
+    render(<CalendarPage f={undefined} onFilterChange={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Calendar' })).toBeInTheDocument();
     expect(screen.getByText('week view')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Next 90 days' }));
