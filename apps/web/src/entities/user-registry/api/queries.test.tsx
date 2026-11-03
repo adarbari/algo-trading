@@ -34,6 +34,6 @@ describe('useUserRegistry', () => {
     const query = String(GQL.mock.calls[0]?.[0]);
     expect(query).toContain('query UserRegistry');
     expect(query).not.toMatch(/email|subject/);
-    expect(result.current.data?.people).toHaveLength(3);
+    expect(result.current.data?.people).toHaveLength(4);
   });
 });

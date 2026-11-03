@@ -581,13 +581,21 @@ in their git-ignored `config/users/<id>/identity.toml`:
 ```toml
 email = "alice@example.com"   # the address the user signs in with (case ignored, unique)
 subject = "7b1c1d2e-..."      # optional: the user's Supabase UID; then the token must be theirs
+name = "Alice"                # optional; with declared_by / declared_at, set by the onboarding form
+declared_by = "local"         # the admin who onboarded the user (onboarding form only)
+declared_at = 2026-11-02T09:30:00Z
 ```
+
+A folder with an `email` and no `users.toml` entry is a **trader** with no licences only when its `declared_by` names a `users.toml` admin (otherwise the file is ignored) (the admin
+form, ID5: `POST /users`, [hosting.md](hosting.md#6-onboarding-a-user)); a `users.toml` entry
+always wins, and only it grants `admin` or a licence. The API reloads the registry after that
+write, so no restart is needed.
 
 A user without the file cannot sign in to the API (403); `site` never has one. Without
 `subject` the email alone identifies the user (safe under the project settings above); with
 it, a token for another Supabase account carrying the same email is 403. Pin it from the
 Supabase dashboard (Authentication -> Users, the UID column) after the user's first sign-in;
-the API reads the file at startup, so restart it after a change. The CLIs ignore the file.
+the API reads the files at startup (and after an onboarding), so restart it after any other change. The CLIs ignore the file.
 
 Phase 0 identity is a **label for namespacing, not authentication**: `--user` on both CLIs,
 defaulting to `$ALGOTRADE_USER`, else `local` (`site` for runs scheduled from site presets). Market data and rollups are

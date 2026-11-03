@@ -3056,7 +3056,7 @@ type PausedIdea {
 }
 
 """
-One declared user (`config/site/users.toml`): `role` admin or trader, `licences` the data licences held beyond open, `scheduled` the site's own scheduled-screens user (never signs in). No email or subject: identity stays on the server
+One declared user (`config/site/users.toml`): `role` admin or trader, `licences` the data licences held beyond open, `scheduled` the site's own scheduled-screens user (never signs in), `pendingProvider` a user the onboarding form declared whose provider account is not pinned yet (ID5). No email or subject: identity stays on the server
 """
 type Person {
   id: String!
@@ -3064,6 +3064,7 @@ type Person {
   role: String!
   licences: [String!]!
   scheduled: Boolean!
+  pendingProvider: Boolean!
 }
 
 """

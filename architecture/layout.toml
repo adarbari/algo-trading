@@ -387,7 +387,7 @@ purpose = "use cases (the backend's interface for apps); shared helpers: configs
 
 [[dir]]
 path = "src/algotrade/services/authoring"
-purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features; the only config writer the API calls"
+purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features, onboarding a trader (ID5); the only config writer the API calls"
 contracts = [
     "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining, events, feedback)",
     "Config writes go only through services.authoring (ADR 0029)",

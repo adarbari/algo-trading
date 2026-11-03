@@ -10,11 +10,14 @@ from algotrade.core.model.errors import PermissionDeniedError
 from algotrade.services.read.users import registry
 from algotrade.services.read.users.viewer import Viewer
 
+SUBJECT = "7b1c1d2e-0000-4000-8000-000000000001"
 USERS = UsersSettings(
     (
         UserRecord("ana", Role.ADMIN, "Ana", "ana@example.com", licences=("personal",)),
         UserRecord("tom", Role.TRADER, "Tom"),
         UserRecord(SITE_USER, Role.ADMIN, "Scheduled site screens"),
+        UserRecord("zoe", Role.TRADER, "Zoe", "zoe@example.com", declared="identity"),
+        UserRecord("zed", Role.TRADER, "Zed", "zed@example.com", SUBJECT, declared="identity"),
     )
 )
 
@@ -28,10 +31,14 @@ def _ctx() -> MagicMock:
 def test_an_admin_reads_the_declared_people_without_identity() -> None:
     with patch.object(registry, "load_users", return_value=USERS):
         found = registry.load_user_registry(_ctx(), Viewer("ana", "Ana", "admin", ("admin",)))
-    assert [(p.user_id, p.role, p.licences, p.scheduled) for p in found.people] == [
-        ("ana", "admin", ("personal",), False),
-        ("tom", "trader", (), False),
-        (SITE_USER, "admin", (), True),
+    assert [
+        (p.user_id, p.role, p.licences, p.scheduled, p.pending_provider) for p in found.people
+    ] == [
+        ("ana", "admin", ("personal",), False, False),
+        ("tom", "trader", (), False, False),
+        (SITE_USER, "admin", (), True, False),
+        ("zoe", "trader", (), False, True),  # onboarded, no provider subject pinned yet
+        ("zed", "trader", (), False, False),
     ]
     assert "ana@example.com" not in repr(found)
 
