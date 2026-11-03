@@ -136,7 +136,7 @@ backfill gap), `no_cik` and `unknown_share` (decision 6 (c)). An AST scan allows
 outcomes task (PR6a) and `services/evaluation` (PR6b) to import the reader.
 
 **PR6a built (2026-11-03):** the `outcomes` task writes `forward_returns@v3` (v2 columns + `delisting_return`,
-`delisting_basis`) beside v2 each night, one computation of each window; a `--from/--to` backfill writes v3 only.
+`delisting_basis`) beside v2 each night, one computation of each window; a `--from/--to` backfill writes both (a v3-only backfill left the v2 readers, the golden edge included, without outcomes).
 v2 keeps its meaning (a test pins its rows equal to the pre-v3 output). The delistings come from the latest
 `events/delisting` snapshot at write time (never as of S or T, whatever `known_from`), applied only when the
 event's `last_session` is in (S, T] and is the name's last bar; max return, drawdown and volatility stay to the
