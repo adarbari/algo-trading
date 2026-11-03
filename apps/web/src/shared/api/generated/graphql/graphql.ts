@@ -461,7 +461,7 @@ export type FeatureTableQueryVariables = Exact<{
   sort?: string | null | undefined;
   page?: number | null | undefined;
   size?: number | null | undefined;
-  surface?: string;
+  surface?: string | null | undefined;
 }>;
 
 
@@ -2368,7 +2368,7 @@ export const FeatureDistributionDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<FeatureDistributionQuery, FeatureDistributionQueryVariables>;
 export const FeatureTableDocument = new TypedDocumentString(`
-    query FeatureTable($columns: [FeatureName!]!, $keys: [String!], $filters: [FilterInput!], $q: String, $sort: String, $page: Int, $size: Int, $surface: String! = "universe") {
+    query FeatureTable($columns: [FeatureName!]!, $keys: [String!], $filters: [FilterInput!], $q: String, $sort: String, $page: Int, $size: Int, $surface: String) {
   table(
     columns: $columns
     keys: $keys

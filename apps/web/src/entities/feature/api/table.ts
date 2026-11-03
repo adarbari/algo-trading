@@ -18,7 +18,7 @@ const FeatureTable = graphql(`
     $sort: String
     $page: Int
     $size: Int
-    $surface: String! = "universe"
+    $surface: String
   ) {
     table(
       columns: $columns
