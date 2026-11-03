@@ -54,6 +54,20 @@ def test_a_position_round_trips() -> None:
     check_edge(parse_edge(put(), "drift", WHERE), WHERE, TEMPLATES)
 
 
+def test_a_position_may_enter_before_an_event_announced_ahead_only() -> None:
+    """X5: a straddle sold the close before a report. The offset counts from the anchor of an
+    announced-ahead class (D = S - 1, the date known by D); a class known when it happens, and
+    every other schedule, keep the floor of 1 (the screen and gate are known after D's close)."""
+    ahead = put(start_offset_sessions=-1, tenor_days=30)
+    ahead["schedule"] = "on_event:earnings_expected"
+    assert parse_edge(ahead, "drift", WHERE).outcome.start_offset_sessions == -1
+    after = {**ahead, "schedule": "on_event:earnings_reaction_session"}
+    with pytest.raises(ConfigurationError, match="entry before the event needs it announced"):
+        parse_edge(after, "drift", WHERE)
+    with pytest.raises(ConfigurationError, match="start_offset_sessions: the screen runs after"):
+        parse_edge(put(start_offset_sessions=-1), "drift", WHERE)
+
+
 @pytest.mark.parametrize(
     ("changes", "match"),
     [
@@ -188,7 +202,8 @@ def test_a_position_is_refused_where_it_would_lose_a_leg_or_an_override() -> Non
 # X1; X2 (vrp_short_premium's new version and its iv_rank_high twin); X3; X4 (B2); X1's ladder;
 # X7 (the wheel); ibs_etf_swing_recovery (a share position with a declared exit)
 BORN_WITH_THE_KEYS = (
-    "index_put_write", "vrp_short_put", "iv_rank_short_put", "covered_call_strike_tenor",
+    "index_put_write", "vrp_short_put", "c17_earnings_straddle_sell", "iv_rank_short_put",
+    "covered_call_strike_tenor",
     "high_vol_call_write", "low_vol_put_write", "index_put_ladder", "index_put_wheel",
     "ibs_etf_swing_recovery",
 )  # fmt: skip

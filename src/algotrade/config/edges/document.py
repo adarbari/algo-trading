@@ -805,7 +805,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         canary=canary_of(o, kind),
         tracks=tracks_of(o),
         wheel=wheel,
-        position=spec_of(o, kind, offset, cases),
+        position=spec_of(o, kind, offset, cases, event in ANNOUNCED_AHEAD),
         entry=entry_of(o),
     )
 
