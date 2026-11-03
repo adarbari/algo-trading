@@ -28,6 +28,7 @@ from algotrade.config.edges.document import (
     job_name,
 )
 from algotrade.config.edges.positions.chain import CHAIN_KIND
+from algotrade.config.edges.positions.templates import load_templates
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.features.framework.feature import LICENCES, strictest
@@ -239,7 +240,19 @@ def _run(
     ctx: Stores, record: RunRecord, edge: Edge, owner: str, legacy_owner: str | None = None
 ) -> EdgeRun:
     session = ctx.session.date if isinstance(ctx, ReadContext) else None
-    return run_of_record(record, edge, owner, legacy_owner, session)
+    run = run_of_record(record, edge, owner, legacy_owner, session)
+    stats = record.stats  # a licensed run from before the split of an edge reading option rows
+    pre_split = "price_source" not in stats and run.evidence_licence != "open"
+    return replace(run, pre_split=pre_split and _reads_chain(ctx, edge))
+
+
+def _reads_chain(ctx: Stores, edge: Edge) -> bool:
+    """Whether the edge reads option trade rows: the outcome's kind, or a ``position:<template>``
+    baseline with an option leg (the writer's ``chain.reads_chain``, over the site's templates)."""
+    if getattr(edge.settings, "kind", None) == CHAIN_KIND:
+        return True
+    templates = once_per_request(ctx, ("templates",), lambda: load_templates(ctx.configs))
+    return any(t in templates and templates[t].has_option for t in edge.position_baselines)
 
 
 def run_of_record(
@@ -278,10 +291,6 @@ def run_of_record(
         screener_hashes=tuple(sorted((stats.get("screener_hashes") or {}).items())),
         evidence_licence=str(stats.get("evidence_licence") or "open"),
         exits_digest=stats.get("exits_digest"),
-        pre_split="price_source"
-        not in stats  # an option edge's run from before the split, if licensed
-        and getattr(edge.settings, "kind", None) == CHAIN_KIND
-        and stats.get("evidence_licence", "open") != "open",
     )
 
 

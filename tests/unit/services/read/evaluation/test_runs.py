@@ -749,13 +749,13 @@ def test_bounded_canonical_run_skips_a_run_committed_after_the_session(
     assert only_newer.run is None and only_newer.not_run is not None
 
 
-def _option_stores(backend: MemoryBackend, user: str = "trader") -> Any:
+def _option_stores(backend: MemoryBackend, user: str = "trader", **changes: Any) -> Any:
     """Stores of a setup that reads option rows (``option_pnl``) for a trader or the owner."""
     option = {
         "kind": "option_pnl", "horizon_sessions": [20], "benchmark": "none", "tenor_days": 30,
         "position": "short_put", "strike_delta": 0.25, "start_offset_sessions": 1,
     }  # fmt: skip
-    edge = {**EDGE, "outcome": option}
+    edge = {**EDGE, "outcome": option, **changes}
     users = {"user": [{"id": "owner", "role": "admin", "licences": ["personal"]},
                       {"id": "trader", "role": "trader"}]}  # fmt: skip
     site = FileConfigStore(REPO_ROOT / "config", local=False)
@@ -817,3 +817,25 @@ def test_a_run_recording_its_price_source_is_never_pre_split(backend: MemoryBack
     (edge,) = load_edges(owner)
     (run,) = load_edge_runs(owner, edge)
     assert run.pre_split is False
+
+
+def test_a_share_edge_with_an_option_position_baseline_is_classified_by_its_templates(
+    backend: MemoryBackend,
+) -> None:
+    """The writer splits it (``reads_chain``), so its pre-split personal run is gated too; a share
+    baseline alone reads no option rows. After a clean Cboe run nothing hides it for good."""
+    share = EDGE["outcome"]
+    write_run(backend, "combined", FROZEN, 0.6, evidence_licence="personal")
+    for baseline, expected in (("short_put", True), ("long_shares", False)):
+        stores_ = _option_stores(
+            backend, "owner", outcome=share, baselines=[f"position:{baseline}"]
+        )
+        (edge,) = load_edges(stores_, gated=False)
+        (run,) = load_edge_runs(stores_, edge)
+        assert run.pre_split is expected
+    trader = _option_stores(backend, "trader", outcome=share, baselines=["position:short_put"])
+    (edge,) = load_edges(trader, gated=False)
+    assert load_edge_runs(trader, edge) == ()
+    write_run(backend, "clean", FROZEN, 0.6, minutes=5, evidence_licence="open", source="cboe")
+    assert [r.run_id for r in load_edge_runs(trader, edge)] == ["clean"]
+    assert evidence_visible(trader, edge)
