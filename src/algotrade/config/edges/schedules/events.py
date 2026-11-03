@@ -88,6 +88,14 @@ def event_class(schedule: str) -> str | None:
     return schedule.removeprefix(ON_EVENT).partition(":")[0]
 
 
+def entry_delay(schedule: str, start_offset_sessions: int) -> int:
+    """The sessions from the decision session D to the entry session S: 1 for an event schedule
+    (its offset places S from the anchor and D = S - 1, so S = D + 1 whatever the offset), else
+    the outcome's ``start_offset_sessions`` (S = D + it). Every read that places S from a served
+    D counts through here, as the harness's ``cross_section/sessions.leg_blocks`` does."""
+    return 1 if event_class(schedule) is not None else start_offset_sessions
+
+
 def event_subtype(schedule: str) -> str | None:
     """The subtype of an ``on_event:<class>:<subtype>`` schedule, else None."""
     if not schedule.startswith(ON_EVENT):

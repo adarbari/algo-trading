@@ -62,12 +62,13 @@ def world(
     trades: list[dict[str, Any]] | None,
     day: date = END,
     recorded: Any = "same",
+    schedule: str = "every_session",
     **outcome: Any,
 ) -> tuple[Any, edges.Edge]:
     """``recorded``: the exits digest on the run record ("same": the document's; None: a run
     from before it was recorded; else that digest)."""
     backend = MemoryBackend()
-    doc = {**EDGE, "outcome": {**OPTION, **outcome}}
+    doc = {**EDGE, "schedule": schedule, "outcome": {**OPTION, **outcome}}
     docs = {**DOCS, **SETTINGS, ("site", "edges", "drift"): doc, ("site", KIND, NAME): TEMPLATES}
     ctx = stores(backend, docs=docs)
     parsed = next(e for e in edges.parsed_edges(ctx, "site") if e.id == "drift")
@@ -241,3 +242,14 @@ def test_an_expiry_not_after_the_entry_session_is_unknown() -> None:
     rule = at(WINNERS, expiry=next_session(END))
     assert rule.stop is None and rule.hold_sessions is None and rule.unknown is not None
     assert rule.unknown.code is UnknownCode.NOT_APPLICABLE
+
+
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_an_event_setups_hold_counts_from_the_session_after_the_served_one(offset: int) -> None:
+    """X5 follow-up: an event schedule's offset places the anchor, so S = D + 1; the hold to the
+    expiry counts from that entry, never from D + offset."""
+    ctx, edge = world(WINNERS, schedule="on_event:earnings_expected", start_offset_sessions=offset)
+    entry = next_session(END)
+    soon = entry + timedelta(days=7)
+    rule = exit_rule_at(ctx, edge, expiry=soon)
+    assert rule.hold_sessions == sessions_to(entry, soon)
