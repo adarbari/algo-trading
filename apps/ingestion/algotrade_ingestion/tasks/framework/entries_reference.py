@@ -220,5 +220,124 @@ def run_etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
     )  # fmt: skip
 
 
-# The ADR 0087 listing tasks, in registry order (registry.py lists them in TASKS; file cap).
-LISTING_TASKS = (LISTING_HISTORY, DELISTED_TICKERS, DELISTED_DETAILS, DELISTINGS)
+FIGI_REVIEW_OUT = Path("var/figi_review.csv")
+UNIVERSE_TABLES = (
+    "universe",
+    "instruments/reference",
+    "instruments/symbol_history",
+    "instruments/id_map",
+    "events/reference_change",
+    "events/index_change",
+)
+
+# The reference and listing tasks, in registry order; declared here, not in registry.py (file cap,
+# 2026-11-03); registry.py lists them in TASKS.
+REFERENCE_TASKS = (
+    Task(
+        "universe-build",
+        "build the universe from Nasdaq Trader + SPY holdings",
+        universe_build,
+        UNIVERSE_TABLES,
+        run_universe_build,
+        sources=("nasdaq_trader", "spy_holdings"),
+        optional_sources=("massive_tickers",),
+        settings="universe.toml",
+        params=(
+            SESSION,
+            Param("review_out", ("--review-out",), Path, "write leverage candidates (CSV)"),
+            Param(
+                "etf_review_out",
+                ("--etf-review-out",),
+                Path,
+                "write ETFs whose category the rules could not settle (CSV)",
+            ),
+            Param(
+                "accept_sp500",
+                ("--accept-sp500",),
+                None,
+                "apply an S&P 500 list that differs a lot from the last snapshot",
+            ),
+            Param(
+                "figi_review_out",
+                ("--figi-review-out",),
+                Path,
+                "write FIGI disagreements to review (CSV)",
+                default=FIGI_REVIEW_OUT,
+            ),
+        ),
+        skip=run_universe_mode,
+    ),
+    Task(
+        "universe",
+        "import the monthly master universe CSVs",
+        universe_import,
+        ("universe", "instruments/reference"),
+        run_universe_csv,
+        params=(
+            SESSION,
+            Param("stocks", ("--stocks",), Path, "stock universe CSV", required=True),
+            Param("etfs", ("--etfs",), Path, "ETF universe CSV"),
+            Param("version", ("--version",), str, "universe version label", required=True),
+        ),
+    ),
+    Task(
+        "company-details",
+        "company details from SEC EDGAR (incremental)",
+        company_details,
+        ("instruments/company",),
+        run_company_details,
+        sources=("sec_tickers", "sec_submissions"),
+        settings="sources.toml [sec_edgar]",
+        params=(
+            SESSION,
+            Param("force", ("--force",), None, "refetch every company"),
+            Param("limit", ("--limit",), int, "fetch at most N companies this run"),
+        ),
+    ),
+    LISTING_HISTORY,
+    DELISTED_TICKERS,
+    DELISTED_DETAILS,
+    DELISTINGS,
+    Task(
+        "index-membership",
+        "S&P 500 membership intervals since 1996 from fja05680/sp500 "
+        "(instruments/index_membership); in no workflow until the owner has read a real pull",
+        index_membership,
+        ("instruments/index_membership",),
+        run_index_membership,
+        sources=("sp500_history",),
+        settings="sources.toml [sp500_history]",
+        params=(SESSION,),
+    ),
+    Task(
+        "winners-sample",
+        "Tiingo daily bars from 2010 for a seeded 200-name sample (100 delisted by year, 50 "
+        "live, 50 hand-listed winners) and its coverage report (var/logs); writes no table "
+        "(resumable; 72 s a name on the free tier)",
+        winners_sample,
+        (),
+        run_winners_sample,
+        sources=("tiingo_prices",),
+        settings="sources.toml [tiingo]",
+        params=(
+            SESSION,
+            Param("report", ("--report",), str, "coverage report path (default var/logs)"),
+            Param("seed", ("--seed",), int, "sampling seed (default fixed: same names)"),
+            Param("limit", ("--limit",), int, "fetch at most N names this run"),
+        ),
+    ),
+    Task(
+        "shares",
+        "shares, financials and statement lines from SEC company facts (incremental)",
+        shares,
+        ("instruments/shares", "instruments/statements"),
+        run_shares,
+        sources=("sec_company_facts", "sec_filings"),
+        settings="sources.toml [sec_edgar] facts_refresh_days, statements_backfill_per_night",
+        params=(
+            SESSION,
+            Param("force", ("--force",), None, "refetch every company"),
+            Param("limit", ("--limit",), int, "fetch at most N companies this run"),
+        ),
+    ),
+)

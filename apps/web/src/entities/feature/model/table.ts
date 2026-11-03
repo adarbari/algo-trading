@@ -13,8 +13,10 @@ export interface FeatureTableQuery {
   columns: readonly string[];
   /** The instruments to show (tickers or ids), in this order; absent: the universe. */
   keys?: readonly string[] | undefined;
-  /** The filter bar's filters in force (the surface `universe`, ADR 0082); with `keys`: none. */
+  /** The filter bar's filters in force (of `surface`, ADR 0082). */
   filters?: readonly AppliedFilter[] | undefined;
+  /** Whose filters those are: `universe` (absent, the server's default) or `calendar_week`. */
+  surface?: string | undefined;
   /** The symbol or name contains it. */
   q?: string | undefined;
   /** A column id (`symbol` or a catalogue name), `-` prefix descending; absent: the default. */
@@ -168,5 +170,6 @@ export function tableVariables(query: FeatureTableQuery): gqlTypes.FeatureTableQ
     // Absent, not null: the server's defaults apply (`page` and `size` are non-null there).
     ...(query.page !== undefined ? { page: query.page } : {}),
     ...(query.size !== undefined ? { size: query.size } : {}),
+    ...(query.surface !== undefined ? { surface: query.surface } : {}),
   };
 }

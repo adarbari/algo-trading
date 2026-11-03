@@ -198,7 +198,7 @@ note = "ADR 0050 EV5: dated occurrences (past instances, next dates) and undated
 [[table]]
 name = "events/filing"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
-note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe by acceptance time; known_from = the first session whose close is after the acceptance (an acceptance after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment, EB H4)"
+note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe, and with `--delisted` of every stock that left it since 2010 (the listing history's ended in-scope listings with an id and its CIK: delisted filers included, ADR 0087), by acceptance time; known_from = the first session whose close is after the acceptance (an acceptance after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment, EB H4)"
 
 [[table]]
 name = "events/filing_text"

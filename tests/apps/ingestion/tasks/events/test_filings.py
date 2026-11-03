@@ -26,6 +26,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.events.filings import (
     COLUMNS,
     DEFAULT_SINCE,
+    DELISTED_SINCE,
     EARNINGS,
     EARNINGS_COLUMNS,
     FORMS_TAG,
@@ -33,9 +34,11 @@ from algotrade_ingestion.tasks.events.filings import (
     TABLE,
     TASK,
     Listed,
+    delisted_names,
     earnings_rows,
     filing_rows,
     ingest_filings,
+    last_walked,
     since_by_cik,
     stored_filings,
 )
@@ -755,3 +758,94 @@ def test_a_filing_accepted_after_the_close_is_known_from_the_next_session() -> N
 def test_a_backfill_after_the_known_from_rule_changed_is_not_skipped_as_covered() -> None:
     old = {"forms": ",".join(sorted(FILING_FORMS))}  # a run before EB H4 recorded the form set only
     assert old["forms"] != FORMS_TAG and KNOWN_FROM_RULE in FORMS_TAG
+
+
+# ------------------------------------------------------------------------- delisted mode (ADR 0087)
+
+
+def listing_store(writer: StoreWriter) -> StoreWriter:
+    """``instruments/listing_history``: delisted names (each exclusion) beside a live one."""
+    day = date(2026, 10, 2)
+    # (id, ticker, start, end, security_type, cik, scope_reason)
+    rows = [
+        ("EQ:OLDMU", "OLDMU", "2000-01-03", "2019-06-03", "Common Stock", "723125", None),
+        ("EQ:OLDA", "OLDA", "2005-01-03", "2012-01-03", "Common Stock", "1652044", None),
+        ("EQ:OLDA", "OLDA2", "2012-01-04", "2020-01-03", "Common Stock", "1652044", None),
+        ("EQ:OLDB", "OLDB", "2005-01-03", "2021-01-04", "Common Stock", "1652044", None),
+        ("EQ:NULLT", "NULLT", "2005-01-03", "2015-01-05", None, "666", None),
+        ("EQ:OLD09", "OLD09", "2000-01-03", "2009-12-31", "Common Stock", "111", None),
+        ("EQ:FUT", "FUT", "2000-01-03", "2027-01-04", "Common Stock", "222", None),
+        ("EQ:LIVE", "LIVE", "2000-01-03", None, "Common Stock", "333", None),
+        (None, "NOID", "2000-01-03", "2015-01-05", "Common Stock", "444", None),
+        ("EQ:NOC", "NOC", "2000-01-03", "2015-01-05", "Common Stock", None, None),
+        ("EQ:ETFX", "ETFX", "2000-01-03", "2015-01-05", "ETF", "555", None),
+        ("EQ:OUT", "OUT", "2000-01-03", "2015-01-05", "Common Stock", "777", "otc_successor"),
+    ]
+    listings = [
+        {"instrument_id": i, "ticker": t, "start_date": date.fromisoformat(a),
+         "end_date": date.fromisoformat(b) if b else None, "exchange": "NYSE",
+         "asset_type": "Stock", "price_currency": "USD", "perma_ticker": "",
+         "security_type": ty, "cik": c, "scope_reason": r, "ts": pd.Timestamp(day, tz="UTC")}
+        for i, t, a, b, ty, c, r in rows
+    ]  # fmt: skip
+    writer.write_table(
+        "instruments/listing_history", day, "lh", stamped(listings, day, "lh", source="tiingo")
+    )
+    return writer
+
+
+def delisted(writer: StoreWriter, feed: Feed, session: date = S1, **kw: Any) -> Any:
+    source = SecFilings(http_for(feed, RetryPolicy(tries=1)))
+    daily = SecDailyIndex(http_for(IndexFeed({}), RetryPolicy(tries=1, not_found=missing_index)))
+    return ingest_filings(context(writer), source, session, (), index=daily, delisted=True, **kw)
+
+
+def test_the_delisted_names_are_the_ended_listings_of_stocks_with_an_id_and_a_cik() -> None:
+    writer = listing_store(store())
+    with IngestRun(context(writer), TASK, S1) as r:
+        found = delisted_names(r)
+    assert found.by_cik == {  # one name per id (its last ticker); a CIK groups its ids
+        "0000723125": [Listed("EQ:OLDMU", "OLDMU")],
+        "0001652044": [Listed("EQ:OLDA", "OLDA2"), Listed("EQ:OLDB", "OLDB")],
+        "0000000666": [Listed("EQ:NULLT", "NULLT")],  # a null type is kept
+    }
+    # before 2010, after the session, live, out of scope: not listings of the window at all
+    assert (found.listings, found.without_id, found.without_cik, found.funds) == (8, 1, 1, 1)
+
+
+def test_a_delisted_run_reads_per_cik_from_2009_and_writes_the_universe_rows() -> None:
+    writer, feed = listing_store(store()), Feed()
+    record = delisted(writer, feed)
+    s = record.stats
+    assert (s["mode"], s["since"], s["covers_since"]) == ("delisted", "2009-01-01", "2009-01-01")
+    assert date(2009, 1, 1) == DELISTED_SINCE and s["ciks"] == 3 and s["names"] == 4
+    assert (s["delisted_listings"], s["delisted_without_id"]) == (8, 1)
+    assert (s["delisted_without_cik"], s["delisted_funds"]) == (1, 1)
+    assert record.items["0000000666"].startswith("NO_DATA")
+    assert len(feed.urls) == 4  # no index day: the 404 CIK, MU and its older page, ALPHA
+    pair = read(writer, TABLE, ["EQ:OLDA", "EQ:OLDB"])  # a share-class pair: a row each
+    assert dict(pair["instrument_id"].value_counts()) == {"EQ:OLDA": 9, "EQ:OLDB": 9}
+    assert set(read(writer, EARNINGS, ["EQ:OLDA"])["symbol"]) == {"OLDA2"}
+
+
+def test_a_delisted_since_is_honoured_and_a_rerun_skips_the_covered_ciks() -> None:
+    writer, feed = listing_store(store()), Feed()
+    first = delisted(writer, feed, since=date(2017, 1, 1), limit=1)
+    assert (first.stats["ciks"], first.stats["since"]) == (1, "2017-01-01")
+    again = delisted(writer, feed, session=S2, since=date(2017, 1, 1))
+    assert again.stats["skipped_covered"] == 1 and again.stats["ciks"] == 2
+    third = delisted(writer, feed, session=date(2026, 10, 13), since=date(2017, 1, 1))
+    assert third.stats["skipped_covered"] == 3 and third.stats["ciks"] == 0
+    wider = delisted(writer, feed, session=date(2026, 10, 14))  # 2009: earlier than every read
+    assert wider.stats["skipped_covered"] == 0 and wider.stats["ciks"] == 3
+
+
+def test_a_delisted_run_records_no_walk_so_the_nightly_start_does_not_move() -> None:
+    writer, feed = listing_store(store()), Feed()
+    index = IndexFeed({date(2026, 10, 5): index_text(date(2026, 10, 5), [])})
+    nightly(writer, feed, index, S1)  # no stored filings yet: a per-CIK first run, no walk
+    delisted(writer, feed, session=S2)
+    record = delisted(writer, feed, session=date(2026, 10, 13))
+    assert record.stats["walked_to"] is None and record.stats["days"] == 0
+    with IngestRun(context(writer), TASK, S2) as r:
+        assert last_walked(r) is None
