@@ -18,6 +18,7 @@ from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import (
     delisted_details,
     delisted_tickers,
+    delistings,
     index_membership,
     listing_history,
     winners_sample,
@@ -91,6 +92,10 @@ def run_listing_history(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
+def run_delistings(ctx: TaskContext, p: Params) -> RunRecord:
+    return delistings.ingest_delistings(ctx, session_of(p))
+
+
 def run_delisted_tickers(ctx: TaskContext, p: Params) -> RunRecord:
     return delisted_tickers.ingest_delisted_tickers(
         ctx, ctx.sources["massive_tickers"], session_of(p)
@@ -141,6 +146,17 @@ DELISTED_DETAILS = Task(
         Param("limit", ("--limit",), int, "ask for at most N names this run"),
     ),
 )
+
+
+DELISTINGS = Task(
+    "delistings",
+    "why and how each delisted name left (events/delisting), from the listing history, the "
+    "filings and the bars; in no workflow",
+    delistings,
+    ("events/delisting",),
+    run_delistings,
+    params=(SESSION,),
+)  # declared here, not in registry.py (file cap); registry.py lists it in TASKS
 
 
 def run_index_membership(ctx: TaskContext, p: Params) -> RunRecord:
@@ -281,6 +297,7 @@ REFERENCE_TASKS = (
     LISTING_HISTORY,
     DELISTED_TICKERS,
     DELISTED_DETAILS,
+    DELISTINGS,
     Task(
         "index-membership",
         "S&P 500 membership intervals since 1996 from fja05680/sp500 "

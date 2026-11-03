@@ -115,6 +115,26 @@ in-scope Tiingo row of the ticker overlaps the dated life; each refusal is count
 `massive_details`) says where a start came from (absent in older partitions, read as null). Ids are
 unchanged: a details-dated record gets an id only by FIGI.
 
+**PR5 built (2026-11-03):** `events/delisting` (`storage/tables/schemas/events.py`, a full snapshot per run
+session, key instrument id + last session) written by the `delistings` task
+(`tasks/listings/delistings.py`, the pure reason rules in `delisting_reason.py`; in no workflow; stored data
+only: the listing history through `data.listings.universe.delisted_listings`, the instrument's `events/filing`
+rows through `data.events`, the closes through `SessionBars`, the outcomes' basis). A row per delisting: an id
+whose listings have all ended, and each ended listing of an id that relisted more than 10 sessions later (a
+delisted name that came back is delisted once per gap; a ticker change is not). The reader is
+`data/listings/delistings.py` (`read_delistings(reader, as_of_write, as_of)`: the latest snapshot on or before a
+write session, never a later one, optionally pinned to what was stored by an instant; `known_by(frame, S)` for a
+feature), which also holds the vocabulary and the convention for an instrument with no OTC print (decision 5,
+owner decision 1). Choices the ADR left open: the last bar is searched within 30 days before the vendor's last
+trading day and anchors the -120 / +30 day window; only a Form 25 filed by the issuer (or its amendment) decides
+VOLUNTARY, while a 25-NSE counts for `known_from` only; `known_from` is the session after the later of the earliest
+notice and the filing that decided the reason, so a row is never public before the filing it was judged from; a
+bankruptcy or listing-standards delisting with no OTC print uses the final exchange (NASDAQ -55%, else -30%).
+The table is current knowledge, so a run FAILS for a session before the listing history it reads was written, with
+no listing history, and with no row. Its stats give rows by reason and by basis, `no_last_bar`, `no_filings` (PR4's
+backfill gap), `no_cik` and `unknown_share` (decision 6 (c)). An AST scan allows only the reader, the writer, the
+outcomes task (PR6a) and `services/evaluation` (PR6b) to import the reader.
+
 **Backfill** (detached, README "Long runs"): Massive inactive list ~6 minutes; Tiingo meta ~35 batches; Tiingo bars
 for the new ids plus the tails ~9,000 to 11,000 requests, 1 to 1.3 hours at 0.4 s, which holds only on the Power
 plan (ends 2026-11-09; the free tier would take about 20 months); SEC submissions for ~6,000 delisted CIKs 30 to

@@ -1,3 +1,4 @@
 """Reads of ``instruments/listing_history`` (ADR 0018 amendment, 2026-10-08): the universe as
-it was on a session, from the latest listing snapshot; and of ``instruments/delisted_tickers``
-(ADR 0087): Massive's delisted tickers, for the id merge and the data-quality report."""
+it was on a session, from the latest listing snapshot; of ``instruments/delisted_tickers``
+(ADR 0087): Massive's delisted tickers, for the id merge and the data-quality report; and of
+``events/delisting`` (ADR 0087): why and how each name left, the snapshot written by a session."""

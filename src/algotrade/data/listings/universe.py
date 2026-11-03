@@ -16,10 +16,11 @@ Both snapshots used are named (``Universe.snapshot``, ``Universe.membership_snap
 delisted: used as a feature, label or sort key it leaks the future. It is read **here, in
 ``SymbolResolver.from_listings`` (both identity reads: is this listing alive on S), by
 ``read_listings`` for the winners-sample runner** (which picks its strata by year of delisting,
-by design: a data-quality sample, never a feature), by ``delisted_by`` for the outcomes task
-(a name counts as delisted at T only when ``end_date <= T``, so no later delisting is known) and
-by ``listings_over`` for ``bars-history --from-listings`` (which fetches a listing's bars by its
-permaTicker and clips them to its own dates: identity, never a feature), nowhere else
+by design: a data-quality sample, never a feature), by ``delisted_listings`` / ``delisted_by`` for
+the delistings and outcomes tasks (a name counts as delisted at T only when ``end_date <= T``, so
+no later delisting is known) and by ``listings_over`` for ``bars-history --from-listings`` (which
+fetches a listing's bars by its permaTicker and clips them to its own dates: identity, never a
+feature), nowhere else
 (``tests/architecture/data/test_listing_end_date_readers.py`` scans for it), and
 ``universe_asof`` does not return it. The adapter stores a live name's end as null (open).
 
@@ -36,10 +37,12 @@ record whose start no Tiingo row gives) is never in a window: it is counted in
 
 from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
+from typing import Any
 
 import pandas as pd
 
+from algotrade.core.time.calendar import sessions_between
 from algotrade.data.listings.membership import SP500, index_members
 from algotrade.data.listings.membership import TABLE as MEMBERSHIP
 from algotrade.data.reference import REFERENCE_HINT, Snapshot, read_snapshot
@@ -216,18 +219,86 @@ def read_listings(reader: StoreReader) -> tuple[pd.DataFrame, date]:
     return frame[frame["source"].eq(TIINGO)].reset_index(drop=True), snap.snapshot_date
 
 
-def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
-    """Instrument id -> last trading day, for the listings with a trusted id whose ``end_date``
-    is on or before ``session`` (``MissingDataError`` with no snapshot). A listing that ends
-    after ``session``, or is open, is absent: at ``session`` its delisting was not known. For
-    the outcomes task (a window ending at ``session`` marks a name with no bar at its end
-    DELISTED)."""
-    frame, _ = listing_frame(reader)
+RELIST_GAP_SESSIONS = (
+    10  # a next listing of the same id this many sessions later is a ticker change
+)
+
+
+def _gap_ends(rows: pd.DataFrame) -> pd.Series:
+    """Per row: the first day a next listing of the id may start for the gap to be a real one (the
+    ``RELIST_GAP_SESSIONS``-th session after the row's end), null where the row has no end."""
+    ends = rows["last_day"].dropna().drop_duplicates()
+    sessions = {
+        e: pd.Timestamp(sessions_between(e.date() + timedelta(1), e.date() + timedelta(30))[
+            RELIST_GAP_SESSIONS - 1])
+        for e in ends
+    }  # fmt: skip
+    return rows["last_day"].map(sessions)
+
+
+def _start_after_end(rows: pd.DataFrame) -> pd.Series:
+    """Per row: the first start among the id's listings strictly after the row's end (null when
+    none, or the row is open): the relisting a stretch-ending row is compared with, never a
+    listing nested inside the stretch."""
+    starts = {i: g.sort_values().to_numpy() for i, g in rows.groupby("instrument_id")["first_day"]}
+    out: list[Any] = []
+    for iid, end in zip(rows["instrument_id"], rows["last_day"], strict=True):
+        later = starts[iid]
+        k = later.searchsorted(end.to_datetime64(), side="right") if pd.notna(end) else len(later)
+        out.append(pd.Timestamp(later[k]) if k < len(later) else pd.NaT)
+    return pd.Series(pd.DatetimeIndex(out), index=rows.index)
+
+
+def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame, date]:
+    """One row per delisting of an instrument id (with a trusted id) known on ``session``
+    (``MissingDataError`` with no snapshot), and the listing snapshot read: ``instrument_id``,
+    ``last_day`` (the vendor's last trading day of that stretch), ``exchange`` and
+    ``security_type`` of the listing that ended (its final venue and type), ``cik`` (the latest
+    non-null one of the id's listings up to it), ``final`` (the id's last listing: every listing
+    of the id has ended), sorted by id and day.
+
+    An id's ended listing is a delisting when it is the last (``final``: every listing of the id
+    has ended on or before ``session``) or when the id's next listing starts more than
+    ``RELIST_GAP_SESSIONS`` sessions after it (a delisted name that relisted: a real gap, not a
+    ticker change). A listing that ends after ``session``, or is open, is not a delisting yet; a
+    listing that starts after ``session`` is not yet known."""
+    frame, snap = listing_frame(reader)
     has_id = frame["instrument_id"].notna() & (frame["instrument_id"].astype(str) != "")
     started = pd.to_datetime(frame["start_date"]) <= pd.Timestamp(session)
-    rows = frame[has_id & started]  # a listing that starts after ``session`` is not yet known
-    # An id several listings share (a ticker change) is delisted only once every one has ended.
-    ends = pd.to_datetime(rows["end_date"]).groupby(rows["instrument_id"].astype(str))
-    stats = ends.agg(["count", "size", "max"])
-    gone = stats[(stats["count"] == stats["size"]) & (stats["max"] <= pd.Timestamp(session))]
-    return {str(i): last.date() for i, last in gone["max"].items()}
+    rows = frame[has_id & started].assign(
+        instrument_id=lambda f: f["instrument_id"].astype(str),
+        last_day=lambda f: pd.to_datetime(f["end_date"]),
+        first_day=lambda f: pd.to_datetime(f["start_date"]),
+    )
+    rows = rows.sort_values(["instrument_id", "first_day", "last_day"], kind="stable")
+    rows = rows.reset_index(drop=True)
+    by_id = rows.groupby("instrument_id")
+    rows["cik"] = by_id["cik"].ffill()
+    rows["cik"] = rows.groupby("instrument_id")["cik"].bfill()
+    # An open listing reaches forever; a listing nested in an earlier one's span (A 2000-2010, B
+    # 2001-2005) never ends the id's stretch: only a row whose end is the running maximum does.
+    reach = rows["last_day"].fillna(pd.Timestamp.max).groupby(rows["instrument_id"]).cummax()
+    ended = rows["last_day"] <= pd.Timestamp(session)
+    stretch_end = ended & (rows["last_day"] == reach)
+    open_ids = rows.loc[rows["last_day"].isna(), "instrument_id"].unique()
+    ended_on = rows["last_day"].fillna(pd.Timestamp.min)
+    latest = ended_on.groupby(rows["instrument_id"]).idxmax()  # the listing that ended last
+    final = rows.index.isin(latest[~latest.index.isin(open_ids)]) & ended
+    after = _start_after_end(rows)  # the next listing starting after a stretch's end
+    real_gap = stretch_end & (after > _gap_ends(rows))
+    rows = rows.assign(final=final)[final | real_gap]
+    out = rows[["instrument_id", "last_day", "exchange", "security_type", "cik", "final"]]
+    out = out.assign(last_day=[d.date() for d in out["last_day"]])
+    return out.sort_values(["instrument_id", "last_day"], kind="stable").reset_index(drop=True), (
+        snap.snapshot_date
+    )
+
+
+def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
+    """Instrument id -> last trading day, for the ids whose every listing has ended on or before
+    ``session`` (the ``final`` rows of ``delisted_listings``; an id that relisted and is open
+    again is absent). For the outcomes task (a window ending at ``session`` marks a name with no
+    bar at its end DELISTED)."""
+    gone, _ = delisted_listings(reader, session)
+    final = gone[gone["final"]]
+    return dict(zip(final["instrument_id"], final["last_day"], strict=True))
