@@ -246,6 +246,9 @@ NIGHTLY: tuple[Step, ...] = (
     # their current state); optional, and its run budget ([macro] run_budget_s) bounds a FRED
     # outage, so it never holds up the screens.
     Step("macro", critical=False, latest_only=SNAPSHOT, accept_with=(check_macro,)),
+    # Why each big mover moved (ADR 0050, EV4a): the session's event_reaction movers against the 8-K
+    # filed for their reaction session. Optional: an unexplained move stays unattributed.
+    Step("attribution", needs=("rollups", "filings"), critical=False),
     # The market-entity rollups (ADR 0047: breadth, macro, the regime, one MKT:US row per group),
     # after the instrument rollups they read. Optional: a failure here never holds back the
     # screens. Not `needs=("macro",)`: a FAILED (or skipped, no FRED key) macro step would hold

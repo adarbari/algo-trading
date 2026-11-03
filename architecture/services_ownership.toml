@@ -248,6 +248,16 @@ section = "docs/adr/0058-llm-usage-log-prices-and-budget.md#budget"
 detect = [{ string = "usage/llm_calls" }, { call = "UsageWriter" }, { call = "UsageLedger" }]
 
 [[responsibility]]
+id = "move-attribution"
+description = "Name the cause of a big move (ADR 0050 decisions 4-5, EV4): the closed cause taxonomy and the 8-K item codes that map to it (services/attributing/taxonomy.py), and the attribution of a session's big movers from the 8-K filed for their reaction session (filing.py): one row per instrument and session, confidence by the number of causes; ingestion's attribution task reads the movers and the filings and stores events/attribution, never classifying itself"
+owner = ["src/algotrade/services/attributing/*"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/events/attribution.py",  # the one caller: reads the movers and filings, stores the rows
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "attribute_from_filings" }, { string = "8-K items" }]
+
+[[responsibility]]
 id = "no-ml-tables"
 description = "Keep rows of a source whose terms bar machine learning (the no_ml tables of architecture/tables.toml = schemas.NO_ML_TABLES, FINRA short interest and short volume) out of every learned fit: training_frame refuses a scorer field computed from one (or one the catalogue cannot resolve), and the winners study leaves such a feature out of its usable fields (the probit proposer fits them all); rule screens and the edge harness may read them; the text model never gets their rows (ADR 0028 amendment 2026-10-17)"
 owner = ["src/algotrade/services/evaluation/training/no_ml.py"]
