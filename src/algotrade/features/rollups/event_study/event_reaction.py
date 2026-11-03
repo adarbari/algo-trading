@@ -367,9 +367,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         values[~long_enough] = np.nan
         frame[name] = values
     frame = frame[traded].reset_index(drop=True)
-    for name, dtype in COLUMNS.items():
-        if dtype == "int":
-            frame[name] = frame[name].astype("Int64")
+    moves.nullable_ints(frame, COLUMNS)
     out: pd.DataFrame = (
         frame[["instrument_id", *COLUMNS]]
         .sort_values("instrument_id", kind="stable")

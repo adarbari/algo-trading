@@ -474,6 +474,7 @@ def test_the_committed_feature_files_load() -> None:
         "bands",
         "corporate_actions",
         "earnings",
+        "event_calendar",
         "filings",
         "forward",
         "fundamentals",
