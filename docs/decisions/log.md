@@ -331,6 +331,6 @@ follow-up PR).
 - Question: the brief asked for `benchmark = "none"`, a Cutler RSI(3) feature, a trend and a volatility variant by `hv10` vs `hv126`, and the IBS-only rule as a variant; what does the code allow, and does the owner's reuse rule (2026-11-02) change the model?
 - Options: follow the brief literally (refused by the parser, or a new stored group) or the nearest reuse-only form.
 - Decision: (a) no new feature: the main rule is `etf_low_ibs` (IBS < 0.2) with exit `close_range_pos` > 0.8 (Kinlay's recovery exit); the RSI(3) version is a follow-up proposal (no stored RSI(3), `rsi_14` is Wilder 14, expression features cannot read bar history, rules cannot compare a field with a field). (b) benchmark SPY (a share path with an exit is scored against a benchmark), SPY dropped from the list, `base = universe`. (c) Variants are universe variants: `pct_vs_sma_200 > 0`, `hv_ratio_10_60 > 1` (a rule cannot compare `hv10` and `hv126`), `volume_z_20d > 0`. (d) `horizon_sessions = [1, 10]`, so horizon 1 is the base rule shifted to D + 1 and the verdict is read at 10. (e) `holdout_from = 2026-11-03`.
-- decided by: the implementing session, from the code and the owner's reuse rule
+- decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: each is the nearest accepted form of the brief; none changes a stored verdict of another setup.
