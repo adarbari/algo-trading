@@ -1,14 +1,14 @@
-"""``GET /files/{surface}.csv?f=&screener=&columns=``: the rows a filter-bar surface shows under the
-page's ``f`` string, as a CSV file (ADR 0082 decision 6, amending ADR 0037: a file, not a page
-read). It calls ``services.read.export``, which reads through the surface's own gated loader and the
-filtering pass with this request's ``ReadContext``, so the file has what the viewer can see: a
-personal-licence value is its public kind (``LICENCE``) to a viewer who does not hold it (ADR 0069,
-as the ledger file, ADR 0064 decision 10). One audit line per export: viewer, surface, filter hash,
-rows, licences held."""
+"""``GET /files/{surface}.csv?f=&screener=&columns=&tab=``: the rows a filter-bar surface shows
+under the page's ``f`` string, as a CSV file (ADR 0082 decision 6, amending ADR 0037: a file,
+not a page read). It calls ``services.read.export``, which reads through the surface's own gated
+loader and the filtering pass with this request's ``ReadContext``, so the file has what the
+viewer can see: a personal-licence value is its public kind (``LICENCE``) to a viewer who does
+not hold it (ADR 0069, as the ledger file, ADR 0064 decision 10). One audit line per export:
+viewer, surface, filter hash, rows, licences held."""
 
 import datetime as dt
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
@@ -49,16 +49,20 @@ def surface_csv(
     columns: Annotated[
         list[str] | None,
         Query(
-            description="catalogue columns to add (screener_results, universe)",
+            description="catalogue columns to add (screener_results, universe, ideas)",
             max_length=MAX_COLUMNS,
         ),
+    ] = None,
+    tab: Annotated[
+        Literal["stocks", "premium"] | None,
+        Query(description="ideas: the tab whose Unproven list to export (none: every screener)"),
     ] = None,
     date: Annotated[
         dt.date | None, Query(description="the session to read (default: the one pages show)")
     ] = None,
 ) -> StreamingResponse:
     ctx = dated_context(store, caller, serving, date)
-    found = export_file(ctx, surface, f, Params(screener, tuple(columns or ())))
+    found = export_file(ctx, surface, f, Params(screener, tuple(columns or ()), tab))
     audit.info(
         "export viewer=%s surface=%s filters=%s rows=%d licences=%s",
         found.viewer,

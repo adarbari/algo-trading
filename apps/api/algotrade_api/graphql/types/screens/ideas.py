@@ -9,10 +9,13 @@ from typing import Self
 import strawberry
 from strawberry.scalars import JSON
 
+from algotrade.services.read import values
+from algotrade.services.read.availability.cause import UnavailableKind, kind_texts
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import ideas
+from algotrade_api.graphql.types.availability import KindText
 from algotrade_api.graphql.types.filtering.facets import FilterFacets
-from algotrade_api.graphql.types.instruments.feature import Unknown
+from algotrade_api.graphql.types.instruments.feature import FeatureInfo, Unknown
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.screens.result import ScreenResult
 from algotrade_api.graphql.types.screens.screener import Screener, ScreenerRun
@@ -163,7 +166,10 @@ class PausedIdea:
     "argument, starts the next; null on the last page, `hasMore` false), `paused` the first "
     "`first` of `pausedTotal` picks the regime gate held back on the first page only (never "
     "counted in `total`); `watchlist` (a tab's pool only): the ideas the rule ranked before "
-    "the viewer's watchlist kept the watched ones, null: no watchlist, no filter (ADR 0083)"
+    "the viewer's watchlist kept the watched ones, null: no watchlist, no filter (ADR 0083). "
+    "`rows[i][j]` is the catalogue column `columns[j]` (the `columns` argument) for `items[i]`, "
+    "null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when "
+    "EXPLAINED; `kinds[i][j]`: its public kind, how a cell is drawn), as a feature table"
 )
 class Ideas:
     session: dt.date
@@ -175,6 +181,11 @@ class Ideas:
     next_cursor: str | None
     facets: FilterFacets | None
     watchlist: int | None
+    columns: list[FeatureInfo]
+    rows: list[list[JSON | None]]
+    unknown: list[list[values.UnknownCode | None]]
+    reasons: list[list[values.NullReason | None]]
+    kinds: list[list[UnavailableKind | None]]
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Whether another page follows this one"
@@ -194,4 +205,15 @@ class Ideas:
             next_cursor=d.next_cursor,
             facets=FilterFacets.of(d.facets) if d.facets is not None else None,
             watchlist=d.watchlist,
+            columns=[FeatureInfo.of(c) for c in d.columns],
+            rows=[[JSON(v) for v in row] for row in d.rows],
+            unknown=[list(row) for row in d.unknown],
+            reasons=[list(row) for row in d.reasons],
+            kinds=[list(row) for row in d.kinds],
         )
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The words of each kind `kinds` uses: how a cell's kind reads"
+    )
+    def kind_texts(self) -> list[KindText]:
+        return [KindText.of(t) for t in kind_texts(self.kinds)]

@@ -53,6 +53,23 @@ def test_a_non_holder_gets_licence_never_the_personal_value_and_the_holder_the_v
     assert PERSONAL not in text and "50.0" not in text
 
 
+def test_an_ideas_export_is_the_tabs_unproven_list_with_its_watchlist_and_columns(
+    reader: StoreReader,
+) -> None:
+    """The fix (2026-11-03): the file ignored the page's tab, so an Unproven export listed every
+    screener's ideas past the tab and the watchlist; it is now the tab's list, with the catalogue
+    columns the page shows as cells."""
+    every = rows_of(export_file(context(reader), "ideas", None))
+    premium = export_file(context(reader), "ideas", None, Params(tab="premium"))
+    assert every and rows_of(premium) == [] and premium.row_count == 0  # no premium screener here
+    watched = {("me", "preferences", "preferences"): {"watchlist": {"instruments": ["EQ:DDD"]}}}
+    stocks = export_file(context(reader, watched), "ideas", None, Params(tab="stocks"))
+    assert [r["symbol"] for r in rows_of(stocks)] == ["DDD"]
+    close = "rollup.price_stats@v2.close"
+    added = rows_of(export_file(context(reader), "ideas", None, Params(columns=(close,))))
+    assert added and close in added[0]
+
+
 def test_ideas_a_withheld_run_is_no_row_and_leaks_nothing(reader: StoreReader) -> None:
     other = export_file(context(reader, user="trader"), "ideas", None)
     assert rows_of(other) == [] and PERSONAL not in "".join(other.lines)

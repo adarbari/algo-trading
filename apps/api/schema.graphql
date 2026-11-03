@@ -2477,7 +2477,7 @@ type IdeaWhy {
 }
 
 """
-The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`); `watchlist` (a tab's pool only): the ideas the rule ranked before the viewer's watchlist kept the watched ones, null: no watchlist, no filter (ADR 0083)
+The ideas for the session: `screeners` (the user's own first, then by id), `items` one page of the `total` ideas that pass the filters (`facets`: the counts of the whole list, `facets.total` before the filters) (`nextCursor`, for the `after` argument, starts the next; null on the last page, `hasMore` false), `paused` the first `first` of `pausedTotal` picks the regime gate held back on the first page only (never counted in `total`); `watchlist` (a tab's pool only): the ideas the rule ranked before the viewer's watchlist kept the watched ones, null: no watchlist, no filter (ADR 0083). `rows[i][j]` is the catalogue column `columns[j]` (the `columns` argument) for `items[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED; `kinds[i][j]`: its public kind, how a cell is drawn), as a feature table
 """
 type Ideas {
   session: Date!
@@ -2489,9 +2489,17 @@ type Ideas {
   nextCursor: String
   facets: FilterFacets
   watchlist: Int
+  columns: [FeatureInfo!]!
+  rows: [[JSON]!]!
+  unknown: [[UnknownCode]!]!
+  reasons: [[NullReason]!]!
+  kinds: [[UnavailableKind]!]!
 
   """Whether another page follows this one"""
   hasMore: Boolean!
+
+  """The words of each kind `kinds` uses: how a cell's kind reads"""
+  kindTexts: [KindText!]!
 }
 
 """What an indicator did before one episode, in one line"""
@@ -3244,13 +3252,14 @@ type Quantile {
 """Reads for the web app, each for one session (ADR 0036)"""
 type Query {
   """
-  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list before it is paged: `total` then counts the ideas that pass, `facets` the counts (ADR 0082); a cursor is only good for the filters it was issued under. `tab` keeps the screeners of that tab (the Unproven section of `setupIdeas`, ADR 0083); none: every screener. Null: nothing stored
+  The tickers the user's screeners picked in the session, ranked by the Ideas rule (a screener's first picks, weighted by position and by whose screener it is; each idea is served from its best pick) (`first` of them from the `after` cursor, `nextCursor` the next page's); a screener with no run for the session is listed NOT_RUN. `filters` (the surface `ideas` of `filterSet`) narrow the whole list before it is paged: `total` then counts the ideas that pass, `facets` the counts (ADR 0082); a cursor is only good for the filters it was issued under. `tab` keeps the screeners of that tab (the Unproven section of `setupIdeas`, ADR 0083); none: every screener. `columns`: catalogue fields read for the page's ideas, served as feature-table cells (`Ideas.rows`). Null: nothing stored
   """
   ideas(
     first: Int! = 50
     after: String = null
     filters: [FilterInput!] = null
     tab: IdeaTab = null
+    columns: [FeatureName!] = null
 
     """
     the session to read (default: the latest with bars); every value below is for exactly this date

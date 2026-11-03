@@ -4927,7 +4927,7 @@
             }
           },
           {
-            "description": "catalogue columns to add (screener_results, universe)",
+            "description": "catalogue columns to add (screener_results, universe, ideas)",
             "in": "query",
             "name": "columns",
             "required": false,
@@ -4944,8 +4944,30 @@
                   "type": "null"
                 }
               ],
-              "description": "catalogue columns to add (screener_results, universe)",
+              "description": "catalogue columns to add (screener_results, universe, ideas)",
               "title": "Columns"
+            }
+          },
+          {
+            "description": "ideas: the tab whose Unproven list to export (none: every screener)",
+            "in": "query",
+            "name": "tab",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "stocks",
+                    "premium"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ideas: the tab whose Unproven list to export (none: every screener)",
+              "title": "Tab"
             }
           },
           {
