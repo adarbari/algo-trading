@@ -2,7 +2,13 @@
 delisted: read for a session S it leaks the future unless it is compared ``<= S``. Only the modules
 below read it (the listing reads, the identity resolver, the listing writers, the winners
 sample and the bars-history clip); anything else, e.g. a feature or the outcomes task, goes through
-``data.listings.delisted_by(reader, T)``."""
+``data.listings.delisted_by(reader, T)``.
+
+``events/delisting`` (ADR 0087 decision 4) is quarantined the same way: only ``data.listings``
+reads it; its name appears as a string only in its schema, its reader and its one writer (the
+``delistings`` task and its registry entry), and ``read_delistings`` is imported by no feature,
+screener or page read (PR6 adds the harness). Another reader would read a delisting without its
+point-in-time rule (``known_by`` for a feature, the (S, T] window for the label)."""
 
 import re
 
@@ -36,3 +42,29 @@ def test_only_the_listing_reads_use_end_date() -> None:
     assert not offenders, (
         f"read a listing end_date outside data.listings (leaks the future): {offenders}"
     )
+
+
+DELISTING_ALLOWED = (
+    "src/algotrade/data/listings/",  # the reader
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
+    "apps/ingestion/algotrade_ingestion/tasks/listings/delistings.py",  # the one writer
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_reference.py",  # its registry entry
+)
+DELISTING_NAME = re.compile(r"events/delisting(?![a-z_])")
+DELISTING_IMPORT = re.compile(r"data\.listings\.delistings import[^\n]*\bread_delistings\b")
+
+
+def test_only_data_listings_reads_the_delisting_table() -> None:
+    named, importers = [], []
+    for root in SCANNED:
+        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            if "node_modules" in rel:
+                continue
+            text = path.read_text()
+            if not rel.startswith(DELISTING_ALLOWED) and DELISTING_NAME.search(text):
+                named.append(rel)
+            if not rel.startswith("src/algotrade/data/listings/") and DELISTING_IMPORT.search(text):
+                importers.append(rel)
+    assert not named, f"read events/delisting outside data.listings: {named}"
+    assert not importers, f"import read_delistings only from services/evaluation: {importers}"

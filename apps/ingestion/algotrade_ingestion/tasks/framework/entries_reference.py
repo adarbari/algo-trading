@@ -10,6 +10,7 @@ from algotrade_ingestion.tasks.framework.params import SESSION, Params, Task, se
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import (
     delisted_tickers,
+    delistings,
     index_membership,
     listing_history,
     winners_sample,
@@ -83,6 +84,10 @@ def run_listing_history(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
+def run_delistings(ctx: TaskContext, p: Params) -> RunRecord:
+    return delistings.ingest_delistings(ctx, session_of(p))
+
+
 def run_delisted_tickers(ctx: TaskContext, p: Params) -> RunRecord:
     return delisted_tickers.ingest_delisted_tickers(
         ctx, ctx.sources["massive_tickers"], session_of(p)
@@ -110,6 +115,17 @@ DELISTED_TICKERS = Task(
     run_delisted_tickers,
     sources=("massive_tickers",),
     settings="sources.toml [massive] [quality]",
+    params=(SESSION,),
+)  # declared here, not in registry.py (file cap); registry.py lists it in TASKS
+
+
+DELISTINGS = Task(
+    "delistings",
+    "why and how each delisted name left (events/delisting), from the listing history, the "
+    "filings and the bars; in no workflow",
+    delistings,
+    ("events/delisting",),
+    run_delistings,
     params=(SESSION,),
 )  # declared here, not in registry.py (file cap); registry.py lists it in TASKS
 

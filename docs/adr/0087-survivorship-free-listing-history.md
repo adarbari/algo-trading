@@ -102,6 +102,20 @@ reused ticker's permaTicker, so PR2 leaves BBBY undated). PR2 keeps every Tiingo
 tenet 2026-11-01): a record whose start no Tiingo row gives is written with a null start and its reason in
 `no_id_reason`, never dropped (Decision 2's "dropped and counted" is superseded).
 
+**PR5 built (2026-11-03):** `events/delisting` (`storage/tables/schemas/events.py`, a full snapshot per run
+session, key instrument id + last session) written by the `delistings` task
+(`tasks/listings/delistings.py`, the pure reason rules in `delisting_reason.py`; in no workflow; stored data
+only: the listing history through `data.listings.universe.delisted_listings`, the instrument's `events/filing`
+rows through `data.events`, the closes through `SessionBars`, the outcomes' basis). The reader is
+`data/listings/delistings.py` (`read_delistings(reader, as_of_write)`: the latest snapshot on or before a write
+session, never a later one; `known_by(frame, S)` for a feature), which also holds the vocabulary and the
+convention for an instrument with no OTC print (decision 5, owner decision 1). Choices the ADR left open: the last
+bar is searched within 30 days before the vendor's last trading day; only a Form 25 filed by the issuer decides
+VOLUNTARY, while a Form 25-NSE counts for `known_from` only; a bankruptcy or listing-standards delisting with no OTC
+print uses the final exchange (NASDAQ -55%, else -30%). The run FAILS with no listing history; its stats give rows
+by reason and by basis, `no_last_bar`, `no_filings` (PR4's backfill gap), `no_cik` and `unknown_share` (decision 6
+(c)). A test scans that only `data.listings` reads the table.
+
 **Backfill** (detached, README "Long runs"): Massive inactive list ~6 minutes; Tiingo meta ~35 batches; Tiingo bars
 for the new ids plus the tails ~9,000 to 11,000 requests, 1 to 1.3 hours at 0.4 s, which holds only on the Power
 plan (ends 2026-11-09; the free tier would take about 20 months); SEC submissions for ~6,000 delisted CIKs 30 to

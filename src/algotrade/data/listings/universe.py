@@ -16,10 +16,11 @@ Both snapshots used are named (``Universe.snapshot``, ``Universe.membership_snap
 delisted: used as a feature, label or sort key it leaks the future. It is read **here, in
 ``SymbolResolver.from_listings`` (both identity reads: is this listing alive on S), by
 ``read_listings`` for the winners-sample runner** (which picks its strata by year of delisting,
-by design: a data-quality sample, never a feature), by ``delisted_by`` for the outcomes task
-(a name counts as delisted at T only when ``end_date <= T``, so no later delisting is known) and
-by ``listings_over`` for ``bars-history --from-listings`` (which fetches a listing's bars by its
-permaTicker and clips them to its own dates: identity, never a feature), nowhere else
+by design: a data-quality sample, never a feature), by ``delisted_listings`` / ``delisted_by`` for
+the delistings and outcomes tasks (a name counts as delisted at T only when ``end_date <= T``, so
+no later delisting is known) and by ``listings_over`` for ``bars-history --from-listings`` (which
+fetches a listing's bars by its permaTicker and clips them to its own dates: identity, never a
+feature), nowhere else
 (``tests/architecture/data/test_listing_end_date_readers.py`` scans for it), and
 ``universe_asof`` does not return it. The adapter stores a live name's end as null (open).
 
@@ -216,18 +217,44 @@ def read_listings(reader: StoreReader) -> tuple[pd.DataFrame, date]:
     return frame[frame["source"].eq(TIINGO)].reset_index(drop=True), snap.snapshot_date
 
 
-def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
-    """Instrument id -> last trading day, for the listings with a trusted id whose ``end_date``
-    is on or before ``session`` (``MissingDataError`` with no snapshot). A listing that ends
-    after ``session``, or is open, is absent: at ``session`` its delisting was not known. For
-    the outcomes task (a window ending at ``session`` marks a name with no bar at its end
-    DELISTED)."""
-    frame, _ = listing_frame(reader)
+def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame, date]:
+    """One row per instrument id (with a trusted id) whose listings have all ended on or before
+    ``session`` (``MissingDataError`` with no snapshot): ``instrument_id``, ``last_day`` (the
+    vendor's last trading day: the latest end of its listings), ``exchange`` and ``security_type``
+    of the listing that ended last (its final venue and type) and ``cik`` (the latest non-null
+    one of its listings), sorted by id, and the listing snapshot read. A listing that ends after
+    ``session``, or is open, keeps its id out: at ``session`` its delisting was not known. An id
+    several listings share (a ticker change) is delisted only once every one has ended; a
+    listing that starts after ``session`` is not yet known."""
+    frame, snap = listing_frame(reader)
     has_id = frame["instrument_id"].notna() & (frame["instrument_id"].astype(str) != "")
     started = pd.to_datetime(frame["start_date"]) <= pd.Timestamp(session)
-    rows = frame[has_id & started]  # a listing that starts after ``session`` is not yet known
-    # An id several listings share (a ticker change) is delisted only once every one has ended.
-    ends = pd.to_datetime(rows["end_date"]).groupby(rows["instrument_id"].astype(str))
-    stats = ends.agg(["count", "size", "max"])
-    gone = stats[(stats["count"] == stats["size"]) & (stats["max"] <= pd.Timestamp(session))]
-    return {str(i): last.date() for i, last in gone["max"].items()}
+    rows = frame[has_id & started].assign(
+        instrument_id=lambda f: f["instrument_id"].astype(str),
+        last_day=lambda f: pd.to_datetime(f["end_date"]),
+    )
+    ends = rows.groupby("instrument_id")["last_day"].agg(["count", "size", "max"])
+    gone = ends[(ends["count"] == ends["size"]) & (ends["max"] <= pd.Timestamp(session))]
+    rows = rows[rows["instrument_id"].isin(gone.index)]
+    last = rows.sort_values(["instrument_id", "last_day"], kind="stable")
+    final = last.drop_duplicates("instrument_id", keep="last").set_index("instrument_id")
+    cik = last.dropna(subset=["cik"]).drop_duplicates("instrument_id", keep="last")
+    out = pd.DataFrame(
+        {
+            "last_day": [d.date() for d in final["last_day"]],
+            "exchange": final["exchange"],
+            "security_type": final["security_type"],
+            "cik": cik.set_index("instrument_id")["cik"].reindex(final.index),
+        },
+        index=final.index,
+    )
+    out = out.rename_axis("instrument_id").reset_index()
+    return out.sort_values("instrument_id", kind="stable"), snap.snapshot_date
+
+
+def delisted_by(reader: StoreReader, session: date) -> dict[str, date]:
+    """Instrument id -> last trading day, for the listings with a trusted id whose ``end_date``
+    is on or before ``session`` (``delisted_listings``). For the outcomes task (a window ending
+    at ``session`` marks a name with no bar at its end DELISTED)."""
+    gone, _ = delisted_listings(reader, session)
+    return dict(zip(gone["instrument_id"], gone["last_day"], strict=True))

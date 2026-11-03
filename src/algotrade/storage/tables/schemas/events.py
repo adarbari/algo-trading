@@ -436,3 +436,34 @@ SHORT_VOLUME_EVENTS = fixed(
     runs="merge",
     key=("instrument_id", "ts"),
 )
+
+# L1: one row per delisted instrument and last session (ADR 0087 decision 4): why it left
+# (``reason`` from its 8-K items and Form 25 around the last bar; ``reason_source`` the
+# accession(s) that decided it), the last stored close, the first OTC close within 10 sessions
+# after it (``terminal_close`` / ``terminal_session``) and the ``terminal_basis`` of the return
+# (``OTC_CLOSE``, ``ZERO_ACQUIRED``, ``REPLACEMENT``, ``ZERO_UNKNOWN``), ``delisting_return`` the
+# return of that step. A FULL snapshot per run session (every delisted instrument each run, so a
+# reason that changes when filings arrive is a new snapshot; the reader takes the latest on or
+# before a write session, ``data.listings.delistings``). ``ts`` is the last session at midnight
+# UTC; ``known_from`` the session the delisting was public from (the session after the Form 25
+# acceptance, else after the last session); ``knowledge_ts`` is the write time, never the
+# delisting day. Quarantined like the outcomes: only ``data.listings`` reads it (a feature only
+# when ``known_from <= S``; the outcome label reads the delistings in (S, T] whatever their
+# ``known_from``).
+DELISTING_EVENTS = fixed(
+    "events/delisting",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "last_session date!",
+    "last_close float64!",
+    "reason string!",
+    "terminal_basis string!",
+    "delisting_return float64!",
+    *strings("reason_source", "exchange", "security_type", "cik"),
+    "terminal_close float64",
+    "terminal_session date",
+    key=("instrument_id", "last_session"),
+)

@@ -266,7 +266,7 @@ purpose = "task machinery: the ingest run loop (IngestRun, TaskContext), the tas
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/listings"
-purpose = "listing tasks (edges ED6, ADR 0087): the vendor listing history merged with Massive's delisted names (the pure pairing and start-date rules in listing_merge), Massive's delisted tickers, the S&P 500 membership history and the winners-study sample with its coverage report"
+purpose = "listing tasks (edges ED6, ADR 0087): the vendor listing history merged with Massive's delisted names (the pure pairing and start-date rules in listing_merge), Massive's delisted tickers, the delistings (events/delisting: reason and terminal return, the pure reason rules in delisting_reason), the S&P 500 membership history and the winners-study sample with its coverage report"
 kind = "task-domain"
 
 [[dir]]

@@ -82,6 +82,19 @@ section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
 detect = [{ call = "ingest_delisted_tickers" }]
 
 [[responsibility]]
+id = "delistings-ingestion"
+description = "Store why and how each delisted name left in events/delisting (ADR 0087 decisions 4 and 5): one full snapshot per run session of every instrument id whose listings have all ended on or before it (data.listings.delisted_listings: last trading day, final exchange, type, CIK), per row the last stored bar within 30 days of the last day (none: no row, no_last_bar), the reason from the instrument's stored events/filing rows in -120 / +30 days (8-K 1.03 BANKRUPTCY, else 2.01 / 5.01 ACQUIRED, else 3.01 STANDARDS, else a Form 25 VOLUNTARY, else UNKNOWN; tasks/listings/delisting_reason.py), known_from (the session after the Form 25 / 25-NSE acceptance, else after the last bar), the first stored close within 10 sessions after the last bar as the terminal OTC close, else the convention (data.listings.delistings.convention: ACQUIRED 0, BANKRUPTCY / STANDARDS -55% NASDAQ / -30% otherwise, else 0); closes split-adjusted as of the terminal session (SessionBars); no listing history FAILS the run; stats by reason and basis, no_last_bar, no_filings, no_cik, unknown_share; in no workflow; reads stored data only"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/listings/delistings.py",
+    "apps/ingestion/algotrade_ingestion/tasks/listings/delisting_reason.py",
+]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_reference.py",  # the registry entry's runner calls the task
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "ingest_delistings" }]
+
+[[responsibility]]
 id = "edge-picks"
 description = "Store what every site edge took at a session in results/edge_picks (ADR 0081): per site edge and screener it lists, the picks the harness's one rule gave (services/evaluation/edge_picks/night.py over picks.long_picks or picks.side_picks, the edge's universe, schedule, top_k and setup gate) with each pick's side and a book's weights, an ensemble's book and a named-symbol setup's row (edge_picks/named.py), or why none (gate_closed, not_decision_day, skipped), one publish per run, resumable by the stored keys, an optional nightly step after the screens with its acceptance check; decides nothing itself (the rule is the harness's)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/edges/picks.py"]
@@ -137,6 +150,7 @@ description = "Store the SEC event filings (8-K and 8-K/A with items, NT 10-K / 
 owner = ["apps/ingestion/algotrade_ingestion/tasks/events/filings.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/events/ipo_lockups.py",  # reads its 424B4 rows to report the search gap
+    "apps/ingestion/algotrade_ingestion/tasks/listings/delistings.py",  # reads a delisted id's 8-K items and Form 25 through data.events (ADR 0087)
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
