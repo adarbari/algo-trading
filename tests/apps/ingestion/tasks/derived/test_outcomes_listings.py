@@ -14,7 +14,8 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.derived import outcomes
-from algotrade_ingestion.tasks.derived.outcomes import TABLE, compute_outcomes
+from algotrade_ingestion.tasks.derived.outcomes import TABLE_V3 as TABLE
+from algotrade_ingestion.tasks.derived.outcomes import compute_outcomes
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import END, SPY, series, store, write_bars, write_rows
 from tests.helpers.stored_frames import universe_rows

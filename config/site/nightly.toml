@@ -157,7 +157,7 @@ budget_gb = 3.0                  # the event and instrument tables' copies toget
 free_disk_floor_gb = 10.0        # no build when the disk has less free (WARN): a rebuilt year exists twice
 
 [compaction]                     # the compact-runs job (ADR 0078): `algotrade-ingest run compact-runs --table T`, run by hand
-tables = ["outcomes/instrument/forward_returns@v2"]   # merge-mode tables with no history copy only (test_nightly.py); anything else is refused
+tables = ["outcomes/instrument/forward_returns@v2", "outcomes/instrument/forward_returns@v3"]   # merge-mode tables with no history copy only (test_nightly.py); anything else is refused
 nice = 10                        # CPU niceness the job takes on, so the API's reads win
 partition_seconds = 300.0        # a partition slower than this stops the run (the disk is struggling)
 workers = 4                      # worker processes, one partition each at a time (--workers N overrides); a swap's old files are swept 30 s + 1 s after it, as the run goes

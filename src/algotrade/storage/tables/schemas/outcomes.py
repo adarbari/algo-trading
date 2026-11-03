@@ -23,6 +23,12 @@ from algotrade.storage.tables.spec import (
 OUTCOMES_PREFIX = "outcomes/instrument/"
 
 FORWARD_RETURNS = f"{OUTCOMES_PREFIX}forward_returns@v2"  # the outcomes task's table
+# v3 (ADR 0087 decision 5): the same windows with the delisting return folded into a DELISTED
+# row's ``fwd_return`` / ``fwd_excess_return``, and its basis beside. v2 keeps its meaning (the
+# last bar, no delisting return) and is written beside it until the readers move to v3.
+FORWARD_RETURNS_V3 = f"{OUTCOMES_PREFIX}forward_returns@v3"
+NO_EVENT = "NO_EVENT"  # DELISTED, but no ``events/delisting`` row ends on the name's last bar
+DELISTING_BASES = ("OTC_CLOSE", "ZERO_ACQUIRED", "REPLACEMENT", "ZERO_UNKNOWN", NO_EVENT)
 # The residual-returns grain (ADR 0053 amendment, EB H11): the return left after the ETF factor
 # betas known before S, beside (never inside) forward_returns, so no stored leg is invalidated.
 RESIDUAL_RETURNS = f"{OUTCOMES_PREFIX}residual_returns@v1"  # the residual-returns task's table
@@ -45,8 +51,10 @@ _OUTCOME_TYPES = (
     "outcome_status string!",  # OUTCOME_STATUSES; DELISTED: measured to the last bar
     "outcome_reason string",  # UNMEASURED only: why (BAD_BAR: a flagged bar in S..T, ADR 0061)
 )
-
-
+_DELISTING_TYPES = (
+    "delisting_return float64",  # DELISTED with an event: the return of the step after the last bar
+    "delisting_basis string",  # DELISTING_BASES; DELISTED only (null: COMPLETE, UNMEASURED)
+)
 _RESIDUAL_TYPES = (
     "instrument_id string!",
     "ts timestamp_utc!",  # the close of S
@@ -72,9 +80,11 @@ def outcomes_spec(table: str) -> TableSpec:
             table, "outcome", ("instrument_id", "ts", "horizon_sessions", "window_end"),
             *_RESIDUAL_TYPES, runs="merge", key=("instrument_id", "horizon_sessions"),
         )  # fmt: skip
+    extra = _DELISTING_TYPES if table == FORWARD_RETURNS_V3 else ()
     return fixed(
         table, "outcome", ("instrument_id", "ts", "horizon_sessions", "window_end", "benchmark"),
-        *_OUTCOME_TYPES, runs="merge", key=("instrument_id", "horizon_sessions", "benchmark"),
+        *_OUTCOME_TYPES, *extra, runs="merge",
+        key=("instrument_id", "horizon_sessions", "benchmark"),
     )  # fmt: skip
 
 
@@ -92,6 +102,30 @@ def outcome_problems(frame: pd.DataFrame) -> list[str]:
             problems.append(f"{column} must be null when UNMEASURED")
         if values[measured].isna().any():
             problems.append(f"{column} is null on a measured outcome")
+    if "delisting_basis" in frame.columns:
+        problems.extend(_delisting_problems(frame))
+    return problems
+
+
+def _delisting_problems(frame: pd.DataFrame) -> list[str]:
+    """v3: the basis is set exactly on DELISTED rows, from the vocabulary; the return is set
+    exactly where a basis other than NO_EVENT says an event applied, and is above -100%."""
+    basis = frame["delisting_basis"]
+    delisted = (frame["outcome_status"] == "DELISTED").to_numpy()
+    problems = []
+    if (basis.notna().to_numpy() != delisted).any():
+        problems.append("delisting_basis must be set on a DELISTED row and null on any other")
+    bad = sorted({str(v) for v in basis.dropna()} - set(DELISTING_BASES))
+    if bad:
+        problems.append(f"delisting_basis must be one of {sorted(DELISTING_BASES)}: {bad}")
+    value = frame["delisting_return"] if "delisting_return" in frame.columns else None
+    if value is None:
+        return [*problems, "delisting_return is missing"]
+    applied = delisted & (basis != NO_EVENT).to_numpy()
+    if (value.notna().to_numpy() != applied).any():
+        problems.append("delisting_return must be set exactly where a delisting event applied")
+    if (value.dropna() <= -1).any():
+        problems.append("delisting_return must be above -1")
     return problems
 
 

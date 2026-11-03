@@ -92,7 +92,7 @@ listings, with S&P 500 intervals), so `pre_snapshot` no longer applies. Measured
 ## Plan (PRs; PR4 and PR5 are file-disjoint after PR2)
 PR1 this ADR, the adapter, the table, the task, the reader and tests, not run on the real store. PR2 merge, ids
 and types (architect review). PR3 the owner's runs (below). PR4 the `filings` task for delisted CIKs (the D1 / D10
-Form 25 follow-up). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3`, the harness
+Form 25 follow-up). PR5 `events/delisting` (architect review). PR6a `forward_returns@v3` written beside v2 (built), PR6b the harness
 disclosure and the `universe_basis` stamp (architect review). PR7 S&P 500 renames through Massive ticker events (probe first) and the 2024-26
 `EQ:<symbol>` bars migration (800 listings with no id have bars stored under `EQ:<symbol>` on 2025-06-02).
 PR3b (not in PR2): Massive ticker details `/v3/reference/tickers/{T}?date=D` are point in time (`list_date`,
@@ -121,6 +121,15 @@ The table is current knowledge, so a run FAILS for a session before the listing 
 no listing history, and with no row. Its stats give rows by reason and by basis, `no_last_bar`, `no_filings` (PR4's
 backfill gap), `no_cik` and `unknown_share` (decision 6 (c)). An AST scan allows only the reader, the writer, the
 outcomes task (PR6a) and `services/evaluation` (PR6b) to import the reader.
+
+**PR6a built (2026-11-03):** the `outcomes` task writes `forward_returns@v3` (v2 columns + `delisting_return`,
+`delisting_basis`) beside v2 each night, one computation of each window; a `--from/--to` backfill writes v3 only.
+v2 keeps its meaning (a test pins its rows equal to the pre-v3 output). The delistings come from the latest
+`events/delisting` snapshot at write time (never as of S or T, whatever `known_from`), applied only when the
+event's `last_session` is in (S, T] and is the name's last bar; max return, drawdown and volatility stay to the
+last bar. A DELISTED row with no such event is `NO_EVENT` with no return. Readers keep v2 through
+`data/outcomes/reading.py` `READ_TABLE`; PR6c flips it after the owner's backfill. Share path and residual returns
+are untouched (PR6d).
 
 **Backfill** (detached, README "Long runs"): Massive inactive list ~6 minutes; Tiingo meta ~35 batches; Tiingo bars
 for the new ids plus the tails ~9,000 to 11,000 requests, 1 to 1.3 hours at 0.4 s, which holds only on the Power

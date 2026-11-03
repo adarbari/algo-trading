@@ -859,6 +859,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
 note = "ADR 0053: forward outcomes per (instrument, start session, horizon, benchmark); read only by the edge harness through algotrade.data.outcomes"
 
 [[table]]
+name = "outcomes/instrument/forward_returns@v3"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
+note = "ADR 0087 decision 5: forward_returns@v2 plus delisting_return and delisting_basis, the delisting step folded into a DELISTED row's fwd_return; written beside v2 by the nightly and alone by a --from/--to backfill; read only by the edge harness through algotrade.data.outcomes (READ_TABLE stays v2 until PR6c)"
+
+[[table]]
 name = "outcomes/option/structure_pnl@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/paths/option_outcomes.py"
 note = "ADR 0088, design 2.5 (replaces the v1 structure grain, ADR 0053 amendment EB H13): one option trade per (underlying, start session, position_key built from the resolved legs) from the stored chains, written only by frame_and_publish; read only by the edge harness through algotrade.data.outcomes"

@@ -23,12 +23,13 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.data.chains import FIRST_CBOE_CHAIN_SESSION
 from algotrade.data.outcomes.reading import (
     OUTCOME_FIELDS,
+    READ_TABLE,
     fold_stamps,
     held_rows,
     missing_in,
 )
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import FORWARD_RETURNS, STRUCTURE_PNL, spec_for
+from algotrade.storage.tables.schemas import STRUCTURE_PNL, spec_for
 
 CBOE = "cboe"
 CHAIN_FIELDS = (
@@ -154,7 +155,7 @@ def licence_frames(
     than the sessions alone). Empty for an outcome table that declares no such
     column (``forward_returns@v2``: its rows are open). The harness folds them into the
     trial's licence for every entry session it covers, a stored leg it reuses included."""
-    table = STRUCTURE_PNL if chain else FORWARD_RETURNS
+    table = STRUCTURE_PNL if chain else READ_TABLE
     if spec_for(table).column("licence") is None:
         return []
     days = sorted(set(sessions))

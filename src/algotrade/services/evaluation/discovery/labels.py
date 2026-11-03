@@ -25,7 +25,7 @@ from algotrade.config.edges.winners import WinnersStudySettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
+from algotrade.data.outcomes.reading import READ_TABLE
 
 COUNTED = ("COMPLETE", "DELISTED")
 HINT = "run `algotrade-ingest run outcomes --horizon 504 --from ... --to ...` (a backfill)"
@@ -59,7 +59,7 @@ def label_winners(
     ``MissingDataError`` when no name is eligible or too many have no counted row."""
     ids = sorted(set(eligible))
     if not ids:
-        raise MissingDataError(FORWARD_RETURNS, f"no eligible name on {session}", HINT)
+        raise MissingDataError(READ_TABLE, f"no eligible name on {session}", HINT)
     rows = outcomes[outcomes["instrument_id"].isin(ids)]
     rows = rows[rows["outcome_status"].isin(COUNTED)]
     excess = pd.to_numeric(rows["fwd_excess_return"], errors="coerce")
@@ -70,7 +70,7 @@ def label_winners(
     missing = (len(ids) - len(counted)) / len(ids)
     if missing > settings.max_missing_fraction:
         raise MissingDataError(
-            FORWARD_RETURNS,
+            READ_TABLE,
             f"{missing:.1%} of the {len(ids)} eligible names on {session} have no COMPLETE or "
             f"DELISTED outcome (at most {settings.max_missing_fraction:.1%})",
             HINT,
