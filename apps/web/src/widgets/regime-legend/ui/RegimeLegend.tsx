@@ -86,7 +86,7 @@ export function RegimeLegend() {
             />
           </Group>
         </Stack>
-              </Stack>
+      </Stack>
     </Panel>
   );
 }
