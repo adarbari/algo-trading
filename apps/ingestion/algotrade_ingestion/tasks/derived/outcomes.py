@@ -2,9 +2,10 @@
 closes to ``outcomes/instrument/forward_returns@v2`` and ``@v3``, the grain only the edge harness
 reads. v2 is the last-bar return, its meaning unchanged; v3 (ADR 0087 decision 5) is the same
 window with the delisting return of the delisting snapshot folded into a DELISTED row
-(``delisting_return``, ``delisting_basis``). The nightly writes both (each window computed once);
-a ``--from/--to`` backfill writes v3 only (the held 2010 backfill is a v3 run), and the readers keep
-v2 (``data.outcomes.reading.READ_TABLE``) until a later PR moves them. The delistings are read from
+(``delisting_return``, ``delisting_basis``). Every run writes both, the nightly and a
+``--from/--to`` backfill alike (a backfill of v3 alone left every v2 reader, the golden edge
+included, with no outcomes for the backfilled sessions), and the readers keep v2
+(``data.outcomes.reading.READ_TABLE``) until a later PR moves them. The delistings are read from
 the latest snapshot at WRITE time, never as of S or T, whatever their ``known_from`` (the label
 reads the future of S, 0053's one exception); a row is rewritten when a later snapshot changes it
 (``changed_rows``). The run's stats count ``delisting_conflicts`` (an event whose last session is
@@ -264,7 +265,7 @@ def _one(
     left_v3 = with_events(left, events, end)
     conflicts = event_conflicts(others[1], events, end)
     mismatch = 0
-    tables = (TABLE_V3,) if not nightly else TABLES
+    tables = TABLES  # a backfill writes v2 too: the readers read v2 until PR6c
     with IngestRun(ctx, TASK, end) as run:
         for h, window in windows(run, end, horizons, first, nightly):
             names, pre_snapshot = universe_ids(run.reader, window.start, not nightly)
@@ -278,10 +279,10 @@ def _one(
                 )
                 frames.append(rows.assign(benchmark=ticker))
                 reasons, eligible = why, len(rows) + len(why)
-                if nightly:  # v2: the departures the reference and listing history note only
-                    old, why_v2 = window_rows(prices, window, names, bench, left, panel.flagged)
-                    frames_v2.append(old.assign(benchmark=ticker))
-                    n_v2 = (len(old), len(why_v2))
+                # v2: the departures the reference and listing history note only
+                old, why_v2 = window_rows(prices, window, names, bench, left, panel.flagged)
+                frames_v2.append(old.assign(benchmark=ticker))
+                n_v2 = (len(old), len(why_v2))
                 if ticker == benchmarks[0]:
                     mismatch += unapplied_delistings(rows, window, events)
             order = ["instrument_id", "benchmark"]
@@ -312,7 +313,7 @@ def _one(
                 "rows": len(out) // max(len(benchmarks), 1),  # computed, not written
                 "written": written,  # rows over the tables written
                 "reasons": len(reasons),
-                "v2": list(n_v2),  # (rows per benchmark, reasons) of forward_returns@v2, nightly
+                "v2": list(n_v2),  # (rows per benchmark, reasons) of forward_returns@v2
                 "examples": dict(sorted(reasons.items())[:SHOWN]),
                 "pre_snapshot": pre_snapshot,  # survivors only: no snapshot, no listing history
             }

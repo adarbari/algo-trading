@@ -165,12 +165,13 @@ def test_v2_is_unchanged_by_the_delisting_return_and_v3_carries_it() -> None:
     assert set(plain["delisting_basis"]) == {"NO_EVENT"} and plain["delisting_return"].isna().all()
 
 
-def test_a_backfill_reads_todays_snapshot_and_writes_v3_only() -> None:
+def test_a_backfill_reads_todays_snapshot_and_writes_v2_and_v3() -> None:
     writer, reader, days = _store()
     _events(writer, days, days[-4], days[-1])
     compute_outcomes(task_ctx(writer), days[-1], days[-6], days[-1])
-    assert not reader.dates(TABLE) and reader.dates(TABLE_V3)
+    assert reader.dates(TABLE) and reader.dates(TABLE_V3)  # the v2 readers keep their outcomes
     assert set(_d_rows(reader, TABLE_V3)["delisting_basis"]) == {"REPLACEMENT"}
+    assert "delisting_basis" not in _d_rows(reader, TABLE).columns  # v2 keeps its meaning
     # a window ending on D's own last session is COMPLETE and right: no run counts a mismatch
     assert [r.stats["delisting_mismatch"] for r in reader.runs("outcomes")] == [0] * 6
 

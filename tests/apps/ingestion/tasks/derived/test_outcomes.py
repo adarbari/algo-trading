@@ -118,10 +118,10 @@ def test_backfill_rows_equal_nightly_rows() -> None:
     backfill_writer, backfill_reader, _ = _store()
     first = days[-3 - RECHECK]  # each night also recomputes the RECHECK window ends before it
     compute_outcomes(task_ctx(backfill_writer), days[-1], first, days[-1])
-    pd.testing.assert_frame_equal(
-        _outcomes(nightly_reader, TABLE_V3), _outcomes(backfill_reader, TABLE_V3)
-    )
-    assert not backfill_reader.dates(TABLE)  # a backfill writes v3 only
+    for table in (TABLE, TABLE_V3):  # a backfill writes v2 too: the readers read v2 until PR6c
+        pd.testing.assert_frame_equal(
+            _outcomes(nightly_reader, table), _outcomes(backfill_reader, table)
+        )
     assert len(backfill_reader.runs("outcomes")) == 3 + RECHECK  # one run per window end
 
 
