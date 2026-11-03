@@ -348,6 +348,12 @@ test('Regime: a tapped card help button opens the indicator drawer as a sheet', 
   page,
 }) => {
   await page.goto('/regime');
+  // The macro score's two tiers sit under it, inside the one column, with no sideways scroll.
+  await expect(page.getByRole('img', { name: /^Early tier: unknown/ })).toBeVisible();
+  await expect(page.getByRole('img', { name: /^Confirming tier: unknown/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   const card = page.getByRole('region', { name: 'Slow-moving warning signs' });
   await card.getByRole('listitem').first().getByRole('button').first().tap();
   await card
