@@ -155,3 +155,11 @@ def test_a_nested_listing_followed_by_a_relist_still_emits_the_gap() -> None:
         (date(2010, 1, 4), "NASDAQ", False)
     ]
     assert delisted_by(reader, date(2030, 1, 1)) == {}
+
+
+def test_a_store_with_no_ended_listing_has_no_delistings_and_does_not_raise() -> None:
+    reader = _listing_store(
+        [("EQ:C", "CCC", "NASDAQ", "COMMON_STOCK", "0003", "2000-01-03", None)]  # open only
+    )
+    gone, _ = delisted_listings(reader, date(2016, 1, 4))
+    assert gone.empty
