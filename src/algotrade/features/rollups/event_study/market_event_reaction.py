@@ -72,9 +72,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         row[f"{prefix}_multiple_median"] = float(median[0]) if enough else np.nan
         row[f"{prefix}_down_worst"] = float(down[0]) if enough else np.nan
     frame = pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
-    for name, dtype in COLUMNS.items():
-        if dtype == "int":
-            frame[name] = frame[name].astype("Int64")
+    moves.nullable_ints(frame, COLUMNS)
     return frame
 
 

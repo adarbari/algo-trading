@@ -27,7 +27,12 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from algotrade.core.time.calendar import last_session_of_month, monthly_expiry
+from algotrade.core.time.calendar import (
+    is_session,
+    last_session_of_month,
+    monthly_expiry,
+    next_session,
+)
 
 type Matrix = npt.NDArray[np.float64]
 
@@ -128,6 +133,15 @@ def calendar_cover(grid: list[date], releases: list[tuple[str, date, str]]) -> i
     return bisect_left(grid, min(day for _, day, _ in releases))
 
 
+def reaction_session(day: date, time_et: str | None = CLOSE_ET) -> date:
+    """The session an event on ``day`` reacts on, with no grid (the maths of ``reaction_position``
+    for a date ahead of the session): a release after the close, or on a day the exchange is
+    closed, reacts on the next session."""
+    if is_session(day) and (time_et is None or time_et <= CLOSE_ET):
+        return day
+    return next_session(day)
+
+
 def reaction_position(grid: list[date], day: date, time_et: str | None = CLOSE_ET) -> int | None:
     """The position on ``grid`` (sessions ending at S, oldest first) of the session an event on
     ``day`` reacts on, or None when it is not on the grid (before the first session, after S, or
@@ -167,6 +181,14 @@ def structure_positions(grid: list[date]) -> dict[str, list[int]]:
             days[QUARTER_END].append(last_session_of_month(year, month))
     found = {cls: [reaction_position(grid, d) for d in ds] for cls, ds in days.items()}
     return {cls: [p for p in ps if p is not None] for cls, ps in found.items()}
+
+
+def nullable_ints(frame: pd.DataFrame, columns: dict[str, str]) -> pd.DataFrame:
+    """``frame`` with each ``int`` column (by the group's ``column_types``) as a nullable Int64."""
+    for name, dtype in columns.items():
+        if dtype == "int":
+            frame[name] = frame[name].astype("Int64")
+    return frame
 
 
 def class_stats(

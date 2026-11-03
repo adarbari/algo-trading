@@ -58,7 +58,11 @@ from algotrade.features.rollups.corporate import (
     financials,
     fundamentals,
 )
-from algotrade.features.rollups.event_study import event_reaction, market_event_reaction
+from algotrade.features.rollups.event_study import (
+    event_calendar,
+    event_reaction,
+    market_event_reaction,
+)
 from algotrade.features.rollups.events import (
     earnings_date_shift,
     earnings_gap_volume,
@@ -174,6 +178,7 @@ GROUPS: dict[str, FeatureGroup] = {
             earnings_gap_volume.GROUP,
             event_reaction.GROUP,
             market_event_reaction.GROUP,
+            event_calendar.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
