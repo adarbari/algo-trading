@@ -120,17 +120,18 @@ class ChainLoader:
         self._days[day] = labels, spots, stamps
         return self._days[day]
 
+    def _quotes(self, day: date, ids: Collection[str] | None) -> pd.DataFrame | None:
+        """The session's option quotes (``QUOTE_COLUMNS`` and ``knowledge_ts``), of the contracts
+        ``ids`` or all; the history writer's loader reads the bought history here."""
+        return option_quote_rows(self.reader, day, ids, (*QUOTE_COLUMNS, "knowledge_ts"))
+
     def __call__(self, day: date, ids: Collection[str] | None) -> DayChain:
         if ids is None and day in self._entry:
             return self._entry[day]
         labels, spots, base = self._day(day)
         stamps = list(base)
         held = None if ids is not None and not ids else ids  # no contract held: none to read
-        options = (
-            None
-            if ids is not None and not ids
-            else option_quote_rows(self.reader, day, held, (*QUOTE_COLUMNS, "knowledge_ts"))
-        )
+        options = None if ids is not None and not ids else self._quotes(day, held)
         if options is not None and not options.empty:
             stamps.append(pd.Timestamp(options["knowledge_ts"].max()))
             options = one_row_per_contract(options).drop(columns=["knowledge_ts", "ts"])
@@ -169,11 +170,13 @@ def trade_rows(
     loader: ChainLoader,
     fields: FieldLoader,
     licence: str,
+    price_source: str = PRICE_SOURCE,
 ) -> tuple[pd.DataFrame, int]:
     """The ``structure_pnl@v2`` rows of position ``w`` for the window ``sessions`` (S..T in
     order) -> (rows, the number of names with an ``OK`` chain at S). The chain of S is read whole,
     the later sessions' only for the contracts the entry chose; each close's rule fields come from
-    that close's own partition."""
+    that close's own partition. ``price_source`` is where the chains came from (the history writer
+    passes ``option_history``)."""
     spec = w.outcome.position
     assert spec is not None
     entry = loader(sessions[0], None)
@@ -190,7 +193,7 @@ def trade_rows(
         stamps.append(max((x for x in (day.known, field_known) if x is not None), default=None))
     trades = walk_trades(days, spec.legs, spec.collateral, selected, w.rules, catalogue, spec.book)
     rows = position_rows(
-        trades, stamps, key=w.key, hold=w.hold, window_end=sessions[-1], price_source=PRICE_SOURCE,
+        trades, stamps, key=w.key, hold=w.hold, window_end=sessions[-1], price_source=price_source,
         licence=licence, ts=close_time(sessions[0]),
     )  # fmt: skip
     return rows, len(selected)
@@ -213,10 +216,10 @@ def _one(
             if sessions[0] < first:
                 run.record_item(w.key, "BEFORE_HISTORY")
                 continue
-            refusal = _refusal(ctx.reader, w, sessions)
-            if refusal:
-                run.record_item(w.key, f"REFUSED: {refusal}")
-                run.stats[w.key] = {"refused": refusal}
+            why = refusal(ctx.reader, w, sessions)
+            if why:
+                run.record_item(w.key, f"REFUSED: {why}")
+                run.stats[w.key] = {"refused": why}
                 continue
             if sessions[0] != current:
                 loader.reset()  # the previous hold's entry chain is not this one's
@@ -241,7 +244,7 @@ def _one(
     return run.record
 
 
-def _refusal(reader: StoreReader, w: Wanted, sessions: list[date]) -> str:
+def refusal(reader: StoreReader, w: Wanted, sessions: list[date]) -> str:
     """Why position ``w`` is not written for the window ``sessions`` ('' when it is)."""
     spec = w.outcome.position
     if spec is not None and spec.skip_report_in_life:
