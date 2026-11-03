@@ -140,3 +140,18 @@ def test_a_listing_nested_in_an_earlier_one_never_ends_the_stretch() -> None:
         (date(2010, 1, 4), "NASDAQ", True)  # the one that ended last, not the nested one
     ]
     assert delisted_by(reader, date(2030, 1, 1)) == {"EQ:N": date(2010, 1, 4)}
+
+
+def test_a_nested_listing_followed_by_a_relist_still_emits_the_gap() -> None:
+    reader = _listing_store(
+        [
+            ("EQ:N", "AAA", "NASDAQ", "COMMON_STOCK", "0001", "2000-01-03", "2010-01-04"),
+            ("EQ:N", "AAB", "NYSE", "COMMON_STOCK", None, "2001-01-02", "2005-01-04"),  # nested
+            ("EQ:N", "AAC", "NYSE", "COMMON_STOCK", None, "2012-01-03", None),  # relisted
+        ]
+    )
+    gone, _ = delisted_listings(reader, date(2030, 1, 1))
+    assert [(r.last_day, r.exchange, r.final) for r in gone.itertuples()] == [
+        (date(2010, 1, 4), "NASDAQ", False)
+    ]
+    assert delisted_by(reader, date(2030, 1, 1)) == {}

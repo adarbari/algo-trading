@@ -38,6 +38,7 @@ record whose start no Tiingo row gives) is never in a window: it is counted in
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
 import pandas as pd
 
@@ -235,6 +236,19 @@ def _gap_ends(rows: pd.DataFrame) -> pd.Series:
     return rows["last_day"].map(sessions)
 
 
+def _start_after_end(rows: pd.DataFrame) -> pd.Series:
+    """Per row: the first start among the id's listings strictly after the row's end (null when
+    none, or the row is open): the relisting a stretch-ending row is compared with, never a
+    listing nested inside the stretch."""
+    starts = {i: g.sort_values().to_numpy() for i, g in rows.groupby("instrument_id")["first_day"]}
+    out: list[Any] = []
+    for iid, end in zip(rows["instrument_id"], rows["last_day"], strict=True):
+        later = starts[iid]
+        k = later.searchsorted(end.to_datetime64(), side="right") if pd.notna(end) else len(later)
+        out.append(pd.Timestamp(later[k]) if k < len(later) else pd.NaT)
+    return pd.Series(pd.DatetimeIndex(out), index=rows.index)
+
+
 def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame, date]:
     """One row per delisting of an instrument id (with a trusted id) known on ``session``
     (``MissingDataError`` with no snapshot), and the listing snapshot read: ``instrument_id``,
@@ -259,7 +273,6 @@ def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame,
     rows = rows.sort_values(["instrument_id", "first_day", "last_day"], kind="stable")
     rows = rows.reset_index(drop=True)
     by_id = rows.groupby("instrument_id")
-    rows["next_start"] = by_id["first_day"].shift(-1)
     rows["cik"] = by_id["cik"].ffill()
     rows["cik"] = rows.groupby("instrument_id")["cik"].bfill()
     # An open listing reaches forever; a listing nested in an earlier one's span (A 2000-2010, B
@@ -271,7 +284,8 @@ def delisted_listings(reader: StoreReader, session: date) -> tuple[pd.DataFrame,
     ended_on = rows["last_day"].fillna(pd.Timestamp.min)
     latest = ended_on.groupby(rows["instrument_id"]).idxmax()  # the listing that ended last
     final = rows.index.isin(latest[~latest.index.isin(open_ids)]) & ended
-    real_gap = stretch_end & (rows["next_start"] > _gap_ends(rows))
+    after = _start_after_end(rows)  # the next listing starting after a stretch's end
+    real_gap = stretch_end & (after > _gap_ends(rows))
     rows = rows.assign(final=final)[final | real_gap]
     out = rows[["instrument_id", "last_day", "exchange", "security_type", "cik", "final"]]
     out = out.assign(last_day=[d.date() for d in out["last_day"]])
