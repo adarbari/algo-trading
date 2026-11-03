@@ -44,6 +44,7 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import resolver as reference_resolver
 from algotrade.data.reference import snapshot
 from algotrade.data.resolver import SymbolResolver
+from algotrade.services.text_model.model import TextModel
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus, done_sessions, start_run
 from algotrade.storage.tables.writers import StoreWriter
@@ -97,6 +98,9 @@ class TaskContext:
     unavailable: Mapping[str, str] = field(default_factory=dict)
     raw_sections: Mapping[str, str] = field(default_factory=dict)
     pacing: Mapping[str, PacingMeter] = field(default_factory=dict)
+    # The site's text model, built when a task asks (``attribution``'s headlines, ADR 0050 EV4b):
+    # (the model or None, why there is none). Never a provider restricted to users.
+    text_model_factory: Callable[[], tuple[TextModel | None, str]] | None = None
 
 
 class NoResponseError(LookupError):

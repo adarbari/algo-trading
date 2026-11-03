@@ -97,6 +97,8 @@ ATTRIBUTION_EVENTS = fixed(
     "confidence float64!",
     "evidence string!",
     "evidence_ref string",
+    "model string",  # a model row: the provider and model that answered
+    "prompt_version string",
     runs="merge",
     key=("instrument_id", "ts", "source"),  # a model row never overwrites a filing row
 )

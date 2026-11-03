@@ -14,12 +14,12 @@ from algotrade_ingestion.tasks.derived import (
 )
 from algotrade_ingestion.tasks.derived.paths import option_outcomes, share_outcomes
 from algotrade_ingestion.tasks.events import (
-    attribution,
     filing_text,
     filings,
     insider,
     ipo_lockups,
 )
+from algotrade_ingestion.tasks.events.attribution import run as attribution
 from algotrade_ingestion.tasks.framework.params import (
     FROM,
     SESSION,
