@@ -289,6 +289,7 @@ def test_an_old_snapshot_reads_null_types_and_the_added_columns_without_a_key_er
     frame, _ = listing_frame(StoreReader(backend))
     assert {"scope_reason", "id_source", "vendor_end_date", "is_adr"} <= set(frame.columns)
     assert frame["scope_reason"].isna().all() and len(frame) == len(old)
+    assert "start_source" in frame.columns and frame["start_source"].isna().all()  # PR3b's column
 
 
 def test_a_listing_with_no_start_is_counted_undated_and_never_returned() -> None:

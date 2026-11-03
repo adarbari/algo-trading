@@ -16,6 +16,7 @@ from algotrade_ingestion.tasks.framework.params import (
 )
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import (
+    delisted_details,
     delisted_tickers,
     index_membership,
     listing_history,
@@ -96,6 +97,12 @@ def run_delisted_tickers(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
+def run_delisted_details(ctx: TaskContext, p: Params) -> RunRecord:
+    return delisted_details.ingest_delisted_details(
+        ctx, ctx.sources["massive_ticker_details"], session_of(p), p.get("limit")
+    )
+
+
 LISTING_HISTORY = Task(
     "listing-history",
     "every US stock / ETF Tiingo ever listed, with its dates "
@@ -119,6 +126,21 @@ DELISTED_TICKERS = Task(
     settings="sources.toml [massive] [quality]",
     params=(SESSION,),
 )  # declared here, not in registry.py (file cap); registry.py lists it in TASKS
+
+DELISTED_DETAILS = Task(
+    "delisted-details",
+    "Massive's ticker details at a delisted record's last day, for the starts it lacks "
+    "(instruments/delisted_details); in no workflow",
+    delisted_details,
+    ("instruments/delisted_details",),
+    run_delisted_details,
+    sources=("massive_ticker_details",),
+    settings="sources.toml [massive]",
+    params=(
+        SESSION,
+        Param("limit", ("--limit",), int, "ask for at most N names this run"),
+    ),
+)
 
 
 def run_index_membership(ctx: TaskContext, p: Params) -> RunRecord:
@@ -258,6 +280,7 @@ REFERENCE_TASKS = (
     ),
     LISTING_HISTORY,
     DELISTED_TICKERS,
+    DELISTED_DETAILS,
     Task(
         "index-membership",
         "S&P 500 membership intervals since 1996 from fja05680/sp500 "

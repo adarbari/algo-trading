@@ -72,6 +72,16 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
+id = "delisted-details-ingestion"
+description = "Store Massive's ticker details as of a delisted record's last day in instruments/delisted_details (ADR 0087, PR3b): for each Massive-only listing_history row still without a start and with a reason details can lift (no_start, perma_ambiguous, no_meta), one MassiveTickerDetails request at date = end_date, newest first and stock types first, increments with a not-found marker never asked again, resumable, a failed request a FETCH_ERROR item (the run FAILS only when every one failed), in no workflow; listing_merge decides whether a list_date becomes the start"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/delisted_details.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_reference.py",  # the registry entry's runner calls the task
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "ingest_delisted_details" }]
+
+[[responsibility]]
 id = "delisted-tickers-ingestion"
 description = "Store Massive's inactive (delisted) tickers in instruments/delisted_tickers (ADR 0087): one full snapshot per session from MassiveTickers' inactive list (cursor-paged, 12.5 s a request on the free tier), a pull under [quality] min_delisted_tickers rows FAILED before any write, the vendor's last trading day as end_date (identity, never a feature) and every other field of the record kept (market, locale, currency_name, last_updated_utc), in no workflow; the listing-history task merges it"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"]

@@ -34,7 +34,9 @@ AUDIT_LABELS = (
     "oos_viewed_during_tuning",
     "replaced_without_forward_test",
     "split_moved_after_viewing",
+    "proposed_by_study",
 )
+PROPOSED_BY_STUDY = "proposed_by_study"  # written once, with the edge, by a winners study proposal
 BOOKMARK_LABELS = ("followed_against_verdict",)
 FOLLOW_KEYS = ("since", "labels")
 AUDIT_KEYS = ("status_since", "status_reason", "replaces", "labels", "oos_revealed")
