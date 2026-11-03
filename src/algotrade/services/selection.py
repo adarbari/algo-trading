@@ -47,9 +47,15 @@ def fields_view(
     )  # fmt: skip
     columns = [c for c in view.frame.columns if c != "instrument_id"]
     rows: dict[str, dict[str, FeatureValue]] = {i: {} for i in ids or ()}
-    for record in view.frame.to_dict("records"):
-        values = {c: to_value(record[c]) for c in columns}
-        rows[str(record["instrument_id"])] = {c: v for c, v in values.items() if v is not None}
+    # column by column (``tolist`` boxes to Python scalars as ``to_dict("records")`` does): no
+    # per-row dict is built, and only the values that are known are kept
+    converted = [[to_value(v) for v in view.frame[c].tolist()] for c in columns]
+    for position, instrument in enumerate(view.frame["instrument_id"].tolist()):
+        rows[str(instrument)] = {
+            c: values[position]
+            for c, values in zip(columns, converted, strict=True)
+            if values[position] is not None
+        }
     if ids is not None:
         wanted = set(ids)
         rows = {i: r for i, r in rows.items() if i in wanted}

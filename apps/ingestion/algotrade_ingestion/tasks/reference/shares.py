@@ -50,7 +50,7 @@ import pandas as pd
 
 from algotrade.core.model.instruments import pad_cik
 from algotrade.data import StoreReader
-from algotrade.data.reference import instruments, snapshot
+from algotrade.data.reference import companies, instruments
 from algotrade.data.rollups import rollup_as_of
 from algotrade.data.shares import CHECKED, DATES, KEY, TABLE, stored_shares
 from algotrade.data.statements.reading import KEY as STATEMENT_KEY
@@ -141,10 +141,7 @@ def instrument_ciks(reader: StoreReader, session: date) -> pd.DataFrame:
             "cik": own,
         }
     )
-    snap = snapshot(reader, COMPANY, session)
-    company = (
-        None if snap is None or snap.pre_snapshot else reader.table(COMPANY, snap.snapshot_date)
-    )
+    company = companies(reader, session)
     if company is not None and not company.empty:
         sec = company.set_index(company["instrument_id"].astype(str))["cik"].map(pad_cik)
         mapped = out["instrument_id"].map(sec)

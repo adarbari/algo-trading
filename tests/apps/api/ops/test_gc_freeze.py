@@ -10,7 +10,9 @@ def test_freezing_moves_tracked_objects_out_of_the_collected_generations() -> No
     try:
         frozen = freeze_warm_heap()
         assert frozen >= 1000
-        assert gc.get_freeze_count() == frozen
+        # a frozen object freed by reference counting leaves the permanent generation, so the
+        # count may fall below the number returned (527740 vs 527742 on CI); it never exceeds it
+        assert 1000 <= gc.get_freeze_count() <= frozen
         assert all(o is not keep[0] for o in gc.get_objects())  # a full pass does not see it
     finally:
         gc.unfreeze()

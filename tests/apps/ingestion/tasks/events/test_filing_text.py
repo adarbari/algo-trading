@@ -38,7 +38,7 @@ from algotrade_sources.vendors.sec_text import filing_items
 from algotrade_sources.vendors.sec_text.filing_text import SecFilingText
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import FIXED, http_for, task_ctx
-from tests.helpers.stored_frames import stamped
+from tests.helpers.stored_frames import stamped, stamped_at_close
 
 SEC = REPO_ROOT / "tests" / "fixtures" / "sources" / "sec"
 TEN_K = (SEC / "10k_items_trimmed.htm").read_bytes()
@@ -202,7 +202,7 @@ def store() -> StoreWriter:
          "fetched_on": day}
         for s, cik in CIKS.items()
     ]  # fmt: skip
-    writer.write_table("instruments/company", day, "co", stamped(company, day, "co"))
+    writer.write_table("instruments/company", day, "co", stamped_at_close(company, day, "co"))
     return writer
 
 

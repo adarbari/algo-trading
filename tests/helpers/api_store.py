@@ -22,6 +22,7 @@ from starlette.requests import Request
 from algotrade.config.site.users import Role, UserRecord
 from algotrade.config.user import DEFAULT_USER, SITE_USER, UserContext
 from algotrade.data import StoreReader
+from algotrade.data.reference import KNOWN_BY_SESSION
 from algotrade.services.backtests.run import EQUITY, FILLS, PORTFOLIO
 from algotrade.services.backtests.run import run_job_name as backtest_job
 from algotrade.services.screening.run import run_job_name as screen_job
@@ -43,7 +44,7 @@ from tests.helpers.rollup_store import (
     write_rows,
     write_split,
 )
-from tests.helpers.stored_frames import holdings_rows, stamped, universe_rows
+from tests.helpers.stored_frames import holdings_rows, stamped, stamped_at_close, universe_rows
 
 END = date(2022, 11, 23)  # the last golden session
 PREVIOUS = date(2022, 11, 22)
@@ -79,7 +80,10 @@ def store_over(
 
 def _write(writer: StoreWriter, table: str, rows: list[dict[str, object]], day: date = END) -> None:
     run = f"{table.replace('/', '_')}-{day}"
-    writer.write_table(table, day, run, stamped(rows, day, run))
+    frame = (
+        stamped_at_close(rows, day, run) if table in KNOWN_BY_SESSION else stamped(rows, day, run)
+    )
+    writer.write_table(table, day, run, frame)
 
 
 def _reference(writer: StoreWriter) -> None:

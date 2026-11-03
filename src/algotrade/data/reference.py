@@ -10,6 +10,14 @@ reads a snapshot table goes through ``snapshot``.
 ``instruments/description`` is the exception: it is stored in increments (each run adds the
 descriptions it fetched), not as snapshots, so ``descriptions`` unions every partition and
 keeps the latest stored row per instrument.
+
+A table in ``KNOWN_BY_SESSION`` (company facts, IBKR contracts) is also read as known by the
+session: a partition counts for ``on`` only when a run of it was visible by the open of the
+second session after ``on`` (``session_cutoff``), so a past-dated run (``company-details --date``)
+that stamps today's facts on an old date is skipped and the read steps back to the snapshot that
+really existed then (ADR 0007). ``instruments/reference`` and ``universe`` are not in it: their
+earlier partitions are written afterwards on purpose (``universe import``, the listing history)
+and ``pre_snapshot`` already labels that survivorship.
 """
 
 import math
@@ -29,6 +37,7 @@ from algotrade.core.model.fields import (
     instrument_field,
 )
 from algotrade.core.model.instruments import AssetClass, Instrument
+from algotrade.core.time.calendar import next_session, open_time
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.tables.readers import StoreReader
 
@@ -39,6 +48,9 @@ UNIVERSE_TABLE = "universe"
 IBKR_CONTRACTS = "instruments/ibkr_contracts"
 UNIVERSE_HINT = "algotrade-ingest universe import --stocks <csv> --etfs <csv> --version <v>"
 REFERENCE_HINT = "run the ingestion job that loads instrument reference data"
+# Snapshot tables of facts that change and are only ever taken forward: a partition written after
+# its session is not what that session knew.
+KNOWN_BY_SESSION = frozenset({COMPANY_TABLE, IBKR_CONTRACTS})
 
 
 @dataclass(frozen=True)
@@ -55,14 +67,38 @@ class Snapshot:
         return self.on is not None and self.snapshot_date > self.on
 
 
+def session_cutoff(on: date) -> datetime:
+    """When a snapshot taken for ``on`` is known: the open of the second session after it (the
+    nightly for ``on`` has committed by then, even one a sleeping Mac started the morning after;
+    a run that finishes later is a past-dated backfill)."""
+    return open_time(next_session(next_session(on)))
+
+
 def snapshot(reader: StoreReader, table: str, on: date | None = None) -> Snapshot | None:
     """Latest snapshot on or before ``on`` (any, when ``on`` is None), else the earliest.
 
-    ``None`` only when the table has no partition at all."""
+    A ``KNOWN_BY_SESSION`` table skips the partitions no run of which was visible by
+    ``session_cutoff(on)``. ``None`` only when the table has no partition at all."""
+    if on is not None and table in KNOWN_BY_SESSION:
+        cutoff = session_cutoff(on)
+        day = reader.latest_date(table, on)  # logs only the dates <= ``on`` (a recorded read)
+        while day is not None:
+            if reader.table(table, day, cutoff, [""]) is not None:  # one id: no rows decoded
+                return Snapshot(table, day, on)
+            day = reader.latest_date(table, day - timedelta(days=1))
+        found = reader.earliest_date(table)  # none known by then: the earliest stands in
+        return None if found is None else Snapshot(table, found, on)
     found = reader.latest_date(table, on)  # a recording reader logs only the dates <= ``on``
     if found is None:
         found = reader.earliest_date(table)  # before every snapshot: the earliest stands in
     return None if found is None else Snapshot(table, found, on)
+
+
+def _known(on: date, as_of: datetime | None) -> datetime:
+    """The version pin of a ``KNOWN_BY_SESSION`` read: the earlier of the caller's ``as_of`` and
+    ``session_cutoff(on)``, so the rows are those a run visible by then holds."""
+    cutoff = session_cutoff(on)
+    return cutoff if as_of is None else min(as_of, cutoff)
 
 
 def read_snapshot(
@@ -77,6 +113,8 @@ def read_snapshot(
     snap = snapshot(reader, table, on)
     if snap is None:
         raise MissingDataError(table, "no snapshot stored" + (f" (for {on})" if on else ""), hint)
+    if on is not None and table in KNOWN_BY_SESSION and not snap.pre_snapshot:
+        as_of = _known(on, as_of)  # a stand-in snapshot (pre_snapshot) is disclosed, not pinned
     frame = reader.table(table, snap.snapshot_date, as_of, instruments)
     if frame is None:
         raise MissingDataError(table, f"snapshot {snap.snapshot_date} not known at {as_of}", hint)
@@ -106,7 +144,7 @@ def companies(
     snap = snapshot(reader, COMPANY_TABLE, on)
     if snap is None or snap.pre_snapshot:
         return None
-    return reader.table(COMPANY_TABLE, snap.snapshot_date, as_of, ids)
+    return reader.table(COMPANY_TABLE, snap.snapshot_date, _known(on, as_of), ids)
 
 
 def company_sectors(reader: StoreReader, on: date) -> pd.DataFrame | None:
@@ -172,7 +210,7 @@ def ibkr_contracts(
     snap = snapshot(reader, IBKR_CONTRACTS, on)
     if snap is None or snap.pre_snapshot:
         return None
-    return reader.table(IBKR_CONTRACTS, snap.snapshot_date, as_of)
+    return reader.table(IBKR_CONTRACTS, snap.snapshot_date, _known(on, as_of))
 
 
 def _present[T](value: object, default: T) -> T:
@@ -334,7 +372,11 @@ def instrument_view(
             frame: pd.DataFrame | None = reference
         elif table == COMPANY_TABLE:  # a snapshot table, like the reference
             company = snapshot(reader, table, session)
-            frame = reader.table(table, company.snapshot_date, as_of) if company else None
+            frame = (
+                reader.table(table, company.snapshot_date, _known(session, as_of))
+                if company
+                else None
+            )
             company_pre = company is not None and company.pre_snapshot
         else:
             frame = _rollup_rows_of(reader, table, session, as_of, ids)
