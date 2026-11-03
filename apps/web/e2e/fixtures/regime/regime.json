@@ -106,10 +106,7 @@
             "screenerId": "vrp_scanner",
             "name": "VRP",
             "enabled": false,
-            "pauseIn": [
-              "STRESS",
-              "CRISIS"
-            ]
+            "pauseIn": ["STRESS", "CRISIS"]
           }
         ]
       },
