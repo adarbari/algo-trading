@@ -92,7 +92,7 @@ listings, with S&P 500 intervals), so `pre_snapshot` no longer applies. Measured
 ## Plan (PRs; PR4 and PR5 are file-disjoint after PR2)
 PR1 this ADR, the adapter, the table, the task, the reader and tests, not run on the real store. PR2 merge, ids
 and types (architect review). PR3 the owner's runs (below). PR4 the `filings` task for delisted CIKs (the D1 / D10
-Form 25 follow-up). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3`, the harness
+Form 25 follow-up; built: `filings --delisted [--since]`, per CIK over the listing history's ended in-scope stocks with an id and a CIK from 2010-01-01, `since` defaulting to 2009-01-01, never the daily walk and no `walked_to`). PR5 `events/delisting` (architect review). PR6 `forward_returns@v3`, the harness
 disclosure and the `universe_basis` stamp (architect review). PR7 S&P 500 renames through Massive ticker events (probe first) and the 2024-26
 `EQ:<symbol>` bars migration (800 listings with no id have bars stored under `EQ:<symbol>` on 2025-06-02).
 PR3b (not in PR2): Massive ticker details `/v3/reference/tickers/{T}?date=D` are point in time (`list_date`,
@@ -101,6 +101,19 @@ fill the start a Massive-only record still lacks (`no_start`, `perma_ambiguous`:
 reused ticker's permaTicker, so PR2 leaves BBBY undated). PR2 keeps every Tiingo row and every Massive record (owner
 tenet 2026-11-01): a record whose start no Tiingo row gives is written with a null start and its reason in
 `no_id_reason`, never dropped (Decision 2's "dropped and counted" is superseded).
+**PR3b built (2026-11-03):** `MassiveTickerDetails` (`massive_ticker_details`, request key
+`TICKER|YYYY-MM-DD`, 404 = not found) and the `delisted-details` task (in no workflow, `--limit`,
+resumable) store every field of the answer in `instruments/delisted_details` (`runs="merge"`, one row
+per asked (ticker, `end_date`), a not-found marker never asked again); asked at `date = end_date`
+for the `source = massive` rows with a null start and the reason `no_start`, `perma_ambiguous` or
+`no_meta`, stock types first, newest first. `merge_listings` takes the details' `list_date` as the
+start when the details row is found, `list_date <= end_date`, the CIK and composite FIGI agree
+where both exist, the details' `delisted_date` is within `PAIR_DAYS` of the record's end, and no
+in-scope Tiingo row of the ticker overlaps the dated life; each refusal is counted
+(`details_mismatch`, `details_after_end`, `details_overlaps`) and keeps the old reason, never
+`pair_ambiguous` or `overlaps_listing`. The new column `start_source` (`tiingo`, `perma_successor`,
+`massive_details`) says where a start came from (absent in older partitions, read as null). Ids are
+unchanged: a details-dated record gets an id only by FIGI.
 
 **Backfill** (detached, README "Long runs"): Massive inactive list ~6 minutes; Tiingo meta ~35 batches; Tiingo bars
 for the new ids plus the tails ~9,000 to 11,000 requests, 1 to 1.3 hours at 0.4 s, which holds only on the Power

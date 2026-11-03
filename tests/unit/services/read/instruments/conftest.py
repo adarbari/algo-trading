@@ -73,9 +73,10 @@ def store_with(*writes: Callable[[StoreWriter], None]) -> StoreReader:
 
 # the shipped filter definitions of the Explore table (ADR 0082): the loader reads them
 FILTERS = {
-    ("site", "filters", "universe"): tomllib.loads(
-        (REPO_ROOT / "config/site/filters/universe.toml").read_text()
+    ("site", "filters", surface): tomllib.loads(
+        (REPO_ROOT / f"config/site/filters/{surface}.toml").read_text()
     )
+    for surface in ("universe", "calendar_week")
 }
 
 

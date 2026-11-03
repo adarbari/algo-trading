@@ -41,6 +41,7 @@ SURFACES = {
     "screeners": ScreenerRow,
     "edges": EdgeRow,
     "edge_trades": TradeRow,
+    "calendar_week": FeatureTable,
 }  # surface -> the read object its columns come from
 NUMERIC = {"int", "float", "float32", "float64", "int32", "int64"}
 KIND_DTYPES = {
@@ -283,10 +284,16 @@ def test_cohort_percentile_filters_are_ranges_over_the_zero_to_one_features(surf
         assert f.kind == "range" and f.bins[0] == 0 and f.bins[-1] == 1, f.id
 
 
+# Stored fractions that are a share of something (0.06 is 6%), so their range is shown in percent
+# like a cohort percentile; a ratio (1.25x) is not one and stays as stored.
+SHARE_FIELDS = {"rollup.implied_move@v1.implied_move"}  # the priced move, a share of the spot
+
+
 @pytest.mark.parametrize("surface", SURFACES)
 def test_every_cohort_percentile_range_is_shown_as_a_percent(surface: str) -> None:
     for f in shipped(surface).filters:
-        assert (f.unit == "percent") == ("cohort_pct_" in f.field), f.id
+        shown = "cohort_pct_" in f.field or f.field in SHARE_FIELDS
+        assert (f.unit == "percent") == shown, f.id
         assert f.unit is None or f.kind == "range", f.id
 
 

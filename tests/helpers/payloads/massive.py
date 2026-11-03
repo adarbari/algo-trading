@@ -67,3 +67,22 @@ def overview(
     if employees:
         results["total_employees"] = employees
     return json.dumps({"request_id": "r", "status": "OK", "results": results}).encode()
+
+
+def ticker_details(ticker: str, **more: object) -> bytes:
+    """A ticker-details answer as of a day (``/v3/reference/tickers/{T}?date=D``), in the shape
+    probed 2026-11-01 for BBBY on 2023-05-02 (the old Bed Bath & Beyond); ``more`` adds or
+    overrides fields (a ``None`` drops one)."""
+    results: dict[str, object] = {
+        "active": False, "cik": "0000886158", "composite_figi": "BBG000BB5R87",
+        "currency_name": "usd", "delisted_utc": "2023-05-02T00:00:00Z",
+        "description": "Bed Bath & Beyond  sells home goods.", "homepage_url": "https://bbby.example",
+        "last_updated_utc": "2023-05-03T00:00:00Z", "list_date": "1992-06-04", "locale": "us",
+        "market": "stocks", "name": "Bed Bath & Beyond Inc.", "primary_exchange": "XNAS",
+        "share_class_figi": "BBG001S5SRZ9", "sic_code": "5700",
+        "sic_description": "RETAIL-HOME FURNITURE", "ticker": ticker, "total_employees": 14000,
+        "type": "CS",
+    }  # fmt: skip
+    results.update(more)
+    results = {k: v for k, v in results.items() if v is not None}
+    return json.dumps({"request_id": "r", "status": "OK", "results": results}).encode()

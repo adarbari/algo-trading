@@ -41,6 +41,20 @@ universe: ``data.listings`` counts them as undated). In this order:
    (active) and ``bbbyq`` Bed Bath & Beyond's: no common permaTicker, BBBY stays undated, the
    safe outcome.
 
+6. Details (PR3b, optional ``details`` frame, ``data.listings.delisted.read_delisted_details``):
+   a record the steps above leave as ``no_start``, ``perma_ambiguous`` or ``no_meta`` (never
+   ``pair_ambiguous`` or ``overlaps_listing``) takes the ``list_date`` of Massive's ticker details
+   asked at its last day (``delisted-details``: the company as it was then) as its start when a
+   details row of the same (ticker, end date) is found, ``list_date <= end``, the identity agrees
+   (CIK equal when both are present, composite FIGI equal when both are present, and the details'
+   ``delisted_date``, when present, within ``PAIR_DAYS`` of the record's end) and no in-scope
+   Tiingo row of the ticker overlaps ``list_date..end`` (else ``overlaps_listing``). A refused
+   detail leaves the old reason; the refusals are counted (``details_mismatch``,
+   ``details_after_end``, ``details_overlaps``, with ``details_dated`` the accepted).
+
+``start_source`` says where a start came from: ``tiingo`` (a Tiingo row's own), ``perma_successor``
+(step 5) or ``massive_details`` (step 6); null where there is no start.
+
 The end date is read here (identity: pairing and the id), never as a feature or label.
 """
 
@@ -63,15 +77,20 @@ NO_START = "no_start"
 OVERLAPS = "overlaps_listing"
 PERMA_AMBIGUOUS = "perma_ambiguous"
 NO_META = "no_meta"
+TIINGO_START = "tiingo"  # ``start_source`` values
+PERMA_SUCCESSOR = "perma_successor"
+MASSIVE_DETAILS = "massive_details"
+LIFTABLE = (NO_START, PERMA_AMBIGUOUS, NO_META)  # reasons a details ``list_date`` can lift
 MASSIVE_ATTRIBUTES = ("name", "vendor_type", "security_type", "cik", "figi", "share_class_figi")
 COLUMNS = [
     "source", "ticker", "exchange", "asset_type", "price_currency", "start_date", "end_date",
     "perma_ticker", "scope_reason", "name", "vendor_type", "security_type", "cik", "figi",
     "share_class_figi", "vendor_exchange", "vendor_end_date", "is_adr",
-    "data_provider_perma_ticker", "no_id_reason",
+    "data_provider_perma_ticker", "no_id_reason", "start_source",
 ]  # fmt: skip
 AskMeta = Callable[[Sequence[str]], pd.DataFrame | None]  # tickers -> meta rows, None: no answer
 Row = dict[str, Any]
+Details = dict[tuple[str, date], Row]  # (ticker, last day) -> a found details row
 
 
 def _none(value: Any) -> Any:
@@ -218,11 +237,71 @@ def _by_perma(
     return starts[0], named.iloc[0], ""
 
 
+def _details_by_record(details: pd.DataFrame | None) -> Details:
+    """The found rows of the details frame by (ticker, last day); none for a missing frame."""
+    if details is None or details.empty:
+        return {}
+    out: Details = {}
+    for rec in details.to_dict("records"):
+        row = _cells(rec)
+        last = _day(row.get("end_date"))
+        if row.get("found") is True and last is not None and row.get("ticker") is not None:
+            out[(str(row["ticker"]), last)] = {
+                **row, "list_date": _day(row.get("list_date")),
+                "delisted_date": _day(row.get("delisted_date")),
+            }  # fmt: skip
+    return out
+
+
+def _disagrees(ours: Any, theirs: Any) -> bool:
+    """Two identifiers that are both present and differ."""
+    a, b = _label(ours), _label(theirs)
+    return a is not None and b is not None and a.upper() != b.upper()
+
+
+def _from_details(
+    row: Row, key: str, details: Details, covering: dict[str, list[Row]], stats: Counter[str]
+) -> None:  # fmt: skip
+    """Step 6 of the module docstring: take the details' ``list_date`` as ``row``'s start, or
+    leave it as it is (counting why not)."""
+    if row["no_id_reason"] not in LIFTABLE:
+        return
+    last = row["end_date"]
+    found = details.get((str(row["ticker"]), last))
+    if found is None or found["list_date"] is None:
+        return
+    started, delisted = found["list_date"], found["delisted_date"]
+    if started > last:
+        stats["details_after_end"] += 1
+    elif (
+        _disagrees(row["cik"], found.get("cik"))
+        or _disagrees(row["figi"], found.get("figi"))
+        or (delisted is not None and not _near(delisted, last))
+    ):
+        stats["details_mismatch"] += 1
+    elif _covers(covering.get(key, []), started, last):
+        stats["details_overlaps"] += 1
+    else:
+        row.update(start_date=started, start_source=MASSIVE_DETAILS, no_id_reason=None)
+        stats["details_dated"] += 1
+
+
 def _date_record(
+    row: Row, successors: _Successors, covering: dict[str, list[Row]], ask_meta: AskMeta,
+    details: Details, stats: Counter[str],
+) -> None:  # fmt: skip
+    """Give ``row`` (a Massive-only record) a start and a permaTicker, or the reason it has none."""
+    _by_successor(row, successors, covering, ask_meta, stats)
+    key = compare_key(row["ticker"])
+    if key is not None and row["end_date"] is not None:
+        _from_details(row, key, details, covering, stats)
+
+
+def _by_successor(
     row: Row, successors: _Successors, covering: dict[str, list[Row]], ask_meta: AskMeta,
     stats: Counter[str],
 ) -> None:  # fmt: skip
-    """Give ``row`` (a Massive-only record) a start and a permaTicker, or the reason it has none."""
+    """Steps 2 to 5 of the module docstring."""
     key, last = compare_key(row["ticker"]), row["end_date"]
     if key is None or last is None:
         row["no_id_reason"] = NO_START
@@ -244,22 +323,28 @@ def _date_record(
         row["no_id_reason"] = OVERLAPS
         return
     row.update(
-        start_date=start["start_date"], perma_ticker=str(meta_row["perma_ticker"]),
+        start_date=start["start_date"], start_source=PERMA_SUCCESSOR,
+        perma_ticker=str(meta_row["perma_ticker"]),
         data_provider_perma_ticker=_label(meta_row.get("data_provider_perma_ticker")),
         is_adr=bool(meta_row.get("is_adr", False)),
     )  # fmt: skip
 
 
 def merge_listings(
-    tiingo: pd.DataFrame, massive: pd.DataFrame, ask_meta: AskMeta
+    tiingo: pd.DataFrame,
+    massive: pd.DataFrame,
+    ask_meta: AskMeta,
+    details: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
     """``tiingo`` (every file row, ``tiingo.listings.COLUMNS``) and ``massive`` (the inactive
     snapshot: ``ticker``, ``end_date``, ``exchange`` the MIC, the Massive attributes) -> (the
     rows of ``COLUMNS``, stats). ``ask_meta(tickers)`` answers Tiingo's meta rows of those
-    tickers, or ``None``."""
+    tickers, or ``None``. ``details``: the stored Massive ticker details (step 6), none by
+    default."""
     rows: list[Row] = [_cells(r, source=TIINGO) for r in tiingo.to_dict("records")]
     for row in rows:
         row["start_date"], row["end_date"] = _day(row["start_date"]), _day(row["end_date"])
+        row["start_source"] = TIINGO_START if row["start_date"] is not None else None
     records: list[Row] = [_cells(r) for r in massive.to_dict("records")]
     for rec in records:
         rec["end_date"] = _day(rec.get("end_date"))
@@ -272,9 +357,12 @@ def merge_listings(
         )
     stats: Counter[str] = Counter(
         paired=len(paired), massive_records=len(records), pair_ambiguous_records=len(ambiguous),
-        meta_record_requests=0,
+        meta_record_requests=0, details_dated=0, details_mismatch=0, details_after_end=0,
+        details_overlaps=0,
     )  # fmt: skip
-    only = _massive_only(rows, records, set(paired.values()), ambiguous, ask_meta, stats)
+    only = _massive_only(
+        rows, records, set(paired.values()), ambiguous, ask_meta, _details_by_record(details), stats
+    )
     stats["massive_only"] = len(only)
     stats["massive_dated"] = sum(1 for r in only if r["start_date"] is not None)
     stats.update(f"massive_{r['no_id_reason']}" for r in only if r["no_id_reason"])
@@ -283,7 +371,7 @@ def merge_listings(
 
 def _massive_only(
     rows: list[Row], records: list[Row], paired: set[int], ambiguous: set[int], ask_meta: AskMeta,
-    stats: Counter[str],
+    details: Details, stats: Counter[str],
 ) -> list[Row]:  # fmt: skip
     """The ``source = massive`` rows of the records no Tiingo row paired with, dated where the
     module docstring says they can be."""
@@ -301,6 +389,6 @@ def _massive_only(
         elif j in ambiguous:
             row["no_id_reason"] = PAIR_AMBIGUOUS
         else:
-            _date_record(row, successors, covering, ask_meta, stats)
+            _date_record(row, successors, covering, ask_meta, details, stats)
         only.append(row)
     return only

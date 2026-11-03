@@ -19,6 +19,7 @@ ALLOWED = (
     # winners sample, coverage, delisted, the merge into the listing history (listing_merge)
     "apps/ingestion/algotrade_ingestion/tasks/listings/",
     "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # listings_over: clip
+    "apps/ingestion/algotrade_ingestion/tasks/events/filings.py",  # delisted names: who left
     "libs/sources/",  # the vendor adapters that write the column (Tiingo, Massive inactive)
 )
 READ = re.compile(r"(?<![A-Za-z0-9_])end_date(?![A-Za-z0-9_])")

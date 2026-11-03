@@ -72,6 +72,16 @@ section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.m
 detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
+id = "delisted-details-ingestion"
+description = "Store Massive's ticker details as of a delisted record's last day in instruments/delisted_details (ADR 0087, PR3b): for each Massive-only listing_history row still without a start and with a reason details can lift (no_start, perma_ambiguous, no_meta), one MassiveTickerDetails request at date = end_date, newest first and stock types first, increments with a not-found marker never asked again, resumable, a failed request a FETCH_ERROR item (the run FAILS only when every one failed), in no workflow; listing_merge decides whether a list_date becomes the start"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/delisted_details.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_reference.py",  # the registry entry's runner calls the task
+]
+section = "docs/adr/0087-survivorship-free-listing-history.md#decision"
+detect = [{ call = "ingest_delisted_details" }]
+
+[[responsibility]]
 id = "delisted-tickers-ingestion"
 description = "Store Massive's inactive (delisted) tickers in instruments/delisted_tickers (ADR 0087): one full snapshot per session from MassiveTickers' inactive list (cursor-paged, 12.5 s a request on the free tier), a pull under [quality] min_delisted_tickers rows FAILED before any write, the vendor's last trading day as end_date (identity, never a feature) and every other field of the record kept (market, locale, currency_name, last_updated_utc), in no workflow; the listing-history task merges it"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/listings/delisted_tickers.py"]
@@ -133,7 +143,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "filing-ingestion"
-description = "Store the SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, Form 25 / 25-NSE, 424B4, Form 10 10-12B) of every operating company in the universe (the session's universe snapshot without ETFs / ETNs) in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; a CIK an earlier run of the current form set (FORMS_TAG) read from --since or earlier is skipped, stored rows never count, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the first session whose close is after the acceptance: a filing after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment 2026-10-18); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the acceptance session). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
+description = "Store the SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, Form 25 / 25-NSE, 424B4, Form 10 10-12B) of every operating company in the universe (the session's universe snapshot without ETFs / ETNs), and with --delisted of the stocks that left it since 2010 (ADR 0087: the listing history's ended in-scope listings with an id and a CIK, per CIK only from --since, default 2009-01-01, never the daily walk and no walked_to), in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; a CIK an earlier run of the current form set (FORMS_TAG) read from --since or earlier is skipped, stored rows never count, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the first session whose close is after the acceptance: a filing after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment 2026-10-18); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the acceptance session). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/events/filings.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/events/ipo_lockups.py",  # reads its 424B4 rows to report the search gap
