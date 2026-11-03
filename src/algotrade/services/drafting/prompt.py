@@ -489,7 +489,9 @@ OPEN_HEADER = "Open requests (key | what it is); reuse one as a missing item's k
 # EV2's event-study groups stay out too (statistic columns that crowd the budget and pull "daily
 # range" words off atr_pct): a screen reads the EV6 expression features over them (days to the
 # next impact event, ...), which are drafted.
-UNDRAFTED_GROUPS = frozenset({"etf_macro@v1", "event_reaction@v1", "market_event_reaction@v1"})
+UNDRAFTED_GROUPS = frozenset(
+    {"etf_macro@v1", "event_reaction@v1", "market_event_reaction@v1", "peer_sensitivity@v1"}
+)
 # Expression features of the allocation edges (EB E5 batch Y) that read those columns or are for a
 # canary gate: two more index lines tip the slice margin, and neither is a stock screen's field.
 UNDRAFTED_FIELDS = frozenset({"feature.credit_spread_vs_ma200", "feature.momentum_13612w"})

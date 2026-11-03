@@ -363,6 +363,13 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: keeps the registry the only role authority and the public file the only grant of anything above `trader`; the git-ignored user folder is already the home of that user's personal data; no new secret and no outbound write to the provider from the public-facing API.
+## 2026-11-02 | EV3 | peers need eight reports, not four (plan decision 3)
+- Question: the plan keeps a peer when the name moved above 1.5 normal days at the median over at least 4 of its reports; the architect measured the false-peer rate of that rule over about 40 candidates per name.
+- Options: keep 4 / require 8 (the 756-session window holds at most about 12 reports) / a placebo base rate with a binomial cut.
+- Decision: `MIN_REPORTS = 8`, `candidates_tested` stored so 0 kept with 0 tested reads as "not measurable"; the figure is labelled backtested (the best of about 40 candidates, chosen in-sample); the placebo-rate version is a follow-up if 8 keeps too few.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: under the null about 15% of reactions clear 1.5, so a median over 4 clears it about 2% of the time and about half of the names would carry a false peer across 40 candidates; at 8 or more reports the rate is a few percent.
 ## 2026-11-02 | EV4b | the nightly's text model: where it is built, who logs its usage, the cap
 - Question: ingestion has no `TextModel`; its usage log and the seam's composition are the API's today (ADRs 0041, 0058, 0005). How does the nightly attribution classify headlines?
 - Options: build the chain in ingestion (a copy) / one composition callers share / skip the model.
