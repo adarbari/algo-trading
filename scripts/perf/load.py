@@ -51,6 +51,8 @@ from pathlib import Path
 
 import httpx2 as httpx  # the httpx API; installed with the test dependencies
 
+from algotrade_api.ops.footprint import process_footprint_mb
+
 REPO = Path(__file__).resolve().parents[2]
 GQL_TS = REPO / "apps/web/src/shared/api/generated/graphql/gql.ts"
 OUT_DIR = REPO / "var/perf"
@@ -58,6 +60,7 @@ REQUEST_TIMEOUT = (
     30.0  # seconds: a slower operation counts as an error (the page is unusable by then)
 )
 SCENARIOS = ("warm", "cold", "first-visit", "stress", "realistic")
+FOOTPRINT_EVERY = 4  # samples (2 s): `footprint` is slower than `ps`
 KEEPALIVE_EXPIRY = 4.0  # seconds: below uvicorn's 5 s idle close, so no reused dead connection
 BUSY_RETRIES = 5  # as apps/web/src/shared/api/graphql.ts
 CRITERIA = {  # the realistic scenario's pass line
@@ -190,6 +193,9 @@ class Sample:
 
     rss_mb: list[float] = field(default_factory=list)
     cpu: list[float] = field(default_factory=list)
+    footprint_mb: list[float] = field(
+        default_factory=list
+    )  # `footprint -p`, not distorted by compression
 
 
 def _ps(pid: int) -> tuple[float, float] | None:
@@ -211,8 +217,13 @@ def pid_on_port(port: int) -> int | None:
 
 
 def sample_process(pid: int, stop: threading.Event, into: Sample, every: float = 0.5) -> None:
-    """Append RSS (MB) and CPU (%) of `pid` to `into` until `stop` is set."""
+    """Append RSS (MB), CPU (%) and, every `FOOTPRINT_EVERY` samples, the footprint (MB, which
+    counts macOS-compressed pages that `ps` RSS hides) of `pid` to `into` until `stop` is set."""
+    n = 0
     while not stop.is_set():
+        if n % FOOTPRINT_EVERY == 0 and (fp := process_footprint_mb(pid)) is not None:
+            into.footprint_mb.append(fp)
+        n += 1
         got = _ps(pid)
         if got:
             into.rss_mb.append(got[0])
@@ -251,7 +262,9 @@ def render_table(report: dict) -> str:
         res = level["resources"]
         lines.append(
             f"\n{level['users']} users: {level['loads']} page loads, "
-            f"peak RSS {res['peak_rss_mb']:.0f} MB, mean CPU {res['mean_cpu_pct']:.0f}%, "
+            f"peak RSS {res['peak_rss_mb']:.0f} MB, "
+            f"peak footprint {res.get('peak_footprint_mb', 0.0):.0f} MB, "
+            f"mean CPU {res['mean_cpu_pct']:.0f}%, "
             f"load client CPU {level.get('client_cpu_pct', 0.0):.0f}%, "
             f"/health p99 {level.get('health', {}).get('p99', 0.0) * 1000:.0f} ms"
         )
@@ -389,7 +402,12 @@ def verdict(level: dict) -> tuple[bool, list[str]]:
     checks = [
         ("page p95", max((p["p95"] for p in pages), default=0.0), CRITERIA["page_p95_s"], "s"),
         ("errors after retries", failed, CRITERIA["error_rate"], ""),
-        ("API peak RSS", level["resources"]["peak_rss_mb"], CRITERIA["peak_rss_mb"], " MB"),
+        (
+            "API peak memory (footprint, else RSS)",
+            level["resources"].get("peak_footprint_mb") or level["resources"]["peak_rss_mb"],
+            CRITERIA["peak_rss_mb"],
+            " MB",
+        ),
         ("/health p99", level["health"]["p99"], CRITERIA["health_p99_s"], "s"),
     ]
     lines, ok = [], True
@@ -479,6 +497,7 @@ async def run(args: argparse.Namespace, pid: int | None) -> dict:
             "health": {"polls": len(health), "p99": percentile(health, 99)},
             "resources": {
                 "peak_rss_mb": max(sample.rss_mb, default=0.0),
+                "peak_footprint_mb": max(sample.footprint_mb, default=0.0),
                 "mean_cpu_pct": sum(sample.cpu) / len(sample.cpu) if sample.cpu else 0.0,
             },
         }

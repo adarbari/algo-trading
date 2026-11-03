@@ -51,6 +51,7 @@ from algotrade.services.read.screens.runs import run_summaries
 from algotrade.services.read.screens.screeners import load_screeners
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.ops.footprint import OwnFootprint
+from algotrade_api.ops.gc_freeze import freeze_warm_heap
 
 WARM_EVERY_S = 60.0
 INGESTION_SESSIONS = 10  # the Admin Ingestion grid's window (entities/ingestion SESSIONS)
@@ -244,6 +245,7 @@ class CacheWarmer:
                 if pending is not None:
                     await self.replay_operations()  # before the market frames' minutes
                     await off_loop(self.finish, pending)
+                    freeze_warm_heap()
             except Exception:  # a store mid-publish or empty: the next poll tries again
                 log.exception("warming the read cache failed")
             await asyncio.sleep(self._every_s)
