@@ -836,6 +836,7 @@ export const SITE_FEATURES = [
   'feature.eps_cagr_3y',
   'feature.eps_cagr_5y',
   'feature.cash_op_profitability',
+  'feature.cash_to_assets',
   'feature.ev_ebit',
   'feature.composite_value_yield',
   'feature.atr_pct',

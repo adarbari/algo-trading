@@ -1,0 +1,28 @@
+# L3 site setting: the Guide's screener for the site preset cash_to_assets_high (ADR 0051; docs/ui/guide.md
+# "The screener page"). The B4 characteristic sort of the options-setups design (ADR 0088 build row S4):
+# a ranking for the edge harness, not a trade idea. Keys as distress_ohlson.toml.
+id = "cash_to_assets_high"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable stock by how much cash it holds against its assets, the most cash first.[^1] It is one of the stock characteristics that the options research sorts on, a candidate edge under test, not a proven trade."
+hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a cash-to-assets value. Every such name qualifies; the order is the point, the highest cash share first."
+not_checked = "It does not check profitability, distress, size or sector. Banks, brokers and insurers have no value, and cash held as short-term investments is not counted, so a company that keeps its cash in securities ranks lower than it should."
+before_acting = [
+  "Read feature.cash_to_assets as a rank across today's names: a high value is a large cash cushion for a small company as often as a rich one for a large one.",
+  "A cash-rich name can be a company that cannot find uses for the cash; feature.net_debt shows whether the cash sits against debt.",
+]
+related = [
+  { id = "distress_ohlson", reason = "the default-risk sort from the same statements" },
+  { id = "cash_op_profitability", reason = "the profitability sort from the same statements" },
+]
+
+[[sources]]
+title = "Palazzo, Cash holdings, risk, and expected returns (2012)"
+url = "https://doi.org/10.1016/j.jfineco.2012.04.007"
+note = "Firms with more cash earn higher average returns, which the paper links to their cash-flow risk."
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+cash_to_assets = "Has a cash-to-assets value"
