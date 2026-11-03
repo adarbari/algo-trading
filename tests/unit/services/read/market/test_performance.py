@@ -4,11 +4,11 @@ chart can ask for, 13,500 exchange sessions (1973 to now) of two stored fields, 
 read, one partition per session) and warm (the frame shared through ``ctx.cache``, bucketing
 only).
 
-Targets: cold under 5 s, warm under 0.5 s. Warm meets it. Cold does not on this machine: the
-read is bound by the backend's serial per-partition work (open, parquet footer and conform,
-~0.9 ms each; about 12 s for 13,500), so the cold ceiling below is a regression guard on that
-cost, not the target; parallelising ``LocalBackend.read_range`` is the follow-up (it needs an
-architect review: it touches the pinned read of one commit sequence).
+Targets: cold under 5 s, warm under 0.5 s. Warm meets it. Cold read about 17 s on a loaded
+machine before partitions were read on a bounded pool (``LocalBackend.read_range``) and an
+already-conformed partition skipped the second cast; now about 9 s on the same loaded machine
+(load 8). The cold ceiling is a regression guard with room for a busy machine; the 5 s target
+is measured on a quiet one (``make perf``).
 
 The strict budgets are the ``perf`` test (``make perf``, an idle machine; building the store
 takes about a minute). The default run keeps machine-independent guards on a short history:
@@ -36,7 +36,7 @@ from tests.helpers.rollup_store import write_rows
 pytestmark = pytest.mark.slow
 
 SESSIONS = 13_500
-COLD_TARGET, COLD_CEILING, WARM = 5.0, 25.0, 0.5  # seconds (wall)
+COLD_TARGET, COLD_CEILING, WARM = 5.0, 15.0, 0.5  # seconds (wall)
 DAY = date(2026, 10, 2)
 TABLE = "rollups/market/regime@v3"
 NAMES = ["market.regime@v3.macro_risk", "market.regime@v3.market_stress"]
