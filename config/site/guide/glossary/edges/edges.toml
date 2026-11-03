@@ -99,8 +99,8 @@ seen while tuning: you looked at a copy's out-of-sample result and kept changing
 result is no longer a fair test. Replaced without a forward test: a new version replaced the old
 one before enough new sessions had passed. Split moved after viewing: the out-of-sample start
 was moved after the result was seen. Proposed by a study: the winners study found the rules
-(what the biggest winners had in common before they won), so the in-sample result is the very
-data they were found in and proves nothing; only the out-of-sample result counts. Labels are
+in what the biggest winners had in common before they won. The in-sample result is the data
+they were found in, so it proves nothing; only the out-of-sample result counts. Labels are
 never removed.
 """
 next = "To avoid one, look at a clone's out-of-sample result only when you have finished tuning, and forward-test a new version before it replaces the old one."
