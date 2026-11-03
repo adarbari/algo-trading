@@ -179,8 +179,14 @@ raw vendor quote on a trader screen (a fitness test in V6 over the trader GraphQ
 **Closing audit (2026-11-02).** Every slice is merged. Deleted in the closing PR: the orphaned
 `widgets/regime-sizing`, `pages/placeholder` and the `placeholderRoute` builder (no section is
 unbuilt). `widgets/options-panel` is admin-only (the trader's Options tab is `widgets/option-grid`).
-`top-ideas`, `paused-ideas`, `ideas-heading`, `pick-detail` and `event-calendar-panel` are still
-composed by the new Ideas, Test result and Calendar pages, so they stay until regrouped. Main's CI
+The five old widgets the new pages still composed are regrouped and deleted (2026-11-03): Ideas'
+`ideas-heading`, `paused-ideas` and `top-ideas` into `widgets/setup-ideas` (`IdeasHeading`,
+`PausedPicks`, `UnprovenMatches`: the tab's Unproven section); `pick-detail` into
+`widgets/feature-table` (`ScreenerResults` shows the pick under review itself, one
+`PickActions` for the detail and the phone sheet); `event-calendar-panel` into
+`pages/trader-calendar` beside Earnings week (`EventsAhead`, `MacroDays`, one `GapNotes`).
+Left: V8c (the `calendar_week` filter surface, due 2026-11-08) and the roadmap's "Ideas list on
+the feature table" (the Unproven columns need the ideas read to serve feature-table rows). Main's CI
 (web static, performance budgets, e2e) is green, so no route budget is over. The raw-quote
 fitness test (`test_trader_option_figures.py`) reads every named web operation. `/admin/users`
 keeps a Guide exemption (no start page yet).

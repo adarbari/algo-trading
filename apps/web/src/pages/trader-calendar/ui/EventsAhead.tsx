@@ -1,15 +1,17 @@
 /**
- * Calendar: the next 90 days of events across names, days against names, the expiry Fridays
+ * Next 90 days: the events of the coming 90 days of events across names, days against names, the expiry Fridays
  * ruled. The names are the site's scope list or the picks of a chosen screener's latest run;
  * what a cell, a Market column entry or a gap says is the API's.
  */
-import { CalendarGrid, Banner, Panel, Stack, Text } from '@algotrade/ui';
+import { Banner, CalendarGrid, Panel, Stack, Text } from '@algotrade/ui';
 import { useMemo } from 'react';
 
 import { calendarDays, gapLines, useEventCalendar } from '@/entities/event';
 import { CalendarSourcePicker, useCalendarSource } from '@/features/calendar-source';
 
-export function EventCalendarPanel() {
+import { GapNotes } from './GapNotes';
+
+export function EventsAhead() {
   const source = useCalendarSource();
   const calendar = useEventCalendar(source.ids, source.scope, source.ready);
   const grid = useMemo(() => (calendar.data ? calendarDays(calendar.data) : null), [calendar.data]);
@@ -35,17 +37,7 @@ export function EventCalendarPanel() {
     >
       <Stack gap={3}>
         {source.message !== null && <Banner tone="info">{source.message}</Banner>}
-        {gaps.length > 0 && (
-          <Banner tone="info" title="Not known for this session">
-            <Stack gap={0.5}>
-              {gaps.map((line) => (
-                <Text key={line} size="sm">
-                  {line}
-                </Text>
-              ))}
-            </Stack>
-          </Banner>
-        )}
+        <GapNotes lines={gaps} />
         {missing.length > 0 && (
           <Banner tone="info" title="Not in the session's snapshot">
             <Text size="sm">{missing.join(', ')}</Text>

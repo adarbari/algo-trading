@@ -14,7 +14,6 @@ import { ScreenerDescription, useMyScreeners, useScreenerRuns } from '@/entities
 import { ScreenerEdgeLine } from '@/widgets/screener-edge-line';
 import { ScreenerRunLine } from '@/widgets/screener-run-line';
 import { ScreenerResults } from '@/widgets/feature-table';
-import { PickDetail } from '@/widgets/pick-detail';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 
 import { TestSteps } from './TestSteps';
@@ -126,24 +125,8 @@ export function TestResultPage({
         onShowDismissed={() => {
           setDismissed(new Set());
         }}
-        renderDetail={({ row, criteria, inSheet }) => (
-          <Stack gap={3}>
-            <PickDetail
-              row={row}
-              screenerId={id}
-              criteria={criteria}
-              compared={compared.includes(row.symbol)}
-              showActions={!inSheet}
-              onOpen={onOpenTicker}
-              onToggleCompare={() => {
-                toggle(row.symbol);
-              }}
-              onDismiss={() => {
-                hide(row.instrumentId);
-              }}
-            />
-            <PriceChartPanel symbol={row.symbol} range={range} onRangeChange={setRange} />
-          </Stack>
+        renderBesidePick={(row) => (
+          <PriceChartPanel symbol={row.symbol} range={range} onRangeChange={setRange} />
         )}
       />
     </Stack>

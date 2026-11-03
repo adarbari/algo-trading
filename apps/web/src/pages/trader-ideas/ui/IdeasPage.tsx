@@ -4,16 +4,20 @@
  */
 import { Stack } from '@algotrade/ui';
 import type { IdeaCompareSearch } from '@/features/idea-compare';
-import { IdeasHeading } from '@/widgets/ideas-heading';
-import { SetupIdeas } from '@/widgets/setup-ideas';
-import { PausedIdeas } from '@/widgets/paused-ideas';
 import { RegimeStrip } from '@/widgets/regime-strip';
-import { TopIdeas, type TopIdeasSearch, type TopIdeasSearchPatch } from '@/widgets/top-ideas';
+import {
+  IdeasHeading,
+  PausedPicks,
+  SetupIdeas,
+  UnprovenMatches,
+  type UnprovenSearch,
+  type UnprovenSearchPatch,
+} from '@/widgets/setup-ideas';
 
 export interface IdeasPageProps {
   /** The column set and the filters in force (the URL's search params). */
-  search: TopIdeasSearch;
-  onSearchChange: (patch: TopIdeasSearchPatch) => void;
+  search: UnprovenSearch;
+  onSearchChange: (patch: UnprovenSearchPatch) => void;
   /** Open the chosen tickers in Explore as a compare set. */
   onCompare: (search: IdeaCompareSearch) => void;
   /** Open one ticker in Explore, with the screener (config id) that surfaced it. */
@@ -62,8 +66,8 @@ export function IdeasPage({
         onOpenSettings={onOpenSettings}
         unproven={
           <Stack gap={3}>
-            <PausedIdeas tab={tab} onOpen={onOpen} onOpenScreener={onOpenScreener} />
-            <TopIdeas
+            <PausedPicks tab={tab} onOpen={onOpen} onOpenScreener={onOpenScreener} />
+            <UnprovenMatches
               tab={tab}
               search={search}
               onSearchChange={onSearchChange}

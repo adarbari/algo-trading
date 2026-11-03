@@ -1,5 +1,5 @@
 /**
- * The top-ideas table's columns, in two sets chosen by the page's `columns` search param. Stocks
+ * The Unproven matches table's columns, in two sets chosen by the page's `columns` search param. Stocks
  * (default): rank, ticker, who picked it, decision (the badge over the criteria it comes from),
  * score, size, price and the watch-outs (flags, then the near-miss reasons). Options: rank, ticker,
  * decision, score, who picked it, then the served facts for the

@@ -1,5 +1,5 @@
 /**
- * One pick of a screener's results, beside the table: the ticker with its decision and score, why
+ * One pick of a screener's results, the detail `ScreenerResults` shows beside its table: the ticker with its decision and score, why
  * it is not simply qualified (a pick the regime gate paused says so, with the rule that did),
  * its criteria scorecard (value, rule, outcome), and the review actions (open in Explore, add to the compare set,
  * dismiss) with their keys. The chart and anything else about the ticker is composed beside it.
@@ -63,6 +63,43 @@ function placeText(edge: PickEdge): string | null {
   return edge.topK
     ? `place ${String(edge.place)} of the top ${String(edge.topK)}`
     : `place ${String(edge.place)}, every qualified name counts`;
+}
+
+type PickActionsProps = Pick<
+  PickDetailProps,
+  'compared' | 'onOpen' | 'onToggleCompare' | 'onDismiss'
+> & { symbol: string };
+
+/** The review actions on one pick: drawn in the detail on a desktop, pinned in the sheet's footer on a phone. */
+export function PickActions({
+  symbol,
+  compared,
+  onOpen,
+  onToggleCompare,
+  onDismiss,
+}: PickActionsProps) {
+  return (
+    <ActionGroup
+      label="Pick actions"
+      actions={[
+        {
+          id: 'open',
+          label: 'Open in Explore',
+          icon: 'external',
+          onClick: () => {
+            onOpen(symbol);
+          },
+        },
+        {
+          id: 'compare',
+          label: compared ? 'Remove from compare' : 'Add to compare',
+          icon: compared ? 'minus' : 'plus',
+          onClick: onToggleCompare,
+        },
+        { id: 'dismiss', label: 'Dismiss', icon: 'close', variant: 'ghost', onClick: onDismiss },
+      ]}
+    />
+  );
 }
 
 export function PickDetail({
@@ -146,31 +183,12 @@ export function PickDetail({
           </Stack>
         ) : null}
         {showActions ? (
-          <ActionGroup
-            label="Pick actions"
-            actions={[
-              {
-                id: 'open',
-                label: 'Open in Explore',
-                icon: 'external',
-                onClick: () => {
-                  onOpen(symbol);
-                },
-              },
-              {
-                id: 'compare',
-                label: compared ? 'Remove from compare' : 'Add to compare',
-                icon: compared ? 'minus' : 'plus',
-                onClick: onToggleCompare,
-              },
-              {
-                id: 'dismiss',
-                label: 'Dismiss',
-                icon: 'close',
-                variant: 'ghost',
-                onClick: onDismiss,
-              },
-            ]}
+          <PickActions
+            symbol={symbol}
+            compared={compared}
+            onOpen={onOpen}
+            onToggleCompare={onToggleCompare}
+            onDismiss={onDismiss}
           />
         ) : null}
         <KeyHints hints={KEY_HINTS} />
