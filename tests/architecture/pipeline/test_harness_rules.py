@@ -145,3 +145,15 @@ def test_the_release_skill_names_the_auto_merge_nudge() -> None:
     skill = (REPO / ".claude/skills/review-and-release/SKILL.md").read_text()
     assert "gh workflow run auto-merge.yml" in skill
     assert "workflow_dispatch" in (REPO / ".github/workflows/auto-merge.yml").read_text()
+
+
+def test_the_status_log_is_union_merged_and_every_line_names_its_track() -> None:
+    """Slice PRs append to docs/status/log.md instead of editing shared roadmap rows (2026-11-02:
+    the options and Event sensitivity rows conflicted on every merge); `union` keeps both sides."""
+    attributes = (REPO / ".gitattributes").read_text().splitlines()
+    assert "docs/status/log.md merge=union" in attributes
+    lines = (REPO / "docs" / "status" / "log.md").read_text().splitlines()
+    entries = [ln for ln in lines if ln.startswith("- ")]
+    assert entries, "the log has no entries"
+    bad = [ln[:60] for ln in entries if not re.match(r"- \[[a-z0-9-]+\] \S", ln)]
+    assert not bad, f"a status line is `- [track] text`: {bad}"

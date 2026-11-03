@@ -254,6 +254,10 @@ purpose = "the decision log: product-direction and policy decisions, by the owne
 kind = "log"
 
 [[docs_dir]]
+path = "docs/status"
+purpose = "the append-only status log of every track (log.md, one `- [track] text` line per slice, union-merged): slice PRs append here instead of editing shared roadmap rows"
+
+[[docs_dir]]
 path = "docs/options"
 purpose = "the options-setups backend plan: the design behind ADR 0088 (share and option setups as positions and rules), its entities, stores and build slices E0 to E16"
 
