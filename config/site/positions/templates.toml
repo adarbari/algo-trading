@@ -61,3 +61,13 @@ legs = [
   { kind = "option", right = "C", qty = 1, strike = "otm_pct", otm_pct = 0.05 },
 ]
 collateral = "max_loss"
+
+# Bought at-the-money straddle (X6: c13, c16): both legs long, so the capital is the premium paid, which is
+# the position's worst case (max_loss).
+[[template]]
+id = "long_straddle"
+legs = [
+  { kind = "option", right = "P", qty = 1, strike = "atm" },
+  { kind = "option", right = "C", qty = 1, strike = "atm" },
+]
+collateral = "max_loss"

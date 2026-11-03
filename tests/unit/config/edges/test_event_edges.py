@@ -80,13 +80,13 @@ E4_OPTION = (
 E4_FUNDS = ("closed_end_fund_discounts", "cef_distribution_trap", "etf_flow_pressure")
 E4 = (*E4_OPTION, *E4_FUNDS)
 RETIRED = (
+    "c12_vrp_cross_section_iv_hv", "c13_iv_term_structure_straddles",
+    "c14_delta_hedged_characteristics", "c16_pre_earnings_straddle_buy",  # X6
     "c17_earnings_iv_crush_sell",  # re-filed as c17_earnings_straddle_sell (ADR 0088, X5)
     "c18_iv_rank_conditional_selling",  # re-filed as setups (ADR 0088, X2 / X3)
-)
+)  # fmt: skip
 E4_EDGES = {e.id: e for e in load_edges(STORE) if e.id in E4}
 BLOCKED = {
-    "c13_iv_term_structure_straddles": "no history",
-    "c16_pre_earnings_straddle_buy": "tenor_sessions",
     "cef_distribution_trap": "earned-income split",
 }  # the keyword each blocked document's reason names
 
@@ -350,6 +350,34 @@ def test_the_earnings_edges_keep_their_event_fields_beside_the_reaction_session_
         assert (spec.count, spec.date, spec.sign, spec.announced_ahead) == EARNINGS_EDGES[
             edge.schedule
         ]
+
+
+X6 = {  # new id: (old id, position template, waits on)
+    "c12_vrp_straddle_ranked": ("c12_vrp_cross_section_iv_hv", "short_straddle", "F7"),
+    "c13_term_slope_straddle_buy": ("c13_iv_term_structure_straddles", "long_straddle", "F7"),
+    "c14_speculative_straddle_sell": ("c14_delta_hedged_characteristics", "short_straddle", "E5"),
+    "c16_pre_earnings_cheap_straddle_buy": (
+        "c16_pre_earnings_straddle_buy", "long_straddle", "F7",
+    ),
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("new", X6)
+def test_an_x6_setup_is_blocked_on_the_history_and_its_old_version_retired(new: str) -> None:
+    """X6 (ADR 0088): each re-filed edge is an option_pnl position, blocked with the E5 / F7 import
+    named, from 2018 with the 3-month holdout, and its old version retired and pointing at it."""
+    edges = {e.id: e for e in load_edges(STORE)}
+    old, template, _ = X6[new]
+    edge = edges[new]
+    assert edge.status == "blocked" and "E5" in edge.rejection_reason
+    assert "F7" in edge.rejection_reason or new.startswith("c14")
+    assert edge.outcome.kind == "option_pnl" and edge.outcome.position.template == template  # type: ignore[union-attr]
+    assert str(edge.frozen_from) == "2018-01-01" and str(edge.holdout_from) == "2026-10-26"
+    assert edges[old].status == "retired" and new in edges[old].rejection_reason
+    if edge.schedule.startswith("on_event:"):  # entered before the report: before-open names only
+        assert (
+            edge.schedule == "on_event:earnings_expected" and edge.outcome.start_offset_sessions < 0
+        )
 
 
 def test_the_conditional_earnings_sale_waits_on_the_history_and_pauses_in_stress() -> None:
